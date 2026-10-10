@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
 # @dependency-start
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
 # upstream design ../../../README.md shared automation index
+# upstream implementation ../values.py refines decoded command payloads
 # @dependency-end
 
 """Bootstrap a persistent agent-team run directory."""
@@ -25,31 +25,37 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-except ImportError:  # direct script/module execution
-    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
-        runtime_artifact_boundary,
-    )
-
-from tools.runtime.authority.writer_target import WriterTargetError, parse_writer_target
-
-from tools.runtime.source.agent_canon_source_root import resolve_agent_canon_source_root
-
+from tools.agent.orchestration.agent_team import (
+    PreparedRunBundle,
+    dispatch_issue_worker,
+    prepare_run_bundle,
+)
+from tools.agent.orchestration.implementation_dispatch import (
+    capacity_start_output_lines,
+    codex_runtime_max_depth,
+    codex_runtime_max_threads,
+    format_agent_type_selections,
+    parse_agent_type_selections,
+    recommended_dynamic_expansion_wave_slots,
+    recommended_dynamic_expansion_waves,
+    recommended_initial_subagent_wave_slots,
+    validate_agent_type_selections,
+    workflow_spawn_budget,
+)
 from tools.agent.orchestration.packets import (
     ACTIVE_DESIGN_PACKET_SCHEMA,
-    ActiveDesignPacketConfig,
     MATHEMATICAL_INTENT_PACKET_SCHEMA,
+    ActiveDesignPacketConfig,
     MathematicalIntentPacket,
+    math_intent_route_id_from_context,
     mathematical_intent_route_config,
     mathematical_intent_route_for_task,
-    math_intent_route_id_from_context,
     normalize_mathematical_intent_packet,
     parse_active_design_packet_input,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
 )
-
+from tools.runtime.values import is_string_object_dict, is_string_object_mapping
 from tools.agent.orchestration.team_config import (
     AgentTypeSelection,
     Role,
@@ -71,10 +77,33 @@ from tools.agent.orchestration.team_config import (
     task_ids,
     workflow_child_handoff_required,
 )
-
+from tools.agent.orchestration.workflow_context import (
+    StoreResult,
+    context_from_workflows,
+    store_workflow_context,
+)
+from tools.repository.workspace.workspace_scope import (
+    make_run_id,
+    resolve_report_root,
+    resolve_repository_roots,
+)
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactBoundary,
+    runtime_artifact_boundary,
+)
+from tools.runtime.authority.task_authority import (
+    AUTHORITY_FILE_NAME,
+    hash_baseline_bytes,
+)
+from tools.runtime.authority.writer_target import (
+    WriterTarget,
+    WriterTargetError,
+    parse_writer_target,
+)
+from tools.runtime.lifecycle.workflow_monitor import append_monitoring
 from tools.runtime.manifest.manifest_rendering import (
-    contract_complete_implementation_policy_output_lines,
     checkout_identity_policy_output_lines,
+    contract_complete_implementation_policy_output_lines,
     coordination_capability_policy_output_lines,
     default_quality_check_policy_output_lines,
     format_subagent_role_instance_wave_chunks,
@@ -92,41 +121,10 @@ from tools.runtime.manifest.manifest_rendering import (
     user_facing_language_policy_output_lines,
     writer_target_policy_output_lines,
 )
-
-from tools.agent.orchestration.implementation_dispatch import (
-    capacity_start_output_lines,
-    codex_runtime_max_depth,
-    codex_runtime_max_threads,
-    format_agent_type_selections,
-    parse_agent_type_selections,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_dynamic_expansion_waves,
-    recommended_initial_subagent_wave_slots,
-    validate_agent_type_selections,
-    workflow_spawn_budget,
+from tools.runtime.source.agent_canon_source_root import (
+    RepositoryRoots,
+    resolve_agent_canon_source_root,
 )
-
-from tools.agent.orchestration.agent_team import (
-    PreparedRunBundle,
-    dispatch_issue_worker,
-    prepare_run_bundle,
-)
-from tools.agent.orchestration.workflow_context import (
-    StoreResult,
-    context_from_workflows,
-    store_workflow_context,
-)
-
-from tools.repository.workspace.workspace_scope import (
-    make_run_id,
-    resolve_report_root,
-    resolve_repository_roots,
-)
-from tools.runtime.authority.task_authority import (
-    AUTHORITY_FILE_NAME,
-    hash_baseline_bytes,
-)
-from tools.runtime.lifecycle.workflow_monitor import append_monitoring
 
 
 @dataclass(frozen=True)
@@ -149,7 +147,7 @@ class BootstrapRunContext:
     adversarial_required: bool = False
     math_intent_route: str | None = None
     issue_worker_candidate: Mapping[str, object] | None = None
-    repository_roots: object | None = None
+    repository_roots: RepositoryRoots | None = None
 
 
 @dataclass(frozen=True)
@@ -370,7 +368,7 @@ def parse_issue_worker_candidate(value: str | None) -> Mapping[str, object] | No
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise RuntimeError("issue_worker_candidate:invalid_json") from exc
-    if not isinstance(parsed, dict) or not parsed:
+    if not is_string_object_dict(parsed) or not parsed:
         raise RuntimeError("issue_worker_candidate:must_be_nonempty_object")
     return parsed
 
@@ -383,7 +381,7 @@ def parse_math_intent_packet_input(value: str | None) -> Mapping[str, object] | 
         parsed = json.loads(value)
     except json.JSONDecodeError as exc:
         raise RuntimeError("mathematical_intent_packet:invalid_json") from exc
-    if not isinstance(parsed, dict) or not parsed:
+    if not is_string_object_dict(parsed) or not parsed:
         raise RuntimeError("mathematical_intent_packet:must_be_nonempty_object")
     return parsed
 
@@ -393,7 +391,7 @@ def resolve_bootstrap_context(
     config: TeamConfig,
     catalog: TaskCatalog,
     workspace_root: Path,
-    repository_roots: object | None = None,
+    repository_roots: RepositoryRoots | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
@@ -552,15 +550,14 @@ def emit_bootstrap_output(
     context: BootstrapRunContext,
     workspace_root: Path,
     runtime: BootstrapRuntime,
-    writer_targets: Mapping[str, object] | None = None,
+    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
+    | None = None,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
     repository_roots = context.repository_roots
     if repository_roots is None:
         raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
-    source_root = getattr(repository_roots, "agentcanon_source_root", None)
-    if source_root is None:
-        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    source_root = repository_roots.agentcanon_source_root
     selected_skills = suggested_skills(
         args.task_id,
         context.workflow_family_id,
@@ -616,6 +613,8 @@ def emit_bootstrap_output(
         math_route_config = mathematical_intent_route_config(
             catalog, context.math_intent_route
         )
+        if math_route_config is None:
+            raise RuntimeError("mathematical_intent_route:catalog_record_missing")
         print(f"MATH_INTENT_ROUTE_ID={context.math_intent_route}")
         print(f"MATH_INTENT_REVIEWER={math_route_config.get('reviewer', 'unknown')}")
         print("MATH_INTENT_PACKET=present")
@@ -653,13 +652,13 @@ def emit_bootstrap_output(
                 dispatch_status = runtime.issue_worker_dispatch.get("status", "unknown")
                 print(f"ISSUE_WORKER_DISPATCH_STATUS={dispatch_status}")
                 tool_call = runtime.issue_worker_dispatch.get("tool_call")
-                if isinstance(tool_call, Mapping):
+                if is_string_object_mapping(tool_call):
                     print(
                         "ISSUE_WORKER_TOOL_CALL="
                         + json.dumps(dict(tool_call), sort_keys=True)
                     )
                 spawn_tool_call = runtime.issue_worker_dispatch.get("spawn_tool_call")
-                if isinstance(spawn_tool_call, Mapping):
+                if is_string_object_mapping(spawn_tool_call):
                     print(
                         "ISSUE_WORKER_SPAWN_TOOL_CALL="
                         + json.dumps(dict(spawn_tool_call), sort_keys=True)
@@ -899,7 +898,7 @@ def _read_optional_bytes(path: Path) -> bytes | None:
 
 
 def _restore_runtime_file(
-    boundary: object,
+    boundary: RuntimeArtifactBoundary,
     path: Path,
     prior: bytes | None,
     purpose: str,
@@ -907,7 +906,7 @@ def _restore_runtime_file(
     """Restore one captured runtime file without touching source state."""
     del purpose
     if prior is not None:
-        boundary.atomic_write_bytes(path, prior)  # type: ignore[attr-defined]
+        boundary.atomic_write_bytes(path, prior)
         return
     if not path.exists():
         return
@@ -924,8 +923,11 @@ def publish_prepared_run(
     report_root = report_root.resolve(strict=False)
     configured_runtime = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip() or None
     runtime_base = configured_runtime or report_root.parent
+    source_root = spec.agentcanon_source_root
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     boundary = runtime_artifact_boundary(
-        spec.agentcanon_source_root,
+        source_root,
         runtime_base,
         create=True,
     )
@@ -945,7 +947,7 @@ def publish_prepared_run(
         pointer_baseline: _read_optional_bytes(pointer_baseline),
         authority_baseline: _read_optional_bytes(authority_baseline),
     }
-    prior_children = (
+    prior_children: set[str] = (
         {child.name for child in report_root.iterdir()}
         if report_root.is_dir()
         else set()
@@ -1018,7 +1020,7 @@ def publish_prepared_run(
                     prior,
                     "bootstrap-publish-rollback",
                 )
-            observed_children = (
+            observed_children: set[str] = (
                 {child.name for child in report_root.iterdir()}
                 if report_root.is_dir()
                 else set()
@@ -1101,15 +1103,15 @@ def main(
         print(str(exc), flush=True)
         return 2
     try:
-        writer_targets: dict[str, object] = {}
+        writer_targets: dict[str, WriterTarget] = {}
         if args.writer_targets:
             parsed_targets = json.loads(args.writer_targets)
-            if not isinstance(parsed_targets, dict):
+            if not is_string_object_dict(parsed_targets):
                 raise WriterTargetError("writer_targets:must_be_mapping")
-            writer_targets = {
-                str(owner): parse_writer_target(target)
-                for owner, target in parsed_targets.items()
-            }
+            for owner, target in parsed_targets.items():
+                if not is_string_object_mapping(target):
+                    raise WriterTargetError("writer_targets:owner_target_must_be_mapping")
+                writer_targets[owner] = parse_writer_target(target)
     except (TypeError, json.JSONDecodeError, WriterTargetError) as exc:
         print(str(exc), flush=True)
         return 2
@@ -1178,10 +1180,7 @@ def main(
                 workspace_root=workspace_root,
                 agentcanon_source_root=repository_roots.agentcanon_source_root,
             )
-            as_dict = getattr(dispatched, "as_dict", None)
-            if not callable(as_dict):
-                raise RuntimeError("issue_worker_dispatch:projection_missing")
-            issue_worker_dispatch = as_dict()
+            issue_worker_dispatch = dispatched.as_dict()
         except (RuntimeError, OSError) as exc:
             print(str(exc), flush=True)
             return 1

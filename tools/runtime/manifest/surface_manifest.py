@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,11 +28,6 @@ from typing import cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
 
 try:
     from tools.agent.skills.skill_projection_registry import (
@@ -47,10 +43,16 @@ except ImportError:  # pragma: no cover - direct script execution
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
 NORMALIZED_SNAPSHOT_SCHEMA = "agent-canon.surface-manifest.v2"
-MANIFEST_COMMANDS = frozenset({"normalized-snapshot", "check-doc", "projection-forbidden-roots"})
+MANIFEST_COMMANDS = frozenset(
+    {"normalized-snapshot", "check-doc", "projection-forbidden-roots"}
+)
 ALLOWED_MODES = frozenset({"runtime", "tool", "eval"})
-ALLOWED_PROJECTION_PRODUCERS = frozenset({"agent-canon", "agent-canon-bootstrap", "agent-canon-log"})
-ALLOWED_PROJECTION_KINDS = frozenset({"runtime_surface", "tool_surface", "eval_surface"})
+ALLOWED_PROJECTION_PRODUCERS = frozenset(
+    {"agent-canon", "agent-canon-bootstrap", "agent-canon-log"}
+)
+ALLOWED_PROJECTION_KINDS = frozenset(
+    {"runtime_surface", "tool_surface", "eval_surface"}
+)
 DOC_MARKERS = (
     "bootstrap runtime",
     "standalone",
@@ -111,7 +113,13 @@ class SurfaceManifest:
         return tuple(entry for entry in self.entries if entry.mode == mode)
 
 
-def _string(mapping: Mapping[str, object], key: str, *, required: bool = False, default: str = "") -> str:
+def _string(
+    mapping: Mapping[str, object],
+    key: str,
+    *,
+    required: bool = False,
+    default: str = "",
+) -> str:
     value = mapping.get(key, default)
     if required and key not in mapping:
         raise ValueError(f"{key} is required")
@@ -129,7 +137,13 @@ def _bool(mapping: Mapping[str, object], key: str, default: bool) -> bool:
 
 def _relative(value: str, field: str) -> str:
     path = Path(value)
-    if not value or path.is_absolute() or "\\" in value or ".." in path.parts or path.as_posix() != value:
+    if (
+        not value
+        or path.is_absolute()
+        or "\\" in value
+        or ".." in path.parts
+        or path.as_posix() != value
+    ):
         raise ValueError(f"{field} must be a normalized repository-relative POSIX path")
     return value
 
@@ -172,7 +186,15 @@ def _entry(mapping: Mapping[str, object]) -> SurfaceEntry:
     source = _string(mapping, "source")
     if source:
         source = _relative(source, f"{path}: source")
-    return SurfaceEntry(path, mode, producer, kind, source, _bool(mapping, "local_override_allowed", False), _bool(mapping, "optional", False))
+    return SurfaceEntry(
+        path,
+        mode,
+        producer,
+        kind,
+        source,
+        _bool(mapping, "local_override_allowed", False),
+        _bool(mapping, "optional", False),
+    )
 
 
 def _selection(data: Mapping[str, object]) -> SurfaceSelection:
@@ -248,7 +270,11 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     candidates = (root / prefix / DEFAULT_DOC, root / DEFAULT_DOC)
     path = next((item for item in candidates if item.is_file()), candidates[-1])
     text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    findings = [f"SURFACE_MANIFEST_FINDING={marker}:missing-doc-marker" for marker in DOC_MARKERS if marker not in text]
+    findings = [
+        f"SURFACE_MANIFEST_FINDING={marker}:missing-doc-marker"
+        for marker in DOC_MARKERS
+        if marker not in text
+    ]
     if not manifest.entries:
         findings.append("SURFACE_MANIFEST_FINDING=runtime-inventory:empty-manifest")
     return findings
@@ -274,7 +300,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"SURFACE_MANIFEST_ERROR={error}", file=__import__("sys").stderr)
         return 1
     if args.command == "normalized-snapshot":
-        print(json.dumps(normalized_snapshot(manifest), ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        print(
+            json.dumps(
+                normalized_snapshot(manifest),
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
     elif args.command == "projection-forbidden-roots":
         print("\n".join(manifest.projection_forbidden_roots))
     else:
