@@ -540,7 +540,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
             checker.write_text(
                 checker.read_text(encoding="utf-8").replace(
-                    "# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagents\n",
+                    "# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagents\n",
                     "",
                 ),
                 encoding="utf-8",
