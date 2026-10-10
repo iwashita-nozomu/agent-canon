@@ -1129,8 +1129,7 @@ def test_linked_reuse_preserves_owned_dirty_wip_and_branch_in_use(
     )
     assert run_git(reused_dirty.clone, "rev-parse", "HEAD") == before_head
     assert (
-        run_git(reused_dirty.clone, "symbolic-ref", "--short", "HEAD")
-        == before_branch
+        run_git(reused_dirty.clone, "symbolic-ref", "--short", "HEAD") == before_branch
     )
 
 
