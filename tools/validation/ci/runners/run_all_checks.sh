@@ -4,9 +4,7 @@
 # responsibility Runs all checks CI automation.
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external CI state and exact cleanup
-# upstream implementation ../../semantic/code/check_static_any.py rejects explicit Python Any usage
-# upstream implementation ../../semantic/logging/check_log_helper_names.py validates log helper naming
-# upstream implementation ../../../analysis/code/import_responsibility.py validates import ownership boundaries
+# upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
 # upstream implementation ../../notebooks/notebook_quality.py validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
@@ -31,7 +29,7 @@ set -euo pipefail
 #
 # 用途: agent/runtime, eval accumulation, Rust,
 #       GitHub workflow, container config, documentation, experiment registry,
-#       pytest, pyright, and ruff checks を一括実行します。
+#       pytest, BasedPyright, and ruff checks を一括実行します。
 #       普段の変更では Makefile の check-matrix から対象 profile を選び、
 #       この script は full confidence gate として使います。
 #
@@ -373,24 +371,6 @@ if "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/smoke_test_research_perspectiv
   echo "✅ research perspective pack smoke test 成功"
 else
   echo "❌ research perspective pack smoke test 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/code/check_static_any.py" 2>&1; then
-  echo "✅ explicit Any static checks 成功"
-else
-  echo "❌ explicit Any static checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/logging/check_log_helper_names.py" --changed --exclude reports 2>&1; then
-  echo "✅ log helper naming checks 成功"
-else
-  echo "❌ log helper naming checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/code/import_responsibility.py" --changed 2>&1; then
-  echo "✅ import responsibility checks 成功"
-else
-  echo "❌ import responsibility checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebook_quality.py" --all 2>&1; then

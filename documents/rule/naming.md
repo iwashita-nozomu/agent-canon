@@ -4,7 +4,6 @@ contract policy
 responsibility Documents 文書および識別子の命名規約。
 upstream design ./README.md document rule canon index
 downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py convention validation
-downstream implementation ../../tools/validation/semantic/logging/check_log_helper_names.py log helper naming validation
 @dependency-end
 -->
 
@@ -44,7 +43,6 @@ filename を `agent-canon-naming-rules.md` にして repository と親 directory
 - 公開 API や単体配布 artifact では、利用者に見えない repository/branch/path を省略の根拠にしません。衝突回避に必要な区別と外部固定名は保持します。
 - proof や generated artifact は探索手順ではなく、対象 theorem profile、public root、projection などの安定した対象を表します。
 - Python helper / local function は、`helper_function_inventory.py` が推定する role と整合する action token を含めます。
-- Python のログ用 helper 関数は [documents/conventions/coding-conventions-logging.md](../conventions/coding-conventions-logging.md) に従い、`_log` から始めます。
 
 ## 命名計画
 
@@ -62,9 +60,3 @@ filename を `agent-canon-naming-rules.md` にして repository と親 directory
 
 レビューでは名前と利用者に見える文脈を合わせ、上位の説明の重複と必要な区別の欠落を確認します。
 短い名前や同じ単語の反復だけを機械的な違反にしません。
-
-ログ helper の命名は、次の checker で検証します。
-
-```bash
-python3 tools/validation/semantic/logging/check_log_helper_names.py --changed --exclude vendor --exclude reports
-```

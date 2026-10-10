@@ -167,20 +167,6 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="import_responsibility",
-        tool="tools/analysis/code/import_responsibility.py",
-        links=(
-            LinkCheck("responsibility-scope.toml"),
-            LinkCheck("documents/design/responsibility-scope-management.md"),
-            LinkCheck("documents/conventions/coding-conventions-python.md"),
-            LinkCheck("tools/catalog.yaml"),
-            LinkCheck("tools/README.md"),
-            LinkCheck("documents/tools/README.md"),
-            LinkCheck("tools/validation/ci/runners/run_all_checks.sh"),
-            LinkCheck("tests/agent_tools/test_import_responsibility.py"),
-        ),
-    ),
-    ToolContract(
         name="tool_rejection_preflight",
         tool="tools/validation/semantic/tools/tool_rejection_preflight.py",
         links=(

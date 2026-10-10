@@ -102,7 +102,6 @@ AREA_DATA: tuple[AreaData, ...] = (
         (
             "python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json",
             "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json",
-            "python3 tools/analysis/code/import_responsibility.py --root <root> --format json",
         ),
         (
             "structure-refactor",

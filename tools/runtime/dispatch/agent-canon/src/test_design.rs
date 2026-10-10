@@ -663,14 +663,12 @@ fn contains_static_analysis_command(text_lower: &str) -> bool {
         "shellcheck",
         "cargo check",
         "cargo clippy",
-        "check_static_any.py",
         "check_dependency_headers.py",
         "scan_dependency_headers.sh",
         "check_dependency_header_format.sh",
         "check_convention_compliance.py",
         "repo_structure_contract.py",
         "responsibility_scope.py",
-        "import_responsibility.py",
         "agent-canon docs check",
         "agent-canon test-design check",
     ]
@@ -1046,7 +1044,7 @@ mod tests {
     fn allows_static_checker_behavior_contract_tests() {
         let file = ScannedFile {
             path: PathBuf::from("/repo/tests/test_static_checker.py"),
-            text: "def test_static_checker_reports_bad_input(tmp_path):\n    source = tmp_path / 'bad.py'\n    source.write_text('x: Any = 1')\n    result = subprocess.run(['python3', 'tools/validation/semantic/code/check_static_any.py', str(source)], capture_output=True, text=True)\n    assert 'STATIC_ANY=fail' in result.stdout\n".to_string(),
+            text: "def test_static_checker_reports_bad_input(tmp_path):\n    source = tmp_path / 'bad.py'\n    source.write_text('x: Any = 1')\n    result = subprocess.run(['basedpyright', '--project', 'tools/validation/code/config/basedpyright-explicit-any.json', str(source)], capture_output=True, text=True)\n    assert 'reportExplicitAny' in result.stdout\n".to_string(),
         };
 
         let findings = analyze_test_file(Path::new("/repo"), &file);

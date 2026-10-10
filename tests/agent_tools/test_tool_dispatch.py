@@ -41,9 +41,14 @@ class ToolDispatchTest(unittest.TestCase):
             self.assertIsInstance(spec.argv, tuple)
             self.assertTrue(spec.argv)
             self.assertEqual(spec.execution_plane, "tool-container")
-            self.assertIn(spec.cwd_policy, {"source-root", "target-root", "task-root", "explicit"})
+            self.assertIn(
+                spec.cwd_policy, {"source-root", "target-root", "task-root", "explicit"}
+            )
             self.assertIn(spec.env_policy, {"allowlisted", "clean"})
-            self.assertIn(spec.side_effect_policy, {"read-only", "external-artifact", "explicit-target-write"})
+            self.assertIn(
+                spec.side_effect_policy,
+                {"read-only", "external-artifact", "explicit-target-write"},
+            )
             self.assertTrue(spec.parity_fixture)
         self.assertEqual(specs["rust-docs"].argv[:2], ("tools/bin/agent-canon", "docs"))
         self.assertEqual(specs["rust-python-module-groups-check"].runtime, "rust")
@@ -60,7 +65,6 @@ class ToolDispatchTest(unittest.TestCase):
         """A Python entry documented as a Rust adapter is not auto-cut over."""
         specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
         self.assertEqual(specs["graph-client"].parity, "legacy")
-        self.assertEqual(specs["pydocstyle-review"].parity, "legacy")
 
     def test_catalog_does_not_default_to_verified(self) -> None:
         """Listing a command cannot silently authorize a cutover."""
@@ -78,7 +82,9 @@ class ToolDispatchTest(unittest.TestCase):
             },
         )
 
-    def test_issue_sync_uses_resident_container_and_external_receipt_route(self) -> None:
+    def test_issue_sync_uses_resident_container_and_external_receipt_route(
+        self,
+    ) -> None:
         """Issue publication receipts use the registered container tool route."""
         specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
         issue_sync = specs["issue-sync"]
@@ -95,7 +101,9 @@ class ToolDispatchTest(unittest.TestCase):
     def test_issue_sync_rejects_online_issue_lookup_on_container_route(self) -> None:
         """Online GitHub reads cannot cross the body-free receipt boundary."""
         specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "container-route-restricted"):
+        with self.assertRaisesRegex(
+            tool_dispatch.DispatchError, "container-route-restricted"
+        ):
             tool_dispatch.run_tool(
                 PROJECT_ROOT,
                 specs["issue-sync"],
@@ -218,7 +226,11 @@ class ToolDispatchTest(unittest.TestCase):
             tool_dispatch, "_run_container_spec", return_value=0
         ) as container_run:
             status = tool_dispatch._run_spec(
-                PROJECT_ROOT, spec, ("--help",), require_parity=True, container_exec=True
+                PROJECT_ROOT,
+                spec,
+                ("--help",),
+                require_parity=True,
+                container_exec=True,
             )
 
         self.assertEqual(status, 0)
@@ -228,7 +240,9 @@ class ToolDispatchTest(unittest.TestCase):
         """Dispatcher options cannot be smuggled into a child command."""
         error = io.StringIO()
         with contextlib.redirect_stderr(error):
-            status = tool_dispatch.main(("run", "--not-a-dispatch-option", "route", "--"))
+            status = tool_dispatch.main(
+                ("run", "--not-a-dispatch-option", "route", "--")
+            )
         self.assertEqual(status, 2)
         self.assertIn("unknown-option", error.getvalue())
 
@@ -261,20 +275,32 @@ class ToolDispatchTest(unittest.TestCase):
             (str(marker), "a value", "--literal"),
         )
         self.assertEqual(status, 0)
-        self.assertEqual(json.loads(marker.read_text(encoding="utf-8")), ["a value", "--literal"])
+        self.assertEqual(
+            json.loads(marker.read_text(encoding="utf-8")), ["a value", "--literal"]
+        )
 
     def test_shell_string_descriptor_is_rejected(self) -> None:
         """A string argv cannot become dispatcher authority."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": "python3 tools/echo.py", "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": "python3 tools/echo.py",
+                "parity": "verified",
+            }
         )
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "shell-string-rejected"):
+        with self.assertRaisesRegex(
+            tool_dispatch.DispatchError, "shell-string-rejected"
+        ):
             tool_dispatch.load_specs(root)
 
     def test_missing_dispatch_fails_before_execution(self) -> None:
         """An executable catalog entry must declare an explicit argv route."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            }
         )
         catalog_path = root / "tools/catalog.yaml"
         catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
@@ -286,11 +312,17 @@ class ToolDispatchTest(unittest.TestCase):
     def test_command_display_metadata_is_never_tokenized(self) -> None:
         """Shell-looking display metadata cannot alter the explicit argv route."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            }
         )
         catalog_path = root / "tools/catalog.yaml"
         catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-        catalog["entries"][0]["command"] = "python3 tools/echo.py | touch SHOULD_NOT_EXIST"
+        catalog["entries"][0]["command"] = (
+            "python3 tools/echo.py | touch SHOULD_NOT_EXIST"
+        )
         catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
         specs, _ = tool_dispatch.load_specs(root)
         self.assertEqual(specs["echo"].argv, ("python3", "tools/echo.py"))
@@ -298,7 +330,11 @@ class ToolDispatchTest(unittest.TestCase):
     def test_parity_fixture_requires_all_observed_fields(self) -> None:
         """A fixture row without measured I/O/path fields cannot cut over."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            }
         )
         fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
         payload = json.loads(fixture.read_text(encoding="utf-8"))
@@ -310,7 +346,11 @@ class ToolDispatchTest(unittest.TestCase):
     def test_parity_fixture_mismatch_is_rejected(self) -> None:
         """A stale observed route does not become an execution authority."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            }
         )
         fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
         payload = json.loads(fixture.read_text(encoding="utf-8"))
@@ -322,7 +362,11 @@ class ToolDispatchTest(unittest.TestCase):
     def test_unknown_agent_canon_environment_is_not_forwarded(self) -> None:
         """The dispatcher uses exact names, never an AGENT_CANON_* wildcard."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            }
         )
         previous = os.environ.get("AGENT_CANON_SECRET")
         os.environ["AGENT_CANON_SECRET"] = "canary"
@@ -333,7 +377,15 @@ class ToolDispatchTest(unittest.TestCase):
                 os.environ.pop("AGENT_CANON_SECRET", None)
             else:
                 os.environ["AGENT_CANON_SECRET"] = previous
-        self.assertNotIn("AGENT_CANON_SECRET", tool_dispatch._environment(root, tool_dispatch.load_specs(root)[0]["echo"], root / "control/runtime", None))
+        self.assertNotIn(
+            "AGENT_CANON_SECRET",
+            tool_dispatch._environment(
+                root,
+                tool_dispatch.load_specs(root)[0]["echo"],
+                root / "control/runtime",
+                None,
+            ),
+        )
 
     def test_container_exec_requires_authenticated_image_and_runtime(self) -> None:
         """The explicit container route executes locally only after marker checks."""
@@ -359,16 +411,28 @@ class ToolDispatchTest(unittest.TestCase):
                     "AGENT_CANON_EXECUTION_PLANE": "tool-container",
                     "AGENT_CANON_CONTAINER_USER": "agentcanon",
                     "AGENT_CANON_IMAGE_ROOT": str(image),
-                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(image / "image-dependencies"),
+                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(
+                        image / "image-dependencies"
+                    ),
                     "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
-                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
-                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
+                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:"
+                    + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
+                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
+                    + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                 }
             )
             status = tool_dispatch.main(
-                ("--container-exec", "--root", str(root), "run", "echo", "--", "a value")
+                (
+                    "--container-exec",
+                    "--root",
+                    str(root),
+                    "run",
+                    "echo",
+                    "--",
+                    "a value",
+                )
             )
             self.assertEqual(status, 0)
         finally:
@@ -397,16 +461,22 @@ class ToolDispatchTest(unittest.TestCase):
                     "AGENT_CANON_EXECUTION_PLANE": "host",
                     "AGENT_CANON_CONTAINER_USER": "agentcanon",
                     "AGENT_CANON_IMAGE_ROOT": str(_image),
-                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(_image / "image-dependencies"),
+                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(
+                        _image / "image-dependencies"
+                    ),
                     "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                 }
             )
-            with self.assertRaisesRegex(tool_dispatch.DispatchError, "container-exec-not-authorized"):
+            with self.assertRaisesRegex(
+                tool_dispatch.DispatchError, "container-exec-not-authorized"
+            ):
                 tool_dispatch._validate_container_context(root)
             os.environ["AGENT_CANON_EXECUTION_PLANE"] = "tool-container"
-            with self.assertRaisesRegex(tool_dispatch.DispatchError, "container-marker-digest-mismatch"):
+            with self.assertRaisesRegex(
+                tool_dispatch.DispatchError, "container-marker-digest-mismatch"
+            ):
                 tool_dispatch._validate_container_context(root)
         finally:
             self._restore_environment(previous)
@@ -414,7 +484,11 @@ class ToolDispatchTest(unittest.TestCase):
     def test_pending_parity_keeps_legacy_route(self) -> None:
         """An unverified entry is never cut over through the new route."""
         root = self._minimal_root(
-            dispatch={"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "pending"}
+            dispatch={
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "pending",
+            }
         )
         specs = tool_dispatch.load_specs(root)[0]
         with self.assertRaisesRegex(tool_dispatch.DispatchError, "legacy-route"):
@@ -433,9 +507,19 @@ class ToolDispatchTest(unittest.TestCase):
                     self._entry("echo"),
                 ]
             )
-            (root / "tools/catalog.yaml").write_text(yaml.safe_dump(catalog), encoding="utf-8")
-            (root / "tests/fixtures/tool_dispatch/public-command-parity.json").write_text(
-                json.dumps({"schema": "agent-canon-tool-parity/v1", "version": 1, "entries": [{"id": "echo"}]}),
+            (root / "tools/catalog.yaml").write_text(
+                yaml.safe_dump(catalog), encoding="utf-8"
+            )
+            (
+                root / "tests/fixtures/tool_dispatch/public-command-parity.json"
+            ).write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon-tool-parity/v1",
+                        "version": 1,
+                        "entries": [{"id": "echo"}],
+                    }
+                ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(tool_dispatch.DispatchError, "duplicate-id"):
@@ -457,7 +541,12 @@ class ToolDispatchTest(unittest.TestCase):
             "status": "canonical",
             "command": "python3 tools/echo.py",
             "writes": False,
-            "dispatch": dispatch or {"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"},
+            "dispatch": dispatch
+            or {
+                "runtime": "python",
+                "argv": ["python3", "tools/echo.py"],
+                "parity": "verified",
+            },
         }
 
     def _catalog(self, entries: list[dict[str, object]]) -> dict[str, object]:
@@ -569,14 +658,20 @@ class ToolDispatchTest(unittest.TestCase):
         root = image / "runtime"
         (root / "tools").mkdir(parents=True)
         (root / "tests/fixtures/tool_dispatch").mkdir(parents=True)
-        (root / "tools/echo.py").write_text("import sys; print(*sys.argv[1:])\n", encoding="utf-8")
+        (root / "tools/echo.py").write_text(
+            "import sys; print(*sys.argv[1:])\n", encoding="utf-8"
+        )
         (root / "tools/catalog.yaml").write_text(
             yaml.safe_dump(
                 self._catalog(
                     [
                         self._entry(
                             "echo",
-                            {"runtime": "python", "argv": ["python3", "tools/echo.py"], "parity": "verified"},
+                            {
+                                "runtime": "python",
+                                "argv": ["python3", "tools/echo.py"],
+                                "parity": "verified",
+                            },
                         )
                     ]
                 )
@@ -622,9 +717,15 @@ class ToolDispatchTest(unittest.TestCase):
         )
         dependencies = image / "image-dependencies"
         dependencies.mkdir(parents=True)
-        (dependencies / "plan.json").write_text('{"schema":"fixture"}\n', encoding="utf-8")
-        (image / tool_dispatch.CONTAINER_MARKER_NAME).write_bytes(tool_dispatch.CONTAINER_MARKER)
-        (root / tool_dispatch.RUNTIME_MARKER_NAME).write_bytes(tool_dispatch.RUNTIME_MARKER)
+        (dependencies / "plan.json").write_text(
+            '{"schema":"fixture"}\n', encoding="utf-8"
+        )
+        (image / tool_dispatch.CONTAINER_MARKER_NAME).write_bytes(
+            tool_dispatch.CONTAINER_MARKER
+        )
+        (root / tool_dispatch.RUNTIME_MARKER_NAME).write_bytes(
+            tool_dispatch.RUNTIME_MARKER
+        )
         for path in (
             image / tool_dispatch.CONTAINER_MARKER_NAME,
             root / tool_dispatch.RUNTIME_MARKER_NAME,

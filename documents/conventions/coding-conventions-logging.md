@@ -34,10 +34,6 @@ downstream design ../experiments/result-log-retention-and-visualization.md defin
 - 出力方法は **標準出力を基本**とし、必要に応じて標準出力を転送します。
 - 出力形式は **JSONL（1 行 1 JSON）** を採用し、**バイナリは使いません**。
 - ログは **実行ごとにディレクトリを分けて保存**します。
-- ログを書き出す、emit する、保存する、整形する helper 関数は Python では `_log` から始めます。
-  例: `_log_case_record`、`_log_jsonl_line`、`_log_runtime_event`。
-- `write_log_*`、`append_log_*`、`emit_log_*`、`record_log_*`、`format_log_*` のような helper 名は使いません。
-  ログ helper であることと private helper であることを同時に示すため、`_log...` へ寄せます。
 
 ## 3. JSON キー規約
 
@@ -81,7 +77,6 @@ downstream design ../experiments/result-log-retention-and-visualization.md defin
 - バイナリ形式でのログ出力は禁止します。
 - 1 行に複数レコードを詰めないでください。
 - `pytest.jsonl` に **JSON 以外の行を混ぜない**でください。
-- ログ用 helper 関数を `_log` 以外の prefix で定義してはいけません。
 
 ## 7. JAX 向けの注意
 
@@ -89,9 +84,9 @@ downstream design ../experiments/result-log-retention-and-visualization.md defin
 
 ## 8. 検証
 
-```bash
-python3 tools/validation/semantic/logging/check_log_helper_names.py --changed --exclude vendor --exclude reports
-```
+Log record shape, ownership, and writer/reader boundaries are checked by the
+contracts that consume those records. Function names alone do not define a log
+writer contract.
 
 結果ログと可視化 helper:
 

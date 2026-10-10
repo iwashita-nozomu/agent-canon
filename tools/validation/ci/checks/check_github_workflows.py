@@ -103,7 +103,6 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
     "responsibility_scope.py",
-    "import_responsibility.py",
     "--baseline-ref",
     "run_accumulated_agent_evals.py",
     "eval_accumulation_check.py",
