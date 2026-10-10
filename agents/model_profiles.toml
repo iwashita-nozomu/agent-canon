@@ -103,7 +103,7 @@ publisher = "workspace-write"
 
 [[role_instruction_templates.diff_triage_reviewer]]
 id = "diff_triage_solid_boundary"
-text = "Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."
+text = "Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundary questions to python_reviewer, and keep validation within the parent-selected route. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope."
 priority = 100
 
 [[role_instruction_templates.python_reviewer]]
@@ -115,7 +115,7 @@ static_obligations = ["validation_owner", "parent_assignment"]
 
 [[role_instruction_templates.reviewer]]
 id = "reviewer_solid_boundary"
-text = "Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete."
+text = "Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For Python changes, follow the parent-selected validation route; require SOLID evidence only when that route selects it, and return revise only when required evidence or changed-path coverage is incomplete."
 priority = 100
 
 [[role_instruction_templates.publisher]]

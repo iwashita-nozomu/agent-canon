@@ -26,24 +26,25 @@ is a private (`0700`) normal Git clone on the source-qualified stable branch
 resolved by `runtime_log_archive_git.py repo-key`, with the exact private
 remote. The log repository's `main` branch is schema/configuration content and
 is not the feedback content branch.
-Runtime data is first written below the external runtime root:
+Runtime data is written under the resident runtime root in the shared state
+volume:
 
 ```text
-<runtime-root>/container-runtime/spool/private-feedback/
+/var/lib/agent-canon/runtime/spool/private-feedback/
 ```
 
-The tool container sees this same directory as
-`/var/lib/agent-canon/runtime/spool/private-feedback/` through the existing
-`container-runtime/` bind mount. A successful `k/f add`, `k capture`, or
-structured runtime-feedback capture creates or reuses one typed, body-free
-request below that spool; explicit `k/f sync` remains available for retry and
-readback. Bootstrap invokes the host archive adapter after every successful
-managed tool or Codex command, passing the bind-mounted host path to the
-adapter implemented in `bootstrap/host/lifecycle/entrypoint.sh`; this crossing uses only
-the host shell's Git/Git-annex commands and never imports AgentCanon Python.
-The adapter performs fetch, non-force publication, compare/readback and
-spool/request retention on conflict. The operational checkout is mounted into
-the container read-only for search/read/status; the container has no Git
+The root `/var/lib/agent-canon/spool/<run-id>` remains the independent eval
+spool. The host adapter exports only the private-feedback subtree to temporary
+staging under `<install-root>/.runtime/container-state/spool/`. A successful
+`k/f add`, `k capture`, or structured runtime-feedback capture creates or
+reuses one typed, body-free request below the private-feedback spool; explicit
+`k/f sync` remains available for retry. Bootstrap invokes the host-shell
+archive adapter after successful managed tool/Codex commands and from
+scheduled `sync`, so pending delivery does not depend on another interactive
+command. The adapter uses host Git/Git-annex, verifies remote readback, and
+clears only the exact acknowledged spool snapshot; failures or changed
+snapshots remain pending. The operational checkout is mounted into the
+container read-only for search/read/status; the container has no Git
 credentials and never publishes or mutates that checkout.
 
 ## Commands
@@ -81,9 +82,12 @@ runtime/skills/<topic>/SKILL.md
 raw/<topic>/<payload>
 ```
 
-`raw/` is git-annex-only. Without a configured special remote, raw content
-remains in the external spool and `sync` reports `pending`; it is not added as
-an ordinary Git blob.
+`raw/` is git-annex-only. The current AgentCanon host adapter has no
+archive-owner payload destination/readback route, so raw content remains in the
+external spool and `sync` reports an error until that route exists. Git branch
+readback or `git annex sync --no-content` is metadata evidence, not proof that
+the raw bytes are available remotely; raw content is never added as an ordinary
+Git blob or deleted on that basis.
 
 ## Read and private derivation
 

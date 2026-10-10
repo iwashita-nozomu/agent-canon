@@ -62,13 +62,20 @@ project's own Docker test runner.
 
 ## One command family
 
+The installer entrypoint comes from the installed runtime source root; the
+observed project/worktree is a separate read-only `--root <topic>` target. Use
+the latest installed/bootstrap absolute entrypoint for that runtime; a topic
+checkout's `./bootstrap.sh` is only for validating lifecycle-source changes and
+may be stale.
+
 Every command starts with the install root and explicit control root. The
 persistent runtime defaults to the control root's ignored `.runtime/`:
 
 ```bash
-BOOTSTRAP=./bootstrap.sh
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 ```
 
 `--control-parent-root` is the authorized parent repository root and selects
@@ -332,6 +339,13 @@ Network or archive failure retains the spool and a failure receipt for retry;
 it does not dirty AgentCanon source. Successful publication is complete only
 after non-force push and remote ref/tree/blob readback. A local bare remote is
 the focused end-to-end test fixture for this sequence.
+
+The existing host scheduler's `sync` route also drains pending hook events,
+eval runs with explicit sync requests, and private-feedback requests. These
+deliveries are attempted after the source-refresh phase even when that phase
+fails; failed publications retain their pending inputs for the next scheduled
+retry. Eval continues to use the root `spool/<run-id>`, while private feedback
+uses the separate resident `runtime/spool/private-feedback` path.
 
 The archive checkout is a runtime lease under the selected runtime root. It is
 not a submodule, vendor checkout, symlink, or required source-tree directory.
