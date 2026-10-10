@@ -57,18 +57,38 @@ def test_source_sync_attempts_pending_delivery_independently(
     tmp_path: Path, fetch_status: int
 ) -> None:
     """Unchanged source and failed source fetch both attempt pending delivery."""
+    archive_owner = tmp_path / "tools/runtime/archive/runtime_log_archive_git.py"
+    archive_owner.parent.mkdir(parents=True)
+    archive_owner.write_text("# fixture archive owner entrypoint\n", encoding="utf-8")
     result = run_adapter(
         tmp_path,
         r'''
 command_args=(sync --install-root "$AGENT_CANON_REPOSITORY_ROOT")
-_agent_canon_archive_pending() {
-  printf 'archive\n' >> "$TEST_CALLS"
-}
 _agent_canon_source_sync_write() { :; }
 _agent_canon_image_reference() { AGENT_CANON_IMAGE_REF=fixture; }
 _agent_canon_image() { AGENT_CANON_IMAGE_REF=fixture; }
 _agent_canon_replace_resident_locked() { :; }
 _agent_canon_scheduler_locked() { :; }
+_agent_canon_use_active_image() { :; }
+_agent_canon_container_name() { printf 'fixture-container'; }
+_agent_canon_ensure_container() { printf 'fixture-container'; }
+_agent_canon_init_state_volume() { :; }
+_agent_canon_volume_copy() {
+  case "$1:$2" in
+    list:eval) printf 'run-1\n' ;;
+    export:eval) printf 'eval-export %s\n' "$4" >> "$TEST_CALLS" ;;
+    *) return 99 ;;
+  esac
+}
+_agent_canon_archive_eval_sync() {
+  printf 'eval-sync %s\n' "$1" >> "$TEST_CALLS"
+}
+_agent_canon_private_feedback_sync() {
+  printf 'feedback-sync\n' >> "$TEST_CALLS"
+}
+python3() {
+  printf 'hook-sync\n' >> "$TEST_CALLS"
+}
 fixture_docker() { printf 'sha256:fixture\n'; }
 AGENT_CANON_DOCKER_CMD=fixture_docker
 git() {
@@ -84,5 +104,10 @@ _agent_canon_sync_operation
     )
     calls = tmp_path / "calls"
     assert calls.exists(), "source synchronization never attempted archive delivery"
-    assert calls.read_text().splitlines() == ["archive"]
+    assert calls.read_text().splitlines() == [
+        "hook-sync",
+        "eval-export run-1",
+        "eval-sync run-1",
+        "feedback-sync",
+    ]
     assert result.returncode == (0 if fetch_status == 0 else 2), result.stderr
