@@ -209,9 +209,14 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "",
                 'catalog_kind = "agent_canon_tool_docs"',
                 "version = 1",
+                (
+                    'classification_values = ["public", "internal", "compat", '
+                    '"retired", "example"]'
+                ),
                 "",
                 "[[tool]]",
                 'id = "tool-catalog"',
+                'classification = "internal"',
                 'tool = "tools/runtime/manifest/tool_catalog.py"',
                 'doc = "documents/tools/tool_catalog.md"',
                 "",
