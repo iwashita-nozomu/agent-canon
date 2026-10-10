@@ -2,6 +2,7 @@
 # contract tool
 # responsibility AgentTeam packets owner module.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream implementation ./team_config.py owns shared configuration normalizers.
 # downstream implementation ./agent_team.py facade consumes packet APIs.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes packet APIs.
 # downstream implementation ../../validation/semantic/lifecycle/waterfall_gate_check.py consumes packet APIs.
@@ -27,9 +28,9 @@ if __package__:
         RunBundleSpec,
         TaskCatalog,
         TeamConfig,
-        _as_object_mapping,
-        _as_required_string,
-        _as_string_tuple,
+        as_object_mapping,
+        as_required_string,
+        as_string_tuple,
     )
 else:
     from tools.agent.orchestration.team_config import (
@@ -37,9 +38,9 @@ else:
         RunBundleSpec,
         TaskCatalog,
         TeamConfig,
-        _as_object_mapping,
-        _as_required_string,
-        _as_string_tuple,
+        as_object_mapping,
+        as_required_string,
+        as_string_tuple,
     )
 
 from tools.repository.workspace.workspace_scope import (
@@ -1141,7 +1142,7 @@ ACTIVE_PACKET_SCHEMA = ACTIVE_DESIGN_PACKET_SCHEMA
 
 def _active_packet_reference_tuple(value: object, field: str) -> tuple[str, ...]:
     """Validate one non-empty typed reference list."""
-    values = _as_string_tuple(value, field)
+    values = as_string_tuple(value, field)
     if not values:
         raise RuntimeError(f"{field}:empty")
     for candidate in values:
@@ -1175,17 +1176,17 @@ def _normalize_active_packet_entry(
 ) -> ActiveDesignPacketEntry:
     """Normalize one graph entry with explicit closed fields and dependencies."""
     entry_field = f"{field_prefix}.{section}"
-    entry = _as_object_mapping(raw_entry, entry_field)
+    entry = as_object_mapping(raw_entry, entry_field)
     unknown = sorted(set(entry).difference(ACTIVE_PACKET_ENTRY_FIELDS))
     if unknown:
         raise RuntimeError(f"{entry_field}:field_unknown:" + ",".join(unknown))
     missing = [field for field in ACTIVE_PACKET_ENTRY_FIELDS if field not in entry]
     if missing:
         raise RuntimeError(f"{entry_field}:field_missing:" + ",".join(missing))
-    entry_id = _as_required_string(entry["entry_id"], f"{entry_field}.entry_id")
+    entry_id = as_required_string(entry["entry_id"], f"{entry_field}.entry_id")
     if entry_id != ACTIVE_PACKET_ENTRY_IDS[section]:
         raise RuntimeError(f"{entry_field}.entry_id:invalid")
-    responsibility_id = _as_required_string(
+    responsibility_id = as_required_string(
         entry["responsibility_id"], f"{entry_field}.responsibility_id"
     )
     references = {
@@ -1209,19 +1210,19 @@ def normalize_active_design_packet_config(
     field_prefix: str,
 ) -> ActiveDesignPacketConfig:
     """Normalize one complete packet record at the typed runtime boundary."""
-    packet = _as_object_mapping(raw_packet, field_prefix)
+    packet = as_object_mapping(raw_packet, field_prefix)
     unknown = sorted(set(packet).difference(ACTIVE_DESIGN_PACKET_FIELDS))
     if unknown:
         raise RuntimeError(f"{field_prefix}:field_unknown:" + ",".join(unknown))
     missing = [field for field in ACTIVE_DESIGN_PACKET_FIELDS if field not in packet]
     if missing:
         raise RuntimeError(f"{field_prefix}:field_missing:" + ",".join(missing))
-    schema = _as_required_string(packet["schema"], f"{field_prefix}.schema")
+    schema = as_required_string(packet["schema"], f"{field_prefix}.schema")
     if schema != ACTIVE_DESIGN_PACKET_SCHEMA:
         raise RuntimeError(f"{field_prefix}:schema_unknown:{schema}")
     paths: dict[str, str] = {}
     for field in ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS:
-        value = _as_required_string(packet[field], f"{field_prefix}.{field}")
+        value = as_required_string(packet[field], f"{field_prefix}.{field}")
         path = Path(value)
         if path.is_absolute() or ".." in path.parts:
             raise RuntimeError(f"{field_prefix}:field_invalid:{field}")
@@ -1235,17 +1236,17 @@ def normalize_active_design_packet_config(
     clauses: list[ActiveDesignClause] = []
     for index, raw_clause in enumerate(raw_clauses):
         clause_field = f"{field_prefix}.clause_registry[{index}]"
-        clause = _as_object_mapping(raw_clause, clause_field)
+        clause = as_object_mapping(raw_clause, clause_field)
         if set(clause) != {"clause_id", "source_ref"}:
             unknown = sorted(set(clause).difference({"clause_id", "source_ref"}))
             if unknown:
                 raise RuntimeError(f"{clause_field}:field_unknown:" + ",".join(unknown))
             missing = sorted({"clause_id", "source_ref"}.difference(clause))
             raise RuntimeError(f"{clause_field}:field_missing:" + ",".join(missing))
-        clause_id = _as_required_string(
+        clause_id = as_required_string(
             clause["clause_id"], f"{clause_field}.clause_id"
         )
-        source_ref = _as_required_string(
+        source_ref = as_required_string(
             clause["source_ref"], f"{clause_field}.source_ref"
         )
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", clause_id):
@@ -1637,11 +1638,11 @@ def resolve_role_document_packet(
     if agentcanon_source_root is None:
         raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     spec = ROLE_DOCUMENT_PACKET_SPECS.get(role.id, {})
-    artifact_keys = _as_string_tuple(
+    artifact_keys = as_string_tuple(
         spec.get("artifact_keys"),
         f"document_packet[{role.id}].artifact_keys",
     )
-    workspace_paths = _as_string_tuple(
+    workspace_paths = as_string_tuple(
         spec.get("workspace_paths"),
         f"document_packet[{role.id}].workspace_paths",
     )

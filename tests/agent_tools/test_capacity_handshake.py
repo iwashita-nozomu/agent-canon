@@ -62,7 +62,16 @@ def _witness() -> TopologyCapacityWitness:
     derivation = _derivation()
     parent = TopologyCapacityNode("parent", "workflow", (), None, 1, 0, (), ())
     children = tuple(
-        TopologyCapacityNode(f"child-{index}", "descendant", ("parent",), "parent", 1, 1, (f"p{index}",), ())
+        TopologyCapacityNode(
+            f"child-{index}",
+            "descendant",
+            ("parent",),
+            "parent",
+            1,
+            1,
+            (f"p{index}",),
+            (),
+        )
         for index in range(6)
     )
     return TopologyCapacityWitness(
@@ -113,15 +122,17 @@ def test_descendant_record_projection_roundtrips_owner_typed_fields() -> None:
 
     assert descendant_record_from_projection(projection) == record
     integer_string_projection = {**projection, "reserved_slots": "3"}
-    assert descendant_record_from_projection(
-        integer_string_projection
-    ).reserved_slots == 3
+    assert (
+        descendant_record_from_projection(integer_string_projection).reserved_slots == 3
+    )
     malformed_projection = {**projection, "reserved_slots": "not-an-int"}
     with pytest.raises(ValueError):
         descendant_record_from_projection(malformed_projection)
 
 
-def test_snapshot_separates_requested_effective_available_and_write(tmp_path: Path) -> None:
+def test_snapshot_separates_requested_effective_available_and_write(
+    tmp_path: Path,
+) -> None:
     snapshot = make_session_snapshot(
         _contract(tmp_path, 22),
         platform_advertised_effective_cap=21,
@@ -160,15 +171,28 @@ def test_nested_reservation_cannot_be_counted_twice(tmp_path: Path) -> None:
 
 
 def test_reservation_is_created_only_after_successful_spawn(tmp_path: Path) -> None:
-    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6, write_scope_cap=2)
+    snapshot = make_session_snapshot(
+        _contract(tmp_path),
+        workflow_dag_demand=20,
+        nested_capacity_reservation=6,
+        write_scope_cap=2,
+    )
     ledger = CapacityLedger(DescendantTopologyReadback("parent"))
-    item = ReadyWorkItem("child", "b" * 64, "spark_implementation_low", required_write_slots=1)
+    item = ReadyWorkItem(
+        "child", "b" * 64, "spark_implementation_low", required_write_slots=1
+    )
     assert request_slot(snapshot, ledger, item).status == "ready"
     assert ledger.open_records == {}
-    assert record_successful_spawn(snapshot, ledger, item, spawn_succeeded=False).status == "queued"
+    assert (
+        record_successful_spawn(snapshot, ledger, item, spawn_succeeded=False).status
+        == "queued"
+    )
     assert ledger.open_records == {}
     ledger.ready_queue.clear()
-    assert record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True).status == "granted"
+    assert (
+        record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True).status
+        == "granted"
+    )
     assert set(ledger.open_records) == {"child"}
     assert set(ledger.reservations) == {"child"}
 
@@ -176,10 +200,26 @@ def test_reservation_is_created_only_after_successful_spawn(tmp_path: Path) -> N
 def _advance_to_readback(ledger: CapacityLedger, work_id: str) -> None:
     sequence = (
         (LifecycleStatus.SPAWNED, LifecycleStatus.ACTIVE, None),
-        (LifecycleStatus.ACTIVE, LifecycleStatus.DURABLE_RESULT_EVIDENCE, "result://durable"),
-        (LifecycleStatus.DURABLE_RESULT_EVIDENCE, LifecycleStatus.HANDED_BACK, "handback://ok"),
-        (LifecycleStatus.HANDED_BACK, LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED, "descendants://closed"),
-        (LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED, LifecycleStatus.CLOSED, "close://accepted"),
+        (
+            LifecycleStatus.ACTIVE,
+            LifecycleStatus.DURABLE_RESULT_EVIDENCE,
+            "result://durable",
+        ),
+        (
+            LifecycleStatus.DURABLE_RESULT_EVIDENCE,
+            LifecycleStatus.HANDED_BACK,
+            "handback://ok",
+        ),
+        (
+            LifecycleStatus.HANDED_BACK,
+            LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED,
+            "descendants://closed",
+        ),
+        (
+            LifecycleStatus.DESCENDANTS_CLOSURE_VERIFIED,
+            LifecycleStatus.CLOSED,
+            "close://accepted",
+        ),
         (LifecycleStatus.CLOSED, LifecycleStatus.READBACK_VERIFIED, "readback://ok"),
     )
     for generation, (old, new, evidence) in enumerate(sequence):
@@ -193,8 +233,12 @@ def _advance_to_readback(ledger: CapacityLedger, work_id: str) -> None:
         )
 
 
-def test_lifecycle_is_closed_compare_and_swap_and_release_retains_record(tmp_path: Path) -> None:
-    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6)
+def test_lifecycle_is_closed_compare_and_swap_and_release_retains_record(
+    tmp_path: Path,
+) -> None:
+    snapshot = make_session_snapshot(
+        _contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6
+    )
     ledger = CapacityLedger(DescendantTopologyReadback("parent"))
     item = ReadyWorkItem("child", "c" * 64, "spark_implementation_low")
     record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True)
@@ -208,7 +252,9 @@ def test_lifecycle_is_closed_compare_and_swap_and_release_retains_record(tmp_pat
         )
     _advance_to_readback(ledger, "child")
     token = {"tool_id": "close_agent", "arguments": {"terminal_agent_id": "child"}}
-    packet = materialize_closeout_packet("parent", ledger, (ledger.topology,), {"child": token})
+    packet = materialize_closeout_packet(
+        "parent", ledger, (ledger.topology,), {"child": token}
+    )
     assert packet.status == "closed"
     assert packet.close_agent_calls[0].close_agent_call_token == token
     assert ledger.open_records["child"].status == LifecycleStatus.RESERVATION_RELEASED
@@ -216,7 +262,9 @@ def test_lifecycle_is_closed_compare_and_swap_and_release_retains_record(tmp_pat
 
 
 def test_closeout_never_reclaims_open_record(tmp_path: Path) -> None:
-    snapshot = make_session_snapshot(_contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6)
+    snapshot = make_session_snapshot(
+        _contract(tmp_path), workflow_dag_demand=20, nested_capacity_reservation=6
+    )
     ledger = CapacityLedger(DescendantTopologyReadback("parent"))
     item = ReadyWorkItem("child", "d" * 64, "spark_implementation_low")
     record_successful_spawn(snapshot, ledger, item, spawn_succeeded=True)
@@ -230,7 +278,7 @@ def _projection_root(tmp_path: Path, configured: int) -> Path:
     (tmp_path / "agents").mkdir(parents=True)
     (tmp_path / ".codex").mkdir(parents=True)
     (tmp_path / "agents" / "capacity_policy.toml").write_text(
-        '''policy_id = "topology_derived_v1"
+        """policy_id = "topology_derived_v1"
 [topology_derivation]
 direct_frontier_count = 20
 nested_reservation_count = 6
@@ -241,16 +289,31 @@ target_value = 26
 required_predicates = ["generated_value_matches_topology_witness"]
 [generated_manifest_policy]
 numeric_family_default = false
-''',
+""",
         encoding="utf-8",
     )
-    (tmp_path / ".codex" / "config.toml").write_text(f"[agents]\nmax_threads = {configured}\n", encoding="utf-8")
+    (tmp_path / ".codex" / "config.toml").write_text(
+        f"[agents]\nmax_threads = {configured}\n", encoding="utf-8"
+    )
     return tmp_path
 
 
-def test_capacity_config_generator_and_readback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_capacity_config_generator_and_readback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     root = _projection_root(tmp_path, 18)
     assert main(("--root", str(root), "--write-config-projection")) == 0
     assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=written\n"
-    assert main(("--root", str(root), "--check-config-projection", "--expected-max-threads", "26")) == 0
+    assert (
+        main(
+            (
+                "--root",
+                str(root),
+                "--check-config-projection",
+                "--expected-max-threads",
+                "26",
+            )
+        )
+        == 0
+    )
     assert capsys.readouterr().out == "CAPACITY_CONFIG_PROJECTION=pass\n"

@@ -1108,10 +1108,10 @@ def main(
             parsed_targets = json.loads(args.writer_targets)
             if not is_string_object_dict(parsed_targets):
                 raise WriterTargetError("writer_targets:must_be_mapping")
-            writer_targets = {
-                owner: parse_writer_target(target)
-                for owner, target in parsed_targets.items()
-            }
+            for owner, target in parsed_targets.items():
+                if not is_string_object_mapping(target):
+                    raise WriterTargetError("writer_targets:owner_target_must_be_mapping")
+                writer_targets[owner] = parse_writer_target(target)
     except (TypeError, json.JSONDecodeError, WriterTargetError) as exc:
         print(str(exc), flush=True)
         return 2

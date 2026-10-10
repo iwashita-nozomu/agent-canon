@@ -972,9 +972,7 @@ def validate_project_extras(workspace: Path, extras: Sequence[str]) -> tuple[str
     if not is_string_object_dict(optional):
         raise DependencyError(f"project.optional-dependencies is missing: {pyproject}")
     available = {
-        canonicalize_name(name)
-        for name in optional
-        if PYTHON_EXTRA_RE.fullmatch(name)
+        canonicalize_name(name) for name in optional if PYTHON_EXTRA_RE.fullmatch(name)
     }
     missing = [
         extra for extra in validated if canonicalize_name(extra) not in available
@@ -1757,7 +1755,7 @@ def _validate_method_fields(
         "provides",
         "failure_policy",
     }
-    method_fields = {
+    method_fields: dict[Method, set[str]] = {
         Method.APT_PACKAGE: {"executable_owner_packages"},
         Method.APT_REPOSITORY: {
             "key_fingerprint",
@@ -2376,8 +2374,7 @@ def load_manifest(source: ManifestSource) -> LoadedManifest:
     if not records and source.role is not ManifestRole.PARENT_OVERLAY:
         raise DependencyError(f"{path}: records must be a non-empty array of tables")
     parsed = tuple(
-        parse_record(item, path=path, index=index)
-        for index, item in enumerate(records)
+        parse_record(item, path=path, index=index) for index, item in enumerate(records)
     )
     ids = [record.id for record in parsed]
     if len(set(ids)) != len(ids):
@@ -2666,6 +2663,8 @@ def select_record_ids(
         raise DependencyError("--records must select at least one record")
     requested_ids: list[str] = []
     for raw_value in raw_values:
+        if not isinstance(raw_value, str):
+            raise DependencyError("--records values must be strings")
         for value in raw_value.split(","):
             record_id = value.strip()
             if not record_id:
@@ -4634,16 +4633,13 @@ class Installer:
                     f"{record.id}: binary source identity mismatch "
                     f"{source_identity}!={expected_source_identity}"
                 )
-        def verify_apt_package(
-            item: DependencyRecord, *, workspace: Path
-        ) -> None:
+
+        def verify_apt_package(item: DependencyRecord, *, workspace: Path) -> None:
             self._verify_apt_package(
                 item, workspace=workspace, strict_executable=strict_executables
             )
 
-        def verify_apt_repository(
-            item: DependencyRecord, *, workspace: Path
-        ) -> None:
+        def verify_apt_repository(item: DependencyRecord, *, workspace: Path) -> None:
             self._verify_apt_repository(
                 item,
                 workspace=workspace,
@@ -4656,7 +4652,7 @@ class Installer:
                 item, workspace=workspace, strict_executable=strict_executables
             )
 
-        verifiers: dict[VerificationKind, DependencyVerifier] = {
+        verifiers: Mapping[VerificationKind, DependencyVerifier] = {
             VerificationKind.APT_PACKAGE: verify_apt_package,
             VerificationKind.APT_REPOSITORY: verify_apt_repository,
             VerificationKind.NPM_PACKAGE: verify_npm_package,
@@ -5728,6 +5724,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     exit_status = 0
     payload: dict[str, object]
     boundary_findings: tuple[BoundaryFinding, ...] = ()
+    sources_output: tuple[str, ...] | None = None
+    order_output: tuple[str, ...] | None = None
+    completed_output: tuple[str, ...] | None = None
     try:
         if args.command not in {"image-install", "image-verify"} and args.records:
             raise DependencyError(
@@ -5775,6 +5774,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                             else None
                         ),
                     )
+                    completed_output = completed
                     payload = {
                         "status": "pass",
                         "completed": list(completed),
@@ -5794,14 +5794,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                         "plan_fingerprint": plan.fingerprint,
                     }
             elif args.command == "validate":
+                sources_output = tuple(str(path) for path in plan.sources)
+                order_output = plan.order
                 payload = {
                     "status": "pass",
-                    "sources": [str(path) for path in plan.sources],
-                    "order": list(plan.order),
+                    "sources": list(sources_output),
+                    "order": list(order_output),
                     "plan_fingerprint": plan.fingerprint,
                 }
             elif args.command == "dry-run":
                 payload = Installer().dry_run(plan)
+                order_output = plan.order
             else:
                 receipts = (
                     Path(args.receipts).resolve()
@@ -5815,6 +5818,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     workspace=Path(args.workspace).resolve(),
                     receipts=receipts,
                 )
+                completed_output = completed
                 payload = {
                     "status": "pass",
                     "completed": list(completed),
@@ -5849,14 +5853,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "boundary":
             for finding in boundary_findings:
                 print(finding.render())
-        if "sources" in payload:
-            print("AGENT_CANON_TOOL_DEPENDENCY_SOURCES=" + ",".join(payload["sources"]))
-        if "order" in payload:
-            print("AGENT_CANON_TOOL_DEPENDENCY_ORDER=" + ",".join(payload["order"]))
-        if "completed" in payload:
+        if sources_output is not None:
+            print("AGENT_CANON_TOOL_DEPENDENCY_SOURCES=" + ",".join(sources_output))
+        if order_output is not None:
+            print("AGENT_CANON_TOOL_DEPENDENCY_ORDER=" + ",".join(order_output))
+        if completed_output is not None:
             print(
                 "AGENT_CANON_TOOL_DEPENDENCY_COMPLETED="
-                + ",".join(payload["completed"])
+                + ",".join(completed_output)
             )
     return exit_status
 

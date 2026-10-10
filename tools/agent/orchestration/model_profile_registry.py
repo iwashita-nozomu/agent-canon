@@ -1545,7 +1545,7 @@ def validate_target_state_contract(
         if field not in target_state_contract:
             issues.append(ValidationIssue("missing_field", f"{field}:missing", field))
     profiles = target_state_contract.get("configured_supported_profiles")
-    if not isinstance(profiles, list):
+    if not is_object_list(profiles):
         issues.append(
             ValidationIssue(
                 "profiles", "configured_supported_profiles:must_be_list", "profiles"

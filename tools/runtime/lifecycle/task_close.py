@@ -417,7 +417,9 @@ def _ledger_from_projection(
     return ledger
 
 
-def _validate_close_agent_token(token: object, terminal_agent_id: str) -> str | None:
+def _validate_close_agent_token(
+    token: object, terminal_agent_id: str
+) -> str | dict[str, object]:
     if not is_string_object_dict(token):
         return f"{terminal_agent_id}:close_agent_tool_call_missing"
     if set(token) != {"tool_id", "arguments"}:
@@ -432,7 +434,7 @@ def _validate_close_agent_token(token: object, terminal_agent_id: str) -> str | 
         or raw_arguments.get("terminal_agent_id") != terminal_agent_id
     ):
         return f"{terminal_agent_id}:close_agent_target_binding_invalid"
-    return None
+    return token
 
 
 def _postorder_descendant_ids(
@@ -512,11 +514,13 @@ def validate_capacity_lifecycle_closeout(
         if work_id in seen_calls:
             failures.append(f"{work_id}:duplicate_close_agent_tool_call")
         seen_calls.append(work_id)
-        failure = _validate_close_agent_token(raw_call.get("tool_call_token"), work_id)
-        if failure:
-            failures.append(failure)
-        elif is_string_object_dict(raw_call.get("tool_call_token")):
-            tokens_by_work_id[work_id] = raw_call["tool_call_token"]
+        validated_token = _validate_close_agent_token(
+            raw_call.get("tool_call_token"), work_id
+        )
+        if isinstance(validated_token, str):
+            failures.append(validated_token)
+        else:
+            tokens_by_work_id[work_id] = validated_token
     for work_id in sorted(descendant_ids - set(seen_calls)):
         failures.append(f"{work_id}:close_agent_tool_call_missing")
     if tuple(seen_calls) != expected_postorder:
@@ -1062,6 +1066,7 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
     raw_projection_metadata = artifact.get("projection_metadata")
     if not is_string_object_dict(raw_projection_metadata):
         return {"ready": False, "reason": "projection_metadata_missing"}
+    projection_metadata = raw_projection_metadata
     if projection_metadata.get("generated_artifact_identity") != (
         f"{source_binding['run_id']}:{source_binding['context_id']}"
     ):
@@ -1198,9 +1203,9 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
     for raw_evidence in monitor_evidence:
         if not is_string_object_dict(raw_evidence):
             return {"ready": False, "reason": "monitor_evidence_item_invalid"}
-        if raw_evidence.get("run_id") != source_binding.get("run_id") or raw_evidence.get(
-            "context_id"
-        ) != source_binding.get("context_id"):
+        if raw_evidence.get("run_id") != source_binding.get(
+            "run_id"
+        ) or raw_evidence.get("context_id") != source_binding.get("context_id"):
             return {"ready": False, "reason": "monitor_evidence_binding_invalid"}
         source_event_ref = raw_evidence.get("source_event_ref")
         if source_event_ref is not None and source_event_ref not in events_by_id:
@@ -1218,9 +1223,7 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
             return {"ready": False, "reason": "gate_evidence_identity_invalid"}
         if not is_object_list(refs) or not refs:
             return {"ready": False, "reason": "gate_evidence_source_invalid"}
-        if any(
-            not isinstance(ref, str) or ref not in events_by_id for ref in refs
-        ):
+        if any(not isinstance(ref, str) or ref not in events_by_id for ref in refs):
             return {"ready": False, "reason": "gate_evidence_source_invalid"}
         gate_ids.add(gate_id)
     if not {"oop_readability_guard", "solid_evidence_gate"}.issubset(gate_ids):
@@ -1240,16 +1243,14 @@ def completion_coverage_consumer(report_dir: Path) -> dict[str, object]:
             return {"ready": False, "reason": "resource_certificate_source_invalid"}
         if source_event_ref not in events_by_id:
             return {"ready": False, "reason": "resource_certificate_source_missing"}
-        if raw_certificate.get("run_id") != source_binding.get("run_id") or raw_certificate.get(
-            "context_id"
-        ) != source_binding.get("context_id"):
+        if raw_certificate.get("run_id") != source_binding.get(
+            "run_id"
+        ) or raw_certificate.get("context_id") != source_binding.get("context_id"):
             return {"ready": False, "reason": "resource_certificate_binding_mismatch"}
         resource_certificate_refs.add(source_event_ref)
     failure_event_refs = artifact.get("failure_event_refs")
     failure_responses = artifact.get("failure_responses")
-    if not is_object_list(failure_event_refs) or not is_object_list(
-        failure_responses
-    ):
+    if not is_object_list(failure_event_refs) or not is_object_list(failure_responses):
         return {"ready": False, "reason": "failure_response_projection_invalid"}
     expected_failure_refs = {
         event_id
@@ -1327,9 +1328,7 @@ def update_lifecycle_closeout_consumer(report_dir: Path) -> dict[str, object]:
         }
     try:
         raw_gate_values = closeout["gate_verdicts"]
-        if not is_object_list(raw_gate_values) or len(raw_gate_values) != len(
-            GATE_IDS
-        ):
+        if not is_object_list(raw_gate_values) or len(raw_gate_values) != len(GATE_IDS):
             raise ValueError("close_agent:all_six_gate_evidence_required")
         gate_values = raw_gate_values
         source_gates = list(

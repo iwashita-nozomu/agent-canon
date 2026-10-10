@@ -5,6 +5,7 @@
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../../agent/orchestration/team_config.py provides rendering configuration inputs.
 # upstream implementation ../../agent/orchestration/packets.py provides rendering packet inputs.
+# upstream implementation ../values.py refines decoded rendering containers.
 # upstream implementation ../../repository/workspace/workspace_scope.py provides rendering paths.
 # downstream implementation ../../agent/orchestration/agent_team.py facade consumes rendering APIs.
 # downstream implementation ../../agent/templates/code_template_rendering.py owns package-safe code source rendering.
@@ -23,6 +24,8 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+
+from tools.runtime.values import is_object_list
 
 from tools.repository.workspace.parent_root_side_effects import (
     ParentRootAttestationRequest,
@@ -70,11 +73,11 @@ from tools.agent.orchestration.team_config import (
     RunBundleSpec,
     SubagentWaveSlot,
     TeamConfig,
-    _as_mapping_tuple,
-    _as_object_mapping,
-    _as_optional_string,
-    _as_required_string,
-    _as_string_tuple,
+    as_mapping_tuple,
+    as_object_mapping,
+    as_optional_string,
+    as_required_string,
+    as_string_tuple,
     normalized_public_skill_name,
     load_task_catalog,
     load_team_config,
@@ -90,7 +93,7 @@ from tools.agent.orchestration.tool_calls import (
 from tools.agent.orchestration.implementation_dispatch import (
     _capacity_projection,
     _CapacityRuntime,
-    _closeout_projection,
+    closeout_projection,
     capacity_runtime_for_spec,
     codex_runtime_max_depth,
     codex_runtime_max_threads,
@@ -107,11 +110,11 @@ def _as_prompt_entry_tuple(value: object, field_name: str) -> tuple[str, ...]:
     """Validate prompt entries and render them with the legacy manifest shape."""
     if value is None:
         return ()
-    if not isinstance(value, list):
+    if not is_object_list(value):
         raise RuntimeError(f"{field_name} must be a list")
     return tuple(
         _render_prompt_entry(item, f"{field_name} entries")
-        for item in cast(list[object], value)
+        for item in value
     )
 
 
@@ -120,7 +123,7 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
-        mapping = _as_object_mapping(cast(object, value), field_name)
+        mapping = as_object_mapping(value, field_name)
         if not mapping:
             raise RuntimeError(f"{field_name} mapping entries must not be empty")
         rendered: dict[str, str] = {}
@@ -1269,7 +1272,7 @@ def manifest_run_lines(
     """Render run-level manifest fields."""
     capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
     capacity_projection = _capacity_projection(capacity_runtime, spec)
-    closeout_projection = _closeout_projection(capacity_runtime, spec)
+    closeout_payload = closeout_projection(capacity_runtime, spec)
     active_design_packet = (
         spec.active_design_packet
         or resolve_active_design_packet_config(
@@ -1371,7 +1374,7 @@ def manifest_run_lines(
         ]
     )
     closeout_yaml = yaml.safe_dump(
-        closeout_projection,
+        closeout_payload,
         sort_keys=False,
         default_flow_style=False,
     ).splitlines()
@@ -2248,19 +2251,19 @@ def manifest_context_policy_lines(
     packet_artifacts = active_design_packet_artifact_map(config, active_design_packet)
     for policy in config.context_policies:
         lines.append("  - roles:")
-        for role_name in _as_string_tuple(
+        for role_name in as_string_tuple(
             policy.get("roles"), "context_policies.roles"
         ):
             lines.append(f"      - {role_name}")
-        mode = _as_required_string(policy.get("mode"), "context_policies.mode")
+        mode = as_required_string(policy.get("mode"), "context_policies.mode")
         lines.append(f"    mode: {mode}")
         lines.append("    share_only:")
-        for artifact in _as_string_tuple(
+        for artifact in as_string_tuple(
             policy.get("share_only"), "context_policies.share_only"
         ):
             lines.append(f"      - {packet_artifacts.get(artifact, artifact)}")
         lines.append("    do_not_share:")
-        for artifact in _as_string_tuple(
+        for artifact in as_string_tuple(
             policy.get("do_not_share"), "context_policies.do_not_share"
         ):
             lines.append(f"      - {artifact}")
@@ -2295,18 +2298,18 @@ def render_role_topology(
     topology = workflow_family.get("role_topology")
     if not isinstance(topology, dict):
         return []
-    topology = _as_object_mapping(cast(object, topology), "role_topology")
+    topology = as_object_mapping(topology, "role_topology")
     lines = [f"{indent}role_topology:"]
     role_families = topology.get("role_families")
     if isinstance(role_families, dict):
         lines.append(f"{indent}  role_families:")
-        for family_name, agent_types in _as_object_mapping(
-            cast(object, role_families), "role_topology.role_families"
+        for family_name, agent_types in as_object_mapping(
+            role_families, "role_topology.role_families"
         ).items():
             lines.append(f"{indent}    {family_name}:")
             if isinstance(agent_types, list):
-                for agent_type in _as_string_tuple(
-                    cast(object, agent_types),
+                for agent_type in as_string_tuple(
+                    agent_types,
                     f"role_topology.role_families.{family_name}",
                 ):
                     lines.append(f"{indent}      - {agent_type}")
@@ -2320,8 +2323,8 @@ def render_role_topology(
     same_role_instances = topology.get("same_role_parallel_instances")
     if isinstance(same_role_instances, dict):
         lines.append(f"{indent}  same_role_parallel_instances:")
-        for key, value in _as_object_mapping(
-            cast(object, same_role_instances),
+        for key, value in as_object_mapping(
+            same_role_instances,
             "role_topology.same_role_parallel_instances",
         ).items():
             if isinstance(value, bool):
@@ -2337,19 +2340,19 @@ def render_role_topology(
     stage_waves = topology.get("stage_waves")
     if isinstance(stage_waves, list):
         lines.append(f"{indent}  stage_waves:")
-        for wave in _as_mapping_tuple(
-            cast(object, stage_waves),
+        for wave in as_mapping_tuple(
+            stage_waves,
             "role_topology.stage_waves",
         ):
             lines.append(
-                f"{indent}    - id: {_as_required_string(wave.get('id'), 'stage_waves[].id')}"
+                f"{indent}    - id: {as_required_string(wave.get('id'), 'stage_waves[].id')}"
             )
             lines.append(
                 f"{indent}      stage_class: "
-                f"{_as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
+                f"{as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
             )
             lines.append(f"{indent}      role_ids:")
-            for role_id in _as_string_tuple(
+            for role_id in as_string_tuple(
                 wave.get("role_ids"), "stage_waves[].role_ids"
             ):
                 lines.append(f"{indent}        - {role_id}")
@@ -2364,9 +2367,9 @@ def render_subagent_prompt_packet(
     prompt = workflow_family.get("subagent_prompt")
     if not isinstance(prompt, dict):
         return []
-    prompt = _as_object_mapping(cast(object, prompt), "subagent_prompt")
+    prompt = as_object_mapping(prompt, "subagent_prompt")
     lines = [f"{indent}subagent_prompt_packet:"]
-    purpose = _as_optional_string(prompt.get("purpose"), "subagent_prompt.purpose")
+    purpose = as_optional_string(prompt.get("purpose"), "subagent_prompt.purpose")
     if purpose:
         lines.append(f"{indent}  purpose: {purpose!r}")
     lines.append(f"{indent}  subagent_startup_route: {SUBAGENT_STARTUP_ROUTE!r}")
@@ -2383,7 +2386,7 @@ def render_subagent_prompt_packet(
     )
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
     for key in ("dispatch_route", "execution_role", "tool_call_route"):
-        value = _as_optional_string(
+        value = as_optional_string(
             prompt.get(key),
             f"subagent_prompt.{key}",
         )
