@@ -22,8 +22,12 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.runtime.artifacts.runtime_artifacts import RuntimePathEscape, SourceLocalArtifact
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimePathEscape,
+    SourceLocalArtifact,
+)
 from tools.runtime.archive.runtime_log_paths import (
+    agent_canon_root,
     agent_report_archive_dir,
     codex_runtime_index_path,
     codex_runtime_summary_path,
@@ -40,6 +44,10 @@ from tools.runtime.archive.runtime_log_paths import (
 class RuntimeLogPathsTest(unittest.TestCase):
     """Exercise runtime log archive path ordering."""
 
+    def test_agent_canon_root_uses_resolved_archive_module_marker(self) -> None:
+        """A source checkout resolves to its root when runtime paths are the marker."""
+        self.assertEqual(agent_canon_root(PROJECT_ROOT), PROJECT_ROOT.resolve())
+
     def runtime_root(self, source: Path) -> Path:
         """Return a sibling runtime root for one temporary source fixture."""
         runtime = source.parent / f".{source.name}.agent-canon-runtime"
@@ -55,7 +63,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
         )
         self._old_git_ceiling = os.environ.get("GIT_CEILING_DIRECTORIES")
-        os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
+        os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = (
+            "https://github.com/test/source.git"
+        )
         # Temporary fixture paths live below the repository checkout.  Stop
         # Git discovery at the fixture temp root so a non-Git fixture cannot
         # accidentally inherit the checkout's HEAD or archive overrides.
@@ -87,11 +97,24 @@ class RuntimeLogPathsTest(unittest.TestCase):
     def make_git_commit(self, root: Path) -> str:
         """Create one commit in root and return its HEAD SHA."""
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
-        subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.invalid"],
+            cwd=root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"], cwd=root, check=True
+        )
         (root / "README.md").write_text("# Repo\n", encoding="utf-8")
-        subprocess.run(["git", "add", "README.md"], cwd=root, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Initial"], cwd=root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "add", "README.md"], cwd=root, check=True, capture_output=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Initial"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
         return subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
             check=True,
@@ -99,7 +122,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
             text=True,
         ).stdout.strip()
 
-    def test_hook_result_search_dirs_parent_prefers_archive_legacy_before_tree_legacy(self) -> None:
+    def test_hook_result_search_dirs_parent_prefers_archive_legacy_before_tree_legacy(
+        self,
+    ) -> None:
         """Parent repo invocation should search mounted legacy import before in-tree legacy logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             parent = Path(temp_dir)
@@ -107,7 +132,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
             runtime = self.runtime_root(parent)
             archive_root = mounted_log_archive_root(canon_root, runtime)
             (archive_root / "hook-runs" / "legacy-import").mkdir(parents=True)
-            (canon_root / "agents" / "evals" / "results" / "hook-runs").mkdir(parents=True)
+            (canon_root / "agents" / "evals" / "results" / "hook-runs").mkdir(
+                parents=True
+            )
 
             dirs = hook_result_search_dirs(parent, canon_root, runtime)
 
@@ -115,14 +142,18 @@ class RuntimeLogPathsTest(unittest.TestCase):
         self.assertEqual(dirs[1], archive_root / "hook-runs" / "legacy-import")
         self.assertEqual(dirs[2], archive_root / "hook-runs")
 
-    def test_hook_result_search_dirs_standalone_prefers_archive_legacy_before_tree_legacy(self) -> None:
+    def test_hook_result_search_dirs_standalone_prefers_archive_legacy_before_tree_legacy(
+        self,
+    ) -> None:
         """Standalone AgentCanon invocation should search mounted legacy import before in-tree legacy logs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             canon_root = Path(temp_dir)
             runtime = self.runtime_root(canon_root)
             archive_root = mounted_log_archive_root(canon_root, runtime)
             (archive_root / "hook-runs" / "legacy-import").mkdir(parents=True)
-            (canon_root / "agents" / "evals" / "results" / "hook-runs").mkdir(parents=True)
+            (canon_root / "agents" / "evals" / "results" / "hook-runs").mkdir(
+                parents=True
+            )
 
             dirs = hook_result_search_dirs(canon_root, canon_root, runtime)
 
@@ -144,7 +175,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
         self.assertEqual(
             report_dir,
-            mounted_log_archive_root(canon_root, runtime) / "agent-reports" / repo_log_key(parent),
+            mounted_log_archive_root(canon_root, runtime)
+            / "agent-reports"
+            / repo_log_key(parent),
         )
 
     def test_codex_runtime_summary_path_uses_chat_partition_and_index(self) -> None:
@@ -157,11 +190,20 @@ class RuntimeLogPathsTest(unittest.TestCase):
             runtime = self.runtime_root(canon_root)
             mounted_log_archive_root(canon_root, runtime).mkdir(parents=True)
 
-            summary_path = codex_runtime_summary_path(parent, canon_root, "Thread 1", runtime)
+            summary_path = codex_runtime_summary_path(
+                parent, canon_root, "Thread 1", runtime
+            )
             index_path = codex_runtime_index_path(parent, canon_root, runtime)
 
-        archive_namespace = mounted_log_archive_root(canon_root, runtime) / "codex-runtime" / repo_log_key(parent)
-        self.assertEqual(summary_path, archive_namespace / "chats" / "thread-1" / "summary-no-git-head.jsonl")
+        archive_namespace = (
+            mounted_log_archive_root(canon_root, runtime)
+            / "codex-runtime"
+            / repo_log_key(parent)
+        )
+        self.assertEqual(
+            summary_path,
+            archive_namespace / "chats" / "thread-1" / "summary-no-git-head.jsonl",
+        )
         self.assertEqual(index_path, archive_namespace / "index.jsonl")
 
     def test_log_branch_key_uses_stable_source_identity(self) -> None:
@@ -215,11 +257,17 @@ class RuntimeLogPathsTest(unittest.TestCase):
             runtime = self.runtime_root(canon_root)
             mounted_log_archive_root(canon_root, runtime).mkdir(parents=True)
 
-            summary_path = codex_runtime_summary_path(parent, canon_root, "Thread 1", runtime)
+            summary_path = codex_runtime_summary_path(
+                parent, canon_root, "Thread 1", runtime
+            )
             hook_name = hook_log_file_name("skill_usage", canon_root)
 
         commit_key = head[:12]
-        runtime_root = mounted_log_archive_root(canon_root, runtime) / "codex-runtime" / repo_log_key(parent)
+        runtime_root = (
+            mounted_log_archive_root(canon_root, runtime)
+            / "codex-runtime"
+            / repo_log_key(parent)
+        )
         self.assertEqual(
             summary_path,
             runtime_root / "chats" / "thread-1" / f"summary-{commit_key}.jsonl",
@@ -247,8 +295,12 @@ class RuntimeLogPathsTest(unittest.TestCase):
 
         self.assertEqual(archive_a, runtime / "archive" / "agent-canon-log")
         self.assertEqual(archive_b, archive_a)
-        self.assertEqual(spool_a, runtime / "spool" / "hook-events" / repo_log_key(caller_a))
-        self.assertEqual(spool_b, runtime / "spool" / "hook-events" / repo_log_key(caller_b))
+        self.assertEqual(
+            spool_a, runtime / "spool" / "hook-events" / repo_log_key(caller_a)
+        )
+        self.assertEqual(
+            spool_b, runtime / "spool" / "hook-events" / repo_log_key(caller_b)
+        )
         self.assertEqual(outcome_a, outcome_b)
 
     def test_bootstrap_source_runtime_is_spool_only(self) -> None:
@@ -282,7 +334,9 @@ class RuntimeLogPathsTest(unittest.TestCase):
             source.mkdir()
             runtime.mkdir()
             external.mkdir()
-            with patch.dict(os.environ, {"AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external)}):
+            with patch.dict(
+                os.environ, {"AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external)}
+            ):
                 with self.assertRaises(RuntimePathEscape):
                     hook_event_spool_root(source, runtime)
 

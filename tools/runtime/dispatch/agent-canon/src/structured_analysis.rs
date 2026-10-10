@@ -774,7 +774,7 @@ fn build_structured_analysis_cache(parsed: &BuildArgs) -> Result<BuildResult, St
         &cache_dir,
         "structured-analysis cache",
     )?;
-    if runtime_root_is_explicit() || !cfg!(test) {
+    if parsed.runtime_root.is_some() || runtime_root_is_explicit() || !cfg!(test) {
         validate_external_target(
             &root,
             &runtime_root,
@@ -3534,7 +3534,6 @@ mod tests {
     #[test]
     fn build_cache_materializes_artifact_layer() {
         let root = test_root("structured-analysis-build-root");
-        let out_dir = test_root("structured-analysis-build-out");
         write_fixture(
             &root,
             "documents/README.md",
@@ -3545,6 +3544,8 @@ mod tests {
             "src/main.rs",
             "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../documents/README.md fixture docs\n// @dependency-end\nfn main() {}\n",
         );
+        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let out_dir = runtime_root.join("structured-analysis-build-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
@@ -3601,12 +3602,12 @@ mod tests {
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);
         let _ = fs::remove_dir_all(result.cache_dir);
+        let _ = fs::remove_dir_all(runtime_root);
     }
 
     #[test]
     fn directory_responsibility_gap_is_reported_from_child_artifacts() {
         let root = test_root("structured-analysis-directory-responsibility-gap");
-        let out_dir = test_root("structured-analysis-directory-responsibility-out");
         write_fixture(
             &root,
             "docs/README.md",
@@ -3622,6 +3623,8 @@ mod tests {
             "docs/runtime.md",
             "# Runtime\n\n<!--\n@dependency-start\nresponsibility Documents runtime cache and bootstrap behavior.\n@dependency-end\n-->\n",
         );
+        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let out_dir = runtime_root.join("structured-analysis-directory-responsibility-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
@@ -3655,6 +3658,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);
         let _ = fs::remove_dir_all(result.cache_dir);
+        let _ = fs::remove_dir_all(runtime_root);
     }
 
     #[test]
@@ -3668,7 +3672,6 @@ mod tests {
     #[test]
     fn graph_contract_accepts_build_cache_schema() {
         let root = test_root("structured-analysis-graph-contract-root");
-        let out_dir = test_root("structured-analysis-graph-contract-out");
         write_fixture(
             &root,
             "README.md",
@@ -3679,6 +3682,8 @@ mod tests {
             "src/main.rs",
             "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../README.md fixture root\n// @dependency-end\nfn main() {}\n",
         );
+        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let out_dir = runtime_root.join("structured-analysis-graph-contract-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
@@ -3694,6 +3699,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(out_dir);
         let _ = fs::remove_dir_all(result.cache_dir);
+        let _ = fs::remove_dir_all(runtime_root);
     }
 
     #[test]

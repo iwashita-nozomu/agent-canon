@@ -2,10 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Fully expands C++ template source roots into Lean evidence definitions.
-# upstream implementation cpp_source_canonical_ir.py extracts C++ source-canonical IR.
+# upstream implementation ../code/cpp_source_canonical_ir.py extracts C++ source-canonical IR.
 # upstream implementation operational_ir_to_lean.py renders Lean evidence.
-# downstream design ../../documents/tools/cpp_template_to_lean.md documents it.
-# downstream implementation ../../tests/agent_tools/test_cpp_template_to_lean.py tests it.
+# downstream design ../../../documents/tools/cpp_template_to_lean.md documents it.
+# downstream implementation ../../../tests/agent_tools/test_cpp_template_to_lean.py tests it.
 # @dependency-end
 """Expand one C++ template source root into complete Lean evidence."""
 

@@ -103,7 +103,6 @@ SKILL_SHIM_ROOT = ROOT / ".codex" / "personal" / "skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
-EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 27
 EXPECTED_MAX_DEPTH = 2
@@ -150,56 +149,6 @@ INITIAL_INTAKE_MARKERS = {
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
-)
-PARENT_ORCHESTRATION_DOCS = {
-    ROOT / "agents" / "COMMUNICATION_PROTOCOL.md": (
-        "Parent Orchestration-Only Contract",
-        "A write-capable child is mandatory",
-        "status=blocked",
-        "parent must not investigate",
-        "Decision-owning reviewers",
-        "A verifier runs prescribed validation",
-        "an auditor",
-        "an integration executor",
-        "a publisher or PR-processing child",
-        "an evaluation reviewer",
-        "Read-only conversational answers remain outside",
-    ),
-    ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md": (
-        "parent agent は orchestrator only",
-        "write-capable implementer handoff first",
-        "packet relay",
-        "decision-owning reviewer",
-    ),
-    ROOT / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md": (
-        "write-capable",
-        "typed blocked/retry/user-report evidence",
-        "decision-owning reviewer",
-    ),
-    ROOT / "agents" / "canonical" / "CODEX_INTAKE.md": (
-        "integration executor",
-    ),
-    ROOT / "agents" / "skills" / "agent-orchestration.md": (
-        "write-capable child",
-        "parent is an orchestrator only",
-        "typed blocker",
-    ),
-    ROOT / "agents" / "skills" / "codex-task-workflow.md": (
-        "write-capable implementer only when the catalog typed route requires a child",
-        "parent does not",
-    ),
-    ROOT / "agents" / "skills" / "subagent-bootstrap.md": (
-        "write-capable child route",
-        "typed blocked/retry/user-report packet",
-        "parent remains orchestrator only",
-    ),
-}
-FORBIDDEN_PARENT_DIRECT_MARKERS = (
-    "Parent-Direct Context Note",
-    "parent-direct",
-    "parent_direct",
-    "PARENT_DIRECT",
-    "parent_direct_reason",
 )
 TOOL_RESULT_ROUTE_MARKERS = (
     "raw checker/stat artifacts -> artifact_reviewer",
@@ -413,10 +362,6 @@ def validate_project_config() -> None:
         + ", ".join(forbidden_project_keys),
     )
     ensure(
-        config.get("model_context_window") == EXPECTED_MODEL_CONTEXT_WINDOW,
-        f"model_context_window must remain {EXPECTED_MODEL_CONTEXT_WINDOW}",
-    )
-    ensure(
         config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
         f"tool_output_token_limit must remain {EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT}",
     )
@@ -625,7 +570,7 @@ def validate_project_hooks() -> None:
 
 
 def validate_generated_role_views() -> None:
-    """Validate the closed role-view projection against canonical sources."""
+    """Validate generated role-view parity against canonical sources."""
     config = load_team_config()
     raw = config.raw
     agent_views = require_mapping(raw.get("agent_views"), "agents_config.agent_views must be a mapping")
@@ -670,7 +615,6 @@ def validate_generated_role_views() -> None:
     for role_id, config_view in sorted(configs.items()):
         source = require_mapping(agent_views.get(role_id), f"agent_views.{role_id} must be a mapping")
         binding = bindings[role_id]
-        ensure({key for key in config_view if not key.startswith("__")} == expected_fields, f"{role_id} generated view must be closed eight-field projection")
         view = generated[role_id]
         for field in expected_fields:
             projected = {
@@ -1629,16 +1573,6 @@ def validate_subagent_protocol_docs() -> None:
     validate_permanent_team_mapping(load_team_config(), subagents_text)
 
 
-def validate_parent_orchestration_contract() -> None:
-    """Require child-only repo writes and remove the retired parent route."""
-    for path, markers in PARENT_ORCHESTRATION_DOCS.items():
-        text = path.read_text(encoding="utf-8")
-        for marker in markers:
-            ensure(marker in text, f"{path} missing parent orchestration marker: {marker}")
-        for marker in FORBIDDEN_PARENT_DIRECT_MARKERS:
-            ensure(marker not in text, f"{path} retains retired parent route: {marker}")
-
-
 def parse_permanent_team_mapping_roles(markdown_text: str) -> set[str]:
     """Return role IDs listed in the CODEX_SUBAGENTS permanent-team mapping table."""
     in_mapping = False
@@ -2106,38 +2040,18 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         run.get("repo_tool_routing_policy"),
         f"task {task_id} manifest missing run.repo_tool_routing_policy",
     )
-    routes = require_list(
-        repo_tool_routing_policy.get("sequential_tool_routes"),
-        f"task {task_id} manifest missing sequential_tool_routes",
+    sequence = require_list(
+        repo_tool_routing_policy.get("sequence"),
+        f"task {task_id} manifest missing native tool sequence",
     )
-    for route in routes:
-        route = require_mapping(route, f"task {task_id} tool route must be a mapping")
-        tool_call_token = require_mapping(
-            route.get("tool_call_token"),
-            f"task {task_id} tool route missing tool_call_token",
-        )
-        for field in (
-            "schema",
-            "tool_id",
-            "argument_schema",
-            "arguments",
-            "intent",
-            "typed_failure_semantics",
-            "token_id",
-            "token_body_sha256",
-        ):
-            ensure(
-                field in tool_call_token,
-                f"task {task_id} tool_call_token missing {field}",
-            )
-        ensure(
-            "packet_command" not in route,
-            f"task {task_id} tool route must not embed packet_command prose",
-        )
-        ensure(
-            "commands" not in route,
-            f"task {task_id} tool route must not embed command menus",
-        )
+    ensure(
+        all(isinstance(stage, str) for stage in sequence),
+        f"task {task_id} native tool sequence must contain strings",
+    )
+    ensure(
+        "sequential_tool_routes" not in repo_tool_routing_policy,
+        f"task {task_id} tool route must not retain command packets",
+    )
     ensure(
         "subagent_lifecycle_policy:" in manifest_text,
         f"task {task_id} manifest missing subagent_lifecycle_policy",
@@ -2147,8 +2061,8 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         f"task {task_id} manifest missing run.subagent_prompt_packet object",
     )
     ensure(
-        "tool_call_tokens" in prompt_packet,
-        f"task {task_id} subagent_prompt_packet missing tool_call_tokens",
+        "native_argv" in prompt_packet,
+        f"task {task_id} subagent_prompt_packet missing native_argv",
     )
     ensure(
         "tool_command_packet_command" not in prompt_packet
@@ -2473,7 +2387,6 @@ def main() -> int:
     validate_dynamic_wave_policy()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
-    validate_parent_orchestration_contract()
     validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0

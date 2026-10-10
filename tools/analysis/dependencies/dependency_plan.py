@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Exposes the shared dependency planner under its neutral public name.
-# upstream implementation ./devcontainer_dependencies.py contains the legacy-compatible implementation
-# downstream implementation ../../bootstrap/container/image/Dockerfile installs the image plan
-# downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh validates the image plan
+# upstream implementation ../../runtime/container/devcontainer_dependencies.py contains the legacy-compatible implementation
+# downstream implementation ../../../bootstrap/container/image/Dockerfile installs the image plan
+# downstream implementation ../../validation/dependencies/docker_dependency_validator.sh validates the image plan
 # @dependency-end
 """Public neutral name for the shared image dependency planner.
 

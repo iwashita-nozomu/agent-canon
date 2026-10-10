@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Finds exact duplicate design documents and emits only external consolidation evidence.
-# upstream design ../README.md shared tool index
-# upstream implementation ./_runtime_output.py external output and mutation capability boundary
-# downstream design ../../documents/design/README.md documents design placement
+# upstream design ../../../../README.md shared tool index
+# upstream implementation ../formatting/_runtime_output.py external output and mutation capability boundary
+# downstream design ../../../../documents/design/README.md documents design placement
 # @dependency-end
 """Detect exact-duplicate design documents.
 

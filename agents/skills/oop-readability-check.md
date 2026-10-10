@@ -86,12 +86,10 @@ C++-only. The tool should decide which files are relevant by suffix.
 
 ## Mechanical Result
 
-When a report is requested or any tool-running mode runs the tool, create a
-Markdown report artifact by default. Chat-only tables are insufficient unless
-the user explicitly says no file / chat only.
-Use `result-artifact-writeout` when the OOP result must be retained beyond the
-chat turn: the checker output is the raw result, the Markdown table is the
-summary artifact, and both point to the same run.
+When the user requests a Markdown report or the result must persist beyond chat,
+create a report artifact. A tool run for a chat-only answer does not require a
+file. When persistence is required, use `result-artifact-writeout`: retain the
+checker output as the raw result and derive the Markdown summary from that run.
 
 Default artifact path:
 
@@ -202,30 +200,7 @@ when it is useful.
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. If the user gives no path, use the repo-local active source paths and
-   exclude generated or vendored surfaces (`vendor`, `reports`, `.git`, `build`,
-   `.pytest_cache`, `.ruff_cache`).
-1. If the user asks for a report, render the mechanical result as tables:
-   command, exit status, summary metrics, SOLID principle signals, dimensions,
-   finding kinds, hotspots, and the first relevant finding rows.
-1. In any tool-running mode, create a Markdown report artifact by default at
-   `reports/agents/<run-id-or-oop-readability-YYYYMMDD-HHMMSS>/oop_readability_<scope>.md`.
-   Chat-only tables do not satisfy this skill unless the user explicitly says
-   no file / chat only. Use `--format markdown --max-report-findings 80` for the
-   artifact, or save JSON as a sibling file and derive the Markdown tables from
-   that same JSON result. Include the artifact path in the final response.
 1. Use `$result-artifact-writeout` when the result must persist beyond chat; save the checker output as the raw artifact and derive Markdown tables from the same source result.
-1. Add agent analysis only in `analyze-existing` or `run-and-analyze` mode.
-   Keep it under a separate `Agent Analysis` section after the mechanical
-   result. Prioritize by risk and leverage, identify likely false positives,
-   group by SOLID principle signals, cite mechanical evidence, and read hotspot
-   files only when needed.
-   Treat `typed_boundary_evidence` as mechanical evidence owned by the checker.
-   Use `status`, `status_reason`, boundary counts, and evidence refs together;
-   never turn a scalar heuristic into the design judgment.
-   Treat public-surface, parameter-count, and complexity findings as boundary
-   review signals, not automatic split/extract or private-helper instructions.
-   Only recommend a boundary change after reading the caller contract, ownership,
-   or surrounding source shape that makes the split stable.
-1. When a run bundle is active, record timing as a behavior event:
-   `tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths>`.
+1. Add agent analysis only in `analyze-existing` or `run-and-analyze`, as defined above.
+   Keep it separate from mechanical output and follow `Agent Analysis`.
+1. Use `Timing Token` when the active run bundle requires that event.

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides sync experiment registry context experiment workflow tooling.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Sync branch/worktree metadata into the experiment registry."""

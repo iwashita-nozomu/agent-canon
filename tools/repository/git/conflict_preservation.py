@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Captures and validates content-preserving conflict and rework packets.
-# upstream design ../../agents/skills/pr-processing.md owns merge and rework order.
-# upstream design ../../agents/canonical/CODEX_SUBAGENTS.md assigns conflict mutation to integration_executor.
-# downstream implementation ../../tests/agent_tools/test_conflict_preservation.py validates the focused preservation contract.
+# upstream design ../../../agents/skills/pr-processing.md owns merge and rework order.
+# upstream design ../../../agents/canonical/CODEX_SUBAGENTS.md assigns conflict mutation to integration_executor.
+# downstream implementation ../../../tests/agent_tools/test_conflict_preservation.py validates the focused preservation contract.
 # @dependency-end
 """Capture and validate the content that a conflict or rework must preserve.
 

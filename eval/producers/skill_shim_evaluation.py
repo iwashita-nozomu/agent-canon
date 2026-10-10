@@ -3,10 +3,10 @@
 # contract tool
 # responsibility Produces route golden, fresh packet, and deterministic shim measurement artifacts.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md approved shim evaluation contract
-# upstream implementation ./route.py owns route behavior and JSON schema
+# upstream implementation ../../tools/agent/orchestration/route.py owns route behavior and JSON schema
 # upstream implementation ./evaluate_workflow_selection.py owns the frozen 525-case manifest loader
-# upstream implementation ./skill_shim_materializer.py owns generated shim records and content
-# upstream implementation ./runtime_artifacts.py owns external runtime receipt publication
+# upstream implementation ../../tools/agent/skills/skill_shim_materializer.py owns generated shim records and content
+# upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external runtime receipt publication
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py focused producer tests
 # @dependency-end
 """Produce route goldens, answer-free packet receipts, and shim measurements."""

@@ -93,7 +93,8 @@ GPU profile の admission semantics は [`gpu-execution`](gpu-execution.md) に�
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
 - prompt からの skill 選択: `python3 tools/agent/orchestration/route.py --prompt "<user request>" --mode routing-only --format json`
-- skill ごとの command packet: `python3 tools/agent/skills/skill_tool_commands.py show --skill <skill> --format text`
+- selected tools use their existing CLI/API/script entrypoints with native argv;
+  execution and validation remain owned by those entrypoints.
 - 依存辞書の静的検査: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 依存辞書の静的検査（source tree を変更しない）: `python3 tools/agent/skills/skill_dependency_map.py check --root .`
 - 通常の Mermaid/JSON 生成（外部 runtime artifact）: `python3 tools/agent/skills/skill_dependency_map.py graph --root . --runtime-root <external-runtime-root>`
@@ -159,7 +160,7 @@ in the Codex host runtime.
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは [`dependency-analysis`](dependency-analysis.md) を使います。
 - 大規模 refactor では [`refactor-loop`](refactor-loop.md) を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に [`dependency-analysis`](dependency-analysis.md) の change-impact packet を正本入力にします。
 - directory 構造、directory README、root view、path mapping、responsibility-scope map を責務ベースで変えるときは [`structure-refactor`](structure-refactor.md) を追加し、recursive directory responsibility graph を先に作ります。
-- ユーザーが 1 件ずつ共同デバッグする進め方を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、修正前の問題提示と修正後の次課題提示を固定します。
+- ユーザーが 1 件ずつの guided debugging を明示した場合は [`user-guided-debugging`](user-guided-debugging.md) を使い、編集前に問題を示して修正後に次課題を提示します。同じ作業で合意済みの完了・検証は継続し、ユーザーが選んだ停止・待機境界を尊重します。
 - C / C++ 差分では [`cpp-review`](cpp-review.md) を既定候補にします。
 - OOP readability tool の実行、表出力、結果解釈はいずれも [`oop-readability-check`](oop-readability-check.md) を使い、出力内で `Mechanical Result` と `Agent Analysis` を分けます。
 - tool、hook、eval、skill、experiment の結果を書き出すときは [`result-artifact-writeout`](result-artifact-writeout.md) を使い、raw result、summary、manifest、unique artifact path、overwrite policy を分けます。
@@ -196,27 +197,41 @@ skill の通常保守には持ち込まず、read-only review は編集・生成
 [Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation)
 を読み、通常の保守では既に解決した担当と判断を再利用します。
 
-1. 変更する canonical doc、catalog entry、依存関係、直接 caller と配布対象を特定します。
-   設計する場合は [PHILOSOPHY](../../PHILOSOPHY.md) と当該設計を基準に、目的・前提、
-   比較した案と証拠、順序・分岐・終了条件の理由、見直し条件を既存の担当設計へ残します。
-   根拠・手順・検証条件を同じ変更で揃え、全 Skill の棚卸しを着手条件にしません。
-2. 新しい再利用指示、大幅な挙動改訂、曖昧な指示による失敗修正、明示的な挙動評価では、
-   最初の挙動変更前に [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow) の
-   Iteration 0 と Scenario Packet の凍結を行い、既存の独立評価経路へ渡します。
-   formatter-only、path-only、生成 view の stale 修正、one-off prompt だけでは起動しません。
-3. canonical doc と `catalog.yaml`、`skill-dependencies.yaml`、実際に影響する caller・
-   route・tool command を揃えます。廃止する公開入口は本体・catalog・依存関係・配布adapterを
-   同じ変更で取り除き、必要な caller を残る担当へ接続します。公式本文のコピーや
-   標準を呼ぶだけの代替 Skill は作りません。
-4. [md-style-check](md-style-check.md) の規定経路で変更文書を整形します。
-   [保守者用 materializer](../../README.md#source-and-artifact-boundary) で対象adapterを
-   生成・readbackし、必要な生成差分を正本と同じcommitへ含めます。利用時には生成しません。
-   `.codex/config.toml` はhost-wiringのsource/inputとして確認し、生成先や第二のinventoryにしません。
-5. 公開surface変更は [Public Skill Surface](#public-skill-surface) のruntime alignment・
-   dependency checkと、既存の `check_skill_tool_invocation_graph.py` で配布と参照を確認します。
-   graphは同節の既存materializerから生成し、通常の外部出力と明示的なtracked pair更新を区別します。
-   検証範囲は [既存のvalidation境界](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
-   に従い、構造整合の成功と独立した挙動評価の成功を区別します。
+Start from the observed task outcome, requested trigger, and canonical owner.
+Identify only the catalog, dependency, caller, and distribution surfaces that
+can change. Use the host-provided `$skill-creator` for general authoring
+guidance: explain consequential constraints, generalize repeated failures
+beyond one example, and remove directions that do not improve a decision or
+outcome. Keep existing authority, safety, compatibility, and completion
+requirements with their owner. Record material design rationale in the existing
+design owner; a bounded wording change does not need a new design artifact.
+
+If the user or selected workflow needs fresh behavior evidence, use
+[empirical-prompt-tuning](empirical-prompt-tuning.md#workflow). Freeze its
+Scenario Packet before changing the tested behavior and follow the selected
+task-catalog and [Codex Subagents](../canonical/CODEX_SUBAGENTS.md) contracts
+for evaluator input and report. This route applies to explicit empirical
+evaluation, not every new or substantially revised Skill. A benchmark or
+improvement claim requires actual comparable measurements; otherwise report
+observed behavior and its limits without a benchmark claim.
+
+Keep the canonical doc, `catalog.yaml`, `skill-dependencies.yaml`, and only the
+affected callers, routes, and tool commands aligned. When retiring an entry,
+remove it from the same public surfaces and connect necessary callers to the
+remaining owner. Do not copy official skill bodies or add a wrapper Skill that
+only forwards to an existing capability.
+
+Format changed Markdown through [md-style-check](md-style-check.md). When a
+canonical change requires an adapter update, use the maintainer
+[materializer](../../README.md#source-and-artifact-boundary), read back the
+generated adapter, and include required output in the same commit. Do not
+generate adapters during runtime use. `.codex/config.toml` is host-wiring input,
+not a generated target or second inventory. Select alignment, dependency,
+invocation-graph, or behavior checks from the changed public surface; generate
+the graph through its existing materializer only when needed. Structural
+alignment and fresh behavior evaluation establish different claims. The existing
+[validation boundary](agent-orchestration.md#write-capable-handoff-validation-trust-boundary)
+controls selected commands.
 
 関連手順を配線する変更では、callerの判断・操作の直前に成立条件、具体的なMarkdownリンク、
 復帰先を置き、[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。

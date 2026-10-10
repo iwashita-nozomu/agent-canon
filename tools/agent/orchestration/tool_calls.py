@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,13 +37,6 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
 )
 
 TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
-
-SKILL_TOOL_CALL_PHASES = (
-    "required",
-    "discovered",
-    "conditional",
-    "maintenance",
-)
 
 ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
 SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.spawn-agent.args.v1"
@@ -196,53 +188,6 @@ def materialize_tool_call_token(
         "sha256:" + hashlib.sha256(canonical_json_bytes(record)).hexdigest()
     )
     return record
-
-
-def materialize_skill_tool_call_token(
-    skill: str, *, phase: str = "required"
-) -> dict[str, object]:
-    """Return the canonical, skill/phase-bound skill-command ToolCall identity."""
-    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", skill):
-        raise RuntimeError("skill_tool_call_token invalid skill")
-    if phase not in SKILL_TOOL_CALL_PHASES:
-        raise RuntimeError("skill_tool_call_token invalid phase")
-    token = materialize_tool_call_token(
-        tool_id="skill-tool-commands",
-        argument_schema_id=(f"agent-canon.skill-tool-commands.{skill}.{phase}.args.v1"),
-        argument_properties={
-            "skill": {"type": "string", "const": skill},
-            "format": {"type": "string", "enum": ["json"]},
-        },
-        arguments={"skill": skill, "format": "json"},
-        intent=(
-            "Materialize the selected skill's canonical repository-tool packet "
-            f"for its {phase} command phase."
-        ),
-        typed_failure_semantics=(
-            {
-                "code": f"skill_tool_route:{phase}:unknown_skill",
-                "retryable": False,
-                "next": "reject_route_packet",
-            },
-            {
-                "code": f"skill_tool_route:{phase}:catalog_mismatch",
-                "retryable": False,
-                "next": "return_to_tool_catalog_owner",
-            },
-        ),
-    )
-    argument_schema = cast(Mapping[str, object], token["argument_schema"])
-    token["identity"] = {
-        "skill": skill,
-        "phase": phase,
-        "tool_id": token["tool_id"],
-        "tool_call_token_id": token["token_id"],
-        "tool_call_digest": token["token_body_sha256"],
-        "argument_schema_id": argument_schema["$id"],
-        "argument_schema_digest": "sha256:"
-        + hashlib.sha256(canonical_json_bytes(argument_schema)).hexdigest(),
-    }
-    return token
 
 
 def materialize_dynamic_route_tool_call_token() -> dict[str, object]:

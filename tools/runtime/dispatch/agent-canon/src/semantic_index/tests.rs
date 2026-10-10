@@ -119,7 +119,7 @@ fn provider_compare_reuses_existing_responsibility_buckets() {
         "# Duplicate\nshared provider comparison phrase\nwith enough lines\nfor merge candidates";
     fs::write(root.join("documents").join("one.md"), duplicate).unwrap();
     fs::write(root.join("documents").join("two.md"), duplicate).unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -194,7 +194,7 @@ fn embed_provider_adds_vectors_without_rebuilding_nodes() {
         "# One\nprovider add vector text\nwith enough lines\nfor an indexed node",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -267,7 +267,7 @@ fn candidate_commands_auto_resolve_provider_dimension() {
         "# Two\nshared auto provider phrase\nwith enough lines\nfor merge candidates",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -370,7 +370,7 @@ fn natural_relations_persist_directed_kind_of_analysis() {
         "# Security\nSecret scanner credential exposure audit.",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -442,7 +442,7 @@ fn discourse_relations_pair_therefore_and_because_variants() {
             "# Flow\nThe runtime log branch may not be mounted before an AgentCanon update.\n\nTherefore the update tool should warn and continue without blocking validation.\n\nThe warning belongs in workflow guidance.\n\nBecause the same missing mount can appear before the log archive checkout exists.",
         )
         .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -536,7 +536,7 @@ fn sqlite_build_and_search_roundtrip() {
         "# Security audit\nsecret scanner hardening",
     )
     .unwrap();
-    let db = root.join(".agent-canon/semantic-index/index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -585,7 +585,7 @@ fn context_pack_returns_bounded_evidence_cells() {
         "# Other\nunrelated content",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -636,7 +636,7 @@ fn responsibility_tree_reports_vectors_and_coverage() {
         "print('semantic index directory coverage tool')\n",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -687,7 +687,9 @@ fn responsibility_tree_reports_vectors_and_coverage() {
         .unwrap()
         .iter()
         .any(|directory| directory.get("vector").is_some()));
-    let output = root.join("responsibility_tree.json");
+    let output = resolve_runtime_root_at(&root, None)
+        .expect("test runtime root")
+        .join("responsibility_tree.json");
     write_pretty_report(&output, &json).unwrap();
     let parsed: Value = serde_json::from_str(&fs::read_to_string(output).unwrap()).unwrap();
     assert_eq!(
@@ -708,7 +710,7 @@ fn responsibility_tree_detects_missing_directory_coverage() {
         "# Policy\nsemantic index coverage baseline",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("documents")],
@@ -772,7 +774,7 @@ fn mismatched_search_dimension_returns_no_hits() {
         "# Alpha\nsemantic vector",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -810,7 +812,7 @@ fn search_skips_cached_nodes_for_deleted_paths() {
         "# Stale\nsemantic vector deleted path phrase\nwith enough lines\nfor an indexed node",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -857,7 +859,7 @@ fn merge_candidates_exclude_same_file_pairs_by_default() {
         "# Two\nshared semantic topic\nwith enough lines\nfor merge candidates",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from("docs")],
@@ -900,7 +902,7 @@ fn merge_candidates_stay_within_responsibility_bucket_on_full_repo_input() {
     fs::write(root.join("docs").join("one.md"), duplicate).unwrap();
     fs::write(root.join("docs").join("two.md"), duplicate).unwrap();
     fs::write(root.join("src").join("one.py"), duplicate).unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -963,7 +965,7 @@ fn responsibility_scope_bucket_tracks_manifest_surfaces() {
         "eval-and-hook-evidence"
     );
     assert_eq!(
-        responsibility_scope_bucket("eval/definitions/skill_workflow_prompt_eval.toml"),
+        responsibility_scope_bucket("eval/definitions/eval_result_families.toml"),
         "eval-and-hook-evidence"
     );
     assert_eq!(
@@ -1001,7 +1003,7 @@ fn similar_pairs_can_cross_responsibility_bucket_for_alignment_search() {
     let duplicate = "# Alignment\nsame exact phrase for code and docs";
     fs::write(root.join("docs").join("alignment.md"), duplicate).unwrap();
     fs::write(root.join("src").join("alignment.py"), duplicate).unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -1080,7 +1082,7 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
         mergeable_duplicate,
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -1137,7 +1139,7 @@ fn merge_candidates_skip_tiny_heading_only_sections() {
         "# Two\n\n## Standard Flow\n\nlong duplicate body\nwith enough lines\nfor scoring",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     let build_args = BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -1190,7 +1192,7 @@ fn thin_docs_reports_short_wrapper_from_vector_db() {
             "# Substantial\nalpha beta gamma delta epsilon\nzeta eta theta iota kappa\nlambda mu nu xi omicron\npi rho sigma tau upsilon\nphi chi psi omega",
         )
         .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -1253,7 +1255,7 @@ fn thin_docs_marks_readme_wrappers_as_protected_entrypoints() {
         "# Docs\nsemantic index cache search routing\nSee [root](../README.md).",
     )
     .unwrap();
-    let db = root.join("index.sqlite");
+    let db = default_db_path(&root);
     build_index(&BuildArgs {
         root: root.clone(),
         includes: vec![PathBuf::from(".")],
@@ -1328,7 +1330,8 @@ fn default_db_path_uses_test_runtime_and_stays_outside_repo() {
     assert!(db.is_absolute());
     assert!(!db.starts_with(&root));
     assert!(db.ends_with("index.sqlite"));
-    assert!(db.starts_with(env::temp_dir().join("agent-canon-test-runtime")));
+    let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+    assert!(db.starts_with(runtime_root));
 }
 
 #[test]
@@ -1590,7 +1593,7 @@ fn absolute_include_outside_root_is_rejected() {
         root: root.clone(),
         includes: vec![outside.to_path_buf()],
         excludes: default_excludes(),
-        db: root.join("index.sqlite"),
+        db: default_db_path(&root),
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
         dim: 64,

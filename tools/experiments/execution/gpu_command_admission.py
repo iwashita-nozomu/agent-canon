@@ -3,10 +3,10 @@
 # contract implementation
 # responsibility Owns provider-independent GPU admission, immutable direct-command plans, exact GPU environments, and descendant-safe lock release.
 # upstream implementation ./execution_resource_plan.py owns strict NVIDIA evidence, BUSY/UNKNOWN/FREE classification, UUID reservation, and admission receipts
-# upstream design ../../documents/experiments/gpu-direct-command.md direct versus managed execution boundary
-# upstream design ../../agents/skills/gpu-execution.md route selection and no-fallback policy
+# upstream design ../../../documents/experiments/gpu-direct-command.md direct versus managed execution boundary
+# upstream design ../../../agents/skills/gpu-execution.md route selection and no-fallback policy
 # downstream implementation ./run_gpu_command.py shell-free command-line adapter
-# downstream implementation ../../tests/tools/test_run_gpu_command.py fake-probe, race, environment, lifecycle, and provider-independence tests
+# downstream implementation ../../../tests/tools/test_run_gpu_command.py fake-probe, race, environment, lifecycle, and provider-independence tests
 # @dependency-end
 
 """Provider-independent GPU admission for arbitrary shell-free commands.

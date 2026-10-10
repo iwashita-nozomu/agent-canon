@@ -17,14 +17,12 @@
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/manifest/tool_catalog.py validates structured tool catalog
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
-# upstream implementation ../../../agent/skills/skill_tool_commands.py validates runtime skill command packets
 # upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
 # upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../../../../eval/producers/evaluate_report_quality.py validates report writing quality checklist cases
 # upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
@@ -479,12 +477,6 @@ if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/skills/check_skill
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/agent/skills/skill_tool_commands.py" check 2>&1; then
-  echo "✅ runtime skill tool command checks 成功"
-else
-  echo "❌ runtime skill tool command checks 失敗"
   EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/runtime/manifest/tool_catalog.py" 2>&1; then

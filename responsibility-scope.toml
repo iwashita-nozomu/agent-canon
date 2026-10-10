@@ -34,12 +34,13 @@ class_values = [
 id = "runtime-entrypoints"
 owner = "agent-canon"
 class = "shared_runtime"
-description = "Canonical AgentCanon runtime entrypoints, adapters, profiles, and shared source templates."
+description = "Canonical AgentCanon runtime entrypoints, adapters, profiles, editor settings, and shared source templates."
 paths = [
   "AGENTS.md",
   "ROOT_AGENTS.md",
   ".agents/**",
   ".codex/**",
+  ".obsidian/**",
   ".vscode/**",
   "agent-canon-environment.toml",
   "agents/**",
@@ -90,12 +91,15 @@ issues = []
 id = "shared-tooling"
 owner = "agent-canon"
 class = "tooling"
-description = "Shared tool implementations, tool catalog, and compiled tooling."
+description = "Shared tool implementations, catalog schemas and validation configuration, and compiled tooling."
 paths = [
   "tools/**",
+  "schemas/agent-canon/**",
 ]
 exclude_paths = [
   "eval/**",
+  "tools/runtime/archive/runtime_log_archive_git.py",
+  "tools/runtime/archive/runtime_log_paths.py",
 ]
 protecting_tools = [
   "tools/validation/semantic/responsibility/responsibility_scope.py",
@@ -113,6 +117,9 @@ paths = [
 ]
 exclude_paths = [
   "eval/**",
+  "tests/agent_tools/test_eval_accumulation_check.py",
+  "tests/agent_tools/test_runtime_log_archive_git.py",
+  "tests/agent_tools/test_runtime_log_paths.py",
 ]
 protecting_tools = [
   "tools/validation/semantic/responsibility/responsibility_scope.py",

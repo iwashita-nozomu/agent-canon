@@ -2,8 +2,8 @@
 # @dependency-start
 # contract environment
 # responsibility Starts one resident AgentCanon tool process, compiles source-mounted Rust tools, or performs its read-only health probe.
-# upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md resident container lifecycle
-# downstream implementation ./Dockerfile shared tool image and Docker healthcheck
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md resident container lifecycle
+# downstream implementation ../image/Dockerfile shared tool image and Docker healthcheck
 # @dependency-end
 
 set -euo pipefail

@@ -23,20 +23,24 @@ provenance、failed/partial を含む terminal status をこの skill が記録�
 
 ## Topic Preparation
 
-topic 名と registry identity を決め、唯一の creator route を実行します。
+topic 名と registry identity を決め、次の唯一の existing creator route を使います。
 
 ```bash
 python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
-作成後は `run.py` の `main::main`、`cases.py`、`config.yaml`、`visualization.py`、`README.md` の順に確認します。
+作成後は、今回の変更・実行に関係する `run.py`、`cases.py`、`config.yaml`、
+`visualization.py`、`README.md` の責務と接続を確認します。順序は調べる依存に合わせます。
 template の直接コピーや別 scaffold fallback は使いません。
 
 ## Run procedure
 
-1. 必要な範囲で `Question`、`Comparison Target`、`Stop Condition`、`Fairness Notes`、`Artifact Plan`、
-   `Registry Plan`、`Config Snapshot Plan`、`Execution Plan` を固定する。準備、実装、static check、run、report は独立した段階とする。
-2. `debug`/`smoke`（局所確認）、`verified`（bounded run）、`formal`（case set、timeout、dtype、backend、worker、output を固定した比較 run）から選ぶ。
+1. 再現・解釈に必要な範囲で、question、comparison target、stop condition、fairness、
+   artifact、registry/config snapshot、execution plan を記録する。空の欄や独立した段階を
+   checklist のためだけに作らない。
+2. 求める証拠に合う既存 variant を選ぶ: `debug`/`smoke` は局所確認、`verified` は
+   bounded run、`formal` は case set、timeout、dtype、backend、worker、output を固定した
+   比較 run に使う。
 3. formal/verified の入口は次を使う。
    `python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py`
 4. source、effective config、command、environment、run identity、terminal status を記録し、producer が選んだものだけを
@@ -51,9 +55,10 @@ template の直接コピーや別 scaffold fallback は使いません。
 
 ## Long GPU or crash branch
 
-長時間 GPU run の開始/延長や crash 後の rerun では、高負荷設定を即時再投入せず、既存ログ・最後の進捗・run identity を確認します。
-compile と run を分け、有限の resource、期限、停止条件、永続保存先を実際に read back できる場合だけ開始します。
-診断は許可された static check、bounded CPU test、上限を確認した小さな GPU check の順に進め、前段成功から長時間 rerun を自動起動しません。
+長時間 GPU run の開始/延長や crash 後の rerun では、既存ログ・最後の進捗・run identity
+を確認し、今回の失敗原因を調べるのに必要な bounded 診断を選びます。compile と run を
+分ける設計ならそれぞれの resource、期限、停止条件、永続保存先を確認してから実行します。
+小さな確認の成功だけで長時間 rerun を自動起動しません。
 topic に mini-runner、scheduler、独自 signal 回収、partial-resume protocol を追加せず、managed runner/scheduler owner に handoff します。
 
 ## Topic boundary

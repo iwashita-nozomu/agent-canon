@@ -7,7 +7,6 @@ version: 1
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # downstream implementation ../../tools/agent/skills/skill_route_catalog.py parses complete rule and capability metadata
 # downstream implementation ../../tools/agent/orchestration/route.py consumes routing and dependency-derived skill order
-# downstream implementation ../../tools/agent/skills/skill_tool_commands.py prints skill command packets with dependency-derived candidates
 # downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public skill catalog consistency
 # downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
@@ -31,25 +30,12 @@ skill_families:
   # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
   # shims use .codex/personal/skills/_<name>/SKILL.md and stay owner-routed.
   - id: agent-orchestration
-    purpose: Mandatory routing skill for repository tasks; selects workflow family, skills, review roles, and runtime entrypoints before execution.
+    purpose: Resolve workflow family, active Skills, roles, and execution route for repository tasks.
     canonical_doc: agents/skills/agent-orchestration.md
     shim: .codex/personal/skills/agent-orchestration/SKILL.md
     discovery:
       name: agent-orchestration
-      description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
-      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
-      - {"executable": "agent-canon", "argv": ["docs"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
-      maintenance:
-      - {"tool_id": "check-execution-time-aware-orchestration", "operation_id": "default"}
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use at repository-task intake to select the workflow, Skills, roles, and execution route."
     routing:
       stage_policy: active
       reason: workflow, skill, subagent, or stage routing is part of the request
@@ -72,13 +58,6 @@ skill_families:
     discovery:
       name: repo-onboarding
       description: "Use when entering an unfamiliar repository or subdirectory and you need the fastest safe path to the repo overview, commands, conventions, and agent canon."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: task-routing
     purpose: Resolve long proposed tool or skill names into short routing areas and compact commands.
     canonical_doc: agents/skills/task-routing.md
@@ -86,19 +65,6 @@ skill_families:
     discovery:
       name: task-routing
       description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "<candidate>"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--area", "<area>", "--changed", "<paths...>"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--area", "checks", "--changed", "<path>"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "profile_surface_resolver.py"]}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "check", "--root", "."]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: skill/tool routing architecture or route contract design is in scope
@@ -183,56 +149,20 @@ skill_families:
     discovery:
       name: start-repository
       description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "git", "argv": ["clone", "<template>", "<new-project>"]}
-      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
-      - {"executable": "bash", "argv": ["scripts/start_repository.sh", "--project-slug", "<slug>", "--display-name", "<name>"]}
-      - {"executable": "bash", "argv": ["scripts/start_repository.sh", "--validate-only"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: codex-task-workflow
-    purpose: Execute repository tasks with a context-independent Codex flow.
+    purpose: Carry a selected repository change through its current owners and closeout.
     canonical_doc: agents/skills/codex-task-workflow.md
     shim: .codex/personal/skills/codex-task-workflow/SKILL.md
     discovery:
       name: codex-task-workflow
-      description: "Use when Codex needs a context-independent execution path for a repository task, from intake and workflow selection through artifact placement, implementation, validation, and closeout."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check", "<changed-markdown-paths>"]}
-      - {"tool_id": "agent-search", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/search/search.py", "--query-file", "<request-or-design-question.txt>", "--providers", "text,semantic,vector,tool,header-deps,code-deps", "--format", "json"]}
-      - {"tool_id": "check-solid-evidence", "operation_id": "default"}
-      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
-      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
-      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
-      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
-      - {"tool_id": "bootstrap-agent-run", "operation_id": "default", "argv_suffix": ["...", "--task-id", "<T*>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use for repository-changing execution after workflow and owners are selected."
   - id: subagent-bootstrap
-    purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
+    purpose: Launch selected child handoffs and durable coordination without duplicating role policy.
     canonical_doc: agents/skills/subagent-bootstrap.md
     shim: .codex/personal/skills/subagent-bootstrap/SKILL.md
     discovery:
       name: subagent-bootstrap
-      description: "Use when a task needs specialist delegation, run-bundle bootstrap, explicit stage subagents, or Codex implementation routing."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--subagent-wave", "..."]}
-      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
-      - {"tool_id": "bootstrap-agent-run", "operation_id": "default"}
-      - {"executable": "git", "argv": ["worktree"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use when a selected route needs child delegation or durable coordination/resumption."
     routing:
       stage_policy: deferred
       reason: repo-changing implementation, patch, doc-edit, or explicit subagent execution requires write-capable handoff routing
@@ -260,12 +190,6 @@ skill_families:
     discovery:
       name: direct-luna-communication
       description: "Use after orchestration selects a Luna execution profile and needs bounded context, explicit authority, effective model/effort readback, and typed handback without a role-specific physical alias."
-    tool_commands:
-      required: []
-      conditional: []
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: logical role, Skill set, Luna profile, and authority must be selected before direct communication
@@ -282,16 +206,6 @@ skill_families:
     discovery:
       name: change-review
       description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "check-solid-evidence", "operation_id": "default", "argv_suffix": ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--root", ".", "<changed-python-paths>", "--evidence", "<oop-readability-report>"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
-      - {"executable": "git", "argv": ["diff", "--stat"]}
-      - {"executable": "git", "argv": ["diff", "--name-only"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: review findings or implementation changes need findings-first review
@@ -316,18 +230,6 @@ skill_families:
     discovery:
       name: python-review
       description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "ruff", "argv": ["check", "python", "tests", "--select", "D,E,F,I,UP", "--ignore", "E501"]}
-      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
-      - {"tool_id": "oop-python-readability", "operation_id": "default"}
-      - {"tool_id": "check-solid-evidence", "operation_id": "default", "argv_suffix": ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--root", ".", "<changed-python-paths>", "--evidence", "<oop-readability-report>"]}
-      - {"tool_id": "run-python-quality-checks", "operation_id": "default"}
-      - {"tool_id": "oop-python-readability", "operation_id": "default", "argv_suffix": ["--root", ".", "--language", "python", "<changed-python-paths>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: Python implementation review is in scope
@@ -349,13 +251,6 @@ skill_families:
     discovery:
       name: cpp-review
       description: "Use when C or C++ code changes need strict review for build evidence, header boundaries, ownership, and native-code behavior."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: C or C++ changed-path evidence selects the native review route.
@@ -374,14 +269,6 @@ skill_families:
     discovery:
       name: oop-readability-check
       description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "oop-python-readability", "operation_id": "default", "argv_suffix": ["--root", ".", "--language", "all", "<paths>"]}
-      - {"tool_id": "oop-python-readability", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: OOP readability or readability guard evidence is in scope
@@ -413,15 +300,6 @@ skill_families:
     discovery:
       name: oop-type-design
       description: "Use before implementation to define language-neutral OOP/type contracts, responsibility boundaries, and explicit capability-owned design packets."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--capability", "oop_type_design"]}
-      - {"tool_id": "run-python-quality-checks", "operation_id": "default"}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--report-dir", "<run-dir>/dependency-review", "--fail-missing"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit pre-implementation OOP/type design capability owns responsibility and boundary modeling
@@ -438,15 +316,6 @@ skill_families:
     discovery:
       name: result-artifact-writeout
       description: "Use when writing, exporting, saving, accumulating, or reporting tool/checker/hook/skill/eval/experiment results; creates durable raw and summary artifacts with unique IDs and no accidental overwrite."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "save-experiment-result-annex", "operation_id": "default", "argv_suffix": ["--result-dir", "experiments/<topic>/result/<run_name>", "--annex-repo", "$EXPERIMENT_RESULT_ANNEX_REPO"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "exec", "--root", "<registered-source-root>", "--", "python3", "tools/runtime/archive/runtime_log_archive_git.py", "archive-agent-report", "--report-dir", "reports/agents/<run-id>"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "exec", "--root", "<registered-source-root>", "--", "python3", "tools/runtime/archive/runtime_log_archive_git.py", "push"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: raw results, reports, manifests, or accumulated evidence must be written out
@@ -472,13 +341,6 @@ skill_families:
     discovery:
       name: result-visualize
       description: "Use when designing reusable result visualizations that bind each figure to its exact calculation, coverage, and chart geometry in one contract."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: result figure design, metric calculation, coverage denominator handling, or reusable visualization planning is in scope
@@ -497,21 +359,12 @@ skill_families:
         - ["figure", "inventory"]
         - ["result", "figure", "inventory"]
   - id: tool-finding-report
-    purpose: Run tools and checkers to discover findings, preserve raw and structured full artifacts, mechanically rank every finding, and produce complete finding packets for implementation or refactor planning; compare impact only when requested.
+    purpose: Run selected tools and checkers, preserve evidence for the requested scope, and conditionally prioritize findings when triage needs it; compare impact only when requested.
     canonical_doc: agents/skills/tool-finding-report.md
     shim: .codex/personal/skills/tool-finding-report/SKILL.md
     discovery:
       name: tool-finding-report
-      description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "tools/validation/code/oop/<language>/readability.py", "argv": ["--format", "json"]}
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py"]}
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
     routing:
       stage_policy: active
       reason: tool warning, checker finding, hardcoded guard, or static-analysis finding must become a typed finding packet
@@ -533,26 +386,12 @@ skill_families:
         - ["run_repo_dependency_review.sh", "dependency", "graph"]
         - ["run_repo_dependency_review.sh", "修正先"]
   - id: issue-finding-report
-    purpose: Convert observed defects or accumulated evidence into cause-qualified repository-qualified GitHub Issues, and reorganize related Issues into cohesive responsibility units without clause loss.
+    purpose: Turn AgentCanon-owned defects or structured evidence into investigative Issues and cohesive responsibility boundaries.
     canonical_doc: agents/skills/issue-finding-report.md
     shim: .codex/personal/skills/issue-finding-report/SKILL.md
     discovery:
       name: issue-finding-report
-      description: "Use when creating, splitting, merging, re-parenting, reopening, or superseding Issues by owner, decision, mechanism, validation, and completion responsibility; investigates cause hypotheses without overclaiming, preserves unique clauses, and can also convert accumulated runtime evidence into durable AgentCanon Issues through the shared dashboard tool."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "status", "--porcelain"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "tool", "run", "--root", "<registered-source-root>", "generate-agent-runtime-dashboard", "--", "--root", ".", "--compact-out", "reports/agent-runtime-dashboard/agent-log-analysis-compact.md", "--api-out", "reports/agent-runtime-dashboard/agent-log-analysis-api.json"]}
-      - {"executable": "git", "argv": ["grep", "-n", "<cause keywords>", "--", "documents/notes/knowledge", "documents/notes/failures", "documents", "agents"]}
-      - {"executable": "gh", "argv": ["issue", "view", "<owner/repository#number>", "--json", "number,title,body,state,url"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
-      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use to record AgentCanon defect evidence or reorganize related Issues by owner and completion responsibility."
     routing:
       stage_policy: active
       reason: a finding or related Issue set needs cause-qualified publication or responsibility reorganization
@@ -581,19 +420,6 @@ skill_families:
     discovery:
       name: agent-log-analysis
       description: "Use when analyzing accumulated AgentCanon skill/tool/workflow/hook/eval logs, missed or late skill invocation, routing misses, weak skills, over-constrained related-skill coverage, or selection gaps; reuse existing structured summaries and use bounded snapshot-qualified drilldown when needed. Archive maintenance, dashboard repair, and eval reruns are separate selected operations, not analysis prerequisites."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "ensure"]}
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "status", "--porcelain"]}
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "sync"]}
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "check-clean", "--porcelain"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<control-parent-root>", "--runtime-root", "<runtime-root>", "tool", "run", "--root", "<registered-source-root>", "generate-agent-runtime-dashboard", "--", "--root", ".", "--compact-out", "reports/agent-runtime-dashboard/agent-log-analysis-compact.md", "--api-out", "reports/agent-runtime-dashboard/agent-log-analysis-api.json"]}
-      - {"tool_id": "eval-accumulation-check", "operation_id": "default", "argv_suffix": ["--root", ".", "--compact-out", "reports/agents/<run-id>/eval-accumulation-before.json", "--format", "text"]}
-      - {"executable": "git", "argv": ["grep", "-n"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: skill/tool/workflow routing misses or selection coverage require runtime log analysis
@@ -645,13 +471,6 @@ skill_families:
     discovery:
       name: runtime-log-repair
       description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: structured runtime dashboard evidence needs owner-routed repair work
@@ -684,18 +503,6 @@ skill_families:
     discovery:
       name: agent-eval-accumulation
       description: "Use when AgentCanon eval collection or repair is selected to establish required evidence; runs registered producers, validates family accumulation, and archives reports. Read-only observation of missing, stale, or failing evidence alone does not activate this repair loop."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "eval-accumulation-check", "operation_id": "default", "argv_suffix": ["--root", ".", "--compact-out", "reports/agents/<run-id>/eval-accumulation-before.json", "--format", "text"]}
-      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py", "--root", ".", "--run-id", "<run-id>", "--report-dir", "reports/agents/<run-id>"]}
-      - {"tool_id": "runtime-log-archive-git", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "sync"]}
-      - {"tool_id": "generated-artifact-guard", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "eval-accumulation-check", "operation_id": "default"}
-      - {"tool_id": "run-accumulated-agent-evals", "operation_id": "default", "argv_suffix": ["python3", "eval/producers/run_accumulated_agent_evals.py"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: agent-canon-update
     purpose: Update and publish standalone AgentCanon source and its shared bootstrap runtime through a qualified source PR.
     canonical_doc: agents/skills/agent-canon-update.md
@@ -703,15 +510,6 @@ skill_families:
     discovery:
       name: agent-canon-update
       description: "Use when updating standalone AgentCanon source, its bootstrap/runtime, skills, eval/archive route, or publishing a qualified AgentCanon branch and PR."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
-      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
-      - {"executable": "git", "argv": ["diff", "--check"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Standalone AgentCanon source, bootstrap, runtime, eval, or source PR workflow is in scope
@@ -731,22 +529,6 @@ skill_families:
     discovery:
       name: agent-canon-bootstrap
       description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
-    tool_commands:
-      required:
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "status"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "target", "add", "--root", "<project-root>", "--mode", "read-only"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "tool", "run", "<catalog-id>", "--", "<args...>"]}
-      conditional:
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "install"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "start"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "exec", "--", "<argv...>"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "eval", "collect", "--root", "<project-root>", "--run-id", "<run-id>"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "eval", "sync", "--run-id", "<run-id>"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "stop"]}
-      - {"executable": "bash", "argv": ["bootstrap.sh", "--repository-root", ".", "--control-parent-root", "<authorized-parent-workspace>", "gc", "--dry-run"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: AgentCanon shared tool-runtime lifecycle, target admission, typed dispatch, eval archive, or cleanup is in scope
@@ -770,15 +552,6 @@ skill_families:
     discovery:
       name: repository-topic-clone
       description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/<topic>/<repo>; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["prepare", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>"]}
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["merge-main", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>"]}
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["cleanup", "--url", "<url>", "--repo-name", "<repo>", "--workspace-root", "<root>", "--topic", "<topic>", "--branch", "<branch>", "--checkout-mode", "<linked-worktree|independent-clone>", "--owner-evidence", "<path>", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
@@ -800,16 +573,6 @@ skill_families:
     discovery:
       name: dependency-module-change
       description: "Use when a dependency source change, independent topic checkout, or reconstructibility-based checkout cleanup is required."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "prepare", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]"]}
-      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "merge-main", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]"]}
-      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "status", "--topic", "<topic>", "[--module", "<path>]"]}
-      - {"tool_id": "dependency-module-change", "operation_id": "default", "argv_suffix": ["--root", "<parent-root>", "cleanup", "--topic", "<topic>", "--module", "<path>", "--branch", "<branch>", "--owner-evidence", "<path>", "[--allowed-path", "<relative-path>", "...]", "[--candidate-cas", "<path>", "--pr-lifecycle", "<path>", "[--publication-readback", "<path>]]", "[--apply]"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
@@ -823,31 +586,12 @@ skill_families:
         - ["独立", "source", "clone"]
         - ["モジュール", "cleanup"]
   - id: pr-processing
-    purpose: Process GitHub pull request and issue queues by inventorying state, preserving PR Essence in bodies and run bundles, checking mutation authority, resolving conflicts, ordering merges, validating gates, triaging issues, and syncing AgentCanon source PRs with parent pin PRs.
+    purpose: Process authorized GitHub Issue and PR operations; queue planning is conditional on candidate dependencies.
     canonical_doc: agents/skills/pr-processing.md
     shim: .codex/personal/skills/pr-processing/SKILL.md
     discovery:
       name: pr-processing
-      description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "gh", "argv": ["pr", "list", "--state", "open", "--json", "number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt"]}
-      - {"executable": "gh", "argv": ["issue", "list", "--state", "open", "--json", "number,title,labels,updatedAt,url"]}
-      - {"executable": "gh", "argv": ["pr", "view"]}
-      - {"executable": "gh", "argv": ["pr", "checks"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
-      - {"tool_id": "bootstrap-agent-run", "operation_id": "default", "argv_suffix": ["--task", "<task>", "--owner", "codex", "--workspace-root", "$PWD"]}
-      - {"executable": "gh", "argv": ["pr", "view", "<n>", "--json", "..."]}
-      - {"executable": "gh", "argv": ["pr", "checks", "<n>"]}
-      - {"executable": "git", "argv": ["merge", "origin/<base>"]}
-      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["capture", "--repo-root", "<clone>", "--base", "<merge-base>", "--ours", "<head>", "--theirs", "<origin-main>", "--output", "<clone>/.agent-canon/conflict-preservation.json"]}
-      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["validate", "--inventory", "<inventory>", "--plan", "<preservation-plan>", "--repo-root", "<clone>"]}
-      - {"tool_id": "conflict-preservation", "operation_id": "default", "argv_suffix": ["validate-rework", "--packet", "<rework-preservation>"]}
-      - {"tool_id": "repository-topic-clone", "operation_id": "default", "argv_suffix": ["finalize-merge", "...", "--inventory", "<inventory>", "--plan", "<preservation-plan>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use for an authorized GitHub Issue or PR operation; build a queue only when candidates depend on or conflict with each other."
     routing:
       stage_policy: active
       reason: pull request, merge queue, conflict repair, or issue triage processing is in scope
@@ -888,16 +632,6 @@ skill_families:
     discovery:
       name: agent-update-branch
       description: "Use when private knowledge, eval results, AgentCanon pins, or other agent-runtime updates should be isolated on template-derived update branches and later integrated through a controlled branch workflow."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "validate", "<lane>"]}
-      - {"executable": "bash", "argv": ["tools/repository/git/agent_update_branch.sh", "push", "<lane>", "<branch>"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "--runtime-root", "<runtime>", "status"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: report-writing
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -909,13 +643,6 @@ skill_families:
     discovery:
       name: report-writing
       description: "Use when drafting or revising reader-facing reports, decision briefs, experiment summaries, presentation narratives, PPT/storyboard plans, or slide-ready visual asset plans from tool, hook, eval, experiment, review, audit, or operational evidence; separates raw-result writeout from report narrative and applies the report quality checklist."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: reader-facing report, decision brief, evaluation summary, or presentation narrative is in scope
@@ -952,15 +679,6 @@ skill_families:
     discovery:
       name: prose-reasoning-graph
       description: "Use when existing prose should be converted into a SQLite-backed structure graph under an explicit external runtime, diagnosed for discourse/argument/evidence/experiment gaps, explained in natural language, and handed off to writing or review skills with split/merge/bridge/reorder rewrite packets."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "ingest", "<source.md>", "--stats-out", "<ingest.stats.json>"]}
-      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "analyze", "--db", "<graph.sqlite>", "--profile", "<writing|logic|experiment|report|academic|paper|all>", "--stats-out", "<analyze.stats.json>"]}
-      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<source.md>", "--out-dir", "<artifact-dir>", "--profile", "<profile>", "--stats-out", "<stats.json>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: prose structure graphing, diagnostics, or rewrite handoff is in scope
@@ -985,14 +703,6 @@ skill_families:
     discovery:
       name: structure-planning
       description: "Use when a report, experiment plan, Eval output, presentation storyboard, PPT/deck plan, document, paper, HTML view, or refactor needs a structure contract before prose, rendering, interpretation, follow-up runs, or edits."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "<general|experiment-report|methods-protocol|academic-argument|refactor-design>", "--format", "jsonl"]}
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: nontrivial design or document structure must be fixed before edits
@@ -1013,14 +723,6 @@ skill_families:
     discovery:
       name: code-visualization
       description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "render-dependency-manifest-graph", "operation_id": "default"}
-      - {"tool_id": "render-dependency-manifest-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/dependencies/render_dependency_manifest_graph.py", "--root", ".", "--scope", "changed", "--bundle-dir", "reports/dependency-graph", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       triggers:
@@ -1048,13 +750,6 @@ skill_families:
     discovery:
       name: html-output
       description: "Use when the user explicitly asks for HTML output, a browser-readable page, dashboard/report HTML, external browser publication, or local preview server; defaults reports to Markdown unless HTML is explicit."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit HTML or browser-readable output is in scope
@@ -1072,13 +767,6 @@ skill_families:
     discovery:
       name: test-design
       description: "Use after the owning implementation mechanism exists to proactively design a logically minimal test set; classify unresolved oracle, specification, regression, and failure-mode risk before adding cases."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit unresolved oracle, specification, regression, or failure-mode risk remains after the owning implementation mechanism exists
@@ -1099,15 +787,6 @@ skill_families:
     discovery:
       name: refactor-loop
       description: "Use when a large refactor should run as a behavior-preserving refactor loop with explicit path mapping, semantic-delta controls, repair slices, and strong review gates."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["python-structure-hash-scope-plan", "--input", "<report.json>", "--dependency-report-dir", "<dependency-review-dir>", "--output", "<change-impact-packet.json>"]}
-      - {"executable": "git", "argv": ["diff"]}
-      - {"executable": "python3", "argv": ["tools/validation/ci/checks/check_merge_structure.py", "..."]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: behavior-preserving refactor work needs an explicit loop and review gates
@@ -1144,25 +823,6 @@ skill_families:
     discovery:
       name: structure-refactor
       description: "Use when repository structure review, repo-refactor requests, expected AgentCanon layout, directory responsibilities, canonical README ownership, path layout, root views, project .codex/.agents views, personal ~/.codex runtime boundaries, or responsibility-scope maps must be reviewed, repaired, or refactored using structure contracts, recursive directory README analysis, source/view ownership checks, stale-surface sweeps, dependency manifests, and behavior-preserving move/rename gates."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<request>", "--format", "json"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--name", "<candidate>"]}
-      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json", ">", "<run>/repo_structure_contract.json"]}
-      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json", ">", "<run>/responsibility_scope.json"]}
-      - {"executable": "./bootstrap.sh", "argv": ["--control-parent-root", "<parent>", "status"]}
-      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "<root>"]}
-      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
-      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<readme-path>", "--out-dir", "<run>/prose/<readme-id>", "--profile", "all", "--stats-out", "<run>/prose/<readme-id>.stats.json"]}
-      - {"tool_id": "check-design-doc-claims", "operation_id": "default", "argv_suffix": ["--root", "<root>", "<design-doc>"]}
-      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
-      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>", "--format", "json"]}
-      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", "<root>"]}
-      - {"tool_id": "prose-reasoning-graph", "operation_id": "default", "argv_suffix": ["python3", "tools/analysis/documents/prose_reasoning_graph.py", "check-document", "<readme-path>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: repository structure, source ownership, path responsibility, or Codex runtime surface boundaries are in scope
@@ -1220,19 +880,12 @@ skill_families:
         - ["すべてのスキル", "修正"]
         - ["全", "skill", "command"]
   - id: user-guided-debugging
-    purpose: Debug or repair one issue at a time when the user explicitly asks for visible problem statements before each edit and the next issue after each fix.
+    purpose: Carry user-guided one-issue edits and agreed validation forward while honoring explicit stop boundaries.
     canonical_doc: agents/skills/user-guided-debugging.md
     shim: .codex/personal/skills/user-guided-debugging/SKILL.md
     discovery:
       name: user-guided-debugging
-      description: "Use when the user explicitly asks to debug, repair, or refactor one issue at a time with visible problem statements before each edit and a next-issue prompt after each scoped fix."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use when the user explicitly requests one-issue-at-a-time debugging with visible pre-edit problems. Present the next issue after each fix while continuing agreed work and validation unless the user sets a stop or wait boundary."
     routing:
       stage_policy: active
       reason: user explicitly asks for one-issue-at-a-time debugging or visible problem statements before each edit
@@ -1271,13 +924,6 @@ skill_families:
     discovery:
       name: grilling
       description: "Use when the user explicitly asks to grill a plan, decision, or idea; ask the settled prerequisite frontier in rounds with recommendations, inspect facts through the agent, and wait for shared understanding before any action."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: user explicitly requests a read-only design-tree grilling interview
@@ -1299,15 +945,6 @@ skill_families:
     discovery:
       name: long-form-writing
       description: "Use for reader-facing README, workflow, guide, migration, or specification writing and revision; proceed from existing sources, text, and brief structure notes, and do not select this skill by text length alone."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "general"]}
-      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py", "--kind", "long-form", "..."]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: academic-writing
     purpose: Draft academic documents with explicit claim mapping and mandatory multi-agent review for notation and logic.
     canonical_doc: agents/skills/academic-writing.md
@@ -1315,15 +952,6 @@ skill_families:
     discovery:
       name: academic-writing
       description: "Use when drafting a paper, thesis chapter, scholarly note, or other academic document that needs mandatory multi-agent review for notation, logic, and reader flow."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "academic-argument"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
-      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: academic or scholarly writing needs notation, logic, and evidence review
@@ -1345,15 +973,6 @@ skill_families:
     discovery:
       name: paper-writing
       description: "Use when drafting a submission paper, thesis chapter, or other paper-style manuscript that needs section contracts, citation-evidence review, notation review, and logic-gap review."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "academic-argument"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
-      - {"executable": "python3", "argv": ["tools/analysis/documents/doc_start.py"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: md-style-check
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1365,19 +984,6 @@ skill_families:
     discovery:
       name: md-style-check
       description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["docs"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check", "<paths...>"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format", "<paths...>"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "-h"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "fix-math", "<paths...>"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "fix-mermaid", "<paths...>"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Markdown style, links, headings, or docs lint are in scope
@@ -1408,13 +1014,6 @@ skill_families:
     discovery:
       name: mvp-skeleton
       description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must define the smallest complete final product scope. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: document-canon-cleanup
     purpose: Find non-canonical documents and route edits to source canon instead of mirrors, generated evidence, or stale copies.
     canonical_doc: agents/skills/document-canon-cleanup.md
@@ -1422,16 +1021,6 @@ skill_families:
     discovery:
       name: document-canon-cleanup
       description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory"]}
-      - {"executable": "agent-canon", "argv": ["structured-analysis", "document-inventory", "--root", "."]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default", "argv_suffix": ["--fail-missing"]}
-      - {"tool_id": "check-convention-compliance", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Document-canon cleanup, stale docs, old docs, or generated-report/document inventory cleanup is in scope
@@ -1465,15 +1054,6 @@ skill_families:
     discovery:
       name: parent-repository-audit
       description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
-    tool_commands:
-      required:
-      - {"executable": "python3", "argv": ["tools/analysis/code/parent_repository_audit.py", "list", "--root", "<parent-root>", "--format", "text"]}
-      conditional:
-      - {"executable": "python3", "argv": ["tools/analysis/code/parent_repository_audit.py", "check", "--root", "<parent-root>", "--format", "text"]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default", "argv_suffix": ["python3", "tools/agent/skills/skill_tool_commands.py", "show", "--skill", "parent-repository-audit", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: parent repository audit capability requires deterministic unit selection and owner-routed finding closure
@@ -1494,28 +1074,6 @@ skill_families:
     discovery:
       name: dependency-analysis
       description: "Use when checking, validating, or diagnosing repository dependency manifests, expanding code/header/search dependencies into a change-impact packet, or preparing repair-planning and subagent handoff context before editing, review, or closeout."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "git", "argv": ["grep", "-l"]}
-      - {"tool_id": "scan-code-dependencies", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "helper-function-inventory", "operation_id": "default", "argv_suffix": ["--changed", "--all-functions", "--format", "json"]}
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed", "--fail-missing"]}
-      - {"tool_id": "check-dependency-header-format", "operation_id": "default", "argv_suffix": ["--changed", "--require-header"]}
-      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--changed", "--print-edges"]}
-      - {"executable": "agent-canon", "argv": ["semantic-index", "context-pack"]}
-      - {"executable": "git", "argv": ["grep", "-l", "search phrase", "--", "<responsibility-scoped", "dirs>", ">", "reports/search_hits.txt"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
-      - {"tool_id": "check-design-doc-claims", "operation_id": "default"}
-      - {"executable": "agent-canon", "argv": ["python-structure-hash-scope-plan"]}
-      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--changed", "--print-edges", "--check-bidirectional"]}
-      - {"tool_id": "scan-dependency-headers", "operation_id": "default"}
-      - {"tool_id": "check-dependency-graph", "operation_id": "default", "argv_suffix": ["--print-edges"]}
-      - {"executable": "git", "argv": ["grep"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: worktree-health
     purpose: Review worktree scope, drift, and cleanup readiness.
     canonical_doc: agents/skills/worktree-health.md
@@ -1523,19 +1081,6 @@ skill_families:
     discovery:
       name: worktree-health
       description: "Use this skill to review current checkout authority, run-bundle drift, legacy worktree cleanup evidence, and cleanup readiness."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "worktree-scope-lint", "operation_id": "default", "argv_suffix": ["--current"]}
-      - {"executable": "git", "argv": ["status", "--short", "--branch"]}
-      - {"executable": "git", "argv": ["diff", "--name-only"]}
-      - {"executable": "git", "argv": ["worktree", "list", "--porcelain"]}
-      - {"executable": "git", "argv": ["branch", "--show-current"]}
-      - {"executable": "bash", "argv": ["tools/validation/documentation/checks/check_worktree_scopes.sh"]}
-      - {"executable": "python3", "argv": ["tools/validation/semantic/authority/validate_role_write_scope.py", "--report-dir", "reports/agents/<run-id>", "--workspace-root", ".", "--role", "<role-id>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: retention
     purpose: Plan retention, archive, externalization, or deletion of existing experiment results without owning execution or serialization.
     canonical_doc: agents/skills/retention.md
@@ -1543,12 +1088,6 @@ skill_families:
     discovery:
       name: retention
       description: "Use when planning whether existing experiment results should be retained, archived, externalized, or deleted before mutation."
-    tool_commands:
-      required: []
-      conditional: []
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit retention planning for existing experiment results is in scope
@@ -1559,19 +1098,6 @@ skill_families:
     discovery:
       name: experiment-lifecycle
       description: "Use this skill when preparing, running, or validating experiments."
-    tool_commands:
-      required:
-      - {"executable": "python3", "argv": ["tools/experiments/lifecycle/create_experiment_topic.py", "<topic>"]}
-      conditional:
-      - {"tool_id": "check-experiment-registry", "operation_id": "default"}
-      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "python3", "experiments/<topic>/run.py"]}
-      - {"tool_id": "save-experiment-result-annex", "operation_id": "default", "argv_suffix": ["--result-dir", "experiments/<topic>/result/<run_name>", "--annex-repo", "$EXPERIMENT_RESULT_ANNEX_REPO"]}
-      - {"tool_id": "tool-rejection-preflight", "operation_id": "default", "argv_suffix": ["--root", ".", "<planned-edit-paths>"]}
-      - {"executable": "python3", "argv": ["-m", "pytest", "tests/tools/test_run_managed_experiment.py", "-q"]}
-      - {"executable": "agent-canon", "argv": ["semantic-index", "discourse-relations", "--profile", "experiment-report"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: experiment run, lifecycle, artifacts, results, or rerun workflow is in scope
@@ -1596,14 +1122,6 @@ skill_families:
     discovery:
       name: experiment-review
       description: "Use when reviewing experiment topics, run.py files, experiment registries, GPU/JAX environment ownership, visualization.py artifacts, or experiment README/report readiness."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "python3", "experiments/<topic>/run.py"]}
-      - {"executable": "git", "argv": ["grep", "-n", "-E", "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env=", "--"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: experiment topic review, managed runner route, environment ownership, artifact schema, or visualization.py readiness is in scope
@@ -1624,17 +1142,6 @@ skill_families:
     discovery:
       name: gpu-execution
       description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, selecting an available GPU index or UUID for native Docker, optional free-GPU admission or reservation, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "docker", "argv": ["run", "--rm", "--gpus", "device=<selected-GPU>", "<image>", "<argv...>"]}
-      - {"executable": "python3", "argv": ["tools/experiments/execution/run_gpu_command.py", "--gpu-count", "1", "--min-free-memory", "<bytes>", "--", "<argv...>"]}
-      - {"tool_id": "run-managed-experiment", "operation_id": "default", "argv_suffix": ["--topic", "<topic>", "--variant", "<variant>", "--", "<inner", "argv...>"]}
-      - {"executable": "python3", "argv": ["-m", "pytest", "tests/tools/test_run_gpu_command.py", "-q"]}
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: GPU/CUDA/JAX/XLA/IREE execution, native Docker device selection, optional strict admission, managed experiment execution, or preallocation-disabled validation is in scope
@@ -1672,14 +1179,6 @@ skill_families:
     discovery:
       name: computational-optimization
       description: "Use when designing, implementing, reviewing, or diagnosing numerical optimization, solvers, preconditioners, convergence, gradients, Jacobians, Hessians, KKT conditions, tolerances, or optimization benchmarks; fixes the mathematical and validation contract before code or experiment changes."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      - {"executable": "python3", "argv": ["tools/analysis/numerical/numeric_performance.py", "--input", "<post-run-observations.json>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: numerical optimization, solver, convergence, derivative, or KKT validation contract is in scope
@@ -1710,19 +1209,6 @@ skill_families:
     discovery:
       name: adaptive-improvement-loop
       description: "Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--runtime-feedback", "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"]}
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<run>", "--behavior-event", "..."]}
-      - {"tool_id": "compare-agent-run-paths", "operation_id": "default", "argv_suffix": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
-      - {"tool_id": "evaluate-agent-run", "operation_id": "default", "argv_suffix": ["--report-dir", "<run>", "--behavior-manifest", "eval/definitions/agent_behavior_eval.toml", "--write"]}
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml", "--accumulate", "--run-id", "<run-id>", "--skill-used", "<skill>"]}
-      - {"executable": "eval/checkers/compare_agent_run_paths.py", "argv": ["--baseline-run", "<run-a>", "--candidate-run", "<run-b>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: backlog-driven iterative experiment, tuning, or code improvement loop is in scope
@@ -1752,13 +1238,6 @@ skill_families:
     discovery:
       name: literature-survey
       description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: formal-proof-workflow
     visualization_owner: code-visualization
     visualization_role: adapter
@@ -1770,24 +1249,6 @@ skill_families:
     discovery:
       name: formal-proof-workflow
       description: "Use when natural-language mathematical claims, JIT-canonical implementation claims, proof sketches, or theory assumptions should be converted into formal-proof obligations, generated Lean evidence, theorem-graph targets, and checker-gated evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "formal-proof", "operation_id": "default"}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::qualname>", "--out", "<ir.json>", "--stablehlo-out", "<root.stablehlo.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
-      - {"tool_id": "cpp-template-to-lean", "operation_id": "default", "argv_suffix": ["--cpp-symbol", "<path.hpp::qualname>", "--namespace", "<Lean.Namespace>", "--out", "<Generated.lean>", "--record-out", "<record.json>"]}
-      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
-      - {"tool_id": "cpp-template-to-lean", "operation_id": "default"}
-      - {"executable": "make", "argv": ["a", "theorem", "or", "validation", "claim", "pass.", "A", "backend-specific", "theorem", "is", "valid"]}
-      - {"tool_id": "jit-ir-to-lean", "operation_id": "default", "argv_suffix": ["--jit-ir", "<ir.json>", "--namespace", "<Lean.Namespace>", "--module-name", "<name>", "--out", "<Generated.lean>"]}
-      - {"tool_id": "cpp-template-to-lean", "operation_id": "default", "argv_suffix": ["--cpp-symbol", "<path.hpp::qualname>", "--namespace", "<Lean.Namespace>", "--module-name", "<name>", "--out", "<Generated.lean>", "--record-out", "<record.json>"]}
-      - {"executable": "lake", "argv": ["build"]}
-      - {"tool_id": "lean-proof-env", "operation_id": "default", "argv_suffix": ["all-smoke|smoke|agent-smoke|counterexample-smoke|check-file", "--env-dir", "reports/formal-proof/lean-proof-env"]}
-      - {"tool_id": "check-proof-trace-alignment", "operation_id": "default", "argv_suffix": ["--trace-module", "<trace.py>"]}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: lean-algorithm-design
     purpose: Design candidate algorithms directly in Lean before production implementation, prove or refute the mathematical design contract, and hand checked definitions to implementation.
     canonical_doc: agents/skills/lean-algorithm-design.md
@@ -1795,13 +1256,6 @@ skill_families:
     discovery:
       name: lean-algorithm-design
       description: "Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "lake", "argv": ["build"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: algorithm-proof-exploration
     purpose: Explore algorithm choices under proof obligations by building JIT-canonical IR, theorem graphs, algorithmic blocker frontiers, and algorithm-change handoffs for formal-proof adoption.
     canonical_doc: agents/skills/algorithm-proof-exploration.md
@@ -1809,15 +1263,6 @@ skill_families:
     discovery:
       name: algorithm-proof-exploration
       description: "Use when exploring, refactoring, or choosing an algorithm under proof obligations; builds JIT-canonical IR, lemma dependency graphs, algorithmic blocker frontiers, and algorithm-change guidance before handing terminal proof work to formal-proof-workflow."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::factory>", "--out", "<ir.json>", "--stablehlo-out", "<root.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: algorithm repair, proof obligations, theorem frontiers, or algorithm-change guidance are in scope
@@ -1839,17 +1284,6 @@ skill_families:
     discovery:
       name: algorithm-flowchart
       description: "Use when rendering JIT-canonical IR records, generated Lean evidence modules, and theorem-graph proof overlays into Mermaid block charts that show the implemented iterative algorithm and proof state."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format", "<artifact.md>"]}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default", "argv_suffix": ["--python-symbol", "<path.py::qualname>", "--input-factory", "<path.py::qualname>", "--out", "<ir.json>", "--stablehlo-out", "<root.stablehlo.mlir>", "--backend-trace-dir", "<dir>", "--backend-trace-out", "<backend.json>"]}
-      - {"tool_id": "jit-ir-to-lean", "operation_id": "default", "argv_suffix": ["--jit-ir", "<ir.json>", "--namespace", "<Namespace>", "--module-name", "<Name>", "--out", "<Generated.lean>"]}
-      - {"tool_id": "jit-canonical-ir", "operation_id": "default"}
-      - {"tool_id": "jit-ir-to-lean", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: research-workflow
     purpose: Manage the outer loop of question framing, external research, iterative changes, runs, and explicit review decisions.
     canonical_doc: agents/skills/research-workflow.md
@@ -1857,13 +1291,6 @@ skill_families:
     discovery:
       name: research-workflow
       description: "Use when a task needs external research, comparison design, iterative implementation and runs, and explicit review decisions before claims are accepted."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "route", "operation_id": "default", "argv_suffix": ["--prompt", "<user request>", "--format", "json"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: research-backed, prior-art, benchmark, or external research workflow is in scope
@@ -1885,13 +1312,6 @@ skill_families:
     discovery:
       name: comprehensive-development
       description: "Use when a repo-wide task spans code, docs, tools, workflows, and runtime surfaces and needs explicit subagent routing."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "bootstrap-agent-run", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: repo-wide architecture redesign spans workflow, tools, docs, runtime, or validation
@@ -1916,16 +1336,6 @@ skill_families:
     discovery:
       name: dependency-design
       description: "Define and validate the typed declarative devcontainer dependency design packet before changing mounted developer or agent tools, manifests, bootstrap, or dependency installation order."
-    tool_commands:
-      required:
-      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--format", "text"]}
-      conditional:
-      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--vendor-root", ".", "--format", "text"]}
-      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "dry-run", "--workspace", ".", "--vendor-root", ".", "--format", "json"]}
-      - {"executable": "bash", "argv": ["tools/validation/dependencies/docker_dependency_validator.sh"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: declarative devcontainer dependency design must precede environment maintenance
@@ -1945,15 +1355,6 @@ skill_families:
     discovery:
       name: devcontainer-exec
       description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-lc", "<command>"]}
-      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-lic", "<command>"]}
-      - {"executable": "devcontainer", "argv": ["exec", "--workspace-folder", "<root>", "zsh", "-l"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: explicit compatibility execution belongs in an already-running project Dev Container; AgentCanon runtime work belongs in agent-canon-bootstrap
@@ -1972,23 +1373,6 @@ skill_families:
     discovery:
       name: environment-maintenance
       description: "Use when touching Docker, CI, dependencies, runtime compatibility, or repository-level development environment instructions."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "tools/validation/ci/policies/python_env_policy.py", "argv": ["--runtime", "container", "--create"]}
-      - {"executable": "bash", "argv": ["tools/validation/dependencies/docker_dependency_validator.sh"]}
-      - {"executable": "python3", "argv": ["-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"]}
-      - {"executable": "python3", "argv": ["-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"]}
-      - {"executable": "make", "argv": ["docker-build-check"]}
-      - {"executable": "make", "argv": ["docker-build-check-host-docker"]}
-      - {"executable": "python3", "argv": ["tools/validation/ci/runners/run_container_pack.py", "--print-only"]}
-      - {"executable": "make", "argv": ["server-check"]}
-      - {"executable": "make", "argv": ["ci-quick"]}
-      - {"executable": "make", "argv": ["ci"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "check"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: Docker, CI, dependency, or runtime environment maintenance is in scope
@@ -2013,22 +1397,6 @@ skill_families:
     discovery:
       name: agent-learning
       description: "Use when private knowledge/feedback curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "reports/agents/<run-id>", "--behavior-event", "..."]}
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "reports/agents/<run-id>", "--runtime-feedback", "source=<user|reviewer|eval> target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|knowledge_record|no_op>"]}
-      - {"tool_id": "evaluate-agent-run", "operation_id": "default", "argv_suffix": ["--report-dir", "reports/agents/<run-id>", "--behavior-manifest", "eval/definitions/agent_behavior_eval.toml", "--write"]}
-      - {"executable": "agent-canon", "argv": ["k", "search", "--query", "<failure-evidence>"]}
-      - {"executable": "agent-canon", "argv": ["k", "add", "<topic>", "--stdin"]}
-      - {"executable": "agent-canon", "argv": ["f", "add", "<topic>", "--stdin"]}
-      - {"executable": "agent-canon", "argv": ["k", "status"]}
-      - {"executable": "agent-canon", "argv": ["f", "status"]}
-      - {"tool_id": "evaluate-agent-run", "operation_id": "default"}
-      - {"tool_id": "workflow-monitor", "operation_id": "default", "argv_suffix": ["python3", "tools/runtime/lifecycle/workflow_monitor.py"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: deferred
       reason: user feedback or recurrence prevention should become durable agent learning
@@ -2060,14 +1428,6 @@ skill_families:
     discovery:
       name: wiki-publication
       description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki sidecar with default-branch-only, source-bound publication checks."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "wiki-publish", "operation_id": "default", "argv_suffix": ["python3", "tools/repository/github/wiki_publish.py"]}
-      - {"executable": "tools/bin/agent-canon", "argv": ["docs", "format"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
   - id: responsibility-cleanup
     purpose: Route responsibility-unit cleanup from tree observation through owner dispatch, integration, and re-review.
     canonical_doc: agents/skills/responsibility-cleanup.md
@@ -2075,13 +1435,6 @@ skill_families:
     discovery:
       name: responsibility-cleanup
       description: "Use when cleanup requires tree observation, source/view/generated/project/personal boundary classification, dependency closure, responsibility-unit dispatch, integration, or re-review."
-    tool_commands:
-      required:
-      - {"executable": "tree", "argv": ["-a", "-J", "--noreport"]}
-      conditional:
-      - {"tool_id": "repo-structure-contract", "operation_id": "default", "argv_suffix": ["--root", ".", "--contract", "documents/structure/repo-structure-contract.toml"]}
-      - {"tool_id": "responsibility-scope", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"executable": "python3", "argv": ["tools/agent/skills/skill_dependency_map.py", "check", "--root", "."]}
     routing:
       stage_policy: active
       reason: responsibility-unit cleanup, ownership boundary, dependency closure, or specialist dispatch is in scope
@@ -2092,11 +1445,6 @@ skill_families:
     discovery:
       name: environment-cleanup
       description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "validate", "--workspace", ".", "--format", "text"]}
-      - {"executable": "python3", "argv": ["tools/runtime/container/devcontainer_dependencies.py", "dry-run", "--workspace", ".", "--vendor-root", ".", "--format", "json"]}
     routing:
       stage_policy: active
       reason: environment dependency or runtime-capability cleanup is in scope
@@ -2107,29 +1455,16 @@ skill_families:
     discovery:
       name: code-cleanup
       description: "Use when public or module code cleanup must be bounded by responsibility and reachability, then passed through dependency-analysis, refactor-loop, and change-review."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "check-dependency-headers", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "scan-code-dependencies", "operation_id": "default", "argv_suffix": ["--changed"]}
-      - {"tool_id": "run-repo-dependency-review", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: public/module responsibility, reachability, or behavior-preserving code cleanup is in scope
   - id: empirical-prompt-tuning
-    purpose: Improve reusable agent instructions through fresh evaluation on frozen baseline and hold-out scenarios until qualitative and quantitative evidence converges.
+    purpose: Improve reusable instructions from observed outcomes; use fresh evaluation when a decision needs evidence about changed behavior.
     canonical_doc: agents/skills/empirical-prompt-tuning.md
     shim: .codex/personal/skills/empirical-prompt-tuning/SKILL.md
     discovery:
       name: empirical-prompt-tuning
-      description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "evaluate-skill-workflow-prompts", "operation_id": "default", "argv_suffix": ["--manifest", "eval/definitions/skill_workflow_prompt_eval.toml"]}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
+      description: "Use when a reusable instruction has an observed or consequential behavior question that needs evidence-based evaluation and revision."
     routing:
       stage_policy: active
       reason: reusable prompt or skill evaluation with frozen scenarios and iterative convergence is in scope
@@ -2150,12 +1485,6 @@ skill_families:
     discovery:
       name: slides
       description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
-    tool_commands:
-      required: []
-      conditional: []
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: an explicitly requested presentation artifact needs a canonical deck owner
@@ -2176,14 +1505,6 @@ skill_families:
     discovery:
       name: tokens
       description: "Use when token budget, role footprint, context reuse, or token-efficiency evidence is an explicit decision."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "compare-codex-token-footprints", "operation_id": "default"}
-      - {"tool_id": "evaluate-codex-agent-roles", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: token budget or efficiency is an explicit runtime decision or evidence-backed claim
@@ -2203,13 +1524,6 @@ skill_families:
     discovery:
       name: integration
       description: "Use when a completed local branch must be integrated into its base or a conflict must be resolved."
-    tool_commands:
-      required: []
-      conditional:
-      - {"tool_id": "conflict-preservation", "operation_id": "default"}
-      maintenance:
-      - {"tool_id": "check-skill-frontmatter", "operation_id": "default", "argv_suffix": ["--root", "."]}
-      - {"tool_id": "skill-tool-commands", "operation_id": "default"}
     routing:
       stage_policy: active
       reason: a completed branch integration or conflict-resolution operation is explicitly in scope

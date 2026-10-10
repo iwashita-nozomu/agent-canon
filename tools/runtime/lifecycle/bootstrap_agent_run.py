@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
-# upstream design ../README.md shared automation index
+# upstream design ../../../README.md shared automation index
 # @dependency-end
 
 """Bootstrap a persistent agent-team run directory."""

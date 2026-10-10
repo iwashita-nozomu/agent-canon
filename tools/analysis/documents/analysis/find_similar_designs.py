@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Finds similar design documents and emits only external consolidation evidence.
-# upstream design ../README.md shared tool index
-# upstream implementation ./_runtime_output.py external output boundary
-# downstream design ../../documents/design/README.md documents design placement
+# upstream design ../../../../README.md shared tool index
+# upstream implementation ../formatting/_runtime_output.py external output boundary
+# downstream design ../../../../documents/design/README.md documents design placement
 # @dependency-end
 """Detect similar design documents without writing into the source checkout."""
 

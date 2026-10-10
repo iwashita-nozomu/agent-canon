@@ -18,13 +18,13 @@ downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.
 
 ## Reader Map
 
-- Purpose: act as the sole public visualization owner, build the complete typed
-  source universe and coverage manifest, then choose a renderer without changing
-  universe membership.
-- Section path: Canonical Contract And Ownership fixes the pre-render contract;
-  Context Diagnosis and Question-To-Diagram Projection choose only the view;
-  Source Evidence Routes and Renderer Choice delegate fact extraction and
-  syntax/layout; Handoff Packet and Closeout require post-format readback.
+- Purpose: own visualization selection, source-fact routing, and renderer
+  boundaries; use typed coverage when the selected route needs a completeness
+  guarantee.
+- Section path: Canonical Contract And Ownership defines the typed coverage
+  route; Context Diagnosis and Question-To-Diagram Projection select a useful
+  view; source evidence, renderer, handoff, and closeout depend on the chosen
+  source and completeness contract.
 - Use when: a task asks to visualize code, dependencies, runtime behavior,
   state, data movement, types, proof status, or repository structure.
 - Boundary: `code-visualization` is the sole public visualization owner. Source
@@ -37,9 +37,10 @@ downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.
 読者が何を理解したいのかを文脈から分類し、その問いに合う図の種類、source
 evidence、所有 skill / tool、renderer を選ぶ skill です。
 
-この skill は唯一の public visualization owner です。図種を選ぶ前に、typed
-source universe、coverage manifest、canonical owner ToolCall を確定します。
-依頼文の対象、時間軸、必要な厳密さ、読者、source fact の所在から判断します。
+この skill は唯一の public visualization owner です。依頼文の対象、時間軸、必要な
+厳密さ、読者、source fact の所在から、必要な source evidence と coverage contract を
+選びます。complete graph coverage を求める場合や、選択 route が typed coverage を
+要求する場合は typed source universe、coverage manifest、canonical owner ToolCall を使います。
 source fact の抽出は
 `dependency-analysis`、`structure-refactor`、`algorithm-flowchart`、
 `prose-reasoning-graph` などの owner に委譲し、図は抽出済み fact の projection
@@ -51,9 +52,9 @@ source fact の抽出は
 visualization. `tools/validation/semantic/tools/visualization_contract.py` is the single exact
 typed implementation module for `VisualizationSourceUniverse`,
 `ProjectionCoverageManifest`, canonical `ToolCall` validation, deterministic
-coverage/readback digests, and typed rejection statuses. Skills and renderers
-must reference those types; they must not define local substitutes or a second
-omission/granularity policy.
+coverage/readback digests, and typed rejection statuses. On the typed route,
+skills and renderers reference those types and do not define local substitutes
+or a second omission/granularity policy.
 
 Its fixed public functions are `build_source_universe`,
 `build_projection_coverage_manifest`, `validate_projection_coverage`,
@@ -63,7 +64,8 @@ calls an underscore-prefixed owner helper. Final-artifact
 readback is external to renderers and is supplied to
 `validate_projection_coverage(..., readback=...)`.
 
-Before selecting a diagram family or renderer, perform this ordered gate:
+When the selected visualization promises complete identity/relation coverage or
+uses a renderer that requires typed coverage, perform this gate:
 
 1. Declare `code-visualization` as the sole public owner; reject a missing owner
    instead of selecting a renderer directly.
@@ -89,31 +91,29 @@ Before selecting a diagram family or renderer, perform this ordered gate:
 | Repository graph adapter | `agent_canon.visualization.adapter.repository_graph` | `agent_canon.visualization.arguments.repository_graph.v1` | Projects complete repository graph facts into static or interactive layout. |
 | Knowledge graph adapter | `agent_canon.visualization.adapter.knowledge_graph` | `agent_canon.visualization.arguments.knowledge_graph.v1` | Projects complete prose/knowledge graph facts into layout. |
 
-Every other renderer is likewise a typed adapter ToolCall downstream of the
-canonical owner ToolCall. A renderer-local identifier never replaces the
-canonical owner call. Executable paths remain literal commands and are never
-ToolIDs. Each renderer-only skill references this section rather than defining
-another omission or granularity policy.
+On the typed route, every renderer is a typed adapter ToolCall downstream of
+the canonical owner ToolCall. A renderer-local identifier never replaces that
+owner call. Executable paths remain literal commands and are never ToolIDs.
+Renderer-only skills reference this section when they use typed coverage.
 
-Literal user scope plus owner/dependency closure is immutable. It must never be
-pruned, aggregated away, top-N ranked, represented by samples, reduced to a
-main path, stripped of helpers, narrowed for importance/readability, or replaced
-by a summary fallback. Diagram-family choice changes only representation.
-Clustering, zoom, expansion, and filtering are reversible view state: every
-source identity remains serialized in the final artifact and discoverable from
-any view state.
+These types and functions apply when the selected route uses typed coverage. A
+bounded explanatory diagram does not need a fabricated universe, manifest, or
+ToolCall. Do not create local substitutes for typed operations.
 
-After rendering, the owning formatter is mandatory. Formatting owns only
-syntax/layout and cannot extract source facts or change the universe or
-manifest. Run canonical post-format readback over the final artifact and
-produce exact eight-kind `source_counts`, `rendered_counts`, and
-`readback_counts` maps for `identity`, `edge`, `field`, `phase`, `branch`,
-`module`, `evidence`, and `time`, plus the deterministic `coverage_digest` and
-`final_token_readback`. Coverage is
-complete only when the typed contract accepts the final manifest and readback.
-If a renderer cannot represent the complete universe, return the typed
-renderer-capacity rejection from `visualization_contract.py`; never prune or
-fall back to a partial artifact.
+On the typed complete-coverage route, literal user scope plus owner/dependency
+closure is immutable. Do not prune, aggregate, sample, or replace it with a
+summary. For a bounded explanatory diagram, keep the requested scope explicit
+and do not imply that omitted code or relations are covered. Clustering, zoom,
+expansion, and filtering are reversible view state when the artifact promises
+complete coverage.
+
+Use the selected formatter and readback route needed by the artifact. On the
+typed complete-coverage route, formatting cannot change the universe or
+manifest; run canonical post-format readback and retain the exact eight-kind
+counts, digest, and final token readback. Coverage is complete only when the
+typed contract accepts the final manifest and readback. If a renderer cannot
+represent that complete universe, return its typed capacity rejection rather
+than a partial artifact.
 
 ## Context Diagnosis
 
@@ -122,28 +122,35 @@ fall back to a partial artifact.
 | Field | Meaning |
 | --- | --- |
 | `context_question` | 読者が図で答えたい問い。例: order、branch precision、call relation、interaction over time、state lifecycle、data movement、module dependency、concurrency timing、type responsibility |
-| `scope` | literal user scope plus its complete source-owner and dependency closure |
-| `time_axis` | 時間順序が中心か、静的な関係が中心か |
-| `precision_need` | identity-complete orientation、exact branch graph、review trace、interactive inspection など。precision は universe membership を変更しない |
+| `scope` | exact bounded view scope; the typed route adds its complete source-owner and dependency closure |
+| `time_axis` | 時間順序が中心か、静的な関係が中心か when it affects the diagram |
+| `precision_need` | identity-complete orientation、exact branch graph、review trace、interactive inspection など。typed coverage membership is fixed by its contract |
 | `source_fact_owner` | code analyzer、dependency manifest、trace/log、schema、workflow contract、JIT-canonical IR など |
 | `reader_action` | 読者が図を見て行う判断。例: review、debug、refactor、test design、proof navigation、interactive inspection |
 | `embedding_context` | 図を文書に埋め込む場合の section、claim、reader path、`visual_plan` slot |
 
-この context を埋めてから図種へ射影します。図種がユーザー文面に直接書かれている
-場合も、context と矛盾しないか確認します。例: 「処理順を見たいコールグラフ」は
-order と call relation の両方を要求するため、必要な projection をすべて作ります。
-どの図種も typed universe を縮小しません。
+Select the context dimensions that affect the requested diagram. Always resolve
+the reader's question and scope; include time axis, precision, source owner,
+reader action, or embedding context when they change the source evidence or
+representation. If the request names a diagram family, check that it answers
+the question. Add another projection only when one view would leave a requested
+relation unexplained. A typed complete-coverage diagram keeps its universe
+unchanged.
 
-文書に図を埋め込む場合も同じです。README、design doc、report、skill 文書、
-workflow 文書、`structure-planning` の `visual_plan` で図が必要になったら、この
-skill で `context_question` と `embedding_context` を決めてから図種を選びます。
+文書に図を埋め込む場合は、この skill で local claim と reader question を確認します。
+section structure や reader path も変わるときは `structure-planning` を使います。
+README、design doc、report、skill 文書、workflow 文書、または
+`structure-planning` の `visual_plan` で図が必要になったら、必要な source evidence を
+選んでから図種を決めます。
 「Mermaid 図を入れる」だけでは図種を確定せず、その section の claim、読者の
 次の行動、source evidence から flowchart、sequence diagram、state-transition
 diagram、dependency graph などへ射影します。
 
 ## Visualization Selection Record
 
-図を作る前に次の record を残します。
+Use a selection record when multiple source/renderer choices remain or a
+renderer handoff needs one. Record only the fields that affect that decision;
+the typed route and a renderer's existing contract retain their required values.
 
 ```text
 Visualization Selection:
@@ -179,19 +186,19 @@ Visualization Selection:
 | Where does proof or algorithm status sit on implemented operations? | algorithm/proof overlay | JIT-canonical operation path and theorem graph status | `$algorithm-flowchart` |
 | Which large graph needs filtering, navigation, or sharing? | HTML graph / dashboard | complete graph inspection with reversible view state | `$html-output` after source graph exists |
 
-When several questions are present, choose every projection required to answer
-them. `reader_action` and diagram-family selection choose representation and
-layout only; they do not establish a primary-only completion path or make any
-covered projection optional. Each projection remains accountable to the same
-immutable universe and typed manifest.
+When several questions are present, choose the smallest set of projections that
+answers them. `reader_action` and diagram-family selection choose representation
+and layout; they do not change source-fact authority. A typed complete-coverage
+route keeps each selected projection accountable to its same universe and
+manifest.
 
 ## Document Embedded Diagrams
 
 Use this skill when a diagram will be embedded in Markdown, report prose,
-design docs, README, workflow docs, skill docs, or a `visual_plan`. The diagram
-choice is part of the document structure, so pair it with `$structure-planning`
-when the document structure or reader path changes, and close Markdown syntax,
-Mermaid, links, and heading checks with `$md-style-check`.
+design docs, README, workflow docs, skill docs, or a `visual_plan`. Use
+`$structure-planning` when the document structure or reader path changes, and
+select `$md-style-check` for Markdown syntax, Mermaid, link, or heading checks
+that the edited document needs.
 
 For embedded diagrams, decide:
 
@@ -199,14 +206,14 @@ For embedded diagrams, decide:
 - what the reader should be able to decide after seeing it;
 - whether the source fact is code, dependency manifest, trace/log, schema,
   workflow contract, proof graph, or prose graph;
-- which identity-complete projection slot carries the claim without replacing
-  or suppressing any universe identity or relation.
+- whether the diagram claims complete identity coverage or explains a bounded
+  source region, and what evidence supports that claim.
 
 ## Source Evidence Routes
 
-Complete the Canonical Contract And Ownership gate before applying a selected
-owner skill or renderer. For repository/code-space dependency visualization,
-the small-model direct route is self-sufficient after that gate:
+For complete typed coverage, complete the Canonical Contract And Ownership gate
+before applying the selected renderer. For repository/code-space dependency
+visualization, use the existing direct route when a dependency graph is requested:
 
 ```bash
 python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json
@@ -258,13 +265,15 @@ call relations, `$structure-refactor` for architecture and responsibility
 maps, `$algorithm-flowchart` for algorithm/proof overlays,
 `$prose-reasoning-graph` for prose graphs, `$html-output` for browser-readable
 large-graph views, and `$md-style-check` for embedded Markdown diagrams.
-Follow each related skill's current command packet; this selector describes the
-ownership route without reproducing those commands.
+Follow each related skill's current owner and native entrypoint; this selector
+describes the ownership route without reproducing or regenerating private command
+definitions.
 
 ## Renderer Choice
 
-Renderer choice occurs only after universe, manifest, and canonical owner
-ToolCall validation. It changes syntax/layout only and cannot change coverage.
+For typed complete-coverage output, choose the renderer after universe, manifest,
+and canonical owner ToolCall validation. In all routes, the renderer changes
+syntax/layout only and cannot change source-fact authority.
 
 - Mermaid is the default for Markdown flowchart, sequence, state, class/type,
   and data-flow projections when it can retain the complete universe.
@@ -288,16 +297,16 @@ formatter, then call `readback_projection` and
 `diagram_count_mismatch` or `table_fallback` violation is authoritative; Rust
 owns syntax formatting only.
 
-Graph renderers preserve GraphIR v2. Interactive clustering, zoom, expansion,
-and filtering alter only reversible view state; all identities remain present
-and discoverable in the serialized final artifact. After rendering, invoke the
-mandatory owning formatter, then run canonical final-artifact readback. A
-renderer or formatter capacity problem returns the typed capacity blocker
-instead of a reduced, summarized, or alternate partial result.
+When GraphIR v2 or another complete-coverage contract is selected, preserve its
+identities through reversible view state and use its required formatter and
+final-artifact readback. If the typed renderer cannot represent the complete
+universe, return the typed capacity blocker instead of a partial artifact.
 
 ## Handoff Packet
 
-Every renderer handoff and return uses this complete packet:
+Use this complete packet when a renderer handoff uses typed coverage or its
+existing contract requires these fields. A local bounded diagram with no
+renderer handoff does not need a fabricated packet:
 
 ```text
 Visualization Handoff:
@@ -328,7 +337,8 @@ partial artifact is accepted.
 
 ## Closeout
 
-Closeout cites:
+Closeout records evidence for the selected route. For typed complete coverage,
+include:
 
 - the `Visualization Selection` record;
 - the `embedding_context` when the diagram is embedded in a document;
@@ -344,64 +354,28 @@ Closeout cites:
 - final typed coverage status, or the typed renderer-capacity blocker when no
   complete artifact can be produced.
 
+For a bounded local diagram, cite the source owner and scope, plus the final
+artifact or embedding location.
+
 ## Runtime Contract Clauses
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-1. Read [agents/skills/code-visualization.md](code-visualization.md).
-   Complete its canonical typed gate before renderer selection.
-1. Record a context-derived `Visualization Selection` before rendering:
-   - `context_question`
-   - `embedding_context`
-   - `literal_user_scope`
-   - `visualization_source_universe`
-   - `projection_coverage_manifest`
-   - `canonical_owner_tool_call`
-   - `precision_need`
-   - `visualization_kind`
-   - `question`
-   - `source_evidence`
-   - `owner_skill_or_tool`
-   - `adapter_tool_calls`
-   - `renderer`
-   - `output_path`
-1. Infer the context question, then project it to a diagram family:
-   - "what happens in what order": flowchart / activity diagram.
-   - "which exact branches and joins exist": control-flow graph.
-   - "what calls or imports what": call graph or dependency graph.
-   - "who exchanges messages over time": sequence diagram.
-   - "how concurrent events overlap": timing diagram or concurrency sequence diagram.
-   - "what states can exist and how transitions occur": state-transition diagram.
-   - "where data or artifacts move": data-flow diagram.
-   - "which types, classes, protocols, or owners relate": class/type diagram or
-     architecture map.
-   - "where algorithm/proof status sits on implemented operations":
-     `$algorithm-flowchart`.
-   - "which large graph needs filtering or navigation": `$html-output` after the
-     graph source is available.
-   Diagram-family selection changes representation only and cannot change the
-   immutable universe or manifest membership.
-1. For a diagram embedded in a document, infer the local claim, section role,
-   reader action, and `visual_plan` slot before choosing the diagram family.
-   Pair this skill with `$structure-planning` for the visual plan and
-   `$md-style-check` for Mermaid / Markdown checks.
-   Treat this as `Document Embedded Diagrams`: the section claim, reader path,
-   and embedding context are part of the visualization selection.
-1. Route source ownership and delegation through owning skills and packets only.
-1. Keep pass/fail authority with the source producer. The diagram is a
-   projection of extracted facts; code, dependency, proof, or runtime checkers
-   own correctness claims.
-1. If the request is repository/code-space dependency visualization, execute
-   exactly one matching command from Small-Model Direct Route after the owner
-   ToolCall, and retain its adapter ToolCall in the handoff.
-1. Run the owning formatter after rendering. Formatter and renderer remain
-   syntax/layout-only and cannot extract facts or mutate typed coverage.
-1. Handoff and closeout are incomplete unless they carry the complete
-   `VisualizationSourceUniverse`, canonical owner ToolCall, every adapter
-   ToolCall, `ProjectionCoverageManifest`, final artifact,
-   exact eight-kind `source_counts`, `rendered_counts`, and `readback_counts`
-   maps for `identity`, `edge`, `field`, `phase`, `branch`, `module`,
-   `evidence`, and `time`, deterministic `coverage_digest`,
-   `final_token_readback`, and final typed status. If
-   capacity prevents complete output, return the typed renderer-capacity
-   blocker with no partial artifact.
+Use the selected source route and renderer contract:
+
+- Resolve the reader's question and requested scope; choose the diagram family
+  that answers it and add another projection only when a requested relation
+  would otherwise be unclear.
+- Route source facts through their owning skill or tool. The diagram does not
+  take correctness authority from code, dependency, proof, or runtime producers.
+- Use typed universe, manifest, ToolCalls, formatter, and readback when the
+  selected output claims complete coverage or its existing adapter requires
+  them. Preserve that route's exact API and capacity behavior.
+- For repository/code-space dependency visualization, use the matching command
+  from `Source Evidence Routes`; keep its adapter ToolCall when the typed route
+  is selected.
+- For an embedded diagram, use `structure-planning` when document structure or
+  reader path changes, and select `md-style-check` for the changed Markdown
+  properties.
+- Use `Handoff Packet` and `Closeout` at their stated scope. Do not create a
+  handoff packet or empty coverage fields for a bounded local diagram.
