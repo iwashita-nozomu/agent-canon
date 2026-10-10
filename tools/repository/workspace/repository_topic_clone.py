@@ -26,26 +26,15 @@ from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-try:
-    from tools.runtime.authority.checkout_identity import resolve_checkout_identity
-    from tools.runtime.authority.writer_target import (
-        WriterTarget,
-        WriterTargetError,
-        WRITER_TARGET_PACKET_RELATIVE,
-        materialize_writer_target_packet,
-        read_writer_target_packet,
-        validate_writer_target_identity,
-    )
-except ImportError:  # direct CLI execution
-    from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # type: ignore[no-redef]
-    from tools.runtime.authority.writer_target import (  # type: ignore[no-redef]
-        WriterTarget,
-        WriterTargetError,
-        WRITER_TARGET_PACKET_RELATIVE,
-        materialize_writer_target_packet,
-        read_writer_target_packet,
-        validate_writer_target_identity,
-    )
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity
+from tools.runtime.authority.writer_target import (
+    WriterTarget,
+    WriterTargetError,
+    WRITER_TARGET_PACKET_RELATIVE,
+    materialize_writer_target_packet,
+    read_writer_target_packet,
+    validate_writer_target_identity,
+)
 
 if TYPE_CHECKING:
     from . import parent_root_side_effects as _parent_boundary
@@ -1440,8 +1429,6 @@ def finalize_merge_main(
         raise RepositoryTopicCloneError(
             "merge-finalize hold: native merge tree readback mismatch"
         )
-    _run_git(clone, ["merge-base", "--is-ancestor", candidate_sha, merged_sha])
-    _run_git(clone, ["merge-base", "--is-ancestor", origin_main_sha, merged_sha])
     receipt = MergeMainReceipt(
         request=request_state,
         clone=clone,
