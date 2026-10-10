@@ -36,19 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "branch",
         nargs="?",
-        help="Legacy branch argument is unsupported; use --current to inspect the current workspace.",
+        help="Legacy branch argument is unsupported; this command inspects the current workspace.",
     )
     parser.add_argument(
         "worktree_path",
         nargs="?",
-        help="Legacy worktree path argument is unsupported; use --current for cleanup diagnostics.",
-    )
-    parser.add_argument(
-        "--current",
-        action="store_true",
-        help=(
-            "Inspect the current workspace root for legacy worktree scope evidence."
-        ),
+        help="Legacy worktree path argument is unsupported; this command inspects the current workspace.",
     )
     parser.add_argument(
         "--no-log",
