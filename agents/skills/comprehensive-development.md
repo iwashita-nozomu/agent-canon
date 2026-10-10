@@ -26,91 +26,21 @@ fingerprint、implementation target、review evidence を
 code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更を、1 本の umbrella workflow と explicit subagent routing で進めます。
 この skill は route packet と reader contract に限定し、spawn budget、role topology、role ownership、write policy は正本 surface へ委譲します。
 
-## Software Engineering Principle Integration
+## Cross-surface work
 
-cross-surface plan は、[ソフトウェア工学原則](../../documents/conventions/software-engineering-principles.md)
-の判断順序を使います。最初に user / domain contract、semantic invariant、state / lifecycle owner、
-public compatibility、root mechanism を固定し、その後で responsibility boundary、validation、
-simplicity、style を判断します。小さい diff、短い code、既存 workflow の形を、上位 contract
-より優先しません。
+Start from the user/domain contract and current callers to identify the affected
+owners, semantic invariant, state/lifecycle boundary, and root mechanism. Include
+the consumer, failure, migration, and validation edges that can change the result;
+reuse established capabilities before proposing a new surface. Keep the existing
+design trace as the place for cross-surface decisions.
 
-handoff には、全原則の checklist ではなく、実際に判断へ影響した clause と task-specific evidence
-だけを含めます。少なくとも次が material な場合に記録します。
-
-- 守る contract / invariant と canonical owner
-- code、docs、tests、workflow、tool、runtime を分ける responsibility / effect boundary
-- 新しい public surface または abstraction の concrete caller と responsibility gap
-- evidence-bounded complete owning unit と、scope に含めない unrelated cleanup
-- selected validation、failure classification、cleanup / rollback、remaining external verification
-
-implementation target は SEP-09 の complete target state から導きます。waves はその target state に
-含まれる work の順序だけを定め、未完了の target を段階実装として扱いません。target-state-first の
-詳細な禁止事項と scope exception は SEP-09 を参照し、この skill は同じ policy を再定義しません。
-
-`not applicable`、negative token、原則別 receipt、新しい general-purpose checker は作りません。
-OOP / SOLID specialization は class、state、inheritance、`Protocol`、public object model が material に
-変わる場合だけ選びます。
-
-## Existing Capability Before Implementation
-
-implementation target と mechanism を選ぶ前に、共通原則 SEP-06/07 と
-[SEP-08 の再利用可能性の判断支援](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-を使います。新しい public API だけでなく、private helper や既存 file 内への追加も対象です。
-
-現在の caller と要求された規模に対する利用案を具体化し、要求と API の保証の対応から、
-直接利用、変換・合成、部分利用と不足、不適合、未確認を区別します。規模に応じたコストを
-決める方式の選定には、[SEP-06 の規模を先に置く方式選定](../../documents/conventions/software-engineering-principles.md#workload-and-scale-before-mechanism)
-を先に適用し、その設計参照を下の basis / alternatives と worker / review の handoff に
-接続します。現在の小さい例だけで mechanism を決め、後から根拠を付けません。
-調べ方、比較の向き、判断例、調査の終了条件は参照先に集約し、この skill で別の判定手順や
-必須帳票を作りません。
-
-採用 API、利用案、根拠、残る不足を既存設計文書へ残し、同じ参照を下の mechanism / basis /
-alternatives と task packet / handoff に接続します。実装するのは適切な owner に残る不足だけ、
-検証するのは変更した domain contract と consumer/provider の接続です。
-
-## Contract-Complete Implementation Basis
-
-この skill が束ねる implementation は、行数、file 数、diff の小ささを completion condition にしません。
-SEP-09 の complete target state を閉じる最小の owning unit を選び、cross-surface の consumer、effect、
-failure、cleanup、migration、validation を同じ handoff に接続します。target state から外れた shortcut
-は単純化ではなく design blocker として、SEP-09 の owner route へ戻します。
-
-material な mechanism decision は、既存の task packet / design trace に次の情報を接続します。
-新しい universal schema や全原則 checklist は作りません。
-
-| Evidence | Required content |
-| --- | --- |
-| contract | input / output、invariant、failure semantics、compatibility のうち変更に関係するもの |
-| owner | state、effect、recovery、validation を閉じる canonical owner と complete owning unit |
-| mechanism | 直接利用・合成する既存 API と、不足分に必要な algorithm、architecture、protocol、resource strategy、migration route |
-| basis | 数理導出、proof obligation、complexity / error bound、conditioning、停止条件、公式仕様、domain model、workload model、measurement、benchmark、failure analysis、標準のうち判断を支える evidence |
-| alternatives | 既存機能を使う基準案と現実に競合した候補、具体的な不足・棄却理由、cost / risk / compatibility trade-off |
-| oracle | contract を判定できる test、static property、proof、measurement、readback |
-
-material な decision のうち、正しさに関係する理由を名前、型、構造から復元できず、現実的な変更で
-invariant を壊し得るものは、[コメント規約](../../documents/conventions/common/03_comments.md) に従い、
-その判断を所有する最も狭い安定した code location へ局所コメントを残します。コメントには必要な
-`invariant / assumption` と理由、必要なら failure または禁止する alternative だけを簡潔に書きます。
-Issue、PR、task packet、design trace は task の追跡 evidence ですが、将来の変更に必要な局所理由の
-代替にはしません。実装を変更した差分では関連コメントを同じ差分で更新または削除し、evidence table
-や処理の逐語説明をコードへ複製しません。
-
-数式や外部文献は、判断がそれを必要とするときだけ使います。単純な rename や明示された定数置換へ
-形式的 proof を追加する必要はありません。一方、algorithm の停止、numerical tolerance、近似誤差、
-concurrency ordering、resource capacity、performance claim、reliability boundary を material に変える場合、
-直感や既存値の踏襲だけを basis にしません。
-
-必要な basis または oracle が得られない場合は、placeholder implementation で成功へ変換せず、
-不足する design clause、必要な evidence、owner、再開条件を blocker として残します。review は
-「check が green」という事実と、変更した contract が立証されたことを区別します。
-
-## Regression Evidence Admission
-
-regression test、fixture、mock、test-only adapter の追加前に、
-[test-design の共通条件](test-design.md#regression-evidence-ownership) を使って、
-既存 evidence への統合か新しい case の追加かを判断します。判断と採用した oracle を
-現在の task packet / design trace に接続し、この skill で成立条件を再定義しません。
+Use actual dependency, collision, authority, and validation relationships to
+choose work order and parallelism. Keep each slice a complete responsibility
+unit, migrate its affected consumers, and retire superseded support when that
+unit requires it. Add a specialist, design review, or test design only for a
+decision or changed guarantee that needs it. Validate the affected contract and
+connections with the selected owner route. A passing check establishes only the
+property it covers.
 
 ## Use When
 
@@ -129,36 +59,10 @@ regression test、fixture、mock、test-only adapter の追加前に、
 - [documents/conventions/common/03_comments.md](../../documents/conventions/common/03_comments.md)
 - [documents/design/semantic-responsibility-contract.md](../../documents/design/semantic-responsibility-contract.md)
 
-## Standard Bundle
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "comprehensive development pass" \
-  --task-id T12 \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-## Default Sequence
-
-1. family を `Comprehensive Development` に固定します。
-1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
-1. [Existing Capability Before Implementation](#existing-capability-before-implementation) で既存機能を使う基準案と残る不足を決めてから、mechanism と implementation target を選びます。
-1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
-1. material かつ code から理由を復元できない decision は、共通コメント規約に従って最も狭い安定 owner の近傍へ残し、変更された既存コメントも同じ差分で同期します。
-1. regression / fixture / mock の追加前に [Regression Evidence Admission](#regression-evidence-admission) の判断を行います。
-1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
-1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
-1. [agents/canonical/CODEX_SUBAGENTS.md](../canonical/CODEX_SUBAGENTS.md) で Codex inventory、activation、runtime surface を確認します。
-1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
-1. [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md) の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
-1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
-1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、コメントの同期、catalog / config / inventory と実 diff の整合を確認します。
-
 ## Parent-Managed Write Scope
 
-- parent は `team_manifest.yaml` に writer ごとの allowed path / directory、integration order、validation route を固定します。
-- colliding writer scope は current checkout 内の後続 wave に serialize します。
+- parent は選択した coordination route の writer placement を
+  [Parallel Write Safety](../canonical/CODEX_SUBAGENTS.md#parallel-write-safety) に委譲します。
 - reviewer は read-only を保ち、parent-managed write-scope discipline の確認は `plan_reviewer` と `project_reviewer` が行います。
 
 ## Boundary

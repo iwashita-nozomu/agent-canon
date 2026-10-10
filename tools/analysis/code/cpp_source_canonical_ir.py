@@ -2,9 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Extracts source-canonical C++ records into the shared thin operational IR.
-# upstream design ../../documents/tools/cpp_source_canonical_ir.md defines the wrapper contract.
-# upstream implementation jit_canonical_ir.py defines the shared thin operational IR schema shape.
-# downstream implementation ../../tests/agent_tools/test_cpp_source_canonical_ir.py tests it.
+# upstream design ../../../documents/tools/cpp_source_canonical_ir.md defines the wrapper contract.
+# upstream implementation ../proof/jit_canonical_ir.py defines the shared thin operational IR schema shape.
+# downstream implementation ../../../tests/agent_tools/test_cpp_source_canonical_ir.py tests it.
 # @dependency-end
 """Extract source-canonical C++ records into the shared thin operational IR."""
 

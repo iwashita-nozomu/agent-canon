@@ -2,13 +2,13 @@
 # @dependency-start
 # contract tool
 # responsibility Projects and validates dependency relations directly from tracked source manifests.
-# upstream design ../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
-# upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
-# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
+# upstream design ../../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
+# upstream design ../../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export
-# upstream implementation ./runtime_artifacts.py owns external graph scratch and TSV publication
+# upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
-# downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
+# downstream implementation ../../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
+# downstream implementation ../../../tests/agent_tools/test_dependency_graph_cycles.py verifies normalized full-topology SCC scope
 # @dependency-end
 set -euo pipefail
 
@@ -225,15 +225,19 @@ collect_changed() {
   } | sed '/^$/d'
 }
 
+scoped=0
+: >"$selected_file"
 if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
+  scoped=1
   printf '%s\n' "${INPUT_PATHS[@]}" | sort -u >"$selected_file"
 elif [[ "$CHANGED" -eq 1 ]]; then
+  scoped=1
   collect_changed | sort -u >"$selected_file"
 fi
 
-if [[ -s "$selected_file" ]]; then
-  awk -F '\t' 'NR == FNR { selected[$0] = 1; next } selected[$3]' "$selected_file" "$all_edges" >"$edges_file"
-  awk 'NR == FNR { selected[$0] = 1; next } selected[$0]' "$selected_file" "$manifest_files" >"$manifest_files.selected"
+if [[ "$scoped" -eq 1 ]]; then
+  awk -F '\t' 'FILENAME == ARGV[1] { selected[$0] = 1; next } selected[$3]' "$selected_file" "$all_edges" >"$edges_file"
+  awk 'FILENAME == ARGV[1] { selected[$0] = 1; next } selected[$0]' "$selected_file" "$manifest_files" >"$manifest_files.selected"
   mv "$manifest_files.selected" "$manifest_files"
 else
   cp "$all_edges" "$edges_file"
@@ -301,7 +305,7 @@ fi
 
 while IFS= read -r manifest_file; do
   [[ -n "$manifest_file" ]] || continue
-  if ! awk -F '\t' -v file="$manifest_file" '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$edges_file"; then
+  if ! awk -F '\t' -v file="$manifest_file" '$3 == file || $4 == file { found = 1 } END { exit(found ? 0 : 1) }' "$all_edges"; then
     echo "$manifest_file: isolated dependency manifest has no graph edges"
     failures=$((failures + 1))
   fi
@@ -322,27 +326,74 @@ while IFS=$'\t' read -r direction kind source target; do
 done < <(awk -F '\t' '$1 != "" && $2 != "" && $3 != "" && $4 != ""' "$edges_file")
 
 check_cycles() {
-  local direction="$1"
-  awk -F '\t' -v wanted="$direction" '
-    $1 == wanted && $2 != "" && $3 != "" && $4 != "" { adj[$3] = adj[$3] SUBSEP $4; nodes[$3] = 1; nodes[$4] = 1 }
-    function dfs(node, raw, parts, count, i, next_node) {
-      state[node] = 1; raw = adj[node]; count = split(raw, parts, SUBSEP)
-      for (i = 1; i <= count; i++) { next_node = parts[i]; if (next_node == "") continue; if (state[next_node] == 1) { print wanted " cycle includes " node " -> " next_node; found = 1; return } if (state[next_node] == 0) { dfs(next_node); if (found) return } }
-      state[node] = 2
-    }
-    END { for (node in nodes) if (state[node] == 0) { dfs(node); if (found) exit 1 } }
-  ' "$edges_file"
+  python3 - "$all_edges" "$selected_file" "$scoped" <<'PYTHON'
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+edges_path, selected_path, scoped = sys.argv[1:]
+selected = set(Path(selected_path).read_text().splitlines()) if scoped == "1" else None
+adjacency = defaultdict(set)
+reverse = defaultdict(set)
+for row in Path(edges_path).read_text().splitlines():
+    direction, kind, source, target = row.split("\t")
+    if not all((direction, kind, source, target)):
+        continue  # The projection check above already records incomplete rows.
+    prerequisite, consumer = (target, source) if direction == "upstream" else (source, target)
+    adjacency[prerequisite].add(consumer)
+    reverse[consumer].add(prerequisite)
+nodes = sorted(adjacency.keys() | reverse.keys())
+
+# Iterative Kosaraju: finish the full topology before applying report scope.
+visited = set()
+finished = []
+for node in nodes:
+    if node in visited:
+        continue
+    visited.add(node)
+    stack = [(node, iter(sorted(adjacency[node])))]
+    while stack:
+        current, neighbors = stack[-1]
+        neighbor = next(neighbors, None)
+        if neighbor is None:
+            finished.append(current)
+            stack.pop()
+        elif neighbor not in visited:
+            visited.add(neighbor)
+            stack.append((neighbor, iter(sorted(adjacency[neighbor]))))
+
+visited.clear()
+cycles = []
+for node in reversed(finished):
+    if node in visited:
+        continue
+    component = set()
+    pending = [node]
+    visited.add(node)
+    while pending:
+        current = pending.pop()
+        component.add(current)
+        for neighbor in reverse[current]:
+            if neighbor not in visited:
+                visited.add(neighbor)
+                pending.append(neighbor)
+    if len(component) > 1 or node in adjacency[node]:
+        if selected is None or not component.isdisjoint(selected):
+            cycles.append(tuple(sorted(component)))
+for component in sorted(cycles):
+    print("dependency cycle includes " + ", ".join(component))
+# Keep interpreter/I/O failures distinct from report-only cycle findings.
+sys.exit(3 if cycles else 0)
+PYTHON
 }
 
-for direction in upstream downstream; do
-  if ! check_cycles "$direction"; then
-    if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-      echo "DEPENDENCY_GRAPH_${direction^^}_CYCLES=report_only"
-    else
-      failures=$((failures + 1))
-    fi
-  fi
-done
+cycle_status=0
+check_cycles || cycle_status=$?
+if [[ "$cycle_status" -eq 3 && "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
+  echo "DEPENDENCY_GRAPH_CYCLES=report_only"
+elif [[ "$cycle_status" -ne 0 ]]; then
+  failures=$((failures + 1))
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   echo "DEPENDENCY_GRAPH=fail"

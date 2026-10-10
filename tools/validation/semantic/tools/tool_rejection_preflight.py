@@ -10,7 +10,6 @@
 # upstream design ../../../../documents/experiments/experiment-registry.md defines managed experiment registry contract
 # upstream design ../../../README.md documents tool entrypoints
 # upstream design ../../../../documents/tools/README.md documents user-facing tool routes
-# upstream implementation ../../../runtime/archive/log_surface_inventory.py checks hook/tool/skill log-surface drift
 # upstream implementation ../../../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ../../../runtime/authority/task_authority.py owns library implementation authority.
 # upstream implementation ../../../bin/agent-canon owns selected style checks.
@@ -85,22 +84,14 @@ CODE_SUFFIXES = {
     ".ts",
     ".tsx",
 }
-HOOK_SURFACE_PREFIXES = (
-    ".codex/hooks/",
-)
+HOOK_SURFACE_PREFIXES = (".codex/hooks/",)
 HOOK_CONFIG_PATHS = frozenset({".codex/hooks.json"})
 STRICT_SCHEMA_JSON_PATHS = HOOK_CONFIG_PATHS
 SKILL_SURFACE_PREFIXES = (
     ".codex/personal/skills/",
     "agents/skills/",
 )
-TOOL_SURFACE_PREFIXES = (
-    "tools/",
-)
-LOG_SURFACE_PREFIXES = (
-    HOOK_SURFACE_PREFIXES + SKILL_SURFACE_PREFIXES
-    + TOOL_SURFACE_PREFIXES
-)
+TOOL_SURFACE_PREFIXES = ("tools/",)
 GITHUB_SURFACE_PREFIXES = (".github/workflows/", ".github/actions/")
 AGENT_PROTOCOL_PATHS = frozenset(
     {
@@ -135,9 +126,7 @@ LIBRARY_SURFACE_PREFIXES = (
     ".venv/",
 )
 AGENT_CANON_TOOL_SOURCE_ROOT = "tools"
-RESPONSIBILITY_SCOPE_COMMAND = (
-    "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root . --format json"
-)
+RESPONSIBILITY_SCOPE_COMMAND = "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root . --format json"
 
 
 @dataclass(frozen=True, order=True)
@@ -175,8 +164,8 @@ CAUSE_INVESTIGATION_GATE_TEMPLATES = (
         gate="cause_investigation_guard",
         command_template=(
             "printf '%s' "
-            "'{{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\","
-            "\"tool_input\":{{\"patch\":\"*** Begin Patch\\n*** Update File: {path}\\n"
+            '\'{{"hookEventName":"PreToolUse","tool_name":"apply_patch",'
+            '"tool_input":{{"patch":"*** Begin Patch\\n*** Update File: {path}\\n'
             "*** End Patch\\n\"}}}}' "
             "| python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation"
         ),
@@ -206,7 +195,7 @@ PYTHON_GATE_TEMPLATES = (
         gate="module_boundary_guard",
         command_template=(
             "printf '%s' "
-            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            '\'{{"hookEventName":"PostToolUse","tool_name":"apply_patch"}}\' '
             "| python3 tools/analysis/code/import_responsibility.py"
         ),
         handoff=(
@@ -242,7 +231,7 @@ LIBRARY_GATE_TEMPLATES = (
         gate="library_implementation_guard",
         command_template=(
             "printf '%s' "
-            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            '\'{{"hookEventName":"PostToolUse","tool_name":"apply_patch"}}\' '
             "| import-only:tools.runtime.authority.task_authority:first_party_library_authorized"
         ),
         handoff=(
@@ -265,7 +254,7 @@ STYLE_CHECK_GATE_TEMPLATES = (
         gate="style_checker_guard",
         command_template=(
             "printf '%s' "
-            "'{{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}}' "
+            '\'{{"hookEventName":"PostToolUse","tool_name":"apply_patch"}}\' '
             "| tools/bin/agent-canon docs check"
         ),
         handoff=(
@@ -279,11 +268,11 @@ DEPENDENCY_GATE_TEMPLATES = (
         gate="dependency_review",
         command_template=(
             "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
-            "--root . --fail-missing --list-changed-dependencies"
+            "--root . --list-changed-dependencies"
         ),
         handoff=(
-            "include dependency header and related edit-scope plan for created "
-            "or edited text files"
+            "include available dependency evidence and the related edit-scope "
+            "plan; resolve ordinary dependencies from their actual source"
         ),
     ),
 )
@@ -292,24 +281,11 @@ STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES = (
         gate="dependency_review",
         command_template=(
             "bash tools/analysis/dependencies/run_repo_dependency_review.sh "
-            "--root . --fail-missing --list-changed-dependencies"
+            "--root . --list-changed-dependencies"
         ),
         handoff=(
             "preserve the strict JSON schema with top-level hooks only; record "
             "dependency context in owner docs, tests, or review artifacts"
-        ),
-    ),
-)
-LOG_SURFACE_GATE_TEMPLATES = (
-    GateTemplate(
-        gate="log_surface_inventory_guard",
-        command_template=(
-            "python3 tools/runtime/archive/log_surface_inventory.py --root . "
-            "--check --baseline documents/runtime/log-surface-inventory.json"
-        ),
-        handoff=(
-            "state whether emitted hook/tool/skill fields changed and regenerate "
-            "the inventory baseline in the same branch"
         ),
     ),
 )
@@ -355,9 +331,7 @@ TOOL_CATALOG_GATE_TEMPLATES = (
 AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES = (
     GateTemplate(
         gate="agentcanon_new_tool_source_route",
-        command_template=(
-            "git status --short --branch"
-        ),
+        command_template=("git status --short --branch"),
         handoff=(
             "treat this planned path as AgentCanon-owned source: add it on the "
             "standalone AgentCanon branch/PR; do not create a parent-local copy"
@@ -428,7 +402,9 @@ def git_output_lines(command: list[str]) -> tuple[str, ...]:
     return tuple(line for line in result.stdout.splitlines() if line)
 
 
-def planned_paths(root: Path, raw_paths: list[str], *, use_changed: bool) -> tuple[str, ...]:
+def planned_paths(
+    root: Path, raw_paths: list[str], *, use_changed: bool
+) -> tuple[str, ...]:
     """Resolve planned paths relative to the workspace root."""
     if raw_paths:
         return tuple(dict.fromkeys(normalize_path(root, path) for path in raw_paths))
@@ -455,7 +431,9 @@ def predict_gates(root: Path, paths: tuple[str, ...]) -> tuple[PredictedGate, ..
     return tuple(sorted(gates))
 
 
-def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[PredictedGate, ...]:
+def path_gates(
+    root: Path, path: str, scope_report: ScopeReport
+) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
     templates: list[GateTemplate] = []
@@ -472,8 +450,6 @@ def path_gates(root: Path, path: str, scope_report: ScopeReport) -> tuple[Predic
         templates.extend(dependency_gate_templates(path))
     if hook_runtime_surface_path(path):
         templates.extend(HOOK_RUNTIME_GATE_TEMPLATES)
-    if path.startswith(LOG_SURFACE_PREFIXES):
-        templates.extend(LOG_SURFACE_GATE_TEMPLATES)
     if agent_canon_new_tool_source_path(root, path):
         templates.extend(AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES)
     if path.startswith(SKILL_SURFACE_PREFIXES):
@@ -553,10 +529,7 @@ def dependency_gate_templates(path: str) -> tuple[GateTemplate, ...]:
 
 def hook_runtime_surface_path(path: str) -> bool:
     """Return whether a planned path belongs to Codex hook runtime wiring."""
-    return (
-        path in HOOK_CONFIG_PATHS
-        or path.startswith(HOOK_SURFACE_PREFIXES)
-    )
+    return path in HOOK_CONFIG_PATHS or path.startswith(HOOK_SURFACE_PREFIXES)
 
 
 def library_surface_path(path: str) -> bool:

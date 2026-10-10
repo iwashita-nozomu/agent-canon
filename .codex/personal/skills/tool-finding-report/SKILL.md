@@ -1,8 +1,8 @@
 ---
 name: tool-finding-report
-description: "Use when running tools, checkers, hooks, static analysis, or structural analyzers to find problems, preserve raw and structured full finding artifacts, mechanically rank every finding, and produce a complete finding report for implementation or refactor planning; before/after impact is optional when explicitly requested."
+description: "Use when running tools or checkers to report findings for the requested scope. Preserve raw or structured evidence as needed; prioritize findings when triage requires it and compare before/after impact only when requested."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f7b6a5e05806b361109adb55fdb5ae0321e49bd28b841591e6af5c2193206db7"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6bb1545053742b73322cad838cb928a03c66fa2fb582b5c001232275b8a6b31f"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/tool-finding-report.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [tool-finding-report](../../../../agents/skills/tool-finding-report.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill tool-finding-report --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

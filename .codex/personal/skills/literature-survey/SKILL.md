@@ -2,7 +2,7 @@
 name: literature-survey
 description: "Use when a task needs paper search, prior-art mapping, contradictory-source hunting, or a reusable bibliography."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f82863ba9675ddc7303e5e8a8fcc8faf22e1347c92157680858af451e5e8cce1"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"19ee194ab622ae91591d927e76961b3bcc9905e9c84e49daf3f69384eb6bcccc"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/literature-survey.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [literature-survey](../../../../agents/skills/literature-survey.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill literature-survey --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

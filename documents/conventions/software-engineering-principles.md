@@ -6,6 +6,7 @@ upstream design ./README.md convention index and reader route
 upstream design ../../PHILOSOPHY.md top-level responsibility and source-of-truth philosophy
 upstream design ../design/semantic-responsibility-contract.md semantic action and verification-owner allocation
 upstream design ../design/responsibility-rationale.md mechanism rationale and activation boundary
+upstream design ../operations/notes-lifecycle.md failed verification topic recording and reuse
 downstream design ../design/responsibility-cleanup.md replacement retirement and necessary consumer migration
 downstream design ./object-oriented-design.md OOP and SOLID specialization
 downstream design ../../agents/skills/comprehensive-development.md cross-surface design and delivery consumer
@@ -23,13 +24,9 @@ downstream design ../../documents/notes/knowledge/coding_decision_methods.md ext
 
 この文書は、AgentCanon の設計、実装、refactor、review、validation に共通する、
 言語・framework・programming paradigm に依存しないソフトウェア工学原則の正本です。
-原則名を網羅することではなく、複数の原則が競合したときに、現在の contract と
-evidence から同じ判断へ到達できることを目的にします。
-
-原則は checklist、score、receipt の項目ではありません。変更で実際に到達する
-contract、invariant、owner、failure mode に関係する原則だけを選び、設計判断、実装、
-review finding、validation route に接続します。選ばれなかった原則について
-`not applicable`、negative token、空の証跡を作りません。
+現在の要求と evidence から、実行する変更、到達状態、検証で確定した結論を導きます。
+変更で実際に到達する contract、invariant、owner、failure mode に関係する原則を選び、
+設計判断、実装、review finding、validation route に接続します。
 
 ## Reader Map
 
@@ -38,7 +35,8 @@ review finding、validation route に接続します。選ばれなかった原�
   「責務と依存境界」と「単純さと抽象化の admission」を読みます。
 - 規模に応じた処理・資源コストを決める実装方式を選ぶ前は、
   [規模を先に置く方式選定](#workload-and-scale-before-mechanism) を読みます。
-- refactor では「変更単位と完全性」、review では「Evidence model」を読みます。
+- 採用・却下の判断では [Reuse feasibility support](#reuse-feasibility-support)、
+  refactor では「変更単位と完全性」、review では「Evidence model」を読みます。
 - class、stateful object、inheritance、`Protocol`、public object model が変わる場合だけ、
   [オブジェクト指向設計方針](./object-oriented-design.md) を専門規約として追加します。
 - 数理・algorithm・domain semantics の action と obligation owner は
@@ -66,18 +64,19 @@ review finding、validation route に接続します。選ばれなかった原�
 原則が競合する場合は、次の順序で判断します。下位の原則は上位の contract を
 弱める根拠になりません。
 
-1. 明示された user / domain contract、safety、correctness
-2. semantic invariant、state / lifecycle owner、public compatibility
+1. 最新の明示的なユーザー合意と user / domain contract、safety、correctness
+2. semantic invariant、state / lifecycle owner
 3. root-cause closure、reachable failure handling、cleanup / recovery
 4. responsibility / dependency boundary、information hiding、authority boundary
 5. testability、reproducibility、operational observability
 6. simplicity、change locality、reuse、abstraction cost
 7. stylistic consistency
 
-この順序は「大きい変更を優先する」という意味ではありません。上位 contract を
-完全に閉じる owning unit を選び、無関係な変更を除いたうえで、完成後の保守対象が
-最小になる実装を選びます。局所性は責務の閉包であり、変更行数・file 数の最小化では
-ありません。小さい diff、短い code、既存 style は correctness や root cause に優先しません。
+上位 contract を完全に閉じる owning unit を選び、完成後の保守対象が最小になる実装を
+選びます。最初に要求された到達状態、有効入力、保証、完了証拠を肯定形で定め、
+根本原因と影響する契約から変更単位を導きます。制約は user、契約、安全性、権限の
+根拠とともに該当操作へ一度記載します。採用・却下・範囲の判断は調査と検証で確定し、
+その結論を同じ設計・handoff・実装・review に引き継ぎます。
 
 ## 原則一覧
 
@@ -105,15 +104,26 @@ review finding、validation route に接続します。選ばれなかった原�
 
 ### SEP-01 Contract first
 
-実装は、明示された user / domain contract と、既存の public contract を先に固定します。
-入力条件、出力条件、不変条件、停止条件、失敗条件、compatibility、side effect、cleanup
-のうち、変更に関係するものを実装前に特定します。
+直前のチャットを含む最新の明示的なユーザー要求と、実装のために選んだ契約を区別します。
+目的、有効入力、必要な結果・安全性・性能・失敗条件は守る条件です。
+一方、既存の API、データ表現、状態遷移、責務分割、内部の前提・不変条件は設計変数です。
+旧契約を固定してからコードだけを短くせず、要求を満たす契約と実装の組を比較し、
+数理的に単純になる契約変更も通常の候補に含めます。既存コード・テスト・文書は
+意味と移行影響の証拠であり、そこに記載済みというだけで変更拒否の根拠にはしません。
 
-- test は code path をなぞるのではなく、contract、counterexample、stable oracle を固定します。
-- validation success は、別の failure class を黙って無視した結果であってはなりません。
-- public behavior を変える場合は、caller、migration、deprecated / removed surface、rollback
-  を同じ target state で閉じます。
-- 数理上の意味、algorithm の停止条件、数値 failure semantics は、短さや既存実装の形より優先します。
+設計には、残す要求、変更する契約条項、新しい表現・規則から要求が導ける理由、
+影響する利用側と移行を簡潔に示します。表現変更なら意味の対応を、挙動変更なら保存する
+性質と認可された差を示し、意図して直す旧挙動との完全同値を要求しません。
+必要な契約変更・利用側移行は認可された修正に含め、契約変更というだけで別承認待ちに
+しません。ただし目的変更、権限外の変更は別です。
+具体的な衝突と必要な判断を示し、未承認の提案を合意扱いせず独立した作業を続けます。
+
+実装を成立させるための入力領域縮小、前提強化、保証弱化、失敗の成功化を、契約整理と
+呼び替えません。内部の前提を変えるなら、要求上有効な入力がそこへ到達するまでに
+その前提を満たすことも導きます。入力・出力、停止・失敗、副作用、cleanup のうち
+変更に関係するものを扱い、[SEP-11](#sep-11-testability-and-validation-selection) で
+要求から検証義務を導出します。caller、移行、旧実装の削除、設計・tests の更新までを
+同じ完成形として閉じ、無関係な全体改修には広げません。
 
 ### SEP-02 Invariant and state ownership
 
@@ -183,9 +193,20 @@ inheritance、substitutability、interface segregation、DI container、public o
 
 ### SEP-06 KISS
 
-KISS は、要求された contract を完全に満たす候補の中で、変更後に保守するコードスペースを
-最小にする設計原則です。「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と
-相互依存を比較します。追加分だけでなく、既存実装とその維持に必要な接続も含めます。
+KISS は、合意した完成形を満たす候補の中で、変更後に保守するコードスペースを最小にします。
+出発点は対象責務のタスクで分けます。「常に再利用」「常に削除」の一律順序にはしません。
+
+| 対象 | 出発点と判断 |
+| --- | --- |
+| 新規機能・新規実装 | 既存の抽象化・API・標準機能・採用済み依存の直接利用、設定、組合せから始める。具体的な不足だけを実装し、不要な基盤の自作や既存機能の再実装をしない。 |
+| 既存機能の修正・変更・整理 | 合意した結果から、対象の既存構造を残す必要も見直す。不要・原因となる構造の削除・置換を継ぎ足しより先に検討し、正しい部品は再利用する。根本原因と影響する契約から変更単位を決める。 |
+
+混在する作業は責務別に選び、file・helper の新旧やIssue全体の名称で一括分類しません。
+必要な挙動・有効入力・安全性の保存と、現在の実装構造の保存は別です。
+挙動保存のrefactorは合意した意味を維持し、修正でも無条件削除・全書換え・範囲外の掃除をしません。
+新規での組合せは不要な重複を避け、修正での維持見直しは欠陥や不要な構造を支える層の増殖を避けます。
+「最短の code」や「最小の diff」ではなく、完成形に残る次の実体と相互依存を比較します。
+追加分だけでなく、既存実装とその維持に必要な接続も含めます。
 
 - 実装本体、補助コード、canonical owner と source of truth
 - public surface と execution route
@@ -194,10 +215,17 @@ KISS は、要求された contract を完全に満たす候補の中で、変�
 - dependency、invariant、schema、compatibility relation
 - independent checker、workflow、receipt、generated view
 
-差分や変更 file 数を減らすために旧実装を残す案より、不要な実装と接続を削除して完成形を
-小さくする案を選びます。置換時の削除と必要な利用側移行は
-[RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で同じ修正として閉じます。
-行の圧縮、別 file への移動、必要な意味や性能保証の削減はコードスペースの削減ではありません。
+数理的な単純さは、独立に保持する情報、可能な状態・分岐、別々に維持する不変条件、
+構成要素間の結合と証明義務で比較します。例えば他の値から導ける重複状態をなくす、
+不正な組合せを表現できない型へ変える、共通の法則から特殊分岐を導いて一本化する案を
+[SEP-01](#sep-01-contract-first) の契約変更も含めて検討します。法則の成立条件を示し、
+浮動小数点・副作用・順序依存へ実数の恒等式や可換性を無条件に持ち込みません。
+
+局所の行数ではなく、利用側の変換・移行・残存互換層を含む完成形で比較し、根拠のある
+削除・統合を同じ変更で実行します。別のcleanup依頼を待ちません。必要な独立性まで
+一つの汎用機構へ押し込んだり、複雑さをcallerへ移したりしません。数値scoreや削除ノルマ、
+行の圧縮、別fileへの移動、必要な保証の削減を成果にせず、置換時の削除と利用側移行は
+[RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で閉じます。
 
 要求上必要な error handling、cleanup、migration、test、documentation を削って短くした実装は
 単純ではなく、未閉鎖の責務を別の場所へ移しただけです。どの異常処理が必要かは
@@ -207,42 +235,35 @@ KISS は、要求された contract を完全に満たす候補の中で、変�
 #### Workload and scale before mechanism
 
 新規実装や変更で algorithm、data structure、処理単位、状態・資源管理を選ぶ場合は、
-目の前の入力例から方式を即決せず、今回の contract が要求する規模で成立する候補を
-先に絞り、その中から最も単純な方式を選びます。小さい diff や短い helper が、
-繰返し利用や入力増加を含む全体コストの小ささを意味するとは限らないためです。
-単純な rename 等、これらの判断を変えない編集へ新しい設計作業を追加しません。
+今回の contract が要求する規模で成立する候補を調べ、最も単純な方式を選びます。
+比較するのは、繰返し利用と入力増加を含む全体コストです。単純な rename 等、
+これらの判断を変えない編集は既存設計を再利用します。
 
 1. **増えるものと要求範囲を先に特定する。** 既存の仕様・設計・caller から、判断に関係する
    入力件数・要素サイズ、反復呼出、同時実行、保持期間等を選びます。既知の通常規模、
-   要求上の範囲、時間・メモリ等の制約とその根拠を区別し、小さい fixture や今回の実行値を
-   上限へ昇格させません。未知の上限や将来負荷は捏造せず、許される成長と未確認点を残し、
-   方式選択を変える一点だけを確認します。
+   要求上の範囲、時間・メモリ等の制約とその根拠を区別します。未指定の将来負荷は
+   仮定と区別し、方式選択を左右する前提を調査します。上限を置かない要求には、
+   許される成長に対する計算量・資源の根拠を示します。
 2. **既存機能を使う基準案の全体コストを見積もる。** 直接利用・合成から始め、必要な時間、
    ピークメモリ、I/O・外部呼出数を規模の関数として捉えます。前処理、反復される全走査、
    コピー・中間データ、保持状態、同時実行による増幅も関係するものだけ含めます。
    例えば n 件を q 回全走査する案は、一呼出の線形性だけでなく全体の n と q の積を見ます。
-   最悪時・平均時・償却のどの根拠かと、その成立前提を区別します。既存 API を使うだけで
-   合成後もスケールするとは扱いません。
-3. **要求範囲で成立する最小の方式を選ぶ。** 現実に競合する候補だけを、支配的なコスト、
-   前処理・保持・更新の負担、既存保証と照合します。Big-O の名前だけで優劣を決めず、
-   明確に限定された規模では単純な方式を残して構いません。一方、要求範囲で破綻すると
-   分かる方式を「まず動かし、後で最適化する」と採用しません。有効入力を切り捨てたり、
-   固定件数や例外分岐で対象を狭めたりして成立したことにしません。cache、並列化、分散化、
-   新 API、汎用化も、この比較で残る具体的な不足なしに追加しません。
+   最悪時・平均時・償却の根拠と成立前提を区別し、合成後の全体コストを確認します。
+3. **要求範囲で成立する最小の方式を選ぶ。** 現実に競合する候補を、支配的なコスト、
+   前処理・保持・更新の負担、既存保証と照合します。棄却する場合は、破綻する要求条件と
+   解析または測定結果を示します。有効入力・保証を維持する候補から選び、残る具体的な
+   不足に対応する cache、並列化、分散化、新 API 等だけを検討します。
 
-採用方式、規模の前提、支配的コストと根拠、単純な代案を退けた理由を、実装前に既存設計の
+採用方式、規模の前提、支配的コストと根拠、単純な代案を退けた検証結果を、実装前に既存設計の
 該当節へ簡潔に残します。十分な既存説明は参照を再利用し、task / worker handoff は同じ節に
-接続します。worker が局所都合で algorithm、保持方法、反復・並行構成や前提を変える場合は、
-先に同じ判断を更新して引き継ぎ、実装後の説明付けや別の局所設計で置き換えません。
-review も同じ前提と実 diff のコストを照合し、小さい成功例だけを規模への保証にしません。
+接続します。worker が algorithm、保持方法、反復・並行構成や前提を変える場合は、
+先に同じ判断を更新して引き継ぎます。review も同じ前提と実 diff の全体コストを照合します。
 
-解析や既存 API の保証で判断できる場合は実測を必須にしません。定数因子や実行系の特性が
-選択を左右するときだけ、既存環境で実行可能な最小の検証を使います。規模を変えた検証は
-主張を確かめる必要がある場合に選び、根拠なしに小規模の時間を要求上限へ外挿しません。
-必要な性能確認が実行不能なら対象の主張を未検証として残し、性能不足とも検証済みとも
-扱いません。そのために環境を再構築したり、独立して進められる変更を止めたりしません。
-本節は方式選定の判断支援であり、全件監査、全利用箇所の移行、巨大 benchmark、新しい
-checker、schema、帳票、承認段階を要求せず、現在の Issue の完了範囲を広げません。
+解析や既存 API の保証を実コードへ対応付け、定数因子や実行系の特性が選択を左右するときは
+正規経路で測定します。判断に必要な規模の検証まで実行して結論を確定します。実行上の
+失敗は条件と実際の結果を topic に記録し、次の認可された検証・修正操作へ接続します。
+アクセス等の具体的な阻害要因はその owner に示し、独立した作業は進めます。
+選択する調査・検証は、現在の要求と変更契約を満たす範囲に対応させます。
 
 ### SEP-07 YAGNI
 
@@ -259,36 +280,29 @@ YAGNI は、要求済み behavior、必要な compatibility migration、failure 
 
 #### Reachability and remedy necessity
 
-異常を表す局所式が書けること、現行の実行でそこへ到達できること、到達した結果が
-要求を満たさないことは別です。異常仮説から修正を導くときは、現在の有効な入口、
-contract が許す入力・状態、制御・データフロー、観測される結果を必要範囲だけ
-対応付けます。外部境界が拒否・防御する責務を持つ不正入力も判断対象に含めます。
+異常仮説から修正を導くときは、現在の有効な入口、contract が許す入力・状態、
+制御・データフロー、観測される結果を対応付けます。外部境界が拒否・防御する責務を
+持つ不正入力も判断対象に含めます。
 
 保証の根拠は実際の parser、constructor、型の強制、制御フロー等に求め、その後の
-mutation、別入口、並行変更、I/O が保証を壊し得るかを確認します。型注釈だけや
-過去に事故がなかったことを到達不能の証拠にしません。同じ境界で維持される不変条件と、
-存在確認後も外部から変化し得る状態を区別します。到達する場合も、既存 owner の
-例外伝播、拒否、cleanup、recovery が既に要求を満たしていないかを先に照合します。
+mutation、別入口、並行変更、I/O による影響を確認します。同じ境界で維持される
+不変条件と、外部から変化する状態を区別します。既存 owner の例外伝播、拒否、cleanup、
+recovery と要求を照合し、調査と検証によって次の結論を確定します。
 
-| 判断 | 根拠の例 | 次の行動 |
+| 確定した判断 | 検証根拠の例 | 次の行動 |
 | --- | --- | --- |
-| 到達不能 | parser が非空を強制し、同じ内部境界でその保証を壊す経路がない | 内部の空入力を理由に修正を要求しない |
-| 既存保証で対応済み | 失敗は起こり得るが、既存 API の例外伝播や cleanup が要求どおり | 追加の catch、guard、fallback を要求しない |
-| 未確認 | 入口や保証の成立・維持に関する判断前提が未確認 | 安全とも欠陥とも断定せず、判断を変える不足前提だけを調べる |
-| 到達可能で契約不足あり | 現行入口からの実行や仕様上の外部障害で、要求された結果・失敗処理が満たされない | その不足を閉じる最も単純な修正と対象検証を既存 owner で選ぶ |
+| 到達不能 | parser の非空保証と、その保証を維持する全ての関連経路を確認した | 保証と根拠を参照して既存実装を使う |
+| 既存保証で対応済み | 到達する失敗に対し、既存 API の例外伝播・cleanup が要求を満たすことを確認した | 既存 owner に委譲する |
+| 到達可能で契約不足あり | 現行入口・仕様上の障害から要求違反までを trace または検証で確認した | 不足を閉じる最も単純な修正と対象検証を既存 owner で実行する |
 
-private helper を mock で直接呼び、実際の入口では作れない状態を注入しただけでは、
-到達可能な不具合の証拠になりません。test double は成立する入力・状態・外部障害を
-表現します。局所 algorithm が独立した契約を持つ場合の owner-local test は妨げません。
-外部入力、存在確認後の変更、仕様上の I/O 失敗などの可能性が契約や解析で示せるなら、
-実事故や危険な再現を要求しません。ただし可能性だけで追加対策を決めず、既存保証で
-埋まらない要求を対応付けます。必要な authorization、安全検証、外部境界の検証は保ちます。
+必要な前提がまだ判明していれば、その前提の調査・検証を実行して判断を確定します。
+検証は実際に成立する入力・状態・外部障害を扱います。独立した契約を持つ局所 algorithm は
+owner-local test を使います。外部障害の可能性は仕様や解析から立証でき、安全を守る
+方法で検証します。必要な authorization、安全検証、外部境界の検証は保ちます。
 
-到達不能・既存保証済みなら、既存の Issue、design、review の記録に理由を短く残して
-元作業へ戻ります。その仮説を production 対策、回帰 test、必須後続 Issue、完了条件に
-変換しません。未確認も投機的な対策へ変換せず、必要な前提の調査に留めます。
-これは判断支援であり、新しい checker、schema、status、帳票、approval gate、全件監査を
-要求しません。実装・review の利用側は、この判断と既存の根拠を参照し、分類規則を複製しません。
+検証結果と判断を既存の Issue、design、review へ接続し、失敗した検証は
+[Notes Lifecycle](../operations/notes-lifecycle.md#failed-verification-record) の topic に保存します。
+実装・review の利用側は同じ判断と根拠を参照します。
 
 ### SEP-08 DRY and abstraction admission
 
@@ -304,8 +318,9 @@ DRY が対象にする重複は、同じ knowledge、policy、invariant、state 
 5. 共通化後も caller-specific semantics を flag / optional parameter / runtime branch で再注入しない。
 6. 共通 owner と validation route が既存 owner より明確になる。
 
-条件を満たさない場合は、局所的な重複を許容します。異なる数理意味論、停止条件、unit、state owner
-を一つの helper や wrapper に押し込むことは DRY ではありません。
+独立した実装や局所分岐を選ぶ場合は、異なる数理意味論、停止条件、unit、state owner 等を
+調査・検証で特定し、その違いが要求上必要なことを示します。共通の責務は同じ owner で直し、
+影響する利用側を移行します。
 
 新しい tool、skill、workflow、checker、schema、document は、既存 owner では埋められない
 responsibility gap がある場合だけ作ります。use-case 名だけの wrapper や、既存 owner の順序を
@@ -320,96 +335,78 @@ boundary と選択した command / options を含め、phase 名だけでは判�
 
 #### Reuse feasibility support
 
-再利用可能性は、同名 API や同じ実装構造の有無ではなく、既存機能を使う具体的な呼出が
-今回の要求を満たせるかで判断します。上の共通 abstraction の新設条件を、既存 API の
-利用条件へ転用しません。一つの caller でも利用でき、provider が正式に提供する設定・
-拡張点は新設 wrapper の flag と区別します。この節を実装・掃除の共通の判断支援とし、
-名称・配置・style の好みを能力不足にせず、新しい判定器、全項目 checklist、必須の比較表、
-schema、承認段階は作りません。
+再利用可能性は、既存機能を使う具体的な呼出が合意した完成形を満たすかで判断します。
+[SEP-01](#sep-01-contract-first) と [SEP-06](#sep-06-kiss) に従い、新規では組合せを
+基準案にし、修正では対象構造の維持も見直します。provider の正式な設定・拡張点も利用案に
+含め、一つの caller からでも実際の能力と要求の対応を検証します。
 
-1. **要求を機能の言葉へ戻す。** caller と設計から、入力の有効領域、必要な変換・結果、
-   守る意味を短く取り出します。自作予定の名前だけでなく、その操作の一般名・別名、
-   入出力の型、既存の呼出例から候補を探します。現在の helper の形や偶然の制約を
-   要求へ昇格させず、state / lifecycle、副作用、失敗、性能は判断に関係するものだけ扱います。
-2. **公開機能の使い方を読む。** current API の仕様・local help・公式資料で、実際の
-   引数、戻り値、既定値以外の設定、nested configuration、overload、拡張点を確認します。
-   一例や既定動作だけを能力の上限にしません。既存の依存宣言・解決版に合う根拠を使い、
-   その確認のための新しい pin や環境調査を追加しません。資料だけで決まれば内部監査は不要です。
-3. **最小の利用案を組み立てる。** `入力 -> 必要な変換 -> 既存 API（設定） -> 必要な変換 -> 出力`
-   を実在 API の呼出例または短い擬似コードにします。直接利用だけでなく、既存 API の
-   合成・反復・設定で埋まる差を先に試案へ含めます。試作の実行を一律必須にしません。
-   各呼出の前提を満たし、合成後に要求を保つかを見ます。引数・型・単位の違いだけでは
-   棄却せず、変換が要求に必要な情報・精度・意味を失わず、禁止された副作用を加えないかを見ます。
-4. **保証の向きを比較する。** 要求上有効な入力・状態のすべてを利用案が扱え、その結果が
-   必要な保証を含むことを確かめます。完全に同じ API 契約である必要はありません。
-   入力領域を狭める前提、出力保証の弱化、失敗の成功化で差を隠しません。合成では
-   中間状態、所有権、原子性、cleanup も関係する場合だけ含めます。性能差を理由にするなら
-   現在の workload と要求上限、計算量・コピー・I/O 等の具体的な根拠を使い、予感で棄却しません。
+1. **要求と既存知見を読む。** 合意と設計から、有効入力、必要な結果、守る保証を取り出します。
+   操作の一般名・別名、型、既存の呼出例から候補を探し、[topic 検索](../operations/notes-lifecycle.md#retrieve-before-deciding)
+   で過去の失敗条件・検証結果も確認します。記録と現在の前提を照合し、同じ条件の結果を再利用します。
+2. **公開機能を具体的に調べる。** 解決済みの依存版に対応する仕様・local help・公式資料で、
+   引数、戻り値、設定、nested configuration、overload、拡張点を読みます。判断に必要な保証は
+   仕様節、実際の caller、実装の制御・データフローへ対応付けます。
+3. **利用案を検証する。** `入力 -> 必要な変換 -> 既存 API（設定） -> 必要な変換 -> 出力`
+   を具体化し、合成・反復・設定で埋まる差も含めます。各呼出の前提と合成後の保証を演繹し、
+   実コードへ対応付けます。判断に必要な観測は正規経路の focused test、呼出確認、測定で
+   取得します。情報・精度・意味・副作用・失敗処理・性能のうち判断を左右する性質を確かめます。
+4. **検証結果から結論を確定する。** 要求上の入力領域が利用案の領域に含まれ、利用案の保証から
+   要求の保証が導けるかを判定します。却下する場合は、確認した設定・合成を含む候補、破る要求、
+   検証条件、手順、実際の結果または仕様・実装上の反例を示し、その候補の不適合を断定します。
+   判断に不足する前提や観測は同じtaskで調査・検証して解消します。
 
-比較の核心は「要求の入力領域が利用案の扱える領域に含まれ、利用案の保証から要求の保証が
-導ける」です。これにより、表現だけの差による誤棄却と、見た目だけの類似による誤採用を
-区別できます。形式証明や provider 全機能の再検証を要求するものではありません。
-
-| 分かったこと | 判断と次の操作 |
+| 検証で確定したこと | 判断と次の操作 |
 | --- | --- |
-| 直接の呼出・設定で要求を満たす | そのまま利用する。新しい helper を作らない。 |
-| 最小の変換・合成で要求を満たす | 呼出側で接続する。provider の algorithm、parser、state、retry を再実装しない。 |
-| 一部を満たすが、具体的な不足が残る | 満たす部分を再利用し、不足だけを責務のある owner で実装する。適合する別候補も必要範囲で比較する。 |
-| 変換・設定・合成でも要求を満たせない根拠がある | 満たせない要求と仕様上の差または反例を示して、その利用案を棄却する。候補全体の無価値や全候補の不存在へ一般化しない。 |
-| 判断に必要な保証が未確認 | 不適合にも適合にも変換しない。判断を変える一点だけを調べ、未確認を自作の正当化にしない。 |
+| 直接の呼出・設定で合意した完成形を満たす | 必要な部品をそのまま利用する |
+| 最小の変換・合成が完成形でも最も単純 | その接続を実装し、provider の既存処理に委譲する |
+| 既存機能が満たす部分と、具体的な不足を確定した | 必要な部品を再利用し、不足を責務のある owner で実装する。修正対象は必要なら置換する |
+| 関連する変換・設定・合成を検証し、要求違反を確定した | その利用案を却下し、要求を満たす候補を選ぶ |
 
-未確認点は、まず該当する仕様節・既存 caller/test で解き、それでも必要な場合だけ最小の
-呼出確認を使います。単一成功例は全入力の保証ではなく、実行不能は能力不存在の証明でも
-ありません。十分な候補が決まれば未採用候補の調査を止めます。決められない場合も、
-その選択の不明点だけを既存 task context に残し、独立して進められる変更を止めません。
+「保証しないとは限らない」「使えない可能性がある」等は判断途中の仮説です。
+採用・却下の理由には、`条件 → 調査・検証 → 実際の結果 → 結論` を書きます。
+一つの成功例による観測、仕様と実コードに基づく一般的保証、反例による棄却はそれぞれの
+検証範囲で述べます。十分な候補が確定したら、その選択に影響しない候補の探索を終えます。
+実行が失敗した場合も、操作と失敗した性質を確定して記録し、判断を完了するための次の
+認可された検証へ進みます。具体的なアクセス・権限上の阻害要因はownerへ接続します。
 
-**判断例（実在製品の能力を主張する例ではない）:**
+**判断例（条件を指定した説明例）:**
 
-- 同じ意味の時間長で caller は秒、API はミリ秒を取る場合、要求領域で範囲・精度を保つ
-  変換ができれば利用可能です。丸めで必要な精度が失われるなら、その変換案は不適合です。
-- 独立した要素処理は、順序・資源・失敗の要求も満たすなら単要素 API の反復で利用可能です。
-  全件の原子的更新が必要なら、途中更新を公開する単純な反復では足りません。既存の
-  transaction / batch 機能を確認し、それでも保証できない範囲だけを不足とします。
-- 既存 parser が構文とエラーを扱い、製品固有の値域規則だけが足りないなら、parser を
-  再利用し値域規則を caller 側に置きます。製品専用 API がないことは parser の再実装理由ではありません。
-- 必要な順序保証が資料の一例に書かれていないだけなら未確認です。関連する保証・設定を
-  読まずに「非対応」とせず、保証されないことが分かった場合も同じ出力例だけで適合としません。
+- 秒からミリ秒への変換を使う案では、要求領域で値域・丸め誤差を調べます。要求精度を
+  満たす範囲の根拠が得られれば採用し、要求精度を破る入力を確認した変換案は却下します。
+- 単要素APIの反復を使う案では、順序・資源・失敗条件を検証します。全件の原子性が必要な
+  場合は既存transaction / batch設定まで確認し、途中状態が公開されるtraceを示して
+  原子性を破る案を却下します。
+- 既存parserが構文とerrorを扱い、製品の値域規則だけが不足すると確認した場合は、parserを
+  再利用し値域規則をcallerに置き、入力から結果・失敗までを検証します。
 
-採用 API と具体的な利用案、決め手となった要求・保証の対応、根拠の locator、残る不足だけを
-既存設計文書の該当節へ簡潔に残し、既存 `reuse_survey` / handoff ではその参照を使います。
-上の表を埋める帳票や新しい disposition enum は追加しません。既存候補が不足する場合も、
-既知の library と自作の保守・依存コストを比較し、依存ゼロのための自作や再利用のためだけの
-新依存を目的にしません。検証は今回の変換・接続・残る domain contract に向け、provider の
-実装・test suite の複製や、全 package 探索・環境再構築を完了条件にしません。
+採用API、具体的利用案、決め手となった要求と保証の対応、検証結果、根拠locatorを
+既存設計へ残し、`reuse_survey` / handoff は同じ参照を使います。失敗した検証は
+[topic record](../operations/notes-lifecycle.md#failed-verification-record)へ直後に保存して
+読み戻します。後の成功や反証も同じtopicに接続します。今回の変換・接続・残るdomain contractを
+検証対象とし、providerの実装やtest suiteは既存ownerに委譲します。
 
 ## 4. 変更単位と完全性
 
 ### SEP-09 Evidence-bounded complete owning unit
 
-変更範囲は symptom file や minimum diff ではなく、root mechanism を所有する replaceable unit と、
-そこから evidence-linked に到達する consumer、effect、failure handling、cleanup、contract、docs、tests、
-validation で決めます。
+要求された到達状態を満たす root mechanism の replaceable unit と、そこから
+契約上の影響が確認できる consumer、effect、failure handling、cleanup、docs、tests、
+validation を変更単位にします。共通の原因を所有する箇所から直し、必要な利用側へ追跡します。
 
 実装開始前に、implementation が導かれる complete target state を固定します。この target state は
 少なくとも `contract`、`responsibility/state/lifecycle`、`failure/recovery`、
-`compatibility/migration`、`cleanup`、`validation` を含みます。implementation sequencing や
+`migration`、`cleanup`、`validation` を含みます。implementation sequencing や
 waves は、すでに定義された work の順序だけを決める仕組みであり、target state を後から完成させるための
 段階実装には使いません。したがって「最初の実装」や `initial implementation`、temporary API、
 placeholder route、required behavior の stub / no-op / hard-coded replacement、deferred-later completion
 は認めません。明示的に選択した小さい product scope は target state として扱えますが、その scope 内で
 同じ complete target state を閉じていなければなりません。
 
-同時に、次は scope に含めません。
-
-- selected owner / mechanism に到達しない repository cleanup
-- unrelated style normalization
-- historical artifact の整理
-- current contract に不要な future extension
-- finding 数や file proximity だけで選ばれた隣接 path
-
-これにより「局所 patch では不完全」「repo-wide cleanup では過剰」の両方を避けます。
-refactor と behavior change を分けることが rollback と review を改善する場合は分離しますが、
-一つの migration を中途半端な互換状態へ残すために分割しません。
+範囲は到達状態と確認した依存・契約から導き、userや安全性・権限が定める制約を根拠付きで
+適用します。変更契約の影響が閉じたところを境界にします。局所分岐・別実装を残す場合は、
+要求上の挙動や入力契約の違いを検証し、その必要性を示します。共通修正と旧分岐の削除、
+必要なconsumer migrationを同じ完成条件で閉じます。reviewやrollbackのための分割も、
+この完成形と必要な移行を維持する順序で行います。
 
 ### SEP-10 Compatibility and migration closure
 
@@ -417,25 +414,50 @@ public surface、schema、path、identity、runtime route を変更する場合�
 不要になった旧実装・alias・wrapper・selector・generated projection の削除、必要な consumer migration
 を一つの完成条件として [RC-09](../design/responsibility-cleanup.md#duplicate-implementation-retirement) で閉じます。
 
-互換経路を残すには、明示された現行の公開契約を満たす必要性を先に示します。supported period、
-owner、read / write direction、removal condition はその必要性に従い、移行の手間や diff の小ささを
-温存理由にしません。必要な入口も正本へ接続し、旧実装を第二の source of truth として残しません。
+複数経路がある場合は直近に反映された実装を基準に利用側を移行し、旧経路と専用supportを削除します。
 
 ## 5. Verification、再現性、運用
 
 ### SEP-11 Testability and validation selection
 
-設計時に stable input boundary、observable output、counterexample、oracle を確保します。pure computation と
-external effect を分けること、clock / filesystem / network / process boundary を adapter で閉じることは、
-必要な場合に testability を高めます。ただし test double のためだけの production abstraction は追加しません。
+検証は演繹を基礎とし、実装前に要求・前提から検証義務を導きます。既存設計の該当節へ
+`要求 → 前提・定義 → 不変条件と導出 → 実装箇所 → 残る実行確認` を接続し、
+テスト通過や観測例の積み上げを全入力・全状態の正しさの根拠にしません。
 
-validation は変更した property と reachable risk に対応させます。
+1. **主張と前提を分離する。** 有効領域、事前・事後条件、必要な不変条件と、利用する
+   既存保証を明示します。前提の出典・成立・整合性を確かめ、結論を仮定に置く循環、
+   矛盾した仮定や空の有効領域による空虚な成立を避けます。外部保証は何を信頼するかを
+   明示し、型注釈や未実施のcheckを保証とみなしません。
+2. **実装構造に沿って導く。** 初期状態での不変条件成立、各到達可能な分岐・遷移での保存、
+   終了時の要求充足を示します。合成では前段の保証が後段の前提を満たすこと、loop・再帰では
+   必要な停止性を整礎な減少量等で示します。停止を要求しないserviceには必要な安全性・進行性を
+   選びます。式や状態表現を変えた場合は、要求領域での意味の対応を示します。必要な失敗処理、
+   cleanup、原子性も同じ推論に含め、正常経路の証明で代用しません。
+3. **モデルと実コードを結ぶ。** 定義・演算・遷移を実際のpath/symbolへ対応付けます。
+   整数の範囲、浮動小数点の丸め・誤差、メモリ、I/O、並行変更等は関係する差だけを扱います。
+   判断に必要な前提・モデルとの差・検証義務を切り出し、調査、導出、focusedな実行確認で
+   解消してから結論を確定します。有効入力、許容誤差、oracleは要求から定めた条件を維持します。
 
-- contract / invariant は focused unit・property・reconstruction test で確認する。
-- integration boundary は実際の caller / provider 組合せで確認する。
-- environment 固有の contract は、その環境が観測可能な場合だけ environment validation を選ぶ。
-- remote CI は clean replay または remote-only property を観測するために使い、local checker の別名にしない。
-- 選ばれなかった full check、diagnostic、report に negative receipt を作らない。
+契約変更では、要求上の入力が新契約で扱えること、新契約と実装の保証から必要な結果が
+導けること、影響callerの前提が移行後も満たされることを確認します。旧テストの期待値は
+この対応から更新し、現在の実装出力をそのまま正解にしません。一般的な主張に必要な
+演繹が未完ならその主張は未証明であり、必要な論証と前提の確認を同じtaskで進めます。
+
+テストは導出した性質から境界・反例・回帰・実際のcaller/provider接続を選び、論証の
+誤りやモデルと実行のずれを検出する補完にします。実機の性能、外部サービス、実行環境等の
+経験的な主張には対応する観測が必要です。演繹を理由に、選択済みの実行検証を省略したり
+実測済みと報告したりしません。既存の規定経路と保証を再利用し、未選択の全suiteや
+環境再構築、新checker・帳票・証明ツール導入を一律の条件にしません。
+
+レビューでは前提から結論への各対応と未証明部分を確認します。演繹的論証、機械検証済みの
+証明、実行試験、未確認を区別します。形式証明が必要な場合は既存の
+[formal-proof-workflow](../../agents/skills/formal-proof-workflow.md) を使い、そのcheckerと
+実コードへの対応が確認できた範囲だけを機械検証済みとします。自然言語の論証や
+solverのtimeoutを、証明成功・反例・証明不能のいずれにも自動変換しません。
+
+方法の一次資料は [Frama-C WP](https://www.frama-c.com/fc-plugins/wp.html) と
+[Dafnyの前提・証明依存の説明](https://dafny.org/v4.5.0/DafnyRef/DafnyRef) を参照します。
+これらは演繹と前提の扱いの根拠であり、当該ツールの採用要求ではありません。
 
 #### SEP-11A Guarantee-first mechanism selection
 
@@ -503,6 +525,11 @@ observability は、障害時に「何が、どの input class / state で、ど
 追えることです。log 行数、dashboard、report の存在自体を quality とみなしません。秘密値や巨大 payload を出さず、
 state identity、source snapshot、operation、first failure、effect / cleanup result を必要範囲で記録します。
 
+失敗した検証は [Notes Lifecycle](../operations/notes-lifecycle.md#failed-verification-record) へ接続し、
+目的、候補、再現条件、手順、期待と実際、確定結論、再利用・再検証条件をtopic単位で保存します。
+次の採用・却下前にそのtopicを検索し、前提が一致する結果を再利用します。今回の観測、後続の
+成功・反証、設計、Issue/PRから同じ記録へ辿れる状態にします。
+
 repository change は、次の trace を保持します。
 
 ```text
@@ -520,18 +547,19 @@ chat、review comment、一時 report は補助 evidence であり、長期 cont
 
 ## Evidence model
 
-設計、実装、review は全原則を列挙せず、判断に影響した原則だけを次の evidence へ接続します。
+設計、実装、review は、判断に影響した原則を次の evidence へ接続します。
 
 | Decision stage | Required evidence when material |
 | --- | --- |
-| Design | contract / invariant、owner、dependency direction、rejected alternative、validation / recovery route |
+| Design | 要求と変更可能な契約、数理的単純化の比較、前提・不変条件・検証義務、owner、migration / recovery |
 | Implementation | owning unit、public / private boundary、state / effect owner、consumer migration、selected validation |
 | Refactor | preserved behavior、allowed structural delta、forbidden semantic delta、abstraction admission、rollback |
-| Review | reachable failure / maintenance impact、contract clause、owner / dependency evidence、resolution |
-| Closeout | diff identity、validation result、unverified external property、Issue / PR trace |
+| Review | 前提から結論への導出と実装対応、検証で確定した採用・却下理由、reachable failure / maintenance impact、resolution |
+| Closeout | diff identity、論証・機械証明・実測の区別、実行結果と確定結論、失敗topicの保存・readback、Issue / PR trace |
 
-原則名だけを finding にしてはなりません。「SRP 違反」「DRY 違反」「複雑」のようなラベルは、具体的な duplicated owner、
-conflicting invariant、reachable failure、caller coupling、testability loss が示されない限り blocking finding ではありません。
+finding は、具体的な duplicated owner、conflicting invariant、reachable failure、caller coupling、
+testability loss と検証結果を示します。判断に必要な不足は調査・検証して解消し、実際の
+アクセス・権限上の阻害要因は試行した操作と結果、そのownerに必要なactionを正確に示します。
 
 ## Consumer integration
 
@@ -554,6 +582,7 @@ review finding は、具体的な contract / invariant / owner / dependency / fa
 
 ## Conflict examples
 
+- **Agreement vs existing structure**: 一つの直接経路への置換に合意したなら、旧 dispatcher を残すための adapter・mode は足しません。必要な parser は再利用し、不要な dispatcher と専用補助コードを削除します。
 - **DRY vs mathematical meaning**: control flow が似ていても、unit、停止条件、residual definition、breakdown semantics が異なるなら統合しません。
 - **KISS vs error handling**: error / cleanup path を削るのではなく、owner と state transition を一つにして route を減らします。
 - **YAGNI vs migration**: future extension は作りませんが、要求済み consumer migration と旧 route removal は現在の完成条件です。
@@ -566,26 +595,24 @@ review finding は、具体的な contract / invariant / owner / dependency / fa
 
 | Clause | Owner decision |
 | --- | --- |
-| SEP-01 | contract、correctness、failure semantics |
+| SEP-01 | 要求と変更可能な契約の分離、correctness、failure semantics |
 | SEP-02 | invariant、state、lifecycle owner |
 | SEP-03 | separation of concerns、single responsibility |
 | SEP-04 | cohesion、coupling、information hiding |
 | SEP-05 | dependency direction、authority boundary |
-| SEP-06 | 要求規模で成立する方式選定と変更後の保守コードスペースの最小化 |
+| SEP-06 | 要求規模で成立する方式、契約変更を含む数理的単純化と保守コードスペースの最小化 |
 | SEP-07 | YAGNI と speculative mechanism |
-| SEP-08 | DRY と abstraction admission |
+| SEP-08 | DRY、abstraction admission、調査・検証からの採用・却下確定 |
 | SEP-09 | complete target state、evidence-bounded complete owning unit、sequencing-only waves |
 | SEP-10 | compatibility と migration closure |
-| SEP-11 | testability と validation selection |
+| SEP-11 | 演繹的な検証義務・実装対応と補完的な実行検証 |
 | SEP-12 | determinism、idempotency、reproducibility |
 | SEP-13 | failure classification、cleanup、recovery |
-| SEP-14 | observability と requirement-to-source traceability |
+| SEP-14 | observability、失敗検証のtopic再利用、requirement-to-source traceability |
 
-## Non-goals
+## 適用と責務
 
-- 原則ごとの public skill、checker、workflow、schema、score、receipt を作りません。
-- 全変更へ OOP / SOLID review を起動しません。
-- file、class、function の数値 threshold だけで責務を分割しません。
-- minimum diff または full-repository cleanup を既定の repair objective にしません。
-- external engineering framework の ceremony を AgentCanon の mandatory process として複製しません。
-- この文書は task-specific design、domain semantics、language convention、validation evidence を置き換えません。
+この文書の原則は、既存のtask-specific design、domain、language、validation ownerを通じて
+適用します。専門reviewは変更した契約に応じて選び、責務分割は意味と依存から判断します。
+変更単位は要求された完成形と根本原因の影響先で決め、採用する手順・検証はその判断に
+必要な既存経路へ接続します。

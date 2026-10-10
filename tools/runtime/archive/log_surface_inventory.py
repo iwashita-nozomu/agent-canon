@@ -2,10 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
-# upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
-# upstream implementation ./runtime_log_paths.py identifies canonical source roots for baseline defaults
-# downstream implementation ./check_hook_retirement.py validates stale retirement inventory drift
-# downstream implementation ../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
+# upstream design ../../../documents/runtime/runtime-log-archive.md hook result accumulation contract
+# downstream implementation ../../validation/semantic/hooks/check_hook_retirement.py validates stale retirement inventory drift
+# downstream implementation ../../../tests/agent_tools/test_log_surface_inventory.py validates field extraction and baseline checks
 # @dependency-end
 """Inventory machine-readable fields emitted by AgentCanon hooks, skills, and tools."""
 
@@ -43,16 +42,10 @@ except ImportError:
         attest_parent_root,
     )
 
-try:
-    from .runtime_log_paths import is_agent_canon_root
-except ImportError:
-    from tools.runtime.archive.runtime_log_paths import is_agent_canon_root  # type: ignore[no-redef]
-
 SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]
 FieldIdentity = tuple[str, SurfaceKind, str, str, Certainty]
 
-DEFAULT_BASELINE = Path("documents") / "runtime" / "log-surface-inventory.json"
 KEY_VALUE_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*)=")
 SHELL_ECHO_PATTERN = re.compile(r"^\s*(?:echo|printf)\s+(?:--\s+)?(?P<value>.+)$")
 EXCLUDED_PARTS = {
@@ -419,10 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", help="Write the JSON inventory to this path.")
     parser.add_argument(
         "--baseline",
-        help=(
-            "Explicit baseline JSON path for --check. When omitted, the "
-            "default is available only from an AgentCanon source root."
-        ),
+        help="Explicit inventory snapshot to compare with --check.",
     )
     parser.add_argument(
         "--check",
@@ -748,20 +738,12 @@ def main() -> int:
     """Run the inventory CLI."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
-    if args.check and not args.baseline and not is_agent_canon_root(root):
+    if args.check and not args.baseline:
         print("LOG_SURFACE_INVENTORY=fail")
         print("LOG_SURFACE_INVENTORY_ERROR=explicit_baseline_required")
         return 1
-    check_root = root
-    baseline_path = (
-        resolve_baseline_path(root, Path(args.baseline))
-        if args.baseline
-        else default_baseline_path(root)
-    )
-    if args.check and baseline_path.is_file() and not args.paths:
-        check_root = inventory_root_for_baseline(baseline_path)
     try:
-        inventory = build_inventory(check_root if args.check else root, list(args.paths))
+        inventory = build_inventory(root, list(args.paths))
     except RuntimeError as exc:
         print("LOG_SURFACE_INVENTORY=fail")
         print(f"LOG_SURFACE_INVENTORY_ERROR={exc}")
@@ -778,6 +760,7 @@ def main() -> int:
         return 1
 
     if args.check:
+        baseline_path = resolve_baseline_path(root, Path(args.baseline))
         if not baseline_path.is_file():
             print("LOG_SURFACE_INVENTORY=fail")
             print(f"LOG_SURFACE_BASELINE_MISSING={baseline_path}")
@@ -807,18 +790,6 @@ def resolve_baseline_path(root: Path, raw_baseline: Path) -> Path:
     if raw_baseline.is_absolute():
         return raw_baseline
     return (root / raw_baseline).resolve()
-
-
-def default_baseline_path(root: Path) -> Path:
-    """Return the default baseline only for a canonical AgentCanon root."""
-    if is_agent_canon_root(root):
-        return (root / DEFAULT_BASELINE).resolve()
-    return (root / ".agent-canon-baseline-required.json").resolve()
-
-
-def inventory_root_for_baseline(baseline: Path) -> Path:
-    """Return the repository root represented by one documents/runtime baseline."""
-    return baseline.resolve().parents[2]
 
 
 if __name__ == "__main__":

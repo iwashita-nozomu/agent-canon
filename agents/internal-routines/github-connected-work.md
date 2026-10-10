@@ -8,7 +8,7 @@ upstream design chatgpt-codex-routing.md execution admission and explicit sessio
 upstream design ../skills/pr-processing.md publication authority, integration, and readback owner
 upstream design ../../documents/operations/BRANCH_SCOPE.md branch scope and dependency-closed commit owner
 upstream design github-status-lifecycle.md Issue status and evidence owner
-upstream design verification-result-structuring.md mandatory pre-write result structuring
+upstream design verification-result-structuring.md reader reconstruction and pre-write result structuring
 downstream design ../skills/pr-processing.md exposes this routine through the existing public skill
 @dependency-end
 -->
@@ -23,9 +23,11 @@ ChatGPT などの現在セッションから、認可済み GitHub 接続で Iss
 [github-status-lifecycle](github-status-lifecycle.md) に残します。新しい public skill、
 publisher、承認段階、全環境共通の capability 検査は追加しません。
 
-検証結果を含むチャット、Issue/PR 本文・コメント、レポートの作成・更新・投稿前には、
-必ず [検証結果の構造化](verification-result-structuring.md) を呼びます。
-途中・中断時も同じ構造化結果から各出力先へ反映し、公開権限と readback は本経路に残します。
+チャット、Issue/PR 本文・コメント、文書・手順・計画・レポートの作成・更新・投稿前には、
+必ず [読み手が再現できる記述](verification-result-structuring.md) を使います。
+検証結果の有無で対象を限定せず、前提・入力・手順・判定を読み手が追えることを確認します。
+検証結果がある場合は途中・中断時も同じ構造化結果から各出力先へ反映し、
+公開権限と readback は本経路に残します。
 
 ## 1. Resolve the operation, then use the available connection
 
@@ -103,14 +105,20 @@ remote readback、hosted checks を区別します。CI の緑だけで対象外
 
 PR の作成・更新前に最新 main と branch を再読し、必要な実統合・競合解決・影響範囲の
 再検証を行います。既存の同じ head/base の PR を再利用し、なければ認可済みの PR 作成を
-実行します。統合不能や作業未完了なら通常の完了 PR とせず、公開可能な draft PR または
-既存 branch / commit と具体的な阻害要因を Issue に残します。PR 作成を main への merge、
-Issue close、実環境への適用と同一視しません。
+実行します。統合不能や作業未完了なら、公開可能な draft PR または既存 branch / commit と
+具体的な阻害要因を Issue に残します。この保存は途中経過であり、未完了の作業から戻る
+終了条件ではありません。公開後も
+[Completion Readiness](../canonical/CODEX_COMPLETION.md#completion-readiness) に従い、
+残る必須作業のうち実行可能な統合・修正・検証・readback を同じ task で続けます。
+利用可能な認可済み経路を使わず、残件の記載やユーザーへの実行依頼で終了しません。
+実際の権限・安全・実行制約による引継ぎも同節の条件と証拠で判定します。
+PR 作成を main への merge、Issue close、実環境への適用と同一視しません。
 
-最後に PR と Issue を再読します。Issue コメントには成果の意味、判断根拠、変更範囲と
-非目標、branch / base / exact head / PR、実施検証と残件、次の owner/action を、チャットと
-同程度に判断可能な内容で残します。PR が作れない場合も、成果または未公開差分の実在する
-保存先と停止理由をコメントします。リンクだけで結果説明を代替しません。
+終了条件または明示された中断・阻害の引継ぎ条件に達したら、PR と Issue を再読します。
+Issue コメントには成果の意味、判断根拠、変更範囲と非目標、branch / base / exact head / PR、
+実施検証と残件、次の owner/action を、チャットと同程度に判断可能な内容で残します。
+PR が作れない場合も、成果または未公開差分の実在する保存先と停止理由をコメントします。
+リンクだけで結果説明を代替しません。
 
 status の意味と順序は既存 lifecycle / taxonomy をそのまま用い、発見した単一 label
 追加・削除 action と readback で適用します。無関係な label の全置換はしません。

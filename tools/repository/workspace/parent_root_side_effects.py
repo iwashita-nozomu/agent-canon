@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Authenticates the selected parent repository and owns parent-local filesystem capabilities.
-# upstream design ../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
-# downstream implementation ../bin/agent-canon bounds CLI child state
-# downstream implementation ../ci/run_all_checks.sh bounds integrated CI child state and scratch
-# downstream implementation ../ci/check_agent_canon_pr.sh bounds PR gate child state and scratch
-# downstream implementation ../ci/agent_canon_pr_graph_selector.py bounds selector publication and graph children
-# downstream implementation ../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
+# responsibility Authenticates selected repositories and owns parent/Git-admin filesystem capabilities.
+# upstream design ../../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
+# downstream implementation ../../bin/agent-canon bounds CLI child state
+# downstream implementation ../../validation/ci/runners/run_all_checks.sh bounds integrated CI child state and scratch
+# downstream implementation ../../validation/ci/checks/check_agent_canon_pr.sh bounds PR gate child state and scratch
+# downstream implementation ../../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
 # @dependency-end
 
-"""Authenticate the parent repository and perform parent-owned effects.
+"""Authenticate a repository root and perform parent/Git-admin-owned effects.
 
 The boundary is intentionally the only place where these adapters may turn a
-path into a write capability.  Git identity is checked before a capability is
-issued, and Linux writes use directory file descriptors rather than pathname
-lookups after the check.
+repository or its actual Git common directory into a file capability. Git
+identity is checked before a capability is issued, and Linux writes use
+directory file descriptors rather than pathname lookups after the check.
 """
 
 from __future__ import annotations
@@ -71,13 +70,32 @@ _ALLOWED_TRANSPORTS = frozenset({"parent-local-file", "stdin", "descriptor"})
 _ALLOWED_STORAGE = frozenset({"parent-local-file", "pipe"})
 _ALLOWED_MODES = frozenset({"0600", "pipe"})
 _MARKER_FIELDS = frozenset(
-    {"schema", "parent_repo_id", "topic_slug", "repo_name", "clone_path",
-     "remote_url", "branch", "owner_evidence_sha256", "source_commit",
-     "source_tree", "created_at", "nonce"}
+    {
+        "schema",
+        "parent_repo_id",
+        "topic_slug",
+        "repo_name",
+        "clone_path",
+        "remote_url",
+        "branch",
+        "owner_evidence_sha256",
+        "source_commit",
+        "source_tree",
+        "created_at",
+        "nonce",
+    }
 )
 _OWNER_FIELDS = frozenset(
-    {"schema", "parent_repo_id", "physical_parent", "module_path",
-     "remote_url", "observed_commit", "observed_tree", "evidence_sha256"}
+    {
+        "schema",
+        "parent_repo_id",
+        "physical_parent",
+        "module_path",
+        "remote_url",
+        "observed_commit",
+        "observed_tree",
+        "evidence_sha256",
+    }
 )
 
 
@@ -130,10 +148,21 @@ class ParentRootAttestationRequest:
     nonce: str = field(default_factory=lambda: secrets.token_hex(16))
 
     def __post_init__(self) -> None:
-        if not str(self.cwd) or not self.purpose or self.purpose != self.purpose.strip():
+        if (
+            not str(self.cwd)
+            or not self.purpose
+            or self.purpose != self.purpose.strip()
+        ):
             raise ValueError("cwd and purpose must be non-empty")
-        for name in ("cwd", "explicit_root", "source_root", "clone_root",
-                     "topic_marker", "gitmodules", "owner_evidence"):
+        for name in (
+            "cwd",
+            "explicit_root",
+            "source_root",
+            "clone_root",
+            "topic_marker",
+            "gitmodules",
+            "owner_evidence",
+        ):
             value = getattr(self, name)
             if value is not None and not isinstance(value, Path):
                 object.__setattr__(self, name, Path(value))
@@ -353,6 +382,77 @@ class ParentOwnedFileHandle:
 
 
 @dataclass
+class ParentOwnedGitAdminFileHandle:
+    """Read and append capability for a file under the attested Git common dir."""
+
+    _handle: ParentOwnedFileHandle
+
+    @property
+    def closed(self) -> bool:
+        """Return whether the receipt-bound stream is closed."""
+        return self._handle.closed
+
+    def read(self, size: int = -1) -> str:
+        """Read from the locked Git-admin file."""
+        return self._handle.read(size)
+
+    def readline(self, size: int = -1) -> str:
+        """Read one line from the locked Git-admin file."""
+        return self._handle.readline(size)
+
+    def readlines(self, hint: int = -1) -> list[str]:
+        """Read lines from the locked Git-admin file."""
+        return self._handle.readlines(hint)
+
+    def write(self, text: str) -> int:
+        """Append text without exposing positioned writes or truncation."""
+        self._handle.seek(0, os.SEEK_END)
+        return self._handle.write(text)
+
+    def writelines(self, lines: Sequence[str]) -> None:
+        """Append each supplied line to the locked Git-admin file."""
+        self._handle.seek(0, os.SEEK_END)
+        self._handle.writelines(lines)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Move the read cursor; subsequent writes remain append-only."""
+        return self._handle.seek(offset, whence)
+
+    def tell(self) -> int:
+        """Return the locked stream position."""
+        return self._handle.tell()
+
+    def flush(self) -> None:
+        """Flush the locked Git-admin file."""
+        self._handle.flush()
+
+    def __enter__(self) -> "ParentOwnedGitAdminFileHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        return self._handle.__exit__(exc_type, exc_value, traceback)
+
+    def close(self) -> None:
+        """Close the locked Git-admin file exactly once."""
+        self._handle.close()
+
+
+@dataclass(frozen=True)
+class ParentOwnedGitAdminFileReceipt:
+    """Readback metadata that does not carry a generic parent-path capability."""
+
+    physical_path: Path
+    purpose: str
+    target_dev: int
+    target_ino: int
+
+
+@dataclass
 class _TreeRemovalFrame:
     """One opened directory in the iterative post-order removal stack."""
 
@@ -366,11 +466,14 @@ class _TreeRemovalFrame:
 
 @dataclass(frozen=True)
 class ParentRootAttestationReceipt:
-    """Immutable authenticated parent/source/clone identity."""
+    """Immutable authenticated repository and Git-admin identity."""
 
     parent_root: Path
     parent_dev: int
     parent_ino: int
+    git_common_dir: Path
+    git_common_dev: int
+    git_common_ino: int
     source_root: Path | None
     clone_root: Path | None
     root_kind: str
@@ -387,8 +490,9 @@ class ParentRootAttestationReceipt:
 
 
 def _canonical_bytes(value: object) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True,
-                      separators=(",", ":")).encode("utf-8")
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def _sha256(value: bytes) -> str:
@@ -396,8 +500,10 @@ def _sha256(value: bytes) -> str:
 
 
 def _is_digest(value: object) -> bool:
-    return isinstance(value, str) and len(value) == 64 and all(
-        character in "0123456789abcdef" for character in value.lower()
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value.lower())
     )
 
 
@@ -409,8 +515,9 @@ def _physical(path: Path, *, strict: bool = False) -> Path:
     try:
         return path.resolve(strict=strict)
     except (OSError, RuntimeError) as exc:
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                        f"cannot resolve {path}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISSING, f"cannot resolve {path}: {exc}"
+        ) from exc
 
 
 def _contains(root: Path, candidate: Path) -> bool:
@@ -425,8 +532,9 @@ def _identity(path: Path) -> tuple[int, int]:
     try:
         info = path.stat()
     except OSError as exc:
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                        f"cannot stat {path}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISSING, f"cannot stat {path}: {exc}"
+        ) from exc
     return info.st_dev, info.st_ino
 
 
@@ -481,20 +589,43 @@ def _write_all(fd: int, data: bytes) -> None:
 
 
 def _git_toplevel(path: Path) -> Path:
-    result = subprocess.run(["git", "-C", str(path), "rev-parse", "--show-toplevel"],
-                            check=False, capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--show-toplevel"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     if result.returncode != 0 or not result.stdout.strip():
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                        f"not an authenticated Git checkout: {path}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISSING, f"not an authenticated Git checkout: {path}"
+        )
     return _physical(Path(result.stdout.strip()), strict=True)
 
 
+def _git_common_dir(path: Path) -> Path:
+    """Resolve the actual shared Git-admin directory for one checkout."""
+    value = Path(_git_value(path, "rev-parse", "--git-common-dir"))
+    candidate = value if value.is_absolute() else path / value
+    common_dir = _physical(candidate, strict=True)
+    if not common_dir.is_dir():
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"Git common directory is not a directory: {common_dir}",
+        )
+    return common_dir
+
+
 def _git_origin(path: Path) -> str:
-    result = subprocess.run(["git", "-C", str(path), "remote", "get-url", "origin"],
-                            check=False, capture_output=True, text=True)
+    result = subprocess.run(
+        ["git", "-C", str(path), "remote", "get-url", "origin"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     if result.returncode != 0 or not result.stdout.strip():
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                        f"origin remote is unavailable: {path}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH, f"origin remote is unavailable: {path}"
+        )
     return result.stdout.strip()
 
 
@@ -507,21 +638,31 @@ def _parent_repo_id(path: Path) -> str:
 
 def _boot_id() -> str:
     try:
-        value = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+        value = (
+            Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+        )
     except OSError as exc:
-        raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM,
-                                        f"Linux boot identity is unavailable: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.UNSUPPORTED_PLATFORM,
+            f"Linux boot identity is unavailable: {exc}",
+        ) from exc
     if not value:
-        raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM,
-                                        "Linux boot identity is empty")
+        raise ParentRootSideEffectError(
+            ParentRootReject.UNSUPPORTED_PLATFORM, "Linux boot identity is empty"
+        )
     return value
 
 
-def _git_value(path: Path, *args: str, reject: ParentRootReject = ParentRootReject.ROOT_MISMATCH) -> str:
-    result = subprocess.run(["git", "-C", str(path), *args], check=False,
-                            capture_output=True, text=True)
+def _git_value(
+    path: Path, *args: str, reject: ParentRootReject = ParentRootReject.ROOT_MISMATCH
+) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(path), *args], check=False, capture_output=True, text=True
+    )
     if result.returncode != 0 or not result.stdout.strip():
-        raise ParentRootSideEffectError(reject, f"Git identity is unavailable at {path}: {' '.join(args)}")
+        raise ParentRootSideEffectError(
+            reject, f"Git identity is unavailable at {path}: {' '.join(args)}"
+        )
     return result.stdout.strip()
 
 
@@ -535,19 +676,26 @@ def _raw_digest(path: Path) -> str:
     try:
         return _sha256(path.read_bytes())
     except OSError as exc:
-        raise ParentRootSideEffectError(ParentRootReject.OWNER_EVIDENCE_INVALID,
-                                        f"cannot hash bound file {path}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.OWNER_EVIDENCE_INVALID,
+            f"cannot hash bound file {path}: {exc}",
+        ) from exc
 
 
-def _module_binding(root: Path, manifest: Path, source: Path,
-                    reject: ParentRootReject) -> dict[str, object]:
+def _module_binding(
+    root: Path, manifest: Path, source: Path, reject: ParentRootReject
+) -> dict[str, object]:
     """Read one exact .gitmodules entry and bind it to the source checkout."""
     result = subprocess.run(
         ["git", "-C", str(root), "config", "--file", str(manifest), "--null", "--list"],
-        check=False, capture_output=True, text=True,
+        check=False,
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
-        raise ParentRootSideEffectError(reject, f"cannot parse module manifest: {manifest}")
+        raise ParentRootSideEffectError(
+            reject, f"cannot parse module manifest: {manifest}"
+        )
     values: dict[str, dict[str, str]] = {}
     for record in result.stdout.split("\0"):
         key, separator, value = record.partition("\n")
@@ -559,16 +707,29 @@ def _module_binding(root: Path, manifest: Path, source: Path,
     relative = source.relative_to(root).as_posix()
     matches = [item for item in values.values() if item.get("path") == relative]
     if len(matches) != 1 or not matches[0].get("url"):
-        raise ParentRootSideEffectError(reject, f"module path is not uniquely bound: {relative}")
+        raise ParentRootSideEffectError(
+            reject, f"module path is not uniquely bound: {relative}"
+        )
     commit, tree = _git_identity(source, reject)
     gitlink = _git_value(root, "ls-tree", "HEAD", "--", relative, reject=reject)
     fields = gitlink.split(None, 3)
-    if len(fields) != 4 or fields[0] != "160000" or fields[1] != "commit" or fields[2] != commit:
-        raise ParentRootSideEffectError(reject,
-                                        f"module path is not an exact gitlink to source HEAD: {relative}")
-    return {"schema": "gitmodules", "sha256": _raw_digest(manifest),
-            "module_path": relative, "url": matches[0]["url"],
-            "observed_commit": commit, "observed_tree": tree}
+    if (
+        len(fields) != 4
+        or fields[0] != "160000"
+        or fields[1] != "commit"
+        or fields[2] != commit
+    ):
+        raise ParentRootSideEffectError(
+            reject, f"module path is not an exact gitlink to source HEAD: {relative}"
+        )
+    return {
+        "schema": "gitmodules",
+        "sha256": _raw_digest(manifest),
+        "module_path": relative,
+        "url": matches[0]["url"],
+        "observed_commit": commit,
+        "observed_tree": tree,
+    }
 
 
 def _normalize_remote(value: str) -> str:
@@ -579,66 +740,98 @@ def _lexical_candidate(root: Path, value: Path | str) -> Path:
     candidate = Path(value)
     lexical = candidate if candidate.is_absolute() else root / candidate
     if any(part == ".." for part in lexical.parts):
-        raise ParentRootSideEffectError(ParentRootReject.SYMLINK_ESCAPE,
-                                        f"lexical parent escape: {value}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE, f"lexical parent escape: {value}"
+        )
     return _absolute(lexical)
 
 
-def _physical_in_root(root: Path, value: Path | str, *, allow_missing: bool) -> tuple[Path, tuple[str, ...]]:
+def _physical_in_root(
+    root: Path, value: Path | str, *, allow_missing: bool
+) -> tuple[Path, tuple[str, ...]]:
     lexical = _lexical_candidate(root, value)
     try:
         physical = lexical.resolve(strict=False)
     except (OSError, RuntimeError) as exc:
-        raise ParentRootSideEffectError(ParentRootReject.SYMLINK_ESCAPE,
-                                        f"cannot resolve {lexical}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE, f"cannot resolve {lexical}: {exc}"
+        ) from exc
     if not _contains(root, physical):
-        raise ParentRootSideEffectError(ParentRootReject.SYMLINK_ESCAPE,
-                                        f"path resolves outside parent root: {lexical} -> {physical}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"path resolves outside parent root: {lexical} -> {physical}",
+        )
     if not allow_missing and not physical.exists():
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                        f"path does not exist: {physical}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISSING, f"path does not exist: {physical}"
+        )
     return physical, tuple(physical.relative_to(root).parts)
 
 
 def _open_root(root: Path) -> int:
     if sys.platform != "linux":
-        raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+        raise ParentRootSideEffectError(
+            ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+        )
     try:
-        return os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        return os.open(
+            root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+        )
     except OSError as exc:
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                        f"cannot open parent root: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISSING, f"cannot open parent root: {exc}"
+        ) from exc
 
 
-def _open_components(root: Path, parts: Sequence[str], *, create: bool) -> tuple[int, Path]:
+def _open_components(
+    root: Path, parts: Sequence[str], *, create: bool
+) -> tuple[int, Path]:
     """Open physical components with openat/O_NOFOLLOW and return leaf parent fd."""
     fd = _open_root(root)
     current = root
     try:
         for component in parts:
             if component in {"", ".", ".."}:
-                raise ParentRootSideEffectError(ParentRootReject.SYMLINK_ESCAPE,
-                                                f"invalid path component: {component!r}")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.SYMLINK_ESCAPE,
+                    f"invalid path component: {component!r}",
+                )
             try:
-                child = os.open(component, os.O_RDONLY | os.O_DIRECTORY |
-                                os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+                child = os.open(
+                    component,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    dir_fd=fd,
+                )
             except FileNotFoundError:
                 if not create:
-                    raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
-                                                    f"missing directory component: {component}")
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_MISSING,
+                        f"missing directory component: {component}",
+                    )
                 try:
                     try:
                         os.mkdir(component, 0o700, dir_fd=fd)
                     except FileExistsError:
                         pass
-                    child = os.open(component, os.O_RDONLY | os.O_DIRECTORY |
-                                    os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
+                    child = os.open(
+                        component,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                        dir_fd=fd,
+                    )
                 except OSError as exc:
-                    raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                                    f"directory component changed: {component}: {exc}") from exc
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        f"directory component changed: {component}: {exc}",
+                    ) from exc
             except OSError as exc:
-                reason = ParentRootReject.SYMLINK_ESCAPE if exc.errno in {errno.ELOOP, errno.ENOTDIR} else ParentRootReject.ROOT_RACE_DETECTED
-                raise ParentRootSideEffectError(reason, f"cannot open component {component}: {exc}") from exc
+                reason = (
+                    ParentRootReject.SYMLINK_ESCAPE
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}
+                    else ParentRootReject.ROOT_RACE_DETECTED
+                )
+                raise ParentRootSideEffectError(
+                    reason, f"cannot open component {component}: {exc}"
+                ) from exc
             os.close(fd)
             fd = child
             current = current / component
@@ -682,10 +875,7 @@ def _component_identities(
                         pass
                     child = os.open(
                         component,
-                        os.O_RDONLY
-                        | os.O_DIRECTORY
-                        | os.O_NOFOLLOW
-                        | os.O_CLOEXEC,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
                         dir_fd=fd,
                     )
                 except OSError as exc:
@@ -711,8 +901,31 @@ def _component_identities(
         os.close(fd)
 
 
+def _require_parent_path_receipt(receipt: object) -> ParentOwnedPathReceipt:
+    """Keep Git-admin file results out of generic parent-path operations."""
+    if not isinstance(receipt, ParentOwnedPathReceipt):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            "operation requires a parent-root path receipt",
+        )
+    return receipt
+
+
+def _require_parent_tree_target(
+    candidate: object,
+) -> ParentOwnedPathReceipt | Path | str:
+    """Keep file-only Git-admin results out of generic tree operations."""
+    if not isinstance(candidate, (ParentOwnedPathReceipt, Path, str)):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            "operation requires a parent-root path or path receipt",
+        )
+    return candidate
+
+
 def _verify_parent_components(receipt: ParentOwnedPathReceipt) -> None:
     """Reject replacement of any root-to-parent directory component."""
+    receipt = _require_parent_path_receipt(receipt)
     if not receipt.parent_components:
         raise ParentRootSideEffectError(
             ParentRootReject.ROOT_RACE_DETECTED,
@@ -727,7 +940,10 @@ def _verify_parent_components(receipt: ParentOwnedPathReceipt) -> None:
         )
     actual = _component_identities(receipt.parent_root, expected_parts, create=False)
     for expected_entry, actual_entry in zip(receipt.parent_components, actual):
-        if expected_entry[0] != actual_entry[0] or expected_entry[1:] != actual_entry[1:]:
+        if (
+            expected_entry[0] != actual_entry[0]
+            or expected_entry[1:] != actual_entry[1:]
+        ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"parent directory identity changed: {expected_entry[0]}",
@@ -759,9 +975,7 @@ def _lexical_snapshot(root: Path, lexical: Path) -> dict[str, object]:
         entry_exists = False
         link_target: str | None = None
         try:
-            entry_info = os.stat(
-                entry_name, dir_fd=parent_fd, follow_symlinks=False
-            )
+            entry_info = os.stat(entry_name, dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
             pass
         else:
@@ -825,9 +1039,7 @@ def _open_lexical_entry(receipt: ParentOwnedPathReceipt) -> tuple[int, str]:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "lexical parent identity changed before removal",
             )
-        actual_components = _component_identities(
-            root, parent_parts, create=False
-        )
+        actual_components = _component_identities(root, parent_parts, create=False)
         if actual_components != receipt.lexical_parent_components:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -836,19 +1048,16 @@ def _open_lexical_entry(receipt: ParentOwnedPathReceipt) -> tuple[int, str]:
         observed = os.stat(
             receipt.lexical_name, dir_fd=parent_fd, follow_symlinks=False
         )
-        if (
-            (observed.st_dev, observed.st_ino)
-            != (receipt.lexical_entry_dev, receipt.lexical_entry_ino)
-            or stat.S_IFMT(observed.st_mode) != receipt.lexical_entry_type
-        ):
+        if (observed.st_dev, observed.st_ino) != (
+            receipt.lexical_entry_dev,
+            receipt.lexical_entry_ino,
+        ) or stat.S_IFMT(observed.st_mode) != receipt.lexical_entry_type:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "lexical entry identity changed before removal",
             )
         if stat.S_ISLNK(observed.st_mode):
-            link_target = os.readlink(
-                receipt.lexical_name, dir_fd=parent_fd
-            )
+            link_target = os.readlink(receipt.lexical_name, dir_fd=parent_fd)
             if link_target != receipt.lexical_link_target:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
@@ -899,11 +1108,14 @@ def _open_lexical_entry(receipt: ParentOwnedPathReceipt) -> tuple[int, str]:
         raise
 
 
-def _parent_directory(root: Path, physical: Path, *, create: bool) -> tuple[int, str, Path]:
+def _parent_directory(
+    root: Path, physical: Path, *, create: bool
+) -> tuple[int, str, Path]:
     relative = tuple(physical.relative_to(root).parts)
     if not relative:
-        raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                        "parent root is not a file target")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH, "parent root is not a file target"
+        )
     parent_fd, parent_path = _open_components(root, relative[:-1], create=create)
     return parent_fd, relative[-1], parent_path
 
@@ -949,12 +1161,18 @@ def _open_receipt_parent_chain(
         fds.append(fd)
         root_info = os.fstat(fd)
         expected_root = expected_components[0]
-        if expected_root[0] != "." or (root_info.st_dev, root_info.st_ino) != expected_root[1:]:
+        if (
+            expected_root[0] != "."
+            or (root_info.st_dev, root_info.st_ino) != expected_root[1:]
+        ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"{purpose}: parent root identity changed",
             )
-        if (root_info.st_dev, root_info.st_ino) != (receipt.parent_dev, receipt.parent_ino):
+        if (root_info.st_dev, root_info.st_ino) != (
+            receipt.parent_dev,
+            receipt.parent_ino,
+        ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"{purpose}: attested parent root identity changed",
@@ -994,7 +1212,9 @@ def _open_receipt_parent_chain(
         raise
 
 
-def _read_json_exact(path: Path, reject: ParentRootReject, required: frozenset[str], schema: str) -> Mapping[str, object]:
+def _read_json_exact(
+    path: Path, reject: ParentRootReject, required: frozenset[str], schema: str
+) -> Mapping[str, object]:
     def reject_duplicate_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
         result: dict[str, object] = {}
         for key, value in pairs:
@@ -1005,17 +1225,27 @@ def _read_json_exact(path: Path, reject: ParentRootReject, required: frozenset[s
 
     try:
         raw = path.read_bytes()
-        value = json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+        value = json.loads(
+            raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs
+        )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-        raise ParentRootSideEffectError(reject, f"invalid bound file {path}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            reject, f"invalid bound file {path}: {exc}"
+        ) from exc
     mapping = cast(Mapping[str, object], value) if isinstance(value, Mapping) else None
-    if (mapping is None or set(mapping) != set(required) or mapping.get("schema") != schema
-            or any(not isinstance(item, str) or not item for item in mapping.values())):
+    if (
+        mapping is None
+        or set(mapping) != set(required)
+        or mapping.get("schema") != schema
+        or any(not isinstance(item, str) or not item for item in mapping.values())
+    ):
         raise ParentRootSideEffectError(reject, f"bound file schema mismatch: {path}")
     return mapping
 
 
-def _read_bound_file(root: Path, path: Path | None, reject: ParentRootReject) -> Mapping[str, object] | None:
+def _read_bound_file(
+    root: Path, path: Path | None, reject: ParentRootReject
+) -> Mapping[str, object] | None:
     if path is None:
         return None
     physical, _ = _physical_in_root(root, path, allow_missing=False)
@@ -1025,20 +1255,30 @@ def _read_bound_file(root: Path, path: Path | None, reject: ParentRootReject) ->
         try:
             raw = physical.read_bytes()
         except FileExistsError as exc:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "publication target collision") from exc
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED, "publication target collision"
+            ) from exc
         except OSError as exc:
-            raise ParentRootSideEffectError(reject, f"cannot read {physical}: {exc}") from exc
+            raise ParentRootSideEffectError(
+                reject, f"cannot read {physical}: {exc}"
+            ) from exc
         if not raw:
             raise ParentRootSideEffectError(reject, f"empty module file: {physical}")
         return {"schema": "gitmodules", "sha256": _sha256(raw), "path": str(physical)}
     if reject is ParentRootReject.MARKER_INVALID:
-        return _read_json_exact(physical, reject, _MARKER_FIELDS, "agent-canon.repository-topic.v2")
+        return _read_json_exact(
+            physical, reject, _MARKER_FIELDS, "agent-canon.repository-topic.v2"
+        )
     if reject is ParentRootReject.OWNER_EVIDENCE_INVALID:
-        return _read_json_exact(physical, reject, _OWNER_FIELDS, "agent-canon.owner-evidence.v1")
+        return _read_json_exact(
+            physical, reject, _OWNER_FIELDS, "agent-canon.owner-evidence.v1"
+        )
     try:
         raw = physical.read_bytes()
     except OSError as exc:
-        raise ParentRootSideEffectError(reject, f"cannot read {physical}: {exc}") from exc
+        raise ParentRootSideEffectError(
+            reject, f"cannot read {physical}: {exc}"
+        ) from exc
     return {"schema": "gitmodules", "sha256": _sha256(raw), "path": str(physical)}
 
 
@@ -1071,8 +1311,12 @@ def _load_secret(root: Path, *, create: bool) -> bytes:
     directory_fd = -1
     fd = -1
     try:
-        directory_fd, _ = _open_components(root, (".agent-canon", "handoff"), create=False)
-        fd = os.open("secret", os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory_fd)
+        directory_fd, _ = _open_components(
+            root, (".agent-canon", "handoff"), create=False
+        )
+        fd = os.open(
+            "secret", os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory_fd
+        )
         info = os.fstat(fd)
         raw = os.read(fd, 4096)
         os.close(fd)
@@ -1080,20 +1324,27 @@ def _load_secret(root: Path, *, create: bool) -> bytes:
         os.close(directory_fd)
         directory_fd = -1
         if info.st_mode & 0o077:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff secret is not private")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff secret is not private"
+            )
         if len(raw) < 32:
             raise ValueError("short secret")
         return raw
     except (FileNotFoundError, NotADirectoryError):
         if not create:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "parent-local handoff secret is missing")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "parent-local handoff secret is missing",
+            )
         value = secrets.token_bytes(32)
         _secure_file(root, "secret", value)
         # Another process may have won the O_EXCL race; always authenticate
         # with the durable parent-local secret actually stored on disk.
         return _load_secret(root, create=False)
     except OSError as exc:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"cannot read handoff secret: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID, f"cannot read handoff secret: {exc}"
+        ) from exc
     finally:
         if fd >= 0:
             os.close(fd)
@@ -1108,7 +1359,9 @@ def _locked_state(root: Path, *, create: bool) -> tuple[int, dict[str, float]]:
     if create:
         _secure_file(root, "nonces.json", b"{}")
     try:
-        fd = os.open("nonces.json", os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory_fd)
+        fd = os.open(
+            "nonces.json", os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory_fd
+        )
         os.close(directory_fd)
         os.fchmod(fd, 0o600)
         fcntl.flock(fd, fcntl.LOCK_EX)
@@ -1118,13 +1371,20 @@ def _locked_state(root: Path, *, create: bool) -> tuple[int, dict[str, float]]:
             raise ValueError("invalid nonce state")
         state = cast(Mapping[str, object], value)
         return fd, {str(k): float(cast(float | int | str, v)) for k, v in state.items()}
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         try:
             os.close(directory_fd)
         except OSError:
             pass
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID,
-                                        f"cannot open nonce receipt: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID, f"cannot open nonce receipt: {exc}"
+        ) from exc
 
 
 def _write_locked_state(fd: int, state: Mapping[str, float]) -> None:
@@ -1149,32 +1409,47 @@ def _decode_envelope(token: str) -> tuple[Mapping[str, object], str]:
         payload = envelope["payload"]
         signature = envelope["signature"]
     except (ValueError, KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID,
-                                        f"malformed handoff token: {exc}") from exc
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID, f"malformed handoff token: {exc}"
+        ) from exc
     if not isinstance(payload, Mapping) or not isinstance(signature, str):
-        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "invalid handoff envelope")
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID, "invalid handoff envelope"
+        )
     return cast(Mapping[str, object], payload), token
 
 
 def _signed_token(payload: Mapping[str, object], secret: bytes) -> str:
     signature = hmac.new(secret, _canonical_bytes(payload), hashlib.sha256).hexdigest()
-    return base64.urlsafe_b64encode(_canonical_bytes({"payload": payload, "signature": signature})).decode("ascii")
+    return base64.urlsafe_b64encode(
+        _canonical_bytes({"payload": payload, "signature": signature})
+    ).decode("ascii")
 
 
 def _session_secret(root: Path, *, create: bool) -> bytes:
-    return hmac.new(_load_secret(root, create=create), _boot_id().encode("ascii"), hashlib.sha256).digest()
+    return hmac.new(
+        _load_secret(root, create=create), _boot_id().encode("ascii"), hashlib.sha256
+    ).digest()
 
 
 class ParentRootSideEffectBoundary:
     """Authenticate Git identity and expose race-safe parent-local effects."""
 
-    def issue_child_handoff(self, parent_root: Path, *, audience: str,
-                            source_root: Path | None = None, clone_root: Path | None = None,
-                            ttl_seconds: int = _DEFAULT_TOKEN_TTL,
-                            transport: str = "parent-local-file") -> str:
+    def issue_child_handoff(
+        self,
+        parent_root: Path,
+        *,
+        audience: str,
+        source_root: Path | None = None,
+        clone_root: Path | None = None,
+        ttl_seconds: int = _DEFAULT_TOKEN_TTL,
+        transport: str = "parent-local-file",
+    ) -> str:
         root = _physical(Path(parent_root), strict=True)
         if _git_toplevel(root) != root:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "handoff root is not Git toplevel")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH, "handoff root is not Git toplevel"
+            )
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
         if transport not in _ALLOWED_TRANSPORTS:
@@ -1183,52 +1458,94 @@ class ParentRootSideEffectBoundary:
         resolved_clone = _physical(clone_root, strict=True) if clone_root else None
         for label, path in (("source", resolved_source), ("clone", resolved_clone)):
             if path is not None and not _contains(root, path):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                                f"handoff {label} is outside parent root")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"handoff {label} is outside parent root",
+                )
             if label == "clone" and path is not None and _git_toplevel(path) != path:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                                "handoff clone is not an authenticated Git checkout")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    "handoff clone is not an authenticated Git checkout",
+                )
         secret = _session_secret(root, create=True)
         now = time.monotonic()
         storage = "parent-local-file" if transport == "parent-local-file" else "pipe"
         mode = "0600" if transport == "parent-local-file" else "pipe"
         payload: dict[str, object] = {
-            "token_version": SCHEMA_HANDOFF, "audience": audience,
+            "token_version": SCHEMA_HANDOFF,
+            "audience": audience,
             "parent_root": str(root),
             "source_root": str(resolved_source) if resolved_source else None,
             "clone_root": str(resolved_clone) if resolved_clone else None,
-            "issued_at": now, "expires_at": now + ttl_seconds,
-            "nonce": secrets.token_hex(16), "storage": storage,
-            "mode": mode, "validation": "hmac-single-use", "transport": transport,
+            "issued_at": now,
+            "expires_at": now + ttl_seconds,
+            "nonce": secrets.token_hex(16),
+            "storage": storage,
+            "mode": mode,
+            "validation": "hmac-single-use",
+            "transport": transport,
         }
-        payload["payload_sha256"] = _sha256(_canonical_bytes({k: v for k, v in payload.items() if k != "payload_sha256"}))
+        payload["payload_sha256"] = _sha256(
+            _canonical_bytes(
+                {k: v for k, v in payload.items() if k != "payload_sha256"}
+            )
+        )
         fd, state = _locked_state(root, create=True)
         try:
-            state[str(payload["nonce"])] = float(cast(float | int | str, payload["expires_at"]))
+            state[str(payload["nonce"])] = float(
+                cast(float | int | str, payload["expires_at"])
+            )
             _write_locked_state(fd, state)
         finally:
             _close_state(fd)
         return _signed_token(payload, secret)
 
-    def _handoff(self, token: str | None, *, request: ParentRootAttestationRequest,
-                 parent_root: Path, source_root: Path | None,
-                 clone_root: Path | None,
-                 consume_nonce: bool = True) -> ChildHandoffReceipt | None:
+    def _handoff(
+        self,
+        token: str | None,
+        *,
+        request: ParentRootAttestationRequest,
+        parent_root: Path,
+        source_root: Path | None,
+        clone_root: Path | None,
+        consume_nonce: bool = True,
+    ) -> ChildHandoffReceipt | None:
         if token is None:
             return None
         payload, raw_token = _decode_envelope(token)
-        required = {"token_version", "audience", "parent_root", "source_root", "clone_root",
-                    "issued_at", "expires_at", "nonce", "payload_sha256", "storage", "mode",
-                    "validation", "transport"}
+        required = {
+            "token_version",
+            "audience",
+            "parent_root",
+            "source_root",
+            "clone_root",
+            "issued_at",
+            "expires_at",
+            "nonce",
+            "payload_sha256",
+            "storage",
+            "mode",
+            "validation",
+            "transport",
+        }
         if set(payload) != required or payload.get("token_version") != SCHEMA_HANDOFF:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff fields are incomplete")
-        if (payload.get("storage") not in _ALLOWED_STORAGE or payload.get("mode") not in _ALLOWED_MODES
-                or payload.get("transport") not in _ALLOWED_TRANSPORTS
-                or payload.get("validation") != "hmac-single-use"):
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID,
-                                            "handoff transport/storage/mode validation is invalid")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff fields are incomplete"
+            )
+        if (
+            payload.get("storage") not in _ALLOWED_STORAGE
+            or payload.get("mode") not in _ALLOWED_MODES
+            or payload.get("transport") not in _ALLOWED_TRANSPORTS
+            or payload.get("validation") != "hmac-single-use"
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "handoff transport/storage/mode validation is invalid",
+            )
         transport = payload["transport"]
-        expected_storage = "parent-local-file" if transport == "parent-local-file" else "pipe"
+        expected_storage = (
+            "parent-local-file" if transport == "parent-local-file" else "pipe"
+        )
         expected_mode = "0600" if transport == "parent-local-file" else "pipe"
         if payload["storage"] != expected_storage or payload["mode"] != expected_mode:
             raise ParentRootSideEffectError(
@@ -1261,13 +1578,29 @@ class ParentRootSideEffectBoundary:
             )
         root = parent_root
         try:
-            expected = hmac.new(_session_secret(root, create=False), _canonical_bytes(payload), hashlib.sha256).hexdigest()
+            expected = hmac.new(
+                _session_secret(root, create=False),
+                _canonical_bytes(payload),
+                hashlib.sha256,
+            ).hexdigest()
             envelope = base64.urlsafe_b64decode(token.encode("ascii"))
             observed = json.loads(envelope.decode("utf-8"))["signature"]
-        except (OSError, ValueError, KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"handoff authentication failed: {exc}") from exc
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            UnicodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                f"handoff authentication failed: {exc}",
+            ) from exc
         if not isinstance(observed, str) or not hmac.compare_digest(expected, observed):
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff signature mismatch")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff signature mismatch"
+            )
         now = time.monotonic()
         issued_value, expires_value = payload["issued_at"], payload["expires_at"]
         nonce_value = payload["nonce"]
@@ -1278,14 +1611,25 @@ class ParentRootSideEffectBoundary:
             or not isinstance(expires_value, (int, float))
         ):
             raise ParentRootSideEffectError(
-                ParentRootReject.HANDOFF_INVALID, "handoff timestamp or nonce type changed"
+                ParentRootReject.HANDOFF_INVALID,
+                "handoff timestamp or nonce type changed",
             )
         issued, expires, nonce = float(issued_value), float(expires_value), nonce_value
         if not issued <= now <= expires:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff expired or not yet valid")
-        if payload["audience"] != request.purpose or _physical(Path(str(payload["parent_root"])), strict=True) != root:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff audience or root mismatch")
-        for key, expected_path in (("source_root", source_root), ("clone_root", clone_root)):
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff expired or not yet valid"
+            )
+        if (
+            payload["audience"] != request.purpose
+            or _physical(Path(str(payload["parent_root"])), strict=True) != root
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff audience or root mismatch"
+            )
+        for key, expected_path in (
+            ("source_root", source_root),
+            ("clone_root", clone_root),
+        ):
             token_path = payload[key]
             if expected_path is None:
                 if token_path is not None:
@@ -1293,37 +1637,70 @@ class ParentRootSideEffectBoundary:
                         ParentRootReject.HANDOFF_INVALID,
                         f"handoff {key} unexpectedly binds a path",
                     )
-            elif token_path is None or _physical(Path(str(token_path)), strict=True) != _physical(expected_path, strict=True):
-                raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"handoff {key} mismatch")
+            elif token_path is None or _physical(
+                Path(str(token_path)), strict=True
+            ) != _physical(expected_path, strict=True):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.HANDOFF_INVALID, f"handoff {key} mismatch"
+                )
         body = {k: v for k, v in payload.items() if k != "payload_sha256"}
         if payload["payload_sha256"] != _sha256(_canonical_bytes(body)):
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff payload digest mismatch")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "handoff payload digest mismatch"
+            )
         fd, state = _locked_state(root, create=False)
         try:
             if nonce not in state:
-                raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "unknown or replayed handoff nonce")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.HANDOFF_INVALID,
+                    "unknown or replayed handoff nonce",
+                )
             if state[nonce] < now:
-                raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff nonce expired")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.HANDOFF_INVALID, "handoff nonce expired"
+                )
             if consume_nonce:
                 del state[nonce]
                 _write_locked_state(fd, state)
         finally:
             _close_state(fd)
-        return ChildHandoffReceipt(str(payload["token_version"]), str(payload["audience"]), root,
-                                   source_root, clone_root, issued, expires, nonce,
-                                   str(payload["payload_sha256"]), str(payload["storage"]),
-                                   str(payload["mode"]), str(payload["validation"]),
-                                   str(payload["transport"]), raw_token)
+        return ChildHandoffReceipt(
+            str(payload["token_version"]),
+            str(payload["audience"]),
+            root,
+            source_root,
+            clone_root,
+            issued,
+            expires,
+            nonce,
+            str(payload["payload_sha256"]),
+            str(payload["storage"]),
+            str(payload["mode"]),
+            str(payload["validation"]),
+            str(payload["transport"]),
+            raw_token,
+        )
 
-    def attest(self, request: ParentRootAttestationRequest) -> ParentRootAttestationReceipt:
+    def attest(
+        self, request: ParentRootAttestationRequest
+    ) -> ParentRootAttestationReceipt:
         """Authenticate the selected Git toplevel and all optional identities."""
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         cwd = _physical(Path(request.cwd), strict=True)
-        explicit = _physical(request.explicit_root, strict=True) if request.explicit_root else None
+        explicit = (
+            _physical(request.explicit_root, strict=True)
+            if request.explicit_root
+            else None
+        )
         if explicit is not None:
             if not explicit.is_dir() or not _contains(explicit, cwd):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_SPOOFED, f"cwd is outside explicit root: {cwd}")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_SPOOFED,
+                    f"cwd is outside explicit root: {cwd}",
+                )
             root = explicit
             precedence = "explicit-git"
             try:
@@ -1336,10 +1713,15 @@ class ParentRootSideEffectBoundary:
                     ) from exc
                 raise
             if explicit_git != root:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "explicit root is not Git toplevel")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH, "explicit root is not Git toplevel"
+                )
             git_cwd = _git_toplevel(cwd)
             if git_cwd != root:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "cwd Git identity differs from explicit root")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    "cwd Git identity differs from explicit root",
+                )
         else:
             git_cwd = _git_toplevel(cwd)
             root = git_cwd
@@ -1351,127 +1733,304 @@ class ParentRootSideEffectBoundary:
                 f"ambient active repository root is inconsistent: ambient={ambient_root} requested={root}",
             )
         parent_dev, parent_ino = _identity(root)
-        source = _physical(request.source_root, strict=True) if request.source_root else None
-        clone = _physical(request.clone_root, strict=True) if request.clone_root else None
+        git_common_dir = _git_common_dir(root)
+        git_common_dev, git_common_ino = _identity(git_common_dir)
+        source = (
+            _physical(request.source_root, strict=True) if request.source_root else None
+        )
+        clone = (
+            _physical(request.clone_root, strict=True) if request.clone_root else None
+        )
         for label, path in (("source", source), ("clone", clone)):
             if path is None:
                 continue
             if not _contains(root, path):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, f"{label} root is outside parent root")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"{label} root is outside parent root",
+                )
             if _git_toplevel(path) != path:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_MISMATCH,
                     f"{label} is not an authenticated Git checkout: {path}",
                 )
         if source is not None and clone is not None and source == clone:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_AMBIGUOUS, "source and clone roots are identical")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_AMBIGUOUS, "source and clone roots are identical"
+            )
         # An outer parent is admitted only with all three authenticated binding files.
-        if clone is not None and any(x is None for x in (request.topic_marker, request.gitmodules, request.owner_evidence)):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "topic clone relation lacks marker/module/owner evidence")
-        marker = _read_bound_file(root, request.topic_marker, ParentRootReject.MARKER_INVALID)
-        module = _read_bound_file(root, request.gitmodules, ParentRootReject.MODULE_INVALID)
-        owner = _read_bound_file(root, request.owner_evidence, ParentRootReject.OWNER_EVIDENCE_INVALID)
+        if clone is not None and any(
+            x is None
+            for x in (request.topic_marker, request.gitmodules, request.owner_evidence)
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "topic clone relation lacks marker/module/owner evidence",
+            )
+        marker = _read_bound_file(
+            root, request.topic_marker, ParentRootReject.MARKER_INVALID
+        )
+        module = _read_bound_file(
+            root, request.gitmodules, ParentRootReject.MODULE_INVALID
+        )
+        owner = _read_bound_file(
+            root, request.owner_evidence, ParentRootReject.OWNER_EVIDENCE_INVALID
+        )
         if source is not None and module is not None and request.gitmodules is not None:
-            module = _module_binding(root, _physical(request.gitmodules, strict=True), source,
-                                     ParentRootReject.MODULE_INVALID)
-        if clone is not None and marker is not None and module is not None and owner is not None:
+            module = _module_binding(
+                root,
+                _physical(request.gitmodules, strict=True),
+                source,
+                ParentRootReject.MODULE_INVALID,
+            )
+        if (
+            clone is not None
+            and marker is not None
+            and module is not None
+            and owner is not None
+        ):
             if source is None:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                                "topic relation lacks an authenticated source root")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    "topic relation lacks an authenticated source root",
+                )
             _git_identity(clone, ParentRootReject.MARKER_INVALID)
-            source_commit, source_tree = _git_identity(source, ParentRootReject.MODULE_INVALID)
-            actual_branch = _git_value(clone, "symbolic-ref", "--short", "HEAD",
-                                       reject=ParentRootReject.MARKER_INVALID)
+            source_commit, source_tree = _git_identity(
+                source, ParentRootReject.MODULE_INVALID
+            )
+            actual_branch = _git_value(
+                clone,
+                "symbolic-ref",
+                "--short",
+                "HEAD",
+                reject=ParentRootReject.MARKER_INVALID,
+            )
             actual_clone_remote = _git_origin(clone)
             gitmodules = request.gitmodules
             owner_evidence = request.owner_evidence
             if gitmodules is None or owner_evidence is None:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                                "topic relation binding files disappeared")
-            actual_module = _module_binding(root, _physical(gitmodules, strict=True), source,
-                                            ParentRootReject.MODULE_INVALID)
-            if _normalize_remote(str(actual_module["url"])) != _normalize_remote(_git_origin(source)):
-                raise ParentRootSideEffectError(ParentRootReject.MODULE_INVALID,
-                                                "module URL does not match source Git origin")
-            if (actual_module["observed_commit"] != source_commit
-                    or actual_module["observed_tree"] != source_tree):
-                raise ParentRootSideEffectError(ParentRootReject.MODULE_INVALID,
-                                                "module observed commit/tree changed during attestation")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    "topic relation binding files disappeared",
+                )
+            actual_module = _module_binding(
+                root,
+                _physical(gitmodules, strict=True),
+                source,
+                ParentRootReject.MODULE_INVALID,
+            )
+            if _normalize_remote(str(actual_module["url"])) != _normalize_remote(
+                _git_origin(source)
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.MODULE_INVALID,
+                    "module URL does not match source Git origin",
+                )
+            if (
+                actual_module["observed_commit"] != source_commit
+                or actual_module["observed_tree"] != source_tree
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.MODULE_INVALID,
+                    "module observed commit/tree changed during attestation",
+                )
             owner_map = owner
             marker_map = marker
             marker_checks = {
                 "parent_repo_id": _parent_repo_id(root),
-                "clone_path": str(clone), "repo_name": clone.name,
-                "topic_slug": clone.parent.name, "branch": actual_branch,
-                "remote_url": actual_clone_remote, "source_commit": source_commit,
+                "clone_path": str(clone),
+                "repo_name": clone.name,
+                "topic_slug": clone.parent.name,
+                "branch": actual_branch,
+                "remote_url": actual_clone_remote,
+                "source_commit": source_commit,
                 "source_tree": source_tree,
             }
             for key, expected in marker_checks.items():
-                if str(marker_map.get(key, "")).rstrip("/") != str(expected).rstrip("/"):
-                    raise ParentRootSideEffectError(ParentRootReject.MARKER_INVALID,
-                                                    f"marker {key} does not match observed identity")
+                if str(marker_map.get(key, "")).rstrip("/") != str(expected).rstrip(
+                    "/"
+                ):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.MARKER_INVALID,
+                        f"marker {key} does not match observed identity",
+                    )
             owner_raw_sha = _raw_digest(_physical(owner_evidence, strict=True))
-            if not _is_digest(marker_map.get("owner_evidence_sha256")) or str(marker_map.get("owner_evidence_sha256")) != owner_raw_sha:
-                raise ParentRootSideEffectError(ParentRootReject.OWNER_EVIDENCE_INVALID,
-                                                "marker owner evidence digest does not match raw evidence")
+            if (
+                not _is_digest(marker_map.get("owner_evidence_sha256"))
+                or str(marker_map.get("owner_evidence_sha256")) != owner_raw_sha
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.OWNER_EVIDENCE_INVALID,
+                    "marker owner evidence digest does not match raw evidence",
+                )
             owner_checks = {
                 "parent_repo_id": _parent_repo_id(root),
-                "physical_parent": str(root), "module_path": actual_module["module_path"],
-                "remote_url": _git_origin(root), "observed_commit": source_commit,
+                "physical_parent": str(root),
+                "module_path": actual_module["module_path"],
+                "remote_url": _git_origin(root),
+                "observed_commit": source_commit,
                 "observed_tree": source_tree,
             }
             for key, expected in owner_checks.items():
                 if str(owner_map.get(key, "")) != str(expected):
-                    raise ParentRootSideEffectError(ParentRootReject.OWNER_EVIDENCE_INVALID,
-                                                    f"owner evidence {key} does not match observed identity")
-            evidence_without_digest = {key: value for key, value in owner_map.items() if key != "evidence_sha256"}
-            expected_evidence_digest = _sha256(_canonical_bytes(evidence_without_digest))
-            if not _is_digest(owner_map.get("evidence_sha256")) or str(owner_map.get("evidence_sha256")) != expected_evidence_digest:
-                raise ParentRootSideEffectError(ParentRootReject.OWNER_EVIDENCE_INVALID,
-                                                "owner evidence digest does not match canonical body")
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.OWNER_EVIDENCE_INVALID,
+                        f"owner evidence {key} does not match observed identity",
+                    )
+            evidence_without_digest = {
+                key: value
+                for key, value in owner_map.items()
+                if key != "evidence_sha256"
+            }
+            expected_evidence_digest = _sha256(
+                _canonical_bytes(evidence_without_digest)
+            )
+            if (
+                not _is_digest(owner_map.get("evidence_sha256"))
+                or str(owner_map.get("evidence_sha256")) != expected_evidence_digest
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.OWNER_EVIDENCE_INVALID,
+                    "owner evidence digest does not match canonical body",
+                )
             module = actual_module
         if request.expected_module_digest:
-            if (not _is_digest(request.expected_module_digest) or module is None
-                    or str(module.get("sha256", "")) != request.expected_module_digest):
-                raise ParentRootSideEffectError(ParentRootReject.MODULE_INVALID, "module digest missing or mismatched")
+            if (
+                not _is_digest(request.expected_module_digest)
+                or module is None
+                or str(module.get("sha256", "")) != request.expected_module_digest
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.MODULE_INVALID,
+                    "module digest missing or mismatched",
+                )
         if request.expected_remote:
-            if _normalize_remote(_git_origin(root)) != _normalize_remote(request.expected_remote):
-                raise ParentRootSideEffectError(ParentRootReject.MARKER_INVALID, "expected remote does not match Git origin")
-        handoff = self._handoff(request.child_handoff_token, request=request,
-                                parent_root=root, source_root=source, clone_root=clone)
+            if _normalize_remote(_git_origin(root)) != _normalize_remote(
+                request.expected_remote
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.MARKER_INVALID,
+                    "expected remote does not match Git origin",
+                )
+        handoff = self._handoff(
+            request.child_handoff_token,
+            request=request,
+            parent_root=root,
+            source_root=source,
+            clone_root=clone,
+        )
         if _identity(root) != (parent_dev, parent_ino):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed during attestation")
-        kind = ("topic" if clone is not None else
-                ("vendored" if source and source.name == "agent-canon" else
-                 ("direct" if request.explicit_root is not None else "standalone")))
-        return ParentRootAttestationReceipt(root, parent_dev, parent_ino, source, clone, kind,
-                                            precedence, marker, module, owner, handoff, "attested",
-                                            token_digest=_sha256(request.child_handoff_token.encode()) if request.child_handoff_token else "",
-                                            purpose=request.purpose)
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent identity changed during attestation",
+            )
+        if _git_common_dir(root) != git_common_dir or _identity(git_common_dir) != (
+            git_common_dev,
+            git_common_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "Git common-directory identity changed during attestation",
+            )
+        kind = (
+            "topic"
+            if clone is not None
+            else (
+                "vendored"
+                if source and source.name == "agent-canon"
+                else ("direct" if request.explicit_root is not None else "standalone")
+            )
+        )
+        return ParentRootAttestationReceipt(
+            root,
+            parent_dev,
+            parent_ino,
+            git_common_dir,
+            git_common_dev,
+            git_common_ino,
+            source,
+            clone,
+            kind,
+            precedence,
+            marker,
+            module,
+            owner,
+            handoff,
+            "attested",
+            token_digest=_sha256(request.child_handoff_token.encode())
+            if request.child_handoff_token
+            else "",
+            purpose=request.purpose,
+        )
 
-    def resolve_parent_owned_path(self, attestation: ParentRootAttestationReceipt,
-                                  candidate: Path | str, purpose: str, *, create: bool = False) -> ParentOwnedPathReceipt:
+    def _verify_attested_roots(self, attestation: ParentRootAttestationReceipt) -> None:
         if attestation.status != "attested":
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "attestation is not active")
-        root = attestation.parent_root
-        physical, _ = _physical_in_root(root, candidate, allow_missing=True)
-        if create:
-            parent_fd, name, _ = _parent_directory(root, physical, create=True)
-            try:
-                try:
-                    fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=parent_fd)
-                    os.close(fd)
-                except FileExistsError:
-                    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent_fd)
-                    os.close(fd)
-            except OSError as exc:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, f"cannot create target: {exc}") from exc
-            finally:
-                os.close(parent_fd)
-            physical, _ = _physical_in_root(root, candidate, allow_missing=False)
-        # Open every existing physical component once.  A missing parent is
-        # permitted for a later atomic create; publication will create it by
-        # dirfd before opening the final component.
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "attestation is not active"
+            )
+        if _identity(attestation.parent_root) != (
+            attestation.parent_dev,
+            attestation.parent_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed"
+            )
+        if _identity(attestation.git_common_dir) != (
+            attestation.git_common_dev,
+            attestation.git_common_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "Git common-directory identity changed",
+            )
+        if _git_common_dir(attestation.parent_root) != attestation.git_common_dir:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "selected checkout no longer resolves to its attested Git common directory",
+            )
+
+    def _parent_owned_file_target(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        *,
+        allow_missing: bool,
+    ) -> tuple[Path, tuple[int, int], Path, Path]:
+        """Bind one file path to its repository root or attested Git admin root."""
+        self._verify_attested_roots(attestation)
+        lexical = _lexical_candidate(attestation.parent_root, candidate)
+        owners = (
+            (
+                attestation.git_common_dir,
+                (attestation.git_common_dev, attestation.git_common_ino),
+            ),
+            (
+                attestation.parent_root,
+                (attestation.parent_dev, attestation.parent_ino),
+            ),
+        )
+        for root, expected in owners:
+            if _contains(root, lexical):
+                physical, _ = _physical_in_root(
+                    root, lexical, allow_missing=allow_missing
+                )
+                self._verify_attested_roots(attestation)
+                return root, expected, physical, lexical
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"parent-owned file is outside repository and Git admin roots: {lexical}",
+        )
+
+    def _parent_owned_path_receipt(
+        self,
+        root: Path,
+        expected: tuple[int, int],
+        physical: Path,
+        lexical: Path,
+        purpose: str,
+        token_digest: str,
+    ) -> ParentOwnedPathReceipt:
+        """Build a no-follow path receipt beneath one identified owner root."""
         try:
             parent_fd, _, _ = _parent_directory(root, physical, create=False)
         except ParentRootSideEffectError as exc:
@@ -1483,9 +2042,11 @@ class ParentRootSideEffectBoundary:
             parent_components = _component_identities(
                 root, tuple(physical.relative_to(root).parts)[:-1], create=False
             )
-        if _identity(root) != (attestation.parent_dev, attestation.parent_ino):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed")
-        lexical = _lexical_candidate(root, candidate)
+        if _identity(root) != expected:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent-owned path root identity changed",
+            )
         target = None
         try:
             info = physical.stat()
@@ -1496,9 +2057,9 @@ class ParentRootSideEffectBoundary:
             lexical,
             physical,
             purpose,
-            attestation.parent_dev,
-            attestation.parent_ino,
-            attestation.token_digest,
+            expected[0],
+            expected[1],
+            token_digest,
             root,
             *(target or (None, None)),
             parent_components,
@@ -1510,18 +2071,101 @@ class ParentRootSideEffectBoundary:
                 raise
             return receipt
 
-    def ensure_parent_owned_directory(self, attestation: ParentRootAttestationReceipt,
-                                      candidate: Path | str, purpose: str) -> ParentOwnedPathReceipt:
+    def _resolve_parent_owned_file_path(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+    ) -> ParentOwnedPathReceipt:
+        root, expected, physical, lexical = self._parent_owned_file_target(
+            attestation, candidate, allow_missing=True
+        )
+        receipt = self._parent_owned_path_receipt(
+            root, expected, physical, lexical, purpose, attestation.token_digest
+        )
+        self._verify_attested_roots(attestation)
+        return receipt
+
+    def resolve_parent_owned_path(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+        *,
+        create: bool = False,
+    ) -> ParentOwnedPathReceipt:
+        if attestation.status != "attested":
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "attestation is not active"
+            )
+        root = attestation.parent_root
+        physical, _ = _physical_in_root(root, candidate, allow_missing=True)
+        if create:
+            parent_fd, name, _ = _parent_directory(root, physical, create=True)
+            try:
+                try:
+                    fd = os.open(
+                        name,
+                        os.O_WRONLY
+                        | os.O_CREAT
+                        | os.O_EXCL
+                        | os.O_NOFOLLOW
+                        | os.O_CLOEXEC,
+                        0o600,
+                        dir_fd=parent_fd,
+                    )
+                    os.close(fd)
+                except FileExistsError:
+                    fd = os.open(
+                        name,
+                        os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                        dir_fd=parent_fd,
+                    )
+                    os.close(fd)
+            except OSError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED, f"cannot create target: {exc}"
+                ) from exc
+            finally:
+                os.close(parent_fd)
+            physical, _ = _physical_in_root(root, candidate, allow_missing=False)
+        lexical = _lexical_candidate(root, candidate)
+        return self._parent_owned_path_receipt(
+            root,
+            (attestation.parent_dev, attestation.parent_ino),
+            physical,
+            lexical,
+            purpose,
+            attestation.token_digest,
+        )
+
+    def ensure_parent_owned_directory(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+    ) -> ParentOwnedPathReceipt:
         """Create and re-open a parent-local directory through component dirfds."""
         if attestation.status != "attested":
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "attestation is not active")
-        physical, parts = _physical_in_root(attestation.parent_root, candidate, allow_missing=True)
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "attestation is not active"
+            )
+        physical, parts = _physical_in_root(
+            attestation.parent_root, candidate, allow_missing=True
+        )
         directory_fd, _ = _open_components(attestation.parent_root, parts, create=True)
         os.fsync(directory_fd)
         os.close(directory_fd)
-        physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=False)
-        if _identity(attestation.parent_root) != (attestation.parent_dev, attestation.parent_ino):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed")
+        physical, _ = _physical_in_root(
+            attestation.parent_root, candidate, allow_missing=False
+        )
+        if _identity(attestation.parent_root) != (
+            attestation.parent_dev,
+            attestation.parent_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed"
+            )
         info = physical.stat()
         parent_components = _component_identities(
             attestation.parent_root, parts[:-1], create=False
@@ -1549,10 +2193,12 @@ class ParentRootSideEffectBoundary:
         *,
         create: bool,
         mode: str,
-    ) -> ParentOwnedFileHandle:
-        """Open and lock a receipt-bound ``a+`` or ``r+`` file without a path race."""
+    ) -> ParentOwnedFileHandle | ParentOwnedGitAdminFileHandle:
+        """Open a repository or Git-admin file through its attested owner."""
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         if mode not in {"a+", "r+"}:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH,
@@ -1568,25 +2214,29 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_MISMATCH,
                 "a+ parent-owned files require create=True",
             )
-        root = attestation.parent_root
-        physical, _ = _physical_in_root(root, candidate, allow_missing=create)
+        root, before, physical, _ = self._parent_owned_file_target(
+            attestation, candidate, allow_missing=create
+        )
+        git_admin_owner = root == attestation.git_common_dir
         parent_fd, name, _ = _parent_directory(root, physical, create=create)
         target_fd = -1
         handle: ParentOwnedFileHandle | None = None
         created = False
         created_info: os.stat_result | None = None
-        before = (attestation.parent_dev, attestation.parent_ino)
         try:
+            self._verify_attested_roots(attestation)
             if _identity(root) != before:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed before file open",
+                    "parent-owned file root changed before file open",
                 )
             try:
                 existing = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
                 existing = None
             flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+            if git_admin_owner:
+                flags |= os.O_APPEND
             if mode == "a+":
                 flags |= os.O_APPEND | os.O_CREAT
             try:
@@ -1621,10 +2271,11 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "parent-owned file identity changed during open",
                 )
+            self._verify_attested_roots(attestation)
             if _identity(root) != before:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed after file open",
+                    "parent-owned file root changed after file open",
                 )
             while True:
                 try:
@@ -1639,7 +2290,12 @@ class ParentRootSideEffectBoundary:
                     ) from exc
             stream = cast(
                 TextIO,
-                os.fdopen(target_fd, mode, encoding="utf-8", newline=""),
+                os.fdopen(
+                    target_fd,
+                    "a+" if git_admin_owner else mode,
+                    encoding="utf-8",
+                    newline="",
+                ),
             )
             target_fd = -1
             handle = ParentOwnedFileHandle(
@@ -1651,6 +2307,8 @@ class ParentRootSideEffectBoundary:
             )
             os.close(parent_fd)
             parent_fd = -1
+            if git_admin_owner:
+                return ParentOwnedGitAdminFileHandle(handle)
             return handle
         except Exception as exc:
             cleanup_errors: list[OSError] = []
@@ -1671,7 +2329,10 @@ class ParentRootSideEffectBoundary:
             if created and created_info is not None:
                 try:
                     current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-                    if current.st_dev == created_info.st_dev and current.st_ino == created_info.st_ino:
+                    if (
+                        current.st_dev == created_info.st_dev
+                        and current.st_ino == created_info.st_ino
+                    ):
                         os.unlink(name, dir_fd=parent_fd)
                         os.fsync(parent_fd)
                 except OSError as cleanup_error:
@@ -1750,9 +2411,7 @@ class ParentRootSideEffectBoundary:
                 )
                 return replace(
                     receipt,
-                    **_lexical_snapshot(
-                        attestation.parent_root, receipt.lexical_path
-                    ),
+                    **_lexical_snapshot(attestation.parent_root, receipt.lexical_path),
                 )
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -1761,8 +2420,12 @@ class ParentRootSideEffectBoundary:
         finally:
             os.close(parent_fd)
 
-    def open_parent_owned_target(self, attestation: ParentRootAttestationReceipt,
-                                 candidate: Path | str, purpose: str) -> ParentOwnedTargetHandle:
+    def open_parent_owned_target(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+    ) -> ParentOwnedTargetHandle:
         """Reserve and open an empty directory without a parent-fd/name gap.
 
         The final directory is created with mkdirat semantics and then kept open
@@ -1771,9 +2434,15 @@ class ParentRootSideEffectBoundary:
         replacement race between attestation and clone.
         """
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
-        physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=True)
-        parent_fd, name, _ = _parent_directory(attestation.parent_root, physical, create=True)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
+        physical, _ = _physical_in_root(
+            attestation.parent_root, candidate, allow_missing=True
+        )
+        parent_fd, name, _ = _parent_directory(
+            attestation.parent_root, physical, create=True
+        )
         target_fd = -1
         reserved = False
         before = (attestation.parent_dev, attestation.parent_ino)
@@ -1858,7 +2527,9 @@ class ParentRootSideEffectBoundary:
     ) -> None:
         """Remove only the exact target reserved by an open target handle."""
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         try:
             if handle.parent_fd < 0 or handle.target_fd < 0:
                 raise ParentRootSideEffectError(
@@ -1934,12 +2605,18 @@ class ParentRootSideEffectBoundary:
         mode: int = 0o600,
     ) -> ParentOwnedPathReceipt:
         """Publish with same-directory O_EXCL temp, fsync, renameat, and identity checks."""
+        receipt = _require_parent_path_receipt(receipt)
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         root = receipt.parent_root
         before = _identity(root)
         if before != (receipt.parent_dev, receipt.parent_ino):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed before publish")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent identity changed before publish",
+            )
         if receipt.parent_components:
             _verify_parent_components(receipt)
         physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=True)
@@ -1957,13 +2634,21 @@ class ParentRootSideEffectBoundary:
         temp_fd = -1
         primary_error: Exception | None = None
         try:
-            temp_fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, mode, dir_fd=parent_fd)
+            temp_fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                mode,
+                dir_fd=parent_fd,
+            )
             _write_all(temp_fd, data)
             os.fsync(temp_fd)
             os.close(temp_fd)
             temp_fd = -1
             if _identity(root) != before:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed before rename")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed before rename",
+                )
             try:
                 existing = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             except FileNotFoundError:
@@ -1980,10 +2665,15 @@ class ParentRootSideEffectBoundary:
             os.replace(temporary, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
             os.fsync(parent_fd)
             if _identity(root) != before:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "parent identity changed after rename")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed after rename",
+                )
             observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             if (observed.st_dev, observed.st_ino) == (0, 0):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "published identity is invalid")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED, "published identity is invalid"
+                )
             published = replace(
                 receipt,
                 physical_path=physical,
@@ -2131,11 +2821,7 @@ class ParentRootSideEffectBoundary:
         try:
             temp_fd = os.open(
                 temporary,
-                os.O_WRONLY
-                | os.O_CREAT
-                | os.O_EXCL
-                | os.O_NOFOLLOW
-                | os.O_CLOEXEC,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
                 0o600,
                 dir_fd=parent_fd,
             )
@@ -2158,7 +2844,9 @@ class ParentRootSideEffectBoundary:
                     follow_symlinks=False,
                 )
             except FileExistsError:
-                existing = self.resolve_parent_owned_path(attestation, physical, purpose)
+                existing = self.resolve_parent_owned_path(
+                    attestation, physical, purpose
+                )
                 if existing.target_dev is None:
                     raise ParentRootSideEffectError(
                         ParentRootReject.ROOT_RACE_DETECTED,
@@ -2169,7 +2857,10 @@ class ParentRootSideEffectBoundary:
                 return "failed", "spool_conflict"
             os.fsync(parent_fd)
             committed = self.resolve_parent_owned_path(attestation, physical, purpose)
-            if committed.target_dev is None or self.read_parent_owned_file(committed) != data:
+            if (
+                committed.target_dev is None
+                or self.read_parent_owned_file(committed) != data
+            ):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "no-replace publication readback differs",
@@ -2248,34 +2939,59 @@ class ParentRootSideEffectBoundary:
         key: str,
         value: str,
         purpose: str,
-    ) -> ParentOwnedPathReceipt:
-        """Run Git config against an inherited, boundary-owned file fd."""
+    ) -> ParentOwnedPathReceipt | ParentOwnedGitAdminFileReceipt:
+        """Append a Git config value and return owner-scoped readback metadata."""
         if not key or any(character in key for character in "\r\n\x00"):
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "Git config key is invalid")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH, "Git config key is invalid"
+            )
         if "\x00" in value or "\r" in value:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, "Git config value is invalid")
-        receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH, "Git config value is invalid"
+            )
+        receipt = self._resolve_parent_owned_file_path(attestation, candidate, purpose)
         if receipt.target_dev is None or receipt.target_ino is None:
-            receipt = self.atomic_publish(receipt, b"")
+            with self.open_parent_owned_file(
+                attestation, candidate, purpose, create=True, mode="a+"
+            ):
+                pass
+            receipt = self._resolve_parent_owned_file_path(
+                attestation, candidate, purpose
+            )
         _verify_parent_components(receipt)
-        physical, _ = _physical_in_root(attestation.parent_root, receipt.physical_path, allow_missing=False)
-        parent_fd, name, _ = _parent_directory(attestation.parent_root, physical, create=False)
+        root = receipt.parent_root
+        physical, _ = _physical_in_root(
+            root, receipt.physical_path, allow_missing=False
+        )
+        parent_fd, name, _ = _parent_directory(root, physical, create=False)
         config_fd = -1
-        before_root = _identity(attestation.parent_root)
+        before_root = _identity(root)
         try:
+            self._verify_attested_roots(attestation)
             config_fd = os.open(
                 name,
                 os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC,
                 dir_fd=parent_fd,
             )
             observed = os.fstat(config_fd)
-            if (observed.st_dev, observed.st_ino) != (receipt.target_dev, receipt.target_ino):
+            if (observed.st_dev, observed.st_ino) != (
+                receipt.target_dev,
+                receipt.target_ino,
+            ):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "Git config target identity changed before write",
                 )
             result = subprocess.run(
-                ["git", "config", "--file", f"/proc/self/fd/{config_fd}", "--add", key, value],
+                [
+                    "git",
+                    "config",
+                    "--file",
+                    f"/proc/self/fd/{config_fd}",
+                    "--add",
+                    key,
+                    value,
+                ],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -2287,10 +3003,11 @@ class ParentRootSideEffectBoundary:
                     f"Git config write failed: {result.stderr.strip() or 'command failed'}",
                 )
             os.fsync(config_fd)
-            if _identity(attestation.parent_root) != before_root:
+            self._verify_attested_roots(attestation)
+            if _identity(root) != before_root:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
-                    "parent identity changed during Git config write",
+                    "Git config owner identity changed during write",
                 )
         except ParentRootSideEffectError:
             raise
@@ -2303,11 +3020,18 @@ class ParentRootSideEffectBoundary:
             if config_fd >= 0:
                 os.close(config_fd)
             os.close(parent_fd)
-        readback = self.resolve_parent_owned_path(attestation, physical, purpose)
+        readback = self._resolve_parent_owned_file_path(attestation, physical, purpose)
         if readback.target_dev is None or readback.target_ino is None:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
                 "Git config target disappeared after write",
+            )
+        if readback.parent_root == attestation.git_common_dir:
+            return ParentOwnedGitAdminFileReceipt(
+                readback.physical_path,
+                readback.purpose,
+                readback.target_dev,
+                readback.target_ino,
             )
         return readback
 
@@ -2326,9 +3050,7 @@ class ParentRootSideEffectBoundary:
         published = self.write_parent_owned_file(attestation, candidate, data, purpose)
         if preserve_mode:
             source_mode = stat.S_IMODE(source_receipt.physical_path.stat().st_mode)
-            published = self.set_parent_owned_mode(
-                attestation, published, source_mode
-            )
+            published = self.set_parent_owned_mode(attestation, published, source_mode)
         return published
 
     def copy_read_only_file(
@@ -2348,9 +3070,7 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_MISMATCH,
                     f"read-only source is not a regular file: {source_path}",
                 )
-            source_fd = os.open(
-                source_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
-            )
+            source_fd = os.open(source_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
             opened = os.fstat(source_fd)
             if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
                 raise ParentRootSideEffectError(
@@ -2396,7 +3116,9 @@ class ParentRootSideEffectBoundary:
         exclude: Sequence[str] = (),
     ) -> None:
         """Synchronize a directory tree through open directory descriptors."""
-        source_physical, _ = _physical_in_root(attestation.parent_root, source, allow_missing=False)
+        source_physical, _ = _physical_in_root(
+            attestation.parent_root, source, allow_missing=False
+        )
         target = self.ensure_parent_owned_directory(attestation, candidate, purpose)
         source_fd, _ = _open_components(
             attestation.parent_root,
@@ -2555,8 +3277,14 @@ class ParentRootSideEffectBoundary:
             self.remove_parent_owned_tree(attestation, stage, purpose)
 
     @classmethod
-    def _copy_open_tree(cls, source_fd: int, target_fd: int,
-                        excluded: frozenset[str], *, top_level: bool = False) -> None:
+    def _copy_open_tree(
+        cls,
+        source_fd: int,
+        target_fd: int,
+        excluded: frozenset[str],
+        *,
+        top_level: bool = False,
+    ) -> None:
         source_names = set(os.listdir(source_fd))
         target_names = set(os.listdir(target_fd))
         for name in sorted(source_names):
@@ -2574,8 +3302,16 @@ class ParentRootSideEffectBoundary:
                         ParentRootReject.ROOT_RACE_DETECTED,
                         f"tree target type changed: {name}",
                     )
-                child_source = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=source_fd)
-                child_target = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=target_fd)
+                child_source = os.open(
+                    name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    dir_fd=source_fd,
+                )
+                child_target = os.open(
+                    name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    dir_fd=target_fd,
+                )
                 try:
                     cls._copy_open_tree(child_source, child_target, excluded)
                 finally:
@@ -2596,12 +3332,19 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     f"unsupported tree source entry: {name}",
                 )
-            source_file = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=source_fd)
+            source_file = os.open(
+                name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=source_fd
+            )
             temporary = f".{name}.{secrets.token_hex(12)}.tmp"
             temp_file = -1
             primary_error: Exception | None = None
             try:
-                temp_file = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=target_fd)
+                temp_file = os.open(
+                    temporary,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    0o600,
+                    dir_fd=target_fd,
+                )
                 while True:
                     chunk = os.read(source_file, 1 << 20)
                     if not chunk:
@@ -2642,10 +3385,16 @@ class ParentRootSideEffectBoundary:
                     raise ParentRootSideEffectError(
                         ParentRootReject.ROOT_RACE_DETECTED, message
                     )
-        for name in sorted(target_names - source_names - (excluded if top_level else frozenset())):
+        for name in sorted(
+            target_names - source_names - (excluded if top_level else frozenset())
+        ):
             info = os.stat(name, dir_fd=target_fd, follow_symlinks=False)
             if stat.S_ISDIR(info.st_mode):
-                child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=target_fd)
+                child = os.open(
+                    name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    dir_fd=target_fd,
+                )
                 try:
                     cls._remove_open_tree(child)
                 finally:
@@ -2664,8 +3413,12 @@ class ParentRootSideEffectBoundary:
     ) -> None:
         """Rename a parent-owned path using source and destination dirfds."""
         before = _identity(attestation.parent_root)
-        source_physical, _ = _physical_in_root(attestation.parent_root, source, allow_missing=False)
-        target_physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=True)
+        source_physical, _ = _physical_in_root(
+            attestation.parent_root, source, allow_missing=False
+        )
+        target_physical, _ = _physical_in_root(
+            attestation.parent_root, candidate, allow_missing=True
+        )
         source_components = _component_identities(
             attestation.parent_root,
             tuple(source_physical.relative_to(attestation.parent_root).parts)[:-1],
@@ -2676,18 +3429,31 @@ class ParentRootSideEffectBoundary:
             tuple(target_physical.relative_to(attestation.parent_root).parts)[:-1],
             create=True,
         )
-        source_fd, source_name, _ = _parent_directory(attestation.parent_root, source_physical, create=False)
-        target_fd, target_name, _ = _parent_directory(attestation.parent_root, target_physical, create=True)
+        source_fd, source_name, _ = _parent_directory(
+            attestation.parent_root, source_physical, create=False
+        )
+        target_fd, target_name, _ = _parent_directory(
+            attestation.parent_root, target_physical, create=True
+        )
         try:
-            if _component_identities(
-                attestation.parent_root,
-                tuple(source_physical.relative_to(attestation.parent_root).parts)[:-1],
-                create=False,
-            ) != source_components or _component_identities(
-                attestation.parent_root,
-                tuple(target_physical.relative_to(attestation.parent_root).parts)[:-1],
-                create=False,
-            ) != target_components:
+            if (
+                _component_identities(
+                    attestation.parent_root,
+                    tuple(source_physical.relative_to(attestation.parent_root).parts)[
+                        :-1
+                    ],
+                    create=False,
+                )
+                != source_components
+                or _component_identities(
+                    attestation.parent_root,
+                    tuple(target_physical.relative_to(attestation.parent_root).parts)[
+                        :-1
+                    ],
+                    create=False,
+                )
+                != target_components
+            ):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     f"parent directory identity changed before move ({purpose})",
@@ -2702,7 +3468,9 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     f"move destination already exists: {target_physical}",
                 )
-            os.rename(source_name, target_name, src_dir_fd=source_fd, dst_dir_fd=target_fd)
+            os.rename(
+                source_name, target_name, src_dir_fd=source_fd, dst_dir_fd=target_fd
+            )
             os.fsync(source_fd)
             if target_fd != source_fd:
                 os.fsync(target_fd)
@@ -2712,7 +3480,10 @@ class ParentRootSideEffectBoundary:
                     f"parent identity changed during move ({purpose})",
                 )
             observed = os.stat(target_name, dir_fd=target_fd, follow_symlinks=False)
-            if (observed.st_dev, observed.st_ino) != (source_info.st_dev, source_info.st_ino):
+            if (observed.st_dev, observed.st_ino) != (
+                source_info.st_dev,
+                source_info.st_ino,
+            ):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "move target identity changed",
@@ -2737,8 +3508,12 @@ class ParentRootSideEffectBoundary:
         purpose: str,
     ) -> ParentOwnedPathReceipt:
         """Create a non-replacing symlink in an authenticated parent."""
-        physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=True)
-        parent_fd, name, _ = _parent_directory(attestation.parent_root, physical, create=True)
+        physical, _ = _physical_in_root(
+            attestation.parent_root, candidate, allow_missing=True
+        )
+        parent_fd, name, _ = _parent_directory(
+            attestation.parent_root, physical, create=True
+        )
         try:
             os.symlink(target, name, dir_fd=parent_fd)
             os.fsync(parent_fd)
@@ -2821,11 +3596,18 @@ class ParentRootSideEffectBoundary:
             os.close(parent_fd)
         return lexical
 
-    def remove_parent_owned_tree(self, attestation: ParentRootAttestationReceipt,
-                                 candidate: Path | str | ParentOwnedPathReceipt, purpose: str) -> None:
+    def remove_parent_owned_tree(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str | ParentOwnedPathReceipt,
+        purpose: str,
+    ) -> None:
         """Remove one parent-local directory tree through no-follow dirfds."""
+        candidate = _require_parent_tree_target(candidate)
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         before = _identity(attestation.parent_root)
         expected_dev = expected_ino = None
         if isinstance(candidate, ParentOwnedPathReceipt):
@@ -2838,33 +3620,54 @@ class ParentRootSideEffectBoundary:
                     "tree removal requires a published target identity",
                 )
         else:
-            physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=False)
-        parent_fd, name, _ = _parent_directory(attestation.parent_root, physical, create=False)
+            physical, _ = _physical_in_root(
+                attestation.parent_root, candidate, allow_missing=False
+            )
+        parent_fd, name, _ = _parent_directory(
+            attestation.parent_root, physical, create=False
+        )
         try:
             target_before = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-            if expected_dev is not None and (target_before.st_dev, target_before.st_ino) != (expected_dev, expected_ino):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                                "target identity changed before removal")
-            target_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
-                                dir_fd=parent_fd)
+            if expected_dev is not None and (
+                target_before.st_dev,
+                target_before.st_ino,
+            ) != (expected_dev, expected_ino):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "target identity changed before removal",
+                )
+            target_fd = os.open(
+                name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=parent_fd,
+            )
             try:
                 target_open = os.fstat(target_fd)
-                if (target_before.st_dev, target_before.st_ino) != (target_open.st_dev, target_open.st_ino):
-                    raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                                    "target identity changed before removal")
+                if (target_before.st_dev, target_before.st_ino) != (
+                    target_open.st_dev,
+                    target_open.st_ino,
+                ):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "target identity changed before removal",
+                    )
                 self._remove_open_tree(target_fd)
             finally:
                 os.close(target_fd)
             os.rmdir(name, dir_fd=parent_fd)
             os.fsync(parent_fd)
         except OSError as exc:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                            f"cannot remove parent-owned tree ({purpose}): {exc}") from exc
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot remove parent-owned tree ({purpose}): {exc}",
+            ) from exc
         finally:
             os.close(parent_fd)
         if _identity(attestation.parent_root) != before:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                            "parent identity changed during removal")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent identity changed during removal",
+            )
 
     def read_parent_owned_file(self, receipt: ParentOwnedPathReceipt) -> bytes:
         """Read a capability target through a retained dirfd chain.
@@ -2896,10 +3699,7 @@ class ParentRootSideEffectBoundary:
             try:
                 fd = os.open(
                     receipt.physical_path.name,
-                    os.O_RDONLY
-                    | os.O_NOFOLLOW
-                    | os.O_CLOEXEC
-                    | os.O_NONBLOCK,
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK,
                     dir_fd=parent_fd,
                 )
             except OSError as exc:
@@ -2947,11 +3747,10 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     f"cannot inspect lexical parent-owned entry: {exc}",
                 ) from exc
-            if (
-                (lexical_entry.st_dev, lexical_entry.st_ino)
-                != (receipt.lexical_entry_dev, receipt.lexical_entry_ino)
-                or stat.S_IFMT(lexical_entry.st_mode) != receipt.lexical_entry_type
-            ):
+            if (lexical_entry.st_dev, lexical_entry.st_ino) != (
+                receipt.lexical_entry_dev,
+                receipt.lexical_entry_ino,
+            ) or stat.S_IFMT(lexical_entry.st_mode) != receipt.lexical_entry_type:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "lexical entry identity changed before read",
@@ -3006,10 +3805,8 @@ class ParentRootSideEffectBoundary:
         *,
         allow_missing: bool = False,
     ) -> bytes | None:
-        """Resolve and read one parent-owned file as authenticated bytes."""
-        receipt = self.resolve_parent_owned_path(
-            attestation, candidate, purpose, create=False
-        )
+        """Resolve and read one parent or Git-admin file as authenticated bytes."""
+        receipt = self._resolve_parent_owned_file_path(attestation, candidate, purpose)
         if receipt.target_dev is None or receipt.target_ino is None:
             if not receipt.lexical_entry_exists:
                 if allow_missing:
@@ -3022,7 +3819,9 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"parent-owned entry has no stable target: {receipt.physical_path}",
             )
-        return self.read_parent_owned_file(receipt)
+        payload = self.read_parent_owned_file(receipt)
+        self._verify_attested_roots(attestation)
+        return payload
 
     def remove_empty_parent_owned_directory(
         self,
@@ -3031,21 +3830,31 @@ class ParentRootSideEffectBoundary:
         purpose: str,
     ) -> bool:
         """Remove an owned directory after an fd-bound empty check."""
+        candidate = _require_parent_tree_target(candidate)
         if sys.platform != "linux":
-            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
         before = _identity(attestation.parent_root)
         if isinstance(candidate, ParentOwnedPathReceipt):
             physical = candidate.physical_path
             expected = (candidate.target_dev, candidate.target_ino)
             _verify_parent_components(candidate)
         else:
-            physical, _ = _physical_in_root(attestation.parent_root, candidate, allow_missing=False)
+            physical, _ = _physical_in_root(
+                attestation.parent_root, candidate, allow_missing=False
+            )
             expected = (None, None)
-        parent_fd, name, _ = _parent_directory(attestation.parent_root, physical, create=False)
+        parent_fd, name, _ = _parent_directory(
+            attestation.parent_root, physical, create=False
+        )
         empty = True
         try:
             observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-            if expected[0] is not None and (observed.st_dev, observed.st_ino) != expected:
+            if (
+                expected[0] is not None
+                and (observed.st_dev, observed.st_ino) != expected
+            ):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     f"target identity changed before empty removal ({purpose})",
@@ -3086,6 +3895,7 @@ class ParentRootSideEffectBoundary:
 
     def remove_parent_owned_file(self, receipt: ParentOwnedPathReceipt) -> None:
         """Unlink a lexical receipt entry through its no-follow parent fd."""
+        receipt = _require_parent_path_receipt(receipt)
         root = receipt.parent_root
         is_symlink = receipt.lexical_entry_type == stat.S_IFLNK
         if not is_symlink:
@@ -3112,8 +3922,10 @@ class ParentRootSideEffectBoundary:
         except ParentRootSideEffectError:
             raise
         except OSError as exc:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                            f"cannot remove parent-owned file: {exc}") from exc
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot remove parent-owned file: {exc}",
+            ) from exc
         finally:
             os.close(parent_fd)
 
@@ -3146,10 +3958,7 @@ class ParentRootSideEffectBoundary:
                     try:
                         child_fd = os.open(
                             name,
-                            os.O_RDONLY
-                            | os.O_DIRECTORY
-                            | os.O_NOFOLLOW
-                            | os.O_CLOEXEC,
+                            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
                             dir_fd=frame.directory_fd,
                         )
                         child_observed = os.fstat(child_fd)
@@ -3316,14 +4125,19 @@ class ParentRootSideEffectBoundary:
             ),
             "AGENT_CANON_TOOLS_HOME": value(
                 "AGENT_CANON_TOOLS_HOME",
-                (runtime_boundary.root / "tools") if runtime_boundary is not None
+                (runtime_boundary.root / "tools")
+                if runtime_boundary is not None
                 else root / ".agent-canon" / "tools",
             ),
             "CARGO_HOME": value("CARGO_HOME", default_cache / "cargo-home"),
         }
         target_a = value("CARGO_TARGET_DIR", default_target)
         target_b = value("AGENT_CANON_CLI_TARGET_DIR", default_target)
-        if env.get("CARGO_TARGET_DIR") and env.get("AGENT_CANON_CLI_TARGET_DIR") and target_a != target_b:
+        if (
+            env.get("CARGO_TARGET_DIR")
+            and env.get("AGENT_CANON_CLI_TARGET_DIR")
+            and target_a != target_b
+        ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "target_alias_mismatch"
             )
@@ -3348,7 +4162,9 @@ class ParentRootSideEffectBoundary:
             env["AGENT_CANON_RUNTIME_ROOT_INO"] = str(observed.st_ino)
         else:
             for key, path in paths.items():
-                capability = self.ensure_parent_owned_directory(attestation, path, f"child-{key}")
+                capability = self.ensure_parent_owned_directory(
+                    attestation, path, f"child-{key}"
+                )
                 env[key] = str(capability.physical_path)
         env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(root)
         env["AGENT_CANON_PARENT_ROOT"] = str(root)
@@ -3396,11 +4212,14 @@ class ParentRootSideEffectBoundary:
         os.execvpe(argv[0], list(argv), env)
         raise RuntimeError("exec failed")
 
-    def reattest_child(self, request: ParentRootAttestationRequest,
-                       environment: Mapping[str, str]) -> ParentRootAttestationReceipt:
+    def reattest_child(
+        self, request: ParentRootAttestationRequest, environment: Mapping[str, str]
+    ) -> ParentRootAttestationReceipt:
         token = environment.get("AGENT_CANON_CHILD_HANDOFF", "")
         if not token:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "child handoff token was dropped")
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "child handoff token was dropped"
+            )
         return self.attest(replace(request, child_handoff_token=token))
 
     def verify_child_environment(
@@ -3415,8 +4234,12 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.HANDOFF_INVALID, "child handoff token was dropped"
             )
         root = _physical(request.explicit_root or request.cwd, strict=True)
-        source = _physical(request.source_root, strict=True) if request.source_root else None
-        clone = _physical(request.clone_root, strict=True) if request.clone_root else None
+        source = (
+            _physical(request.source_root, strict=True) if request.source_root else None
+        )
+        clone = (
+            _physical(request.clone_root, strict=True) if request.clone_root else None
+        )
         handoff = self._handoff(
             token,
             request=request,
@@ -3431,37 +4254,67 @@ class ParentRootSideEffectBoundary:
             )
         return handoff
 
-    def self_check(self, root: Path, *, sentinel_outside: Path | None = None) -> dict[str, object]:
+    def self_check(
+        self, root: Path, *, sentinel_outside: Path | None = None
+    ) -> dict[str, object]:
         before_home = os.environ.get("HOME")
-        att = self.attest(ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="self-check"))
-        receipt = self.resolve_parent_owned_path(att, Path(".agent-canon") / "self-check.txt", "self-check")
+        att = self.attest(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose="self-check"
+            )
+        )
+        receipt = self.resolve_parent_owned_path(
+            att, Path(".agent-canon") / "self-check.txt", "self-check"
+        )
         published = self.atomic_publish(receipt, b"parent-owned\n")
         observed = self.read_parent_owned_file(published).decode("utf-8")
         self.remove_parent_owned_file(published)
         if sentinel_outside is not None and Path(sentinel_outside).exists():
-            raise ParentRootSideEffectError(ParentRootReject.SYMLINK_ESCAPE, "outside sentinel exists")
+            raise ParentRootSideEffectError(
+                ParentRootReject.SYMLINK_ESCAPE, "outside sentinel exists"
+            )
         if os.environ.get("HOME") != before_home:
-            raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "HOME changed")
-        return {"status": "pass", "root": str(att.parent_root), "observed": observed,
-                "home_unchanged": True,
-                "outside_sentinel_absent": not (sentinel_outside and Path(sentinel_outside).exists())}
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "HOME changed"
+            )
+        return {
+            "status": "pass",
+            "root": str(att.parent_root),
+            "observed": observed,
+            "home_unchanged": True,
+            "outside_sentinel_absent": not (
+                sentinel_outside and Path(sentinel_outside).exists()
+            ),
+        }
 
 
 _DEFAULT_BOUNDARY = ParentRootSideEffectBoundary()
 
 
-def attest_parent_root(request: ParentRootAttestationRequest) -> ParentRootAttestationReceipt:
+def attest_parent_root(
+    request: ParentRootAttestationRequest,
+) -> ParentRootAttestationReceipt:
     return _DEFAULT_BOUNDARY.attest(request)
 
 
-def resolve_parent_owned_path(attestation: ParentRootAttestationReceipt, candidate: Path | str,
-                              purpose: str, *, create: bool = False) -> ParentOwnedPathReceipt:
-    return _DEFAULT_BOUNDARY.resolve_parent_owned_path(attestation, candidate, purpose, create=create)
+def resolve_parent_owned_path(
+    attestation: ParentRootAttestationReceipt,
+    candidate: Path | str,
+    purpose: str,
+    *,
+    create: bool = False,
+) -> ParentOwnedPathReceipt:
+    return _DEFAULT_BOUNDARY.resolve_parent_owned_path(
+        attestation, candidate, purpose, create=create
+    )
 
 
-def ensure_parent_owned_directory(attestation: ParentRootAttestationReceipt, candidate: Path | str,
-                                  purpose: str) -> ParentOwnedPathReceipt:
-    return _DEFAULT_BOUNDARY.ensure_parent_owned_directory(attestation, candidate, purpose)
+def ensure_parent_owned_directory(
+    attestation: ParentRootAttestationReceipt, candidate: Path | str, purpose: str
+) -> ParentOwnedPathReceipt:
+    return _DEFAULT_BOUNDARY.ensure_parent_owned_directory(
+        attestation, candidate, purpose
+    )
 
 
 def create_parent_owned_temp_directory(
@@ -3475,14 +4328,21 @@ def create_parent_owned_temp_directory(
     )
 
 
-def remove_parent_owned_tree(attestation: ParentRootAttestationReceipt, candidate: Path | str,
-                             purpose: str) -> None:
+def remove_parent_owned_tree(
+    attestation: ParentRootAttestationReceipt, candidate: Path | str, purpose: str
+) -> None:
     _DEFAULT_BOUNDARY.remove_parent_owned_tree(attestation, candidate, purpose)
 
 
-def write_parent_owned_file(attestation: ParentRootAttestationReceipt, candidate: Path | str,
-                            data: bytes, purpose: str) -> ParentOwnedPathReceipt:
-    return _DEFAULT_BOUNDARY.write_parent_owned_file(attestation, candidate, data, purpose)
+def write_parent_owned_file(
+    attestation: ParentRootAttestationReceipt,
+    candidate: Path | str,
+    data: bytes,
+    purpose: str,
+) -> ParentOwnedPathReceipt:
+    return _DEFAULT_BOUNDARY.write_parent_owned_file(
+        attestation, candidate, data, purpose
+    )
 
 
 def read_parent_owned_bytes(
@@ -3508,15 +4368,25 @@ def capture_subprocess(
     return _DEFAULT_BOUNDARY.capture_subprocess(attestation, candidate, argv, purpose)
 
 
-def git_config_add(attestation: ParentRootAttestationReceipt, candidate: Path | str,
-                   key: str, value: str, purpose: str) -> ParentOwnedPathReceipt:
-    """Append one Git config value through an inherited boundary file fd."""
+def git_config_add(
+    attestation: ParentRootAttestationReceipt,
+    candidate: Path | str,
+    key: str,
+    value: str,
+    purpose: str,
+) -> ParentOwnedPathReceipt | ParentOwnedGitAdminFileReceipt:
+    """Append one Git config value through its owner-bound file descriptor."""
     return _DEFAULT_BOUNDARY.git_config_add(attestation, candidate, key, value, purpose)
 
 
-def copy_parent_owned_file(attestation: ParentRootAttestationReceipt, source: Path | str,
-                           candidate: Path | str, purpose: str, *,
-                           preserve_mode: bool = False) -> ParentOwnedPathReceipt:
+def copy_parent_owned_file(
+    attestation: ParentRootAttestationReceipt,
+    source: Path | str,
+    candidate: Path | str,
+    purpose: str,
+    *,
+    preserve_mode: bool = False,
+) -> ParentOwnedPathReceipt:
     return _DEFAULT_BOUNDARY.copy_parent_owned_file(
         attestation,
         source,
@@ -3526,10 +4396,16 @@ def copy_parent_owned_file(attestation: ParentRootAttestationReceipt, source: Pa
     )
 
 
-def copy_parent_owned_tree(attestation: ParentRootAttestationReceipt, source: Path | str,
-                           candidate: Path | str, purpose: str,
-                           exclude: Sequence[str] = ()) -> None:
-    _DEFAULT_BOUNDARY.copy_parent_owned_tree(attestation, source, candidate, purpose, exclude)
+def copy_parent_owned_tree(
+    attestation: ParentRootAttestationReceipt,
+    source: Path | str,
+    candidate: Path | str,
+    purpose: str,
+    exclude: Sequence[str] = (),
+) -> None:
+    _DEFAULT_BOUNDARY.copy_parent_owned_tree(
+        attestation, source, candidate, purpose, exclude
+    )
 
 
 def checkout_index_parent_owned(
@@ -3545,14 +4421,24 @@ def checkout_index_parent_owned(
     )
 
 
-def move_parent_owned(attestation: ParentRootAttestationReceipt, source: Path | str,
-                      candidate: Path | str, purpose: str) -> None:
+def move_parent_owned(
+    attestation: ParentRootAttestationReceipt,
+    source: Path | str,
+    candidate: Path | str,
+    purpose: str,
+) -> None:
     _DEFAULT_BOUNDARY.move_parent_owned(attestation, source, candidate, purpose)
 
 
-def symlink_parent_owned(attestation: ParentRootAttestationReceipt, target: str,
-                        candidate: Path | str, purpose: str) -> ParentOwnedPathReceipt:
-    return _DEFAULT_BOUNDARY.symlink_parent_owned(attestation, target, candidate, purpose)
+def symlink_parent_owned(
+    attestation: ParentRootAttestationReceipt,
+    target: str,
+    candidate: Path | str,
+    purpose: str,
+) -> ParentOwnedPathReceipt:
+    return _DEFAULT_BOUNDARY.symlink_parent_owned(
+        attestation, target, candidate, purpose
+    )
 
 
 def remove_empty_parent_owned_directory(
@@ -3560,7 +4446,9 @@ def remove_empty_parent_owned_directory(
     candidate: Path | str | ParentOwnedPathReceipt,
     purpose: str,
 ) -> bool:
-    return _DEFAULT_BOUNDARY.remove_empty_parent_owned_directory(attestation, candidate, purpose)
+    return _DEFAULT_BOUNDARY.remove_empty_parent_owned_directory(
+        attestation, candidate, purpose
+    )
 
 
 def remove_empty_parent_owned_directory_cli(
@@ -3696,13 +4584,40 @@ def _main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "self-check":
-            print(json.dumps(_DEFAULT_BOUNDARY.self_check(args.root, sentinel_outside=args.sentinel_outside), sort_keys=True))
+            print(
+                json.dumps(
+                    _DEFAULT_BOUNDARY.self_check(
+                        args.root, sentinel_outside=args.sentinel_outside
+                    ),
+                    sort_keys=True,
+                )
+            )
         elif args.command == "attest":
-            receipt = _DEFAULT_BOUNDARY.attest(ParentRootAttestationRequest(cwd=args.root, explicit_root=args.root, purpose=args.purpose))
-            print(json.dumps({"status": receipt.status, "parent_root": str(receipt.parent_root), "parent_dev": receipt.parent_dev, "parent_ino": receipt.parent_ino}, sort_keys=True))
+            receipt = _DEFAULT_BOUNDARY.attest(
+                ParentRootAttestationRequest(
+                    cwd=args.root, explicit_root=args.root, purpose=args.purpose
+                )
+            )
+            print(
+                json.dumps(
+                    {
+                        "status": receipt.status,
+                        "parent_root": str(receipt.parent_root),
+                        "parent_dev": receipt.parent_dev,
+                        "parent_ino": receipt.parent_ino,
+                    },
+                    sort_keys=True,
+                )
+            )
         elif args.command == "resolve":
-            receipt = _DEFAULT_BOUNDARY.attest(ParentRootAttestationRequest(cwd=args.root, explicit_root=args.root, purpose=args.purpose))
-            physical, _ = _physical_in_root(receipt.parent_root, args.candidate, allow_missing=True)
+            receipt = _DEFAULT_BOUNDARY.attest(
+                ParentRootAttestationRequest(
+                    cwd=args.root, explicit_root=args.root, purpose=args.purpose
+                )
+            )
+            physical, _ = _physical_in_root(
+                receipt.parent_root, args.candidate, allow_missing=True
+            )
             print(str(physical))
         elif args.command == "read-presence":
             receipt = _DEFAULT_BOUNDARY.attest(
@@ -3719,8 +4634,14 @@ def _main(argv: Sequence[str] | None = None) -> int:
             print("present")
             return 0
         elif args.command == "ensure-dir":
-            receipt = _DEFAULT_BOUNDARY.attest(ParentRootAttestationRequest(cwd=args.root, explicit_root=args.root, purpose=args.purpose))
-            directory = _DEFAULT_BOUNDARY.ensure_parent_owned_directory(receipt, args.candidate, args.purpose)
+            receipt = _DEFAULT_BOUNDARY.attest(
+                ParentRootAttestationRequest(
+                    cwd=args.root, explicit_root=args.root, purpose=args.purpose
+                )
+            )
+            directory = _DEFAULT_BOUNDARY.ensure_parent_owned_directory(
+                receipt, args.candidate, args.purpose
+            )
             print(str(directory.physical_path))
         elif args.command == "verify-child":
             request = ParentRootAttestationRequest(
@@ -3822,7 +4743,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 )
                 print(str(published.physical_path))
             elif args.command == "move":
-                _DEFAULT_BOUNDARY.move_parent_owned(receipt, args.source, args.candidate, args.purpose)
+                _DEFAULT_BOUNDARY.move_parent_owned(
+                    receipt, args.source, args.candidate, args.purpose
+                )
                 print(str(args.candidate))
             elif args.command == "symlink":
                 link = _DEFAULT_BOUNDARY.symlink_parent_owned(
@@ -3844,7 +4767,9 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 target = _DEFAULT_BOUNDARY.resolve_parent_owned_path(
                     receipt, args.candidate, args.purpose, create=False
                 )
-                _DEFAULT_BOUNDARY.remove_parent_owned_tree(receipt, target, args.purpose)
+                _DEFAULT_BOUNDARY.remove_parent_owned_tree(
+                    receipt, target, args.purpose
+                )
                 print(str(target.physical_path))
             elif args.command == "remove-empty-dir":
                 removed = remove_empty_parent_owned_directory_cli(

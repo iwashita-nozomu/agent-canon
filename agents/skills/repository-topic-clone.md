@@ -30,7 +30,14 @@ repository-topic checkout の操作を選び、
 
 共通入口は `python3 tools/repository/workspace/repository_topic_clone.py` です。
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
-から組み立てます。handoff の identity と owner evidence を引き継ぎ、`prepare` には allowed paths も渡します。
+から組み立てます。handoff の identity と current owner evidence を引き継ぎ、write-capable な `prepare` には
+current allowed paths を渡します。`owner-evidence` digest は承認ではなく lifecycle metadata です。
+computed path と actual Git identity が一致する checkout の task marker / writer packet は
+`prepare` で current metadata へ更新できます。
+この metadata-only operation は source と Git index を変更せず、dirty status を clean 扱いしません。
+source discovery の `prepare` は writer scope 確定前でも可能で、その場合 packet は作られません。
+scope 確定後は同じ exact Git identity で再prepareし、current allowed paths を packet にします。
+`cleanup` は current Git identity を確認し、marker が存在する場合は marker と current evidence の一致も要求します。
 
 | 操作 | 実行前に読む正本 |
 | --- | --- |
@@ -40,8 +47,9 @@ repository-topic checkout の操作を選び、
 | `cleanup`（不要になった時点） | [起動・保持判断と復元可能性・削除条件](../../documents/rule/repository-topic-clone.md#クリーンアップ) |
 
 `linked-worktree` の `cleanup --apply` は request の exact worktree/topic path を回収しますが、
-local topic branch は保持します。branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority
-と復旧可能性の契約をそのまま適用します。
+local topic branch は保持します。実行前に task owner が ignored / untracked / submodule / annex-only content を
+削除対象外へ保存したことを確認します。CLI の status と local superproject head はその内容の復元可能性を証明しません。
+branch の削除権限をこの lifecycle に追加せず、既存の cleanup authority と復旧可能性の契約をそのまま適用します。
 
 操作結果を read back し、失敗時は
 [例外/フォールバック](../../documents/rule/repository-topic-clone.md#例外フォールバック)

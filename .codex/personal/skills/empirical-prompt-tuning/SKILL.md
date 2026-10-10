@@ -1,8 +1,8 @@
 ---
 name: empirical-prompt-tuning
-description: "Use when a reusable skill, prompt, or instruction surface needs fresh empirical evaluation against frozen baseline and hold-out scenarios, followed by evidence-based iteration to convergence."
+description: "Use when a reusable instruction has an observed or consequential behavior question that needs evidence-based evaluation and revision."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1da2ba2d9c986cc28d42af4e8de3bc48a1e3626e2bf90ff4358f140712badf55"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d9b7d527073e887488e7e6b9ea3ceafdc1bf9abc19503ef955e7c4c97b8d6c87"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/empirical-prompt-tuning.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [empirical-prompt-tuning](../../../../agents/skills/empirical-prompt-tuning.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill empirical-prompt-tuning --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

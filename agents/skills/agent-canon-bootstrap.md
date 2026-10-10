@@ -26,10 +26,14 @@ evidence.
   AgentCanon Python; it builds/adopts the image and starts exactly one resident
   container before using `docker exec` for the controller. Always pass explicit
   `--repository-root` and `--control-parent-root`; the effective runtime is
-  always the bootstrap-owned, ignored `<repository-root>/.runtime/`.
-  `--control-parent-root` authorizes access but never selects runtime or log
-  placement. The historical `--runtime-root` value is accepted only as a
+  always the bootstrap-owned, ignored `<control-parent-root>/.runtime/`.
+  `--control-parent-root` selects the shared runtime authority while the
+  private log placement remains owned by the install-root parent. The
+  historical `--runtime-root` value is accepted only as a
   migration-compatible input and cannot create new state at that path.
+  When the same control-root resident already exists, the host reuses that
+  control-root runtime and the resident's named state volume; it does not
+  infer a source-checkout runtime or create another authority.
 - Host pre-container values are the fixed bootstrap constants in
   `bootstrap/host/lifecycle/entrypoint.sh` (install/runtime paths, image/container limits,
   and mount destinations). Do not add a generic TOML parser or duplicate the
@@ -57,7 +61,7 @@ evidence.
   `test/testrunner.sh`/test list. Do not mount a project's tests into the
   AgentCanon tool container and do not make AgentCanon know project test names.
 - Bootstrap lifecycle state and cache live in the ignored, reconstructible
-  `<repository-root>/.runtime/`. The private `agent-canon-log` checkout is the
+  `<control-parent-root>/.runtime/`. The private `agent-canon-log` checkout is the
   sibling `<repository-root>/../agent-canon-log`, independent of the control
   root. General eval/report/SQLite/log/
   analysis artifacts remain outside the source checkout; the artifact output
@@ -66,52 +70,57 @@ evidence.
   `~/.agents/skills` directory link, `~/.codex/agents/<role>.toml`, and
   `~/.codex/config.toml` links. The last points to the ignored personal config
   source under the AgentCanon checkout; existing regular config bytes and mode
-  are migrated losslessly and restored on uninstall. Project hooks and
+  are migrated before the two canonical context settings are applied, while
+  unrelated personal TOML remains intact. Those settings are
+  `model_context_window = 1050000` and
+  `model_auto_compact_token_limit = 900000`. The saved source is restored on
+  uninstall. Project hooks and
   authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
   state remain outside this link set. `codex prepare` remains runtime-local.
-- `sync` acquires `replacement.lock` once, runs exactly `git -C
-  <install-root> pull --ff-only origin main`, publishes
-  `.runtime/source-sync/source-sync.json`, and selects the shared
+- `install` and `sync` use one source transition under `replacement.lock`:
+  `git -C <install-root> fetch origin main` followed by
+  `git -C <install-root> checkout --force -B main FETCH_HEAD`. It publishes
+  `.runtime/source-sync/source-sync.json`; sync then selects the shared
   `:env-<key>` image through `bootstrap/container/image/digest.sh`.
   An exact local image and resident with current source/cache mounts are
   reused; otherwise the image is pulled or built once and the resident is
-  replaced. Detached and shallow checkouts are accepted when Git accepts the
-  pull. No remote-ref comparison, candidate checkout, Git rollback, or
+  replaced. No remote-ref comparison, candidate checkout, Git rollback, or
   secondary source-sync lock is allowed. Source-mounted Rust tools are then
   compiled by the container's generic `tools/**/Cargo.toml` scan into cache/bin.
-  For caller compatibility, sync also accepts and ignores historical
-  `--remote` and `--branch` arguments; the operation always uses `origin main`.
+  For caller compatibility, `sync` accepts and ignores `--remote` and `--branch`;
+  the source remote and branch remain fixed to `origin main`.
 - Eval collection is append-only and is handed to the repository-qualified
   `iwashita-nozomu/agent-canon-log` archive through the host adapter. Never
   write archive output back into the AgentCanon source tree.
 
 ## User Flow
 
-1. Resolve the task and project owner first. Use the project repository's
-   normal Docker/test runner for project execution; select this skill only for
-   AgentCanon tools or their lifecycle.
-2. Reuse the source install root and authorized control root, then invoke the
-   catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
-   Preserve argv, cwd, input/output, exit/signal, written paths, execution plane,
-   and responsibility owner from the result. Success needs no route preflight.
-3. Only after failure, diagnose the relevant route. Use `status` for an unresolved
-   runtime failure or target readback for a target rejection; do not scan every
-   surface or infer a project-code failure from a tool-plane rejection.
-4. Install/start or `target add` only for an explicit lifecycle request or an
-   authorized repair of that failure. Default new targets to read-only; writes
-   require the existing target-write authority. Read back the changed target or
-   generation, then retry only when allowed. Preserve the one-container/image
-   limit and record task-created resource IDs for cleanup.
-5. For eval work, run the registered producers, collect the run bundle, sync
-   it through the archive adapter, and verify the remote repository and commit
-   readback. Producer definitions and manifests come from the image-owned
-   AgentCanon snapshot; the registered project remains only the observed,
-   read-only target. Use `$agent-eval-accumulation` for the producer/checker
-   details.
-6. Stop/release task leases, remove only resources created by this task, run
-   scoped garbage collection, and verify the source checkout and unrelated
-   Docker resources are unchanged. Keep the closeout receipt and cleanup
-   evidence outside the source tree.
+For project code, use the project repository's normal Docker/test runner. Use
+this runtime only for AgentCanon tools and lifecycle operations. For an ordinary
+tool request, reuse the source install and authorized control roots and invoke
+the catalog-qualified `tool run --root <project> <catalog-id> -- ...` directly.
+Carry the actual argv, cwd, input/output, exit/signal, written paths, execution
+plane, and owner from its result; success needs no route preflight.
+
+If a tool fails, diagnose only the relevant route: use `status` for an unresolved
+runtime failure or target readback for a target rejection. A tool-plane failure
+does not establish a project-code failure. Install/start or add a target only
+for an explicit lifecycle request or an authorized repair. Targets remain
+read-only; authoring uses the tool's output and host publication. Read back the
+changed target or generation, retry only when the owner permits it, and retain
+the one-container/image limit and task-created resource IDs for cleanup.
+
+Eval collection is its own selected branch: run registered producers, collect
+the run bundle, sync through the archive adapter, and verify remote repository
+and commit readback. Producer definitions and manifests come from the
+image-owned AgentCanon snapshot; the registered project remains a read-only
+observation target. Use `$agent-eval-accumulation` for producer/checker detail.
+
+When a selected lifecycle operation creates leases or resources, release or
+remove only those task-owned items through the existing owner. Use scoped
+garbage collection for cleanup and confirm pre-existing source and unrelated
+Docker state remain untouched. Routine successful tool use creates no cleanup
+or health-probe requirement. Keep cleanup evidence outside the source tree.
 
 The host records the exact resident `Config.Image` reference and immutable ID
 in `host-state/active-image.tsv` after install/update/rollback readback.
@@ -120,8 +129,8 @@ update, and sync paths derive a new image reference.
 
 ## Command Shape
 
-The control root is a task input; the effective runtime is always the fixed
-bootstrap path `<repository-root>/.runtime`:
+The install root is the source input; the effective runtime is always the fixed
+bootstrap path `<control-parent-root>/.runtime`:
 
 ```bash
 bash bootstrap.sh \

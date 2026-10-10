@@ -9,10 +9,15 @@
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,8 +34,89 @@ from tools.agent.skills.skill_shim_materializer import (  # noqa: E402
 )
 
 
+@contextmanager
+def writable_source_fixture() -> Iterator[Path]:
+    """Yield a disposable Git source checkout for materializer writes."""
+    with patch.dict("os.environ", {}, clear=False):
+        for key in tuple(os.environ):
+            if key.startswith("AGENT_CANON_"):
+                os.environ.pop(key, None)
+        with tempfile.TemporaryDirectory(prefix="agent-canon-materializer-") as root:
+            source = Path(root) / "source"
+            try:
+                shutil.copytree(
+                    PROJECT_ROOT,
+                    source,
+                    symlinks=True,
+                    ignore=shutil.ignore_patterns(
+                        ".git", ".runtime", ".ruff_cache", ".pytest_cache", "__pycache__"
+                    ),
+                )
+                subprocess.run(
+                    ["git", "init", "-q", "-b", "main", str(source)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                for key, value in (
+                    ("user.name", "AgentCanon Materializer Fixture"),
+                    ("user.email", "agent-canon-materializer@example.invalid"),
+                ):
+                    subprocess.run(
+                        ["git", "-C", str(source), "config", key, value],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                subprocess.run(
+                    ["git", "-C", str(source), "add", "-A"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                subprocess.run(
+                    ["git", "-C", str(source), "commit", "-qm", "fixture"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(source),
+                        "remote",
+                        "add",
+                        "origin",
+                        "git@github.com:iwashita-nozomu/agent-canon.git",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except Exception:
+                raise
+            yield source
+
+
 class SkillShimMaterializerTest(unittest.TestCase):
     """Verify materialization converges without a second writer."""
+
+    def test_explicit_authoring_root_is_independent_of_runtime_alias(self) -> None:
+        expected = render_shim(
+            build_record(build_context(PROJECT_ROOT), "code-cleanup")
+        )
+        with patch.dict(
+            "os.environ",
+            {
+                "AGENT_CANON_SOURCE_ROOT": "/opt/agent-canon/source",
+                "AGENT_CANON_CANON_ROOT": "/opt/agent-canon/source",
+            },
+        ):
+            actual = render_shim(
+                build_record(build_context(PROJECT_ROOT), "code-cleanup")
+            )
+        self.assertEqual(actual, expected)
 
     def test_build_context_does_not_launch_catalog_validators(self) -> None:
         """Ordinary materialization resolves real inputs without authoring tools."""
@@ -44,13 +130,13 @@ class SkillShimMaterializerTest(unittest.TestCase):
 
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""
-        # Materializer writes are intentionally parent-bound even in direct unit
-        # runs. Scope the capability to this test instead of mutating the test
-        # process environment at module import time.
-        with patch.dict(
-            "os.environ", {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
-        ):
-            actual = fixed_point_acceptance(PROJECT_ROOT)
+        with writable_source_fixture() as source:
+            # Materializer writes are intentionally parent-bound even in direct
+            # unit runs. Scope the capability to this test-owned source.
+            with patch.dict(
+                "os.environ", {"AGENT_CANON_PARENT_ROOT": str(source)}
+            ):
+                actual = fixed_point_acceptance(source)
         self.assertEqual(actual["schema"], "agent_canon.skill_runtime_shim.fixed_point")
         self.assertEqual(actual["version"], 3)
         # Git can check out non-executable files as 0664 under umask 0002;
@@ -67,122 +153,106 @@ class SkillShimMaterializerTest(unittest.TestCase):
 
     def test_materialization_record_digest_is_read_back_from_generated_bytes(self) -> None:
         """A changed structured record digest leaves generated bytes in drift."""
-        context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        record = build_record(context, skill)
-        provenance = record["provenance"]
-        if not isinstance(provenance, dict):
-            raise AssertionError("record provenance is not a mapping")
-        digest = provenance["record_digest"]
-        if not isinstance(digest, str):
-            raise AssertionError("record digest is not a string")
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        original = runtime_path.read_text(encoding="utf-8")
-        self.assertIn(f'"record_digest":"{digest}"', original)
-        runtime_path.write_text(
-            original.replace(digest, "0" * 64, 1),
-            encoding="utf-8",
-        )
-        try:
-            result = check(PROJECT_ROOT, all_skills=True)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(result["status"], "fail")
-        self.assertIn(runtime_path.relative_to(PROJECT_ROOT).as_posix(), result["content_delta_paths"])
+        with writable_source_fixture() as source:
+            context = build_context(source)
+            skill = "agent-orchestration"
+            record = build_record(context, skill)
+            provenance = record["provenance"]
+            if not isinstance(provenance, dict):
+                raise AssertionError("record provenance is not a mapping")
+            digest = provenance["record_digest"]
+            if not isinstance(digest, str):
+                raise AssertionError("record digest is not a string")
+            runtime_path = source / ".codex/personal/skills" / skill / "SKILL.md"
+            original = runtime_path.read_text(encoding="utf-8")
+            self.assertIn(f'"record_digest":"{digest}"', original)
+            runtime_path.write_text(
+                original.replace(digest, "0" * 64, 1),
+                encoding="utf-8",
+            )
+            try:
+                result = check(source, all_skills=True)
+            finally:
+                runtime_path.write_text(original, encoding="utf-8")
+            self.assertEqual(result["status"], "fail")
+            self.assertIn(runtime_path.relative_to(source).as_posix(), result["content_delta_paths"])
 
     def test_legacy_classification_blocks_tool_commands_only(self) -> None:
         """Generated section-only bodies must keep all unmatched blocks and remain blocked."""
-        context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        expected = render_shim(build_record(context, skill))
-        original = runtime_path.read_text(encoding="utf-8")
-        runtime_path.write_text(
-            "<!-- generated: agent_canon.skill_runtime_shim.v1 -->\n"
-            "## Tool Commands\n"
-            "python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text\n",
-            encoding="utf-8",
-        )
-        try:
-            receipt = classify_legacy(context, skill, expected)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(receipt["resolution"], "blocked")
-        self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
-        self.assertEqual(len(receipt["unmatched_blocks"]), 2)
-        locators = [entry["locator"] for entry in receipt["unmatched_blocks"]]
-        self.assertIn(
-            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#preamble",
-            locators,
-        )
-        self.assertIn(
-            f"{runtime_path.relative_to(PROJECT_ROOT).as_posix()}#L2-L3",
-            locators,
-        )
+        with writable_source_fixture() as source:
+            context = build_context(source)
+            skill = "agent-orchestration"
+            runtime_path = source / ".codex/personal/skills" / skill / "SKILL.md"
+            expected = render_shim(build_record(context, skill))
+            original = runtime_path.read_text(encoding="utf-8")
+            runtime_path.write_text(
+                "<!-- generated: agent_canon.skill_runtime_shim.v1 -->\n"
+                "## Tool Commands\n"
+                "python3 tools/agent/skills/skill_tool_commands.py show --skill agent-orchestration --format text\n",
+                encoding="utf-8",
+            )
+            try:
+                receipt = classify_legacy(context, skill, expected)
+            finally:
+                runtime_path.write_text(original, encoding="utf-8")
+            self.assertEqual(receipt["resolution"], "blocked")
+            self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
+            self.assertEqual(len(receipt["unmatched_blocks"]), 2)
+            locators = [entry["locator"] for entry in receipt["unmatched_blocks"]]
+            self.assertIn(
+                f"{runtime_path.relative_to(source).as_posix()}#preamble",
+                locators,
+            )
+            self.assertIn(
+                f"{runtime_path.relative_to(source).as_posix()}#L2-L3",
+                locators,
+            )
 
     def test_legacy_receipt_lists_every_unmatched_block(self) -> None:
         """Legacy prose is rejected without a canonical-heading fallback."""
-        context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        expected = render_shim(build_record(context, skill))
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        original = runtime_path.read_text(encoding="utf-8")
-        runtime_path.write_text(
-            "---\nname: agent-orchestration\ndescription: "
-            '"Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."\n---\n'
-            "# Legacy\n\n## Reader Map\n\nUnmatched prose.\n",
-            encoding="utf-8",
-        )
-        try:
-            receipt = classify_legacy(context, skill, expected)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(receipt["resolution"], "blocked")
-        blocks = receipt["unmatched_blocks"]
-        self.assertEqual(len(blocks), 2)
-        self.assertTrue(all("locator" in block and "digest" in block for block in blocks))
-
-    def test_legacy_classification_blocks_expected_section_subset(self) -> None:
-        """An exact generated section subset is not a migration oracle."""
-        context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        expected = render_shim(build_record(context, skill))
-        legacy = expected
-        canonical_start = legacy.index("## Canonical Skill")
-        commands_start = legacy.index("## Tool Commands")
-        subset = legacy[:canonical_start] + legacy[commands_start:]
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        original = runtime_path.read_text(encoding="utf-8")
-        runtime_path.write_text(subset, encoding="utf-8")
-        try:
-            receipt = classify_legacy(context, skill, expected)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
-        self.assertEqual(receipt["resolution"], "blocked")
-        self.assertGreater(len(receipt["unmatched_blocks"]), 0)
+        with writable_source_fixture() as source:
+            context = build_context(source)
+            skill = "agent-orchestration"
+            expected = render_shim(build_record(context, skill))
+            runtime_path = source / ".codex/personal/skills" / skill / "SKILL.md"
+            original = runtime_path.read_text(encoding="utf-8")
+            runtime_path.write_text(
+                "---\nname: agent-orchestration\ndescription: "
+                '"Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."\n---\n'
+                "# Legacy\n\n## Reader Map\n\nUnmatched prose.\n",
+                encoding="utf-8",
+            )
+            try:
+                receipt = classify_legacy(context, skill, expected)
+            finally:
+                runtime_path.write_text(original, encoding="utf-8")
+            self.assertEqual(receipt["resolution"], "blocked")
+            blocks = receipt["unmatched_blocks"]
+            self.assertEqual(len(blocks), 2)
+            self.assertTrue(all("locator" in block and "digest" in block for block in blocks))
 
     def test_legacy_classification_blocks_missing_owner_link(self) -> None:
         """A complete-looking old schema without its owner link fails closed."""
-        context = build_context(PROJECT_ROOT)
-        skill = "agent-orchestration"
-        expected = render_shim(build_record(context, skill))
-        legacy = expected
-        owner_line = (
-            "Canonical workflow and policy: "
-            "[agent-orchestration](../../../../agents/skills/agent-orchestration.md).\n"
-        )
-        self.assertIn(owner_line, legacy)
-        runtime_path = PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md"
-        original = runtime_path.read_text(encoding="utf-8")
-        runtime_path.write_text(legacy.replace(owner_line, "", 1), encoding="utf-8")
-        try:
-            receipt = classify_legacy(context, skill, expected)
-        finally:
-            runtime_path.write_text(original, encoding="utf-8")
-        self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
-        self.assertEqual(receipt["resolution"], "blocked")
-        self.assertGreater(len(receipt["unmatched_blocks"]), 0)
+        with writable_source_fixture() as source:
+            context = build_context(source)
+            skill = "agent-orchestration"
+            expected = render_shim(build_record(context, skill))
+            legacy = expected
+            owner_line = (
+                "Canonical workflow and policy: "
+                "[agent-orchestration](../../../../agents/skills/agent-orchestration.md).\n"
+            )
+            self.assertIn(owner_line, legacy)
+            runtime_path = source / ".codex/personal/skills" / skill / "SKILL.md"
+            original = runtime_path.read_text(encoding="utf-8")
+            runtime_path.write_text(legacy.replace(owner_line, "", 1), encoding="utf-8")
+            try:
+                receipt = classify_legacy(context, skill, expected)
+            finally:
+                runtime_path.write_text(original, encoding="utf-8")
+            self.assertEqual(receipt["classification"], "legacy_schema_mismatch")
+            self.assertEqual(receipt["resolution"], "blocked")
+            self.assertGreater(len(receipt["unmatched_blocks"]), 0)
 
     def test_render_shim_contains_canonical_skill_dependency_manifest(self) -> None:
         """The generated discovery adapter emits the registered skill manifest."""

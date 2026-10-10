@@ -60,6 +60,10 @@ For a program execution request, use this order:
    checkout does not prove parent/worker execution equivalence. Keep a worker's
    access failure scoped to that worker, not a host outage or test assertion.
    Preserve observed parent success as counterevidence, not proof of worker repair.
+   For failed verification, immediately use
+   [Failed Verification Record](../../documents/operations/notes-lifecycle.md#failed-verification-record)
+   and link the topic from the existing task/Issue. Later diagnosis updates that
+   record; saving it does not wait for a confirmed cause or task closeout.
 3. Identify which required outcome the failure prevents before expanding diagnosis.
    A program assertion or test failure is not by itself an environment defect.
    Warnings, optional settings, and unavailable diagnostic tools are not new gates.
@@ -128,21 +132,24 @@ First establish that no active work depends on it and no unpreserved local state
 would be lost; unknown or user-owned clones remain untouched. Record removal
 or the specific retention reason in the existing task result. This is checkout
 cleanup, not authorization to delete remote branches or a shared workspace.
+For AgentCanon topic checkouts, read [repository-topic-clone](../skills/repository-topic-clone.md)
+at cleanup; checkout drift is owned by [worktree-health](../skills/worktree-health.md).
 
 ## Branch and storage owners
 
-Before a branch or annex operation, read the applicable repository's branch and
-storage owners. Keep Git branch metadata and any annex payload as separate
-concerns, and let those owners authorize data operations. This common base
-defines the read edge only; it does not name a source-repository path or
-prescribe an annex command, so a generated consumer root remains self-contained.
+Before an AgentCanon branch operation, read [Branch Scope](../../documents/operations/BRANCH_SCOPE.md)
+and the selected [branch reuse/authority section](CODEX_INTAKE.md#branch-reuse-default).
+Before an annex pointer or payload operation, read [annex](../../documents/operations/annex.md).
+Keep branch metadata and payload ownership distinct; these source-specific links do
+not add AgentCanon paths to a generated consumer's portable rules.
 
 ## Team ownership
 
-Before forming, changing, or delegating a team, read the applicable repository
-team owner and the selected orchestration skill, then follow the selected typed
-route's definitions for logical role, model/profile, skills, authority, and
-handoff. Candidate role lists are not activation instructions, and logical-role
-coverage is not a physical-instance count. Keep consumer-owned team guidance
-self-contained; a source-specific checkout may name its canonical AgentCanon
-team owners, but a consumer root must not import or copy those source paths.
+Before forming, changing, or delegating an AgentCanon team, read the selected
+[orchestration decision](../skills/agent-orchestration.md#decision-order), then its
+selected row in `agents/task_catalog.yaml` and the applicable
+[subagent procedure](CODEX_SUBAGENTS.md). The typed route owns logical roles,
+model/profile, Skills, authority, and handoff. Candidate lists do not activate
+instances; logical-role coverage is not an instance count. Retain the common
+root's parent-executed user-guided debugging boundary. Consumer teams continue to
+use their own self-contained guidance.

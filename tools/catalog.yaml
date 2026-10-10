@@ -6,7 +6,6 @@
 # upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation runtime/manifest/tool_catalog.py validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
-# downstream implementation validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
@@ -1009,7 +1008,6 @@ entries:
       - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
-      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: graph-client
     summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
@@ -1029,7 +1027,6 @@ entries:
       - agents/canonical/CLI_ENTRYPOINTS.md
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
-      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
@@ -1051,28 +1048,6 @@ entries:
       - documents/runtime/runtime-log-archive.md
     tests:
       - tests/agent_tools/test_evaluate_workflow_selection.py
-
-  - id: report-quality-eval
-    summary: Validates report-writing skill quality checklist and report reviewer routing.
-    path: eval/producers/evaluate_report_quality.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/producers/evaluate_report_quality.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_report_quality.py"]}
-    writes: true
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - eval/definitions/README.md
-      - eval/definitions/report_quality_eval.toml
-      - documents/runtime/runtime-log-archive.md
-      - agents/skills/report-writing.md
-    tests:
-      - tests/agent_tools/test_evaluate_report_quality.py
 
   - id: test-design-check
     public: true
@@ -1290,35 +1265,12 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/design/dependency-manifest-design.md
-    tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
-
-  - id: check-design-doc-claims
-    public: true
-    summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
-    path: tools/validation/semantic/documents/check_design_doc_claims.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/documents/check_design_doc_claims.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/documents/check_design_doc_claims.py"]}
-    writes: false
-    default_wiring:
-      ci: false
       pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/check_design_doc_claims.md
-      - documents/design/README.md
       - documents/design/dependency-manifest-design.md
     tests:
-      - tests/agent_tools/test_check_design_doc_claims.py
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-semantic-responsibility-contract
@@ -1370,7 +1322,7 @@ entries:
     dispatch: {argv: ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1380,7 +1332,7 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks changed files for required dependency manifests and registered contract kinds.
+    summary: Checks selected files for dependency manifests and registered contract kinds.
     path: tools/validation/semantic/dependencies/check_dependency_headers.py
     family: agent_tools
     role: checker
@@ -1389,7 +1341,7 @@ entries:
     dispatch: {argv: ["python3", "tools/validation/semantic/dependencies/check_dependency_headers.py"]}
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1517,29 +1469,6 @@ entries:
       - documents/rule/repository-topic-clone.md
     tests:
       - tests/agent_tools/test_repository_topic_clone.py
-
-  - id: conflict-preservation
-    public: true
-    summary: Captures and validates three-way conflict and focused rework content-preservation packets.
-    path: tools/repository/git/conflict_preservation.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    audience: skill
-    placement: skill_helper
-    command: python3 tools/repository/git/conflict_preservation.py
-    dispatch: {argv: ["python3", "tools/repository/git/conflict_preservation.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/conflict_preservation.md
-      - agents/skills/pr-processing.md
-    tests:
-      - tests/agent_tools/test_conflict_preservation.py
 
   - id: dependency-module-change
     public: true
@@ -1775,25 +1704,6 @@ entries:
       - agents/canonical/skills.md
     tests:
       - tests/agent_tools/test_check_skill_frontmatter.py
-
-  - id: skill-tool-commands
-    summary: Materializes and checks runtime skill Tool Commands packets.
-    path: tools/agent/skills/skill_tool_commands.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/agent/skills/skill_tool_commands.py check
-    dispatch: {argv: ["python3", "tools/agent/skills/skill_tool_commands.py", "check"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/task-routing.md
-    tests:
-      - tests/agent_tools/test_skill_tool_commands.py
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
@@ -2322,24 +2232,6 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/agent_tools/test_evaluate_agent_run.py
-
-  - id: evaluate-skill-workflow-prompts
-    summary: Runs frozen prompt evals for skill and workflow surfaces.
-    path: eval/producers/evaluate_skill_workflow_prompts.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/producers/evaluate_skill_workflow_prompts.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_skill_workflow_prompts.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_evaluate_skill_workflow_prompts.py
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.

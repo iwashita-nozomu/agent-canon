@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Checks changed-file dependency headers and registered contract kind metadata.
-# upstream design ../../../../templates/agents/closeout_gate.md closeout requires dependency evidence
+# responsibility Checks explicitly selected dependency-header files and registered contract kind metadata.
 # upstream design ../../../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # upstream design ../../../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
 # downstream implementation ../../../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
 # @dependency-end
-"""Check that changed human-authored text files declare dependency manifests."""
+"""Check that selected human-authored text files declare dependency manifests."""
 
 from __future__ import annotations
 
@@ -116,7 +115,9 @@ def git_lines(root: Path, args: list[str]) -> list[str]:
 
 def changed_paths(root: Path) -> list[Path]:
     """Return changed and untracked paths relative to one repository root."""
-    changed = git_lines(root, ["diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"])
+    changed = git_lines(
+        root, ["diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"]
+    )
     untracked = git_lines(root, ["ls-files", "--others", "--exclude-standard"])
     return [root / path for path in [*changed, *untracked]]
 
@@ -293,7 +294,9 @@ def allowed_contract_kinds(root: Path) -> set[str]:
     return kinds
 
 
-def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> list[str]:
+def contract_kind_findings(
+    root: Path, path: Path, allowed_kinds: set[str]
+) -> list[str]:
     """Return contract-kind findings for one manifest-bearing file."""
     relative = repo_relative(root, path)
     contract_lines = [
@@ -301,22 +304,28 @@ def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> l
     ]
     if len(contract_lines) != 1:
         return [
-            (f"{relative}: dependency manifest must contain exactly one contract line; "
-            f"fix: add 'contract <registered-kind>' after @dependency-start and choose the kind "
-            f"from {contract_registry_path(root).as_posix()}")
+            (
+                f"{relative}: dependency manifest must contain exactly one contract line; "
+                f"fix: add 'contract <registered-kind>' after @dependency-start and choose the kind "
+                f"from {contract_registry_path(root).as_posix()}"
+            )
         ]
     match = CONTRACT_LINE_RE.fullmatch(contract_lines[0])
     if match is None:
         return [
-            (f"{relative}: contract line must be: contract <registered-kind>; "
-            f"fix: use lowercase kebab-case from {contract_registry_path(root).as_posix()}")
+            (
+                f"{relative}: contract line must be: contract <registered-kind>; "
+                f"fix: use lowercase kebab-case from {contract_registry_path(root).as_posix()}"
+            )
         ]
     contract_kind = match.group("kind")
     if contract_kind not in allowed_kinds:
         return [
-            (f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
-            f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
-            "or update the registry with review")
+            (
+                f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
+                f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
+                "or update the registry with review"
+            )
         ]
     return []
 
@@ -396,9 +405,7 @@ def main() -> int:
         resolved = path if path.is_absolute() else root / path
         if not should_check(root, resolved):
             continue
-        findings.extend(
-            source_contract_kind_findings(root, resolved, allowed_kinds)
-        )
+        findings.extend(source_contract_kind_findings(root, resolved, allowed_kinds))
 
     if findings:
         print("DEPENDENCY_HEADERS=fail")

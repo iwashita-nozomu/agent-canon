@@ -1,8 +1,8 @@
 ---
 name: pr-processing
-description: "Use when processing GitHub pull requests or issue queues: inventory open PRs, preserve PR Essence in bodies and run bundles, resolve conflicts, order merges, update branch protection evidence, merge only with authority, triage stale issues, and sync AgentCanon source PRs with parent pin PRs."
+description: "Use for an authorized GitHub Issue or PR operation; build a queue only when candidates depend on or conflict with each other."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"12aeee18963e87177dde3eedf683d567a03d9823f36c78c6bf2a69888d12d7fd"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"98a7f3b26c23005f327084845ad4a244a9b300d5d245eec4803097b671c23296"} -->
 
 <!--
 @dependency-start
@@ -17,11 +17,5 @@ upstream design ../../../../agents/skills/pr-processing.md owner
 ## Canonical Skill
 
 Canonical workflow and policy: [pr-processing](../../../../agents/skills/pr-processing.md).
-
-## Tool Commands
-
-<!-- skill-tool-commands:start -->
-`python3 tools/agent/skills/skill_tool_commands.py show --skill pr-processing --format text`
-<!-- skill-tool-commands:end -->
 
 1. Read the canonical owner before applying this skill.

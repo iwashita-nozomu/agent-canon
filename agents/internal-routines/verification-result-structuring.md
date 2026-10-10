@@ -1,12 +1,12 @@
-# Verification result structuring
+# Reader-reproducible writing and verification results
 
 <!--
 @dependency-start
 contract agent-runtime
-responsibility Structures established verification results before reader-facing output without losing findings or re-owning publication.
+responsibility Makes reader-facing writing reproducible and structures verification results without losing findings or re-owning publication.
 upstream design ../../ROOT_AGENTS.md portable evidence and delivery boundary
 upstream design ../skills/README.md internal skill visibility boundary
-downstream design ../canonical/ROOT_DELIVERY.md chat and handoff output caller
+downstream design ../canonical/ROOT_DELIVERY.md general writing, chat, and handoff caller
 downstream design ../skills/report-writing.md report drafting caller
 downstream design ../skills/pr-processing.md Issue and PR publication caller
 downstream design github-connected-work.md connected publication caller
@@ -16,24 +16,74 @@ downstream design README.md internal routine index
 
 ## Invocation and boundary
 
-This internal skill must run before drafting, updating, posting, or saving any
-reader-facing verification result: chat progress or final replies, Issue and PR
-bodies or comments, reports, and handoffs, including interrupted or failed work.
-Do not wait for all verification to finish. An acknowledgement or plan containing
-no verification results does not activate it.
+Use this internal routine before drafting, updating, posting, or saving any
+reader-facing writing: chat, Issue/PR bodies and comments, reports, README and
+operational documentation, designs, specifications, plans, instructions, reviews,
+code comments, and handoffs. Verification results are one case, not the activation
+condition. Proposed or unrun work still needs understandable prerequisites,
+steps, and success criteria; it must not be represented as an observed result.
 
-Callers use the same structured result from the existing task/Issue record,
-not separate copies of this procedure. Reuse still-valid structure and evidence;
-incorporate new facts and corrections before the next output. This is a
-mandatory writing step, not a new approval, checker, ledger, or fixed template.
-Optional document topology planning does not make this step optional.
+Apply [reader reconstruction](#reader-reconstruction) to the content being written.
+For verification findings, also use [Structure before writeout](#structure-before-writeout),
+including progress, interrupted, and failed work; do not wait for all verification
+to finish. A brief acknowledgement needs no invented procedure or evidence fields.
+
+Reuse the applicable source and existing task/Issue record rather than creating
+another summary store. Reconcile new facts and corrections before the next output.
+This is a writing step, not a new approval, checker, ledger, or fixed template.
+Optional document topology planning does not make the applicable steps optional.
 
 | Caller | Output boundary |
 | --- | --- |
-| [Evidence and delivery](../canonical/ROOT_DELIVERY.md#result-reporting) | Chat progress, final result, and handoff |
-| [Report writing](../skills/report-writing.md#source-packet) | Report draft or revision |
-| [PR processing](../skills/pr-processing.md#publication-boundary) | Issue/PR body or comment |
+| [Evidence and delivery](../canonical/ROOT_DELIVERY.md#reader-facing-writing) | General writing, chat progress, final result, and handoff |
+| [Report writing](../skills/report-writing.md#procedure) | Every report draft or revision, including proposals and procedures |
+| [PR processing](../skills/pr-processing.md#publication-boundary) | Every Issue/PR body or comment |
 | [Connected work](github-connected-work.md#use-and-boundary) | The same outputs through authorized GitHub tools |
+
+## Reader reconstruction
+
+Write for an intended reader who has the output and its explicitly identified,
+accessible references, but not the author's chat history, temporary workspace,
+or unstated assumptions. Before writeout, walk through what that reader needs
+to repeat the relevant action, apply the instruction, or check the conclusion.
+Supply the applicable relationships below, not empty headings or a universal form.
+
+| Reader need | Information to preserve |
+| --- | --- |
+| Identify the subject and applicability | Purpose, scope, target and precise locator; revision or snapshot when the claim depends on it |
+| Establish the starting conditions | Relevant prerequisites, input values or durable retrieval/creation steps, configuration, and environment differences that affect the outcome |
+| Repeat the procedure | Ordered actions through the owner's fixed route; exact commands/arguments, working directory, input paths, and branch conditions when needed |
+| Recognize the result | Expected behavior or success criterion, separately from observed output, error, exit status, and where that evidence can be inspected |
+| Reconstruct an explanation or decision | Definitions, premises, sources, method or derivation, and the evidence-to-conclusion relationship with assumptions and limitations |
+
+Use precise file/symbol/section or artifact locators; use immutable references for
+snapshot-specific observations. A source link supports the explanation rather
+than replacing it. Reuse an existing procedure by identifying its applicable
+section and the task-specific inputs or differences; do not copy an entire manual.
+Generic examples may use variables only when their meaning and how to obtain or
+choose values are explained. Ellipses, unexplained placeholders, "as before",
+"the usual command", or author-only paths cannot stand in for necessary steps.
+
+Retain known outcome-relevant versions, seeds, tolerances, units, aggregation rules,
+and nondeterministic limits when applicable, not a speculative environment dump.
+For a non-executable design or explanation, reconstructability concerns its
+premises and method, not a fabricated command or test. Do not disclose private
+reasoning; give the factual justification needed to evaluate the conclusion.
+
+Fill missing context from already available evidence. When a required input,
+permission, or result is unknown, unavailable, or private, state the specific gap,
+its effect on reproduction or interpretation, and any feasible next owner/action.
+Use a safe fixture or authorized reference only when it exists, and explain any
+loss of equivalence; never invent original inputs or claim an unrun procedure
+was reproduced. Do not add reruns, environment discovery, or evidence retention
+contrary to the existing execution, publication, or storage owner.
+
+Finally, check that the reader can follow the relevant chain without guessing.
+Repair the missing explanation or narrow the claim explicitly; a polished layout,
+shortness, or a citation count does not establish sufficiency. Scale detail to the
+reader's task. Progress may identify a specific retained record for unchanged
+conditions, but an independently consumed document or handoff must resolve its
+necessary context without reconstructing a private conversation.
 
 ## Structure before writeout
 
@@ -83,7 +133,7 @@ Optional document topology planning does not make this step optional.
 
 ## Choose the presentation
 
-After structuring the facts and before drafting or revising the output, choose
+After structuring the content and before drafting or revising the output, choose
 its form by the relationship the reader needs to see. Honor explicit user and
 destination format requirements. Structuring does not imply a table, list,
 fixed headings, or the same layout for every destination.
@@ -110,10 +160,12 @@ part of the existing writing step, not a separate approval or validation gate.
 
 ## Ownership and engineering rationale
 
-Supported sentences alone cannot detect a finding omitted before drafting.
-Organizing existing facts first and checking coverage in both directions
-addresses that omission; one internal owner keeps the output routes consistent.
-Use existing records and source references rather than another summary store.
+Evidence-backed sentences can still omit the inputs, steps, or premises needed
+by another reader. Reader reconstruction addresses that gap for all writing;
+verification-specific structuring additionally prevents lost findings and
+counterevidence. One internal owner keeps the output routes consistent, while
+the common root remains self-contained for source-free consumers. The existing
+file path is retained; this is not a second writing or reproduction workflow.
 
 This skill neither selects tests nor authorizes reruns, environment discovery,
 log resynchronization, new Issues, out-of-scope repairs, or extra completion

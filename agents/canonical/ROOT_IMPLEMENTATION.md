@@ -10,7 +10,7 @@ upstream design ../../documents/design/entrypoint-owner-map.md source and consum
 upstream design ../../documents/design/api-surface-traversal-policy.md traversal and API change rationale
 upstream design ../../documents/conventions/software-engineering-principles.md maintained code-space objective, abstraction admission, and reuse feasibility decision owner
 upstream design ../../documents/design/responsibility-cleanup.md replacement retirement and necessary consumer migration
-upstream design ../../documents/notes/knowledge/unix-linux-philosophy.md primary-source rationale and limits for composable boundaries
+upstream design ../../documents/operations/notes-lifecycle.md failed verification recording and reuse
 @dependency-end
 -->
 
@@ -20,161 +20,104 @@ additional startup packet or a dependency of generated consumer instructions.
 
 ## Contract and valid domain
 
-Preserve the problem class, valid input domain, and output guarantees required
-by the explicit user request and applicable canonical contract. A bounded
-change scope is not permission to narrow that problem. Do not add fixed
-dimensions, shapes, distributions, or other preconditions merely to fit a
-chosen algorithm, library, test fixture, implementation convenience, or
-performance target. Distinguish restrictions inherent in the governing problem
-from limitations of the chosen method; choose or derive a suitable method
-instead of promoting the latter into the specification. Do not reject or skip
-valid cases, or silently truncate or project them into a different problem,
-and call the result complete. Unresolved coverage remains an implementation
-gap, not invalid input or authorization to shrink the contract. Narrowing
-requires explicit user direction. Validate through the applicable implementation
-and test owners, including valid cases beyond the motivating example and cases
-a shortcut would exclude.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to distinguish required problem semantics from changeable design contracts.
+API shape, representation, internal preconditions, state transitions, and ownership
+are candidates for redesign, not immutable constraints merely because code, tests,
+or documentation already prescribe them. Compare contract-and-implementation pairs
+before choosing the simplest design, with preserved requirements, intended semantic
+changes, and necessary consumer migration explicit. Do not require equivalence to
+obsolete behavior that the authorized change is meant to correct.
+
+Keep the required input domain, output, safety, performance, and failure guarantees.
+Do not turn a method's limitations into stronger user preconditions, silently skip
+valid cases, or weaken guarantees to make implementation or proof easier. A changed
+internal precondition needs a derivation showing how every required input reaches
+it legally. A real conflict with explicit compatibility or authority needs the
+exact affected requirement and decision, not a blanket contract-preservation veto.
 
 ## Simplest complete implementation
 
- Before implementation, use the existing
- [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
- to locate abstractions that already own the required behavior. Trace actual
- callers, usage examples, provider dependencies, contracts, configuration, and
- extension points. A failed name search or unfamiliar location does not establish
- absence. Settle direct use, composition, extension at the existing owner, or an
- evidenced responsibility gap before writing code, including private helpers and
- additions inside existing files. Unknown keeps only the affected implementation
- pending; it does not require a repository-wide audit or justify inventing a
- foundation.
+Use [SEP-01](../../documents/conventions/software-engineering-principles.md#sep-01-contract-first)
+to align the owning design with the latest explicit agreement before choosing a
+mechanism. State the required outcome, valid inputs, guarantees, and completion
+evidence first. Carry source-backed constraints with the affected operation.
 
- Design for the smallest maintained code space after the change, not the smallest
-diff. Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
-to the final implementation, including retained code and support mechanisms.
-Start with direct use or composition of existing APIs; admit new abstractions,
-configuration, routes, or state only for an evidenced unmet current requirement.
-Hypothetical reuse, pattern uniformity, or test-double convenience is not a gap.
-Preserve the required domain, correctness, safety, performance, and failure semantics;
-code compression or omitted behavior is not simplification.
-For replacements, include the retained owner, superseded code, and necessary
-consumer migration in the existing design before implementation, then close
-[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-in the same change. Do not defer deletion to a later cleanup or keep the old path
-to reduce the diff. Keep unrelated changes out; add no checker, report, or approval
-gate to enforce this objective.
+Apply [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)
+per responsibility: compose existing capabilities for new functionality; reconsider
+structure preservation for repairs. Use [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+to inspect abstractions, actual callers, APIs, configuration, dependencies, and
+extension points before implementation. Follow its investigation-to-verdict sequence:
+check the concrete use, settle the material requirement, and state the evidence-backed
+adoption, correction, or rejection. Search prior failed attempts through
+[Notes Lifecycle](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding),
+reuse results under matching premises, and verify decision-relevant changed premises.
 
-When composition, interfaces, policy placement, or resource lifetime changes,
-use the applicable decision below. Other edits do not activate all sections or
-a fresh philosophy survey. Existing engineering principles remain the general
-policy owner; the optional [research note](../../documents/notes/knowledge/unix-linux-philosophy.md)
-explains the sources, tradeoffs, and limits rather than adding a second policy.
+Within that starting point, apply SEP-06's mathematical simplicity comparison,
+including contract redesign, independent state, exceptional cases, coupled
+invariants, and proof obligations across the affected unit and its consumers.
+Before selecting a repair, use [SEP-07 Reachability and remedy necessity](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)
+to establish that the current implementation fails a required contract and that
+existing guarantees do not already satisfy it.
+Remove redundant representations and mechanisms when the derivation permits.
+Consolidate the root responsibility and trace affected contracts to consumers;
+use that complete unit to determine the change scope. For repairs, correct the
+existing owner's mechanism rather than adding a specialized branch; preserve
+verified distinctions required by domain behavior or input contracts. Reuse sound
+parts and retire superseded branches together with the common correction.
 
-## Composable interfaces and explicit mechanisms
+For replacement or retirement, close [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+in the same change: remove obsolete paths and support, migrate affected uses, and
+validate agreed behavior rather than freezing superseded implementation in tests.
+Review the completed unit, including retained code, not just the diff. Record
+material reductions and necessary growth in the existing design/PR rationale;
+line compression, relocation, and deletion quotas are not evidence of improvement.
+Preserve required domain, correctness, safety, performance, failure semantics, and
+behavior-preserving refactor contracts. Add no unrelated cleanup, checker, report,
+or approval gate.
 
-### Policy, mechanism, and representation
-
-Keep one cohesive responsibility behind a usable contract. Compose the same
-existing component in standalone and combined use; do not make a second
-implementation for a pipeline or caller variant. Under
-[SEP-03 and SEP-05](../../documents/conventions/software-engineering-principles.md),
-keep use-case selection, configuration policy, orchestration, and presentation
-with the caller, and reusable computation or mechanism with its owner.
-Do not split one invariant or atomic operation merely to make smaller files,
-functions, or processes; IPC and serialization are costs, not proof of modularity.
-
-Before adding branches or modes, inspect the data representation, valid states,
-units, and ownership. Prefer an existing type, standard data structure, or small
-table when it removes special cases without hiding different semantics.
-A new DSL, schema, interpreter, registry, or generic framework still needs the
-existing abstraction-admission evidence. Keep control flow and effects readable;
-comments explain non-obvious invariants and reasons, not a paraphrase of each line.
-
-### Program boundaries
-
-For a machine-facing CLI, keep result data on stdout and diagnostics on stderr;
-follow an existing protocol's channel contract instead when it specifies another
-boundary. Do not mix progress, decoration, or interactive prompts into data.
-Provide non-interactive inputs for automated use without bypassing authorization.
-Define the applicable input format, encoding, record boundaries, escaping, ordering,
-exit-status meanings, and validity of partial output. Reuse established formats,
-serializers, parsers, argument APIs, and native tools rather than inventing them.
-Do not parse human display output when a supported machine interface suffices,
-or interpolate untrusted input into shell command strings.
-
-Use text when it preserves the required interoperability, precision, and cost;
-keep typed in-process or binary interfaces when those better satisfy the contract.
-Do not force a numerical library through a CLI or convert every value to a string.
-A command's quiet success still has defined output and status; failures must remain
-observable. A reusable library reports errors through its API, not by unexpectedly
-printing to global streams or terminating its caller.
-
-### Streams and owned resources
-
-For streaming or process composition, account for framing, EOF, partial I/O,
-backpressure, cancellation, and descriptor ownership where they affect the
-changed contract. A byte stream is not a message protocol. Reuse guarantees of
-the selected library/runtime rather than rebuilding low-level handling.
-Do not assume unlimited buffering or a particular pipe capacity. Streaming is
-not mandatory when the operation needs global data; use the supported workload
-and existing resource owner to choose storage and processing granularity.
-Classify early consumer termination by the command contract: neither suppress
-all broken-pipe failures nor assume every deliberate short read is a defect.
-Do not impose a blanket signal handler, retry loop, shell option, or preflight.
-
-Give acquired resources an explicit lifetime owner and use the language's native
-scoped cleanup where sufficient. Handle partial acquisition, cancellation, and
-failure without double release, leaks, hidden shared state, or loss of the first
-failure. Close only owned resources; borrowed resources retain their owner's
-contract. Validate reachable cleanup paths, using the existing
-[reachability and remedy rule](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity),
-not speculative guards or repeated checks already guaranteed by the boundary.
-
-### Compatibility and evidence
-
-Check actual affected workflows, not just unchanged signatures: data meaning,
-precision, ordering, status, side effects, and required performance may change
-without an API rename. Apply [Public API additions](#public-api-additions) to
-necessary changes and migration; public visibility alone is not an API freeze.
-Linux's unusually strong user-regression policy is not permission to ignore
-undocumented usage, nor a universal ban on authorized internal replacement.
-
-Use the existing [workload and scale decision](../../documents/conventions/software-engineering-principles.md#workload-and-scale-before-mechanism)
-for algorithm and resource choices. Support claimed speedups with relevant
-measurements; do not demand new benchmarks when existing guarantees or analysis
-settle the decision, and do not call unmeasured performance verified.
-Review one complete logical change with its necessary callers, tests, and docs;
-small patches aid review but do not excuse unfinished migration. Validate the
-changed boundaries and observable results, not adherence to slogans or code shape.
-Keep rationale and evidence with the existing design/PR, without a new checklist,
-checker, report, approval stage, or runtime setup obligation.
+Before implementing, derive the selected contract's obligations through
+[SEP-11](../../documents/conventions/software-engineering-principles.md#sep-11-testability-and-validation-selection).
+Connect assumptions, invariants, transitions, and required termination to actual
+paths/symbols; derive tests from those properties and remaining execution risks.
+Discharge decision-relevant obligations by checking the derivation, its premises,
+and actual code, and executing the necessary focused checks. Close gaps in the same
+task with the next relevant investigation or verification. Record failed checks in
+the owning topic with their reproduction conditions and verified conclusions.
 
 ## Public API additions
 
-Do not stop a requested fix to preserve an existing API or ask for separate
-approval solely because the fix changes its public shape. The request covers
-necessary replacement, removal, signature changes, and unavoidable additions,
-with affected consumer migration, not unrelated features or speculative exports.
-An explicit compatibility requirement remains a constraint; do not invent one
-from active use, existing tests, or public visibility.
+A requested fix covers necessary replacement, removal, signature changes, unavoidable
+additions, and affected consumer migration. Resolve concrete compatibility or
+authority conflicts through the existing owner routes while correcting the root
+contract.
 
 Before implementation, use [API surface traversal](../../documents/design/api-surface-traversal-policy.md)
 to inspect current abstractions, real callers, APIs, configuration, extension
-points, standard facilities, and adopted dependencies. Reuse sufficient current
-findings; not finding a name or preferring another signature is not a capability
-gap. If direct use or composition suffices, use it without a new API. Otherwise,
-record the candidates, source evidence, unmet contract, and necessary owner/API
-change in the existing design, then implement it within the requested scope.
-Unknown capability remains unknown; it neither justifies speculative additions
-nor blocks independent authorized work.
+points, standard facilities, and adopted dependencies. New functionality starts
+with direct use or composition before a new API. Keep one exposed API per
+functional capability. Alternate names or routes, forwarding aliases, independent
+duplicate APIs, and compatibility wrappers are additional APIs for that capability.
+Private implementation decomposition is not an API; preserve distinct
+responsibilities. Use existing domain types, API contracts, and responsibility
+abstractions for structural guarantees; keep workflow guidance with its owner
+instead of encoding it wholesale in flags, validators, or runtime admission
+gates. Validate real untrusted input and I/O at their boundary, but do not repeat
+guards for invariants already enforced by a type or API. For a repair, choose the
+simplest complete correction, including replacement when justified. Test a
+concrete candidate use against the required property, including relevant
+configuration and composition.
+State the checked input/source, actual result, and conclusion; investigate a missing
+guarantee until the material decision is settled. Record candidates, verified unmet
+contracts, and necessary owner/API changes in the existing design.
 
-Fix the root, then trace references and callers through the existing dependency
-or LSP owner and migrate affected implementations, tests, and documentation in
-the same change. Stop tracing at unchanged contracts, not at the originally
-named files. Validate required semantics and the corrected public contract;
-do not freeze defective behavior in tests or move the defect into caller
-workarounds. Remove obsolete implementation paths and dedicated support code;
-retain a compatibility entrypoint only for an actual required contract and
-connect it to the canonical implementation, not a second implementation.
+Fix the root, then trace references and actual callers through the existing
+dependency or LSP owner against the required contract. Use or migrate affected
+implementations, tests, and documentation to the existing/latest canonical API
+in the same change; stop tracing at unchanged contracts, not at the originally
+named files. Validate required semantics and the corrected public contract; do
+not freeze defective behavior in tests or move the defect into caller workarounds.
+Retire duplicate/obsolete entrypoints and exclusive support in the same change.
 
 Keep existing safety, access, and publication authority. A concrete conflict
 with an explicit compatibility constraint or unavailable consumer write access
@@ -192,19 +135,26 @@ records. Explain the concrete requirement and caller/consumer, what would remain
 unmet without the code/API, and the mathematical or engineering grounds and
 assumptions for the chosen approach. Compare direct use or composition of
 existing APIs and simpler alternatives; justify any additional mechanism only
-by the remaining gap. A behavior description, signature, or generic claim of
-future usefulness or safety is not a necessity rationale. For removals, explain
-why it is no longer needed or which mechanism now meets the requirement.
+by the remaining gap. Support each material rejection with the checked condition,
+verification method, actual result, and the unmet requirement. Apply the conclusion
+to the verified scope and link the reusable failed-verification topic.
+For removals, explain which mechanism meets the requirement or why it is retired.
 Establish the rationale before implementation and keep it aligned with the
 change in the same PR. Connect its design section to the relevant implementation
 paths/symbols at responsibility-unit granularity. Reuse an adequate, still-current
 design explanation by reference instead of copying it for each function or edit;
 add or update a concise section under existing design conventions when needed.
-Chat, Issue/PR discussion, and code comments may support or link to that section
-but never replace its explanation. If necessity cannot be justified, reconsider
-the implementation rather than inventing a reason. Use the existing design and
-review owners; do not add a checker, schema, approval gate, or unrelated
-retrospective documentation task.
+Record the latest explicit agreement in that section before editing; its older
+text must not override the agreement. Chat, Issue/PR discussion, and code comments
+may support or link to the rationale but do not replace the durable explanation.
+At nonobvious code boundaries, keep the local necessity, guaranteed behavior or
+effect boundary, and owning responsibility readable with concise comments or
+docstrings; link the actual design owner where useful. Do not restate symbol names
+or invent rationale, and do not require a comment for every line or function. If
+necessity or ownership cannot be explained from evidence, investigate or
+reconsider the implementation instead of writing a comment to bless it. Use the
+existing design and review owners; do not add a checker, schema, approval gate,
+or unrelated retrospective documentation task.
 
 ## Dependency constraints
 
@@ -220,29 +170,20 @@ not authorization to turn that observation into a permanent execution constraint
 ## Reachable abnormal conditions
 
 Before implementing a guard, retry, fallback, or other abnormal-condition
-handling, first determine whether the condition can occur under the current
-contract and supported execution environment. Identify the triggering
-input/state and assess reachability from observations, specifications, code,
-or mathematical and engineering analysis. Distinguish established possibility,
-exclusion by maintained invariants, and unresolved uncertainty. Absence of
-incidents does not prove impossibility; a hypothetical failure alone does not
-establish reachability. Do not add handling for excluded conditions or turn
-uncertainty into speculative production code; investigate the missing premise
-first. Preventive handling does not require a real incident or unsafe
-reproduction when specifications or analysis establish possibility. Only after
-that judgment, use impact and existing guarantees to select the smallest
-necessary remedy at the responsible owner and validate it against the
-identified condition. Do not make guards or preflight checks stricter than the
-governing contract: avoid environment, directory-layout, or exact-version
-restrictions when the required capability suffices, and repeated checks of
-invariants already guaranteed at the same trust boundary. An unavailable
-optional tool or diagnostic must not block an otherwise supported path.
-Validate untrusted inputs at the owning boundary rather than coupling reusable
-code to one caller's setup. Prefer no new check unless it closes an evidenced
-gap without unnecessarily reducing portability or reuse. Preserve required
-authorization, safety, and external-boundary checks; do not suppress their
-failures. Record the judgment and grounds in the existing Issue or design record,
-not a new gate or report.
+handling, determine the required failure behavior and triggering input/state.
+Trace the supported entrypoint, governing specification, maintained invariants,
+and actual control/data flow. Verify whether the condition is reachable and
+whether existing rejection, propagation, cleanup, or recovery meets the requirement.
+Investigate a missing premise and perform the focused check needed to settle that
+judgment. Specifications and sound analysis can establish a possible failure without
+an unsafe reproduction. Preserve required authorization and external-boundary checks.
+
+Choose the simplest remedy for the demonstrated gap at its owner and verify the
+identified condition. Use the governing capability contract for guards; keep
+portability and reuse across supported environments. Reuse guarantees already
+maintained at the same trust boundary. Record the triggering condition, existing
+guarantee, checked result, and selected action in the existing design or Issue;
+persist a failed check through the existing topic-note/log owner.
 
 ## Algorithm-first numerical diagnosis
 
@@ -271,8 +212,10 @@ the cause. Unknown cause, numerical or implementation trouble, debugging value,
 and possible future reuse do not justify retention or waiting for task/PR closeout.
 Apply this disposition through the existing experiment lifecycle and artifact
 owners; a generic preserve-results or append-only rule must not override it.
-Keep only a concise failure, cause/evidence, and deletion or physical-retention
-record in the existing Issue or task record, not a relocated experiment bundle.
+Retain the concise failure, reproduction conditions, verified conclusion, and
+reuse conditions in the existing topic memo or authorized log. Link the deletion
+or physical-retention disposition from the Issue/task and preserve that finding
+while retiring the failed implementation and experiment-only artifacts.
 Do not extend deletion to successful results, shared code, other owners' data,
 or Git history. Preserve required safe stopping and scoped deletion authority;
 do not add a classifier, checker, archive prerequisite, or rerun to decide cleanup.
@@ -282,16 +225,12 @@ do not add a classifier, checker, archive prerequisite, or rerun to decide clean
 Before selecting or editing a repository surface, inspect its actual location,
 canonical owner, callers, and consumers. For library-backed work, inspect the
 caller and the relevant public API, including nested configuration and existing
-extension points, before proposing library edits. Distinguish a caller's
-convenience gap from a defect or missing capability in the library's own
-contract. Keep use-case selection, orchestration, environment setup, and
-presentation with their owning callers; do not move them into a reusable core
-merely to shorten a caller, remove textual duplication, or anticipate future
-reuse. Change a library only when the required behavior belongs to its
-abstraction and an evidenced contract defect or capability gap requires it,
-within the authorized scope. One valid caller can demonstrate a library defect;
-do not hide it in a caller workaround or require multiple callers for a
-correctness fix. Prefer direct use or composition of existing APIs when
-sufficient, without adding an unnecessary wrapper, helper, mode, or
-generalization layer. Record the owner choice and rejected alternative in the
-existing Issue / PR rationale, not a new gate or report.
+extension points, before proposing library edits. Trace the required behavior to
+the owner that maintains its guarantees: use-case selection, orchestration,
+environment setup, and presentation stay with their callers; reusable semantics
+stay with the library. Verify the concrete use, including relevant configuration
+and composition, to identify an unmet library contract or caller-owned correction.
+One valid caller can establish a library defect. Correct that common owner and
+migrate its affected uses, then verify both the contract and consumer connection.
+Record the owner decision, checked result, and verified alternative comparison
+in the existing design/PR rationale, referencing reusable failure evidence.

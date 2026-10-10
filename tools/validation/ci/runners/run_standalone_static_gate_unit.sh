@@ -14,14 +14,15 @@
 set -euo pipefail
 
 if [[ "$#" -lt 1 ]]; then
-  echo "usage: $0 {rust|contracts|eval|workflow-container|full} [full-check-options...]" >&2
+  echo "usage: $0 {docs|rust|contracts|eval|workflow-container|full} [docs-paths|contracts-baseline|full-check-options...]" >&2
   exit 2
 fi
 
 UNIT="$1"
 shift
 UNIT_ARGS=("$@")
-if [[ "${UNIT}" != "full" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
+if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "contracts" && "${#UNIT_ARGS[@]}" -ne 0 ]] ||
+   [[ "${UNIT}" == "contracts" && "${#UNIT_ARGS[@]}" -gt 1 ]]; then
   echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
   exit 2
 fi
@@ -32,50 +33,44 @@ if [[ ! -f /usr/local/share/agent-canon/.agent-canon-tool-container ]]; then
   exit 2
 fi
 ROOT="${AGENT_CANON_TARGET_ROOT:?AGENT_CANON_TARGET_ROOT is required}"
-RUNTIME_ROOT=/usr/local/share/agent-canon/runtime
+RUNTIME_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd -P)"
 TOOLS_ROOT="${RUNTIME_ROOT}/tools"
 
 assert_read_only_target() {
   python3 - "${ROOT}" <<'PY'
+import json
 from pathlib import Path
+import subprocess
 import sys
 
 
-def decode_mount_path(value: str) -> str:
-    for encoded, decoded in (
-        ("\\040", " "),
-        ("\\011", "\t"),
-        ("\\012", "\n"),
-        ("\\134", "\\"),
-    ):
-        value = value.replace(encoded, decoded)
-    return value
+# libmount owns path decoding, nested mounts and visible overmount selection.
+# Query this process's namespace; only VFS flags authorize the read-only body.
+try:
+    target = Path(sys.argv[1]).resolve(strict=True)
+    result = subprocess.run(
+        [
+            "findmnt", "--kernel", "--first-only", "--direction", "backward",
+            "--list", "--target", str(target), "--json",
+            "--output", "TARGET,VFS-OPTIONS",
+        ],
+        check=True, capture_output=True, text=True,
+    )
+    payload = json.loads(result.stdout)
+except (OSError, subprocess.CalledProcessError, ValueError) as error:
+    raise SystemExit(
+        f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_query_failed error={type(error).__name__}"
+    ) from error
 
-
-target = Path(sys.argv[1]).resolve(strict=True)
-mountinfo = Path("/proc/self/mountinfo")
-if not mountinfo.is_file():
-    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=mountinfo_unavailable")
-
-best: tuple[int, Path, set[str]] | None = None
-for line in mountinfo.read_text(encoding="utf-8").splitlines():
-    left, separator, _right = line.partition(" - ")
-    fields = left.split()
-    if not separator or len(fields) < 6:
-        continue
-    mount_point = Path(decode_mount_path(fields[4])).resolve(strict=False)
-    try:
-        target.relative_to(mount_point)
-    except ValueError:
-        continue
-    candidate = (len(mount_point.parts), mount_point, set(fields[5].split(",")))
-    if best is None or candidate[0] > best[0]:
-        best = candidate
-
-if best is None:
+mounts = payload.get("filesystems") if isinstance(payload, dict) else None
+if not isinstance(mounts, list) or len(mounts) != 1 or not isinstance(mounts[0], dict):
     raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_missing")
-_depth, mount_point, options = best
-if "ro" not in options:
+mount_point = mounts[0].get("target")
+vfs_options = mounts[0].get("vfs-options")
+if not isinstance(mount_point, str) or not mount_point or not isinstance(vfs_options, str):
+    raise SystemExit("AGENT_CANON_STATIC_GATE=fail reason=target_mount_columns_missing")
+options = set(vfs_options.split(","))
+if "ro" not in options or "rw" in options:
     raise SystemExit(
         f"AGENT_CANON_STATIC_GATE=fail reason=target_mount_not_read_only mount={mount_point}"
     )
@@ -120,12 +115,9 @@ PY
 AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"
 AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_STATIC_RUNTIME_ROOT}")"
 export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
-export AGENT_CANON_CACHE_ROOT="$(runtime_boundary_path "${AGENT_CANON_CACHE_ROOT:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache}")"
-export CARGO_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/cargo-home")"
-export RUSTUP_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/rustup-home")"
-export CARGO_TARGET_DIR="$(runtime_boundary_path "${CARGO_TARGET_DIR:-${AGENT_CANON_CACHE_ROOT}/cargo-target}")"
 export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
-mkdir -p "${CARGO_HOME}" "${RUSTUP_HOME}" "${CARGO_TARGET_DIR}" "${TMPDIR}"
+mkdir -p "${TMPDIR}"
+export PYTHONDONTWRITEBYTECODE=1
 
 run_full() {
   # Bootstrap authenticates and supplies this control capability.  The
@@ -133,11 +125,25 @@ run_full() {
   local control_parent_root="${AGENT_CANON_CONTROL_PARENT_ROOT:?AGENT_CANON_CONTROL_PARENT_ROOT is required}"
   AGENT_CANON_CONTROL_PARENT_ROOT="${control_parent_root}" \
   AGENT_CANON_CHILD_PURPOSE="standalone-static-gate-unit" \
-  AGENT_CANON_CLI_CMD="/usr/local/bin/agent-canon" \
+  AGENT_CANON_CLI_CMD="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon" \
   AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
-  CARGO_HOME="${CARGO_HOME}" \
-  RUSTUP_HOME="${RUSTUP_HOME}" \
     bash "${ROOT}/tools/validation/ci/runners/run_all_checks.sh" "${UNIT_ARGS[@]}"
+}
+
+run_docs() {
+  local cli="${AGENT_CANON_CACHE_ROOT}/bin/agent-canon"
+  local path
+  local -a paths=()
+  for path in "${UNIT_ARGS[@]}"; do
+    # A deletion can break links in unchanged documents. Use the docs owner's
+    # full check rather than silently dropping missing input paths.
+    if [[ ! -f "${ROOT}/${path#./}" ]]; then
+      "${cli}" docs check --root "${ROOT}"
+      return
+    fi
+    paths+=("./${path#./}")
+  done
+  "${cli}" docs check --root "${ROOT}" "${paths[@]}"
 }
 
 run_rust() {
@@ -156,31 +162,30 @@ run_rust() {
 
 run_contracts() {
   node --version
-  python3 -m unittest \
+  python3 -m pytest -p no:cacheprovider --pyargs \
     tests.agent_tools.test_visualization_contract \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
-    tests.tools.test_agent_canon_pr_dependency_source_gate \
-    tests.tools.test_agent_canon_pr_graph_gate_integration \
+    tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \
-    tests.agent_tools.test_check_design_doc_claims \
     tests.agent_tools.test_tool_drift \
     tests.agent_tools.test_vector_search \
-    tests.agent_tools.test_dependency_manifest_tools
+    tests/agent_tools/test_dependency_*.py
+  python3 -m pytest -p no:cacheprovider \
+    tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
   python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
   python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
-  local base_ref="${GITHUB_BASE_REF:-main}"
-  git rev-parse --verify "origin/${base_ref}^{commit}" >/dev/null
+  local base_ref="${UNIT_ARGS[0]:-origin/main}"
+  git rev-parse --verify "${base_ref}^{commit}" >/dev/null
   python3 "${TOOLS_ROOT}/analysis/code/import_responsibility.py" \
-    --changed --baseline-ref "origin/${base_ref}"
+    --changed --baseline-ref "${base_ref}"
   PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \
     --root "${ROOT}" --format json
-  python3 "${TOOLS_ROOT}/agent/skills/skill_tool_commands.py" check
 }
 
 run_eval() (
@@ -191,8 +196,11 @@ run_eval() (
     local trap_status=$?
     trap - EXIT
     set +e
-    rm -rf -- "${temp_root}"
-    cleanup_status=$?
+    # CI copies failed producer logs from the runtime volume before teardown.
+    if [[ "${primary_status}" -eq 0 && "${trap_status}" -eq 0 ]]; then
+      rm -rf -- "${temp_root}"
+      cleanup_status=$?
+    fi
     set -e
     if [[ "${primary_status}" -ne 0 ]]; then
       exit "${primary_status}"
@@ -203,19 +211,18 @@ run_eval() (
     exit "${cleanup_status}"
   }
   trap cleanup_eval EXIT
-  local hook_archive="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/archive/agent-canon-log}"
+  # Static evaluations use the CI runtime root, not the shared private hook log.
+  local eval_archive_root="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  hook_archive="$(runtime_boundary_path "${hook_archive}")"
-  mkdir -p "${eval_log_dir}"
+  mkdir -p "${eval_log_dir}" "${eval_archive_root}/eval-results"
   set +e
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
+  AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
+  AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
     python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
       --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}" \
-      --log-dir "${eval_log_dir}" \
-      --skill-used agent-orchestration \
-      --skill-used result-artifact-writeout
+      --log-dir "${eval_log_dir}"
   primary_status=$?
   if [[ "${primary_status}" -ne 0 ]]; then
     local eval_log
@@ -232,7 +239,8 @@ run_eval() (
     done
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
-    AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
+    AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
       python3 "${RUNTIME_ROOT}/eval/checkers/eval_accumulation_check.py" \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
     primary_status=$?
@@ -258,6 +266,7 @@ run_workflow_container() {
 
 case "${UNIT}" in
   full) run_full ;;
+  docs) run_docs ;;
   rust) run_rust ;;
   contracts) run_contracts ;;
   eval) run_eval ;;

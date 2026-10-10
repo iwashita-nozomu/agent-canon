@@ -61,4 +61,3 @@ project 固有 skill は repository または対象 subtree に置きます。
 
 - AgentCanon public skill の追加は `agents/skills/<skill>.md` と `catalog.yaml`、project 固有 skill の追加はその repository の `.agents/skills/` で行います。
 - Skill 編集の検査は変更した契約から選びます。補助診断は [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従い、文書編集の開始条件にしません。
-- Skill 内の code fence に `KEY=value` 形式の機械出力例を追加・削除した場合は `python3 tools/runtime/archive/log_surface_inventory.py --root . --check --baseline documents/runtime/log-surface-inventory.json` を通し、意図した field change なら `documents/runtime/log-surface-inventory.json` を再生成します。
