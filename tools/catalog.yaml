@@ -6,7 +6,6 @@
 # upstream design ../documents/tools/visualization_contract.md canonical visualization coverage and readback tool contract
 # downstream implementation runtime/manifest/tool_catalog.py validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
-# downstream implementation validation/semantic/documents/check_design_doc_claims.py validates design-document evidence claims
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
@@ -988,7 +987,6 @@ entries:
       - documents/design/dependency-manifest-design.md
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
-      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: graph-client
     summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
@@ -1008,7 +1006,6 @@ entries:
       - agents/canonical/CLI_ENTRYPOINTS.md
     tests:
       - tests/agent_tools/test_check_dependency_headers.py
-      - tests/agent_tools/test_check_design_doc_claims.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
@@ -1253,29 +1250,6 @@ entries:
       - documents/tools/README.md
       - documents/design/dependency-manifest-design.md
     tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
-
-  - id: check-design-doc-claims
-    public: true
-    summary: Checks design-document claims against dependency-header, implementation, and parent-document evidence.
-    path: tools/validation/semantic/documents/check_design_doc_claims.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/documents/check_design_doc_claims.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/documents/check_design_doc_claims.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/tools/check_design_doc_claims.md
-      - documents/design/README.md
-      - documents/design/dependency-manifest-design.md
-    tests:
-      - tests/agent_tools/test_check_design_doc_claims.py
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-semantic-responsibility-contract

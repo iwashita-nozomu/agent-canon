@@ -157,7 +157,6 @@ exclude_paths = [
 ]
 protecting_tools = [
   "tools/validation/semantic/dependencies/check_dependency_headers.py",
-  "tools/validation/semantic/documents/check_design_doc_claims.py",
   "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []

@@ -46,7 +46,7 @@ global Python executable, or Host Cargo fallback.
 | source/dependency analysis | `search.py`, `source_dependency_graph.py`, `lsp_code_analysis.py` |
 | runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
-| docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py`, `check_design_doc_claims.py` |
+| docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py` |
 | Skill loading | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` via the persistent AgentCanon tool container (bounded UTF-8 chunks and EOF admission) |
 | review and closeout | `review_dispatch.py`, `task_close.py`, canonical workflow |
 
@@ -68,7 +68,7 @@ promote an internal tool, require a check, or revalidate a historical record.
 | Select a task route or inspect the CLI | [Task routing](route.md), [AgentCanon CLI and docs formatting](agent-canon.md) |
 | Search and inspect source | [Search coordination](search-coordination.md), [LSP analysis](lsp_code_analysis.md), [Semantic index](semantic_index.md), [Provider comparison reports](semantic_provider_html_report.md) |
 | Plan dependency or repository changes | [Dependency diff summary](git_dependency_diff_summary.md), [Dependency module changes](dependency_module_change.md), [Repository topic checkouts](repository_topic_clone.md) |
-| Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Design claims](check_design_doc_claims.md), [Semantic responsibility contracts](check_semantic_responsibility_contract.md) |
+| Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Semantic responsibility contracts](check_semantic_responsibility_contract.md) |
 | Review object contracts and test design | [Python readability](oop/python/readability.md), [Python rule inventory](oop/python/rule_inventory.md), [C++ readability](oop/cpp/readability.md), [C++ rule inventory](oop/cpp/rule_inventory.md), [Test design](test_design.md) |
 | Extract, analyze, or visualize documents | [DOCX extraction](extract_docx.md), [Prose reasoning graph](prose_reasoning_graph.md), [Dependency graph rendering](render_dependency_manifest_graph.md), [Visualization contract](visualization_contract.md) |
 | Plan and check formal proofs | [Formal proof](formal_proof.md), [Lean capabilities](lean_capability_matrix.md), [Lean proof environment](lean_proof_env.md), [Recursive proof search](lean_recursive_proof_search.md), [Tool proof coverage](tool_proof_coverage.md) |
