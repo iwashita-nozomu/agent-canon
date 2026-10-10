@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # @dependency-start
 # contract tool
 # responsibility Bootstraps agent run artifacts for agent workflows.
