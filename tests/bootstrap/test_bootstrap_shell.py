@@ -5977,9 +5977,14 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         assert manifest["source_root"] == str(source_root)
         managed = manifest["links"]
         assert managed
+        codex_container_home = next(
+            line.partition("=")[2]
+            for line in ADAPTER.read_text(encoding="utf-8").splitlines()
+            if line.startswith("AGENT_CANON_CODEX_HOME_DESTINATION=")
+        )
         for entry in managed:
             target = codex_home / Path(entry["target"]).relative_to(
-                "/var/lib/agent-canon/runtime/codex-home"
+                codex_container_home
             )
             source = Path(entry["source"])
             assert target.is_symlink()
