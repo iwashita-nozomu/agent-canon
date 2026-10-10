@@ -5,6 +5,7 @@
 # responsibility Verifies standalone static unit source/runtime routing and eval failure evidence retention.
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs the selected eval producer collection
+# upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs selected unit owners
 # @dependency-end
@@ -17,6 +18,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
+from tools.runtime.archive.runtime_log_paths import LOG_ARCHIVE_PARENT
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = (
@@ -113,6 +116,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             smoke_status,
         ),
     )
+    archive_relative = LOG_ARCHIVE_PARENT.as_posix()
     for relative, name, status in paths:
         script = source / relative
         script.parent.mkdir(parents=True, exist_ok=True)
@@ -123,12 +127,12 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "stderr = ''.join(f'producer stderr line {index + 1}\\n' for index in range(161))\n"
             "(log_dir / '02-workflow-selection.stdout.txt').write_text(stdout, encoding='utf-8')\n"
             "(log_dir / '02-workflow-selection.stderr.txt').write_text(stderr, encoding='utf-8')\n"
-            "report_dir = Path(os.environ['AGENT_CANON_HOOK_ARCHIVE_DIR']) / 'eval-results' / 'workflow-selection'\n"
+            f"report_dir = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / 'eval-results' / 'workflow-selection'\n"
             "report_dir.mkdir(parents=True, exist_ok=True)\n"
             "(report_dir / 'agent-canon-pr-gate-pass.md').write_text('synthetic report\\n', encoding='utf-8')\n"
             if name == "producer"
             else (
-                "report = Path(os.environ['AGENT_CANON_HOOK_ARCHIVE_DIR']) / "
+                f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
                 "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
                 "if not report.is_file():\n"
                 "    raise SystemExit(87)\n"
@@ -142,7 +146,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "with Path(os.environ['CALLS']).open('a') as stream:\n"
             f"    stream.write(json.dumps([{name!r}, "
             "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
-            "os.environ.get('AGENT_CANON_LOG_ROOT')]) + '\\n')\n"
+            "os.environ.get('AGENT_CANON_LOG_ROOT'), "
+            "os.environ.get('AGENT_CANON_RUNTIME_ROOT')]) + '\\n')\n"
             + producer_logs
             + f"raise SystemExit({status})\n",
             encoding="utf-8",
@@ -163,9 +168,11 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "ROOT": str(source),
             "RUNTIME_ROOT": str(source),
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
+            "PYTHONPATH": str(ROOT),
         },
         capture_output=True,
         text=True,
@@ -176,12 +183,17 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     )
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
-    archive = str(runtime)
     assert all(
-        record[1:] == [archive, archive] for record in records if record[0] != "smoke"
+        record[1:] == [None, None, str(runtime)]
+        for record in records
+        if record[0] != "smoke"
     )
     report_path = (
-        runtime / "eval-results" / "workflow-selection" / "agent-canon-pr-gate-pass.md"
+        runtime
+        / LOG_ARCHIVE_PARENT
+        / "eval-results"
+        / "workflow-selection"
+        / "agent-canon-pr-gate-pass.md"
     )
     assert report_path.is_file()
     temporary_logs = (

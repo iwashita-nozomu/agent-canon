@@ -7,7 +7,6 @@
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
-# upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
@@ -135,9 +134,6 @@ cleanup_agent_canon_pr_temp_root() {
 trap cleanup_agent_canon_pr_temp_root EXIT
 AGENT_CANON_G1_BUNDLE_ACTIVE=0
 PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
-PR_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_RUNTIME_ROOT}/archive/agent-canon-log}"
-PR_HOOK_ARCHIVE_DIR="$(runtime_boundary_path "${PR_HOOK_ARCHIVE_DIR}")"
-mkdir -p "${PR_HOOK_ARCHIVE_DIR}"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"

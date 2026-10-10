@@ -4,6 +4,7 @@
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream implementation ./run_all_checks.sh owns the full-confidence check body executed from a read-only target
+# upstream implementation ../../../../tools/runtime/archive/runtime_log_paths.py resolves the canonical eval archive destination
 # downstream implementation ../checks/check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../../../tests/tools/test_standalone_static_gate_units.py unit partition regression
@@ -182,7 +183,7 @@ run_contracts() {
 }
 
 run_eval() (
-  local temp_root primary_status=0 cleanup_status=0
+  local temp_root eval_results_parent primary_status=0 cleanup_status=0
   temp_root="${AGENT_CANON_STATIC_RUNTIME_ROOT}/eval/agent-canon-pr-gate"
   mkdir -p "${temp_root}"
   cleanup_eval() {
@@ -205,12 +206,28 @@ run_eval() (
   }
   trap cleanup_eval EXIT
   # Static evaluations use the CI runtime root, not the shared private hook log.
-  local eval_archive_root="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
+  # Create the canonical archive's eval-results directory for CI readback,
+  # using the archive owner's path resolver rather than a caller override.
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  mkdir -p "${eval_log_dir}" "${eval_archive_root}/eval-results"
+  eval_results_parent="$(
+    env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
+      PYTHONPATH="${RUNTIME_ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
+      python3 - "${ROOT}" "${AGENT_CANON_STATIC_RUNTIME_ROOT}" <<'PY'
+from pathlib import Path
+import sys
+
+from tools.runtime.archive.runtime_log_paths import eval_results_dir
+
+print(
+    eval_results_dir(
+        Path(sys.argv[1]), "codex-agent-role", Path(sys.argv[2])
+    ).parent
+)
+PY
+  )"
+  mkdir -p "${eval_log_dir}" "${eval_results_parent}"
   set +e
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
-  AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
+  env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
@@ -232,8 +249,7 @@ run_eval() (
     done
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
-    AGENT_CANON_HOOK_ARCHIVE_DIR="${eval_archive_root}" \
-    AGENT_CANON_LOG_ROOT="${eval_archive_root}" \
+    env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
       python3 "${RUNTIME_ROOT}/eval/checkers/eval_accumulation_check.py" \
         --root "${ROOT}" --runtime-root "${AGENT_CANON_STATIC_RUNTIME_ROOT}"
     primary_status=$?
