@@ -44,6 +44,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     --mount=type=bind,source=tools/analysis/dependencies/dependency_plan.py,target=/src/tools/analysis/dependencies/dependency_plan.py,readonly \
     --mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py,target=/src/tools/repository/workspace/parent_root_side_effects.py,readonly \
     --mount=type=bind,source=tools/runtime/artifacts/runtime_artifacts.py,target=/src/tools/runtime/artifacts/runtime_artifacts.py,readonly \
+    --mount=type=bind,source=tools/runtime/values.py,target=/src/tools/runtime/values.py,readonly \
     --mount=type=bind,source=tools,target=/src/all-tools,readonly \
     set -eux; \
     export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo; \

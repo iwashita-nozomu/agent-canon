@@ -4289,6 +4289,10 @@ class DependencyModelTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn(
+            "--mount=type=bind,source=tools/runtime/values.py,target=/src/tools/runtime/values.py,readonly",
+            dockerfile,
+        )
+        self.assertIn(
             "!tools/repository/workspace/parent_root_side_effects.py", dockerignore
         )
         self.assertIn("dependency_plan.py", dockerfile)
