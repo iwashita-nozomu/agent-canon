@@ -647,7 +647,9 @@ fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> Result<Vec<Finding>, 
 
     let mut command = Command::new("markdownlint-cli2");
     command
-        .current_dir(root)
+        // The first-party JSON formatter resolves its relative `name` in the
+        // process working directory, so keep its result in this owned temp dir.
+        .current_dir(&output_directory.0)
         .arg("--config")
         .arg(&command_config)
         .arg("--no-globs");
