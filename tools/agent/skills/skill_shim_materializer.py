@@ -4,6 +4,7 @@
 # responsibility Materializes and reads back the complete public Codex skill-shim adapter set.
 # upstream design ../../../documents/design/skill-runtime-shim-materialization.md owns the v3 schema, migration, and fixed-point contract
 # upstream design ../../../agents/skills/catalog.yaml owns public skill identity and discovery metadata
+# upstream implementation ../../runtime/values.py refines decoded metadata mappings
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
 # upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
 # downstream implementation ../../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
@@ -23,13 +24,14 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import yaml
 
+from tools.runtime.values import is_string_object_mapping
 from tools.agent.skills.skill_dependency_map import build_graph
 from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
@@ -41,6 +43,7 @@ from tools.agent.skills.skill_route_catalog import (
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
+        ParentRootAttestationReceipt,
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -49,6 +52,7 @@ try:
     )
 except ImportError:
     from tools.repository.workspace.parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationReceipt,
         ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
@@ -73,7 +77,9 @@ ABSOLUTE_LOCATOR_RE = re.compile(
 )
 
 
-def _parent_boundary(purpose: str) -> tuple[Any, Any]:
+def _parent_boundary(
+    purpose: str,
+) -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt]:
     """Return the existing source-maintenance write capability."""
     configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
     if not configured:
@@ -184,12 +190,6 @@ def _mapping(value: object, field: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise MaterializerError("invalid_mapping", field)
     return dict(cast(dict[str, object], value))
-
-
-def _string(value: object, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise MaterializerError("invalid_string", field)
-    return _normalize_string(value)
 
 
 def _catalog_entries(
@@ -471,8 +471,8 @@ def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
         expected_metadata = yaml.safe_load(expected_match.group(1))
     except yaml.YAMLError:
         return False
-    if not isinstance(candidate_metadata, Mapping) or not isinstance(
-        expected_metadata, Mapping
+    if not is_string_object_mapping(candidate_metadata) or not is_string_object_mapping(
+        expected_metadata
     ):
         return False
     if candidate_metadata.get("name") != expected_metadata.get("name"):

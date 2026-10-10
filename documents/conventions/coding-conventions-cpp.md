@@ -21,33 +21,33 @@ layout と build tree の正本は [cpp-build-layout.md](../design/cpp-build-lay
 - 例外や分岐が多くなる設計は避けます。
 - 数値計算の安定性を意識し、前提条件をコメントで明示します。
 - template 既定の C++ 実装形態は header-only にします。
-- `cpp/CMakeLists.txt` を唯一の C++ project entrypoint にします。
-- `cpp/cmake/` は project-local helper module、`cpp/include/` は public header、
-  `cpp/src/` は production implementation、`tests/cpp/` は derived project の CTest source、
-  `cpp/experiments/` は native experiment source と target wiring に固定します。
-- parent root は language-neutral な入口として保ち、C++ command は `cpp` を
-  source anchor にして実行します。
+- C++ source path と configure graph は consumer が選択した profile に従います。
+  profile の正本は [cpp-build-layout.md](../design/cpp-build-layout.md) です。
+- `root-aggregate` profile は project root の既存 `CMakeLists.txt` を entrypoint とし、
+  public headers と production source は project-owned `include/`、`src/` に置きます。
+- `consumer-local` profile は選択された test/experiment manifest を個別に configure し、
+  sibling consumer の graph を要求しません。
+- `cpp/` prefix、root CMake の追加・削除、target 名を全 consumer 共通の規約にしません。
 
 ## 1.1 Native project boundary
 
-| owner | path/state | evidence command |
+| profile | graph owner | evidence command |
 | --- | --- | --- |
-| project | `cpp/CMakeLists.txt` が `cpp/src`、`cpp/include`、`${ROOT}/tests/cpp`、`cpp/experiments` を同一 configure graph に登録する。tests/cpp は明示 binary directory 付き out-of-tree `add_subdirectory` を使う | `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` |
-| production | `cpp-core` が public header と production source を提供する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-core` |
-| tests | `cpp-test-<name>` が `cpp-core` を consume し、CTest が実行を所有する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests`; `ctest --test-dir "$ROOT/build/cpp/<profile>"` |
-| experiments | `cpp-experiment-<name>` が `cpp-core` を consume し、build と run を分離する | `cmake --build "$ROOT/build/cpp/<profile>" --target cpp-experiments` |
+| `root-aggregate` | project root CMake が production target と存在する consumers を登録する。target 名と test path は project-owned | consumer の root configure/build command |
+| `consumer-local` | 選択された test/experiment manifest が一つの consumer graph を所有する | 当該 manifest の configure/build/test command |
 
-`tests/cpp/` は derived project の adapter/integration test owner です。AgentCanon の
-runtime/template test と cppdev の numerical/mathematical/NN oracle test は、それぞれの
-owning repository に保持し、この project の test tree に複製しません。production subtree
-には test compatibility path を作成しません。
+Production target は consumer が選ぶ名前と interface を持ちます。Test と experiment
+target も project-owned 名で production provider を consume し、target graph の configure
+ownerだけが `add_subdirectory` または個別 configure route を決めます。AgentCanon runtime/template
+test と cppdev の numerical/mathematical/NN oracle test は、それぞれの owning repository に
+保持し、derived project の C++ test path へ複製しません。
 
 ## 禁止事項
 
-- `cpp/src/` は production translation unit の所有先です。header-only の `cpp-core` は
-  `cpp/include/` を中心に構成し、translation unit と artifact の選択は source/artifact
-  contract として設計記録へ残します。
-- in-source build を禁止します。`build/cpp/<profile>/` を使います。
+- `root-aggregate` profile では `src/` が production translation unit、`include/` が public
+  header の所有先です。Header-only/library artifact の選択は project の source/artifact
+  contract へ残します。別 profile の source path はその project の layout owner が決めます。
+- in-source build を禁止します。Binary directory は選択した CMake profile と project owner が決めます。
 
 ## 2. 命名規則
 
@@ -61,10 +61,12 @@ owning repository に保持し、この project の test tree に複製しませ
 
 ## 3.5 Header-Only Rule
 
-- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合は `cpp/include/<project>/*.hpp` を既定にします。
+- template 既定では C++ 実装を持ちません。派生 repo で C++ を追加する場合、
+  `root-aggregate` profile では `include/<project>/*.hpp` を既定にします。
 - focused helper、policy class、FFI binding helper、shape/stride 変換、artifact loader helper は header-only にします。
-- `cpp/src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、外部 library 事情で header-only が不適切だと説明できる場合だけにします。
-- `cpp/src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残さなければなりません。
+- `root-aggregate` profile の `src/` に `.cc` / `.cpp` を置くのは、compile time、link time、ODR、
+  外部 library 事情で header-only が不適切だと説明できる場合だけにします。
+- `src/` を使うときは、なぜ header-only では駄目かを設計文書か change note に残します。
 
 ## 4. コメント
 
@@ -110,10 +112,14 @@ AgentCanon 自体には C++ CMake project や compile database がないため�
 
 - bounded かつ決定的な入力で検証します。
 - 期待結果が分かるケース（対角行列、既知解など）を優先します。
-- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも `python3 tools/validation/ci/checks/check_jax_export_stack.py` と `cmake --build "$ROOT/build/cpp/<profile>" --target <project-cpp-smoke-target>` を通します。
+- `jax.export` と C++ をつなぐ変更では、project-local smoke target を追加し、少なくとも
+  `python3 tools/validation/ci/checks/check_jax_export_stack.py` と
+  `cmake --build <selected-build-dir> --target <project-cpp-smoke-target>` を通します。
 
 ## 6. 再利用
 
-- 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。
+- 再利用する local install tree は選択した project profile の install prefix に置きます。
 - optional な local `jax.export` artifact は project-local `.state/<project>/jax-export/<profile>/` のように用途名を含む path に置きます。
-- `docker/Dockerfile`、`pyproject.toml` の selected extras、`cpp/CMakeLists.txt`、`cpp/cmake/`、optional `jax/jaxlib` version、calling convention が変わったら、必要な extras を選択した container boundary で `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` から rebuild します。
+- `docker/Dockerfile`、`pyproject.toml` の selected extras、project CMake entrypoint、optional
+  `jax/jaxlib` version、calling convention が変わったら、必要な extras を選択した container
+  boundary で project owner の configure command から rebuild します。

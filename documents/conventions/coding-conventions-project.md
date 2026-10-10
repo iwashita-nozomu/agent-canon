@@ -32,12 +32,13 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
 - `docker/` は template / project の runtime image、build library、dependency pack の定義です。
 - `bootstrap.sh` / `bootstrap/` は AgentCanon-owned shared Python/Rust/LSP tool runtime の正本です。親の `.devcontainer/` は存在する場合も project-owned で、AgentCanon runtime の installer/fallback ではありません。
 - `experiments/` は Python managed experiment の registry、run、result、report の正本です。
-- `cpp/` は native C++ production project の正本です。`cpp/CMakeLists.txt` が project
-  entrypoint、`cpp/src/`、`cpp/include/`、`cpp/experiments/` が production/native target
-  ownership を持ちます。derived project の C++ adapter/integration tests は
-  `tests/cpp/` が所有し、root CMake から out-of-tree に接続します。
-- `python/` は Python implementation の正本です。parent root は language-neutral な
-  command/document entry として保ちます。
+- C++ の production source path と target graph は [cpp-build-layout.md](../design/cpp-build-layout.md)
+  の consumer-selected profile が所有します。`root-aggregate` は project root の既存 CMake
+  entrypoint を使い、`consumer-local` は選択 consumer の manifest を個別に構成します。
+  全 project に `cpp/` subdirectory、root CMake の追加/削除、または同一の test path を強制しません。
+- `python/` は Python implementation の正本です。共通 command/document entry は language-neutral
+  に保ちますが、`root-aggregate` CMake profile を選んだ C++ consumer は project-owned root CMake
+  entrypoint を持てます。
 - C++ を使う場合の build layout は [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) を正本にします。
 - Bash 実装は用途で置き場所を固定します。shared automation の Bash は `tools/`、repo-local bootstrap の Bash は `scripts/` に置きます。
 
@@ -65,7 +66,9 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
 - Python 依存を追加する場合は、親 `pyproject.toml` の optional extras と親 image build の image-owned dependency lifecycle / readback を契約の基準にします。Agent/Codex tools は AgentCanon の `bootstrap/` manifest から shared image build 時に導入します。post-create や source checkout は dependency installer ではありません。
 - `docker/Dockerfile`、`pyproject.toml`、`bootstrap/`、または親 `.devcontainer/` を更新した変更では、対応する container contract checker と対象 image/runtime validation を実行します。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
-- Python を使う場合でも、repo 全体の入口は language-neutral に保ちます。
+- Python を含む場合も共通 entrypoint は language-neutral に保ちます。選択された project profile が
+  C++ build entrypoint を追加する場合、その CMake ownership は [cpp-build-layout.md](../design/cpp-build-layout.md)
+  と project owner に従います。
 - canonical container の safe-directory は shared post-create が mounted workspace の実体を検証して管理します。image build や host runtime で repository-specific な登録スクリプトを呼び出しません。
 - Template / AgentCanon 固有の machine-local remote path は [documents/contracts/template-github-remote.md](../contracts/template-github-remote.md) と [documents/agent-canon/agent-canon-github-remote.md](../agent-canon/agent-canon-github-remote.md) を正本にします。
 - Docker container 内から Docker を使う手順を正本にする場合は、明示した `docker-host` optional profile の socket bind または別 daemon の要件を文書へ明記します。default lifecycle は host Docker CLI/socket に依存しません。
@@ -93,26 +96,24 @@ downstream implementation ../../tools/validation/semantic/convention/convention_
 - Docker runtime の project 正本は `docker/Dockerfile` とし、`docker/packs/*.toml` と Python execution rules は存在するときだけ project-owned override として使います。nested-Codex の profile 選択は [documents/runtime/runtime-profiles-and-check-matrix.md](../runtime/runtime-profiles-and-check-matrix.md) を参照します。
 - Docker runtime、optional runtime pack、または親 devcontainer 導線を変えた場合は対応 checker を通し、存在する project surface と AgentCanon shared runtime の所有境界を確認します。
 - main server host の path、mount、builder 前提は [documents/contracts/server-host-contract.md](../contracts/server-host-contract.md) と `templates/documents/server_runtime_layout.template.toml` を正本にし、実行経路を都度記録して共有します。
-- C++ の canonical project entrypoint は `cpp/CMakeLists.txt` です。parent root は
-  language-neutral に保ち、C++ は explicit な `cpp` source directory から configure します。
-- template 既定では C++ 実装を持ちません。C++ を追加する project では `cpp/include/`
-  を public header の所有先、`cpp/src/` を production source の所有先として、
-  source/artifact contract に対応する `cpp-core` target を構成します。
-- C++ build は out-of-source とし、`build/cpp/<profile>/` を使います。
-- 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
+- C++ の project entrypoint、production path、target name、build/install directory は
+  consumer-selected profile と project CMake owner が決めます。`root-aggregate` profile では
+  project root の existing `CMakeLists.txt` を使い、root `include/` / `src/` を production
+  owner にできます。AgentCanon は `cpp/` 配置や `cpp-core` target を universal default にしません。
+- template 既定では C++ 実装を持ちません。C++ を追加する project は選択した profile に応じて
+  public header/source の owner と source/artifact contract を決めます。
+- C++ build は out-of-source とし、binary/install directory は project-owned です。
+- optional な local `jax.export` artifact は用途名を含む `.state/<project>/...` 配下に分離します。
 
 ### C++ command owner
 
-`cpp/CMakeLists.txt` が project identity と profile cache を所有し、parent command
-surface は同じ anchor を呼び出します。
+選択された CMake profile の project owner が project identity、configure entrypoint、binary
+directory、install prefix を所有します。parent command surface はその existing command を
+直接呼び出し、別の default path や compatibility CMake entrypoint を作りません。
 
-```bash
-cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" \
-  -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"
-cmake --build "$ROOT/build/cpp/<profile>" --target cpp-tests
-ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure
-cmake --install "$ROOT/build/cpp/<profile>"
-```
+configure/build/test/install command は、選択した profile の project CMake owner が公開する
+既存 command をそのまま使います。この文書は新しい command template や placeholder variable を
+実行入口として定義しません。
 
 ## 4.7 Legacy Forwarder Migration Rule
 
@@ -127,17 +128,16 @@ cmake --install "$ROOT/build/cpp/<profile>"
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針は [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) の手順で扱います。
 - host-global install 由来の要件は [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md) / `docker/` の更新対象として収束させます。
 - CI でも使う tool は、共有運用ルートへ反映して運用します。
-- `cpp/` の下に nested manifest を追加する場合は `cpp/CMakeLists.txt` の同一 configure
-  graph に接続し、nested manifest は project identity を持たず target ownership を
-  宣言します。
+- nested CMake manifest は、selected profile の configure boundary と target ownership に
+  接続します。consumer-local profile では sibling consumer の configure graph を要求しません。
 - legacy forwarder / migration wrapper が出した `fix-now` 移行警告は、移行方針を示した `run bundle` / `issue` / PR body を blocker として残してから作業再開します。
 
 ## 5. テストとレビュー
 
-- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。derived project の
-  C++ test source は `tests/cpp/`、CTest registration は `tests/cpp/CMakeLists.txt` が
-  所有します。`cpp/CMakeLists.txt` は `${ROOT}/tests/cpp` と明示的な binary directory を
-  `add_subdirectory` に渡し、production subtree の test fallback は作成しません。
+- 実装変更には、対応するテストまたは検証手順を同じ変更でそろえます。C++ test source と
+  CTest registration の path/owner は selected CMake profile が決めます。root-aggregate では
+  project root graph が existing test surface を登録し、consumer-local では選択 manifest が
+  その consumer だけを configure します。production source tree に test fallback は作りません。
 - 仕上げ前に `make ci-quick`、必要に応じて `make ci` を流します。
 - 文書変更ではリンク切れと記述の入口整合を確認します。
 - legacy forwarder / migration wrapper の warning policy は `python3 tools/validation/semantic/convention/check_convention_compliance.py` で確認します。
@@ -145,9 +145,9 @@ cmake --install "$ROOT/build/cpp/<profile>"
 ## 6. 実験運用
 
 - Python managed experiment の registry、run、result、report は `experiments/` 配下に集約します。
-- Native C++ experiment source と target は `cpp/experiments/` に置き、build は
-  `cpp-experiment-<name>`、run は lifecycle-owned `experiments/<topic>/result/<run-id>/`
-  へ分離します。
+- Native C++ experiment source と target の path/name は selected CMake profile と project
+  owner が決め、build と run を分離します。run/config/result/report/retention は existing
+  experiment lifecycle owners に残します。
 - 1 回の run は fresh 実行として扱います。
 - 正式結果は planned run と acceptance criteria が揃った実行から採用します。
 - 複数 run をまたぐ知見は `documents/notes/experiments/` または `documents/notes/themes/` に残します。

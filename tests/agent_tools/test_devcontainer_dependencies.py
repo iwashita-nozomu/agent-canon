@@ -926,7 +926,7 @@ class DependencyModelTests(unittest.TestCase):
                 )
                 self.assertEqual(payload["status"], "installed")
                 self.assertTrue(
-                    Installer._receipt_matches(
+                    Installer.receipt_matches(
                         image_root / "receipts" / f"{record_id}.json",
                         plan,
                         plan.by_id()[record_id],
@@ -989,7 +989,7 @@ class DependencyModelTests(unittest.TestCase):
             verify_runner = FakeRunner()
             installer = Installer(verify_runner)
             payload = json.loads(receipt.read_text(encoding="utf-8"))
-            installer._verify_installed_receipt(parsed, payload, workspace=root)
+            installer.verify_installed_receipt(parsed, payload, workspace=root)
             self.assertEqual(receipt.read_bytes(), before)
             self.assertIn(
                 ("/usr/local/bin/node-tool", "--version"), verify_runner.calls
@@ -1131,7 +1131,7 @@ class DependencyModelTests(unittest.TestCase):
                     DependencyError,
                     "installed executable is missing or not executable: pyright-langserver",
                 ):
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
 
     def test_installed_receipt_rejects_non_executable_secondary_binding(self) -> None:
         """A non-executable secondary provider cannot satisfy an installed receipt."""
@@ -1168,7 +1168,7 @@ class DependencyModelTests(unittest.TestCase):
                     DependencyError,
                     "installed executable is missing or not executable: pyright-langserver",
                 ):
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
 
     def test_installed_tool_receipts_probe_jq_tree_and_rustc_directly(self) -> None:
         """Manifest executable fields provide direct image verification for tools."""
@@ -1245,7 +1245,7 @@ class DependencyModelTests(unittest.TestCase):
                     with mock.patch.object(
                         installer, "_path_is_regular_executable", return_value=True
                     ):
-                        installer._verify_installed_receipt(
+                        installer.verify_installed_receipt(
                             item, payload, workspace=root
                         )
                 self.assertEqual(
@@ -1273,7 +1273,7 @@ class DependencyModelTests(unittest.TestCase):
             }
             with mock.patch.object(installer, "_capture") as capture:
                 self.assertIsNone(
-                    installer._verify_installed_receipt(parsed, payload, workspace=root)
+                    installer.verify_installed_receipt(parsed, payload, workspace=root)
                 )
             capture.assert_not_called()
 
@@ -2331,10 +2331,10 @@ class DependencyModelTests(unittest.TestCase):
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
             self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
-            self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+            self.assertTrue(installer.receipt_matches(receipt, plan, parsed))
             payload["repository_package"]["sha256"] = rolling_sha
             receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-            self.assertFalse(installer._receipt_matches(receipt, plan, parsed))
+            self.assertFalse(installer.receipt_matches(receipt, plan, parsed))
 
     def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
         parsed = parse_record(
@@ -2502,8 +2502,11 @@ class DependencyModelTests(unittest.TestCase):
         """Manifest executable resolution is receipt-bound and independent of PATH."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            init_authentic_git(root)
-            prefix = root / "npm"
+            # The fake-runner receipt test must not depend on host Node/npm.
+            workspace = root / "workspace"
+            workspace.mkdir()
+            init_authentic_git(workspace)
+            prefix = workspace / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
             target_dir = prefix / "lib"
@@ -2514,7 +2517,9 @@ class DependencyModelTests(unittest.TestCase):
                 target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
                 target.chmod(0o755)
             (bin_dir / "pyright").symlink_to(target_v1)
-            manifest = root / "bootstrap" / "container" / "image" / "dependencies.toml"
+            manifest = (
+                workspace / "bootstrap" / "container" / "image" / "dependencies.toml"
+            )
             write_manifest(
                 manifest,
                 [
@@ -2533,7 +2538,24 @@ class DependencyModelTests(unittest.TestCase):
                 ],
             )
             fake = FakeRunner()
-            receipts = root / "receipts"
+            receipts = workspace / "receipts"
+            oci_root = root / "trusted" / "usr" / "local"
+            oci_bin = oci_root / "bin"
+            system_root = root / "trusted" / "usr"
+            system_bin = system_root / "bin"
+            oci_bin.mkdir(parents=True)
+            system_bin.mkdir(parents=True)
+            trusted_dirs = (str(oci_bin), str(system_bin))
+            trusted_roots = {
+                str(oci_bin): str(oci_root),
+                str(system_bin): str(system_root),
+            }
+            trusted_path = os.pathsep.join(trusted_dirs)
+
+            def trusted_which(name: str, *, path: str | None = None) -> str:
+                self.assertEqual(path, trusted_path)
+                return str(oci_bin / name)
+
             parsed = parse_record(
                 record(
                     "pyright-language-server",
@@ -2551,10 +2573,32 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
             plan = build_plan((loaded_manifest(manifest, (parsed,)),))
-            with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+            with (
+                mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_SYSTEM_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_ROOTS",
+                    trusted_roots,
+                ),
+                mock.patch.object(
+                    dependency_module.shutil,
+                    "which",
+                    side_effect=trusted_which,
+                ),
+            ):
                 Installer(fake).install(
                     plan,
-                    workspace=root,
+                    workspace=workspace,
                     receipts=receipts,
                 )
                 with mock.patch.object(
@@ -2563,7 +2607,7 @@ class DependencyModelTests(unittest.TestCase):
                     lambda: Installer(fake),
                 ):
                     resolved = dependency_module.resolve_verified_executable(
-                        root,
+                        workspace,
                         receipts,
                         "pyright-language-server",
                         "pyright",
@@ -2594,7 +2638,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError, "executable receipt binding is stale"
                     ):
                         dependency_module.resolve_verified_executable(
-                            root,
+                            workspace,
                             receipts,
                             "pyright-language-server",
                             "pyright",
@@ -2617,7 +2661,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError, "receipt path or output drift"
                     ):
                         dependency_module.resolve_verified_executable(
-                            root,
+                            workspace,
                             receipts,
                             "pyright-language-server",
                             "pyright",
@@ -2666,7 +2710,7 @@ class DependencyModelTests(unittest.TestCase):
                 installer._parent_attestation = dependency_module._parent_attestation(
                     root, "test-receipt"
                 )
-                bindings = installer._executable_bindings(parsed, workspace=root)
+                bindings = installer.executable_bindings(parsed, workspace=root)
                 receipt = root / "receipts" / "pyright-language-server.json"
                 installer._write_receipt(
                     receipt, plan, parsed, executable_bindings=bindings
@@ -2677,7 +2721,7 @@ class DependencyModelTests(unittest.TestCase):
                     "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver",
                 )
                 self.assertFalse(marker.exists())
-                self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+                self.assertTrue(installer.receipt_matches(receipt, plan, parsed))
 
     def test_secondary_npm_binding_rejects_escape_and_missing_provider(self) -> None:
         """Secondary providers remain fail-closed on escape, missing, or non-exec path."""
@@ -2724,7 +2768,7 @@ class DependencyModelTests(unittest.TestCase):
                         DependencyError,
                         "(escapes its method-owned root|executable is missing|executable is not executable)",
                     ):
-                        Installer()._executable_bindings(parsed, workspace=root)
+                        Installer().executable_bindings(parsed, workspace=root)
 
     def test_rust_analyzer_binding_uses_cargo_home_not_path(self) -> None:
         """Rust executable bindings stay inside the pinned Cargo home."""
@@ -4237,11 +4281,23 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(dockerfile.count("\nRUN ") + dockerfile.startswith("RUN "), 2)
         self.assertNotIn("ARG TARGETVARIANT", dockerfile)
         self.assertNotIn("FROM node:", dockerfile)
+        # #1049 replaced a crate-specific bind with the generic Cargo scan root.
         self.assertIn(
-            "--mount=type=bind,source=tools/runtime/dispatch/agent-canon", dockerfile
+            "--mount=type=bind,source=tools,target=/src/all-tools,readonly",
+            dockerfile,
         )
+        self.assertTrue(
+            (ROOT / "tools/runtime/dispatch/agent-canon/Cargo.toml").is_file()
+        )
+        self.assertIn("!tools/**", dockerignore)
+        self.assertIn("for manifest in /src/all-tools/**/Cargo.toml", dockerfile)
+        self.assertIn('cargo fetch --locked --manifest-path "$manifest"', dockerfile)
         self.assertIn(
             "--mount=type=bind,source=tools/repository/workspace/parent_root_side_effects.py",
+            dockerfile,
+        )
+        self.assertIn(
+            "--mount=type=bind,source=tools/runtime/values.py,target=/src/tools/runtime/values.py,readonly",
             dockerfile,
         )
         self.assertIn(
@@ -4249,12 +4305,16 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertIn("dependency_plan.py", dockerfile)
         self.assertIn("image-install --workspace /src", dockerfile)
+        self.assertIn("CARGO_HOME=/var/lib/agent-canon/cache/cargo", dockerfile)
         self.assertIn(
-            "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
+            "PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin",
+            dockerfile,
         )
         self.assertIn(
-            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin", dockerfile
+            "export CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo",
+            dockerfile,
         )
+        self.assertIn('export PATH="$CARGO_HOME/bin:$PATH"', dockerfile)
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
         self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)

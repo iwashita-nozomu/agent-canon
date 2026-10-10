@@ -2,6 +2,10 @@
 # contract tool
 # responsibility AgentTeam team config owner module.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
+# upstream implementation ../../runtime/values.py refines decoded configuration containers
+# downstream implementation ./implementation_dispatch.py consumes public config normalizers
+# downstream implementation ./packets.py consumes public config normalizers
+# downstream implementation ../../runtime/manifest/manifest_rendering.py consumes public config normalizers
 # downstream implementation ./agent_team.py facade consumes config APIs.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes config APIs.
 # @dependency-end
@@ -10,19 +14,20 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import yaml
 
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+from tools.runtime.values import is_object_list, is_string_object_dict
 
-from tools.agent.orchestration.route import implementation_handoff_required, load_skill_route_rules
+from tools.agent.orchestration.route import (
+    implementation_handoff_required,
+    load_skill_route_rules,
+)
 
 if TYPE_CHECKING:
     if __package__:
@@ -140,6 +145,11 @@ class TeamConfig:
     artifacts: dict[str, str]
 
 
+def _empty_writer_targets() -> dict[str, WriterTarget]:
+    """Provide the empty value at the typed writer-target boundary."""
+    return {}
+
+
 @dataclass(frozen=True)
 class TaskCatalog:
     """Materialized task catalog."""
@@ -183,33 +193,31 @@ class RunBundleSpec:
     active_design_packet: ActiveDesignPacketConfig | None = None
     math_intent_route: str | None = None
     math_intent_packet: "MathematicalIntentPacket | None" = None
-    writer_targets: Mapping[str, object] = field(default_factory=dict)
+    writer_targets: Mapping[str, WriterTarget] = field(
+        default_factory=_empty_writer_targets
+    )
 
 
 def load_team_config(path: Path = TEAM_CONFIG_PATH) -> TeamConfig:
     """Load the canonical team config."""
     parsed: object = json.loads(path.read_text(encoding="utf-8"))
-    raw = _as_object_mapping(parsed, "team config")
-    team = _as_object_mapping(raw.get("team"), "team")
+    raw = as_object_mapping(parsed, "team config")
+    team = as_object_mapping(raw.get("team"), "team")
     always_on_roles = tuple(
         _parse_role(role, "always")
-        for role in _as_mapping_tuple(raw.get("always_on_roles"), "always_on_roles")
+        for role in as_mapping_tuple(raw.get("always_on_roles"), "always_on_roles")
     )
     specialist_roles = tuple(
         _parse_role(role, "optional")
-        for role in _as_mapping_tuple(raw.get("specialist_roles"), "specialist_roles")
+        for role in as_mapping_tuple(raw.get("specialist_roles"), "specialist_roles")
     )
-    handoffs = _as_mapping_tuple(raw.get("handoffs"), "handoffs")
-    context_policies = _as_mapping_tuple(
-        raw.get("context_policies"), "context_policies"
-    )
-    activation_rules = _as_mapping_tuple(
-        raw.get("activation_rules"), "activation_rules"
-    )
-    quality_gates = _as_string_tuple(raw.get("quality_gates"), "quality_gates")
-    artifact_registry = _as_object_mapping(raw.get("artifacts"), "artifacts")
+    handoffs = as_mapping_tuple(raw.get("handoffs"), "handoffs")
+    context_policies = as_mapping_tuple(raw.get("context_policies"), "context_policies")
+    activation_rules = as_mapping_tuple(raw.get("activation_rules"), "activation_rules")
+    quality_gates = as_string_tuple(raw.get("quality_gates"), "quality_gates")
+    artifact_registry = as_object_mapping(raw.get("artifacts"), "artifacts")
     artifacts = {
-        key: _as_required_string(value, f"artifacts.{key}")
+        key: as_required_string(value, f"artifacts.{key}")
         for key, value in artifact_registry.items()
         if key != "active_design_packet"
     }
@@ -231,14 +239,14 @@ def load_task_catalog(config: TeamConfig, root: Path = ROOT) -> TaskCatalog:
     """Load the task catalog referenced by the team config."""
     catalog_path = root / str(config.team["task_catalog"])
     parsed: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-    raw = _as_object_mapping(parsed, f"task catalog {catalog_path}")
+    raw = as_object_mapping(parsed, f"task catalog {catalog_path}")
     return TaskCatalog(
         raw=raw,
-        workflow_families=_as_mapping_tuple(
+        workflow_families=as_mapping_tuple(
             raw.get("workflow_families"), "workflow_families"
         ),
-        tasks=_as_mapping_tuple(raw.get("tasks"), "tasks"),
-        review_packs=_as_mapping_tuple(raw.get("review_packs"), "review_packs"),
+        tasks=as_mapping_tuple(raw.get("tasks"), "tasks"),
+        review_packs=as_mapping_tuple(raw.get("review_packs"), "review_packs"),
     )
 
 
@@ -264,7 +272,7 @@ def default_review_pack_ids_for_task(
     """Return review pack ids selected by default for one task."""
     selected: list[str] = []
     for pack in catalog.review_packs:
-        default_tasks = _as_string_tuple(
+        default_tasks = as_string_tuple(
             pack.get("default_for_tasks"),
             f"review_packs[{pack['id']}].default_for_tasks",
         )
@@ -293,7 +301,7 @@ def expand_enabled_specialists(
                 expanded.append(name)
             continue
         if name in review_packs:
-            for role_id in _as_string_tuple(
+            for role_id in as_string_tuple(
                 review_packs[name].get("specialists"),
                 f"review_packs[{name}].specialists",
             ):
@@ -336,21 +344,21 @@ def resolve_workflow_family(catalog: TaskCatalog, family_id: str) -> dict[str, o
 
 def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
     """Return catalog-owned role topology stages."""
-    topology = _as_object_mapping(
+    topology = as_object_mapping(
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults",
     )
-    waves = _as_mapping_tuple(
+    waves = as_mapping_tuple(
         topology.get("stage_waves"), "role_topology_defaults.stage_waves"
     )
     return tuple(
         StageWave(
-            id=_as_required_string(wave.get("id"), "stage_waves[].id"),
-            stage_class=_as_required_string(
+            id=as_required_string(wave.get("id"), "stage_waves[].id"),
+            stage_class=as_required_string(
                 wave.get("stage_class"),
                 "stage_waves[].stage_class",
             ),
-            role_ids=_as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"),
+            role_ids=as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"),
         )
         for wave in waves
     )
@@ -413,21 +421,18 @@ def default_specialists_for_task(
     """Return task-default specialist ids including default review packs."""
     task = resolve_task_spec(catalog, task_id)
     family = resolve_workflow_family(catalog, str(task["family"]))
-    family_roles = family.get("roles", {})
-    if not isinstance(family_roles, dict):
+    family_roles: object = family.get("roles", {})
+    if not is_string_object_dict(family_roles):
         raise RuntimeError(
             f"workflow family roles must be a mapping for {family['id']}"
         )
-    family_roles = _as_object_mapping(
-        cast(object, family_roles), f"workflow_families[{family['id']}].roles"
-    )
-    family_specialists = _as_string_tuple(
+    family_specialists = as_string_tuple(
         family_roles.get("specialists"),
         f"workflow_families[{family['id']}].roles.specialists",
     )
     selected: list[str] = []
 
-    for role_id in _as_string_tuple(
+    for role_id in as_string_tuple(
         task.get("specialists"), f"tasks[{task_id}].specialists"
     ):
         if role_id not in family_specialists:
@@ -440,13 +445,13 @@ def default_specialists_for_task(
 
     if include_default_review_packs:
         for pack in catalog.review_packs:
-            default_tasks = _as_string_tuple(
+            default_tasks = as_string_tuple(
                 pack.get("default_for_tasks"),
                 f"review_packs[{pack['id']}].default_for_tasks",
             )
             if task_id not in default_tasks:
                 continue
-            for role_id in _as_string_tuple(
+            for role_id in as_string_tuple(
                 pack.get("specialists"),
                 f"review_packs[{pack['id']}].specialists",
             ):
@@ -474,11 +479,7 @@ def select_roles(
         all_roles = config.always_on_roles + config.specialist_roles
         if workflow_family_id == "skill_evaluation":
             return tuple(role for role in all_roles if role.id == "skill_evaluator")
-        return tuple(
-            role
-            for role in all_roles
-            if role.id != "skill_evaluator"
-        )
+        return tuple(role for role in all_roles if role.id != "skill_evaluator")
     always_on_roles = workflow_always_on_roles(config, catalog, workflow_family_id)
     selected_specialist_names = [
         role_id
@@ -497,7 +498,9 @@ def select_roles(
         and "publisher" not in selected_specialist_names
     ):
         selected_specialist_names.append("publisher")
-    enabled_roles = tuple(resolve_role(config, name) for name in selected_specialist_names)
+    enabled_roles = tuple(
+        resolve_role(config, name) for name in selected_specialist_names
+    )
     selected_roles = list(always_on_roles)
     selected_ids = {role.id for role in selected_roles}
     for role in enabled_roles:
@@ -523,16 +526,16 @@ def workflow_always_on_roles(
     if catalog is None or not workflow_family_id:
         return config.always_on_roles
     family = resolve_workflow_family(catalog, workflow_family_id)
-    family_roles = family.get("roles", {})
-    if not isinstance(family_roles, dict):
-        return config.always_on_roles
-    family_roles = _as_object_mapping(
-        cast(object, family_roles),
-        f"workflow_families[{workflow_family_id}].roles",
-    )
+    family_roles: object = family.get("roles", {})
+    if not is_string_object_dict(family_roles):
+        if not isinstance(family_roles, dict):
+            return config.always_on_roles
+        raise RuntimeError(
+            f"workflow_families[{workflow_family_id}].roles must be a mapping"
+        )
     if "always_on" not in family_roles:
         return config.always_on_roles
-    role_ids = _as_string_tuple(
+    role_ids = as_string_tuple(
         family_roles.get("always_on"),
         f"workflow_families[{workflow_family_id}].roles.always_on",
     )
@@ -548,29 +551,28 @@ def workflow_child_handoff_required(
     """Return whether a selected typed family contains a write-capable child."""
     if catalog is None or not workflow_family_id:
         return False
-    policy = _as_object_mapping(
+    policy = as_object_mapping(
         catalog.raw.get("workflow_activation_policy"),
         "workflow_activation_policy",
     )
-    child_handoff = _as_object_mapping(
+    child_handoff = as_object_mapping(
         policy.get("child_handoff"),
         "workflow_activation_policy.child_handoff",
     )
     if child_handoff.get("activation") != "selected_typed_route":
         return False
     family = resolve_workflow_family(catalog, workflow_family_id)
-    if (
-        workflow_family_id == "issue_worker_publication"
-        and not isinstance(issue_worker_candidate, Mapping)
+    if workflow_family_id == "issue_worker_publication" and not isinstance(
+        issue_worker_candidate, Mapping
     ):
         return False
-    roles = _as_object_mapping(
+    roles = as_object_mapping(
         family.get("roles", {}), f"workflow_families[{workflow_family_id}].roles"
     )
-    role_ids = _as_string_tuple(
+    role_ids = as_string_tuple(
         roles.get("always_on"),
         f"workflow_families[{workflow_family_id}].roles.always_on",
-    ) + _as_string_tuple(
+    ) + as_string_tuple(
         roles.get("specialists"),
         f"workflow_families[{workflow_family_id}].roles.specialists",
     )
@@ -609,29 +611,29 @@ def codex_agent_model_matrix_for_roles(
 
 def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
     """Parse a role from json."""
-    role_id = _as_required_string(raw_role.get("id"), "role.id")
-    raw_write_policy = _as_object_mapping(
+    role_id = as_required_string(raw_role.get("id"), "role.id")
+    raw_write_policy = as_object_mapping(
         raw_role.get("write_policy"), f"roles[{role_id}].write_policy"
     )
     write_policy = WritePolicy(
-        mode=_as_required_string(
+        mode=as_required_string(
             raw_write_policy.get("mode"), f"roles[{role_id}].write_policy.mode"
         ),
-        allowed_artifacts=_as_string_tuple(
+        allowed_artifacts=as_string_tuple(
             raw_write_policy.get("allowed_artifacts"),
             f"roles[{role_id}].write_policy.allowed_artifacts",
         ),
         conditional_artifacts={
-            str(condition): _as_string_tuple(
+            str(condition): as_string_tuple(
                 artifacts,
                 f"roles[{role_id}].write_policy.conditional_artifacts.{condition}",
             )
-            for condition, artifacts in _as_object_mapping(
+            for condition, artifacts in as_object_mapping(
                 raw_write_policy.get("conditional_artifacts", {}),
                 f"roles[{role_id}].write_policy.conditional_artifacts",
             ).items()
         },
-        allowed_directories=_as_string_tuple(
+        allowed_directories=as_string_tuple(
             raw_write_policy.get("allowed_directories"),
             f"roles[{role_id}].write_policy.allowed_directories",
         ),
@@ -639,7 +641,7 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
             raw_write_policy.get("requires_worktree_scope", False),
             f"roles[{role_id}].write_policy.requires_worktree_scope",
         ),
-        notes=_as_optional_string(
+        notes=as_optional_string(
             raw_write_policy.get("notes"), f"roles[{role_id}].write_policy.notes"
         ),
     )
@@ -647,68 +649,63 @@ def _parse_role(raw_role: dict[str, object], default_activation: str) -> Role:
     activation = (
         default_activation
         if raw_activation is None
-        else _as_required_string(raw_activation, f"roles[{role_id}].activation")
+        else as_required_string(raw_activation, f"roles[{role_id}].activation")
     )
     return Role(
         id=role_id,
-        owns=_as_string_tuple(raw_role.get("owns"), f"roles[{role_id}].owns"),
-        required_outputs=_as_string_tuple(
+        owns=as_string_tuple(raw_role.get("owns"), f"roles[{role_id}].owns"),
+        required_outputs=as_string_tuple(
             raw_role.get("required_outputs"), f"roles[{role_id}].required_outputs"
         ),
         activation=activation,
         write_policy=write_policy,
-        codex_agents=_as_string_tuple(
+        codex_agents=as_string_tuple(
             raw_role.get("codex_agents"), f"roles[{role_id}].codex_agents"
         ),
     )
 
 
-def _as_mapping_tuple(value: object, field_name: str) -> tuple[dict[str, object], ...]:
+def as_mapping_tuple(value: object, field_name: str) -> tuple[dict[str, object], ...]:
     """Validate a list of mappings and return it as a tuple."""
     if value is None:
         return ()
-    if not isinstance(value, list):
+    if not is_object_list(value):
         raise RuntimeError(f"{field_name} must be a list")
     normalized: list[dict[str, object]] = []
-    for item in cast(list[object], value):
-        normalized.append(_as_object_mapping(item, f"{field_name} entries"))
+    for item in value:
+        normalized.append(as_object_mapping(item, f"{field_name} entries"))
     return tuple(normalized)
 
 
-def _as_object_mapping(value: object, field_name: str) -> dict[str, object]:
+def as_object_mapping(value: object, field_name: str) -> dict[str, object]:
     """Validate a string-keyed mapping and return a typed copy."""
-    if not isinstance(value, dict):
+    if not is_string_object_dict(value):
         raise RuntimeError(f"{field_name} must be a mapping")
-    normalized: dict[str, object] = {}
-    for key, item in cast(dict[object, object], value).items():
-        if not isinstance(key, str):
-            raise RuntimeError(f"{field_name} keys must be strings")
-        normalized[key] = item
-    return normalized
+    return dict(value)
 
 
-def _as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
+def as_string_tuple(value: object, field_name: str) -> tuple[str, ...]:
     """Validate a list of strings and return it as a tuple."""
     if value is None:
         return ()
-    if not isinstance(value, list):
+    if not is_object_list(value):
         raise RuntimeError(f"{field_name} must be a list")
     normalized: list[str] = []
-    for item in cast(list[object], value):
+    for item in value:
         if not isinstance(item, str):
             raise RuntimeError(f"{field_name} entries must be strings")
         normalized.append(item)
     return tuple(normalized)
 
 
-def _as_required_string(value: object, field_name: str) -> str:
+def as_required_string(value: object, field_name: str) -> str:
     """Validate one required string field."""
     if not isinstance(value, str):
         raise RuntimeError(f"{field_name} must be a string")
     return value
 
 
-def _as_optional_string(value: object, field_name: str) -> str:
+def as_optional_string(value: object, field_name: str) -> str:
     """Validate one optional string field."""
     if value is None:
         return ""

@@ -21,11 +21,15 @@
 from __future__ import annotations
 
 if __package__:
-    from .implementation_dispatch import _capacity_projection as __capacity_projection
-    from .implementation_dispatch import _closeout_projection as __closeout_projection
+    from .implementation_dispatch import capacity_projection
+    from .implementation_dispatch import closeout_projection
 else:
-    from tools.agent.orchestration.implementation_dispatch import _capacity_projection as __capacity_projection
-    from tools.agent.orchestration.implementation_dispatch import _closeout_projection as __closeout_projection
+    from tools.agent.orchestration.implementation_dispatch import (
+        capacity_projection,
+    )
+    from tools.agent.orchestration.implementation_dispatch import (
+        closeout_projection,
+    )
 
 from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
 from tools.runtime.manifest.manifest_rendering import has_template as _has_template
@@ -68,12 +72,23 @@ else:
     )
 
 import json as _json
-from collections.abc import Mapping as _Mapping
+from collections.abc import Mapping as _Mapping, Sequence as _Sequence
 from dataclasses import dataclass as _dataclass
 from pathlib import Path as _Path
+from typing import TYPE_CHECKING as _TYPE_CHECKING
 
-from tools.runtime.authority.task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
-from tools.runtime.authority.task_authority import build_default_task_authority as _build_default_task_authority
+if _TYPE_CHECKING:
+    from tools.repository.github.issue_worker_dispatch import (
+        IssueWorkerDispatch as _IssueWorkerDispatch,
+        PublisherSpawn as _PublisherSpawn,
+    )
+
+from tools.runtime.authority.task_authority import (
+    AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME,
+)
+from tools.runtime.authority.task_authority import (
+    build_default_task_authority as _build_default_task_authority,
+)
 
 if __package__:
     from .team_config import (
@@ -250,10 +265,29 @@ else:
     )
 
 
-def dispatch_issue_worker(*args: object, **kwargs: object) -> object:
+def dispatch_issue_worker(
+    candidate: _Mapping[str, object],
+    objective: str,
+    spawn: _PublisherSpawn | None = None,
+    *,
+    workspace_root: _Path | str = ".",
+    agentcanon_source_root: _Path | str | None = None,
+    request_clause_ids: _Sequence[str] = (),
+) -> _IssueWorkerDispatch:
     """Expose the logical IssueWorker route through the AgentTeam facade."""
-    from tools.repository.github.issue_worker_dispatch import dispatch_issue_worker as dispatch
-    return dispatch(*args, **kwargs)  # type: ignore[arg-type]
+    from tools.repository.github.issue_worker_dispatch import (
+        dispatch_issue_worker as dispatch,
+    )
+
+    return dispatch(
+        candidate,
+        objective,
+        spawn,
+        workspace_root=workspace_root,
+        agentcanon_source_root=agentcanon_source_root,
+        request_clause_ids=request_clause_ids,
+    )
+
 
 del annotations
 
@@ -394,14 +428,17 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
     rendered[spec.config.artifacts["team_manifest"]] = _build_manifest(
         spec, capacity_runtime
     )
-    rendered["closeout_packet.json"] = _json.dumps(
-        {
-            "capacity_request": __capacity_projection(capacity_runtime, spec),
-            "closeout_packet": __closeout_projection(capacity_runtime, spec),
-        },
-        indent=2,
-        sort_keys=True,
-    ) + "\n"
+    rendered["closeout_packet.json"] = (
+        _json.dumps(
+            {
+                "capacity_request": capacity_projection(capacity_runtime, spec),
+                "closeout_packet": closeout_projection(capacity_runtime, spec),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
     created_files.append("closeout_packet.json")
     rendered[spec.config.artifacts["verification"]] = "\n".join(
         (
@@ -433,9 +470,7 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
             created_files.append(relative)
     unique_created_files = tuple(dict.fromkeys(created_files))
     return PreparedRunBundle(
-        files=tuple(
-            (path, rendered[path].encode("utf-8")) for path in rendered
-        ),
+        files=tuple((path, rendered[path].encode("utf-8")) for path in rendered),
         created_files=unique_created_files,
         active_design_packet=active_design_packet,
     )
@@ -449,6 +484,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
     # The import is deliberately lazy because bootstrap imports this facade to
     # prepare its bundle before invoking the publisher with monitoring.
     from tools.runtime.lifecycle.bootstrap_agent_run import publish_prepared_run
+
     return publish_prepared_run(spec, prepared, report_root)
 
 
