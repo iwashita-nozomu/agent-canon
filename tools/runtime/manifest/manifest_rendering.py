@@ -2211,9 +2211,11 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "the selected workflow"
     )
     write_scope = (
-        "write only in the manifest write_policy scope and avoid paths assigned to other writers"
+        "when the physical sandbox and handoff permit writes, write only in the manifest "
+        "write_policy scope and avoid paths assigned to other writers; otherwise return "
+        "the assigned result inline without editing files"
         if role.write_policy.mode != "read_only"
-        else "do not edit repository files"
+        else "do not edit repository files; return the assigned result inline"
     )
     writer_target = (
         " Carry writer_target with absolute checkout_root, fixed branch, normalized remote, "
@@ -2225,28 +2227,30 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
     reuse_instruction = reuse_survey_prompt_instruction(role, workflow_family)
     return (
         f"You are the {role.id} role for {family_name}. Start from structured context artifacts and the "
-        "owned role_document_packet named in the handoff; load cross_cutting_document_packet "
+        "owned role_document_packet named in the handoff when supplied; load cross_cutting_document_packet "
         "entries only when the selected route or review gate makes them active, otherwise mark "
-        f"them not_applicable. Use allowed_paths and do_not_read as ownership boundaries. {write_scope}. "
+        "them not_applicable. Respect allowed_paths and do_not_read when supplied by the handoff. "
+        f"{write_scope}. "
         f"{writer_target} "
         f"{reuse_instruction} "
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
-        "Work only on the node dispatched by run.execution_graph; report the actual "
-        "completion result and do not treat a spawn id or monitor row as completion. "
+        "The parent owns execution-graph progression and dispatch. Complete the assigned "
+        "role task and return its actual result inline; do not operate the parent's graph "
+        "or treat a spawn id or monitor row as completion. For requirements and intake "
+        "assignments, include the objective, non-goals, constraints, and completion "
+        "conditions in that handoff. "
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
         "run.repo_tool_routing_policy tool_route, native argv, process result, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
         "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
         "and normalized remote owner/repository at the bounded transition points; do not "
-        "repeat it for ordinary commands. Execute only a graph-ready spawn_agent ToolCall "
-        "through the host's native collaboration.spawn_agent operation with its exact "
-        "arguments; the selected ToolCall is the admission. Do not require a second "
-        "AgentTeam/MCP dispatcher or launch an unselected child. "
-        "Return findings or outputs tied to request_clause_ids, artifact paths, dependency-file "
-        "headers for every edited or created text file, remaining planned work, and the next "
-        "required gate."
+        "repeat it for ordinary commands. Do not delegate unless the handoff explicitly "
+        "supplies delegated_spawn_policy and a graph-ready ToolCall; do not require another "
+        "dispatcher or launch an unselected child. Return findings or outputs tied to "
+        "request_clause_ids, include artifact paths and dependency-file headers when files "
+        "are created, and report remaining planned work or a next gate only when assigned."
     )
 
 
@@ -2268,7 +2272,9 @@ def compact_role_prompt_contract(
             "cross-cutting run context."
         )
     write_scope = (
-        "read-only" if role.write_policy.mode == "read_only" else "bounded writer"
+        "bounded writer when the physical sandbox and handoff permit writes; otherwise inline handoff"
+        if role.write_policy.mode != "read_only"
+        else "read-only; return assigned result inline"
     )
     writer_target = (
         " carry writer_target (absolute checkout_root, fixed branch, normalized remote, allowed_paths); "
@@ -2278,10 +2284,12 @@ def compact_role_prompt_contract(
     )
     reuse_instruction = reuse_survey_prompt_instruction(role, workflow_family)
     return (
-        f"{role.id} for {family_name}; {write_scope}; use structured context artifacts, "
-        "role-specific packet, common packet only when active, allowed paths, "
-        "subagent startup route when present, repo tool route fields, and the listed "
-        "output fields."
+        f"{role.id} for {family_name}; {write_scope}; use supplied handoff context and "
+        "named accessible packets, respect supplied path boundaries, and use the "
+        "subagent startup route and repo tool route fields when present. The parent "
+        "owns execution-graph progression; return the assigned result inline. For "
+        "requirements and intake assignments, include the objective, non-goals, "
+        "constraints, and completion conditions in that handoff."
         f" Include checkout_identity in every handoff where Git state matters;{writer_target}."
         f" {reuse_instruction}"
     )
