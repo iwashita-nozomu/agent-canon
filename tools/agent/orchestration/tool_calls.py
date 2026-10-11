@@ -458,9 +458,10 @@ def materialize_subagent_spawn_tool_call(
         argument_properties=argument_properties,
         arguments=arguments,
         intent=(
-            "Ask the parent runtime to use the canonical AgentTeam dispatch route "
-            "and writer-target validator for the selected stage owner; raw "
-            "spawn_agent is not an admission path."
+            "Dispatch only this graph-ready spawn_agent ToolCall through the host's "
+            "native collaboration.spawn_agent operation with its exact arguments; "
+            "the selected ToolCall is the admission. Do not require a second "
+            "AgentTeam/MCP dispatcher or launch an unselected child."
         ),
         typed_failure_semantics=(
             {
