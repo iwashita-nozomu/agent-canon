@@ -35,7 +35,7 @@ def write_fake_server(
     *,
     malformed: bool = False,
     outside_symbol: bool = False,
-    malformed_notification: bool = False,
+    malformed_frame_response: bool = False,
 ) -> Path:
     """Create a minimal Content-Length LSP 3.17 fixture."""
     script = root / "fake_lsp.py"
@@ -63,15 +63,16 @@ def write_fake_server(
             if method == 'initialize':
                 send({{'jsonrpc':'2.0','id':message['id'],'result':{{'serverInfo':{{'name':'fake','version':'9.9'}},'capabilities':{{'documentSymbolProvider':True}}}}}})
             elif method == 'textDocument/documentSymbol':
-                if {str(malformed)}:
+                if {str(malformed_frame_response)}:
+                    sys.stdout.buffer.write(b'Content-Length: 1\\r\\n\\r\\n{{')
+                    sys.stdout.buffer.flush()
+                elif {str(malformed)}:
                     send({{'jsonrpc':'2.0','id':message['id'],'result':[{{'name':'broken'}}]}})
                 elif {str(outside_symbol)}:
                     send({{'jsonrpc':'2.0','id':message['id'],'result':[{{'name':'outside','kind':12,'location':{{'uri':'file:///tmp/outside-symbol.py','range':{{'start':{{'line':0,'character':0}},'end':{{'line':0,'character':4}}}}}}}}]}})
                 else:
                     uri = message['params']['textDocument']['uri']
                     send({{'jsonrpc':'2.0','id':message['id'],'result':[{{'name':'main','kind':12,'range':{{'start':{{'line':0,'character':0}},'end':{{'line':0,'character':4}}}},'selectionRange':{{'start':{{'line':0,'character':0}},'end':{{'line':0,'character':4}}}}}}]}})
-                    if {str(malformed_notification)}:
-                        send({{'jsonrpc':'2.0','method':'textDocument/publishDiagnostics','params':{{'uri':uri,'diagnostics':'broken'}}}})
             elif method == 'shutdown':
                 send({{'jsonrpc':'2.0','id':message['id'],'result':None}})
             elif method == 'exit':
@@ -721,21 +722,21 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(payload["status"], "failed")
             self.assertEqual(payload["error"]["code"], "path-escape")
 
-    def test_malformed_push_diagnostics_notification_fails_closed(self) -> None:
-        """Malformed asynchronous diagnostics never produce a partial pass."""
+    def test_malformed_json_response_times_out_without_partial_facts(self) -> None:
+        """A discarded malformed frame cannot yield a successful report."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source = root / "main.py"
             source.write_text("def main():\n    return 1\n", encoding="utf-8")
-            server = write_fake_server(root, malformed_notification=True)
+            server = write_fake_server(root, malformed_frame_response=True)
             spec = lsp.LspServerSpec(
-                "python", (sys.executable, "-u", str(server)), record_id="quiet"
+                "python", (sys.executable, "-u", str(server)), record_id="malformed-frame"
             )
 
-            report = lsp.analyze(root, [source], specs={"python": spec})
+            report = lsp.analyze(root, [source], specs={"python": spec}, timeout=0.1)
 
             self.assertEqual(report.status, "failed")
-            self.assertEqual(report.error["code"], "malformed-response")
+            self.assertEqual(report.error["code"], "request-timeout")
             self.assertEqual(report.symbols, ())
 
     def test_pull_diagnostics_preserve_source_and_version(self) -> None:

@@ -45,9 +45,11 @@ image に package が既に展開済みであることを示すものではあ�
 既存の verified server process とその stdio を library に渡し、request timeout、
 child cleanup、report と root-bound result validation を維持します。
 
-required `documentSymbolProvider` が提供されない、reader が protocol error を返す、
+required `documentSymbolProvider` が提供されない、reader error が adapter に届く、
 request timeout が発生する、または server process が異常終了する場合、report は
 `status=failed` と typed error を持ち、partial facts は成功扱いになりません。
+upstream reader が malformed JSON をログして破棄し、response が届かない場合は、
+bounded request timeout として報告します。
 
 位置は常に UTF-16 で、URI は root-relative POSIX path に正規化します。root 外の
 位置は `path-escape` で失敗します。optional capability は capability matrix に
