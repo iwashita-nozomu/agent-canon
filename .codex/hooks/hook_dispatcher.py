@@ -293,6 +293,15 @@ def hook_root() -> HookRootState:
             standalone=True,
             status=HookRootStatus.OVERRIDE,
         )
+    target_root = os.environ.get("AGENT_CANON_TARGET_ROOT", "").strip() or os.environ.get(
+        "AGENT_CANON_TARGET_CONTAINER_ROOT", ""
+    ).strip()
+    if target_root:
+        return HookRootState(
+            active_root=Path(target_root).resolve(),
+            standalone=True,
+            status=HookRootStatus.OVERRIDE,
+        )
     try:
         resolution = resolve_agent_canon_source_root(Path.cwd())
         return HookRootState(

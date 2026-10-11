@@ -8,6 +8,7 @@ import hashlib
 import fcntl
 import os
 import shutil
+import subprocess
 import sys
 import tarfile
 from pathlib import Path
@@ -303,6 +304,85 @@ def _memory_bytes(value: str) -> int:
     if value.endswith("m"):
         return int(value[:-1]) * 1024**2
     return int(value)
+
+
+def _run_source_free_resident_python(
+    command: list[str],
+    exec_environment: dict[str, str],
+    container: dict,
+    runtime_root: Path,
+) -> int:
+    """Execute the packaged canonical verifier or hook in the fake resident."""
+    if runtime_root is None:
+        return 1
+    source_mount = next(
+        (
+            mount
+            for mount in container.get("Mounts", [])
+            if mount.get("Destination") == "/opt/agent-canon/source"
+        ),
+        None,
+    )
+    if source_mount is None:
+        return 1
+    source_root = Path(source_mount["Source"]).resolve()
+    script_container_path = Path(command[1])
+    try:
+        script_relative = script_container_path.relative_to("/opt/agent-canon/source")
+    except ValueError:
+        return 1
+    script = source_root / script_relative
+    if not script.is_file() or script.is_symlink():
+        return 1
+
+    mapped_args: list[str] = []
+    for value in command[2:]:
+        if value == "/opt/agent-canon/source":
+            mapped_args.append(str(source_root))
+        else:
+            mapped_args.append(value)
+
+    environment = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(runtime_root.parent / "fake-home"),
+        "PYTHONPATH": str(source_root),
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+        "AGENT_CANON_PRIVATE_LOG_ROOT": str(runtime_root.parent / "private-log"),
+    }
+    Path(environment["HOME"]).mkdir(parents=True, exist_ok=True)
+    Path(environment["AGENT_CANON_PRIVATE_LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
+
+    target_digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
+    if target_digest:
+        state_path = runtime_root / "state.json"
+        if not state_path.is_file():
+            return 1
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        target = state.get("targets", {}).get(target_digest)
+        if not isinstance(target, dict) or target.get("mode") != "read-only":
+            return 1
+        target_root = target.get("host_root")
+        if (
+            not isinstance(target_root, str)
+            or target_root != exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT")
+            or not Path(target_root).is_dir()
+        ):
+            return 1
+        environment["AGENT_CANON_TARGET_CONTAINER_ROOT"] = target_root
+        environment["AGENT_CANON_TARGET_DIGEST"] = target_digest
+
+    result = subprocess.run(
+        [sys.executable, str(script), *mapped_args],
+        input=sys.stdin.buffer.read(),
+        capture_output=True,
+        cwd=runtime_root,
+        env=environment,
+        check=False,
+    )
+    sys.stdout.buffer.write(result.stdout)
+    sys.stderr.buffer.write(result.stderr)
+    return result.returncode
 
 
 def main(argv: list[str]) -> int:
@@ -1339,8 +1419,22 @@ def main(argv: list[str]) -> int:
         if (
             len(command) >= 2
             and command[0] == "python3"
+            and command[1].endswith("tools/agent/templates/template_bundle.py")
+        ):
+            return _run_source_free_resident_python(
+                command, exec_environment, found[1], runtime_root
+            )
+        if (
+            len(command) >= 2
+            and command[0] == "python3"
             and command[1].endswith("tools/runtime/container/bootstrap_runtime.py")
         ):
+            if "codex" in command[2:] and (
+                "hook" in command[2:] or "hook-admission" in command[2:]
+            ):
+                return _run_source_free_resident_python(
+                    command, exec_environment, found[1], runtime_root
+                )
             failed_operation = os.environ.get(
                 "FAKE_DOCKER_FAIL_CONTROLLER_OPERATION", ""
             )
@@ -1457,6 +1551,90 @@ def main(argv: list[str]) -> int:
                             "status": "ok",
                             "operation": "target_add",
                             "code": "target_registered",
+                        }
+                    )
+                )
+                return 0
+            if "target" in command[2:] and "remove" in command[2:]:
+                runtime_mount = next(
+                    (
+                        mount
+                        for mount in found[1]["Mounts"]
+                        if mount["Destination"]
+                        in {
+                            "/var/lib/agent-canon",
+                            "/var/lib/agent-canon/runtime",
+                        }
+                    ),
+                    None,
+                )
+                if runtime_mount is None:
+                    return 1
+                digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
+                host_root = exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT", "")
+                container_root = exec_environment.get(
+                    "AGENT_CANON_TARGET_CONTAINER_ROOT", f"/targets/{digest}"
+                )
+                state_path = runtime_root / "state.json"
+                if not digest or not state_path.is_file():
+                    return 1
+                lifecycle = json.loads(state_path.read_text(encoding="utf-8"))
+                targets = lifecycle.setdefault("targets", {})
+                target = targets.get(digest)
+                if (
+                    not isinstance(target, dict)
+                    or target.get("host_root") != host_root
+                    or target.get("root") != container_root
+                    or target.get("mode") != "read-only"
+                ):
+                    return 1
+                del targets[digest]
+                mount_rows = []
+                mounts_toml = ['schema = "agent-canon.mount-registry.v2"', ""]
+                for target_digest, target_record in sorted(targets.items()):
+                    if not isinstance(target_record, dict):
+                        return 1
+                    target_root = target_record.get("root")
+                    target_host_root = target_record.get("host_root")
+                    if (
+                        not isinstance(target_root, str)
+                        or not isinstance(target_host_root, str)
+                        or target_record.get("mode") != "read-only"
+                    ):
+                        return 1
+                    mount_rows.append(
+                        f"target\t{target_digest}\t{target_host_root}\t"
+                        f"/targets/{target_digest}\tread-only"
+                    )
+                    mounts_toml.extend(
+                        [
+                            f"[targets.{target_digest}]",
+                            f"root = {json.dumps(target_root)}",
+                            'mode = "read-only"',
+                            f"digest = {json.dumps(target_digest)}",
+                            "",
+                        ]
+                    )
+                state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
+                exchange_root = Path(runtime_mount["Source"])
+                if runtime_mount["Destination"] != "/var/lib/agent-canon/runtime":
+                    exchange_root /= "runtime"
+                exchange_root /= "exchange"
+                exchange_root.mkdir(parents=True, exist_ok=True)
+                (exchange_root / "mounts.tsv").write_text(
+                    "\n".join(mount_rows) + ("\n" if mount_rows else ""),
+                    encoding="utf-8",
+                )
+                (exchange_root / "mounts.toml").write_text(
+                    "\n".join(mounts_toml), encoding="utf-8"
+                )
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.bootstrap-receipt.v2",
+                            "status": "ok",
+                            "operation": "target_remove",
+                            "code": "target_removed",
                         }
                     )
                 )

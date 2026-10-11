@@ -89,6 +89,21 @@ class PromptClassifierCase(TypedDict):
 class CodexHooksTest(unittest.TestCase):
     """Validate active hook behavior without exercising retired hook scripts."""
 
+    def test_registered_container_target_owns_project_report_resolution(self) -> None:
+        """Resident hooks resolve trusted targets through the existing mount root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / "trusted-project"
+            target.mkdir()
+            with mock.patch.dict(
+                os.environ,
+                {"AGENT_CANON_TARGET_CONTAINER_ROOT": str(target)},
+                clear=True,
+            ):
+                state = hook_dispatcher.hook_root()
+            self.assertEqual(state.active_root, target.resolve())
+            self.assertTrue(state.standalone)
+            self.assertEqual(state.status, hook_dispatcher.HookRootStatus.OVERRIDE)
+
     def _run_hook(
         self,
         event: str,

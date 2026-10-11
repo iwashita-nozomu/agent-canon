@@ -59,8 +59,9 @@ usage: bootstrap.sh [--repository-root PATH] --control-parent-root PATH
 OPERATION: install | update | start | status | stop | rollback | uninstall |
            sync | scheduler | target | tool | template | codex | eval | task | gc
 
-The host adapter requires Docker and Git only. AgentCanon Python and Rust
-tools execute in the resident network-disabled container.
+Source-backed lifecycle operations use Git; source-free Codex bundles use the
+packaged host adapter and the existing resident container. AgentCanon Python
+and Rust tools execute in the resident network-disabled container.
 USAGE
 }
 
@@ -198,13 +199,20 @@ _agent_canon_ensure_source_sync_state() {
   local source_tree=${AGENT_CANON_SYNC_INITIAL_TREE:-unknown}
   local source_remote=${AGENT_CANON_SYNC_INITIAL_REMOTE:-origin}
   local source_remote_url=${AGENT_CANON_SYNC_INITIAL_REMOTE_URL:-unknown}
-  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
-  source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD^{tree} 2>/dev/null) || :
+  local source_branch=${AGENT_CANON_SYNC_INITIAL_BRANCH:-main}
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    source_remote=bundle
+    source_remote_url=unknown
+    source_branch=bundle
+  else
+    source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD 2>/dev/null) || :
+    source_tree=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify 'HEAD^{tree}' 2>/dev/null) || :
+  fi
   [[ "$source_head" =~ ^[0-9a-f]{40}$ ]] || source_head=unknown
   [[ "$source_tree" =~ ^[0-9a-f]{40}$ ]] || source_tree=unknown
   _agent_canon_source_sync_write success not_run "$AGENT_CANON_REPOSITORY_ROOT" \
     "$source_head" "$source_tree" "$source_remote" "$source_remote_url" \
-    "${AGENT_CANON_SYNC_INITIAL_BRANCH:-main}" \
+    "$source_branch" \
     "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" ||
     _agent_canon_json_error source_sync_state_write_failed \
       "initial source-sync state could not be atomically published"
@@ -445,7 +453,11 @@ _agent_canon_validate_roots() {
   }
   AGENT_CANON_CONTROL_ROOT=$control
   default_runtime="$AGENT_CANON_CONTROL_ROOT/.runtime"
-  AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    AGENT_CANON_PRIVATE_LOG_ROOT="$AGENT_CANON_CONTROL_ROOT/agent-canon-log"
+  else
+    AGENT_CANON_PRIVATE_LOG_ROOT="$(dirname -- "$AGENT_CANON_REPOSITORY_ROOT")/agent-canon-log"
+  fi
   _agent_canon_validate_new_path "$default_runtime" "control runtime root"
   _agent_canon_validate_new_path "$AGENT_CANON_PRIVATE_LOG_ROOT" "private log root"
   AGENT_CANON_RUNTIME_ROOT=$default_runtime
@@ -1986,7 +1998,11 @@ _agent_canon_container_exec() {
   fi
   image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$AGENT_CANON_IMAGE_REF")
   container_id=$("$AGENT_CANON_DOCKER_CMD" container inspect --format '{{.Id}}' "$container")
-  source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD)
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    source_head=unknown
+  else
+    source_head=$(git -C "$AGENT_CANON_REPOSITORY_ROOT" rev-parse --verify HEAD)
+  fi
   local -a extra_env=()
   [[ -n "${AGENT_CANON_RESTORE_IMAGE_ID:-}" ]] &&
     extra_env+=(--env "AGENT_CANON_RESTORE_IMAGE_ID=$AGENT_CANON_RESTORE_IMAGE_ID")
@@ -4189,22 +4205,43 @@ _agent_canon_eval_sync_locked() {
 }
 
 _agent_canon_remove_global_links() {
-  local home_root
+  local scope=${1:-all} home_root codex_home
   home_root=$(realpath -e -- "$HOME")
-  [[ "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || return 0
+  codex_home=${CODEX_HOME:-$home_root/.codex}
+  codex_home=$(realpath -m -- "$codex_home")
   local skills_link="$home_root/.agents/skills"
   # The manifest owns the complete directory link. Never traverse it while
   # removing legacy per-skill records: doing so would delete canonical source.
   local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
+  if [[ "$scope" == bundle && ( -e "$manifest" || -L "$manifest" ) &&
+        ( ! -f "$manifest" || -L "$manifest" ) ]]; then
+    _agent_canon_json_error global_links_manifest_invalid \
+      "global link manifest is not a regular file"
+    return 2
+  fi
   [[ -f "$manifest" && ! -L "$manifest" ]] || return 0
-  local key target source mode digest resolved config_tmp
+  if [[ "$scope" == bundle ]]; then
+    local validation_snapshot
+    validation_snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links-validate.XXXXXX") || return $?
+    if ! _agent_canon_global_bundle_records_snapshot "$validation_snapshot"; then
+      rm -f -- "$validation_snapshot"
+      return 2
+    fi
+    rm -f -- "$validation_snapshot"
+  fi
+  local key target source mode digest resolved config_tmp manifest_tmp
   local failures=()
   while IFS=$'\t' read -r key target source mode digest; do
     case "$key" in
       schema)
-        [[ "$target" == agent-canon.global-links.v1 && -z "$source$mode$digest" ]] ||
-          _agent_canon_json_error global_links_manifest_invalid "global link manifest schema is invalid" ;;
+        [[ "$target" == agent-canon.global-links.v1 && -z "$source$mode$digest" ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "global link manifest schema is invalid"
+          return 2
+        }
+        ;;
       link)
+        [[ "$scope" == all && "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || continue
         [[ "$target" != "$skills_link"/* ]] || continue
         [[ -L "$target" && -n "$source" && -z "$mode$digest" ]] || continue
         resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
@@ -4212,6 +4249,7 @@ _agent_canon_remove_global_links() {
           if ! rm -f -- "$target"; then failures+=("$target"); fi
         fi ;;
       config)
+        [[ "$scope" == all && "$AGENT_CANON_CONTROL_ROOT" == "$home_root" ]] || continue
         [[ "$target" == "$home_root/.codex/config.toml" && -L "$target" && -f "$source" && -n "$mode" && "$digest" =~ ^[0-9a-f]{64}$ ]] || continue
         resolved=$(readlink -f -- "$target" 2>/dev/null || printf '')
         if [[ "$resolved" == "$source" ]]; then
@@ -4224,12 +4262,78 @@ _agent_canon_remove_global_links() {
             failures+=("$target")
           fi
         fi ;;
-      *) _agent_canon_json_error global_links_manifest_invalid "global link manifest contains an unknown key: $key" ;;
+      bundle-file)
+        [[ "$scope" == all || "$scope" == bundle ]] || continue
+        [[ "$source" =~ ^(agents/agent-canon-[A-Za-z0-9_.-]+\.toml|guidance/AGENTS\.md)$ &&
+           "$mode" =~ ^[0-7]{3,4}$ && "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "bundle file ownership record is invalid"
+          return 2
+        }
+        if [[ "$source" == guidance/AGENTS.md ]]; then
+          [[ "$target" == "$codex_home/AGENTS.md" ]] || {
+            _agent_canon_json_error global_links_manifest_invalid \
+              "bundle guidance target differs from its canonical destination"
+            return 2
+          }
+        else
+          [[ "${source#agents/}" != */* &&
+             "$target" == "$codex_home/agents/${source##*/}" ]] || {
+            _agent_canon_json_error global_links_manifest_invalid \
+              "bundle agent target differs from its canonical destination"
+            return 2
+          }
+        fi
+        if [[ -e "$target" || -L "$target" ]]; then
+          if [[ -f "$target" && ! -L "$target" &&
+                "$(_agent_canon_sha256 "$target")" == "$digest" &&
+                "$(stat -c '%a' -- "$target")" == "$mode" ]]; then
+            rm -f -- "$target" || failures+=("$target")
+          else
+            failures+=("$target")
+          fi
+        fi ;;
+      *)
+        _agent_canon_json_error global_links_manifest_invalid \
+          "global link manifest contains an unknown key: $key"
+        return 2
+        ;;
     esac
   done < "$manifest"
   if ((${#failures[@]})); then
     _agent_canon_json_error uninstall_links_failed "owned global link cleanup failed: ${failures[*]}"
+    return 2
   fi
+  if [[ "$scope" == bundle ]]; then
+    manifest_tmp=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links-remove.XXXXXX") || return $?
+    if ! awk -F '\t' '$1 != "bundle-file" { print }' "$manifest" > "$manifest_tmp" ||
+       ! chmod 600 -- "$manifest_tmp" || ! mv -f -- "$manifest_tmp" "$manifest"; then
+      rm -f -- "$manifest_tmp"
+      _agent_canon_json_error global_links_manifest_write_failed \
+        "bundle ownership records could not be removed from the global link manifest"
+      return 2
+    fi
+  fi
+}
+
+_agent_canon_codex_bundle_uninstall_locked() {
+  _agent_canon_remove_global_links bundle || return $?
+  local target_digest
+  target_digest=$(_agent_canon_target_digest "$AGENT_CANON_REPOSITORY_ROOT" || true)
+  if [[ -n "$target_digest" ]]; then
+    _agent_canon_target_operation_locked remove "$AGENT_CANON_REPOSITORY_ROOT" \
+      "$target_digest" "/targets/$target_digest" >/dev/null || return $?
+  fi
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"codex_bundle_uninstall","code":"owned_files_removed"}\n'
+}
+
+_agent_canon_codex_bundle_uninstall() {
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "Codex bundle removal requires a source-free package"
+    return 2
+  }
+  _agent_canon_with_replacement_lock _agent_canon_codex_bundle_uninstall_locked
 }
 
 _agent_canon_apply_context_defaults() {
@@ -4259,6 +4363,467 @@ _agent_canon_apply_context_defaults() {
   fi
 }
 
+_agent_canon_codex_target_add() {
+  local target_root=$1
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 &&
+     -f "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" &&
+     ! -L "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "source-free Codex bundle host entrypoint is unavailable"
+    return 2
+  }
+  bash "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" \
+    --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
+    target add --root "$target_root" --mode read-only >/dev/null
+}
+
+_agent_canon_codex_target_remove() {
+  local target_root=$1
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 &&
+     -f "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" &&
+     ! -L "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "source-free Codex bundle host entrypoint is unavailable"
+    return 2
+  }
+  _agent_canon_target_digest "$target_root" >/dev/null || return 0
+  bash "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" \
+    --control-parent-root "$AGENT_CANON_CONTROL_ROOT" \
+    target remove --root "$target_root" --mode read-only >/dev/null
+}
+
+_agent_canon_global_bundle_records_snapshot() {
+  local destination=$1 preserve_all=${2:-0} manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
+  local raw key target source mode digest extra schema_seen=0
+  : > "$destination"
+  [[ -e "$manifest" || -L "$manifest" ]] || return 0
+  [[ -f "$manifest" && ! -L "$manifest" ]] || {
+    _agent_canon_json_error global_links_manifest_invalid \
+      "global link manifest is not a regular file"
+    return 2
+  }
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    IFS=$'\t' read -r key target source mode digest extra <<< "$raw"
+    case "$key" in
+      schema)
+        [[ "$schema_seen" == 0 && "$target" == agent-canon.global-links.v1 &&
+           -z "$source$mode$digest$extra" ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "global link manifest schema is invalid"
+          return 2
+        }
+        schema_seen=1
+        ;;
+      link)
+        [[ -n "$target" && "$target" == /* && -n "$source" && "$source" == /* &&
+           -z "$mode$digest$extra" ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "global link manifest link record is invalid"
+          return 2
+        }
+        if [[ "$preserve_all" == 1 ]]; then
+          printf 'link\t%s\t%s\n' "$target" "$source" >> "$destination"
+        fi
+        ;;
+      config)
+        [[ -n "$target" && "$target" == /* && -n "$source" && "$source" == /* &&
+           -n "$mode" && "$digest" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "global link manifest config record is invalid"
+          return 2
+        }
+        if [[ "$preserve_all" == 1 ]]; then
+          printf 'config\t%s\t%s\t%s\t%s\n' \
+            "$target" "$source" "$mode" "$digest" >> "$destination"
+        fi
+        ;;
+      bundle-file)
+        [[ -n "$target" && "$target" == /* &&
+           "$source" =~ ^(agents/agent-canon-[A-Za-z0-9_.-]+\.toml|guidance/AGENTS\.md)$ &&
+           "$mode" =~ ^[0-7]{3,4}$ && "$digest" =~ ^[0-9a-f]{64}$ && -z "$extra" ]] || {
+          _agent_canon_json_error global_links_manifest_invalid \
+            "global link manifest bundle-file record is invalid"
+          return 2
+        }
+        printf 'bundle-file\t%s\t%s\t%s\t%s\n' \
+          "$target" "$source" "$mode" "$digest" >> "$destination"
+        ;;
+      *)
+        _agent_canon_json_error global_links_manifest_invalid \
+          "global link manifest contains an unknown key: $key"
+        return 2
+        ;;
+    esac
+  done < "$manifest"
+  [[ "$schema_seen" == 1 ]] || {
+    _agent_canon_json_error global_links_manifest_invalid \
+      "global link manifest schema is missing"
+    return 2
+  }
+}
+
+_agent_canon_global_bundle_file_record_write() {
+  local target=$1 source=$2 mode=$3 digest=$4
+  local manifest="$AGENT_CANON_STATE_ROOT/global-links.tsv"
+  local snapshot temporary raw key existing_target existing_source existing_mode existing_digest extra
+  snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-links.XXXXXX") || return $?
+  temporary=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.global-links.XXXXXX") || {
+    rm -f -- "$snapshot"
+    return 2
+  }
+  if ! _agent_canon_global_bundle_records_snapshot "$snapshot" 1; then
+    rm -f -- "$snapshot" "$temporary"
+    return 2
+  fi
+  {
+    printf 'schema\tagent-canon.global-links.v1\n'
+    while IFS= read -r raw || [[ -n "$raw" ]]; do
+      IFS=$'\t' read -r key existing_target existing_source existing_mode existing_digest extra <<< "$raw"
+      if [[ "$key" != bundle-file || "$existing_target" != "$target" ]]; then
+        printf '%s\n' "$raw"
+      fi
+    done < "$snapshot"
+    printf 'bundle-file\t%s\t%s\t%s\t%s\n' \
+      "$target" "$source" "$mode" "$digest"
+  } > "$temporary" || {
+    rm -f -- "$snapshot" "$temporary"
+    return 2
+  }
+  rm -f -- "$snapshot"
+  chmod 600 -- "$temporary" || {
+    rm -f -- "$temporary"
+    return 2
+  }
+  mv -f -- "$temporary" "$manifest"
+}
+
+_agent_canon_codex_hook() {
+  local event=$1 payload= codex_home codex_config container admission admission_rc=0
+  local project_root project_digest project_container_root
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "Codex hook runtime requires the source-free user bundle"
+    return 2
+  }
+  case "$event" in
+    UserPromptSubmit|PreToolUse|PostToolUse) ;;
+    *) _agent_canon_json_error unsupported_hook_event "unsupported active Codex hook event"; return 2 ;;
+  esac
+  # Codex hook JSON is text. Retain it in-process so the same bytes reach the
+  # resident admission parser and the canonical dispatcher without a raw-prompt
+  # temporary file.
+  IFS= read -r -d '' payload || :
+
+  # The existing target transaction switches the resident's source mount to
+  # this packaged closure. Project targets are added separately only after
+  # resident trust admission.
+  _agent_canon_codex_target_add "$AGENT_CANON_REPOSITORY_ROOT" || return $?
+  unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
+    AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
+    AGENT_CANON_TARGET_PENDING_DIGEST
+  container=$(_agent_canon_container_name)
+  _agent_canon_use_active_image "$container" || return $?
+  container=$(_agent_canon_ensure_container) || return $?
+  if ! _agent_canon_container_exec "$container" \
+    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
+    verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
+    _agent_canon_json_error codex_bundle_invalid \
+      "Codex user bundle integrity readback failed"
+    return 2
+  fi
+
+  codex_home=${CODEX_HOME:-$HOME/.codex}
+  codex_config="$codex_home/config.toml"
+  admission=$(
+    {
+      if [[ -f "$codex_config" ]]; then
+        cat -- "$codex_config" || exit $?
+      fi
+      printf '\0'
+      printf '%s' "$payload"
+    } | _agent_canon_container_exec "$container" --stdin \
+      python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/runtime/container/bootstrap_runtime.py" \
+      --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
+      --control-parent-root /var/lib/agent-canon \
+      --runtime-root /var/lib/agent-canon/runtime \
+      codex hook-admission --event "$event"
+  ) || admission_rc=$?
+  ((admission_rc == 0)) || return "$admission_rc"
+
+  if [[ "$admission" == trusted$'\t'* ]]; then
+    project_root=${admission#*$'\t'}
+    if ! project_root=$(realpath -e -- "$project_root" 2>/dev/null); then
+      _agent_canon_json_error codex_project_invalid \
+        "trusted Codex project root is unavailable"
+      return 2
+    fi
+    [[ -d "$project_root" && ! -L "$project_root" ]] || {
+      _agent_canon_json_error codex_project_invalid \
+        "trusted Codex project root must be a regular directory"
+      return 2
+    }
+    _agent_canon_codex_target_add "$project_root" || return $?
+    project_digest=$(printf '%s' "$project_root" | sha256sum | awk '{print $1}')
+    project_container_root="/targets/$project_digest"
+    AGENT_CANON_TARGET_HOST_ROOT=$project_root
+    AGENT_CANON_TARGET_CONTAINER_ROOT=$project_container_root
+    AGENT_CANON_TARGET_DIGEST=$project_digest
+    export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
+      AGENT_CANON_TARGET_DIGEST
+  elif [[ "$admission" == untrusted ]]; then
+    unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
+      AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
+      AGENT_CANON_TARGET_PENDING_DIGEST
+  else
+    _agent_canon_json_error codex_hook_admission_invalid \
+      "resident trust admission returned an invalid result"
+    return 2
+  fi
+
+  container=$(_agent_canon_container_name)
+  _agent_canon_use_active_image "$container" || return $?
+  container=$(_agent_canon_ensure_container) || return $?
+  printf '%s' "$payload" | _agent_canon_container_exec "$container" --stdin \
+    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/runtime/container/bootstrap_runtime.py" \
+    --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
+    --control-parent-root /var/lib/agent-canon \
+    --runtime-root /var/lib/agent-canon/runtime \
+    codex hook --event "$event"
+}
+
+_agent_canon_codex_bundle_install_locked() {
+  local container records bundle_digest source_commit kind component bundle_path destination digest extra
+  local codex_home target source parent source_root created installed=0
+  local snapshot row_type row_target row_source row_mode row_digest row_extra previous_digest previous_mode current_digest
+  local temporary backup source_current source_part
+  local bundle_root bundle_target_digest bundle_container_root
+  local -a source_parts=()
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "Codex bundle installation requires a verified source-free package"
+    return 2
+  }
+  bundle_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || return 2
+  [[ -d "$bundle_root" && ! -L "$bundle_root" ]] || {
+    _agent_canon_json_error target_root_invalid \
+      "Codex bundle root must be a regular directory"
+    return 2
+  }
+  bundle_target_digest=$(printf '%s' "$bundle_root" | sha256sum | awk '{print $1}')
+  bundle_container_root="/targets/$bundle_target_digest"
+  _agent_canon_target_operation_locked add "$bundle_root" \
+    "$bundle_target_digest" "$bundle_container_root" >/dev/null || return $?
+  container=$(_agent_canon_container_name)
+  _agent_canon_use_active_image "$container" || return $?
+  container=$(_agent_canon_ensure_container) || return $?
+  records=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.codex-bundle-install.XXXXXX") || return $?
+  if ! _agent_canon_container_exec "$container" \
+    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
+    verify --root "$AGENT_CANON_SOURCE_DESTINATION" --format install-tsv > "$records"; then
+    rm -f -- "$records"
+    _agent_canon_json_error codex_bundle_invalid \
+      "Codex user bundle integrity readback failed"
+    return 2
+  fi
+  codex_home=${CODEX_HOME:-$HOME/.codex}
+  [[ "$codex_home" == /* && ! -L "$codex_home" ]] || {
+    rm -f -- "$records"
+    _agent_canon_json_error codex_home_invalid \
+      "Codex home must be an absolute non-symlink directory"
+    return 2
+  }
+  mkdir -p -- "$codex_home" || { rm -f -- "$records"; return 2; }
+  codex_home=$(realpath -e -- "$codex_home") || { rm -f -- "$records"; return 2; }
+  source_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || {
+    rm -f -- "$records"
+    return 2
+  }
+  local bundle_headers=0
+  while IFS=$'\t' read -r kind component bundle_path destination digest extra; do
+    case "$kind" in
+      bundle)
+        [[ "$bundle_headers" == 0 && "$component" =~ ^[0-9a-f]{64}$ &&
+           "$bundle_path" =~ ^[0-9a-f]{40}$ && -z "$destination$digest$extra" ]] || {
+          rm -f -- "$records"
+          _agent_canon_json_error codex_bundle_invalid \
+            "Codex bundle verification record is invalid"
+          return 2
+        }
+        bundle_digest=$component
+        source_commit=$bundle_path
+        bundle_headers=1
+        ;;
+      install)
+        [[ "$bundle_headers" == 1 && -z "$extra" &&
+           ( "$component" == agent || "$component" == guidance ) &&
+           "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+          rm -f -- "$records"
+          _agent_canon_json_error codex_bundle_invalid \
+            "Codex bundle install record is invalid"
+          return 2
+        }
+        case "$component:$bundle_path:$destination" in
+          agent:agents/agent-canon-*.toml:codex/agents/agent-canon-*.toml)
+            [[ "${bundle_path#agents/}" != */* &&
+               "${destination#codex/}" == "agents/${bundle_path#agents/}" ]] || {
+              rm -f -- "$records"
+              _agent_canon_json_error codex_bundle_invalid \
+                "Codex bundle agent path is not a direct child"
+              return 2
+            }
+            ;;
+          guidance:guidance/AGENTS.md:codex/AGENTS.md) ;;
+          *)
+            rm -f -- "$records"
+            _agent_canon_json_error codex_bundle_invalid \
+              "Codex bundle install path is not canonical"
+            return 2
+            ;;
+        esac
+        source="$source_root/$bundle_path"
+        source_current=$source_root
+        IFS='/' read -r -a source_parts <<< "$bundle_path"
+        for source_part in "${source_parts[@]}"; do
+          source_current="$source_current/$source_part"
+          [[ ! -L "$source_current" ]] || {
+            rm -f -- "$records"
+            _agent_canon_json_error codex_bundle_invalid \
+              "Codex bundle source contains a symlink"
+            return 2
+          }
+        done
+        [[ -f "$source" && "$(_agent_canon_sha256 "$source")" == "$digest" ]] || {
+          rm -f -- "$records"
+          _agent_canon_json_error codex_bundle_invalid \
+            "Codex bundle install source failed host readback"
+          return 2
+        }
+        target="$codex_home/${destination#codex/}"
+        parent=${target%/*}
+        [[ ! -L "$codex_home" && ! -L "$parent" ]] || {
+          rm -f -- "$records"
+          _agent_canon_json_error codex_install_path_invalid \
+            "Codex installation path contains a symlink"
+          return 2
+        }
+        mkdir -p -- "$parent" || { rm -f -- "$records"; return 2; }
+        current_digest=
+        snapshot=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-files.XXXXXX") || {
+          rm -f -- "$records"
+          return 2
+        }
+        if ! _agent_canon_global_bundle_records_snapshot "$snapshot"; then
+          rm -f -- "$records" "$snapshot"
+          return 2
+        fi
+        previous_digest=
+        previous_mode=
+        while IFS=$'\t' read -r row_type row_target row_source row_mode row_digest row_extra; do
+          if [[ "$row_type" == bundle-file && "$row_target" == "$target" ]]; then
+            [[ -z "$previous_digest" ]] || {
+              rm -f -- "$records" "$snapshot"
+              _agent_canon_json_error global_links_manifest_invalid \
+                "Codex destination has multiple ownership records"
+              return 2
+            }
+            previous_digest=$row_digest
+            previous_mode=$row_mode
+          fi
+        done < "$snapshot"
+        rm -f -- "$snapshot"
+        backup=
+        created=0
+        if [[ -e "$target" || -L "$target" ]]; then
+          [[ -f "$target" && ! -L "$target" &&
+             "$previous_digest" =~ ^[0-9a-f]{64}$ &&
+             "$previous_mode" =~ ^[0-7]{3,4}$ ]] || {
+            rm -f -- "$records"
+            _agent_canon_json_error codex_install_collision \
+              "Codex path is not an owned regular bundle file: $target"
+            return 2
+          }
+          current_digest=$(_agent_canon_sha256 "$target")
+          [[ "$current_digest" == "$previous_digest" &&
+             "$(stat -c '%a' -- "$target")" == "$previous_mode" ]] || {
+            rm -f -- "$records"
+            _agent_canon_json_error codex_install_conflict \
+              "Codex bundle file was modified and is preserved: $target"
+            return 2
+          }
+          if [[ "$current_digest" != "$digest" ]]; then
+            backup=$(mktemp "$parent/.agent-canon-bundle-backup.XXXXXX") || {
+              rm -f -- "$records"
+              return 2
+            }
+            cp -- "$target" "$backup" || {
+              rm -f -- "$records" "$backup"
+              return 2
+            }
+            chmod "$previous_mode" "$backup" || {
+              rm -f -- "$records" "$backup"
+              return 2
+            }
+          fi
+        else
+          created=1
+        fi
+        if [[ "${current_digest:-}" != "$digest" ]]; then
+          temporary=$(mktemp "$parent/.agent-canon-bundle-install.XXXXXX") || {
+            [[ -z "$backup" ]] || rm -f -- "$backup"
+            rm -f -- "$records"
+            return 2
+          }
+          if ! cp -- "$source" "$temporary" || ! chmod 644 -- "$temporary" ||
+             [[ "$(_agent_canon_sha256 "$temporary")" != "$digest" ]] ||
+             ! mv -f -- "$temporary" "$target"; then
+            rm -f -- "$temporary"
+            [[ -z "$backup" ]] || rm -f -- "$backup"
+            rm -f -- "$records"
+            _agent_canon_json_error codex_install_write_failed \
+              "Codex bundle file could not be installed and read back: $target"
+            return 2
+          fi
+        fi
+        if ! _agent_canon_global_bundle_file_record_write "$target" "$bundle_path" 644 "$digest"; then
+          if [[ -n "$backup" ]]; then
+            mv -f -- "$backup" "$target"
+          elif ((created == 1)); then
+            rm -f -- "$target"
+          fi
+          [[ -z "$backup" ]] || rm -f -- "$backup"
+          rm -f -- "$records"
+          return 2
+        fi
+        [[ -z "$backup" ]] || rm -f -- "$backup"
+        installed=$((installed + 1))
+        ;;
+      *)
+        rm -f -- "$records"
+        _agent_canon_json_error codex_bundle_invalid \
+          "Codex bundle verification returned an unknown record"
+        return 2
+        ;;
+    esac
+  done < "$records"
+  rm -f -- "$records"
+  [[ "$bundle_headers" == 1 ]] || {
+    _agent_canon_json_error codex_bundle_invalid \
+      "Codex bundle identity record is missing"
+    return 2
+  }
+  printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"codex_bundle_install","code":"installed","bundle_digest":"%s","source_commit":"%s","files":%s}\n' \
+    "$bundle_digest" "$source_commit" "$installed"
+}
+
+_agent_canon_codex_bundle_install() {
+  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
+    _agent_canon_json_error codex_bundle_missing \
+      "Codex bundle installation requires a verified source-free package"
+    return 2
+  }
+  _agent_canon_with_replacement_lock _agent_canon_codex_bundle_install_locked
+}
+
 _agent_canon_install_global_links() {
   local container=${1:-}
   local home_root
@@ -4271,11 +4836,16 @@ _agent_canon_install_global_links() {
   local config_target="$codex_home/config.toml"
   local config_source="$source_root/config.toml"
   local skills_link="$home_root/.agents/skills"
-  local link source resolved mode digest
+  local link source resolved mode digest preserved_bundle_files
   [[ -d "$skill_source_root" && ! -L "$skill_source_root" ]] || {
     _agent_canon_json_error skill_source_missing "Git-distributed skills are missing: $skill_source_root"
     return 2
   }
+  preserved_bundle_files=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bundle-files.XXXXXX") || return $?
+  if ! _agent_canon_global_bundle_records_snapshot "$preserved_bundle_files"; then
+    rm -f -- "$preserved_bundle_files"
+    return 2
+  fi
   mkdir -p "$home_root/.agents" "$codex_home/agents"
   # A correct directory link survives ordinary Git updates unchanged.
   if [[ -L "$skills_link" ]]; then
@@ -4292,6 +4862,8 @@ _agent_canon_install_global_links() {
   fi
   : > "$manifest"
   printf 'schema\tagent-canon.global-links.v1\n' >> "$manifest"
+  cat -- "$preserved_bundle_files" >> "$manifest"
+  rm -f -- "$preserved_bundle_files"
   printf 'link\t%s\t%s\n' "$skills_link" "$skill_source_root" >> "$manifest"
 
   # A personal config is the one remaining file view.  Preserve it only when
@@ -4488,6 +5060,7 @@ bootstrap_host_entrypoint() {
   shift
   local repository_request=$repository_root
   AGENT_CANON_REPOSITORY_ROOT=
+  AGENT_CANON_SOURCE_FREE_BUNDLE=0
   AGENT_CANON_CONTROL_ROOT=
   AGENT_CANON_CONTROL_ROOT_REQUEST=
   AGENT_CANON_MANIFEST=
@@ -4536,6 +5109,12 @@ bootstrap_host_entrypoint() {
   if ! AGENT_CANON_REPOSITORY_ROOT=$(CDPATH= cd -- "$repository_request" && pwd -P); then
     _agent_canon_json_error repository_root_invalid "repository root is not an existing directory"
   fi
+  if [[ -f "$AGENT_CANON_REPOSITORY_ROOT/codex-user-bundle.json" &&
+        ! -L "$AGENT_CANON_REPOSITORY_ROOT/codex-user-bundle.json" ]] &&
+     grep -Fq '"schema": "agent-canon.codex-user-bundle.v1"' \
+       "$AGENT_CANON_REPOSITORY_ROOT/codex-user-bundle.json"; then
+    AGENT_CANON_SOURCE_FREE_BUNDLE=1
+  fi
   if [[ -n "${AGENT_CANON_CONTROL_ROOT_REQUEST:-}" ]]; then
     if ! AGENT_CANON_CONTROL_ROOT=$(CDPATH= cd -- "$AGENT_CANON_CONTROL_ROOT_REQUEST" && pwd -P); then
       _agent_canon_json_error control_root_invalid "control parent root is not an existing directory"
@@ -4544,6 +5123,20 @@ bootstrap_host_entrypoint() {
   [[ -n "$AGENT_CANON_CONTROL_ROOT" ]] || _agent_canon_json_error control_root_required "--control-parent-root is required"
   [[ ${#command_args[@]} -gt 0 ]] || { _agent_canon_usage >&2; return 64; }
   local operation=${command_args[0]} image_ref= local_build=0
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    case "$operation" in
+      codex)
+        case "${command_args[1]:-}" in
+          hook|bundle-install|bundle-uninstall) ;;
+          *) _agent_canon_json_error source_free_bundle_operation_unsupported \
+            "source-free user bundles expose only Codex hook and bundle lifecycle operations"; return 2 ;;
+        esac
+        ;;
+      target|status|start|stop|rollback|uninstall|gc) ;;
+      *) _agent_canon_json_error source_free_bundle_operation_unsupported \
+        "source-free user bundle cannot run source-update or catalog operations"; return 2 ;;
+    esac
+  fi
   if [[ "$operation" == sync ]]; then
     local sync_root_index=1
     while ((sync_root_index < ${#command_args[@]})); do
@@ -4564,7 +5157,8 @@ bootstrap_host_entrypoint() {
   fi
   _agent_canon_validate_roots
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
-  export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
+  export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_SOURCE_FREE_BUNDLE \
+    AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
   if ! command -v "$AGENT_CANON_DOCKER_CMD" >/dev/null 2>&1 &&
      [[ ! -x "$AGENT_CANON_DOCKER_CMD" ]]; then
     _agent_canon_json_error runtime_unavailable "Docker executable is unavailable"
@@ -4725,6 +5319,24 @@ bootstrap_host_entrypoint() {
       ;;
     codex)
       local codex_action=${command_args[1]:-} codex_project=${AGENT_CANON_PROJECT_ROOT:-}
+      if [[ "$codex_action" == hook ]]; then
+        [[ ${#command_args[@]} -eq 3 ]] ||
+          _agent_canon_json_error argument_invalid "codex hook requires one active event"
+        _agent_canon_codex_hook "${command_args[2]}"
+        return $?
+      fi
+      if [[ "$codex_action" == bundle-install ]]; then
+        [[ ${#command_args[@]} -eq 2 ]] ||
+          _agent_canon_json_error argument_invalid "codex bundle-install takes no arguments"
+        _agent_canon_codex_bundle_install
+        return $?
+      fi
+      if [[ "$codex_action" == bundle-uninstall ]]; then
+        [[ ${#command_args[@]} -eq 2 ]] ||
+          _agent_canon_json_error argument_invalid "codex bundle-uninstall takes no arguments"
+        _agent_canon_codex_bundle_uninstall
+        return $?
+      fi
       local codex_index=1
       while ((codex_index < ${#command_args[@]})); do
         if [[ "${command_args[codex_index]}" == --project-root &&

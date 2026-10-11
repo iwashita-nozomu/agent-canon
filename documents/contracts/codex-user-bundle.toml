@@ -1,9 +1,41 @@
-version = 1
-components = ["personal-agents", "global-guidance", "hook-plugin"]
+version = 2
+components = ["personal-agents", "global-guidance", "plugin-skills", "hook-runtime"]
 source_checkout_required_at_runtime = false
+git_metadata_required_at_runtime = false
+host_python_required_at_runtime = false
 user_config_mutation = false
+project_dotfile_mutation = false
+project_trust_mutation = false
 hook_trust_bypass = false
 automatic_latest_update = false
+plugin_cache_mutation = false
+global_project_mount = false
+
+[hook_runtime]
+entrypoint = "bootstrap.sh codex hook <event>"
+execution_plane = "shared-resident-container"
+project_identity_input = "Codex hook payload cwd"
+trust_input = "CODEX_HOME/config.toml projects.<cwd>.trust_level"
+trust_required_value = "trusted"
+project_target_mode = "read-only"
+project_registration_owner = "existing bootstrap target add operation"
+project_unregistration_owner = "existing bootstrap target remove operation"
+bundle_target_mode = "read-only"
+bundle_target_registration_owner = "existing bootstrap target add operation"
+bundle_target_unregistration_owner = "existing bootstrap target remove operation"
+untrusted_project_behavior = "run user hook without registering or mounting the project"
+writable_hook_state = "existing shared-resident runtime hook-event spool"
+plugin_skill_projection = "canonical skill body with materializer-generated discovery frontmatter"
+
+[source_free_host_runtime]
+bundle_root_is_plugin_root = true
+host_entrypoint = "bootstrap.sh"
+host_lifecycle = "bootstrap/host/lifecycle/entrypoint.sh"
+resident_controller = "tools/runtime/container/bootstrap_runtime.py"
+hook_source = ".codex/hooks/hook_dispatcher.py"
+shared_resident_provisioning = "existing source-backed bootstrap lifecycle"
+bundle_source_mount = "read-only existing host-install mount"
+trusted_project_mount = "read-only target mount only after explicit trust"
 
 [identity]
 normalize_path_order = true
@@ -11,8 +43,19 @@ normalize_line_endings = true
 normalize_archive_timestamp = true
 exclude_wall_clock = true
 exclude_host_identity = true
+ordered_file_hashes = true
+aggregate_sha256 = true
 
 [install]
 reject_unowned_collision = true
 reject_symlink_traversal = true
 remove_modified_owned_files = false
+read_back_installed_hashes = true
+agent_guidance_install_command = "bootstrap.sh codex bundle-install"
+agent_guidance_remove_command = "bootstrap.sh codex bundle-uninstall"
+agent_guidance_projection = "copied files tracked by existing global-links.tsv"
+official_plugin_installation = true
+official_plugin_hook_trust_review = true
+plugin_install_owner = "Codex marketplace manager"
+plugin_remove_owner = "Codex plugin manager"
+uninstall_modified_files = "preserve-and-report-conflict"

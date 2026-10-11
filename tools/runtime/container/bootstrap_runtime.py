@@ -3477,6 +3477,11 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
             return runtime.codex_prepare()
         if args.codex_operation == "launch":
             return runtime.codex_launch(Path(args.project_root))
+        if args.codex_operation in {"hook", "hook-admission"}:
+            raise BootstrapError(
+                "container_control_unsupported",
+                "Codex hook actions are dispatched before resident state operations",
+            )
         raise BootstrapError(
             "container_control_unsupported",
             "unsupported Codex operation in resident controller",
@@ -3685,6 +3690,39 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _trusted_project_from_hook_input(raw: bytes) -> str | None:
+    """Return the exact Codex-trusted cwd from a transient framed request.
+
+    The host sends the read-only user config followed by one NUL byte and the
+    original hook JSON. Neither input is written to runtime state or echoed.
+    Missing, malformed, and explicitly untrusted settings all fail closed.
+    """
+    config_bytes, separator, hook_bytes = raw.partition(b"\0")
+    if not separator or b"\0" in hook_bytes:
+        return None
+    try:
+        config = tomllib.loads(config_bytes.decode("utf-8"))
+        payload = json.loads(hook_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError, tomllib.TOMLDecodeError):
+        return None
+    if not isinstance(config, dict) or not isinstance(payload, dict):
+        return None
+    project_root = payload.get("cwd")
+    if (
+        not isinstance(project_root, str)
+        or not project_root.startswith("/")
+        or any(character in project_root for character in "\x00\t\n\r")
+    ):
+        return None
+    projects = config.get("projects")
+    if not isinstance(projects, dict):
+        return None
+    project = projects.get(project_root)
+    if isinstance(project, dict) and project.get("trust_level") == "trusted":
+        return project_root
+    return None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the typed bootstrap command parser."""
     parser = argparse.ArgumentParser(description="AgentCanon shared runtime bootstrap")
@@ -3747,6 +3785,21 @@ def build_parser() -> argparse.ArgumentParser:
     codex_sub.add_parser("prepare")
     launch = codex_sub.add_parser("launch")
     launch.add_argument("--project-root", required=True)
+    hook = codex_sub.add_parser("hook", help=argparse.SUPPRESS)
+    hook.add_argument(
+        "--event",
+        choices=("UserPromptSubmit", "PreToolUse", "PostToolUse"),
+        required=True,
+    )
+    hook_admission = codex_sub.add_parser(
+        "hook-admission",
+        help=argparse.SUPPRESS,
+    )
+    hook_admission.add_argument(
+        "--event",
+        choices=("UserPromptSubmit", "PreToolUse", "PostToolUse"),
+        required=True,
+    )
     codex.add_argument("--project-root", dest="project_root_shorthand")
     evaluation = sub.add_parser("eval")
     eval_sub = evaluation.add_subparsers(dest="eval_operation", required=True)
@@ -3773,8 +3826,44 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the bootstrap CLI and emit a typed JSON receipt or error."""
+    args = build_parser().parse_args(argv)
+    if args.operation == "codex" and args.codex_operation == "hook-admission":
+        project_root = _trusted_project_from_hook_input(sys.stdin.buffer.read())
+        if project_root is None:
+            sys.stdout.write("untrusted\n")
+        else:
+            sys.stdout.write(f"trusted\t{project_root}\n")
+        return 0
+    if args.operation == "codex" and args.codex_operation == "hook":
+        try:
+            hook_directory = Path(args.repository_root) / ".codex" / "hooks"
+            if hook_directory.is_symlink() or not hook_directory.is_dir():
+                raise BootstrapError(
+                    "codex_hook_source_missing",
+                    "bundled canonical hook source is unavailable",
+                )
+            hook_directory_text = str(hook_directory)
+            if hook_directory_text not in sys.path:
+                sys.path.insert(0, hook_directory_text)
+            import hook_dispatcher
+
+            return hook_dispatcher.dispatch_event(args.event, sys.stdin.buffer.read())
+        except BootstrapError as exc:
+            print(
+                _json(
+                    {
+                        "schema": SCHEMA_RECEIPT,
+                        "status": "error",
+                        "code": exc.code,
+                        "detail": exc.detail,
+                        "evidence": exc.evidence,
+                    }
+                ),
+                file=sys.stderr,
+            )
+            return 2
     try:
-        result = run(build_parser().parse_args(argv))
+        result = run(args)
     except BootstrapError as exc:
         print(
             _json(

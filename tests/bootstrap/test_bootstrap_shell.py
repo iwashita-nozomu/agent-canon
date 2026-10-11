@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -83,6 +84,243 @@ _agent_canon_remove_global_links
         foreign_link.is_symlink() and foreign_link.resolve() == foreign_source.resolve()
     )
     assert system_sentinel.read_text(encoding="utf-8") == "system\n"
+
+
+def test_source_free_codex_bundle_registers_only_trusted_project_targets(
+    tmp_path: Path,
+) -> None:
+    """Bundled hooks reuse the resident, target API, and exact owned file cleanup."""
+    home = tmp_path / "home"
+    control = tmp_path / "control"
+    repository = tmp_path / "agent-canon"
+    bundle = tmp_path / "codex-plugin"
+    codex_home = tmp_path / "codex-home"
+    trusted = tmp_path / "trusted-project"
+    untrusted = tmp_path / "untrusted-project"
+    for path in (home, control, trusted, untrusted):
+        path.mkdir()
+    create_source_checkout(repository)
+    subprocess.run(
+        ["git", "-C", str(repository), "update-ref", "refs/heads/main", "HEAD"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
+        check=True,
+    )
+    fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
+    state_path = tmp_path / "docker-state.json"
+    environment = {
+        **os.environ,
+        "HOME": str(home),
+        "CODEX_HOME": str(codex_home),
+        "AGENT_CANON_DOCKER": str(fake_docker),
+        "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+    }
+    source_common = [
+        str(repository / "bootstrap.sh"),
+        "--repository-root",
+        str(repository),
+        "--control-parent-root",
+        str(control),
+    ]
+
+    installed = subprocess.run(
+        [*source_common, "install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert installed.returncode == 0, installed.stderr
+    exported = subprocess.run(
+        [
+            sys.executable,
+            str(repository / "tools/agent/templates/template_bundle.py"),
+            "export",
+            "--source-root",
+            str(repository),
+            "--source-ref",
+            "HEAD",
+            "--profile",
+            "codex-user",
+            "--output",
+            str(bundle),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert exported.returncode == 0, exported.stderr
+
+    bundle_common = [str(bundle / "bootstrap.sh"), "--control-parent-root", str(control)]
+    global_links = control / ".runtime" / "container-state" / "global-links.tsv"
+    link_record = (
+        f"link\t{home / '.agents/skills'}\t"
+        f"{repository / '.codex/personal/skills'}\n"
+    )
+    config_record = (
+        f"config\t{codex_home / 'config.toml'}\t"
+        f"{repository / '.codex/personal/config.toml'}\t600\t{'a' * 64}\n"
+    )
+    global_links.write_text(
+        "schema\tagent-canon.global-links.v1\n" + link_record + config_record,
+        encoding="utf-8",
+    )
+    bundle_install = subprocess.run(
+        [*bundle_common, "codex", "bundle-install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert bundle_install.returncode == 0, bundle_install.stderr
+    install_receipt = json.loads(bundle_install.stdout)
+    assert install_receipt["operation"] == "codex_bundle_install"
+    assert install_receipt["files"] > 1
+    manifest_lines = global_links.read_text(encoding="utf-8").splitlines()
+    assert link_record.rstrip("\n") in manifest_lines
+    assert config_record.rstrip("\n") in manifest_lines
+    bundle_records = [
+        line for line in global_links.read_text(encoding="utf-8").splitlines()
+        if line.startswith("bundle-file\t")
+    ]
+    assert len(bundle_records) == install_receipt["files"]
+    assert all(line.split("\t")[3] == "644" for line in bundle_records)
+    installed_guidance = codex_home / "AGENTS.md"
+    installed_agent = codex_home / "agents" / "agent-canon-worker.toml"
+    assert installed_guidance.read_bytes() == (bundle / "guidance/AGENTS.md").read_bytes()
+    assert installed_agent.read_bytes() == (bundle / "agents/agent-canon-worker.toml").read_bytes()
+
+    repeated_install = subprocess.run(
+        [*bundle_common, "codex", "bundle-install"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert repeated_install.returncode == 0, repeated_install.stderr
+    assert len(
+        [
+            line for line in global_links.read_text(encoding="utf-8").splitlines()
+            if line.startswith("bundle-file\t")
+        ]
+    ) == install_receipt["files"]
+
+    trusted_config = (
+        f"[projects.{json.dumps(str(trusted))}]\n"
+        'trust_level = "trusted"\n'
+        f"[projects.{json.dumps(str(untrusted))}]\n"
+        'trust_level = "untrusted"\n'
+    )
+    codex_config = codex_home / "config.toml"
+    codex_config.parent.mkdir(parents=True, exist_ok=True)
+    codex_config.write_text(trusted_config, encoding="utf-8")
+    config_before = codex_config.read_bytes()
+
+    def run_hook(project: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [*bundle_common, "codex", "hook", "UserPromptSubmit"],
+            input=json.dumps(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "cwd": str(project),
+                    "prompt": "a harmless fixture prompt",
+                }
+            ),
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=120,
+        )
+
+    first_hook = run_hook(trusted)
+    assert first_hook.returncode == 0, first_hook.stderr
+    mounts = control / ".runtime" / "container-state" / "mounts.tsv"
+    project_digest = hashlib.sha256(str(trusted.resolve()).encode("utf-8")).hexdigest()
+    package_digest = hashlib.sha256(str(bundle.resolve()).encode("utf-8")).hexdigest()
+    assert {line.split("\t")[1] for line in mounts.read_text().splitlines()} == {
+        package_digest,
+        project_digest,
+    }
+
+    repeated_hook = run_hook(trusted)
+    assert repeated_hook.returncode == 0, repeated_hook.stderr
+    assert {line.split("\t")[1] for line in mounts.read_text().splitlines()} == {
+        package_digest,
+        project_digest,
+    }
+
+    untrusted_hook = run_hook(untrusted)
+    assert untrusted_hook.returncode == 0, untrusted_hook.stderr
+    mounted_sources = {
+        line.split("\t")[2] for line in mounts.read_text(encoding="utf-8").splitlines()
+    }
+    assert str(untrusted.resolve()) not in mounted_sources
+    assert str(trusted.resolve()) in mounted_sources
+    assert codex_config.read_bytes() == config_before
+
+    removed_project = subprocess.run(
+        [
+            *bundle_common,
+            "target",
+            "remove",
+            "--root",
+            str(trusted),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert removed_project.returncode == 0, removed_project.stderr
+    assert str(trusted.resolve()) not in {
+        line.split("\t")[2] for line in mounts.read_text(encoding="utf-8").splitlines()
+    }
+
+    installed_guidance.write_text("user-owned edit\n", encoding="utf-8")
+    conflicted = subprocess.run(
+        [*bundle_common, "codex", "bundle-uninstall"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert conflicted.returncode == 2
+    assert installed_guidance.read_text(encoding="utf-8") == "user-owned edit\n"
+    installed_guidance.write_bytes((bundle / "guidance/AGENTS.md").read_bytes())
+    removed_bundle = subprocess.run(
+        [*bundle_common, "codex", "bundle-uninstall"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert removed_bundle.returncode == 0, removed_bundle.stderr
+    assert not installed_guidance.exists()
+    assert not installed_agent.exists()
+    assert not any(
+        line.startswith("bundle-file\t")
+        for line in global_links.read_text(encoding="utf-8").splitlines()
+    )
+    final_manifest_lines = global_links.read_text(encoding="utf-8").splitlines()
+    assert link_record.rstrip("\n") in final_manifest_lines
+    assert config_record.rstrip("\n") in final_manifest_lines
+    assert not any(
+        line.split("\t")[2] == str(bundle.resolve())
+        for line in mounts.read_text(encoding="utf-8").splitlines()
+    )
 
 
 def test_shell_install_preserves_unowned_skill_directory(
