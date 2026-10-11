@@ -50,7 +50,11 @@ def test_bundle_identity_has_profile_and_manifest_inputs() -> None:
 
 def test_template_bundle_imports_on_runtime_python() -> None:
     result = subprocess.run(
-        [sys.executable, "-c", "from tools.agent.templates.template_bundle import bundle_identity; print(bundle_identity.__name__)"],
+        [
+            sys.executable,
+            "-c",
+            "from tools.agent.templates.template_bundle import bundle_identity; print(bundle_identity.__name__)",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -113,8 +117,7 @@ def test_codex_user_profile_exports_source_free_plugin_and_verified_projection(
     assert verified["bundle_digest"] == identity["bundle_digest"]
     assert any(row["component"] == "agent" for row in verified["install_files"])
     assert {
-        (row["component"], row["destination"])
-        for row in verified["install_files"]
+        (row["component"], row["destination"]) for row in verified["install_files"]
     }.issuperset({("guidance", "codex/AGENTS.md")})
 
     (first / "hooks" / "hooks.json").write_text("{}\n", encoding="utf-8")

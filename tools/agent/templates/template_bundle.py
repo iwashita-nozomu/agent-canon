@@ -38,9 +38,13 @@ class TemplateBundleError(RuntimeError):
 
 
 def _git(root: Path, *args: str) -> bytes:
-    result = subprocess.run(["git", "-C", str(root), *args], check=False, capture_output=True)
+    result = subprocess.run(
+        ["git", "-C", str(root), *args], check=False, capture_output=True
+    )
     if result.returncode:
-        raise TemplateBundleError(result.stderr.decode("utf-8", "replace").strip() or "git command failed")
+        raise TemplateBundleError(
+            result.stderr.decode("utf-8", "replace").strip() or "git command failed"
+        )
     return result.stdout
 
 
@@ -73,7 +77,9 @@ def _entries(root: Path, commit: str, roots: list[str]) -> list[tuple[str, str]]
         metadata, raw_path = record.split(b"\t", 1)
         mode, kind, _object_id = metadata.decode().split(" ", 2)
         path = raw_path.decode()
-        if kind == "blob" and any(path == root_path or path.startswith(root_path + "/") for root_path in roots):
+        if kind == "blob" and any(
+            path == root_path or path.startswith(root_path + "/") for root_path in roots
+        ):
             entries.append((path, mode))
     return sorted(entries)
 
@@ -104,7 +110,9 @@ def _codex_user_hook_configuration(root: Path, commit: str) -> bytes:
             projected_hooks: list[dict[str, Any]] = []
             for hook in group["hooks"]:
                 if not isinstance(hook, dict) or hook.get("type") != "command":
-                    raise TemplateBundleError(f"canonical hook command is invalid: {event}")
+                    raise TemplateBundleError(
+                        f"canonical hook command is invalid: {event}"
+                    )
                 projected_hook = dict(hook)
                 projected_hook["command"] = (
                     'bash "${PLUGIN_ROOT}/bootstrap.sh" '
@@ -115,14 +123,18 @@ def _codex_user_hook_configuration(root: Path, commit: str) -> bytes:
             projected_group["hooks"] = projected_hooks
             projected_groups.append(projected_group)
         projected["hooks"][event] = projected_groups
-    return (json.dumps(projected, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
+    return (
+        json.dumps(projected, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode()
 
 
 def _codex_skill_frontmatter(content: bytes, skill: str) -> bytes:
     """Reuse the generated shim's plugin discovery metadata, not its source link."""
     match = re.match(rb"\A---\r?\n.*?\r?\n---\r?\n", content, re.DOTALL)
     if match is None:
-        raise TemplateBundleError(f"generated Codex skill frontmatter is invalid: {skill}")
+        raise TemplateBundleError(
+            f"generated Codex skill frontmatter is invalid: {skill}"
+        )
     frontmatter = match.group(0)
     try:
         lines = frontmatter.decode("utf-8").splitlines()
@@ -149,7 +161,9 @@ def _codex_user_payload(
     canonical_skills: dict[str, bytes] = {}
     for source_path, mode in entries:
         if mode not in {"100644", "100755"}:
-            raise TemplateBundleError(f"Codex bundle source is not a regular file: {source_path}")
+            raise TemplateBundleError(
+                f"Codex bundle source is not a regular file: {source_path}"
+            )
         content = _blob(root, commit, source_path)
         if source_path == "ROOT_AGENTS.md":
             root_guidance = content
@@ -160,10 +174,14 @@ def _codex_user_payload(
         if source_path.startswith(".codex/agents/"):
             filename = source_path.rsplit("/", 1)[-1]
             if source_path.count("/") != 2 or not filename.endswith(".toml"):
-                raise TemplateBundleError("Codex bundle agent source is not a direct TOML child")
+                raise TemplateBundleError(
+                    "Codex bundle agent source is not a direct TOML child"
+                )
             destination = f"agents/agent-canon-{filename}"
             if destination in payload:
-                raise TemplateBundleError("Codex bundle agent destination is duplicated")
+                raise TemplateBundleError(
+                    "Codex bundle agent destination is duplicated"
+                )
             payload[destination] = content
             payload_modes[destination] = mode
             install_files.append(
@@ -178,7 +196,9 @@ def _codex_user_payload(
             relative = source_path.removeprefix(".codex/personal/skills/")
             parts = relative.split("/")
             if len(parts) != 2 or parts[1] != "SKILL.md":
-                raise TemplateBundleError("Codex skill materialization is not one-file scoped")
+                raise TemplateBundleError(
+                    "Codex skill materialization is not one-file scoped"
+                )
             skill = parts[0]
             if skill in skill_frontmatter:
                 raise TemplateBundleError(f"Codex skill view is duplicated: {skill}")
@@ -274,7 +294,9 @@ def _codex_user_bundle_digest(
         digest.update(path.encode() + b"\0" + hashlib.sha256(content).digest() + b"\0")
     for record in install_files:
         digest.update(
-            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+            json.dumps(
+                record, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode()
             + b"\0"
         )
     return digest.hexdigest()
@@ -286,7 +308,9 @@ def bundle_identity(root: Path, source_ref: str, profile: str) -> dict[str, Any]
     commit = _commit(root, source_ref)
     manifest, manifest_digest = _manifest(root, commit)
     profile_record = manifest["profiles"].get(profile)
-    if not isinstance(profile_record, dict) or not isinstance(profile_record.get("roots"), list):
+    if not isinstance(profile_record, dict) or not isinstance(
+        profile_record.get("roots"), list
+    ):
         raise TemplateBundleError(f"unknown template profile: {profile}")
     roots = [str(item) for item in profile_record["roots"]]
     digest = hashlib.sha256()
@@ -302,7 +326,9 @@ def bundle_identity(root: Path, source_ref: str, profile: str) -> dict[str, Any]
         payload, _payload_modes, install_files = _codex_user_payload(
             root, commit, entries
         )
-        source_tree = _git(root, "rev-parse", "--verify", f"{commit}^{{tree}}").decode().strip()
+        source_tree = (
+            _git(root, "rev-parse", "--verify", f"{commit}^{{tree}}").decode().strip()
+        )
         return {
             "schema": CODEX_USER_SCHEMA,
             "source_commit": commit,
@@ -352,7 +378,9 @@ def _codex_user_manifest(
     }
 
 
-def export_bundle(*, source_root: Path, source_ref: str, profile: str, output: Path) -> dict[str, Any]:
+def export_bundle(
+    *, source_root: Path, source_ref: str, profile: str, output: Path
+) -> dict[str, Any]:
     """Export one profile without touching source or consumer repositories."""
     source_root = source_root.resolve()
     output = output if output.is_absolute() else Path.cwd() / output
@@ -371,7 +399,9 @@ def export_bundle(*, source_root: Path, source_ref: str, profile: str, output: P
             identity["source_commit"],
             [
                 str(item)
-                for item in _manifest(source_root, identity["source_commit"])[0]["profiles"][profile]["roots"]
+                for item in _manifest(source_root, identity["source_commit"])[0][
+                    "profiles"
+                ][profile]["roots"]
             ],
         )
         payload, payload_modes, install_files = _codex_user_payload(
@@ -385,7 +415,8 @@ def export_bundle(*, source_root: Path, source_ref: str, profile: str, output: P
                 destination.chmod(0o755)
         bundle_manifest = _codex_user_manifest(identity, payload, install_files)
         (output / CODEX_USER_MANIFEST).write_text(
-            json.dumps(bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            json.dumps(bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n",
             encoding="utf-8",
         )
         return {**identity, "output": str(output)}
@@ -460,7 +491,9 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
             or not HEX_64.fullmatch(sha256)
             or relative <= previous
         ):
-            raise TemplateBundleError("Codex user bundle file path or digest is invalid")
+            raise TemplateBundleError(
+                "Codex user bundle file path or digest is invalid"
+            )
         previous = relative
         candidate = root.joinpath(*PurePosixPath(relative).parts)
         current = root
@@ -472,7 +505,9 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
             raise TemplateBundleError(f"Codex user bundle file is missing: {relative}")
         content = candidate.read_bytes()
         if hashlib.sha256(content).hexdigest() != sha256:
-            raise TemplateBundleError(f"Codex user bundle file digest differs: {relative}")
+            raise TemplateBundleError(
+                f"Codex user bundle file digest differs: {relative}"
+            )
         payload[relative] = content
 
     actual: set[str] = set()
@@ -501,7 +536,11 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
     normalized_installs: list[dict[str, str]] = []
     seen_destinations: set[str] = set()
     for row in installs:
-        if not isinstance(row, dict) or set(row) != {"component", "bundle_path", "destination"}:
+        if not isinstance(row, dict) or set(row) != {
+            "component",
+            "bundle_path",
+            "destination",
+        }:
             raise TemplateBundleError("Codex user bundle install record is invalid")
         component = row["component"]
         bundle_path = row["bundle_path"]
@@ -526,12 +565,20 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
         if component == "guidance" and not (
             bundle_path == "guidance/AGENTS.md" and destination == "codex/AGENTS.md"
         ):
-            raise TemplateBundleError("Codex user bundle guidance destination is invalid")
+            raise TemplateBundleError(
+                "Codex user bundle guidance destination is invalid"
+            )
         seen_destinations.add(destination)
         normalized_installs.append(
-            {"component": component, "bundle_path": bundle_path, "destination": destination}
+            {
+                "component": component,
+                "bundle_path": bundle_path,
+                "destination": destination,
+            }
         )
-    normalized_installs.sort(key=lambda item: (item["destination"], item["bundle_path"]))
+    normalized_installs.sort(
+        key=lambda item: (item["destination"], item["bundle_path"])
+    )
     expected_installs = [
         {
             "component": "agent",
