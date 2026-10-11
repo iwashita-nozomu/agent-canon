@@ -10,7 +10,7 @@ upstream design code-visualization.md sole public visualization owner and typed 
 upstream design report-writing.md report evidence and optional structure boundary
 upstream design structure-planning.md actual structural decision owner
 upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md responsibility-owned validation selection
-downstream implementation ../../tests/tools/test_fix_mermaid.py tests formatter and post-format coverage behavior
+downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax checks
 @dependency-end
 -->
 
@@ -31,21 +31,20 @@ an AgentCanon checker. If a check reports a path, inspect the relevant text and
 repair that formatting, link, heading, math, or Mermaid issue. Route semantic or
 cross-document findings to the content owner.
 
-The AgentCanon docs route uses the pinned `markdownlint-cli2` configuration at
-`.markdownlint-cli2.jsonc` for heading increments, trailing spaces, hard tabs,
-list spacing, and fenced-code languages. Per-depth unordered-marker consistency
-remains repository-specific because the standard `sublist` rule also requires
-parent and child markers to differ. Use `agent-canon docs check` so these
-provider findings stay composed with the repository's local-link, math,
-bootstrap-documentation, and runtime-profile checks.
-The `0.17.2` pin reuses the shared Node 18 runtime; `0.23.3` requires Node 22,
-which is outside this documentation-check migration.
+The AgentCanon docs route invokes the configured `markdownlint-cli2` and offline
+`lychee` providers directly, then uses Quarto's embedded Pandoc AST for
+workspace-absolute local-target policy and Mermaid-block selection. `mmdc`
+validates Mermaid syntax in a temporary output directory without rewriting the
+source. The repository-specific residuals are per-depth unordered-marker
+consistency, exact math delimiter spelling, bootstrap documentation, and the
+runtime-profile inventory. Standard-tool output and exit status remain native.
 
-Use the selected math/Mermaid formatter when available. Preserve existing
-delimiter and literal-command conventions. After a formatter/fixer edit, rerun
-the same required check when it can establish the corrected property, reusing a
-nearby result from that command. Inspect the final change for readability and
-meaning: formatting success alone does not establish content correctness.
+`agent-canon docs format` only normalizes line endings, trailing whitespace, and
+repeated blank lines before rerunning `docs check`. It does not change math or
+diagram meaning. Make content repairs deliberately, then run the selected check
+when it establishes the corrected property. Inspect the final change for
+readability and meaning; formatting success alone does not establish content
+correctness.
 
 ## Boundary
 

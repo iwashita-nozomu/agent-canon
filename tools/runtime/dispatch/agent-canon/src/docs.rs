@@ -1,22 +1,22 @@
 // @dependency-start
 // contract implementation
-// responsibility Provides unified Rust Markdown documentation formatting and checks.
+// responsibility Composes native Markdown providers with AgentCanon-specific documentation checks.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
-// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests syntax-only Mermaid formatting
+// downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // @dependency-end
 
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
-static MARKDOWNLINT_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+static DOCS_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -48,34 +48,6 @@ const DERIVED_REPO_STALE_STRINGS: &[&str] = &[
 
 const SKIP_PARTS: &[&str] = &[".git", ".worktrees", "__pycache__", "Archive", "target"];
 
-const MERMAID_LANGS: &[&str] = &["mermaid", "mermeid"];
-const MERMAID_RESERVED_NODE_IDS: &[&str] = &[
-    "class",
-    "classdef",
-    "click",
-    "direction",
-    "end",
-    "flowchart",
-    "graph",
-    "linkstyle",
-    "style",
-    "subgraph",
-];
-const MERMAID_DIRECTIVES: &[&str] = &[
-    "flowchart",
-    "graph",
-    "sequencediagram",
-    "classdiagram",
-    "statediagram",
-    "statediagram-v2",
-    "erdiagram",
-    "journey",
-    "gantt",
-    "pie",
-    "mindmap",
-    "timeline",
-];
-const FLOW_DIRECTIONS: &[&str] = &["bt", "lr", "rl", "tb", "td"];
 const RUNTIME_PROFILE_DEPENDENCY_HEADER: &str = "<!--
 @dependency-start
 contract reference
@@ -95,28 +67,18 @@ struct Args {
     command: DocsCommand,
     root: PathBuf,
     paths: Vec<String>,
-    output_format: OutputFormat,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DocsCommand {
     Check,
     Format,
-    FixMath,
-    FixMermaid,
     RenderRuntimeProfile,
     Help,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum OutputFormat {
-    Text,
-    Json,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct Finding {
-    check: &'static str,
     path: Option<PathBuf>,
     line: Option<usize>,
     message: String,
@@ -124,7 +86,6 @@ struct Finding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct WriteSummary {
-    action: &'static str,
     changed_files: usize,
     changes: usize,
 }
@@ -133,7 +94,7 @@ pub fn run(args: &[String]) -> i32 {
     match Args::parse(args) {
         Ok(parsed) => run_parsed(parsed),
         Err(message) => {
-            render_tool_error("DOCS_TOOL", "invalid-arguments", &message);
+            eprintln!("docs: {message}");
             print_usage();
             2
         }
@@ -147,28 +108,8 @@ fn run_parsed(args: Args) -> i32 {
             print_usage();
             0
         }
-        DocsCommand::Check => render_check(&root, &args.paths, &args.output_format),
-        DocsCommand::Format => render_write_then_check(
-            &root,
-            &args.paths,
-            &args.output_format,
-            "format",
-            format_markdown_files,
-        ),
-        DocsCommand::FixMath => render_write_then_check(
-            &root,
-            &args.paths,
-            &args.output_format,
-            "fix-math",
-            fix_math_files,
-        ),
-        DocsCommand::FixMermaid => render_write_then_check(
-            &root,
-            &args.paths,
-            &args.output_format,
-            "fix-mermaid",
-            fix_mermaid_files,
-        ),
+        DocsCommand::Check => render_check(&root, &args.paths),
+        DocsCommand::Format => render_format(&root, &args.paths),
         DocsCommand::RenderRuntimeProfile => render_runtime_profile_command(&root),
     }
 }
@@ -178,8 +119,6 @@ impl Args {
         let command = match args.first().map(|item| item.as_str()) {
             Some("check") => DocsCommand::Check,
             Some("format") => DocsCommand::Format,
-            Some("fix-math") => DocsCommand::FixMath,
-            Some("fix-mermaid") => DocsCommand::FixMermaid,
             Some("render-runtime-profile") => DocsCommand::RenderRuntimeProfile,
             Some("help") | Some("--help") | Some("-h") => DocsCommand::Help,
             Some(other) => return Err(format!("unknown docs command {other}")),
@@ -188,7 +127,6 @@ impl Args {
 
         let mut root = PathBuf::from(".");
         let mut paths = Vec::new();
-        let mut output_format = OutputFormat::Text;
         let mut index = 1;
         while index < args.len() {
             match args[index].as_str() {
@@ -199,23 +137,11 @@ impl Args {
                     root = PathBuf::from(value);
                     index += 2;
                 }
-                "--format" => {
-                    let value = args
-                        .get(index + 1)
-                        .ok_or_else(|| "--format requires a value".to_string())?;
-                    output_format = match value.as_str() {
-                        "text" => OutputFormat::Text,
-                        "json" => OutputFormat::Json,
-                        _ => return Err(format!("unknown --format value {value}")),
-                    };
-                    index += 2;
-                }
                 "--help" | "-h" => {
                     return Ok(Self {
                         command: DocsCommand::Help,
                         root,
                         paths,
-                        output_format,
                     });
                 }
                 value if value.starts_with("--") => {
@@ -232,7 +158,6 @@ impl Args {
             command,
             root,
             paths,
-            output_format,
         })
     }
 }
@@ -243,14 +168,11 @@ fn usage_text() -> &'static str {
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
-  fix-math                normalize Markdown math notation, then run the adjacent docs check\n\
-  fix-mermaid             normalize Mermaid fenced blocks and node labels, then run the adjacent docs check\n\
   render-runtime-profile  render the runtime profile inventory\n\
   help, -h, --help        show this command contract\n\
 \n\
 options:\n\
   --root <repo-root>      repository root to evaluate; defaults to the current directory\n\
-  --format text|json      output format for check results; defaults to text\n\
 \n\
 examples:\n\
   tools/bin/agent-canon docs -h\n\
@@ -278,137 +200,65 @@ fn render_runtime_profile_command(root: &Path) -> i32 {
     }
 }
 
-fn render_check(root: &Path, raw_paths: &[String], output_format: &OutputFormat) -> i32 {
-    let findings = collect_check_findings(root, raw_paths);
-    render_findings(&findings, root, output_format)
-}
-
-fn render_write_then_check(
-    root: &Path,
-    raw_paths: &[String],
-    output_format: &OutputFormat,
-    action: &'static str,
-    writer: fn(&Path, &[String]) -> io::Result<WriteSummary>,
-) -> i32 {
-    let summary = match writer(root, raw_paths) {
-        Ok(summary) => summary,
-        Err(error) => {
-            let report_name = format!("DOCS_{}", action.to_ascii_uppercase().replace('-', "_"));
-            render_tool_error(&report_name, "write-error", &error.to_string());
-            return 1;
-        }
-    };
-    match output_format {
-        OutputFormat::Text => {
-            println!(
-                "DOCS_{}=wrote changed_files={} changes={}",
-                summary.action.to_ascii_uppercase().replace('-', "_"),
-                summary.changed_files,
-                summary.changes
-            );
-        }
-        OutputFormat::Json => {
-            println!(
-                "{{\"action\":\"{}\",\"changed_files\":{},\"changes\":{}}}",
-                json_escape(summary.action),
-                summary.changed_files,
-                summary.changes
-            );
+fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
+    let markdown_files = collect_markdown_files(root, raw_paths);
+    let mut succeeded = run_markdownlint_cli(root, &markdown_files);
+    succeeded &= run_lychee(root, &markdown_files);
+    let mut findings = Vec::new();
+    for path in &markdown_files {
+        let text = match fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) => {
+                findings.push(Finding {
+                    path: Some(path.clone()),
+                    line: None,
+                    message: format!("cannot read Markdown source: {error}"),
+                });
+                succeeded = false;
+                continue;
+            }
+        };
+        findings.extend(check_list_marker_consistency_by_depth(path, &text));
+        match read_document_ast(root, path) {
+            Ok(document) => {
+                findings.extend(check_workspace_absolute_links(root, path, &document.links));
+                findings.extend(check_markdown_math(path, &text, &document.math_fences));
+                if document.has_mermaid {
+                    succeeded &= run_mermaid_cli(root, path);
+                }
+            }
+            Err(message) => {
+                eprintln!("{}: {message}", display_path(root, path));
+                succeeded = false;
+            }
         }
     }
-    let findings = collect_check_findings(root, raw_paths);
-    render_findings(&findings, root, output_format)
-}
-
-fn render_findings(findings: &[Finding], root: &Path, output_format: &OutputFormat) -> i32 {
-    match output_format {
-        OutputFormat::Text => {
-            if findings.is_empty() {
-                println!("DOCS_CHECK=pass");
-                return 0;
-            }
-            eprintln!("DOCS_CHECK=fail");
-            for finding in findings {
-                let path = finding
-                    .path
-                    .as_ref()
-                    .map(|path| display_path(root, path))
-                    .unwrap_or_else(|| "-".to_string());
-                let line = finding
-                    .line
-                    .map(|line| line.to_string())
-                    .unwrap_or_else(|| "-".to_string());
-                eprintln!(
-                    "DOCS_CHECK_FINDING={}:{}:{}:{}",
-                    finding.check, path, line, finding.message
-                );
-            }
-            eprint!("{}", structured_findings_report(findings, root));
-        }
-        OutputFormat::Json => {
-            let mut output = String::from("{\"status\":\"");
-            output.push_str(if findings.is_empty() { "pass" } else { "fail" });
-            output.push_str("\",\"findings\":[");
-            for (index, finding) in findings.iter().enumerate() {
-                if index > 0 {
-                    output.push(',');
-                }
-                output.push_str("{\"check\":\"");
-                output.push_str(&json_escape(finding.check));
-                output.push_str("\",\"path\":");
-                if let Some(path) = &finding.path {
-                    output.push('"');
-                    output.push_str(&json_escape(&display_path(root, path)));
-                    output.push('"');
-                } else {
-                    output.push_str("null");
-                }
-                output.push_str(",\"line\":");
-                if let Some(line) = finding.line {
-                    output.push_str(&line.to_string());
-                } else {
-                    output.push_str("null");
-                }
-                output.push_str(",\"message\":\"");
-                output.push_str(&json_escape(&finding.message));
-                output.push_str("\"}");
-            }
-            output.push_str("]}");
-            println!("{output}");
-        }
-    }
-    if findings.is_empty() {
+    findings.extend(check_bootstrap_docs(root));
+    findings.extend(check_runtime_profile_inventory(root));
+    succeeded &= render_findings(&findings, root);
+    if succeeded {
         0
     } else {
         1
     }
 }
 
-fn render_tool_error(report_name: &str, kind: &str, detail: &str) {
-    eprintln!("{report_name}=fail");
-    eprintln!("DOCS_TOOL_FINDING={kind}:{detail}");
-    eprintln!("DOCS_TOOL_REPORT_BEGIN");
-    eprintln!("status: fail");
-    eprintln!("summary: AgentCanon docs tool failed before completing the requested operation.");
-    eprintln!("findings:");
-    eprintln!("- kind: {kind}");
-    eprintln!("  detail: {detail}");
-    eprintln!("next_action:");
-    eprintln!("- Use the machine-readable finding above as the repair target.");
-    eprintln!("- Run `tools/bin/agent-canon docs -h` for the command contract and option list.");
-    eprintln!("- Do not inspect implementation files unless this report lacks the needed contract detail.");
-    eprintln!("DOCS_TOOL_REPORT_END");
+fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
+    let summary = match format_markdown_files(root, raw_paths) {
+        Ok(summary) => summary,
+        Err(error) => {
+            eprintln!("docs format: {error}");
+            return 1;
+        }
+    };
+    println!(
+        "docs format: {} file(s), {} change(s)",
+        summary.changed_files, summary.changes
+    );
+    render_check(root, raw_paths)
 }
 
-fn structured_findings_report(findings: &[Finding], root: &Path) -> String {
-    let mut report = String::new();
-    report.push_str("DOCS_CHECK_REPORT_BEGIN\n");
-    report.push_str("status: fail\n");
-    report.push_str(&format!(
-        "summary: Documentation checks found {} issue(s). Use these locations before reading broader files.\n",
-        findings.len()
-    ));
-    report.push_str("findings:\n");
+fn render_findings(findings: &[Finding], root: &Path) -> bool {
     for finding in findings {
         let path = finding
             .path
@@ -417,35 +267,205 @@ fn structured_findings_report(findings: &[Finding], root: &Path) -> String {
             .unwrap_or_else(|| "-".to_string());
         let line = finding
             .line
-            .map(|line| line.to_string())
-            .unwrap_or_else(|| "-".to_string());
-        report.push_str(&format!("- check: {}\n", finding.check));
-        report.push_str(&format!("  location: {path}:{line}\n"));
-        report.push_str(&format!("  problem: {}\n", finding.message));
+            .map(|line| format!(":{line}"))
+            .unwrap_or_default();
+        eprintln!("{}{}: {}", path, line, finding.message);
     }
-    report.push_str("next_action:\n");
-    report.push_str("- Open only the reported location and nearby lines needed for the repair.\n");
-    report.push_str("- Prefer `tools/bin/agent-canon docs format`, `fix-math`, or `fix-mermaid` when the finding is mechanical.\n");
-    report.push_str("- Rerun `tools/bin/agent-canon docs check <paths...>` after the repair.\n");
-    report.push_str("DOCS_CHECK_REPORT_END\n");
-    report
+    findings.is_empty()
 }
 
-fn collect_check_findings(root: &Path, raw_paths: &[String]) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let markdown_files = collect_markdown_files(root, raw_paths);
-    findings.extend(check_markdown_lint(root, &markdown_files));
-    findings.extend(check_markdown_math(&markdown_files));
-    findings.extend(check_markdown_links(root, &markdown_files));
-    findings.extend(check_bootstrap_docs(root));
-    findings.extend(check_runtime_profile_inventory(root));
-    findings
+fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
+    if files.is_empty() {
+        return true;
+    }
+    let mut command = Command::new("markdownlint-cli2");
+    command
+        .current_dir(root)
+        .arg("--config")
+        .arg(root.join(".markdownlint-cli2.jsonc"))
+        .arg("--no-globs");
+    for path in files {
+        command.arg(format!(":{}", path.display()));
+    }
+    run_native_command("markdownlint-cli2", &mut command)
+}
+
+fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
+    if files.is_empty() {
+        return true;
+    }
+    let mut inputs = Vec::with_capacity(files.len());
+    for path in files {
+        let Some(relative) = pathdiff::diff_paths(path, root) else {
+            eprintln!(
+                "lychee: cannot make Markdown input relative to docs root: {}",
+                path.display()
+            );
+            return false;
+        };
+        inputs.push(relative);
+    }
+
+    let mut command = Command::new("lychee");
+    command
+        .current_dir(root)
+        .arg("--config")
+        .arg(root.join("tools/validation/documentation/config/lychee.toml"))
+        .args(inputs);
+    run_native_command("lychee", &mut command)
+}
+
+fn run_native_command(name: &str, command: &mut Command) -> bool {
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(error) => {
+            eprintln!("{name}: {error}");
+            return false;
+        }
+    };
+    let stdout_ok = io::stdout().lock().write_all(&output.stdout).is_ok();
+    let stderr_ok = io::stderr().lock().write_all(&output.stderr).is_ok();
+    stdout_ok && stderr_ok && output.status.success()
+}
+
+#[derive(Default)]
+struct DocumentAst {
+    links: Vec<String>,
+    math_fences: Vec<String>,
+    has_mermaid: bool,
+}
+
+fn read_document_ast(root: &Path, path: &Path) -> Result<DocumentAst, String> {
+    let output = Command::new("quarto")
+        .current_dir(root)
+        .arg("pandoc")
+        .arg(path)
+        .arg("--to=json")
+        .output()
+        .map_err(|error| format!("quarto pandoc: {error}"))?;
+    if !output.status.success() {
+        let _ = io::stdout().lock().write_all(&output.stdout);
+        let _ = io::stderr().lock().write_all(&output.stderr);
+        return Err(format!("quarto pandoc exited with {}", output.status));
+    }
+    let document: Value = serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("quarto pandoc emitted invalid JSON AST: {error}"))?;
+    let mut ast = DocumentAst::default();
+    collect_document_ast(&document, &mut ast);
+    Ok(ast)
+}
+
+fn collect_document_ast(value: &Value, document: &mut DocumentAst) {
+    if let Some(kind) = value.get("t").and_then(Value::as_str) {
+        match kind {
+            "Link" | "Image" => {
+                if let Some(target) = value
+                    .get("c")
+                    .and_then(Value::as_array)
+                    .and_then(|content| content.get(2))
+                    .and_then(Value::as_array)
+                    .and_then(|target| target.first())
+                    .and_then(Value::as_str)
+                {
+                    document.links.push(target.to_string());
+                }
+            }
+            "CodeBlock" => {
+                if let Some(classes) = value
+                    .get("c")
+                    .and_then(Value::as_array)
+                    .and_then(|content| content.first())
+                    .and_then(Value::as_array)
+                    .and_then(|attributes| attributes.get(1))
+                    .and_then(Value::as_array)
+                {
+                    for class in classes.iter().filter_map(Value::as_str) {
+                        match class.to_ascii_lowercase().as_str() {
+                            "mermaid" => document.has_mermaid = true,
+                            "math" | "latex" | "tex" => {
+                                document.math_fences.push(class.to_ascii_lowercase());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_document_ast(item, document);
+            }
+        }
+        Value::Object(fields) => {
+            for item in fields.values() {
+                collect_document_ast(item, document);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn run_mermaid_cli(root: &Path, path: &Path) -> bool {
+    let directory = match DocsTemporaryDirectory::create("mermaid") {
+        Ok(directory) => directory,
+        Err(error) => {
+            eprintln!("mmdc: cannot create temporary directory: {error}");
+            return false;
+        }
+    };
+    let config = directory.0.join("puppeteer.json");
+    if let Err(error) = fs::write(&config, br#"{"args":["--no-sandbox"]}"#) {
+        eprintln!("mmdc: cannot write Puppeteer configuration: {error}");
+        return false;
+    }
+    let rendered_markdown = directory.0.join("rendered.md");
+    let mut command = Command::new("mmdc");
+    command
+        .current_dir(root)
+        .arg("--puppeteerConfigFile")
+        .arg(config)
+        .arg("-i")
+        .arg(path)
+        .arg("-o")
+        .arg(rendered_markdown);
+    run_native_command("mmdc", &mut command)
+}
+
+struct DocsTemporaryDirectory(PathBuf);
+
+impl DocsTemporaryDirectory {
+    fn create(purpose: &str) -> io::Result<Self> {
+        for _ in 0..32 {
+            let sequence = DOCS_TEMP_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "agent-canon-docs-{purpose}-{}-{sequence}",
+                std::process::id()
+            ));
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self(path)),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "could not allocate a unique docs temporary directory",
+        ))
+    }
+}
+
+impl Drop for DocsTemporaryDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 fn format_markdown_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, "format", |text| {
+    rewrite_markdown_files(root, raw_paths, |text| {
         let text = text.replace("\r\n", "\n").replace('\r', "\n");
-        let (text, mermaid_changes) = fix_mermaid_markdown(&text);
         let lines = text.split('\n').map(str::trim_end);
         let mut output = Vec::new();
         let mut blank_count = 0usize;
@@ -461,22 +481,13 @@ fn format_markdown_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteS
         }
         let formatted = output.join("\n").trim_end_matches('\n').to_string() + "\n";
         let extra_changes = if formatted != text { 1 } else { 0 };
-        (formatted, mermaid_changes + extra_changes)
+        (formatted, extra_changes)
     })
-}
-
-fn fix_math_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, "fix-math", fix_markdown_math)
-}
-
-fn fix_mermaid_files(root: &Path, raw_paths: &[String]) -> io::Result<WriteSummary> {
-    rewrite_markdown_files(root, raw_paths, "fix-mermaid", fix_mermaid_markdown)
 }
 
 fn rewrite_markdown_files(
     root: &Path,
     raw_paths: &[String],
-    action: &'static str,
     rewrite: fn(&str) -> (String, usize),
 ) -> io::Result<WriteSummary> {
     let mut changed_files = 0usize;
@@ -490,10 +501,9 @@ fn rewrite_markdown_files(
         fs::write(&path, updated)?;
         changed_files += 1;
         changes += file_changes.max(1);
-        println!("DOCS_WRITE_FILE={}", display_path(root, &path));
+        println!("formatted {}", display_path(root, &path));
     }
     Ok(WriteSummary {
-        action,
         changed_files,
         changes,
     })
@@ -549,29 +559,6 @@ fn skip_path(path: &Path) -> bool {
     })
 }
 
-fn check_markdown_lint(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let mut readable_files = Vec::new();
-    for path in files {
-        let Ok(text) = fs::read_to_string(path) else {
-            findings.push(Finding {
-                check: "markdown-lint",
-                path: Some(path.clone()),
-                line: None,
-                message: "file is not readable as UTF-8".to_string(),
-            });
-            continue;
-        };
-        // Markdownlint has no mode for the repository's per-depth marker rule:
-        // its `sublist` mode also requires nested levels to use different
-        // markers. Keep only that non-overlapping rule here.
-        findings.extend(check_list_marker_consistency_by_depth(path, &text));
-        readable_files.push(path.clone());
-    }
-    findings.extend(check_markdownlint_cli(root, &readable_files));
-    findings
-}
-
 fn check_list_marker_consistency_by_depth(path: &Path, text: &str) -> Vec<Finding> {
     let mut markers: BTreeMap<usize, BTreeSet<char>> = BTreeMap::new();
     for line in text.lines() {
@@ -585,7 +572,6 @@ fn check_list_marker_consistency_by_depth(path: &Path, text: &str) -> Vec<Findin
         .into_iter()
         .filter(|(_, values)| values.len() > 1)
         .map(|(depth, values)| Finding {
-            check: "markdown-lint",
             path: Some(path.to_path_buf()),
             line: None,
             message: format!(
@@ -602,155 +588,6 @@ fn unordered_marker(line: &str) -> Option<char> {
         Some(marker)
     } else {
         None
-    }
-}
-
-fn check_markdownlint_cli(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
-    if files.is_empty() {
-        return Vec::new();
-    }
-    match run_markdownlint_cli(root, files) {
-        Ok(findings) => findings,
-        Err(message) => vec![Finding {
-            check: "markdown-lint",
-            path: None,
-            line: None,
-            message,
-        }],
-    }
-}
-
-fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> Result<Vec<Finding>, String> {
-    let config_path = root.join(".markdownlint-cli2.jsonc");
-    let config_text = fs::read_to_string(&config_path)
-        .map_err(|error| format!("cannot read {}: {error}", config_path.display()))?;
-    let mut config: Value = serde_json::from_str(&config_text)
-        .map_err(|error| format!("invalid {}: {error}", config_path.display()))?;
-    let config_object = config
-        .as_object_mut()
-        .ok_or_else(|| format!("{} must contain a JSON object", config_path.display()))?;
-
-    let output_directory = MarkdownlintOutputDirectory::create()
-        .map_err(|error| format!("cannot create markdownlint output directory: {error}"))?;
-    let results_name = "markdownlint-results.json";
-    config_object.insert(
-        "outputFormatters".to_string(),
-        serde_json::json!([["markdownlint-cli2-formatter-json", {"name": results_name}]]),
-    );
-    let command_config = output_directory.0.join(".markdownlint-cli2.jsonc");
-    fs::write(
-        &command_config,
-        serde_json::to_vec(&config)
-            .map_err(|error| format!("cannot serialize markdownlint config: {error}"))?,
-    )
-    .map_err(|error| format!("cannot write {}: {error}", command_config.display()))?;
-
-    let mut command = Command::new("markdownlint-cli2");
-    command
-        // The first-party JSON formatter resolves its relative `name` in the
-        // process working directory, so keep its result in this owned temp dir.
-        .current_dir(&output_directory.0)
-        .arg("--config")
-        .arg(&command_config)
-        .arg("--no-globs");
-    for path in files {
-        command.arg(format!(":{}", path.display()));
-    }
-    let output = command
-        .output()
-        .map_err(|error| format!("cannot run markdownlint-cli2: {error}"))?;
-    if !matches!(output.status.code(), Some(0 | 1)) {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(format!(
-            "markdownlint-cli2 failed with {}{}",
-            output.status,
-            if stderr.is_empty() {
-                String::new()
-            } else {
-                format!(": {stderr}")
-            }
-        ));
-    }
-
-    let result_path = output_directory.0.join(results_name);
-    let result_text = fs::read_to_string(&result_path)
-        .map_err(|error| format!("cannot read {}: {error}", result_path.display()))?;
-    parse_markdownlint_findings(root, &result_text)
-}
-
-fn parse_markdownlint_findings(root: &Path, text: &str) -> Result<Vec<Finding>, String> {
-    let result: Value = serde_json::from_str(text)
-        .map_err(|error| format!("markdownlint JSON output is invalid: {error}"))?;
-    let findings = result
-        .as_array()
-        .ok_or_else(|| "markdownlint JSON output must be an array".to_string())?;
-    findings
-        .iter()
-        .map(|item| {
-            let object = item
-                .as_object()
-                .ok_or_else(|| "markdownlint JSON finding must be an object".to_string())?;
-            let file_name = object
-                .get("fileName")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "markdownlint finding is missing fileName".to_string())?;
-            let file_name = file_name.strip_prefix(':').unwrap_or(file_name);
-            let reported_path = PathBuf::from(file_name);
-            let path = if reported_path.is_absolute() {
-                reported_path
-            } else {
-                root.join(reported_path)
-            };
-            let rule = object
-                .get("ruleNames")
-                .and_then(Value::as_array)
-                .and_then(|rules| rules.first())
-                .and_then(Value::as_str)
-                .ok_or_else(|| "markdownlint finding is missing ruleNames".to_string())?;
-            let description = object
-                .get("ruleDescription")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "markdownlint finding is missing ruleDescription".to_string())?;
-            let line = object
-                .get("lineNumber")
-                .and_then(Value::as_u64)
-                .and_then(|line| usize::try_from(line).ok());
-            Ok(Finding {
-                check: "markdown-lint",
-                path: Some(path),
-                line,
-                message: format!("{rule} {description}"),
-            })
-        })
-        .collect()
-}
-
-struct MarkdownlintOutputDirectory(PathBuf);
-
-impl MarkdownlintOutputDirectory {
-    fn create() -> io::Result<Self> {
-        for _ in 0..32 {
-            let sequence = MARKDOWNLINT_TEMP_SEQUENCE.fetch_add(1, AtomicOrdering::Relaxed);
-            let path = std::env::temp_dir().join(format!(
-                "agent-canon-markdownlint-{}-{sequence}",
-                std::process::id()
-            ));
-            match fs::create_dir(&path) {
-                Ok(()) => return Ok(Self(path)),
-                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error),
-            }
-        }
-        Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            "could not allocate a unique markdownlint output directory",
-        ))
-    }
-}
-
-impl Drop for MarkdownlintOutputDirectory {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
     }
 }
 
@@ -773,680 +610,161 @@ fn is_closing_fence(line: &str, fence_char: char, fence_len: usize) -> bool {
     count >= fence_len && trimmed[count..].trim().is_empty()
 }
 
-fn check_markdown_math(files: &[PathBuf]) -> Vec<Finding> {
+fn check_markdown_math(path: &Path, text: &str, math_fences: &[String]) -> Vec<Finding> {
+    // Pandoc normalizes source delimiter spelling into Math nodes, so retain
+    // only this spelling residual beside the shared AST parser.
     let mut findings = Vec::new();
-    for path in files {
-        let Ok(text) = fs::read_to_string(path) else {
+    for language in math_fences {
+        findings.push(math_finding(
+            path,
+            None,
+            &format!(
+                "mathematical notation belongs in a standalone `$$` display block, not a `{language}` code fence"
+            ),
+        ));
+    }
+
+    let mut fence: Option<(char, usize)> = None;
+    let mut in_display_block = false;
+    for (line_index, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if let Some((fence_char, fence_len)) = fence {
+            if is_closing_fence(trimmed, fence_char, fence_len) {
+                fence = None;
+            }
             continue;
-        };
-        let mut fence: Option<(char, usize, Option<String>)> = None;
-        let mut in_display_block = false;
-        for (line_index, line) in text.lines().enumerate() {
-            let trimmed = line.trim_start();
-            if let Some((fence_char, fence_len, math_fence_lang)) = fence.as_ref() {
-                if is_closing_fence(trimmed, *fence_char, *fence_len) {
-                    fence = None;
-                    continue;
-                }
-                if let Some(lang) = math_fence_lang.as_deref() {
-                    if is_text_fence_language(lang) && has_math_like_fence_violation(line) {
-                        findings.push(math_finding(
-                            path,
-                            line_index + 1,
-                            &format!(
-                                "mathematical notation must use standalone `$$` display math, not a `{}` fenced block",
-                                lang
-                            ),
-                        ));
-                    }
-                }
-                continue;
-            }
-            let Some((fence_char, fence_len, info)) = opening_fence_info(trimmed) else {
-                let line_no = line_index + 1;
-                if line.contains("\\(") || line.contains("\\)") {
-                    findings.push(math_finding(
-                        path,
-                        line_no,
-                        "inline math must use `$...$`, not `\\(...\\)`",
-                    ));
-                }
-                if line.contains("\\[") || line.contains("\\]") {
-                    findings.push(math_finding(
-                        path,
-                        line_no,
-                        "display math must use `$$...$$`, not `\\[...\\]`",
-                    ));
-                }
-                let compact = line.trim();
-                if compact == "$$" {
-                    in_display_block = !in_display_block;
-                    continue;
-                }
-                if compact == "$" {
-                    findings.push(math_finding(
-                        path,
-                        line_no,
-                        "display math must use `$$...$$`, not `$` block delimiters",
-                    ));
-                    continue;
-                }
-                if in_display_block {
-                    continue;
-                }
-                if compact.starts_with('$')
-                    && compact.ends_with('$')
-                    && !compact.starts_with("$$")
-                    && compact.len() > 2
-                {
-                    findings.push(math_finding(
-                        path,
-                        line_no,
-                        "display math must use `$$...$$`, not `$...$` on its own line",
-                    ));
-                    continue;
-                }
-                if compact.starts_with("$$") && compact.ends_with("$$") {
-                    continue;
-                }
-                if line.contains("$$") {
-                    findings.push(math_finding(
-                        path,
-                        line_no,
-                        "inline math must use `$...$`, not `$$...$$`",
-                    ));
-                }
-                continue;
-            };
-            let fence_info = math_fence_language(info);
-            if fence_info.as_deref().is_some_and(is_declared_math_fence) {
-                findings.push(math_finding(
-                    path,
-                    line_index + 1,
-                    &format!(
-                        "mathematical notation must use standalone `$$` display math, not a `{}` fenced block",
-                        fence_info.as_deref().unwrap_or_default()
-                    ),
-                ));
-            }
-            fence = Some((fence_char, fence_len, fence_info));
+        }
+        if let Some((fence_char, fence_len, _)) = opening_fence_info(trimmed) {
+            fence = Some((fence_char, fence_len));
+            continue;
+        }
+
+        let line_no = Some(line_index + 1);
+        let markdown_text = remove_inline_code_spans(line);
+        if markdown_text.contains("\\(") || markdown_text.contains("\\)") {
+            findings.push(math_finding(
+                path,
+                line_no,
+                "inline math must use `$...$`, not `\\(...\\)`",
+            ));
+        }
+        if markdown_text.contains("\\[") || markdown_text.contains("\\]") {
+            findings.push(math_finding(
+                path,
+                line_no,
+                "display math must use `$$...$$`, not `\\[...\\]`",
+            ));
+        }
+
+        let compact = markdown_text.trim();
+        if compact == "$$" {
+            in_display_block = !in_display_block;
+            continue;
+        }
+        if compact == "$" {
+            findings.push(math_finding(
+                path,
+                line_no,
+                "display math must use `$$...$$`, not `$` block delimiters",
+            ));
+            continue;
+        }
+        if in_display_block {
+            continue;
+        }
+        if compact.starts_with('$')
+            && compact.ends_with('$')
+            && !compact.starts_with("$$")
+            && compact.len() > 2
+        {
+            findings.push(math_finding(
+                path,
+                line_no,
+                "display math must use `$$...$$`, not `$...$` on its own line",
+            ));
+            continue;
+        }
+        if compact.starts_with("$$") && compact.ends_with("$$") {
+            continue;
+        }
+        if markdown_text.contains("$$") {
+            findings.push(math_finding(
+                path,
+                line_no,
+                "inline math must use `$...$`, not `$$...$$`",
+            ));
         }
     }
     findings
 }
 
-fn has_math_like_fence_violation(line: &str) -> bool {
-    let compact = line.trim();
-    if compact.is_empty() {
-        return false;
-    }
-    has_text_fence_math_syntax(compact)
-}
-
-fn is_declared_math_fence(language: &str) -> bool {
-    matches!(language, "math" | "latex" | "tex")
-}
-
-fn is_text_fence_language(language: &str) -> bool {
-    matches!(language, "text" | "plaintext" | "txt" | "plain")
-}
-
-fn has_text_fence_math_syntax(line: &str) -> bool {
-    let candidate = math_candidate_text(line);
-    let candidate = candidate.trim();
-    has_math_optimization_keyword(candidate)
-        || has_explicit_math_delimiters(candidate)
-        || has_math_relation_operator(candidate)
-        || contains_tex_command(candidate)
-}
-
-fn math_candidate_text(line: &str) -> String {
-    let mut candidate = String::with_capacity(line.len());
-    let mut index = 0;
-    while index < line.len() {
-        let rest = &line[index..];
-        if let Some(length) = backtick_literal_span_length(rest) {
-            candidate.push(' ');
-            index += length;
+fn remove_inline_code_spans(line: &str) -> String {
+    let bytes = line.as_bytes();
+    let mut output = String::with_capacity(line.len());
+    let mut cursor = 0;
+    while cursor < bytes.len() {
+        if bytes[cursor] != b'`' {
+            let character = line[cursor..].chars().next().unwrap_or_default();
+            output.push(character);
+            cursor += character.len_utf8();
             continue;
         }
-        if let Some(length) = url_literal_span_length(rest) {
-            candidate.push(' ');
-            index += length;
-            continue;
-        }
-        if let Some(length) = angle_literal_span_length(rest) {
-            candidate.push(' ');
-            index += length;
-            continue;
-        }
-        if rest.starts_with("->") {
-            candidate.push(' ');
-            index += 2;
-            continue;
-        }
-        let character = rest.chars().next().unwrap_or_default();
-        candidate.push(character);
-        index += character.len_utf8();
-    }
-    candidate
-}
-
-fn backtick_literal_span_length(rest: &str) -> Option<usize> {
-    if !rest.starts_with('`') {
-        return None;
-    }
-    rest[1..].find('`').map(|closing| closing + 2)
-}
-
-fn url_literal_span_length(rest: &str) -> Option<usize> {
-    if !rest.starts_with("https://") && !rest.starts_with("http://") {
-        return None;
-    }
-    Some(
-        rest.char_indices()
-            .find_map(|(index, character)| character.is_whitespace().then_some(index))
-            .unwrap_or(rest.len()),
-    )
-}
-
-fn angle_literal_span_length(rest: &str) -> Option<usize> {
-    if !rest.starts_with('<') {
-        return None;
-    }
-    let closing = rest.find('>')?;
-    let body = &rest[1..closing];
-    if body.is_empty() || body.trim() != body {
-        return None;
-    }
-    body.chars()
-        .all(|character| {
-            character.is_alphanumeric()
-                || character.is_whitespace()
-                || matches!(
-                    character,
-                    '|' | ',' | '_' | '-' | '/' | '.' | '=' | ':' | '"' | '\'' | '!' | '?'
-                )
-        })
-        .then_some(closing + 1)
-}
-
-fn has_explicit_math_delimiters(line: &str) -> bool {
-    line == "$"
-        || has_unescaped_dollar_math_pair(line)
-        || has_paired_delimiters(line, "\\(", "\\)")
-        || has_paired_delimiters(line, "\\[", "\\]")
-}
-
-fn has_paired_delimiters(line: &str, opening: &str, closing: &str) -> bool {
-    let Some(opening_index) = line.find(opening) else {
-        return false;
-    };
-    let content_start = opening_index + opening.len();
-    let Some(closing_offset) = line[content_start..].find(closing) else {
-        return false;
-    };
-    closing_offset > 0
-}
-
-fn has_unescaped_dollar_math_pair(line: &str) -> bool {
-    let positions: Vec<usize> = line
-        .char_indices()
-        .filter_map(|(index, character)| {
-            (character == '$' && !is_escaped_delimiter(line, index)).then_some(index)
-        })
-        .collect();
-
-    positions.windows(2).any(|pair| {
-        if pair[1] == pair[0] + 1 {
-            return true;
-        }
-        if dollar_starts_shell_or_currency_token(line, pair[1]) {
-            return false;
-        }
-        has_math_dollar_payload(&line[pair[0] + 1..pair[1]])
-    })
-}
-
-fn dollar_starts_shell_or_currency_token(line: &str, dollar_index: usize) -> bool {
-    line[dollar_index + 1..]
-        .chars()
-        .next()
-        .is_some_and(|character| character.is_ascii_alphanumeric() || character == '_')
-}
-
-fn is_escaped_delimiter(line: &str, index: usize) -> bool {
-    let mut backslash_count = 0;
-    let mut cursor = index;
-    while cursor > 0 && line.as_bytes()[cursor - 1] == b'\\' {
-        backslash_count += 1;
-        cursor -= 1;
-    }
-    backslash_count % 2 == 1
-}
-
-fn has_math_dollar_payload(payload: &str) -> bool {
-    has_math_expression_marker(payload) || payload.split_whitespace().any(is_math_atom_token)
-}
-
-fn has_math_optimization_keyword(line: &str) -> bool {
-    has_prefix_token(line, "minimize")
-        || has_prefix_token(line, "maximize")
-        || has_prefix_token(line, "subject to")
-}
-
-fn has_prefix_token(line: &str, token: &str) -> bool {
-    if !line.starts_with(token) {
-        return false;
-    }
-    if line.len() == token.len() {
-        return true;
-    }
-    !line
-        .as_bytes()
-        .get(token.len())
-        .is_some_and(|char_byte| char_byte.is_ascii_alphabetic())
-}
-
-fn has_math_relation_operator(line: &str) -> bool {
-    has_binary_math_relation(line) || has_spaced_math_equality(line)
-}
-
-fn has_binary_math_relation(line: &str) -> bool {
-    let mut index = 0;
-    while index < line.len() {
-        let rest = &line[index..];
-        if let Some(operator_length) = relation_operator_length(rest) {
-            let left = line[..index].split_whitespace().next_back();
-            let right = line[index + operator_length..].split_whitespace().next();
-            if left.is_some_and(is_math_atom_token) && right.is_some_and(is_math_atom_token) {
-                return true;
+        let run_end = cursor
+            + bytes[cursor..]
+                .iter()
+                .take_while(|byte| **byte == b'`')
+                .count();
+        let run_length = run_end - cursor;
+        let mut search = run_end;
+        let closing = loop {
+            let Some(offset) = bytes[search..].iter().position(|byte| *byte == b'`') else {
+                break None;
+            };
+            let candidate = search + offset;
+            let candidate_end = candidate
+                + bytes[candidate..]
+                    .iter()
+                    .take_while(|byte| **byte == b'`')
+                    .count();
+            if candidate_end - candidate == run_length {
+                break Some(candidate_end);
             }
-            index += operator_length;
-            continue;
+            search = candidate_end;
+        };
+        if let Some(end) = closing {
+            output.push_str(&" ".repeat(end - cursor));
+            cursor = end;
+        } else {
+            output.push_str(&line[cursor..run_end]);
+            cursor = run_end;
         }
-        index += rest.chars().next().unwrap_or_default().len_utf8();
     }
-    false
+    output
 }
 
-fn relation_operator_length(rest: &str) -> Option<usize> {
-    ["<=", ">=", "!=", "≤", "≥", "≠", "≈", "<", ">"]
-        .iter()
-        .find_map(|operator| rest.starts_with(operator).then_some(operator.len()))
-}
-
-fn has_spaced_math_equality(line: &str) -> bool {
-    let tokens: Vec<&str> = line.split_whitespace().collect();
-    let has_expression_marker = has_math_expression_marker(line);
-
-    tokens.iter().enumerate().any(|(index, token)| {
-        if *token != "=" {
-            return false;
-        }
-        let left = &tokens[..index];
-        let right = &tokens[index + 1..];
-        !left.is_empty()
-            && !right.is_empty()
-            && ((contains_math_atom(left) && contains_math_atom(right))
-                || (has_expression_marker
-                    && (contains_math_atom(left) || contains_math_atom(right))))
-    })
-}
-
-fn contains_math_atom(side: &[&str]) -> bool {
-    side.iter().any(|token| is_math_atom_token(token))
-}
-
-fn is_math_atom_token(token: &str) -> bool {
-    let expression_token = token.trim_matches(|character: char| {
-        matches!(character, '[' | ']' | '{' | '}' | ',' | ';' | ':')
-    });
-    if is_function_expression_atom(expression_token) {
-        return true;
-    }
-    let token = expression_token.trim_matches(|character: char| {
-        matches!(
-            character,
-            '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';' | ':'
-        )
-    });
-    if token.is_empty() {
-        return false;
-    }
-
-    is_numeric_math_atom(token) || is_symbolic_math_atom(token)
-}
-
-fn is_numeric_math_atom(token: &str) -> bool {
-    token.chars().any(|character| character.is_ascii_digit()) && token.parse::<f64>().is_ok()
-}
-
-fn is_function_expression_atom(token: &str) -> bool {
-    let Some(opening) = token.find('(') else {
-        return false;
-    };
-    if opening == 0 || !token.ends_with(')') {
-        return false;
-    }
-    let function = &token[..opening];
-    let arguments = &token[opening + 1..token.len() - 1];
-    is_symbolic_math_atom(function)
-        && !arguments.is_empty()
-        && arguments.split(',').all(|argument| {
-            let argument = argument.trim();
-            is_numeric_math_atom(argument) || is_symbolic_math_atom(argument)
-        })
-}
-
-fn is_symbolic_math_atom(token: &str) -> bool {
-    let mut chars = token.chars();
-    if matches!((chars.next(), chars.next()), (Some(character), None) if character.is_alphabetic())
-    {
-        return true;
-    }
-
-    if let Some((base, suffix)) = token.split_once('_') {
-        let mut base_chars = base.chars();
-        return matches!(
-            (base_chars.next(), base_chars.next()),
-            (Some(character), None) if character.is_alphabetic()
-        ) && !suffix.is_empty()
-            && suffix.chars().all(|character| character.is_alphanumeric());
-    }
-
-    matches!(
-        token,
-        "alpha"
-            | "beta"
-            | "gamma"
-            | "delta"
-            | "epsilon"
-            | "theta"
-            | "lambda"
-            | "mu"
-            | "pi"
-            | "sigma"
-            | "phi"
-            | "omega"
-    )
-}
-
-fn has_math_expression_marker(line: &str) -> bool {
-    line.chars()
-        .any(|character| matches!(character, '^' | '+' | '*' | '/'))
-        || contains_tex_command(line)
-        || contains_unicode_math_symbol(line)
-}
-
-fn contains_unicode_math_symbol(line: &str) -> bool {
-    line.chars().any(|character| {
-        matches!(
-            character,
-            '≤' | '≥'
-                | '≠'
-                | '≈'
-                | '∈'
-                | '∉'
-                | '∑'
-                | '∏'
-                | '∫'
-                | '∂'
-                | '∇'
-                | '∞'
-                | '∪'
-                | '∩'
-                | '⊂'
-                | '⊆'
-                | '⊃'
-                | '⊇'
-                | '∀'
-                | '∃'
-                | '×'
-                | '·'
-                | '±'
-                | '→'
-                | '⇒'
-                | '⇔'
-                | '√'
-                | 'α'
-                | 'β'
-                | 'γ'
-                | 'δ'
-                | 'ε'
-                | 'θ'
-                | 'λ'
-                | 'μ'
-                | 'π'
-                | 'σ'
-                | 'φ'
-                | 'ω'
-                | 'Δ'
-                | 'Σ'
-                | 'Π'
-                | 'Ω'
-        )
-    })
-}
-
-fn contains_tex_command(line: &str) -> bool {
-    const MATH_TEX_COMMANDS: &[&str] = &[
-        "frac",
-        "sum",
-        "prod",
-        "int",
-        "le",
-        "ge",
-        "neq",
-        "in",
-        "notin",
-        "times",
-        "cdot",
-        "left",
-        "right",
-        "begin",
-        "end",
-        "sqrt",
-        "operatorname",
-        "mathcal",
-        "mathbb",
-        "mathrm",
-        "mathbf",
-        "partial",
-        "nabla",
-        "alpha",
-        "beta",
-        "gamma",
-    ];
-
-    line.match_indices('\\').any(|(offset, _)| {
-        let rest = &line[offset + 1..];
-        let command_len = rest
-            .bytes()
-            .take_while(|byte| byte.is_ascii_alphabetic())
-            .count();
-        command_len > 0 && MATH_TEX_COMMANDS.contains(&&rest[..command_len])
-    })
-}
-
-fn math_fence_language(info: &str) -> Option<String> {
-    let first_token = info.split_whitespace().next()?;
-    let normalized = first_token.to_ascii_lowercase();
-    match normalized.as_str() {
-        "text" | "plaintext" | "txt" | "plain" | "math" | "latex" | "tex" => Some(normalized),
-        _ => None,
-    }
-}
-
-fn math_finding(path: &Path, line_no: usize, message: &str) -> Finding {
+fn math_finding(path: &Path, line: Option<usize>, message: &str) -> Finding {
     Finding {
-        check: "markdown-math",
         path: Some(path.to_path_buf()),
-        line: Some(line_no),
+        line,
         message: message.to_string(),
     }
 }
-
-fn check_markdown_links(root: &Path, files: &[PathBuf]) -> Vec<Finding> {
-    let mut findings = Vec::new();
-    let name_index = build_name_index(root);
-    for path in files {
-        let Ok(text) = fs::read_to_string(path) else {
-            continue;
-        };
-        for (target, line_no) in markdown_link_targets(&text) {
-            if is_external_target(&target) {
-                continue;
-            }
-            let (target_path, _) = split_anchor(&target);
-            if target_path.is_empty() {
-                continue;
-            }
-            if let Some(resolved) = resolve_local_target(path, root, target_path) {
-                if workspace_absolute_target(root, target_path, &resolved) {
-                    findings.push(Finding {
-                        check: "markdown-links",
-                        path: Some(path.to_path_buf()),
-                        line: Some(line_no),
-                        message: format!(
-                            "workspace-absolute markdown link should be relative: {target}"
-                        ),
-                    });
-                }
-                continue;
-            }
-            let candidates = Path::new(target_path)
-                .file_name()
-                .and_then(|name| name.to_str())
-                .and_then(|name| name_index.get(name))
-                .cloned()
-                .unwrap_or_default();
-            let message = if candidates.len() == 1 {
-                format!(
-                    "local markdown link target is missing; unique candidate exists: {}",
-                    display_path(root, &candidates[0])
-                )
-            } else if candidates.is_empty() {
-                format!("local markdown link target is missing: {target}")
-            } else {
-                format!(
-                    "local markdown link target is missing with {} filename candidates: {target}",
-                    candidates.len()
-                )
-            };
-            findings.push(Finding {
-                check: "markdown-links",
-                path: Some(path.to_path_buf()),
-                line: Some(line_no),
-                message,
-            });
-        }
-    }
-    findings
+fn check_workspace_absolute_links(root: &Path, source: &Path, targets: &[String]) -> Vec<Finding> {
+    targets
+        .iter()
+        .filter(|target| workspace_absolute_target(root, target))
+        .map(|target| Finding {
+            path: Some(source.to_path_buf()),
+            line: None,
+            message: format!("workspace-absolute Markdown target should be relative: {target}"),
+        })
+        .collect()
 }
 
-fn workspace_absolute_target(root: &Path, target_path: &str, resolved: &Path) -> bool {
+fn workspace_absolute_target(root: &Path, target: &str) -> bool {
+    let target_path = target.split('#').next().unwrap_or(target);
     let raw = Path::new(target_path);
-    if !raw.is_absolute() {
-        return false;
-    }
-    resolved.starts_with(root) || map_absolute_workspace_path(root, raw).is_some()
-}
-
-fn markdown_link_targets(text: &str) -> Vec<(String, usize)> {
-    let mut result = Vec::new();
-    for (line_index, line) in text.lines().enumerate() {
-        let bytes = line.as_bytes();
-        let mut index = 0usize;
-        while index < bytes.len() {
-            if bytes[index] != b'[' {
-                index += 1;
-                continue;
-            }
-            let Some(label_end) = line[index + 1..].find(']').map(|offset| index + 1 + offset)
-            else {
-                index += 1;
-                continue;
-            };
-            if bytes.get(label_end + 1) != Some(&b'(') {
-                index = label_end + 1;
-                continue;
-            }
-            let target_start = label_end + 2;
-            let Some(target_end) = line[target_start..]
-                .find(')')
-                .map(|offset| target_start + offset)
-            else {
-                index = target_start;
-                continue;
-            };
-            result.push((line[target_start..target_end].to_string(), line_index + 1));
-            index = target_end + 1;
-        }
-    }
-    result
-}
-
-fn is_external_target(target: &str) -> bool {
-    let lowercase = target.to_ascii_lowercase();
-    lowercase.starts_with("mailto:")
-        || target.starts_with('#')
-        || lowercase.starts_with("http://")
-        || lowercase.starts_with("https://")
-        || lowercase.starts_with("file://")
-}
-
-fn split_anchor(target: &str) -> (&str, &str) {
-    target.split_once('#').unwrap_or((target, ""))
-}
-
-fn resolve_local_target(source_path: &Path, root: &Path, target_path: &str) -> Option<PathBuf> {
-    let canonical_root = root
-        .canonicalize()
-        .ok()
-        .unwrap_or_else(|| root.to_path_buf());
-
-    let accepted = |candidate: &Path| -> bool {
-        candidate
-            .canonicalize()
-            .map(|canonical| canonical.starts_with(&canonical_root))
-            .unwrap_or(false)
-    };
-
-    let raw = PathBuf::from(target_path);
-    if raw.is_absolute() {
-        if raw.exists() {
-            if accepted(&raw) {
-                return Some(raw);
-            }
-            return None;
-        }
-        if let Some(mapped) = map_absolute_workspace_path(root, &raw) {
-            if mapped.exists() && accepted(&mapped) {
-                return Some(mapped);
-            }
-        }
-        return None;
-    }
-    let base_dir = if source_path.is_symlink() {
-        if let Some(canonical_parent) = source_path
-            .canonicalize()
-            .ok()
-            .and_then(|canonical| canonical.parent().map(PathBuf::from))
-        {
-            canonical_parent
-        } else {
-            source_path.parent()?.to_path_buf()
-        }
-    } else {
-        source_path.parent()?.to_path_buf()
-    };
-    let candidate = base_dir.join(raw);
-    if candidate.exists() && accepted(&candidate) {
-        Some(candidate)
-    } else {
-        None
-    }
+    raw.is_absolute() && (raw.starts_with(root) || map_absolute_workspace_path(root, raw).is_some())
 }
 
 fn map_absolute_workspace_path(root: &Path, path: &Path) -> Option<PathBuf> {
@@ -1466,35 +784,6 @@ fn map_absolute_workspace_path(root: &Path, path: &Path) -> Option<PathBuf> {
     }
     None
 }
-
-fn build_name_index(root: &Path) -> BTreeMap<String, Vec<PathBuf>> {
-    let mut index = BTreeMap::new();
-    collect_name_index(root, &mut index);
-    index
-}
-
-fn collect_name_index(path: &Path, index: &mut BTreeMap<String, Vec<PathBuf>>) {
-    if skip_path(path) {
-        return;
-    }
-    if path.is_dir() {
-        if let Ok(entries) = fs::read_dir(path) {
-            for entry in entries.flatten() {
-                collect_name_index(&entry.path(), index);
-            }
-        }
-        return;
-    }
-    if path.is_file() {
-        if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-            index
-                .entry(name.to_string())
-                .or_default()
-                .push(path.to_path_buf());
-        }
-    }
-}
-
 fn check_bootstrap_docs(root: &Path) -> Vec<Finding> {
     let mut findings = Vec::new();
     let project_name = current_project_name(root);
@@ -1508,22 +797,12 @@ fn check_bootstrap_docs(root: &Path) -> Vec<Finding> {
             continue;
         };
         for (line_index, line) in text.lines().enumerate() {
-            if line.contains("](/mnt/l/workspace/") {
-                findings.push(Finding {
-                    check: "bootstrap-docs",
-                    path: Some(path.clone()),
-                    line: Some(line_index + 1),
-                    message: "replace workspace-absolute markdown links with relative links"
-                        .to_string(),
-                });
-            }
             if !check_stale {
                 continue;
             }
             for stale in DERIVED_REPO_STALE_STRINGS {
                 if line.contains(stale) {
                     findings.push(Finding {
-                        check: "bootstrap-docs",
                         path: Some(path.clone()),
                         line: Some(line_index + 1),
                         message: format!("stale template bootstrap text remains: {stale}"),
@@ -1569,7 +848,6 @@ fn check_runtime_profile_inventory(root: &Path) -> Vec<Finding> {
         Ok(rendered) => rendered,
         Err(message) => {
             return vec![Finding {
-                check: "runtime-profile-inventory",
                 path: Some(inventory_path),
                 line: None,
                 message,
@@ -1581,7 +859,6 @@ fn check_runtime_profile_inventory(root: &Path) -> Vec<Finding> {
         Vec::new()
     } else {
         vec![Finding {
-            check: "runtime-profile-inventory",
             path: Some(doc_path),
             line: None,
             message:
@@ -1797,335 +1074,6 @@ fn render_table(headers: &[&str], rows: &[Vec<String>]) -> String {
     output.trim_end().to_string() + "\n"
 }
 
-fn fix_mermaid_markdown(content: &str) -> (String, usize) {
-    let lines: Vec<&str> = content.lines().collect();
-    let mut output = Vec::new();
-    let mut changes = 0usize;
-    let mut index = 0usize;
-    while index < lines.len() {
-        let line = lines[index];
-        let Some((indent, fence_marker, language, suffix)) = opening_mermaid_fence(line) else {
-            output.push(line.to_string());
-            index += 1;
-            continue;
-        };
-        if language != "mermaid" {
-            changes += 1;
-        }
-        output.push(format!("{indent}{fence_marker}mermaid{suffix}"));
-        index += 1;
-        let block_start = output.len();
-        while index < lines.len() && !closing_mermaid_fence(lines[index], &fence_marker) {
-            output.push(lines[index].to_string());
-            index += 1;
-        }
-        let block = output.split_off(block_start);
-        let (fixed_block, block_changes) = fix_mermaid_block(&block);
-        changes += block_changes;
-        output.extend(fixed_block);
-        if index < lines.len() {
-            output.push(lines[index].to_string());
-            index += 1;
-        }
-    }
-    let mut fixed = output.join("\n");
-    if content.ends_with('\n') {
-        fixed.push('\n');
-    }
-    (fixed, changes)
-}
-
-fn opening_mermaid_fence(line: &str) -> Option<(String, String, String, String)> {
-    let indent_len = line.len() - line.trim_start().len();
-    let indent = line[..indent_len].to_string();
-    let trimmed = line.trim_start();
-    let fence_char = trimmed.chars().next()?;
-    if !matches!(fence_char, '`' | '~') {
-        return None;
-    }
-    let fence_len = trimmed.chars().take_while(|ch| *ch == fence_char).count();
-    if fence_len < 3 {
-        return None;
-    }
-    let info = trimmed[fence_len..].trim();
-    let mut parts = info.splitn(2, char::is_whitespace);
-    let language = parts.next()?.to_ascii_lowercase();
-    if !MERMAID_LANGS.contains(&language.as_str()) {
-        return None;
-    }
-    let suffix = parts
-        .next()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| format!(" {value}"))
-        .unwrap_or_default();
-    Some((
-        indent,
-        fence_char.to_string().repeat(fence_len),
-        language,
-        suffix,
-    ))
-}
-
-fn closing_mermaid_fence(line: &str, opening_marker: &str) -> bool {
-    is_closing_fence(
-        line,
-        opening_marker.chars().next().unwrap_or('`'),
-        opening_marker.len(),
-    )
-}
-
-fn fix_mermaid_block(lines: &[String]) -> (Vec<String>, usize) {
-    let rename_map = reserved_node_rename_map(lines);
-    if rename_map.is_empty() {
-        return (lines.to_vec(), 0);
-    }
-    let mut changes = 0usize;
-    let fixed = lines
-        .iter()
-        .map(|line| {
-            let updated = rewrite_mermaid_line(line, &rename_map);
-            if updated != *line {
-                changes += 1;
-            }
-            updated
-        })
-        .collect();
-    (fixed, changes)
-}
-
-fn reserved_node_rename_map(lines: &[String]) -> BTreeMap<String, String> {
-    let mut result = BTreeMap::new();
-    for line in lines {
-        for reserved in MERMAID_RESERVED_NODE_IDS {
-            if mermaid_node_id_used(line, reserved) {
-                let replacement = if *reserved == "graph" {
-                    "graph_node".to_string()
-                } else {
-                    format!("{reserved}_node")
-                };
-                result.insert((*reserved).to_string(), replacement);
-            }
-        }
-    }
-    result
-}
-
-fn mermaid_node_id_used(line: &str, node_id: &str) -> bool {
-    let stripped = line.trim();
-    if stripped.is_empty() || stripped.starts_with("%%") {
-        return false;
-    }
-    let first = stripped
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if MERMAID_DIRECTIVES.contains(&first.as_str()) {
-        if matches!(first.as_str(), "flowchart" | "graph") {
-            let remainder = stripped[first.len()..].trim();
-            if remainder
-                .split_whitespace()
-                .next()
-                .map(|value| FLOW_DIRECTIONS.contains(&value.to_ascii_lowercase().as_str()))
-                .unwrap_or(false)
-            {
-                return false;
-            }
-        }
-        if first == node_id {
-            return false;
-        }
-    }
-    contains_node_before_shape(line, node_id) || contains_node_after_edge(line, node_id)
-}
-
-fn contains_node_before_shape(line: &str, node_id: &str) -> bool {
-    for marker in ["[", "(", "{"] {
-        if line.contains(&format!("{node_id}{marker}")) {
-            return true;
-        }
-    }
-    false
-}
-
-fn contains_node_after_edge(line: &str, node_id: &str) -> bool {
-    let edges = [
-        "-->", "---", "==>", "~~~", "~~", "o--", "x--", "-.->", "-.-",
-    ];
-    edges.iter().any(|edge| {
-        line.contains(&format!("{edge} {node_id}"))
-            || line.contains(&format!("{edge}|"))
-                && line
-                    .split('|')
-                    .next_back()
-                    .map(|tail| tail.trim_start().starts_with(node_id))
-                    .unwrap_or(false)
-    })
-}
-
-fn rewrite_mermaid_line(line: &str, rename_map: &BTreeMap<String, String>) -> String {
-    let mut output = line.to_string();
-    for (old, new) in rename_map.iter().rev() {
-        output = replace_mermaid_token(&output, old, new);
-    }
-    output
-}
-
-fn replace_mermaid_token(line: &str, old: &str, new: &str) -> String {
-    let mut output = String::new();
-    let mut index = 0usize;
-    while index < line.len() {
-        let rest = &line[index..];
-        if rest.starts_with(old)
-            && is_token_boundary(line, index, index + old.len())
-            && mermaid_token_is_node_position(line, index, index + old.len())
-        {
-            output.push_str(new);
-            index += old.len();
-            continue;
-        }
-        let ch = rest.chars().next().expect("non-empty rest has char");
-        output.push(ch);
-        index += ch.len_utf8();
-    }
-    output
-}
-
-fn is_token_boundary(line: &str, start: usize, end: usize) -> bool {
-    let before = line[..start].chars().next_back();
-    let after = line[end..].chars().next();
-    !before.map(is_token_char).unwrap_or(false) && !after.map(is_token_char).unwrap_or(false)
-}
-
-fn is_token_char(ch: char) -> bool {
-    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
-}
-
-fn mermaid_token_is_node_position(line: &str, start: usize, end: usize) -> bool {
-    let after = line[end..].trim_start();
-    if after.starts_with('[')
-        || after.starts_with('(')
-        || after.starts_with('{')
-        || starts_mermaid_edge(after)
-    {
-        return true;
-    }
-    let before = line[..start].trim_end();
-    if ends_with_mermaid_edge(before) {
-        return true;
-    }
-    if let Some(pipe_index) = before.rfind('|') {
-        return ends_with_mermaid_edge(before[..pipe_index].trim_end());
-    }
-    false
-}
-
-fn starts_mermaid_edge(value: &str) -> bool {
-    [
-        "-->", "---", "==>", "===", "-.->", "-.-", "~~~", "~~", "o--", "x--",
-    ]
-    .iter()
-    .any(|edge| value.starts_with(edge))
-}
-
-fn ends_with_mermaid_edge(value: &str) -> bool {
-    [
-        "-->", "---", "==>", "===", "-.->", "-.-", "~~~", "~~", "o--", "x--",
-    ]
-    .iter()
-    .any(|edge| value.ends_with(edge))
-}
-
-fn fix_markdown_math(content: &str) -> (String, usize) {
-    let mut output = Vec::new();
-    let mut changes = 0usize;
-    let mut in_fence = false;
-    let mut in_legacy_display = false;
-    for line in content.lines() {
-        let stripped = line.trim_start();
-        if stripped.starts_with("```") {
-            in_fence = !in_fence;
-            output.push(line.to_string());
-            continue;
-        }
-        if in_fence {
-            output.push(line.to_string());
-            continue;
-        }
-        if in_legacy_display {
-            if line.trim() == "\\]" {
-                output.push("$$".to_string());
-                changes += 1;
-                in_legacy_display = false;
-            } else {
-                output.push(line.to_string());
-            }
-            continue;
-        }
-        if line.trim() == "\\[" {
-            output.push("$$".to_string());
-            changes += 1;
-            in_legacy_display = true;
-            continue;
-        }
-        if line.trim().starts_with("\\[") && line.trim().ends_with("\\]") {
-            let inner = line
-                .trim()
-                .trim_start_matches("\\[")
-                .trim_end_matches("\\]")
-                .trim();
-            output.push(format!("$${inner}$$"));
-            changes += 1;
-            continue;
-        }
-        if line.trim() == "$" {
-            output.push("$$".to_string());
-            changes += 1;
-            continue;
-        }
-        if line.trim().starts_with('$')
-            && line.trim().ends_with('$')
-            && !line.trim().starts_with("$$")
-            && line.trim().len() > 2
-        {
-            let inner = line.trim().trim_matches('$').trim();
-            output.push(format!("$${inner}$$"));
-            changes += 1;
-            continue;
-        }
-        let updated = replace_legacy_inline_math(line);
-        if updated != line {
-            changes += 1;
-        }
-        output.push(updated);
-    }
-    let mut fixed = output.join("\n");
-    if content.ends_with('\n') {
-        fixed.push('\n');
-    }
-    (fixed, changes)
-}
-
-fn replace_legacy_inline_math(line: &str) -> String {
-    let mut output = String::new();
-    let mut rest = line;
-    while let Some(start) = rest.find("\\(") {
-        output.push_str(&rest[..start]);
-        let after_start = &rest[start + 2..];
-        let Some(end) = after_start.find("\\)") else {
-            output.push_str(&rest[start..]);
-            return output;
-        };
-        output.push('$');
-        output.push_str(&after_start[..end]);
-        output.push('$');
-        rest = &after_start[end + 2..];
-    }
-    output.push_str(rest);
-    output
-}
-
 fn display_path(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .unwrap_or(path)
@@ -2133,97 +1081,9 @@ fn display_path(root: &Path, path: &Path) -> String {
         .replace('\\', "/")
 }
 
-fn json_escape(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r")
-        .replace('\t', "\\t")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn formats_mermeid_fence_and_reserved_graph_node() {
-        let source = "```mermeid\ngraph[SQLite graph]\ngraph --> class\n```\n";
-        let (fixed, changes) = fix_mermaid_markdown(source);
-
-        assert!(changes >= 2);
-        assert!(fixed.contains("```mermaid"));
-        assert!(fixed.contains("graph_node[SQLite graph]"));
-        assert!(fixed.contains("graph_node --> class_node"));
-    }
-
-    #[test]
-    fn fixes_legacy_math_notation() {
-        let source = "\\(x\\)\n\\[\ny\n\\]\n$z$\n";
-        let (fixed, changes) = fix_markdown_math(source);
-
-        assert_eq!(changes, 4);
-        assert_eq!(fixed, "$x$\n$$\ny\n$$\n$$z$$\n");
-    }
-
-    #[test]
-    fn flags_workspace_absolute_markdown_links_even_when_target_exists() {
-        let root =
-            std::env::temp_dir().join(format!("agent-canon-docs-test-{}", std::process::id()));
-        let docs = root.join("docs");
-        fs::create_dir_all(&docs).expect("create docs dir");
-        let target = docs.join("target.md");
-        let source = docs.join("source.md");
-        fs::write(&target, "# Target\n").expect("write target");
-        fs::write(&source, format!("[Target]({})\n", target.display())).expect("write source");
-
-        let findings = check_markdown_links(&root, std::slice::from_ref(&source));
-        fs::remove_dir_all(&root).ok();
-
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].check, "markdown-links");
-        assert_eq!(findings[0].path.as_ref(), Some(&source));
-        assert!(findings[0]
-            .message
-            .contains("workspace-absolute markdown link should be relative"));
-    }
-
-    #[test]
-    fn structured_report_tells_agents_to_use_reported_location() {
-        let root = PathBuf::from("/repo");
-        let finding = Finding {
-            check: "markdown-links",
-            path: Some(root.join("docs/bad.md")),
-            line: Some(3),
-            message: "local markdown link target is missing: ./missing.md".to_string(),
-        };
-
-        let report = structured_findings_report(&[finding], &root);
-
-        assert!(report.contains("DOCS_CHECK_REPORT_BEGIN"));
-        assert!(report.contains("summary: Documentation checks found 1 issue(s)."));
-        assert!(report.contains("location: docs/bad.md:3"));
-        assert!(report.contains("Open only the reported location"));
-        assert!(report.contains("DOCS_CHECK_REPORT_END"));
-    }
-
-    #[test]
-    fn maps_markdownlint_json_to_docs_findings() {
-        let root = PathBuf::from("/repo");
-        let findings = parse_markdownlint_findings(
-            &root,
-            r#"[{"fileName":":documents/example.md","lineNumber":4,"ruleNames":["MD001","heading-increment"],"ruleDescription":"Heading levels should only increment by one level at a time"}]"#,
-        )
-        .expect("formatter output should map to docs findings");
-
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].check, "markdown-lint");
-        assert_eq!(findings[0].path, Some(root.join("documents/example.md")));
-        assert_eq!(findings[0].line, Some(4));
-        assert_eq!(
-            findings[0].message,
-            "MD001 Heading levels should only increment by one level at a time"
-        );
-    }
 
     #[test]
     fn keeps_unordered_marker_consistency_scoped_to_each_depth() {
@@ -2236,14 +1096,86 @@ mod tests {
     }
 
     #[test]
-    fn help_text_exposes_options_and_examples() {
+    fn keeps_exact_math_delimiter_policy_without_scanning_code_fences() {
+        let path = Path::new("doc.md");
+        let findings = check_markdown_math(
+            path,
+            "Inline `\\(literal\\)` and \\(x\\); display \\[y\\].\n\n$$z$$ inline.\n\n```text\n\\(code\\)\n```\n",
+            &[],
+        );
+
+        assert_eq!(findings.len(), 3);
+        assert!(findings[0].message.contains("inline math must use"));
+        assert!(findings[1].message.contains("display math must use"));
+        assert!(findings[2].message.contains("inline math must use"));
+    }
+
+    #[test]
+    fn rejects_math_code_fences_reported_by_the_markdown_ast() {
+        let findings = check_markdown_math(
+            Path::new("doc.md"),
+            "```math\nx + y\n```\n",
+            &["math".to_string()],
+        );
+
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("not a `math` code fence"));
+    }
+
+    #[test]
+    fn reads_links_and_validation_fences_from_pandoc_ast_shape() {
+        let ast = serde_json::json!({
+            "blocks": [
+                {
+                    "t": "Para",
+                    "c": [{
+                        "t": "Link",
+                        "c": [
+                            [{"t": "Str", "c": "label"}],
+                            [{"t": "Str", "c": "target"}],
+                            ["/repo/docs/guide.md", ""]
+                        ]
+                    }]
+                },
+                {
+                    "t": "CodeBlock",
+                    "c": [
+                        ["", ["mermaid"], []],
+                        "flowchart LR\n  a --> b"
+                    ]
+                },
+                {
+                    "t": "CodeBlock",
+                    "c": [["", ["tex"], []], "x + y"]
+                }
+            ]
+        });
+        let mut document = DocumentAst::default();
+
+        collect_document_ast(&ast, &mut document);
+
+        assert_eq!(document.links, vec!["/repo/docs/guide.md"]);
+        assert!(document.has_mermaid);
+        assert_eq!(document.math_fences, vec!["tex"]);
+    }
+
+    #[test]
+    fn workspace_absolute_link_policy_uses_ast_targets() {
+        let root = Path::new("/repo");
+        assert!(workspace_absolute_target(
+            root,
+            "/repo/docs/guide.md#section"
+        ));
+        assert!(!workspace_absolute_target(root, "docs/guide.md"));
+        assert!(!workspace_absolute_target(root, "/elsewhere/guide.md"));
+    }
+
+    #[test]
+    fn help_exposes_check_and_format_commands() {
         let usage = usage_text();
 
-        assert!(usage.contains("usage: agent-canon docs <command> [options] [paths...]"));
-        assert!(usage.contains("help, -h, --help"));
-        assert!(usage.contains("--root <repo-root>"));
-        assert!(usage.contains("--format text|json"));
-        assert!(usage.contains("tools/bin/agent-canon docs -h"));
+        assert!(usage.contains("docs check"));
+        assert!(usage.contains("docs format"));
     }
 
     #[test]
@@ -2259,98 +1191,5 @@ mod tests {
         assert_eq!(parsed.command, DocsCommand::Format);
         assert_eq!(parsed.root, PathBuf::from("/repo"));
         assert_eq!(parsed.paths, vec!["README.md"]);
-    }
-
-    #[test]
-    fn resolves_relative_links_from_standalone_source_paths() {
-        let workspace = std::env::temp_dir().join(format!(
-            "agent-canon-docs-standalone-link-test-{}-{}",
-            std::process::id(),
-            std::thread::current().name().unwrap_or("no-name")
-        ));
-        let documents = workspace.join("documents");
-        let source = workspace.join("ROOT_AGENTS.md");
-        let target = documents.join("root-view-target.md");
-        fs::create_dir_all(&documents).expect("create standalone documents");
-        fs::write(&source, "[]").expect("write standalone source");
-        fs::write(&target, "[]").expect("write standalone target");
-
-        assert_eq!(
-            resolve_local_target(&source, &workspace, "documents/root-view-target.md"),
-            Some(target)
-        );
-
-        fs::remove_dir_all(&workspace).ok();
-    }
-
-    #[test]
-    fn renders_validation_failure_response_from_inventory() {
-        let root = std::env::temp_dir().join(format!(
-            "agent-canon-runtime-profile-test-{}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&root).expect("create temp dir");
-        let inventory = root.join("inventory.json");
-        fs::write(
-            &inventory,
-            r##"{
-  "version": 1,
-  "title": "Runtime Profiles And Check Matrix",
-  "summary": ["summary"],
-  "profile_classes": [
-    {"id": "base-project", "profile": "Base project", "activates": ["`README.md`"], "required_when": "Every repo"}
-  ],
-  "compatibility_note": ["compat note"],
-  "risk_classes": [
-    {"risk": "Routine docs", "examples": "examples", "required_validation": "validation"}
-  ],
-  "risk_note": ["risk note"],
-    "validation_failure_response": {
-    "rule": [
-      "After any validation test/check failure, preserve intended behavior.",
-      "Record `failing_contract`, `observation_level`, `cause_classification`, `intent_preservation`, and `evidence`."
-    ],
-    "required_fields": [
-      "failing_contract",
-      "observation_level",
-      "cause_classification",
-      "intent_preservation",
-      "evidence"
-    ],
-    "cause_classes": [
-      "implementation_bug",
-      "stale_generated_artifact"
-    ],
-    "intent_preservation": [
-      "repair_same_intent",
-      "redesign_same_intent",
-      "escalate_design_conflict"
-    ],
-    "repair_routes": [
-      "repair_same_intent: repair implementation while preserving approved intent",
-      "redesign_same_intent: return to design while preserving approved intent",
-      "escalate_design_conflict: escalate before any intent change"
-    ]
-  },
-  "check_matrix": [
-    {"changed_surface": "Markdown docs only", "required_check": ["`tools/bin/agent-canon docs check`"]}
-  ],
-  "closeout_rule": ["closeout"]
-}
-"##,
-        )
-        .expect("write inventory");
-
-        let rendered = render_runtime_profile_inventory(&inventory).expect("render inventory");
-        fs::remove_dir_all(&root).ok();
-
-        assert!(rendered.contains("## Validation Failure Response"));
-        assert!(!rendered.contains("Strict dependency graph"));
-        assert!(rendered.contains("`intent_preservation`"));
-        assert!(rendered.contains("`stale_generated_artifact`"));
-        assert!(rendered.contains(
-            "repair_same_intent: repair implementation while preserving approved intent"
-        ));
-        assert!(rendered.find("## Risk Classes") < rendered.find("## Check Matrix"));
     }
 }

@@ -74,12 +74,11 @@ agent-canon structured-analysis ...
 ```
 
 Python tools are not made into flat global executables. A public catalog entry
-is callable through the namespaced route only when its schema-v2 parity fixture
-is verified:
+is callable through the namespaced route using its typed descriptor:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
-  tool run --root <project-root> <verified-catalog-id> -- <args...>
+  tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
 Catalog-declared native CLI commands use the same route and execute their fixed
@@ -91,21 +90,16 @@ Only after a relevant failure, follow [bootstrap](../agents/skills/agent-canon-b
 for route diagnosis and authorized target/lifecycle repair. Do not prepend `status`
 or `target add` to every tool invocation.
 
-Parity covers argv, cwd, stdin/stdout/stderr, exit and signal behavior, and
-written paths. The dispatcher rejects unknown IDs, shell command strings, and
-unverified entries. It does not infer that every internal Python file is a
-public command.
-
-Until parity is verified, keep the existing exact command and use the typed
-legacy execution route:
+The descriptor owns argv, cwd, stream, exit/signal, runtime, and effect policy;
+the dispatcher validates the registered target and authenticated runtime when
+the command is invoked. It rejects unknown IDs and shell command strings, and
+does not infer that every internal Python file is a public command. For a
+caller-selected direct command, use the argv-only route:
 
 ```bash
 ./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
   exec --root <registered-project> -- <existing-command> <args...>
 ```
-
-A parity failure leaves the legacy route authoritative; no compatibility alias
-silently changes the command's execution plane or side effects.
 
 ## Source maintenance guides
 
@@ -120,10 +114,8 @@ reading list or a second command catalog.
 ## Catalog and ownership
 
 `tools/catalog.yaml` is the machine-readable catalog. It owns command identity,
-audience, placement, current legacy route, and schema-v2 dispatch metadata.
-`tools/fixtures/tool_dispatch/public-command-parity.json` records the observed
-parity evidence. Use the existing catalog/checker owners rather than adding a
-second README registry.
+audience, placement, and typed dispatch metadata. Use the existing
+catalog/checker owners rather than adding a second README registry.
 
 | Need | Owner command |
 | --- | --- |
