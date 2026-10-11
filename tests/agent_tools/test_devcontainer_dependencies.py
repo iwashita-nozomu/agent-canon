@@ -2901,6 +2901,88 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
         self.assertEqual(install_call[-1], "/usr/local/bin/rustup-init")
 
+    def test_deb_release_asset_is_verified_before_apt_install(self) -> None:
+        content = b"pinned-renderer-deb"
+        package_url = "https://example.test/releases/tool.deb"
+        with self.assertRaisesRegex(DependencyError, "must name a .deb file"):
+            parse_record(
+                record(
+                    "mislabelled-deb",
+                    method="release-asset",
+                    checksum=hashlib.sha256(content).hexdigest(),
+                    asset="tool.tar.gz",
+                    archive_format="deb",
+                    extract="none",
+                    destination="/usr/local/bin/renderer",
+                    source="https://example.test/releases",
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+        parsed = parse_record(
+            record(
+                "renderer",
+                method="release-asset",
+                checksum=hashlib.sha256(content).hexdigest(),
+                asset="tool.deb",
+                archive_format="deb",
+                extract="none",
+                destination="/usr/local/bin/renderer",
+                source="https://example.test/releases",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+
+        def download(
+            url: str,
+            destination: Path,
+            **_: object,
+        ) -> None:
+            self.assertEqual(url, package_url)
+            destination.write_bytes(content)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_authentic_git(root)
+            with (
+                mock.patch(
+                    "tools.runtime.container.devcontainer_dependencies.architecture",
+                    return_value="x86_64",
+                ),
+                mock.patch(
+                    "tools.runtime.container.devcontainer_dependencies._download",
+                    side_effect=download,
+                ),
+            ):
+                Installer(runner, image_owned=True).install_record(
+                    parsed, workspace=root
+                )
+                installs = [
+                    call
+                    for call in runner.calls
+                    if call[:2] == ("apt-get", "install")
+                ]
+                self.assertEqual(len(installs), 1)
+                self.assertEqual(
+                    installs[0][2:5], ("-y", "--no-install-recommends", "--no-remove")
+                )
+                self.assertTrue(installs[0][-1].endswith("/tool.deb"))
+                self.assertFalse(any(call[0] == "install" for call in runner.calls))
+
+                runner.calls.clear()
+                mismatched = replace(
+                    parsed, checksum=hashlib.sha256(b"different deb").hexdigest()
+                )
+                with self.assertRaisesRegex(DependencyError, "release checksum mismatch"):
+                    Installer(runner, image_owned=True).install_record(
+                        mismatched, workspace=root
+                    )
+                self.assertFalse(
+                    any(call[:2] == ("apt-get", "install") for call in runner.calls)
+                )
+
     def test_parent_values_are_retained_and_compatible_sets_union(self) -> None:
         parent = parse_record(
             record("shared", deps=["node"], provides=["codex"]),
@@ -3106,8 +3188,8 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn(".devcontainer/devcontainer.json", report.checked)
         self.assertNotIn(".devcontainer/post-create.sh", report.checked)
 
-    def test_canonical_manifest_is_a_small_default_tool_set(self) -> None:
-        """Default startup retains only LSP and small structure/agent tools."""
+    def test_canonical_manifest_matches_complete_default_image_record_set(self) -> None:
+        """Default image selection matches the complete canonical manifest."""
         plan = load_plan(
             ROOT,
             manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
@@ -3123,11 +3205,55 @@ class DependencyModelTests(unittest.TestCase):
                 "basedpyright",
                 "pyright-language-server",
                 "bash-language-server",
+                "markdownlint-cli2",
+                "markdownlint-cli2-formatter-json",
+                "gnupg",
+                "node",
+                "puppeteer-fonts-liberation",
+                "puppeteer-libasound2t64",
+                "puppeteer-libatk-bridge2.0-0t64",
+                "puppeteer-libatk1.0-0t64",
+                "puppeteer-libcairo2",
+                "puppeteer-libcups2t64",
+                "puppeteer-libdbus-1-3",
+                "puppeteer-libexpat1",
+                "puppeteer-libfontconfig1",
+                "puppeteer-libgbm1",
+                "puppeteer-libglib2.0-0t64",
+                "puppeteer-libgtk-3-0t64",
+                "puppeteer-libnspr4",
+                "puppeteer-libnss3",
+                "puppeteer-libpango-1.0-0",
+                "puppeteer-libpangocairo-1.0-0",
+                "puppeteer-libx11-6",
+                "puppeteer-libx11-xcb1",
+                "puppeteer-libxcb1",
+                "puppeteer-libxcomposite1",
+                "puppeteer-libxcursor1",
+                "puppeteer-libxdamage1",
+                "puppeteer-libxext6",
+                "puppeteer-libxfixes3",
+                "puppeteer-libxi6",
+                "puppeteer-libxkbcommon0",
+                "puppeteer-libxrandr2",
+                "puppeteer-libxrender1",
+                "puppeteer-libxss1",
+                "puppeteer-libxtst6",
+                "puppeteer-lsb-release",
+                "puppeteer-wget",
+                "puppeteer-xdg-utils",
                 "jq",
                 "tree",
                 "clangd-language-server",
                 "rust-toolchain",
+                "shellcheck",
+                "actionlint",
+                "zizmor",
                 "python3-pytest",
+                "quarto",
+                "lychee",
+                "puppeteer",
+                "mermaid-cli",
             },
         )
         for removed in (
@@ -3143,6 +3269,67 @@ class DependencyModelTests(unittest.TestCase):
             "pyyaml",
         ):
             self.assertNotIn(removed, ids)
+
+    def test_puppeteer_runtime_closure_is_pinned_and_ordered(self) -> None:
+        """Chrome runtime packages are typed, pinned, and precede Puppeteer."""
+        plan = load_plan(
+            ROOT,
+            manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
+        )
+        records = plan.by_id()
+        expected = {
+            "puppeteer-fonts-liberation": ("fonts-liberation", "1:2.1.5-3"),
+            "puppeteer-libasound2t64": ("libasound2t64", "1.2.11-1build2"),
+            "puppeteer-libatk-bridge2.0-0t64": (
+                "libatk-bridge2.0-0t64",
+                "2.52.0-1build1",
+            ),
+            "puppeteer-libatk1.0-0t64": ("libatk1.0-0t64", "2.52.0-1build1"),
+            "puppeteer-libcairo2": ("libcairo2", "1.18.0-3build1"),
+            "puppeteer-libcups2t64": ("libcups2t64", "2.4.7-1.2ubuntu7"),
+            "puppeteer-libdbus-1-3": ("libdbus-1-3", "1.14.10-4ubuntu4"),
+            "puppeteer-libexpat1": ("libexpat1", "2.6.1-2build1"),
+            "puppeteer-libfontconfig1": ("libfontconfig1", "2.15.0-1.1ubuntu2"),
+            "puppeteer-libgbm1": ("libgbm1", "24.0.5-1ubuntu1"),
+            "puppeteer-libglib2.0-0t64": ("libglib2.0-0t64", "2.80.0-6ubuntu1"),
+            "puppeteer-libgtk-3-0t64": ("libgtk-3-0t64", "3.24.41-4ubuntu1"),
+            "puppeteer-libnspr4": ("libnspr4", "2:4.35-1.1build1"),
+            "puppeteer-libnss3": ("libnss3", "2:3.98-1build1"),
+            "puppeteer-libpango-1.0-0": ("libpango-1.0-0", "1.52.1+ds-1build1"),
+            "puppeteer-libpangocairo-1.0-0": (
+                "libpangocairo-1.0-0",
+                "1.52.1+ds-1build1",
+            ),
+            "puppeteer-libx11-6": ("libx11-6", "2:1.8.7-1build1"),
+            "puppeteer-libx11-xcb1": ("libx11-xcb1", "2:1.8.7-1build1"),
+            "puppeteer-libxcb1": ("libxcb1", "1.15-1ubuntu2"),
+            "puppeteer-libxcomposite1": ("libxcomposite1", "1:0.4.5-1build3"),
+            "puppeteer-libxcursor1": ("libxcursor1", "1:1.2.1-1build1"),
+            "puppeteer-libxdamage1": ("libxdamage1", "1:1.1.6-1build1"),
+            "puppeteer-libxext6": ("libxext6", "2:1.3.4-1build2"),
+            "puppeteer-libxfixes3": ("libxfixes3", "1:6.0.0-2build1"),
+            "puppeteer-libxi6": ("libxi6", "2:1.8.1-1build1"),
+            "puppeteer-libxkbcommon0": ("libxkbcommon0", "1.6.0-1build1"),
+            "puppeteer-libxrandr2": ("libxrandr2", "2:1.5.2-2build1"),
+            "puppeteer-libxrender1": ("libxrender1", "0.9.10-1.1build1"),
+            "puppeteer-libxss1": ("libxss1", "1:1.2.3-1build3"),
+            "puppeteer-libxtst6": ("libxtst6", "2:1.2.3-1.1build1"),
+            "puppeteer-lsb-release": ("lsb-release", "12.0-2"),
+            "puppeteer-wget": ("wget", "1.21.4-1ubuntu4"),
+            "puppeteer-xdg-utils": ("xdg-utils", "1.1.3-4.1ubuntu3"),
+        }
+        self.assertEqual(
+            plan.providers_for("puppeteer"),
+            ("node", *expected),
+        )
+        self.assertEqual(plan.providers_for("node"), ("gnupg",))
+        self.assertEqual(records["gnupg"].version, "2.4.4-2ubuntu17")
+        for record_id, (package, version) in expected.items():
+            record = records[record_id]
+            self.assertEqual(record.package, package)
+            self.assertEqual(record.version, version)
+            self.assertEqual(record.method.value, "apt-package")
+            self.assertEqual(record.source, "ubuntu:24.04")
 
     def test_canonical_apt_records_are_jammy_multiarch_owned(self) -> None:
         """Shared apt records target Jammy without pinning one host architecture."""
@@ -4315,6 +4502,11 @@ class DependencyModelTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn('export PATH="$CARGO_HOME/bin:$PATH"', dockerfile)
+        self.assertIn(
+            "PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer",
+            dockerfile,
+        )
+        self.assertIn("PUPPETEER_SKIP_CHROME_DOWNLOAD=true", dockerfile)
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
         self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
@@ -4322,7 +4514,15 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
         apt_bootstrap = dockerfile.split("apt-get install", 1)[1].split(";", 1)[0]
-        for package in ("pipx", "jq", "tree", "clangd-18"):
+        for package in (
+            "pipx",
+            "jq",
+            "tree",
+            "clangd-18",
+            "nodejs",
+            "npm",
+            "gnupg",
+        ):
             self.assertNotIn(package, apt_bootstrap)
         self.assertNotIn("ninja-build", dockerfile)
         self.assertNotIn("USER agentcanon", dockerfile)
