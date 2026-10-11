@@ -716,7 +716,6 @@ def resolve_bootstrap_context(
         if repository_roots is not None
         else resolve_report_root(
             args.report_root,
-            workspace_root,
             runtime_root=args.runtime_root,
         )
     )

@@ -475,13 +475,11 @@ def main() -> int:
             else:
                 report_root = resolve_report_root(
                     args.report_root,
-                    workspace_root,
                     runtime_root=args.runtime_root,
                 )
         else:
             report_root = resolve_report_root(
                 args.report_root,
-                workspace_root,
                 runtime_root=args.runtime_root,
             )
     if not args.report_dir and args.run_id:

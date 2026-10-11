@@ -730,7 +730,7 @@ _agent_canon_replace_resident_locked() {{
   printf '%s\\n' replaced > {str(replaced)!r}
   _agent_canon_commit_pending_rollback_plan
 }}
-_agent_canon_update_locked '' ignored
+_agent_canon_update_locked ''
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -1044,7 +1044,7 @@ _agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(callbacks)!r}; 
 _agent_canon_run_controller() {{ printf '%s\\n' controller >> {str(callbacks)!r}; return 0; }}
 _agent_canon_record_active_container() {{ printf '%s\\n' record >> {str(callbacks)!r}; return 0; }}
 _agent_canon_install_global_links() {{ printf '%s\\n' links >> {str(callbacks)!r}; return 0; }}
-_agent_canon_update_locked '' candidate
+_agent_canon_update_locked ''
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"

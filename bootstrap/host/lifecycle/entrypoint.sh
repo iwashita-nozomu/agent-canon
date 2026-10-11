@@ -3764,9 +3764,8 @@ _agent_canon_replace_resident() {
 }
 
 _agent_canon_update() {
-  local requested_ref=${1:-} candidate_image_ref=${2:-}
-  _agent_canon_with_replacement_lock _agent_canon_update_locked \
-    "$requested_ref" "$candidate_image_ref"
+  local requested_ref=${1:-}
+  _agent_canon_with_replacement_lock _agent_canon_update_locked "$requested_ref"
 }
 
 _agent_canon_ensure_start_resident() {
@@ -5297,8 +5296,7 @@ bootstrap_host_entrypoint() {
     update)
       AGENT_CANON_ALLOW_BUILD=1
       export AGENT_CANON_ALLOW_BUILD
-      _agent_canon_image_reference "$image_ref"
-      _agent_canon_update "$image_ref" "$AGENT_CANON_IMAGE_REF"
+      _agent_canon_update "$image_ref"
       return $?
       ;;
     rollback)
