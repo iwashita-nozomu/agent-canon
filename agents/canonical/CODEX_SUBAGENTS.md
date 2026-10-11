@@ -76,16 +76,17 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   witness/static proof を確認して adjudicate し、distinct unresolved risk の
   ときだけ specialist を追加します
 - selected coordination/delegation route では parent agent は orchestrator /
-  integrator です。親は handoff packet の選択、agent 起動、packet relay、依存順、
+  integrator です。親は handoff packet の選択、agent 起動、packet relay、
   status、選択済み integration と最終 readback を担当し、child に割り当てた
   implementation unit を代替実装しません。bounded single-owner route や
   user-guided debugging の executor は各 workflow owner が定めます
-- routing と owner-critical な review を決めてから、必要な subagent wave
-  だけを起動する
-- Agent Wave の `計画 -> レビュー -> 編集` は候補 stage です。各 wave は
-  選択した stage の plan artifact、review gate decision、edit handoff
-  evidence だけを `team_manifest.yaml`、`schedule.md`、
-  `workflow_monitoring.md` に残します。
+- selected route と必要な owner-critical review を解決します。AgentCanon
+  execution graph が active な場合、`bootstrap_agent_run.py` が selected Skill
+  本文/prerequisite と role dependency から ready set を作ります。親は返された
+  ToolCall を実行し、その実結果を同じ run に戻します。
+- Agent Wave の `計画 -> レビュー -> 編集` は graph node の型を説明します。
+  `team_manifest.yaml` は declared graph を示し、schedule/monitoring ledger は
+  実起動・完了結果の readback のみを担います。
 - selected delegation / coordination route だけが write-capable implementer
   handoff を作ります。そのrouteでspawn authorization、tool gate、または他の
   launch blockerがある場合はtyped blocked/retry/user-report packetを残し、
@@ -97,7 +98,8 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - 探索、レビュー、仕様確認の並列化を使い、write-heavy implementation は dependency order と disjoint write scope が揃った wave に限定する
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
-- 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
+- 追加 wave の手動選択や wave 完了の自己申告は行わず、graph の ready ToolCall
+  と actual completion result を同じ run に渡します。
 - 同じ checkout root の write-capable agent は同時起動しません。先行writerの
   lifecycle終了とowner release/readback後だけ同じcheckoutを直列再利用します。
   並列writerはcheckout ownerが選択したdistinct checkout rootを使います。
@@ -157,15 +159,16 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   evidence の preflight、`CleanupProof` / receipt、typed hold の順で handback し、proof-free
   deletion を完了扱いにしません。
 - 同じ responsibility unit の follow-up は compatible な worker context を再利用します。file-sized slice、細粒度の fresh agent、または同じ oracle を共有する断片化は parallel source workstream として起動しません。依存または衝突する stream は記録済み merge order の ordered wave にします。
-- Wave は frontier-driven adaptive loop です。owning reviewer、verifier、または
-  integration executor が checker / graph / review output から次 frontier queue を
-  作り、必要な subagent を適応的に追加し、結果を処理して同じ validation を再実行
-  します。parent は packet relay と status を管理します。frontier が
+- Wave は frontier-driven adaptive loop です。execution graph が actual callback /
+  ToolCall results から ready frontier を進め、parent はその ToolCall を実行し
+  結果を同じ run に戻します。reviewer/verifier/integration executor は各自の
+  owner result を返し、別の scheduler や monitor status で readiness を決めません。
+  frontier が
   `verified`、`refuted`、`unprovable_under_assumptions`、または checked external
   boundary に縮約された時点で closeout 条件を満たします。
-- multi-agent family で予定 stage wave を絞る場合は、rate limit、blocked role、irrelevant role、または選択した coordination rationale を `schedule.md` / `workflow_monitoring.md` に残します
+- stage や role が選択されない場合は、既存 catalog route の条件で説明します。runtime graph の readback には実際に起動した role だけを記録し、予定 list を埋めるための skipped row は作りません。
 - `role` は permanent responsibility id であり、実行単位は `role_id+instance_id+agent_type` です。同じ role を複数起動する場合は、各 instance に distinct `input_packet`、`allowed_paths` / `do_not_read`、`expected_output`、`validation_route`、`review_gate` を与えます。read-only role は review focus や input packet が分離される場合に同一 wave で複数起動できます。write-capable role は disjoint write scope、distinct checkout roots、integration executor の順序証拠がある場合だけ同一 wave で複数起動できます。
-- role topology と same-role instance policy は `agents/task_catalog.yaml` の `workflow_families[].role_topology` を source にし、`team_manifest.yaml` の `run.spawn_wave_recommendation.role_topology` に mirror します。`.codex/config.toml` の `max_threads` は topology-derived requested/configured readback であり、platform-effective / current-available capacity は handshake の別入力です。
+- role topology と same-role instance policy は `agents/task_catalog.yaml` の `role_topology_defaults.stage_waves` を source にします。`team_manifest.yaml#run.execution_graph` は topology と実行境界を参照します。実際の ready set は `bootstrap_agent_run.py` が host ToolCall results から計算し、monitor ledger は readback のみです。`.codex/config.toml` の `max_threads` は topology-derived requested/configured readback であり、platform-effective / current-available capacity は handshake の別入力です。
 - workflow demand、write-cap、nested reservation、available capacity は
   [capacity handshake](#capacity-and-lifecycle) の generated projection です。
   固定 active/write 数、task-size/count/time budget、または disposable probe は
@@ -273,15 +276,16 @@ conflict/rework artifact contract to the handoff.
 ## Wave Plan Contract
 
 Selected coordination routes reuse the existing run-bundle and lifecycle owners.
-The task catalog selects stages and roles; the materializer supplies the selected
-role/profile and any required handoff. Record only selected waves and actual
-handoff/close results through those owners. Do not create a second wave ledger,
-fixed stage sequence, or repeated field checklist here. A compatible active
-agent may receive revised scope; independent workstreams remain separate only
-when their owning route requires a replaceable unit and distinct write boundary.
-The former `Intake Responsibility Wave` and `Agent Wave Ledger` names refer to
-legacy lifecycle terminology only; they are not phases or ledgers created by this
-inventory.
+The task catalog declares role stages and conditions; `bootstrap_agent_run.py`
+evaluates the selected route and only dispatches its ready graph frontier through
+the existing ToolCall/AgentTeam APIs. Re-enter that run with actual spawn and
+completion results; monitor rows are readback only. Do not create a second wave
+planner, ledger, fixed workflow, or repeated field checklist here. A compatible
+active agent may receive revised scope; independent workstreams remain separate
+only when their owning route requires a replaceable unit and distinct write
+boundary.
+`Agent Wave Ledger` remains a run-local readback artifact, not a readiness
+authority or a second execution path.
 
 ## ユーザー向け言語ポリシー
 

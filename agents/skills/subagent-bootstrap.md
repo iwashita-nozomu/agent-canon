@@ -27,9 +27,26 @@ resumption. Repository-changing work alone does not select either.
 ## Launch and Handoff
 
 Resolve the task and role from the selected catalog route and
-[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). Use the existing structured
-handoff; bootstrap a run bundle only when coordination or resumption needs
-durable lifecycle evidence.
+[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). For an AgentCanon run,
+`bootstrap_agent_run.py` owns the execution transition: use only the returned
+`EXECUTION_GRAPH_READY_TOOL_CALLS_JSON` and re-enter that same `RUN_ID` with the
+host's actual ToolCall results. A spawn result means launched, not completed;
+dependent waves remain blocked until the child completion result arrives. Do
+not select a second wave manually or treat a monitor row as the result.
+
+The graph reads only currently selected canonical Skill documents and their
+required prerequisites through file EOF before dispatch. Related candidates and
+deferred Skills remain unloaded until their route activates. Carry the loaded
+canonical body in the dispatch context; a generated shim or a different agent's
+read does not satisfy it. Use the existing structured handoff and run bundle for
+durable lifecycle evidence; `task_close.py` remains the terminal owner.
+
+Result re-entry uses `--execution-results` keyed by the existing
+`role_id:instance_id:agent_type`. Supply the actual host `spawn_result` and the
+child's actual `completion_result` in the standard ToolCall result shape
+(`isError`, `content`). Only completion results unlock dependents. The
+IssueWorker route uses the same role entry's `publication_result` for its
+existing follow-up ToolCall. Do not synthesize success from a monitor status.
 
 [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) owns handoff and context
 fields. For a write-capable child, use its prepared writer target and allowed
@@ -39,9 +56,9 @@ preparation. Do not duplicate their packet or checkout rules here. Read
 selected profile, and [subagent-startup](../internal-routines/subagent-startup.md)
 only when that private route is selected.
 
-The parent relays packets, dependency order, and status. The child acts within
-its assigned authority; a blocked write-capable child is not a parent-write
-fallback.
+The parent relays packets and actual results. The child acts within its
+assigned authority; a failed or incomplete child result does not unlock a
+dependent node or become a parent-write fallback.
 
 ## Reuse and Parallel Work
 

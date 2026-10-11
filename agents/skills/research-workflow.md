@@ -67,6 +67,8 @@ next action、および利用した commit/run path を残します。artifact i
 - 外部 source の検索、採否、反証、URL / DOI / access / cache metadata、citation-ready
   record は `literature-survey` が所有する。research はその source packet を消費して
   source claim と task claim の境界を保つ
+- DOI から得た CSL metadata は書誌情報であり、論文内容や research claim の裏付けではない。
+  source quality と claim support は `literature-survey` の採否・確認手順に戻す。
 - 単一 run、terminal status、rerun、実行 provenance は `experiment-lifecycle` が所有する
 - 実在 artifact の role、checksum、readback、retention は `result-artifact-writeout` が所有する
 - 複数 iteration の backlog、budget、next item は `adaptive-improvement-loop` が所有する

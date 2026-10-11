@@ -507,7 +507,7 @@ class WorkflowMonitorTest(unittest.TestCase):
                         "do_not_read=.agent-canon/log-archive,reports/agents/other "
                         "write_scope=read_only validation_route=parent_review "
                         "review_gate=integration_executor "
-                        "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation "
+                        "handoff_artifacts=team_manifest.yaml#run.execution_graph "
                         "status=completed"
                     ),
                     "--timestamp",
