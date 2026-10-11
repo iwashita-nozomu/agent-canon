@@ -294,17 +294,33 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
-    let mut command = Command::new("lychee");
-    command
-        .current_dir(root)
-        .arg("--config")
-        .arg(root.join("tools/validation/documentation/config/lychee.toml"));
-    command.args(
-        files
-            .iter()
-            .map(|path| path.strip_prefix(root).unwrap_or(path)),
-    );
-    run_native_command("lychee", &mut command)
+    let mut files_by_directory: BTreeMap<PathBuf, Vec<PathBuf>> = BTreeMap::new();
+    for path in files {
+        let (directory, input) = match path.strip_prefix(root) {
+            Ok(relative) => (root.to_path_buf(), relative.to_path_buf()),
+            Err(_) => (
+                path.parent().unwrap_or(root).to_path_buf(),
+                PathBuf::from(path.file_name().unwrap_or(path.as_os_str())),
+            ),
+        };
+        files_by_directory
+            .entry(directory)
+            .or_default()
+            .push(input);
+    }
+
+    let config = root.join("tools/validation/documentation/config/lychee.toml");
+    let mut succeeded = true;
+    for (directory, inputs) in files_by_directory {
+        let mut command = Command::new("lychee");
+        command
+            .current_dir(directory)
+            .arg("--config")
+            .arg(&config)
+            .args(inputs);
+        succeeded &= run_native_command("lychee", &mut command);
+    }
+    succeeded
 }
 
 fn run_native_command(name: &str, command: &mut Command) -> bool {

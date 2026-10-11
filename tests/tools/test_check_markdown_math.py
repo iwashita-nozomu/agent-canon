@@ -101,6 +101,18 @@ class CheckMarkdownMathTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("missing.md", result.stdout + result.stderr)
 
+    def test_uses_lychee_for_absolute_inputs_outside_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent = Path(tmp_dir)
+            root = parent / "repo"
+            document = parent / "outside" / "doc.md"
+            self.write_file(document, "# Doc\n\n[Missing](missing.md)\n")
+
+            result = self.run_cli(root, str(document))
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("missing.md", result.stdout + result.stderr)
+
     def test_flags_existing_workspace_absolute_ast_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
