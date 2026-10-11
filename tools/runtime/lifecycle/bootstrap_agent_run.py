@@ -1691,13 +1691,11 @@ def main(
     if resuming_run and args.execution_results is None:
         print(f"bootstrap_run_id_collision:{context.run_id}", flush=True)
         return 1
-    if resuming_run and not execution_results:
-        print("execution_result:empty_result_input", flush=True)
-        return 2
     if not resuming_run and args.execution_results is not None:
         print("execution_result:run_not_found", flush=True)
         return 1
     existing_run: Mapping[str, object] | None = None
+    prior_execution_results: dict[str, dict[str, ToolExecutionResult]] = {}
     if resuming_run:
         try:
             existing_run = validate_execution_run_readback(
@@ -1711,8 +1709,9 @@ def main(
             print(str(exc), flush=True)
             return 1
         try:
+            prior_execution_results = persisted_execution_results(existing_run)
             execution_results = merge_execution_results(
-                persisted_execution_results(existing_run),
+                prior_execution_results,
                 execution_results,
             )
         except (RuntimeError, TypeError, ValueError) as exc:
@@ -2146,12 +2145,29 @@ def main(
 
     if resuming_run:
         try:
+            prior_completed_wave_ids = set(
+                completed_execution_wave_ids(
+                    execution_waves, prior_execution_results
+                )
+            )
+            current_completed_wave_ids = set(
+                completed_execution_wave_ids(execution_waves, execution_results)
+            )
+            newly_completed_wave_ids = (
+                current_completed_wave_ids - prior_completed_wave_ids
+            )
             readback_rows = execution_wave_readback_rows(
                 execution_waves,
                 execution_results,
                 active_budget=context.workflow_active_spawn_budget or 0,
                 workspace_root=workspace_root,
                 writer_targets=writer_targets,
+            )
+            readback_rows = tuple(
+                row
+                for row in readback_rows
+                if row.partition(" ")[0].removeprefix("wave_id=")
+                in newly_completed_wave_ids
             )
             if readback_rows:
                 append_monitoring(
