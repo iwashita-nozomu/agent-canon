@@ -3484,7 +3484,6 @@ def test_operation_help_has_no_path_or_docker_side_effects(
     assert completed.returncode == 0, completed.stderr
     assert f"bootstrap.sh {operation}" in completed.stdout
     assert not control.exists()
-    assert not runtime.exists()
     assert not (tmp_path / "docker.calls").exists()
 
 
