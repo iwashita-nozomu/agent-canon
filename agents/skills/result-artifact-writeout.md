@@ -35,12 +35,9 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 
 Persist concrete outputs without inventing a second experiment, report, or publication state. For each selected artifact that actually exists, record its parent result/run reference, path, semantic role, content checksum or equivalent immutable identity, producer/source reference when needed, destination, and successful readback. Do not overwrite different bytes at the same identity; identical replay may be treated as idempotent.
 
-For experiment artifacts, apply
-[Failed experiment cleanup](experiment-lifecycle.md#failed-experiment-cleanup)
-before retention. Its deletion decision takes precedence over the raw-first,
-append-only, failure-writeout, report, and archive instructions below. Do not
-copy or regenerate a deleted failed-run bundle; record only the lifecycle's
-concise disposition. This does not change retention of non-experiment evidence.
+For experiment artifacts, follow the explicit disposition in
+[retention](retention.md). A failed run's status alone does not determine
+whether its existing evidence is written out or removed.
 
 ## No fixed artifact inventory
 
@@ -99,10 +96,10 @@ evidence.
 1. Derive tables and Markdown from the same raw result; do not rerun a checker
    just to get nicer prose unless the rerun is explicitly recorded as a new
    source result.
-1. For experiments, first apply
-   [Failed experiment cleanup](experiment-lifecycle.md#failed-experiment-cleanup).
-   Otherwise treat failed, skipped, blocked, and partial runs as writeout targets;
-   lack of success evidence alone is not a reason to drop non-experiment results.
+1. For experiment artifacts, follow [retention](retention.md); do not interpret
+   failure status as a disposal decision.
+1. Failed, skipped, blocked, and partial non-experiment results remain writeout
+   targets; lack of success evidence alone is not a reason to drop them.
 1. Use a unique path or append-only JSONL for repeated runs. Do not overwrite
    detailed eval, hook, skill, or experiment results.
 1. When the active run-local agent report needs cross-run retention, call
@@ -159,7 +156,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. For prose graph outputs, treat the SQLite DB as the source result and keep projection, diagnostics, explanation, integration plan, handoff, and rewrite packets tied to that DB path.
 1. If the user asks for a reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence, also use `$report-writing`; this skill owns raw/summary artifact writeout, not the report source packet, interpretation, limitations, next action, or quality checklist.
 1. Record `source_result`, `artifact_id`, raw artifact path, summary artifact path, manifest details, and overwrite policy; manifest details include command/argv, cwd, branch, commit, runtime namespace, timestamps, exit code, status, inputs, counts, and schema version when available.
-1. Apply [Failed experiment cleanup](experiment-lifecycle.md#failed-experiment-cleanup) before experiment writeout or retention; do not recreate deleted artifacts. Failed, skipped, blocked, and partial non-experiment results remain writeout targets.
+1. Failed, skipped, blocked, and partial non-experiment results remain writeout targets; do not drop them for lack of success evidence.
 1. Use append-only JSONL or a unique file path for repeated hook, skill eval, prompt eval, checker, or experiment runs; do not overwrite detailed results.
 1. Include stable grouping fields such as payload/input fingerprint, hook/tool name, status, exit code, branch, commit, and runtime namespace when available.
 1. For experiment outputs, persist only producer-selected files that actually exist under `experiments/<topic>/result/<run-id>/`; bind them to the lifecycle run reference and record semantic role, checksum, no-overwrite result, and readback. Create `experiments/<topic>/report/<run-id>.md` only when `$report-writing` is selected.
