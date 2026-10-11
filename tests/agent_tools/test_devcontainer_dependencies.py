@@ -3432,6 +3432,7 @@ class DependencyModelTests(unittest.TestCase):
                 "zizmor",
                 "python3-pytest",
                 "quarto",
+                "puppeteer-unzip",
                 "vl-convert",
                 "lychee",
                 "puppeteer",

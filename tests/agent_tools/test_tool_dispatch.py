@@ -84,6 +84,7 @@ class ToolDispatchTest(unittest.TestCase):
                 "route",
                 "skill-document-reader",
                 "template-bundle",
+                "vl-convert",
             },
         )
 

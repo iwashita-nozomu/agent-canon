@@ -188,6 +188,32 @@
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "written_paths": []
       }
+    },
+    {
+      "id": "vl-convert",
+      "probe_args": ["--version"],
+      "observed": {
+        "argv": ["vl-convert"],
+        "cwd": "target-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "a66b6eb3d7880f5aa559aade5173039a7d184e83f787f394470aad57d3cfed27",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "a66b6eb3d7880f5aa559aade5173039a7d184e83f787f394470aad57d3cfed27",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
     }
   ]
 }
