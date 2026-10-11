@@ -75,7 +75,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     chmod 0444 /usr/local/share/agent-canon/.agent-canon-tool-container; \
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
-    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init; \
+    rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init /usr/local/share/agent-canon/pipx/shared; \
     DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove pipx; \
     rm -rf /var/lib/apt/lists/*
 
