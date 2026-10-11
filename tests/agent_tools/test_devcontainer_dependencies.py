@@ -3406,6 +3406,7 @@ class DependencyModelTests(unittest.TestCase):
             "puppeteer-lsb-release": "lsb-release",
             "puppeteer-wget": "wget",
             "puppeteer-xdg-utils": "xdg-utils",
+            "puppeteer-unzip": "unzip",
         }
         self.assertEqual(
             plan.providers_for("puppeteer"),
