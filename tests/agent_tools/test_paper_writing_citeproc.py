@@ -100,6 +100,7 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENT_CANON_OUTPUT_ROOT", str(output_root))
+    monkeypatch.delenv("AGENT_CANON_MOUNT_REGISTRY", raising=False)
     return output_root
 
 
