@@ -9,10 +9,10 @@ upstream design ../../agents/skills/agent-canon-update.md AgentCanon source and 
 upstream implementation ../../tools/runtime/container/devcontainer_dependencies.py reusable dependency planning and image installation logic
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py existing archive publication owner
 downstream implementation ../../bootstrap.sh host bootstrap entrypoint
-downstream implementation ../../bootstrap/container/image/Dockerfile shared Python and Rust tool image
+downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
 downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
 downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
-downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced Python and Rust dispatcher
+downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced typed dispatcher
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
 @dependency-end
 -->
@@ -26,7 +26,7 @@ downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootst
 ## Reader Map
 
 - Host は Skill、[AGENTS.md](../../AGENTS.md)、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
-- 共有 tool container は AgentCanon の Python / Rust / LSP tool だけを実行する。
+- 共有 tool container は AgentCanon の Python / Rust / LSP tool と catalog-declared native CLI を実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
 - runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
   一般の eval、report、SQLite、log、analysis、archive artifact は source tree 外に置く。
@@ -43,7 +43,7 @@ Host
             |
             v
 Shared AgentCanon Tool Container (maximum one)
-  Rust CLI / Python tools / LSP / static analysis
+  Rust CLI / Python tools / LSP / catalog-native CLI / static analysis
             |
             +-- external runtime root
             +-- allowlisted repository mounts
@@ -323,7 +323,7 @@ Python tool は flat executable を増やさず、次の namespace を使いま�
 agent-canon tool run <catalog-id> -- <args...>
 ```
 
-catalog schema v2 は public Python / Rust command に対して次を型付きで持ちます。
+catalog schema v2 は Python / Rust / native CLI command に対して次を型付きで持ちます。
 
 ```text
 id, typed argv, runtime, execution_plane, cwd policy, env policy,
@@ -332,16 +332,20 @@ stdin/stdout/stderr policy, exit/signal policy, side_effect_policy, output_root
 
 `tools/runtime/dispatch/tool_dispatch.py` は `tool-container` と
 `read-only`、`external-artifact`、`explicit-target-write` を列挙値にします。
+`native` runtime は catalog が宣言した executable argv を認証済み tool
+container 内で直接起動し、child argument を shell 評価しません。source mount
+上の catalog argv path と registered target 上の child path は別々に解決します。
+宣言された `external-runtime` output root は dispatcher が validation 後に作成します。
 shell command string を dispatcher authority にしません。
 
-public command inventory は command id、現行 entrypoint、help digest、parity fixture を
-versioned fixture として固定します。Rust clap tree と public Python catalog から取得した
-inventory に差分がある間は catalog v2 cutover を禁止します。
+catalog runtime inventory は command id、現行 entrypoint、help digest、parity fixture を
+versioned fixture として固定します。Public CLI inventory は Rust clap tree と public
+Python catalog から取得し、差分がある間は Python catalog v2 cutover を禁止します。
 
-`tools/fixtures/tool_dispatch/public-command-parity.json` は public Python / Rust command の旧 direct route と新 dispatcher route の
-argv、cwd、stdout、stderr、exit code、signal、written paths の parity fixture を
-作ります。`tools/fixtures/tool_dispatch/public-command-parity.json` が通らない entry は旧 route を維持し、cutover しません。全 internal
-Python file を自動的に public catalog 化しません。
+`tools/fixtures/tool_dispatch/public-command-parity.json` は catalog Python / Rust / native
+command の direct argv と typed dispatcher route の argv、cwd、stdout、stderr、exit
+code、signal、written paths を記録します。fixture が通らない entry は従来の route を
+維持し、cutover しません。全 internal Python file を自動的に public catalog 化しません。
 
 ## Shell/Container Adapter Registry
 

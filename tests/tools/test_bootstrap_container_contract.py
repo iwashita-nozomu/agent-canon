@@ -106,11 +106,15 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
 
 def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    manifest = DEPENDENCIES.read_text(encoding="utf-8")
-    assert "clangd-18" in manifest
+    manifest = tomllib.loads(DEPENDENCIES.read_text(encoding="utf-8"))
+    records = {record["id"]: record for record in manifest["records"]}
+    assert "clangd-language-server" in records
     apt_bootstrap = text.split("apt-get install", 1)[1].split(";", 1)[0]
-    for package in ("pipx", "jq", "tree", "clangd-18"):
+    for package in ("pipx", "jq", "tree", "clangd-18", "nodejs", "npm"):
         assert package not in apt_bootstrap
+    assert set(records["node"]["provides"]) >= {"node", "nodejs", "npm"}
+    assert "apt-get purge -y --auto-remove pipx" in text
+    assert "apt-get purge -y --auto-remove npm pipx" not in text
     assert "build-essential curl" in text
     assert "python3.12" in text
     assert "nodejs=18.19.1" not in text
@@ -277,7 +281,8 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
-    # run_all_checks.sh's docs command invokes the native Markdown, link, and AST providers.
+    # run_all_checks.sh's docs command invokes native Markdown, link, AST, and
+    # selected document/diagram providers; packages remain typed-manifest owned.
     assert ids == {
         "pipx",
         "check-jsonschema",
@@ -334,6 +339,10 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "shellcheck",
         "actionlint",
         "zizmor",
+        "quarto",
+        "lychee",
+        "puppeteer",
+        "mermaid-cli",
         "python3-pytest",
     }
     assert not ids & {"github-cli", "codex-cli"}
