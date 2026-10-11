@@ -78,7 +78,7 @@ is callable through the namespaced route only when its schema-v2 parity fixture
 is verified:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+./bootstrap.sh --control-parent-root <root> \
   tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
 
@@ -96,7 +96,7 @@ Until parity is verified, keep the existing exact command and use the typed
 legacy execution route:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+./bootstrap.sh --control-parent-root <root> \
   exec --root <registered-project> -- <existing-command> <args...>
 ```
 

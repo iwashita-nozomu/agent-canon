@@ -54,11 +54,7 @@ route に進みます。
 ```bash
 SOURCE_ROOT="$(git rev-parse --show-toplevel)"
 CONTROL_PARENT_ROOT="$(cd "${SOURCE_ROOT}/.." && pwd -P)"
-RUNTIME_ROOT="${CONTROL_PARENT_ROOT}/workspace/agent-canon-runtime/full-check"
-COMMON=(
-  --control-parent-root "${CONTROL_PARENT_ROOT}"
-  --runtime-root "${RUNTIME_ROOT}"
-)
+COMMON=(--control-parent-root "${CONTROL_PARENT_ROOT}")
 
 ./bootstrap.sh "${COMMON[@]}" install
 ./bootstrap.sh "${COMMON[@]}" start

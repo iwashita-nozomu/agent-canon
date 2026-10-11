@@ -3458,7 +3458,6 @@ def test_operation_help_has_no_path_or_docker_side_effects(
 ) -> None:
     """Operation help exits before validating or preparing any host state."""
     control = tmp_path / "missing-control"
-    runtime = tmp_path / "missing-runtime"
     docker = tmp_path / "docker-counter"
     docker.write_text(
         "#!/usr/bin/env bash\n"
@@ -3474,8 +3473,6 @@ def test_operation_help_has_no_path_or_docker_side_effects(
             str(tmp_path / "missing-repository"),
             "--control-parent-root",
             str(control),
-            "--runtime-root",
-            str(runtime),
             operation,
             "--help",
         ],
@@ -3619,7 +3616,6 @@ def _gc_fixture(
 def _run_gc(
     repository: Path,
     control: Path,
-    runtime: Path,
     environment: dict[str, str],
     *,
     dry_run: bool = False,
@@ -3631,8 +3627,6 @@ def _run_gc(
         str(repository),
         "--control-parent-root",
         str(control),
-        "--runtime-root",
-        str(runtime),
         "gc",
     ]
     if dry_run:
@@ -3677,7 +3671,7 @@ def test_gc_dry_run_does_not_create_or_chmod_runtime_files(tmp_path: Path) -> No
     _state, _owned, repository, control, runtime, state_path, _name, environment = (
         _gc_fixture(tmp_path, runtime=False)
     )
-    completed = _run_gc(repository, control, runtime, environment, dry_run=True)
+    completed = _run_gc(repository, control, environment, dry_run=True)
     assert completed.returncode == 0, completed.stderr
     assert json.loads(completed.stdout)["code"] == "gc_plan"
     assert not runtime.exists()
@@ -3694,7 +3688,7 @@ def test_gc_keeps_live_resident_over_stale_persisted_container_id(
     (runtime / "container-state" / "state.json").write_text(
         json.dumps({"container_id": "container-stale"}), encoding="utf-8"
     )
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert result["containers"][name]["Id"] == state["containers"][name]["Id"]
@@ -3714,7 +3708,7 @@ def test_gc_keeps_live_resident_untagged_image_by_immutable_id(
     state["images"][f"untagged:{live_id}"] = live_image
     state["containers"][name]["Config"]["Image"] = live_id
     state_path.write_text(json.dumps(state), encoding="utf-8")
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert f"untagged:{live_id}" in result["images"]
@@ -3741,7 +3735,7 @@ def test_gc_keeps_shared_active_and_rollback_image_id(tmp_path: Path) -> None:
         "Config": {"Labels": owned},
     }
     state_path.write_text(json.dumps(state), encoding="utf-8")
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert result["images"][active_ref]["Id"] == shared_id
@@ -3754,7 +3748,7 @@ def test_gc_removes_only_exact_stale_owned_resources(tmp_path: Path) -> None:
     _state, _owned, repository, control, runtime, state_path, _name, environment = (
         _gc_fixture(tmp_path)
     )
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert "agent-canon-tools:stale" not in result["images"]
@@ -3766,7 +3760,7 @@ def test_gc_preserves_foreign_resources(tmp_path: Path) -> None:
     _state, _owned, repository, control, runtime, state_path, _name, environment = (
         _gc_fixture(tmp_path)
     )
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     result = json.loads(state_path.read_text(encoding="utf-8"))
     assert "foreign-tools:keep" in result["images"]
@@ -3778,7 +3772,7 @@ def test_gc_invokes_container_state_gc_and_combines_receipt(tmp_path: Path) -> N
     _state, _owned, repository, control, runtime, _state_path, _name, environment = (
         _gc_fixture(tmp_path)
     )
-    completed = _run_gc(repository, control, runtime, environment)
+    completed = _run_gc(repository, control, environment)
     assert completed.returncode == 0, completed.stderr
     receipt = json.loads(completed.stdout)
     assert receipt["details"]["state"]["code"] == "state_gc_complete"
@@ -4764,7 +4758,6 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         check=True,
         capture_output=True,
     )
-    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
     fake_state = tmp_path / "docker-state.json"
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     environment = {
@@ -4780,8 +4773,6 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         str(repository),
         "--control-parent-root",
         str(home),
-        "--runtime-root",
-        str(legacy_runtime),
     ]
     personal_skills = repository / ".codex" / "personal" / "skills"
     assert not (repository / ".runtime").exists()
@@ -4798,7 +4789,6 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     assert (home / ".runtime").is_dir()
     assert personal_skills.is_dir()
     assert list(personal_skills.glob("*/SKILL.md"))
-    assert not legacy_runtime.exists()
     assert (
         subprocess.run(
             ["git", "-C", str(repository), "branch", "--show-current"],
@@ -4859,7 +4849,6 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
         env={
             **environment,
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(home),
-            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
         },
     )
     assert wrapper.returncode == 0, wrapper.stderr
@@ -5005,7 +4994,6 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
     fake_state = tmp_path / "docker-state.json"
     calls = tmp_path / "docker.calls"
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
-    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
     environment = {
         **os.environ,
         "HOME": str(home),
@@ -5020,8 +5008,6 @@ def test_clean_install_failure_restores_resident_and_lifecycle_state(
         str(repository),
         "--control-parent-root",
         str(home),
-        "--runtime-root",
-        str(legacy_runtime),
     ]
 
     installed = subprocess.run(
@@ -5159,7 +5145,6 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
     )
-    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
     personal_skills = repository / ".codex" / "personal" / "skills"
     runtime = repository / ".runtime"
     container_name = (
@@ -5172,8 +5157,6 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         str(repository),
         "--control-parent-root",
         str(home),
-        "--runtime-root",
-        str(legacy_runtime),
     ]
     environment = {
         **os.environ,
@@ -5206,7 +5189,6 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
         assert runtime.is_dir()
         assert personal_skills.is_dir()
         assert list(personal_skills.glob("*/SKILL.md"))
-        assert not legacy_runtime.exists()
 
         started = subprocess.run(
             [*common, "start"],
@@ -5250,7 +5232,6 @@ def test_real_docker_public_clean_install_e2e(tmp_path: Path) -> None:
             env={
                 **environment,
                 "AGENT_CANON_CONTROL_PARENT_ROOT": str(home),
-                "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
             },
             timeout=120,
         )
@@ -5326,50 +5307,6 @@ def test_missing_docker_is_typed_without_host_python(tmp_path: Path) -> None:
     assert completed.returncode == 2
     receipt = json.loads(completed.stderr)
     assert receipt["code"] == "runtime_unavailable"
-
-
-def test_legacy_runtime_argument_keeps_install_state_at_control_runtime_path(
-    tmp_path: Path,
-) -> None:
-    """The legacy argument cannot redirect control-owned runtime state."""
-    repository = tmp_path / "agent-canon"
-    control = tmp_path / "control"
-    repository.mkdir()
-    control.mkdir()
-    legacy = control / "workspace" / "agent-canon-runtime" / "host"
-    fake_docker = tmp_path / "docker"
-    fake_docker.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-    fake_docker.chmod(0o755)
-
-    completed = subprocess.run(
-        [
-            str(BOOTSTRAP),
-            "--repository-root",
-            str(repository),
-            "--control-parent-root",
-            str(control),
-            "--runtime-root",
-            str(legacy),
-            "status",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-            "AGENT_CANON_DOCKER": str(fake_docker),
-        },
-    )
-
-    assert completed.returncode == 0, completed.stderr
-    receipt = json.loads(completed.stdout)
-    assert receipt["runtime_root"] == str(control / ".runtime")
-    assert (control / ".runtime" / "container-state").is_dir()
-    assert not (repository / ".runtime").exists()
-    assert not legacy.exists()
-    assert not (control / "agent-canon-log").exists()
-    assert (tmp_path / "agent-canon-log").is_dir()
 
 
 def test_shared_control_projection_is_reused_across_source_checkouts(
@@ -5462,10 +5399,10 @@ def test_shared_control_projection_is_reused_across_source_checkouts(
     )
 
 
-def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
+def test_symlinked_control_runtime_is_rejected_before_runtime_creation(
     tmp_path: Path,
 ) -> None:
-    """A symlinked control runtime cannot redirect the legacy migration input."""
+    """A symlinked control runtime is rejected before any runtime write."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
     outside = tmp_path / "outside-runtime"
@@ -5474,8 +5411,6 @@ def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
     outside.mkdir()
     (outside / "sentinel").write_text("untouched\n", encoding="utf-8")
     (control / ".runtime").symlink_to(outside, target_is_directory=True)
-    legacy = control / "workspace" / "agent-canon-runtime" / "host"
-
     completed = subprocess.run(
         [
             str(BOOTSTRAP),
@@ -5483,8 +5418,6 @@ def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
             str(repository),
             "--control-parent-root",
             str(control),
-            "--runtime-root",
-            str(legacy),
             "status",
         ],
         check=False,
@@ -5503,7 +5436,6 @@ def test_symlinked_control_runtime_is_rejected_before_legacy_argument_mapping(
     assert (control / ".runtime").is_symlink()
     assert not (repository / ".runtime").exists()
     assert not (outside / "container-state").exists()
-    assert not (control / "workspace").exists()
     assert not (tmp_path / "agent-canon-log").exists()
 
 
@@ -5519,8 +5451,6 @@ def test_symlinked_private_log_is_rejected_before_runtime_creation(
     outside.mkdir()
     (outside / "sentinel").write_text("untouched\n", encoding="utf-8")
     (tmp_path / "agent-canon-log").symlink_to(outside, target_is_directory=True)
-    legacy = control / "workspace" / "agent-canon-runtime" / "host"
-
     completed = subprocess.run(
         [
             str(BOOTSTRAP),
@@ -5528,8 +5458,6 @@ def test_symlinked_private_log_is_rejected_before_runtime_creation(
             str(repository),
             "--control-parent-root",
             str(control),
-            "--runtime-root",
-            str(legacy),
             "status",
         ],
         check=False,
@@ -5546,14 +5474,6 @@ def test_symlinked_private_log_is_rejected_before_runtime_creation(
     assert json.loads(completed.stderr)["code"] == "symlink_path_rejected"
     assert (outside / "sentinel").read_text(encoding="utf-8") == "untouched\n"
     assert not (repository / ".runtime").exists()
-    assert not (control / "workspace").exists()
-
-
-def test_runtime_root_argument_is_parse_only() -> None:
-    """The shell always resolves runtime state below the install source."""
-    text = ADAPTER.read_text(encoding="utf-8")
-    assert "AGENT_CANON_RUNTIME_ROOT=$default_runtime" in text
-    assert "runtime_root_escape" not in text
 
 
 def test_malicious_docker_environment_is_not_sourced(tmp_path: Path) -> None:
@@ -5619,8 +5539,6 @@ def test_scheduler_template_invokes_shell_bootstrap() -> None:
     ).read_text(encoding="utf-8")
     assert "ExecStart=@BOOTSTRAP@" in text
     assert "sync --install-root @INSTALL_ROOT@" in text
-    assert "--runtime-root" not in text
-    assert "@RUNTIME_ROOT@" not in text
     assert "python3" not in text
 
 
@@ -5842,7 +5760,6 @@ def test_forced_rollback_recovery_failure_retains_mounted_backup(
     repository.mkdir()
     (repository / "bootstrap").symlink_to(ROOT / "bootstrap", target_is_directory=True)
     control = tmp_path / "control"
-    runtime = control / "runtime"
     control.mkdir()
     fake_docker = tmp_path / "docker"
     fake_docker.write_text(
@@ -5884,8 +5801,7 @@ _agent_canon_restore_candidate_failure() {
   return 1
 }
 bootstrap_host_entrypoint "$1" \
-  --control-parent-root "$2" \
-  --runtime-root "$3" rollback
+  --control-parent-root "$2" rollback
 """
     completed = subprocess.run(
         [
@@ -5895,7 +5811,6 @@ bootstrap_host_entrypoint "$1" \
             "bootstrap-test",
             str(repository),
             str(control),
-            str(runtime),
         ],
         check=False,
         capture_output=True,
@@ -5923,9 +5838,6 @@ bootstrap_host_entrypoint "$1" \
 def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None:
     """Resident preparation leaves host-live links usable by host Codex."""
     control = tmp_path / "control"
-    # The shell runtime is the canonical control-root `.runtime`; the CLI flag
-    # remains parse-only.
-    runtime_request = control / "runtime"
     effective_runtime = control / ".runtime"
     project = tmp_path / "project"
     target_a = tmp_path / "target-a"
@@ -5950,8 +5862,6 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         str(source_root),
         "--control-parent-root",
         str(control),
-        "--runtime-root",
-        str(runtime_request),
     ]
     try:
         installed = subprocess.run(
@@ -6229,7 +6139,6 @@ def test_public_install_failure_is_terminal_before_follow_on_target(
     """A typed install failure cannot fall through to start or target add."""
     repository = tmp_path / "agent-canon"
     control = tmp_path / "control"
-    runtime = tmp_path / "runtime"
     marker = tmp_path / "phases"
     foreign = tmp_path / "foreign-resource"
     repository.mkdir()
@@ -6238,7 +6147,6 @@ def test_public_install_failure_is_terminal_before_follow_on_target(
     source_head = "0" * 40
     script = f"""
 source {str(ADAPTER)!r}
-_agent_canon_validate_roots() {{ :; }}
 _agent_canon_sync_operation() {{
   printf 'up_to_date\\t{source_head}\\t{source_head}\\torigin\\n'
 }}
@@ -6260,8 +6168,7 @@ AGENT_CANON_DOCKER=/bin/false
 export AGENT_CANON_DOCKER
 set -e
 bootstrap_host_entrypoint {str(repository)!r} \\
-  --control-parent-root {str(control)!r} \\
-  --runtime-root {str(runtime)!r} install
+  --control-parent-root {str(control)!r} install
 printf '%s\\n' start >> {str(marker)!r}
 printf '%s\\n' target-add >> {str(marker)!r}
 """

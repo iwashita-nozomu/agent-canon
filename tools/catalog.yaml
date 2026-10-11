@@ -1662,7 +1662,7 @@ entries:
     family: agent_tools
     role: sync
     status: canonical
-    command: bootstrap.sh --control-parent-root <control-parent-root> --runtime-root <runtime-root> tool run --root <registered-target-root> issue-sync -- --receipt-preflight
+    command: bootstrap.sh --control-parent-root <control-parent-root> tool run --root <registered-target-root> issue-sync -- --receipt-preflight
     writes: true
     dispatch:
       runtime: python

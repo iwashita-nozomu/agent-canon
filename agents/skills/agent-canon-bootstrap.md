@@ -28,9 +28,7 @@ evidence.
   `--repository-root` and `--control-parent-root`; the effective runtime is
   always the bootstrap-owned, ignored `<control-parent-root>/.runtime/`.
   `--control-parent-root` selects the shared runtime authority while the
-  private log placement remains owned by the install-root parent. The
-  historical `--runtime-root` value is accepted only as a
-  migration-compatible input and cannot create new state at that path.
+  private log placement remains owned by the install-root parent.
   When the same control-root resident already exists, the host reuses that
   control-root runtime and the resident's named state volume; it does not
   infer a source-checkout runtime or create another authority.

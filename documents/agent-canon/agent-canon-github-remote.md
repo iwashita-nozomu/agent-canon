@@ -38,8 +38,8 @@ and read back `main` before any parent documentation or integration update.
 
 ## Runtime and credentials
 
-AgentCanon tools run through `bootstrap.sh` with explicit
-`--control-parent-root` and `--runtime-root`. Credentials remain in the host
-GitHub client process; they are not written to source, runtime, or a global
-environment file. A failed remote lookup is recorded as source/host evidence
+AgentCanon tools run through `bootstrap.sh` with an explicit
+`--control-parent-root`; the host derives runtime storage from that control
+root. Credentials remain in the host GitHub client process; they are not
+written to source, runtime, or a global environment file. A failed remote lookup is recorded as source/host evidence
 and does not trigger a vendor, submodule, or hidden clone fallback.
