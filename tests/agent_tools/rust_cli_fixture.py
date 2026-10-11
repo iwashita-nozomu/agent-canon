@@ -1,17 +1,16 @@
 # @dependency-start
 # contract test fixture
-# responsibility Builds and exposes the Rust CLI for formatter tests without invoking the bootstrap wrapper.
+# responsibility Builds and exposes the Rust CLI for docs-command tests without invoking the bootstrap wrapper.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs owns the standalone formatter CLI
 # upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md assigns bootstrap routing to user tools
 # downstream implementation ../tools/test_check_markdown_math.py uses the fixture for math checks
-# downstream implementation ../tools/test_fix_markdown_math.py uses the fixture for math fixes
 # downstream implementation ../tools/test_fix_mermaid.py uses the fixture for Mermaid fixes
 # @dependency-end
-"""Provide an external-target standalone AgentCanon binary for Rust CLI tests.
+"""Provide an external-target standalone AgentCanon binary for docs CLI tests.
 
 ``tools/bin/agent-canon`` is intentionally a bootstrap control-plane adapter;
 it cannot execute without an installed runtime and registered target.  These
-formatter tests exercise the Rust implementation contract itself, so they use
+docs-command tests exercise the Rust implementation contract itself, so they use
 the standalone binary built into a task-owned external target directory.  The
 source checkout remains read-only; test inputs live in temporary roots.
 """

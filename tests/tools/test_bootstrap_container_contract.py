@@ -79,6 +79,11 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert len(digests) == 1
     assert "--mount=type=bind,source=.,target=/src,readonly" not in text
     assert text.count("apt-get update") == 1
+    assert "nodejs=18.19.1" not in text
+    assert "npm=9.2.0" not in text
+    assert "PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer" in text
+    assert "PUPPETEER_CHROME_SKIP_DOWNLOAD=true" in text
+    assert "apt-get purge" in text
     assert "materialize" not in text
     assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
     assert "AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache" in text
@@ -112,6 +117,8 @@ def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     assert "apt-get purge -y --auto-remove npm pipx" not in text
     assert "build-essential curl" in text
     assert "python3.12" in text
+    assert "nodejs=18.19.1" not in text
+    assert "npm=9.2.0" not in text
     assert "test -x" not in text
     assert "command -v" not in text
 
@@ -274,8 +281,8 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
-    # The shared image owns the selected document/diagram renderer closure;
-    # package ownership stays in the typed manifest rather than Dockerfile setup.
+    # run_all_checks.sh's docs command invokes native Markdown, link, AST, and
+    # selected document/diagram providers; packages remain typed-manifest owned.
     assert ids == {
         "pipx",
         "check-jsonschema",
@@ -285,10 +292,14 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "pyright-language-server",
         "bash-language-server",
         "markdownlint-cli2",
-        "markdownlint-cli2-formatter-json",
         "gnupg",
         "node",
+        "quarto",
+        "lychee",
+        "puppeteer",
+        "mermaid-cli",
         "puppeteer-fonts-liberation",
+        "puppeteer-unzip",
         "puppeteer-libasound2t64",
         "puppeteer-libatk-bridge2.0-0t64",
         "puppeteer-libatk1.0-0t64",
@@ -321,7 +332,6 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "puppeteer-lsb-release",
         "puppeteer-wget",
         "puppeteer-xdg-utils",
-        "puppeteer-unzip",
         "jq",
         "tree",
         "clangd-language-server",
@@ -361,6 +371,23 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     rust = next(record for record in records if record["id"] == "rust-toolchain")
     assert rust["components"] == ["rust-src", "rust-analyzer", "rustfmt", "clippy"]
     assert rust["verification"]["executable"] == "rustc"
+    node = next(record for record in records if record["id"] == "node")
+    assert node["method"] == "apt-repository"
+    assert node["version"] == "22.23.3-1nodesource1"
+    assert "gnupg" in node["deps"]
+    quarto = next(record for record in records if record["id"] == "quarto")
+    assert quarto["version"] == "1.10.19"
+    lychee = next(record for record in records if record["id"] == "lychee")
+    assert lychee["version"] == "0.24.2"
+    puppeteer = next(record for record in records if record["id"] == "puppeteer")
+    mermaid = next(record for record in records if record["id"] == "mermaid-cli")
+    assert puppeteer["version"] == "25.13.0"
+    assert mermaid["version"] == "12.0.0"
+    assert set(mermaid["deps"]) >= {"node", "puppeteer"}
+    puppeteer_libraries = {
+        record["id"] for record in records if record["id"].startswith("puppeteer-")
+    }
+    assert puppeteer_libraries <= set(puppeteer["deps"])
 
 
 def test_single_repository_dockerignore_is_deny_by_default() -> None:

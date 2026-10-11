@@ -335,6 +335,21 @@ def test_docs_unit_executes_native_checker_and_propagates_failure(
     assert calls.read_text().splitlines() == expected
 
 
+def test_runner_places_xdg_cache_under_the_task_runtime() -> None:
+    text = RUNNER.read_text()
+    runtime_root_setup = text.index(
+        'AGENT_CANON_STATIC_RUNTIME_ROOT="${AGENT_CANON_RUNTIME_ROOT}"'
+    )
+    docs_dispatch = text.index("run_docs() {")
+    xdg_cache_setup = (
+        'export XDG_CACHE_HOME="$(runtime_boundary_path '
+        '"${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache")"'
+    )
+    runtime_setup = text[runtime_root_setup:docs_dispatch]
+    assert xdg_cache_setup in runtime_setup
+    assert 'mkdir -p "${XDG_CACHE_HOME}"' in runtime_setup
+
+
 def test_contract_collection_and_source_toolchain_owners() -> None:
     text = RUNNER.read_text()
     body = text.split("run_contracts() {", 1)[1].split("\n}\n\nrun_eval()", 1)[0]

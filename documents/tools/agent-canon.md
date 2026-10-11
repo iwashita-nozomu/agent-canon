@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
-upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, fix-math, and fix-mermaid.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check and format.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/config.rs implements the lifecycle-only TOML context projection
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
 @dependency-end
@@ -43,39 +43,23 @@ examples in a compact text block.
 tools/bin/agent-canon docs -h
 tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
-tools/bin/agent-canon docs fix-math <paths...>
-tools/bin/agent-canon docs fix-mermaid <paths...>
 tools/bin/agent-canon test-design check <test-paths...>
 agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
 ```
 
-`check` verifies Markdown lint, heading order, fenced-code language, math
-notation, local links, bootstrap-facing docs, and runtime profile inventory
-drift. When no path is supplied, it checks the repository documentation targets
-used by the shared AgentCanon docs gate.
+`check` invokes the configured `markdownlint-cli2` and offline `lychee` commands
+for the selected Markdown paths, parses each file with Quarto's embedded
+Pandoc AST, and validates Mermaid fences with `mmdc`. Provider output and exit
+status are passed through. AgentCanon retains only the checks the standard
+providers do not own: per-depth unordered-marker consistency, the exact math
+delimiter convention, workspace-absolute local targets, bootstrap-facing docs,
+and runtime profile inventory drift. Mermaid validation renders to a temporary
+directory; it never rewrites diagram source. When no path is supplied, the
+command checks the repository documentation targets used by the shared docs
+gate.
 
-Failed text-mode checks keep the compact machine lines and also emit a
-structured prose report block on stderr:
-
-```text
-DOCS_CHECK=fail
-DOCS_CHECK_FINDING=<check>:<path>:<line>:<message>
-DOCS_CHECK_REPORT_BEGIN
-status: fail
-summary: Documentation checks found <n> issue(s). Use these locations before reading broader files.
-findings:
-- check: <check>
-  location: <path>:<line>
-  problem: <message>
-next_action:
-- Open only the reported location and nearby lines needed for the repair.
-DOCS_CHECK_REPORT_END
-```
-
-Agent and subagent prompts should use the report block as the repair packet
-instead of opening implementation files or scanning whole documents. If the
-command contract is unclear, run `tools/bin/agent-canon docs -h` first.
+If the command contract is unclear, run `tools/bin/agent-canon docs -h` first.
 
 `test-design check` reports missing oracle, brittle coupling, exact
 mock/output/prose assertions, time coupling, unseeded randomness, and
@@ -86,10 +70,9 @@ property/metamorphic candidates. Its detailed contract lives in
 current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
-`format`, `fix-math`, and `fix-mermaid` write mechanical repairs and then run
-the same adjacent `check` path. A formatter run is complete only when the final
-`DOCS_CHECK=pass` evidence is present or the unavailable command is recorded as
-a blocker.
+`format` normalizes line endings, trailing whitespace, and repeated blank lines,
+then runs the same adjacent `check` path. Math and Mermaid content is not
+rewritten by the checker; edit source deliberately and validate it with `check`.
 
 ## Compatibility Entrypoints
 
