@@ -42,7 +42,7 @@ CONTAINER_MARKER_NAME = ".agent-canon-tool-container"
 RUNTIME_MARKER_NAME = ".agent-canon-runtime"
 CATALOG_RELATIVE = Path("tools/catalog.yaml")
 ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-")
-ALLOWED_RUNTIMES = frozenset({"python", "rust"})
+ALLOWED_RUNTIMES = frozenset({"python", "rust", "native"})
 ALLOWED_PLANES = frozenset({"tool-container"})
 ALLOWED_CWDS = frozenset({"source-root", "target-root", "task-root", "explicit"})
 ALLOWED_ENVS = frozenset({"allowlisted", "clean"})
@@ -242,7 +242,7 @@ def _spec_from_entry(
     entry: Mapping[str, object],
     runtime_schema: Mapping[str, object],
 ) -> ToolSpec | None:
-    """Normalize one catalog entry, or skip non-Python/Rust support entries."""
+    """Normalize one catalog entry, or skip non-runtime support entries."""
     raw_id = entry.get("id")
     raw_path = entry.get("path")
     if not isinstance(raw_id, str) or not raw_id or any(ch not in ID_CHARS for ch in raw_id):
@@ -250,9 +250,10 @@ def _spec_from_entry(
     if not isinstance(raw_path, str):
         raise DispatchError("invalid-path", raw_id)
     path = _safe_relative(raw_path, field=f"entry:{raw_id}:path")
-    if not _is_public_path(path):
-        return None
     explicit = entry.get("dispatch")
+    if not _is_public_path(path):
+        if not isinstance(explicit, Mapping) or explicit.get("runtime") != "native":
+            return None
     if explicit is None:
         raise DispatchError("missing-dispatch", raw_id)
     dispatch = _mapping(explicit, field=f"entry:{raw_id}:dispatch")
@@ -359,7 +360,7 @@ def load_specs(root: Path) -> tuple[dict[str, ToolSpec], Mapping[str, object]]:
             raise DispatchError("duplicate-id", spec.tool_id)
         specs[spec.tool_id] = spec
     if not specs:
-        raise DispatchError("empty-inventory", "public Python/Rust commands")
+        raise DispatchError("empty-inventory", "catalog runtime commands")
     return specs, schema
 
 
@@ -641,7 +642,10 @@ def _resolve_container_argv(root: Path, spec: ToolSpec, args: Sequence[str]) -> 
         raise DispatchError("invalid-argv", spec.tool_id)
     if command and command[0] in {"python", "python3"}:
         command[0] = sys.executable
-    for index, value in enumerate(command):
+    # Only descriptor-owned argv contains logical paths rooted in the AgentCanon
+    # source mount. Child arguments belong to the registered target and must
+    # remain relative to its declared cwd, even when they start with "tools/".
+    for index, value in enumerate(command[: len(spec.argv)]):
         if value == "tools/bin/agent-canon":
             command[index] = str(
                 Path(os.environ.get("AGENT_CANON_CACHE_ROOT", "/var/lib/agent-canon/cache"))
@@ -729,7 +733,6 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": spec.tool_id,
-        "runtime": spec.runtime,
         # Keep catalog paths logical. Bootstrap maps the source mount and the
         # image-owned Rust binary; host absolute paths must never leak into a
         # container request.
@@ -777,6 +780,13 @@ def _run_container_spec(root: Path, spec: ToolSpec, args: Sequence[str]) -> int:
     registered = _registered_roots(runtime)
     cwd = _cwd_for(root, spec, runtime)
     output = _output_root(spec, runtime, registered)
+    if output is not None and spec.output_root == "external-runtime":
+        try:
+            output.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise DispatchError(
+                "output-root-unavailable", f"{spec.tool_id}:{output}"
+            ) from error
     command = _resolve_container_argv(root, spec, args)
     environment = _environment(root, spec, runtime, output)
     stdin = subprocess.PIPE if spec.stdin_policy == "captured" else None

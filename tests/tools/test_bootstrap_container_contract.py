@@ -79,8 +79,6 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert len(digests) == 1
     assert "--mount=type=bind,source=.,target=/src,readonly" not in text
     assert text.count("apt-get update") == 1
-    assert "nodejs" in text and "npm" in text
-    assert "apt-get purge" in text
     assert "materialize" not in text
     assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
     assert "AGENT_CANON_CACHE_ROOT=/var/lib/agent-canon/cache" in text
@@ -103,15 +101,17 @@ def test_dockerfile_copies_only_runtime_tool_artifacts() -> None:
 
 def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    manifest = DEPENDENCIES.read_text(encoding="utf-8")
-    assert "clangd-18" in manifest
+    manifest = tomllib.loads(DEPENDENCIES.read_text(encoding="utf-8"))
+    records = {record["id"]: record for record in manifest["records"]}
+    assert "clangd-language-server" in records
     apt_bootstrap = text.split("apt-get install", 1)[1].split(";", 1)[0]
-    for package in ("pipx", "jq", "tree", "clangd-18"):
+    for package in ("pipx", "jq", "tree", "clangd-18", "nodejs", "npm"):
         assert package not in apt_bootstrap
-    assert "apt-get purge -y --auto-remove npm pipx" in text
+    assert set(records["node"]["provides"]) >= {"node", "nodejs", "npm"}
+    assert "apt-get purge -y --auto-remove pipx" in text
+    assert "apt-get purge -y --auto-remove npm pipx" not in text
     assert "build-essential curl" in text
     assert "python3.12" in text
-    assert "nodejs" in text and "npm" in text
     assert "test -x" not in text
     assert "command -v" not in text
 
@@ -274,7 +274,8 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
-    # run_all_checks.sh's docs command invokes both providers for Markdown style.
+    # The shared image owns the selected document/diagram renderer closure;
+    # package ownership stays in the typed manifest rather than Dockerfile setup.
     assert ids == {
         "pipx",
         "check-jsonschema",
@@ -285,6 +286,42 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "bash-language-server",
         "markdownlint-cli2",
         "markdownlint-cli2-formatter-json",
+        "gnupg",
+        "node",
+        "puppeteer-fonts-liberation",
+        "puppeteer-libasound2t64",
+        "puppeteer-libatk-bridge2.0-0t64",
+        "puppeteer-libatk1.0-0t64",
+        "puppeteer-libcairo2",
+        "puppeteer-libcups2t64",
+        "puppeteer-libdbus-1-3",
+        "puppeteer-libexpat1",
+        "puppeteer-libfontconfig1",
+        "puppeteer-libgbm1",
+        "puppeteer-libglib2.0-0t64",
+        "puppeteer-libgtk-3-0t64",
+        "puppeteer-libnspr4",
+        "puppeteer-libnss3",
+        "puppeteer-libpango-1.0-0",
+        "puppeteer-libpangocairo-1.0-0",
+        "puppeteer-libx11-6",
+        "puppeteer-libx11-xcb1",
+        "puppeteer-libxcb1",
+        "puppeteer-libxcomposite1",
+        "puppeteer-libxcursor1",
+        "puppeteer-libxdamage1",
+        "puppeteer-libxext6",
+        "puppeteer-libxfixes3",
+        "puppeteer-libxi6",
+        "puppeteer-libxkbcommon0",
+        "puppeteer-libxrandr2",
+        "puppeteer-libxrender1",
+        "puppeteer-libxss1",
+        "puppeteer-libxtst6",
+        "puppeteer-lsb-release",
+        "puppeteer-wget",
+        "puppeteer-xdg-utils",
+        "puppeteer-unzip",
         "jq",
         "tree",
         "clangd-language-server",
@@ -292,6 +329,10 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "shellcheck",
         "actionlint",
         "zizmor",
+        "quarto",
+        "lychee",
+        "puppeteer",
+        "mermaid-cli",
         "python3-pytest",
     }
     assert not ids & {"github-cli", "codex-cli"}
