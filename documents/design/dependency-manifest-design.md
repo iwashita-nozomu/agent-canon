@@ -11,7 +11,7 @@ downstream implementation ../../tools/analysis/dependencies/scan_dependency_head
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
-downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
+downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh launches bounded queries against a selected standard SCIP index
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
@@ -393,11 +393,11 @@ downstream<TAB>implementation<TAB>tools/example.py<TAB>tests/tools/test_example.
 - `source` and `target` are repo-relative normalized paths
 - rows are sorted and de-duplicated before writing
 
-Dependency facts remain distinct from code `import`, `include`, and `symbol`
-facts, although all relation families share the same validated Graph DSL
-storage. `scan_code_dependencies.sh` is the sole code-relation producer and is
-invoked once by graph build with an authoritative paths file. Consumers never
-invoke it or reconstruct its rows.
+This dependency graph contains declared header facts only. SCIP code
+definitions/references remain a separate evidence source: the optional
+`scip_index.py` API reads/writes standard `index.scip` artifacts and returns a
+bounded query projection, but does not write a Graph DSL relation or persistent
+code-graph mirror. The dependency graph build does not invoke a code indexer.
 
 Completeness is explicit. Unresolved targets, ambiguous bindings, uncovered
 eligible sources, and excluded sources are persisted as typed sets. A published
@@ -584,28 +584,28 @@ even when only A is selected and B/C are unchanged.
 
 ## Tool Split
 
-Code dependency extraction is deliberately separate from dependency manifest validation.
-`scan_code_dependencies.sh` is the compatibility command surface, while
-`lsp_code_analysis.py scan-legacy` owns the canonical code-relation projection.
-The shell wrapper delegates normal scans to that LSP command and uses its
-lexical extractor only when `--lexical-only` is explicit.
-The LSP adapter reads language syntax through server capabilities such as
-document symbols, definitions, references, and call hierarchy; the explicit
-lexical route still reads Python imports, local C/C++ includes, and shell source
-statements.
+Code dependency evidence remains separate from dependency-manifest validation.
+`scip_index.py` writes the standard SCIP artifact using a selected native
+producer and projects bounded definitions, references, and explicitly declared
+implementation relationships through the official SCIP reader. The
+`scan_code_dependencies.sh` path is only a compatibility launcher for that
+query; it no longer scans text, emits dependency TSV, or supplies a lexical
+fallback. Point LSP analysis and diagnostics remain owned by
+`lsp_code_analysis.py analyze` and are not repository-wide SCIP indexing.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
-Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
+Keep the evidence meanings separate: SCIP records indexed symbol occurrences,
+while header dependency evidence answers which design, implementation,
+environment, and test context must be read. References are not call edges, and
+an unsupported or unindexed target is not evidence of no references.
 
 ### `scan_code_dependencies.sh`
 
 Responsibilities:
 
-- delegate the normal scan to the canonical LSP `scan-legacy` report
+- pass an explicitly selected external `index.scip` and bounded target paths to `scip_index.py query`
 - keep output independent from manifest upstream/downstream edges
-- support explicit path lists and `--changed`
-- provide pre-edit evidence for [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)
-- require `--lexical-only` for the compatibility extractor and fail closed when
-  the canonical LSP server is unavailable
+- provide optional pre-edit evidence for [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)
+- never scan source text or fabricate unsupported-language coverage
 
 ### `scan_dependency_headers.sh`
 

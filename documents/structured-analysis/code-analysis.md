@@ -6,34 +6,35 @@ upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
 upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
 upstream implementation ../../tools/analysis/code/lsp_code_analysis.py extracts canonical LSP code facts
-upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh preserves compatibility evidence
+upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh launches bounded queries against selected SCIP evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end
 -->
 
 # Code Analysis Adapter
 
-この文書は、Python、shell、C/C++、Rust などの code dependency 解析を
-structured analysis に取り込む adapter contract を定義する。
+この文書は、point LSP facts と optional SCIP reference evidence の境界を
+structured analysis に取り込む際の adapter contract として定義する。現在の
+SCIP query は external `index.scip` から bounded evidence を返すだけであり、
+この package の `deps.code_edges` や persistent graph mirror へ ingest しない。
 
 ## Reader Map
 
 - Owns code dependency analysis scope for the structured-analysis package.
-- Main path: Scope, Boundary, Import Mapping, Report Trace, and Diagnostics.
-- Read this before importing import/include/source evidence into structured
-  analysis or joining it with dependency-manifest evidence.
+- Main path: Scope, Boundary, Import Mapping, Report Trace, and evidence limits.
+- Read this before joining code evidence with dependency-manifest evidence.
 - Boundary: code dependency edges and manifest edges may be joined for
   explanation, but their meanings stay distinct.
 
 ## Scope
 
-Code analysis は、実装 surface がどの symbol、file、module、include、source script を
-参照しているかを扱う。実行時の正本は LSP 3.17 JSON-RPC の
-`lsp_code_analysis.py analyze --format json` であり、これは dependency header
-manifest とは別の evidence である。`scan_code_dependencies.sh` は明示的な
-`--lexical-only` または成功した canonical LSP projection に限定し、LSP 不在時は
-fail closed する。Rust の `mod`/`use` は analysis-json/search sidecar に保持し、
-legacy TSV へは投影しない。
+Point code analysis uses LSP 3.17 JSON-RPC through
+`lsp_code_analysis.py analyze --format json`; it remains distinct from
+dependency-header evidence. Repository-wide symbol/reference evidence is an
+optional native SCIP index/query path selected through
+`scip_index.py` and the bounded Change Impact consumer. The compatibility
+`scan_code_dependencies.sh` launcher accepts a selected standard index; it does
+not scan source syntax or invoke LSP.
 
 Canonical report schema は `agent-canon.lsp-code-analysis.v1` である。report は
 root-relative POSIX locator、UTF-16 position、language server record、capability
@@ -47,26 +48,24 @@ server executable は devcontainer manifest の
 だけを受け付ける。caller override は absolute executable として provenance に残り、
 ambient PATH discovery は code analysis の実行経路にならない。
 
-| Language family | MVP evidence |
-| --- | --- |
-| Python | import、from import、package/module locator。 |
-| Shell | `source`、`.`、local executable/script reference。 |
-| C/C++ | local `#include`、header/source relation。 |
-| Rust | `mod`、`use`、crate/module locator。 |
-
-MVP は precise compiler-grade dependency graph を目標にしない。既存 scanner で取れる
-best-effort edge を report trace と impact packet に渡す。
+The selected native SCIP producers currently cover Python when the project
+owner supplies its environment input and C/C++ when the build owner supplies a
+compile database. Shell and Rust have no selected producer. These capability
+limits are not negative reference results; query output is bounded and does not
+claim source freshness or call-graph completeness.
 
 ## Evidence And Assumption Ledger
 
 - Evidence sources: [documents/structured-analysis/code-analysis.md](code-analysis.md) owns this scope.
 - Evidence sources: `tools/analysis/code/lsp_code_analysis.py` owns the LSP adapter and report.
-- Evidence sources: `.devcontainer/dependencies.toml` and [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) provide manifest, receipt, and live-verification evidence.
+- Evidence sources: `bootstrap/container/image/dependencies.toml` and [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) provide manifest, receipt, and live-verification evidence.
 - Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`, `tests/agent_tools/test_dependency_manifest_tools.py`, `tests/agent_tools/test_search.py`, and `tests/agent_tools/test_git_dependency_diff_summary.py` cover protocol, scanner, consumer, and summary behavior.
 - Assumptions: the manifest receipt/live verifier is the authority for executable selection.
 - Assumptions: LSP 3.17 server responses are runtime evidence.
-- Assumptions: lexical candidates are compatibility and impact evidence, not compiler completeness.
-- Assumptions: explicit `--lexical-only` does not trigger automatic downgrade.
+- Assumptions: selected SCIP artifacts are reference evidence, not proof of
+  current source bytes, compiler completeness, or caller/callee relations.
+- Assumptions: unindexed and unsupported targets are reported as capability
+  gaps, not empty-reference proof.
 - Parent-doc alignment: [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) owns manifest/dependency evidence.
 - Parent-doc alignment: [documents/tools/lsp_code_analysis.md](../tools/lsp_code_analysis.md) owns the tool and report contract.
 - Parent-doc alignment: [documents/tools/search-coordination.md](../tools/search-coordination.md) owns the in-memory `code-deps` consumer boundary.
@@ -75,49 +74,40 @@ best-effort edge を report trace と impact packet に渡す。
 
 次を分ける。
 
-| Graph | Meaning | DB table |
+| Evidence family | Meaning | Storage owner |
 | --- | --- | --- |
 | Dependency manifest graph | 人間/agent が読むべき design、implementation、environment context。 | `deps.dependency_edges` |
-| Code dependency graph | 言語構文から見える import/include/source relation。 | `deps.code_edges` |
+| Code dependency evidence | Point LSP report or bounded SCIP index/query facts. SCIP remains an external standard artifact; it is not stored in this package's graph tables. | External runtime artifact |
 | Prose reasoning graph | source text anchor と claim/evidence/discourse relation。 | `prose.nodes`, `prose.edges` |
 | Report contract graph | report root から claim、evidence、finding、action への trace。 | `report.*` |
 
-Manifest edge と code edge を同じ relation として扱うと、「読む context」と「実行時または
-build 時の参照」が混ざる。Structured analysis は join して説明してよいが、edge の意味は
-保持する。
+Manifest edge と code evidence を同じ relation として扱うと、「読む context」と「source
+symbol/reference evidence」が混ざる。Any selected report may link them for explanation,
+but this adapter does not import SCIP occurrences into a second graph.
 
 ## Import Mapping
 
-| Code evidence | DB target | Notes |
-| --- | --- | --- |
-| source file | `deps.artifacts` | `kind = code`、language を `payload_json` に入れる。 |
-| imported module / include path | `deps.code_edges.target_locator` | repo 内 artifact に解決できる場合は `target_artifact_id` も payload に入れる。 |
-| symbol or module name | `deps.code_edges.symbol` | symbol-level precision がない場合は module/file name。 |
-| scanner confidence | `deps.code_edges.confidence` | exact local path は high、unresolved module は low。 |
+This package has no current SCIP-to-database importer. Preserve the native
+index path/hash and bounded query output as external evidence references; do
+not materialize the full index or infer `deps.code_edges` rows from it.
 
 ## Report Trace
 
-Code analysis は、設計文書と実装が mirror しているかを見るときに使う。
+Selected code evidence may support review of a design/implementation boundary;
+it does not establish a complete mirror or populate a persistent relation graph.
 
 ```text
 report.claims.claim_id
   -> report.evidence_refs.target_id = artifact:code-file
-  -> deps.artifacts
-  -> deps.code_edges
-  -> deps.dependency_edges
+  -> external SCIP index/query artifact (when selected)
+  -> dependency-header evidence (kept as a separate relation family)
   -> prose/source anchors that explain the design
 ```
 
 この trace により、「設計文書で主張した module boundary が、実装 import/include と
 dependency header の両方で支えられているか」を検証できる。
 
-## Diagnostics
-
-| Rule | Severity | Meaning |
-| --- | --- | --- |
-| `design_code_mirror_missing_code_edge` | warn | 設計 claim が code artifact を参照するが、対応 code edge がない。 |
-| `code_edge_without_manifest_context` | warn | code edge はあるが、読むべき design/header context が manifest にない。 |
-| `unresolved_code_target` | warn | scanner が target artifact を repo 内で解決できない。 |
-| `cross_language_boundary_unexplained` | warn | shell、C++、Rust、Python の boundary を跨ぐが design claim がない。 |
-
-Diagnostics は review seed であり、compiler、type checker、build、test の代替ではない。
+The bounded SCIP query reports unsupported and unindexed targets through its
+existing status/capability fields. This package does not emit code-edge
+diagnostics from that projection. Empty or omitted rows must not be interpreted
+as evidence that a source relationship is absent.

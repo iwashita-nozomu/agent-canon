@@ -67,7 +67,7 @@ promote an internal tool, require a check, or revalidate a historical record.
 | --- | --- |
 | Select a task route or inspect the CLI | [Task routing](route.md), [AgentCanon CLI and docs formatting](agent-canon.md) |
 | Search and inspect source | [Repository search](search-coordination.md), [LSP analysis](lsp_code_analysis.md), [Semantic index](semantic_index.md), [Provider comparison reports](semantic_provider_html_report.md) |
-| Plan dependency or repository changes | [Dependency diff summary](git_dependency_diff_summary.md), [Dependency module changes](dependency_module_change.md), [Repository topic checkouts](repository_topic_clone.md) |
+| Plan dependency or repository changes | [SCIP code impact](scip_index.md), [Dependency diff summary](git_dependency_diff_summary.md), [Dependency module changes](dependency_module_change.md), [Repository topic checkouts](repository_topic_clone.md) |
 | Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Semantic responsibility contracts](check_semantic_responsibility_contract.md) |
 | Review object contracts and test design | [Python readability](oop/python/readability.md), [Python rule inventory](oop/python/rule_inventory.md), [C++ readability](oop/cpp/readability.md), [C++ rule inventory](oop/cpp/rule_inventory.md), [Test design](test_design.md) |
 | Extract, analyze, or visualize documents | [DOCX extraction](extract_docx.md), [Prose reasoning graph](prose_reasoning_graph.md), [Dependency graph rendering](render_dependency_manifest_graph.md) |

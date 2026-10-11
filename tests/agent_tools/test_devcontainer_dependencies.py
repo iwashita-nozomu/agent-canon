@@ -3106,8 +3106,8 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn(".devcontainer/devcontainer.json", report.checked)
         self.assertNotIn(".devcontainer/post-create.sh", report.checked)
 
-    def test_canonical_manifest_is_a_small_default_tool_set(self) -> None:
-        """Default startup retains only LSP and small structure/agent tools."""
+    def test_canonical_manifest_contains_selected_language_tools(self) -> None:
+        """Default image records LSP, SCIP, and small structure/agent tools."""
         plan = load_plan(
             ROOT,
             manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
@@ -3122,10 +3122,13 @@ class DependencyModelTests(unittest.TestCase):
                 "ruff",
                 "basedpyright",
                 "pyright-language-server",
+                "scip-python",
                 "bash-language-server",
                 "jq",
                 "tree",
                 "clangd-language-server",
+                "scip-clang",
+                "scip-cli",
                 "rust-toolchain",
                 "python3-pytest",
             },
@@ -3143,6 +3146,32 @@ class DependencyModelTests(unittest.TestCase):
             "pyyaml",
         ):
             self.assertNotIn(removed, ids)
+
+        scip_python = plan.by_id()["scip-python"]
+        self.assertEqual(scip_python.method.value, "npm-global")
+        self.assertEqual(scip_python.package, "@sourcegraph/scip-python")
+        self.assertEqual(scip_python.version, "0.6.6")
+        self.assertEqual(scip_python.deps, ("node",))
+
+        scip_clang = plan.by_id()["scip-clang"]
+        self.assertEqual(scip_clang.method.value, "release-asset")
+        self.assertEqual(scip_clang.version, "0.4.0")
+        self.assertEqual(scip_clang.platforms, ("linux/amd64",))
+        self.assertEqual(scip_clang.archive_format, "binary")
+        self.assertEqual(
+            dict(scip_clang.assets), {"x86_64": "scip-clang-x86_64-linux"}
+        )
+        self.assertEqual(len(dict(scip_clang.checksums)["x86_64"]), 64)
+
+        scip_cli = plan.by_id()["scip-cli"]
+        self.assertEqual(scip_cli.method.value, "release-asset")
+        self.assertEqual(scip_cli.version, "0.10.0")
+        self.assertEqual(scip_cli.platforms, ("linux/amd64", "linux/arm64"))
+        self.assertEqual(scip_cli.archive_format, "tar.gz")
+        self.assertEqual(set(dict(scip_cli.assets)), {"aarch64", "x86_64"})
+        self.assertTrue(
+            all(len(value) == 64 for value in dict(scip_cli.checksums).values())
+        )
 
     def test_canonical_apt_records_are_jammy_multiarch_owned(self) -> None:
         """Shared apt records target Jammy without pinning one host architecture."""
