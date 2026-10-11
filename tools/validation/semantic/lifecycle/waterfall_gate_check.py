@@ -216,7 +216,7 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
     if args.report_dir:
         return Path(args.report_dir).resolve()
     return (
-        resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
+        resolve_report_root(args.report_root) / str(args.run_id)
     ).resolve()
 
 

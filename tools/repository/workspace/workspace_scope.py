@@ -20,22 +20,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from tools.runtime.artifacts.runtime_artifacts import (
-        RUNTIME_ROOT_ENV,
-        RuntimeRootRequired,
-        SourceLocalArtifact,
-        RuntimeSymlinkEscape,
-        runtime_artifact_boundary,
-    )
-except ImportError:  # direct script/module execution
-    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
-        RUNTIME_ROOT_ENV,
-        RuntimeRootRequired,
-        SourceLocalArtifact,
-        RuntimeSymlinkEscape,
-        runtime_artifact_boundary,
-    )
+from tools.runtime.artifacts.runtime_artifacts import (
+    RUNTIME_ROOT_ENV,
+    RuntimeRootRequired,
+    SourceLocalArtifact,
+    RuntimeSymlinkEscape,
+    runtime_artifact_boundary,
+)
 
 try:
     from .parent_root_side_effects import (
@@ -199,7 +190,6 @@ def resolve_repository_roots(
         )
     selected_report = resolve_report_root(
         None if report_root is None else str(report_root),
-        workspace,
         runtime_root=runtime_root,
         source_root=resolution.source_root,
     )
@@ -215,7 +205,6 @@ def resolve_repository_roots(
 
 def resolve_report_root(
     report_root: str | None,
-    workspace_root: Path | None = None,
     *,
     runtime_root: Path | str | None = None,
     source_root: Path | None = None,
@@ -228,7 +217,6 @@ def resolve_report_root(
     additive compatibility path and is accepted only when it is outside the
     AgentCanon source tree.
     """
-    del workspace_root  # retained for the additive positional API
     source = (source_root or _agent_canon_source_root()).resolve()
     configured = runtime_root
     if configured is None:
