@@ -74,11 +74,25 @@ elif args[0] == "inspect":
     inspect_output = Path(args[2])
     figure = source.parent / "provider-delta.svg"
     project = project_for(source)
+    project_config = (
+        (project / "_quarto.yml").read_text(encoding="utf-8")
+        if project is not None
+        else None
+    )
+    resources = json.loads(
+        os.environ.get("FAKE_INSPECT_RESOURCES", '["provider-delta.svg"]')
+    )
     inspect_output.write_text(
-        json.dumps({"resources": ["provider-delta.svg"], "formats": {"html": {}}, "project": str(project) if project else None}),
+        json.dumps(
+            {
+                "resources": resources,
+                "formats": {"html": {}},
+                "project": str(project) if project else None,
+            }
+        ),
         encoding="utf-8",
     )
-    record({"kind": "inspect", "argv": args, "source_path": str(source), "project": str(project) if project else None, "source": source.read_text(encoding="utf-8"), "figure": figure.read_text(encoding="utf-8")})
+    record({"kind": "inspect", "argv": args, "source_path": str(source), "project": str(project) if project else None, "project_config": project_config, "source": source.read_text(encoding="utf-8"), "figure": figure.read_text(encoding="utf-8")})
 elif args[0] == "render":
     render_status = int(os.environ.get("FAKE_RENDER_STATUS", "0"))
     if render_status:
@@ -93,12 +107,10 @@ elif args[0] == "render":
     output_name = args[args.index("--output") + 1]
     output_dir = Path(args[args.index("--output-dir") + 1])
     output_dir.mkdir(parents=True, exist_ok=True)
-    asset_dir = output_dir / f"{Path(output_name).stem}_files"
-    asset_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source.parent / "provider-delta.svg", asset_dir / "provider-delta.svg")
+    shutil.copyfile(source.parent / "provider-delta.svg", output_dir / "provider-delta.svg")
     output = output_dir / output_name
     output.write_text(
-        f'<html><body><img src="{asset_dir.name}/provider-delta.svg"></body></html>\\n',
+        '<html><body><img src="provider-delta.svg"></body></html>\\n',
         encoding="utf-8",
     )
     record({"kind": "render", "argv": args, "source_path": str(source), "project": str(project) if project else None})
@@ -205,6 +217,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
         lychee_status: int = 0,
         tmpdir: Path | None = None,
         project_marker: Path | None = None,
+        inspect_resources: list[str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], list[dict[str, object]]]:
         compare_json = root / "compare.json"
         if not missing_source:
@@ -220,6 +233,8 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
         env["FAKE_RENDER_EVENTS"] = str(event_path)
         env["FAKE_RENDER_STATUS"] = str(render_status)
         env["FAKE_LYCHEE_STATUS"] = str(lychee_status)
+        if inspect_resources is not None:
+            env["FAKE_INSPECT_RESOURCES"] = json.dumps(inspect_resources)
         if tmpdir is not None:
             env["TMPDIR"] = str(tmpdir)
         if project_marker is not None:
@@ -294,8 +309,8 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             self.assertIn("--to", render_argv)
             self.assertEqual(events[-1]["kind"], "lychee")
             self.assertIn("--config", event_argv(events[-1]))
-            self.assertIn("report_files/provider-delta.svg", output.read_text(encoding="utf-8"))
-            self.assertTrue((root / "report_files" / "provider-delta.svg").is_file())
+            self.assertIn('src="provider-delta.svg"', output.read_text(encoding="utf-8"))
+            self.assertTrue((root / "provider-delta.svg").is_file())
 
     def test_missing_search_section_is_allowed(self) -> None:
         """A compare report without query search is still rendered by Quarto."""
@@ -311,6 +326,30 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
                 "Search comparison was not recorded",
                 event_string(events[0], "source"),
             )
+
+    def test_inspect_resource_list_may_omit_inline_svg(self) -> None:
+        """Rendered output and Lychee validate SVGs omitted by inspect metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            output = root / "report.html"
+            result, events = self.run_report(
+                root,
+                sample_compare_report(),
+                output,
+                inspect_resources=[],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            result_line = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("SEMANTIC_PROVIDER_HTML_REPORT_RESULT=")
+            )
+            receipt = json.loads(result_line.split("=", 1)[1])
+            self.assertEqual(receipt["resources"], [])
+            self.assertEqual(receipt["validation"]["lychee"], "pass")
+            self.assertTrue((root / "provider-delta.svg").is_file())
+            self.assertEqual(events[-1]["kind"], "lychee")
 
     def test_embedded_resources_are_explicit_opt_in(self) -> None:
         """Resource embedding only appears in Quarto metadata when requested."""
@@ -367,7 +406,7 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             self.assertEqual(render_event["project"], str(generated_project))
             self.assertIn(project.resolve(), generated_source.parents)
             self.assertEqual(
-                (generated_project / "_quarto.yml").read_text(encoding="utf-8"),
+                inspect_event["project_config"],
                 "project:\n  type: default\n",
             )
 

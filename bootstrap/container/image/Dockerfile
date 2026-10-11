@@ -24,7 +24,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIPX_MAN_DIR=/usr/local/share/man \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
     PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer \
-    PUPPETEER_SKIP_CHROME_DOWNLOAD=true \
+    PUPPETEER_CHROME_SKIP_DOWNLOAD=true \
     PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
 
 LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \

@@ -715,18 +715,16 @@ def main() -> int:
                 resource_path = source_directory / resource_path
             if not resource_path.is_file():
                 missing_resources.append(resource)
-        if missing_resources or not any(
-            Path(item).name == figure_path.name for item in resources
-        ):
+        if missing_resources:
             return failed(
                 "missing_asset",
-                "Quarto inspect found a missing report asset",
+                "Quarto source has a missing local report asset",
                 source=str(source_path),
                 source_sha256=source_hash,
                 config_sha256=config_sha256,
                 asset_sha256=asset_sha256,
                 resources=resources,
-                missing_resources=missing_resources or [figure_path.name],
+                missing_resources=missing_resources,
             )
 
         render_argv = [
