@@ -62,15 +62,18 @@ python3 tools/analysis/documents/doc_start.py \
 
 When a paper needs formatted citations, keep the author-selected bibliography and
 CSL style as local files and use Pandoc citation keys in the manuscript, such as
-`[@source-key]`. Run Quarto's embedded Pandoc through the existing shared
-container `exec` route for the already-registered paper project; do not depend
-on a host Quarto installation or add another renderer. The route uses the
-author-selected output format and preserves Pandoc's native exit status and
-diagnostics:
+`[@source-key]`. Run Quarto's embedded Pandoc through the registered native
+`quarto` tool route; manuscript, bibliography, and CSL paths are relative to the
+registered project root. Keep output under the shared runtime's external tool
+output directory rather than writing into the read-only project target. The route
+uses the author-selected output format and preserves Pandoc's native exit status
+and diagnostics:
 
 ```bash
-"$BOOTSTRAP" "${COMMON[@]}" exec --root "$PROJECT_ROOT" -- \
-  quarto pandoc "$MANUSCRIPT" \
+# Choose a new output filename for each render.
+OUTPUT=/var/lib/agent-canon/runtime/tool-output/paper.html
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root "$PROJECT_ROOT" quarto -- \
+  pandoc "$MANUSCRIPT" \
   --citeproc \
   --bibliography "$BIBLIOGRAPHY" \
   --csl "$CSL_STYLE" \

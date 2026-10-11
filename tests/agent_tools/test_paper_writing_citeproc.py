@@ -3,16 +3,21 @@
 # responsibility Tests paper-writing's native local citeproc route and failure.
 # upstream design ../../agents/skills/paper-writing.md paper citation command contract
 # upstream design ../../documents/contracts/quarto-html-output.toml Quarto provider pin
+# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py native CLI route
 # @dependency-end
 
 """Exercise offline Pandoc citeproc through the shared Quarto CLI."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
 
+from tools.runtime.dispatch import tool_dispatch
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CSL_AUTHOR_DATE = """<?xml version="1.0" encoding="utf-8"?>
 <style
@@ -51,10 +56,137 @@ CSL_AUTHOR_DATE = """<?xml version="1.0" encoding="utf-8"?>
 """
 
 
+def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
+    """Provide the authenticated image and registered-target context for dispatch."""
+    image_root = tmp_path.parent / f"{tmp_path.name}-image"
+    runtime_root = tmp_path.parent / f"{tmp_path.name}-runtime"
+    dependencies_root = image_root / "image-dependencies"
+    image_runtime = image_root / "runtime"
+    dependencies_root.mkdir(parents=True)
+    image_runtime.mkdir(parents=True)
+    marker_paths = (
+        image_root / tool_dispatch.CONTAINER_MARKER_NAME,
+        image_runtime / tool_dispatch.RUNTIME_MARKER_NAME,
+        dependencies_root / "plan.json",
+    )
+    marker_paths[0].write_bytes(tool_dispatch.CONTAINER_MARKER)
+    marker_paths[1].write_bytes(tool_dispatch.RUNTIME_MARKER)
+    marker_paths[2].write_text(
+        '{"schema":"agent-canon-test-image/v1"}\n', encoding="utf-8"
+    )
+    for marker in marker_paths:
+        marker.chmod(0o444)
+
+    runtime_root.mkdir()
+    output_root = runtime_root / "tool-output"
+    (runtime_root / "state.json").write_text(
+        json.dumps({"targets": {"fixture": {"root": str(tmp_path)}}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_CANON_EXECUTION_PLANE", "tool-container")
+    monkeypatch.setenv("AGENT_CANON_IMAGE_ROOT", str(image_root))
+    monkeypatch.setenv(
+        "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT", str(dependencies_root)
+    )
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_TOOLS_ROOT", str(PROJECT_ROOT))
+    monkeypatch.setenv(
+        "AGENT_CANON_IMAGE_MARKER_DIGEST",
+        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "AGENT_CANON_RUNTIME_MARKER_DIGEST",
+        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
+    )
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
+    monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(tmp_path))
+    monkeypatch.setenv("AGENT_CANON_OUTPUT_ROOT", str(output_root))
+    return output_root
+
+
+def test_quarto_native_argv_matches_direct_probe_and_parity_record(
+    tmp_path: Path,
+    monkeypatch,
+    capfd,
+) -> None:
+    """The catalog route preserves direct Quarto argv, cwd, streams, and status."""
+    output_root = _configure_native_tool_route(tmp_path, monkeypatch)
+    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
+    probe_args = ("pandoc", "--version")
+    environment = tool_dispatch._environment(
+        PROJECT_ROOT, spec, output_root.parent, output_root
+    )
+    direct = subprocess.run(
+        [*spec.argv, *probe_args],
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+    )
+    routed_status = tool_dispatch._run_spec(
+        PROJECT_ROOT,
+        spec,
+        probe_args,
+        require_parity=False,
+        container_exec=True,
+    )
+    routed_output = capfd.readouterr()
+    direct_result = {
+        "exit_code": direct.returncode,
+        "stdout_sha256": hashlib.sha256(direct.stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(direct.stderr).hexdigest(),
+        "written_paths": [],
+    }
+    routed_stdout = routed_output.out.encode("utf-8")
+    routed_stderr = routed_output.err.encode("utf-8")
+    routed_result = {
+        "exit_code": routed_status,
+        "stdout_sha256": hashlib.sha256(routed_stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(routed_stderr).hexdigest(),
+        "written_paths": [],
+    }
+    assert output_root.is_dir()
+    assert routed_result == direct_result
+    fixture_path = PROJECT_ROOT / "tools/fixtures/tool_dispatch/public-command-parity.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    row = next(
+        (entry for entry in fixture["entries"] if entry.get("id") == "quarto"),
+        None,
+    )
+    if row is None:
+        raise AssertionError(
+            json.dumps(
+                {
+                    "id": "quarto",
+                    "probe_args": list(probe_args),
+                    "observed": {
+                        "argv": list(spec.argv),
+                        "cwd": spec.cwd_policy,
+                        "stdin": spec.stdin_policy,
+                        "stdout": spec.stdout_policy,
+                        "stderr": spec.stderr_policy,
+                        "exit": spec.exit_policy,
+                        "signal": spec.signal_policy,
+                        "written_paths": list(spec.written_paths),
+                    },
+                    "legacy_result": direct_result,
+                    "container_result": routed_result,
+                },
+                sort_keys=True,
+            )
+        )
+    tool_dispatch._check_parity_fixture(PROJECT_ROOT, spec)
+    assert row["probe_args"] == list(probe_args)
+    assert row["legacy_result"] == direct_result
+    assert row["container_result"] == routed_result
+
+
 def test_local_citations_render_and_unknown_key_fails_natively(
     tmp_path: Path,
+    monkeypatch,
+    capfd,
 ) -> None:
-    """The native CLI formats local keys and fails when a key has no record."""
+    """The registered native Quarto route formats local keys and propagates failure."""
+    output_root = _configure_native_tool_route(tmp_path, monkeypatch)
     bibliography_path = tmp_path / "references.json"
     bibliography_path.write_text(
         json.dumps(
@@ -92,30 +224,30 @@ def test_local_citations_render_and_unknown_key_fails_natively(
     pandoc_options = [
         "--citeproc",
         "--bibliography",
-        str(bibliography_path),
+        bibliography_path.name,
         "--csl",
-        str(csl_path),
+        csl_path.name,
         "--to",
         "html",
         "--standalone",
         "--fail-if-warnings",
     ]
-    rendered_path = tmp_path / "paper.html"
-    render = subprocess.run(
+    rendered_path = output_root / "paper.html"
+    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
+    render_status = tool_dispatch.run_container_tool(
+        PROJECT_ROOT,
+        spec,
         [
-            "quarto",
             "pandoc",
-            str(manuscript_path),
+            manuscript_path.name,
             *pandoc_options,
             "--output",
             str(rendered_path),
         ],
-        check=False,
-        capture_output=True,
-        text=True,
     )
 
-    assert render.returncode == 0, render.stdout + render.stderr
+    render_output = capfd.readouterr()
+    assert render_status == 0, render_output.out + render_output.err
     assert rendered_path.is_file()
     rendered = rendered_path.read_text(encoding="utf-8")
     assert "Alpha 2020" in rendered
@@ -129,19 +261,18 @@ def test_local_citations_render_and_unknown_key_fails_natively(
         "An unresolved citation [@unknown-source].\n",
         encoding="utf-8",
     )
-    failed = subprocess.run(
+    failed_status = tool_dispatch.run_container_tool(
+        PROJECT_ROOT,
+        spec,
         [
-            "quarto",
             "pandoc",
-            str(unresolved_path),
+            unresolved_path.name,
             *pandoc_options,
             "--output",
-            str(tmp_path / "unresolved.html"),
+            str(output_root / "unresolved.html"),
         ],
-        check=False,
-        capture_output=True,
-        text=True,
     )
+    failure_output = capfd.readouterr()
 
-    assert failed.returncode != 0, failed.stdout + failed.stderr
-    assert "unknown-source" in failed.stdout + failed.stderr
+    assert failed_status != 0, failure_output.out + failure_output.err
+    assert "unknown-source" in failure_output.out + failure_output.err
