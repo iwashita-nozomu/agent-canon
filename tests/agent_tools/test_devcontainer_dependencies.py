@@ -166,7 +166,7 @@ def record(
     method: str = "npm-global",
     deps: list[str] | None = None,
     provides: list[str] | None = None,
-    version: str = "1.0.0",
+    version: str | None = "1.0.0",
     source: str = "https://registry.example.test/package",
     **extra: Any,
 ) -> dict[str, Any]:
@@ -174,16 +174,21 @@ def record(
         "id": record_id,
         "package": record_id,
         "method": method,
-        "version": version,
-        "source": source,
-        "deps": deps or [],
-        "provides": provides or [record_id],
-        "failure_policy": "fail",
     }
+    if version is not None:
+        value["version"] = version
+    value.update(
+        {
+            "source": source,
+            "deps": deps or [],
+            "provides": provides or [record_id],
+            "failure_policy": "fail",
+        }
+    )
     value.update(extra)
     value.setdefault(
         "verification",
-        default_verification(record_id, method, version, value),
+        default_verification(record_id, method, version or "", value),
     )
     return value
 
@@ -240,12 +245,14 @@ class FakeRunner:
         fail_on: str | None = None,
         fail_once_on: str | None = None,
         emulate_non_root_sudo: bool = False,
+        package_versions: dict[str, str] | None = None,
     ) -> None:
         self.calls: list[tuple[str, ...]] = []
         self.environments: list[dict[str, str] | None] = []
         self.fail_on = fail_on
         self.fail_once_on = fail_once_on
         self.emulate_non_root_sudo = emulate_non_root_sudo
+        self.package_versions = dict(package_versions or {})
         self.ownership_lists: dict[str, tuple[str, ...]] = {}
         self.resolved_paths: dict[str, str] = {}
         self.virtual_executables: set[str] = set()
@@ -291,10 +298,11 @@ class FakeRunner:
             raise subprocess.CalledProcessError(1, command)
         if Path(command[0]).name == "dpkg-query" and command[1:2] == ("--show",):
             package = command[-1]
+            version = self.package_versions.get(package, "1.0.0")
             return subprocess.CompletedProcess(
                 command,
                 0,
-                f"install ok installed\t1.0.0\t{package}\n",
+                f"install ok installed\t{version}\t{package}\n",
                 "",
             )
         if command[:2] == ("/usr/bin/dpkg-query", "--listfiles"):
@@ -961,6 +969,91 @@ class DependencyModelTests(unittest.TestCase):
                 )["executable_bindings"]["python-tool"]["absolute_path"],
                 "/usr/local/bin/python-tool",
             )
+
+    def test_distribution_managed_apt_receipt_tracks_resolved_package_version(
+        self,
+    ) -> None:
+        """An omitted apt version uses distro selection and binds its receipt to dpkg."""
+        with self.assertRaisesRegex(DependencyError, "version is required"):
+            parse_record(
+                record("repository-tool", method="apt-repository", version=None),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+        with self.assertRaisesRegex(DependencyError, "version is required"):
+            parse_record(
+                record("registry-tool", method="npm-global", version=None),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+        parsed = parse_record(
+            record(
+                "system-library",
+                method="apt-package",
+                version=None,
+                source="ubuntu:24.04",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertIsNone(parsed.version)
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "24.04", "linux/amd64")
+        resolved_version = "2.80.0-6ubuntu3.9"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-root"
+            runner = FakeRunner(
+                package_versions={"system-library": resolved_version}
+            )
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=runner,
+                identity=identity,
+            )
+            apt_install = next(
+                call
+                for call in runner.calls
+                if call[:2] == ("apt-get", "install")
+            )
+            self.assertEqual(
+                apt_install,
+                (
+                    "apt-get",
+                    "install",
+                    "-y",
+                    "--no-install-recommends",
+                    "--no-remove",
+                    "system-library",
+                ),
+            )
+            receipt = image_root / "receipts" / "system-library.json"
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertIsNone(payload["manifest_version"])
+            self.assertEqual(payload["resolved_package_version"], resolved_version)
+            self.assertTrue(Installer.receipt_matches(receipt, plan, parsed))
+
+            image_verify_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(
+                    package_versions={"system-library": resolved_version}
+                ),
+            )
+            with self.assertRaisesRegex(
+                DependencyError, "dpkg package/version/owned state mismatch"
+            ):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(
+                        package_versions={"system-library": "2.80.0-6ubuntu3.10"}
+                    ),
+                )
 
     def test_installed_receipt_verification_direct_probes_without_rewriting(
         self,
@@ -3270,64 +3363,61 @@ class DependencyModelTests(unittest.TestCase):
         ):
             self.assertNotIn(removed, ids)
 
-    def test_puppeteer_runtime_closure_is_pinned_and_ordered(self) -> None:
-        """Chrome runtime packages are typed, pinned, and precede Puppeteer."""
+    def test_puppeteer_runtime_closure_is_distribution_managed_and_ordered(
+        self,
+    ) -> None:
+        """Ubuntu owns browser library versions and installs them before Puppeteer."""
         plan = load_plan(
             ROOT,
             manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
         )
         records = plan.by_id()
         expected = {
-            "puppeteer-fonts-liberation": ("fonts-liberation", "1:2.1.5-3"),
-            "puppeteer-libasound2t64": ("libasound2t64", "1.2.11-1ubuntu0.3"),
-            "puppeteer-libatk-bridge2.0-0t64": (
-                "libatk-bridge2.0-0t64",
-                "2.52.0-1build1",
-            ),
-            "puppeteer-libatk1.0-0t64": ("libatk1.0-0t64", "2.52.0-1build1"),
-            "puppeteer-libcairo2": ("libcairo2", "1.18.0-3build1"),
-            "puppeteer-libcups2t64": ("libcups2t64", "2.4.7-1.2ubuntu7.14"),
-            "puppeteer-libdbus-1-3": ("libdbus-1-3", "1.14.10-4ubuntu4.1"),
-            "puppeteer-libexpat1": ("libexpat1", "2.6.1-2ubuntu0.6"),
-            "puppeteer-libfontconfig1": ("libfontconfig1", "2.15.0-1.1ubuntu2"),
-            "puppeteer-libgbm1": ("libgbm1", "25.2.8-0ubuntu0.24.04.4"),
-            "puppeteer-libglib2.0-0t64": ("libglib2.0-0t64", "2.80.0-6ubuntu3.9"),
-            "puppeteer-libgtk-3-0t64": ("libgtk-3-0t64", "3.24.41-4ubuntu1.3"),
-            "puppeteer-libnspr4": ("libnspr4", "2:4.35-1.1build1"),
-            "puppeteer-libnss3": ("libnss3", "2:3.98-1ubuntu0.2"),
-            "puppeteer-libpango-1.0-0": ("libpango-1.0-0", "1.52.1+ds-1build1"),
-            "puppeteer-libpangocairo-1.0-0": (
-                "libpangocairo-1.0-0",
-                "1.52.1+ds-1build1",
-            ),
-            "puppeteer-libx11-6": ("libx11-6", "2:1.8.7-1build1"),
-            "puppeteer-libx11-xcb1": ("libx11-xcb1", "2:1.8.7-1build1"),
-            "puppeteer-libxcb1": ("libxcb1", "1.15-1ubuntu2"),
-            "puppeteer-libxcomposite1": ("libxcomposite1", "1:0.4.5-1build3"),
-            "puppeteer-libxcursor1": ("libxcursor1", "1:1.2.1-1build1"),
-            "puppeteer-libxdamage1": ("libxdamage1", "1:1.1.6-1build1"),
-            "puppeteer-libxext6": ("libxext6", "2:1.3.4-1build2"),
-            "puppeteer-libxfixes3": ("libxfixes3", "1:6.0.0-2build1"),
-            "puppeteer-libxi6": ("libxi6", "2:1.8.1-1build1"),
-            "puppeteer-libxkbcommon0": ("libxkbcommon0", "1.6.0-1build1"),
-            "puppeteer-libxrandr2": ("libxrandr2", "2:1.5.2-2build1"),
-            "puppeteer-libxrender1": ("libxrender1", "0.9.10-1.1build1"),
-            "puppeteer-libxss1": ("libxss1", "1:1.2.3-1build3"),
-            "puppeteer-libxtst6": ("libxtst6", "2:1.2.3-1.1build1"),
-            "puppeteer-lsb-release": ("lsb-release", "12.0-2"),
-            "puppeteer-wget": ("wget", "1.21.4-1ubuntu4.5"),
-            "puppeteer-xdg-utils": ("xdg-utils", "1.1.3-4.1ubuntu3"),
+            "puppeteer-fonts-liberation": "fonts-liberation",
+            "puppeteer-libasound2t64": "libasound2t64",
+            "puppeteer-libatk-bridge2.0-0t64": "libatk-bridge2.0-0t64",
+            "puppeteer-libatk1.0-0t64": "libatk1.0-0t64",
+            "puppeteer-libcairo2": "libcairo2",
+            "puppeteer-libcups2t64": "libcups2t64",
+            "puppeteer-libdbus-1-3": "libdbus-1-3",
+            "puppeteer-libexpat1": "libexpat1",
+            "puppeteer-libfontconfig1": "libfontconfig1",
+            "puppeteer-libgbm1": "libgbm1",
+            "puppeteer-libglib2.0-0t64": "libglib2.0-0t64",
+            "puppeteer-libgtk-3-0t64": "libgtk-3-0t64",
+            "puppeteer-libnspr4": "libnspr4",
+            "puppeteer-libnss3": "libnss3",
+            "puppeteer-libpango-1.0-0": "libpango-1.0-0",
+            "puppeteer-libpangocairo-1.0-0": "libpangocairo-1.0-0",
+            "puppeteer-libx11-6": "libx11-6",
+            "puppeteer-libx11-xcb1": "libx11-xcb1",
+            "puppeteer-libxcb1": "libxcb1",
+            "puppeteer-libxcomposite1": "libxcomposite1",
+            "puppeteer-libxcursor1": "libxcursor1",
+            "puppeteer-libxdamage1": "libxdamage1",
+            "puppeteer-libxext6": "libxext6",
+            "puppeteer-libxfixes3": "libxfixes3",
+            "puppeteer-libxi6": "libxi6",
+            "puppeteer-libxkbcommon0": "libxkbcommon0",
+            "puppeteer-libxrandr2": "libxrandr2",
+            "puppeteer-libxrender1": "libxrender1",
+            "puppeteer-libxss1": "libxss1",
+            "puppeteer-libxtst6": "libxtst6",
+            "puppeteer-lsb-release": "lsb-release",
+            "puppeteer-wget": "wget",
+            "puppeteer-xdg-utils": "xdg-utils",
         }
         self.assertEqual(
             plan.providers_for("puppeteer"),
             ("node", *expected),
         )
         self.assertEqual(plan.providers_for("node"), ("gnupg",))
-        self.assertEqual(records["gnupg"].version, "2.4.4-2ubuntu17.6")
-        for record_id, (package, version) in expected.items():
+        self.assertEqual(records["node"].version, "22.23.3-1nodesource1")
+        self.assertIsNone(records["gnupg"].version)
+        for record_id, package in expected.items():
             record = records[record_id]
             self.assertEqual(record.package, package)
-            self.assertEqual(record.version, version)
+            self.assertIsNone(record.version)
             self.assertEqual(record.method.value, "apt-package")
             self.assertEqual(record.source, "ubuntu:24.04")
 

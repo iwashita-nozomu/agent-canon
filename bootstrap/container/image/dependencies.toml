@@ -117,7 +117,6 @@ failure_policy = "fail"
 id = "gnupg"
 package = "gnupg"
 method = "apt-package"
-version = "2.4.4-2ubuntu17.6"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -147,7 +146,6 @@ failure_policy = "fail"
 id = "puppeteer-fonts-liberation"
 package = "fonts-liberation"
 method = "apt-package"
-version = "1:2.1.5-3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -158,7 +156,6 @@ failure_policy = "fail"
 id = "puppeteer-libasound2t64"
 package = "libasound2t64"
 method = "apt-package"
-version = "1.2.11-1ubuntu0.3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -169,7 +166,6 @@ failure_policy = "fail"
 id = "puppeteer-libatk-bridge2.0-0t64"
 package = "libatk-bridge2.0-0t64"
 method = "apt-package"
-version = "2.52.0-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -180,7 +176,6 @@ failure_policy = "fail"
 id = "puppeteer-libatk1.0-0t64"
 package = "libatk1.0-0t64"
 method = "apt-package"
-version = "2.52.0-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -191,7 +186,6 @@ failure_policy = "fail"
 id = "puppeteer-libcairo2"
 package = "libcairo2"
 method = "apt-package"
-version = "1.18.0-3build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -202,7 +196,6 @@ failure_policy = "fail"
 id = "puppeteer-libcups2t64"
 package = "libcups2t64"
 method = "apt-package"
-version = "2.4.7-1.2ubuntu7.14"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -213,7 +206,6 @@ failure_policy = "fail"
 id = "puppeteer-libdbus-1-3"
 package = "libdbus-1-3"
 method = "apt-package"
-version = "1.14.10-4ubuntu4.1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -224,7 +216,6 @@ failure_policy = "fail"
 id = "puppeteer-libexpat1"
 package = "libexpat1"
 method = "apt-package"
-version = "2.6.1-2ubuntu0.6"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -235,7 +226,6 @@ failure_policy = "fail"
 id = "puppeteer-libfontconfig1"
 package = "libfontconfig1"
 method = "apt-package"
-version = "2.15.0-1.1ubuntu2"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -246,7 +236,6 @@ failure_policy = "fail"
 id = "puppeteer-libgbm1"
 package = "libgbm1"
 method = "apt-package"
-version = "25.2.8-0ubuntu0.24.04.4"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -257,7 +246,6 @@ failure_policy = "fail"
 id = "puppeteer-libglib2.0-0t64"
 package = "libglib2.0-0t64"
 method = "apt-package"
-version = "2.80.0-6ubuntu3.9"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -268,7 +256,6 @@ failure_policy = "fail"
 id = "puppeteer-libgtk-3-0t64"
 package = "libgtk-3-0t64"
 method = "apt-package"
-version = "3.24.41-4ubuntu1.3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -279,7 +266,6 @@ failure_policy = "fail"
 id = "puppeteer-libnspr4"
 package = "libnspr4"
 method = "apt-package"
-version = "2:4.35-1.1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -290,7 +276,6 @@ failure_policy = "fail"
 id = "puppeteer-libnss3"
 package = "libnss3"
 method = "apt-package"
-version = "2:3.98-1ubuntu0.2"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -301,7 +286,6 @@ failure_policy = "fail"
 id = "puppeteer-libpango-1.0-0"
 package = "libpango-1.0-0"
 method = "apt-package"
-version = "1.52.1+ds-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -312,7 +296,6 @@ failure_policy = "fail"
 id = "puppeteer-libpangocairo-1.0-0"
 package = "libpangocairo-1.0-0"
 method = "apt-package"
-version = "1.52.1+ds-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -323,7 +306,6 @@ failure_policy = "fail"
 id = "puppeteer-libx11-6"
 package = "libx11-6"
 method = "apt-package"
-version = "2:1.8.7-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -334,7 +316,6 @@ failure_policy = "fail"
 id = "puppeteer-libx11-xcb1"
 package = "libx11-xcb1"
 method = "apt-package"
-version = "2:1.8.7-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -345,7 +326,6 @@ failure_policy = "fail"
 id = "puppeteer-libxcb1"
 package = "libxcb1"
 method = "apt-package"
-version = "1.15-1ubuntu2"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -356,7 +336,6 @@ failure_policy = "fail"
 id = "puppeteer-libxcomposite1"
 package = "libxcomposite1"
 method = "apt-package"
-version = "1:0.4.5-1build3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -367,7 +346,6 @@ failure_policy = "fail"
 id = "puppeteer-libxcursor1"
 package = "libxcursor1"
 method = "apt-package"
-version = "1:1.2.1-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -378,7 +356,6 @@ failure_policy = "fail"
 id = "puppeteer-libxdamage1"
 package = "libxdamage1"
 method = "apt-package"
-version = "1:1.1.6-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -389,7 +366,6 @@ failure_policy = "fail"
 id = "puppeteer-libxext6"
 package = "libxext6"
 method = "apt-package"
-version = "2:1.3.4-1build2"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -400,7 +376,6 @@ failure_policy = "fail"
 id = "puppeteer-libxfixes3"
 package = "libxfixes3"
 method = "apt-package"
-version = "1:6.0.0-2build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -411,7 +386,6 @@ failure_policy = "fail"
 id = "puppeteer-libxi6"
 package = "libxi6"
 method = "apt-package"
-version = "2:1.8.1-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -422,7 +396,6 @@ failure_policy = "fail"
 id = "puppeteer-libxkbcommon0"
 package = "libxkbcommon0"
 method = "apt-package"
-version = "1.6.0-1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -433,7 +406,6 @@ failure_policy = "fail"
 id = "puppeteer-libxrandr2"
 package = "libxrandr2"
 method = "apt-package"
-version = "2:1.5.2-2build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -444,7 +416,6 @@ failure_policy = "fail"
 id = "puppeteer-libxrender1"
 package = "libxrender1"
 method = "apt-package"
-version = "0.9.10-1.1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -455,7 +426,6 @@ failure_policy = "fail"
 id = "puppeteer-libxss1"
 package = "libxss1"
 method = "apt-package"
-version = "1:1.2.3-1build3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -466,7 +436,6 @@ failure_policy = "fail"
 id = "puppeteer-libxtst6"
 package = "libxtst6"
 method = "apt-package"
-version = "2:1.2.3-1.1build1"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -477,7 +446,6 @@ failure_policy = "fail"
 id = "puppeteer-lsb-release"
 package = "lsb-release"
 method = "apt-package"
-version = "12.0-2"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -488,7 +456,6 @@ failure_policy = "fail"
 id = "puppeteer-wget"
 package = "wget"
 method = "apt-package"
-version = "1.21.4-1ubuntu4.5"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
@@ -499,7 +466,6 @@ failure_policy = "fail"
 id = "puppeteer-xdg-utils"
 package = "xdg-utils"
 method = "apt-package"
-version = "1.1.3-4.1ubuntu3"
 source = "ubuntu:24.04"
 verification = { kind = "apt-package" }
 deps = []
