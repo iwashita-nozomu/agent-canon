@@ -3,7 +3,6 @@
 # contract tool
 # responsibility Provides shared path-filter helpers for AgentCanon tooling.
 # upstream design ../README.md shared tooling ownership
-# downstream implementation ../analysis/code/analyze_refactor_surface.py consumes shared path filters
 # downstream implementation ../validation/semantic/algorithm/check_algorithm_config_partition.py consumes shared path filters
 # downstream implementation ../validation/semantic/logging/check_run_log_contract.py consumes shared path filters
 # downstream implementation ../validation/semantic/logging/check_run_log_contract.py consumes shared path filters

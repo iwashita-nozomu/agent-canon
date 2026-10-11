@@ -211,7 +211,7 @@
     "agents/internal-routines/github-connected-work.md",
     "documents/experiments/host-build-admission.md",
     "agents/skills/agent-canon-bootstrap.md",
-    "codex-cli-guide/MANIFEST.md",
+    "codex-cli-guide/README.md",
     "tools/experiments/execution/host_build_admission.py",
     "tests/tools/test_host_build_admission.py",
     "agents/internal-routines/incremental-code-change.md",

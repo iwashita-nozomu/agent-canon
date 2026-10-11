@@ -412,7 +412,7 @@ entries:
 
   - id: git-dependency-diff-summary
     public: true
-    summary: Summarizes Git diff paths, line counts, code dependency edges, and dependency-header edit-scope artifacts.
+    summary: Summarizes Git diffs with optional SCIP impact references and dependency-header edit-scope artifacts.
     path: tools/analysis/dependencies/git_dependency_diff_summary.py
     family: agent_tools
     role: checker
@@ -1360,23 +1360,39 @@ entries:
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
-  - id: scan-code-dependencies
-    summary: Extracts import, include, and shell source dependency edges.
-    path: tools/analysis/dependencies/scan_code_dependencies.sh
+  - id: scip
+    summary: Runs the official SCIP CLI against standard index.scip artifacts in the shared tool container.
+    path: tools/runtime/dispatch/tool_dispatch.py
     family: agent_tools
-    role: checker
+    role: helper
     status: canonical
-    command: bash tools/analysis/dependencies/scan_code_dependencies.sh
-    dispatch: {argv: ["bash", "tools/analysis/dependencies/scan_code_dependencies.sh"]}
+    audience: skill
+    placement: skill_helper
+    command: bootstrap.sh --control-parent-root <root> tool run --root <registered-project> scip -- <scip-cli-args...>
     writes: false
+    dispatch:
+      runtime: native
+      argv: [scip]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
     default_wiring:
       ci: false
       pr_check: false
     docs:
-      - tools/README.md
-      - documents/design/dependency-manifest-design.md
+      - documents/tools/scip_index.md
+      - documents/tools/dependency-tools-and-licenses.md
     tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
+      - tests/agent_tools/test_tool_dispatch.py
+      - tests/agent_tools/test_scip_index.py
 
   - id: check-github-workflows
     summary: Validates GitHub Actions and PR template surfaces.

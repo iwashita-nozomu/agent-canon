@@ -22,14 +22,10 @@ cache、ambient PATH discovery は持ちません。
 ```bash
 python3 tools/analysis/code/lsp_code_analysis.py analyze \
   --root . --files python/example.py --format json
-python3 tools/analysis/code/lsp_code_analysis.py scan-legacy \
-  --root . --files python/example.py --analysis-json reports/code-analysis.json
 ```
 
-`analyze` の stdout は canonical JSON です。`scan-legacy` は既存の
-`CODE_DEPENDENCY` 7 列と pass footer を維持し、`--analysis-json FILE` を指定した
-ときだけ同じ report を atomic に保存します。`--lexical-only` は server を起動せず、
-既存 scanner と同じ lexical evidence だけを返します。
+`analyze` is a point LSP request and writes its report to stdout. It does not
+maintain a repository-wide index or emit legacy dependency TSV rows.
 
 ## Contract
 
@@ -52,11 +48,8 @@ push diagnostics は capability flag を仮定せず、短い quiet/drain 区間
 通知だけを `supported_empty` として記録します。pull diagnostics は
 `diagnosticProvider` が広告された場合だけ `supported_facts` になります。
 
-`scan-legacy --analysis-json FILE` は complete/failed のどちらでも atomic JSON を
-先に書きます。LSP failure は rc=1 と fail stderr で終了し、legacy pass footer や
-自動 lexical downgrade は行いません。server を使わない互換出力は、明示した
-`--lexical-only` の場合だけ成功します。`--files` を省略した場合は自動検出し、
-`--files` を値なしで明示した場合は空選択として扱います。
+`--files` を省略した場合は point-analysis owner の bounded source surfaces から
+対象を検出し、`--files` を値なしで明示した場合は空選択として扱います。
 
 自動検出はこの LSP owner が管理する bounded source surface (`tools`、`agents`、
 `.agents`、`documents`、`.codex`、`mcp`、`python`、`src`、`include`、`tests`) に
@@ -66,10 +59,6 @@ push diagnostics は capability flag を仮定せず、短い quiet/drain 区間
 `path-escape` として拒否します。references は各 document symbol の
 `selectionRange.start` ごとに問い合わせ、response の全 location を検証してから
 deterministic relation に正規化します。
-
-`scan_code_dependencies.sh --lexical-only --analysis-json` は Rust の `mod`/`use`
-を canonical analysis-json sidecar に保存します。Rust は legacy TSV の行を生成せず、
-scanner の footer では対象ファイル数だけを報告します。
 
 ## Consumer boundary
 

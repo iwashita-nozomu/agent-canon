@@ -281,6 +281,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     assert "container" not in document
     records = document["records"]
     ids = {record["id"] for record in records}
+    # This is the static shared inventory; target plans apply platform selection.
     # run_all_checks.sh's docs command invokes native Markdown, link, AST, and
     # selected document/diagram providers; packages remain typed-manifest owned.
     assert ids == {
@@ -290,6 +291,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "ruff",
         "basedpyright",
         "pyright-language-server",
+        "scip-python",
         "bash-language-server",
         "markdownlint-cli2",
         "gnupg",
@@ -335,6 +337,8 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "jq",
         "tree",
         "clangd-language-server",
+        "scip-clang",
+        "scip-cli",
         "rust-toolchain",
         "shellcheck",
         "actionlint",

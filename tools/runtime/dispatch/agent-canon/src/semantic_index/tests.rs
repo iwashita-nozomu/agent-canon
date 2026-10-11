@@ -1046,7 +1046,6 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
     fs::create_dir_all(root.join(".codex/personal/skills/example")).unwrap();
     fs::create_dir_all(root.join("agents/evals/results/example")).unwrap();
     fs::create_dir_all(root.join("templates/agents/_partials")).unwrap();
-    fs::create_dir_all(root.join("codex-cli-guide/source")).unwrap();
     fs::create_dir_all(root.join("codex-cli-guide/sections")).unwrap();
     let mergeable_duplicate =
         "# Same\nshared duplicate section text\nwith enough lines\nfor a merge candidate";
@@ -1069,11 +1068,6 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
     .unwrap();
     fs::write(
         root.join("templates/agents/_partials").join("table.md"),
-        mergeable_duplicate,
-    )
-    .unwrap();
-    fs::write(
-        root.join("codex-cli-guide/source").join("guide.full.md"),
         mergeable_duplicate,
     )
     .unwrap();
@@ -1119,7 +1113,6 @@ fn merge_candidates_skip_alignment_mirrors_and_eval_logs() {
             path.starts_with(".agents/")
                 || path.starts_with("agents/evals/results/")
                 || path.starts_with("templates/agents/_partials/")
-                || path.starts_with("codex-cli-guide/source/")
                 || path.starts_with("codex-cli-guide/sections/")
         })
     }));

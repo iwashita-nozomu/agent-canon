@@ -182,14 +182,10 @@ runtime/config/routing surface として経路化しません。`codex-cli-guide
 - Official Codex source/help evidence: upstream `openai/codex` の
   [`codex-rs/exec/src/lib.rs`](https://github.com/openai/codex/blob/main/codex-rs/exec/src/lib.rs)
   にある OSS provider resolution と、公式 CLI reference の
-  `--local-provider` / `--oss` の定義。既存 guide の
-  [codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md](../../codex-cli-guide/source/codex_cli_guide_config_deepdive.full.md) も、
-  `--oss`（source line 459）と `oss_provider`（source line 626）を記録する
-  upstream-only reference です。
-- Reviewed version evidence: [codex-cli-guide/README.md](../../codex-cli-guide/README.md) の Runtime
-  compatibility note が記録する `codex-cli 0.130.0` と、上記 version/help
-  route の組合せ。この version evidence は AgentCanon の runtime version
-  pin や local-provider support claim ではありません。
+  `--local-provider` / `--oss` の定義。静的な例は
+  [section 01](../../codex-cli-guide/sections/01-overview-and-basic-usage.md) にもありますが、
+  これは current API/version evidence ではありません。現行動作は上記
+  `$openai-docs` route と公式 source/help evidence から確認します。
 
 | API | 上流 API の事実 |
 | --- | --- |

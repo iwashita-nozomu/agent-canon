@@ -149,7 +149,6 @@ pub(super) fn is_alignment_or_log_surface(path: &str) -> bool {
         || path.starts_with(".agent-canon/")
         || path.starts_with(".codex/personal/skills/")
         || path.starts_with("templates/agents/_partials/")
-        || path.starts_with("codex-cli-guide/source/")
         || path.starts_with("codex-cli-guide/sections/")
 }
 

@@ -287,7 +287,7 @@ class GraphClient:
         depth: int = 0,
         all_nodes: bool = False,
     ) -> GraphResponse:
-        """Query dependency source directly; use runtime for other graph relations."""
+        """Read a source projection or query persisted graph records."""
         if relation not in GRAPH_RELATIONS:
             raise GraphClientError(f"unsupported graph relation: {relation}")
         if direction not in GRAPH_DIRECTIONS:

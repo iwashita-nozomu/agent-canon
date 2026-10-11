@@ -83,14 +83,30 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
 
         self.assertEqual(summary_tool.changed_file_list(rows), ["new.py", "old.py"])
 
-    def test_code_scan_paths_include_rust_artifacts(self) -> None:
-        """Changed Rust files reach the code-analysis sidecar selector."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            (root / "main.rs").write_text("mod helper;\n", encoding="utf-8")
-            rows = [summary_tool.ChangedPath(status="M", path="main.rs")]
-
-            self.assertEqual(summary_tool.code_scan_paths(root, rows), ["main.rs"])
+    def test_scip_targets_include_rust_artifacts(self) -> None:
+        """Changed, deleted, and renamed source paths seed a SCIP query."""
+        rows = [
+            summary_tool.ChangedPath(status="M", path="main.rs"),
+            summary_tool.ChangedPath(status="D", path="old.py"),
+            summary_tool.ChangedPath(status="M", path="typing.pyi"),
+            summary_tool.ChangedPath(status="M", path="native.cxx"),
+            summary_tool.ChangedPath(status="M", path="include/native.hxx"),
+            summary_tool.ChangedPath(
+                status="R100", old_path="previous.rs", path="current.rs"
+            ),
+        ]
+        self.assertEqual(
+            summary_tool.scip_target_paths(rows),
+            [
+                "current.rs",
+                "include/native.hxx",
+                "main.rs",
+                "native.cxx",
+                "old.py",
+                "previous.rs",
+                "typing.pyi",
+            ],
+        )
 
     def test_cli_summarizes_worktree_diff_as_json(self) -> None:
         """The CLI reports modified and untracked files for a worktree diff."""
@@ -134,7 +150,6 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(report_dir),
                     "--runtime-root",
                     str(runtime_root),
-                    "--skip-code-dependencies",
                     "--skip-dependency-review",
                     "--format",
                     "json",
@@ -150,8 +165,10 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
             self.assertEqual(payload["schema"], summary_tool.SCHEMA)
             paths = {row["path"] for row in payload["changed_files"]}
             self.assertEqual(paths, {"alpha.py", "beta.py"})
-            analysis = json.loads((report_dir / "code_analysis.json").read_text(encoding="utf-8"))
-            self.assertEqual(analysis["schema_version"], "agent-canon.lsp-code-analysis.v1")
+            impact_path = Path(payload["artifacts"]["scip_impact"])
+            impact = json.loads(impact_path.read_text(encoding="utf-8"))
+            self.assertEqual(impact["status"], "not-selected")
+            self.assertNotIn("code_dependencies", payload["artifacts"])
             self.assertTrue((report_dir / "summary.md").is_file())
 
     def test_cli_preserves_rename_stats_and_seed_paths(self) -> None:
@@ -201,7 +218,7 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(report_dir),
                     "--runtime-root",
                     str(runtime_root),
-                    "--skip-code-dependencies",
+                    "--skip-scip-impact",
                     "--skip-dependency-review",
                     "--format",
                     "json",
@@ -270,7 +287,7 @@ class GitDependencyDiffSummaryTest(unittest.TestCase):
                     str(report_dir),
                     "--runtime-root",
                     str(runtime_root),
-                    "--skip-code-dependencies",
+                    "--skip-scip-impact",
                     "--skip-dependency-review",
                     "--format",
                     "json",

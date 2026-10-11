@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -70,6 +71,45 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertFalse(configured_target.exists())
             summary = (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8")
             self.assertIn("| inventory | 0 |", summary)
+
+    def test_code_dependency_check_reports_unselected_index_without_failing(self) -> None:
+        """The optional semantic check records missing SCIP input as a coverage gap."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "parent"
+            root.mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            runtime = root.parent / "runtime"
+            report_dir = runtime / "reports"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REVIEW_SCAN),
+                    "--root",
+                    str(root),
+                    "--report-dir",
+                    "reports",
+                    "--root-only",
+                    "--check",
+                    "code-dependencies",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
+                },
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            impact = json.loads(
+                (report_dir / "scip_impact_root.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(impact["status"], "not-selected")
+            self.assertEqual(impact["capabilities"]["scip"], "not-selected")
+            self.assertIn("| code-dependencies:root | 0 |", (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8"))
 
     def test_stale_search_excludes_git_paths(self) -> None:
         """The stale search should not read .git object databases."""
