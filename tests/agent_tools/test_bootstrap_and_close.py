@@ -1139,7 +1139,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
         parent_env.start()
         self.addCleanup(parent_env.stop)
 
-    def test_skill_graph_reads_only_selected_hard_prerequisites_to_file_eof(self) -> None:
+    def test_skill_graph_reads_only_selected_hard_prerequisites_to_file_eof(
+        self,
+    ) -> None:
         """A shared prerequisite is read once; related branches remain unloaded."""
         documents = read_selected_skill_documents(
             ("$subagent-bootstrap", "$direct-luna-communication"),
@@ -1192,7 +1194,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ),
             ):
                 initial = read_selected_skill_documents(("$selected",), source_root)
-                initial_digest = hashlib.sha256(initial[0][2].encode("utf-8")).hexdigest()
+                initial_digest = hashlib.sha256(
+                    initial[0][2].encode("utf-8")
+                ).hexdigest()
                 read_state = serialized_skill_document_reads(initial)
                 prior_graph = {"skill_document_reads": read_state}
                 with patch(
@@ -1206,9 +1210,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     )
                 self.assertEqual(unchanged, initial)
 
-                skill_path.write_text(
-                    "# Selected\n\nchanged body\n", encoding="utf-8"
-                )
+                skill_path.write_text("# Selected\n\nchanged body\n", encoding="utf-8")
                 refreshed = read_selected_skill_documents(
                     ("$selected",),
                     source_root,
@@ -1259,9 +1261,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("skill_execution_graph_read_failed", output.getvalue())
             self.assertEqual(calls, [])
-            self.assertFalse(
-                (report_root / "skill-read-blocks-execution").exists()
-            )
+            self.assertFalse((report_root / "skill-read-blocks-execution").exists())
 
     def test_execution_graph_waits_for_actual_completion_before_dependent_dispatch(
         self,
@@ -1288,7 +1288,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
         }
         launched = advance_execution_graph(waves, launch_results)
         self.assertEqual(launched.status, "waiting")
-        self.assertEqual(launched.waiting_identities, tuple(s.executable_identity for s in intake))
+        self.assertEqual(
+            launched.waiting_identities, tuple(s.executable_identity for s in intake)
+        )
 
         first_identity = intake[0].executable_identity
         second_identity = intake[1].executable_identity
@@ -1366,9 +1368,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 cwd=workspace_root,
                 check=True,
             )
-            subprocess.run(
-                ["git", "add", "-A"], cwd=workspace_root, check=True
-            )
+            subprocess.run(["git", "add", "-A"], cwd=workspace_root, check=True)
             subprocess.run(
                 ["git", "commit", "--quiet", "-m", "test: seed graph writer target"],
                 cwd=workspace_root,
@@ -1491,9 +1491,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     identity: {
                         "spawn_result": {
                             "isError": False,
-                            "content": [
-                                {"type": "text", "text": f"agent-{identity}"}
-                            ],
+                            "content": [{"type": "text", "text": f"agent-{identity}"}],
                         },
                         "completion_result": {
                             "isError": False,

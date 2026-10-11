@@ -88,7 +88,10 @@ from tools.agent.orchestration.team_config import (
     task_ids,
     workflow_child_handoff_required,
 )
-from tools.agent.skills.skill_document_reader import SkillDocumentError, SkillDocumentReader
+from tools.agent.skills.skill_document_reader import (
+    SkillDocumentError,
+    SkillDocumentReader,
+)
 from tools.agent.skills.skill_route_catalog import (
     derive_skill_invocation_order,
     load_skill_route_rules,
@@ -198,7 +201,9 @@ def suggested_skills(
     )
 
 
-def parse_execution_results(value: str | None) -> dict[str, dict[str, ToolExecutionResult]]:
+def parse_execution_results(
+    value: str | None,
+) -> dict[str, dict[str, ToolExecutionResult]]:
     """Parse actual host ToolCall results keyed by existing role-instance identity."""
     if value is None:
         return {}
@@ -253,7 +258,9 @@ def merge_execution_results(
     return merged
 
 
-def persisted_execution_results(run: Mapping[str, object]) -> dict[str, dict[str, ToolExecutionResult]]:
+def persisted_execution_results(
+    run: Mapping[str, object],
+) -> dict[str, dict[str, ToolExecutionResult]]:
     """Load actual results from the existing run graph node state."""
     graph = run.get("execution_graph")
     if not is_string_object_mapping(graph):
@@ -351,13 +358,17 @@ def read_selected_skill_documents(
     root = source_root.resolve()
     for skill in order:
         relative = Path(rules_by_skill[skill].canonical_doc)
-        if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
+        if relative.is_absolute() or any(
+            part in {"", ".", ".."} for part in relative.parts
+        ):
             raise SkillDocumentError("canonical_path_invalid", relative.as_posix())
         path = (root / relative).resolve()
         try:
             path.relative_to(root)
         except ValueError as exc:
-            raise SkillDocumentError("canonical_path_outside_source", str(path)) from exc
+            raise SkillDocumentError(
+                "canonical_path_outside_source", str(path)
+            ) from exc
         relative_name = relative.as_posix()
         current_digest = hashlib.sha256(path.read_bytes()).hexdigest()
         previous = previous_reads.get(skill)
@@ -952,7 +963,11 @@ def emit_bootstrap_output(
         print(f"EXECUTION_GRAPH_STATUS={transition.status}")
         print(
             "EXECUTION_GRAPH_WAVE_INDEX="
-            + (str(transition.wave_index + 1) if transition.wave_index is not None else "none")
+            + (
+                str(transition.wave_index + 1)
+                if transition.wave_index is not None
+                else "none"
+            )
         )
         print(
             "EXECUTION_GRAPH_READY_TOOL_CALLS_JSON="
@@ -1165,13 +1180,18 @@ def validate_execution_run_readback(
     manifest_path = report_dir / "team_manifest.yaml"
     if not pointer.is_file() or not manifest_path.is_file():
         raise RuntimeError("execution_result:existing_run_artifacts_missing")
-    if Path(pointer.read_text(encoding="utf-8").strip()).resolve() != report_dir.resolve():
+    if (
+        Path(pointer.read_text(encoding="utf-8").strip()).resolve()
+        != report_dir.resolve()
+    ):
         raise RuntimeError("execution_result:active_run_mismatch")
     try:
         raw: object = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise RuntimeError("execution_result:run_manifest_invalid") from exc
-    if not is_string_object_mapping(raw) or not is_string_object_mapping(raw.get("run")):
+    if not is_string_object_mapping(raw) or not is_string_object_mapping(
+        raw.get("run")
+    ):
         raise RuntimeError("execution_result:run_manifest_invalid")
     run = raw["run"]
     if (
@@ -1240,9 +1260,7 @@ def persist_execution_graph_readback(
                 default_flow_style=False,
             ),
         )
-        readback: object = yaml.safe_load(
-            resolved_manifest.read_text(encoding="utf-8")
-        )
+        readback: object = yaml.safe_load(resolved_manifest.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError, RuntimeError) as exc:
         raise RuntimeError("execution_result:run_manifest_write_failed") from exc
     if (
@@ -1291,9 +1309,7 @@ def validate_execution_graph_readback(
         raise RuntimeError("execution_result:selected_roles_mismatch")
     observed_issue = run.get("issue_worker_dispatch")
     observed_handoff = (
-        observed_issue.get("handoff")
-        if isinstance(observed_issue, Mapping)
-        else None
+        observed_issue.get("handoff") if isinstance(observed_issue, Mapping) else None
     )
     expected_handoff = (
         issue_worker_dispatch.get("handoff")
@@ -1331,9 +1347,7 @@ def validate_execution_graph_readback(
     if observed_later != expected_later:
         raise RuntimeError("execution_result:later_graph_mismatch")
     raw_family = run.get("workflow_family")
-    observed_family = (
-        raw_family.get("id") if isinstance(raw_family, Mapping) else None
-    )
+    observed_family = raw_family.get("id") if isinstance(raw_family, Mapping) else None
     if observed_family != workflow_family_id:
         raise RuntimeError("execution_result:workflow_family_mismatch")
     raw_routing = run.get("repo_tool_routing_policy")
@@ -1418,9 +1432,7 @@ def execution_wave_readback_rows(
             "runtime_max_threads": str(codex_runtime_max_threads(workspace_root)),
             "runtime_max_depth": str(codex_runtime_max_depth(workspace_root)),
             "spawned_roles": ",".join(slot.role_id for slot in wave),
-            "role_instances": ",".join(
-                slot.executable_identity for slot in wave
-            ),
+            "role_instances": ",".join(slot.executable_identity for slot in wave),
             "skipped_roles": "none",
             "allowed_paths": ",".join(allowed_paths) or "none",
             "do_not_read": "none",
@@ -1631,7 +1643,9 @@ def main(
                 raise WriterTargetError("writer_targets:must_be_mapping")
             for owner, target in parsed_targets.items():
                 if not is_string_object_mapping(target):
-                    raise WriterTargetError("writer_targets:owner_target_must_be_mapping")
+                    raise WriterTargetError(
+                        "writer_targets:owner_target_must_be_mapping"
+                    )
                 writer_targets[owner] = parse_writer_target(target)
     except (TypeError, json.JSONDecodeError, WriterTargetError) as exc:
         print(str(exc), flush=True)
@@ -1792,10 +1806,7 @@ def main(
         and issue_worker_dispatch.get("status") not in {"pending", "spawned"}
     ):
         graph_issue_worker_candidate = None
-    if (
-        context.workflow_family_id is not None
-        and context.workflow_active_spawn_budget
-    ):
+    if context.workflow_family_id is not None and context.workflow_active_spawn_budget:
         active_budget = context.workflow_active_spawn_budget
         initial_slots = recommended_initial_subagent_wave_slots(
             roles,
@@ -1845,8 +1856,7 @@ def main(
             execution_results,
         )
         if context.workflow_family_id != "issue_worker_publication" and any(
-            "publication_result" in result
-            for result in execution_results.values()
+            "publication_result" in result for result in execution_results.values()
         ):
             raise RuntimeError("execution_result:publication_not_applicable")
         execution_tool_calls: tuple[dict[str, object], ...] = ()
@@ -1895,7 +1905,9 @@ def main(
                             args.task,
                             lambda role, prompt: spawn(
                                 role,
-                                prompt + "\n\n" + skill_document_context(skill_documents),
+                                prompt
+                                + "\n\n"
+                                + skill_document_context(skill_documents),
                             ),
                             workspace_root=workspace_root,
                             agentcanon_source_root=repository_roots.agentcanon_source_root,
@@ -1992,7 +2004,9 @@ def main(
                     "publisher_agent_id": spawned_ids[0],
                 }
         if context.workflow_family_id == "issue_worker_publication":
-            if any("publication_result" in result for result in execution_results.values()):
+            if any(
+                "publication_result" in result for result in execution_results.values()
+            ):
                 if not all(
                     "completion_result" in result
                     for result in execution_results.values()
@@ -2033,7 +2047,9 @@ def main(
                         wave_index=None,
                         completed_results=execution_transition.completed_results,
                     )
-            elif execution_transition.status == "awaiting_closeout" and execution_results:
+            elif (
+                execution_transition.status == "awaiting_closeout" and execution_results
+            ):
                 publisher_result = next(iter(execution_results.values()))
                 publisher_agent_id = publisher_result["spawn_result"].text
                 dispatched = dispatch_issue_worker(

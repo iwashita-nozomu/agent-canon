@@ -3188,7 +3188,11 @@ def _execution_graph_from_run(
         return None, None, ["team_manifest.yaml:execution_graph_missing"]
     raw_state = raw_graph.get("result_readback")
     if not is_string_object_mapping(raw_state):
-        return raw_run, raw_graph, ["team_manifest.yaml:execution_graph_result_readback_missing"]
+        return (
+            raw_run,
+            raw_graph,
+            ["team_manifest.yaml:execution_graph_result_readback_missing"],
+        )
     return raw_run, raw_graph, []
 
 
@@ -3223,14 +3227,19 @@ def _execution_graph_waves(
         raw_instances = raw_wave.get("role_instances")
         if wave_id == "none" and raw_instances == []:
             continue
-        if not isinstance(wave_id, str) or not wave_id.strip() or not isinstance(
-            raw_instances, list
+        if (
+            not isinstance(wave_id, str)
+            or not wave_id.strip()
+            or not isinstance(raw_instances, list)
         ):
             blockers.append("team_manifest.yaml:execution_graph_later_wave_invalid")
             continue
         identities: list[str] = []
         for raw_identity in raw_instances:
-            if not isinstance(raw_identity, str) or ":team_manifest.yaml#roles." not in raw_identity:
+            if (
+                not isinstance(raw_identity, str)
+                or ":team_manifest.yaml#roles." not in raw_identity
+            ):
                 blockers.append(
                     f"team_manifest.yaml:execution_graph_role_instance_invalid:{wave_id}"
                 )
@@ -3298,9 +3307,11 @@ def _execution_graph_result_blockers(
                     f"team_manifest.yaml:execution_graph_{field}_missing:{identity}"
                 )
                 continue
-            if raw_value.get("is_error") is not False or not isinstance(
-                raw_value.get("text"), str
-            ) or not str(raw_value.get("text", "")).strip():
+            if (
+                raw_value.get("is_error") is not False
+                or not isinstance(raw_value.get("text"), str)
+                or not str(raw_value.get("text", "")).strip()
+            ):
                 blockers.append(
                     f"team_manifest.yaml:execution_graph_{field}_unsuccessful:{identity}"
                 )
@@ -3308,7 +3319,9 @@ def _execution_graph_result_blockers(
     if is_string_object_mapping(issue_dispatch):
         issue_status = issue_dispatch.get("status")
         if issue_status in {"pending", "spawned"}:
-            blockers.append("team_manifest.yaml:issue_worker_publication_result_missing")
+            blockers.append(
+                "team_manifest.yaml:issue_worker_publication_result_missing"
+            )
         elif issue_status == "result_received":
             publication_results = [
                 value.get("publication_result")
