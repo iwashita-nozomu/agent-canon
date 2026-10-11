@@ -29,16 +29,16 @@ authority. Before working, confirm the directory, branch, and dependency HEADs;
 recheck changed premises only. Preserve unknown Git state and user data. Authority
 for the task does not authorize unrelated changes or publication.
 
-Before proposing a repair, state what required behavior the current implementation
-cannot meet by locating the current file/function and failing operation, then trace
-a relevant valid input/state from its actual caller through control/dataflow to the
-unmet behavior, citing the observed or statically established failure. Treat
-failure reports and review claims as hypotheses; use the selected implementation
-owner's reachability/remedy guidance.
-Verify only facts that could change the owner, mechanism, required guarantee,
-scope, or validation. Separate observations, inferences, and unresolved
-decision-relevant premises; follow callers, effects, and affected consumers far
-enough to close the owning mechanism.
+For a local repair, judge the target code, current diff, and governing contract;
+do not make use-site or out-of-scope investigation a prerequisite. State what
+required behavior the target cannot meet and the operation that demonstrates it.
+Treat failure reports and review claims as hypotheses; use the selected
+implementation owner's reachability/remedy guidance.
+If those target facts cannot resolve a concrete decision, name the missing fact
+and the smallest reference needed. For a request that explicitly crosses modules
+or migrates an API, investigate only dependencies and consumers within that
+declared scope. Separate observations, inferences, and unresolved
+decision-relevant premises.
 
 Carry the requested outcome and authority through cause discovery; do not turn
 preliminary paths, slices, or non-goals into a completion ceiling. After cause
@@ -141,8 +141,9 @@ state it rather than giving an untested confirmation. This adds no blanket test 
 
 ## Validation Routing
 
-Select validation from changed guarantees and affected consumers. Reuse unchanged
-results; run broader suites only when those guarantees require them. Format the
-final edited files with the configured formatter before delivery, including its
-diff; unavailable formatting remains unverified. Tests, observations, and proofs
-establish different properties: report what was actually established.
+Select validation from changed guarantees. Include consumer checks when the
+request explicitly migrates those consumers. Reuse unchanged results; run broader
+suites only when those guarantees require them. Format the final edited files
+with the configured formatter before delivery, including its diff; unavailable
+formatting remains unverified. Tests, observations, and proofs establish
+different properties: report what was actually established.

@@ -16,25 +16,22 @@ downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 
 ## Purpose
 
-Clean the complete owning responsibility, including affected consumers and
-obsolete support, rather than choosing a minimum diff or deleting whole files
-without understanding their contents.
+Clean the requested responsibility from its target source and governing
+contract. Keep cleanup within the requested unit.
 
 ## Route
 
-1. Start from the agreed final behavior and most recently incorporated path. Read
-   actual control flow and compare existing capabilities before adding code.
-2. Follow callers and effects through [dependency-analysis](dependency-analysis.md)
-   only while the cause or migration boundary remains unresolved.
-3. Retire superseded entrypoints, implementation, exclusive support, fixtures, and
-   docs together, migrating necessary consumers to the retained owner. RC-09 owns
-   retirement; do not add a compatibility layer as a cleanup step.
-4. Remove relay-only packets, wrappers, types, and names. Keep abstractions only
+1. Start from the agreed final behavior, target source, current diff, and most
+   recently incorporated path. Read control flow in the target and compare
+   existing capabilities before adding code.
+2. Retire superseded entrypoints, implementation, exclusive support, fixtures,
+   and docs in the requested unit. RC-09 owns retirement; do not add a
+   compatibility layer as a cleanup step.
+3. Remove relay-only packets, wrappers, types, and names. Keep abstractions only
    for domain meaning, independent behavior, or a demonstrated shared responsibility.
-5. For numerical code, establish equations and convergence semantics before
+4. For numerical code, establish equations and convergence semantics before
    deletion. Use [refactor-loop](refactor-loop.md) for structural migration and
    [change-review](change-review.md) for the resulting contract and missed deletions.
-6. Validate changed guarantees and consumer connections, not the retired path.
+5. Validate the changed guarantees in the selected scope.
 
-Use existing dependency and reference tools only for unresolved questions.
 No new inventory, handoff schema, or full-repository scan is required by cleanup.

@@ -32,10 +32,9 @@ handoff unless the route requires one.
 
 ## Owner-First Readback
 
-Use the applicable root instructions and selected Skill. Follow only linked
-owners needed for the current decision, and preserve settled context across
-phases. Trace actual callers or consumers when they can change the
-implementation boundary.
+Use the applicable root instructions and selected Skill. Preserve settled
+context across phases. For a local change, use the target, current diff, and
+governing contract to select the next action.
 
 ## Stages
 
