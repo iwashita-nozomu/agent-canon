@@ -79,6 +79,8 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
 
     runtime_root.mkdir()
     output_root = runtime_root / "tool-output"
+    home = runtime_root / "cache" / "home"
+    home.mkdir(parents=True)
     (runtime_root / "state.json").write_text(
         json.dumps({"targets": {"fixture": {"root": str(tmp_path)}}}),
         encoding="utf-8",
@@ -98,6 +100,9 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(tmp_path))
     monkeypatch.setenv("AGENT_CANON_OUTPUT_ROOT", str(output_root))
+    # Quarto's cache belongs under this test's task-owned runtime cache rather
+    # than the read-only ambient HOME of the shared contracts container.
+    monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("AGENT_CANON_MOUNT_REGISTRY", raising=False)
     return output_root
 

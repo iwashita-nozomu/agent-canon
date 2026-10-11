@@ -331,9 +331,22 @@ class ToolDispatchTest(unittest.TestCase):
 
     def test_cli_requires_explicit_external_runtime(self) -> None:
         """The public route cannot fall back to source-local cache state."""
-        error = io.StringIO()
-        with contextlib.redirect_stderr(error):
-            status = tool_dispatch.main(("run", "route", "--", "--help"))
+        root_environment = (
+            "AGENT_CANON_CONTROL_PARENT_ROOT",
+            "AGENT_CANON_RUNTIME_ROOT",
+            "AGENT_CANON_TARGET_ROOT",
+            "AGENT_CANON_MOUNT_REGISTRY",
+            "AGENT_CANON_OUTPUT_ROOT",
+        )
+        previous = {key: os.environ.get(key) for key in root_environment}
+        try:
+            for key in root_environment:
+                os.environ.pop(key, None)
+            error = io.StringIO()
+            with contextlib.redirect_stderr(error):
+                status = tool_dispatch.main(("run", "route", "--", "--help"))
+        finally:
+            self._restore_environment(previous)
         self.assertEqual(status, 2)
         self.assertIn("runtime-root-required", error.getvalue())
 
@@ -548,6 +561,9 @@ class ToolDispatchTest(unittest.TestCase):
                         _image / "image-dependencies"
                     ),
                     "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
+                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:" + "0" * 64,
+                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
+                    + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                 }
@@ -679,12 +695,19 @@ class ToolDispatchTest(unittest.TestCase):
             for key in (
                 "AGENT_CANON_CONTROL_PARENT_ROOT",
                 "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_TARGET_ROOT",
+                "AGENT_CANON_MOUNT_REGISTRY",
+                "AGENT_CANON_OUTPUT_ROOT",
             )
         }
         self.addCleanup(self._restore_environment, previous)
         os.environ["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(control)
         os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
         os.environ["AGENT_CANON_TARGET_ROOT"] = str(root)
+        # The fixture's state.json owns its targets; do not inherit the
+        # resident's read-only mount registry for a different checkout.
+        os.environ.pop("AGENT_CANON_MOUNT_REGISTRY", None)
+        os.environ.pop("AGENT_CANON_OUTPUT_ROOT", None)
         (runtime / "state.json").write_text(
             json.dumps({"targets": {"fixture": {"root": str(root)}}}),
             encoding="utf-8",
