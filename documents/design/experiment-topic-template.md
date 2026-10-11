@@ -6,9 +6,15 @@ upstream design ../experiments/experiment-registry.md owns topic identity and re
 upstream design ../experiments/result-log-retention-and-visualization.md owns result retention classes
 upstream design ./experiment_runner.md owns runner and experiment-side execution responsibilities
 downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py materializes one topic and registry entry
+downstream implementation ../../tools/catalog.yaml exposes the one public creator through typed target-write dispatch
 downstream implementation ../../templates/experiments/_template/run.py owns run aggregation and summary publication
 downstream implementation ../../templates/experiments/_template/cases.py owns case models and execution
 downstream implementation ../../templates/experiments/_template/visualization.py owns visualization status
+downstream implementation ../../templates/experiments/_cpp_template/topic.cpp owns the native target extension point
+downstream implementation ../../templates/experiments/_cpp_template/run.py owns bounded native launch and raw readback
+downstream implementation ../../templates/experiments/_cpp_template/optional/cases.py owns the selected native CaseSpec field model
+downstream implementation ../../templates/experiments/_cpp_template/visualization.py owns native raw-output rendering
+downstream implementation ../../documents/contracts/template-bundle-manifest.toml exports both package sources
 downstream implementation ../../agents/skills/experiment-lifecycle.md exposes topic preparation
 downstream implementation ../../tests/tools/test_experiment_template_contracts.py validates materialized behavior
 @dependency-end
@@ -18,9 +24,10 @@ downstream implementation ../../tests/tools/test_experiment_template_contracts.p
 
 ## 目的
 
-本設計は、`create_experiment_topic.py` が一つのcopy sourceからrunnable experiment topicを
-materializeし、過分割されていないmoduleとraw/summary分離済みresult layoutを提供する契約を定める。
-topic固有のalgorithm、metric、visualization内容はtemplateに実装しない。
+本設計は、`create_experiment_topic.py` が選択されたcopy sourceからexperiment topicとregistry entryを
+materializeする契約を定める。Python profileは既存managed lifecycleへ接続するrunnable scaffoldを生成し、
+C++ profileはnative starter packageをdraft状態で生成する。topic固有のalgorithm、metric、visualization内容は
+汎用Python scaffoldへ実装しない。
 
 ## Target structure
 
@@ -36,12 +43,44 @@ templates/experiments/_template/
 │   └── .gitkeep
 └── result/
     └── .gitkeep
+
+templates/experiments/_cpp_template/
+├── README.md
+├── provenance.toml
+├── config.yaml
+├── topic.cpp
+├── run.py
+├── visualization.py
+├── cmake/
+│   ├── consumer-local.CMakeLists.txt
+│   └── root-aggregate.registration.cmake
+├── report/
+│   └── .gitkeep
+└── result/
+    └── .gitkeep
 ```
 
-materialized topicも同じrelative structureを持つ。README/provenanceの第二copy source、compatibility
-copy、symlink、fallback templateは持たない。
+C++ source packageは`optional/cases.py`も保持する。creatorは`--multi-case`選択時だけこれをtopic rootへ
+materializeし、それ以外ではtopicにcase moduleを作らない。
+
+materialized topicは選択profileのCMake entrypointと、選択時だけのcase moduleを含む。
+README/provenanceの第二copy source、compatibility copy、symlink、fallback templateは持たない。
+
+既存Python scaffoldは従来通り`cases.py`を含み、managed case lifecycleを所有する。C++ profileは
+`topic.cpp`をnative targetにし、`run.py`を実行境界、`visualization.py`をraw output readerに限定する。
+固定一件caseでは`cases.py`を作らない。明示的にmulti-caseを選んだ時だけ、既存`CaseSpec` field contract
+のinput adapterをmaterializeし、`run.py`がnon-empty case configを列挙して同じC++ targetへ渡す。
+Python case workerやempty/example registryは生成しない。C++ sourceはconfig pathとoptional case identityを
+持つ`experiment::Request`、raw output stringを返す`experiment::Result`、CLI process boundaryを定義する。
+consumerはselected CMake targetへ含まれる`topic.cpp`で`experiment::run(const experiment::Request&)`を
+実装する。config/result schemaとalgorithmはconsumer-ownedのままにする。registryはdraftのままにし、
+生成だけでbuild・run・scientific resultの完了を宣言しない。
 
 ## Clauses
+
+ETC clauses below describe the existing Python scaffold profile. The C++ package
+uses the same creator and registry transaction while keeping native execution
+inside its selected CMake consumer graph.
 
 | clause | operation | resulting state | completion evidence |
 | --- | --- | --- | --- |
@@ -126,21 +165,45 @@ canonical commandは次である。
 python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
-creatorはregistry `defaults.topic_template_dir`またはcanonical defaultを解決し、single `copytree`でtopicを
-作成した後、template root内のREADME/provenance tokenだけを置換してregistry entryを追加する。
-別directoryからREADME/provenanceをcopyしない。
+tool-container経由ではcatalog entry `create-experiment-topic`を使い、登録済みparent targetへ
+explicit-target-writeします。`template-bundle`の`experiment-scaffold` profileは両方のsource packageを
+source-free exportし、topic materializationは既存creatorが所有します。
 
-`--dry-run`はtarget structureのexact file inventoryを表示する。`--force`は既存topic削除を伴うため、
-既存destructive authority contractを維持する。
+C++ packageは同じcreatorの選択引数で生成する。CMake profileはconsumer ownerが選び、creatorは
+path shapeや既定値から推測しない。
+
+```bash
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic> \
+  --template-profile cpp --cmake-profile <root-aggregate|consumer-local>
+```
+
+multi-case input adapterが必要な場合だけ`--multi-case`を追加する。生成後の`config.yaml`へ実際のcase
+inputsを入れるまでlauncherはfail closedし、空registryやsynthetic caseは生成しない。
+
+Python profileは従来通りregistry `defaults.topic_template_dir`またはcanonical defaultを解決し、single
+`copytree`でtopicを作成してREADME/provenance tokenを置換する。別directoryからREADME/provenanceをcopyしない。
+C++ profileでは
+`templates/experiments/_cpp_template`から共有filesをcopyし、選択されたCMake fragmentだけを
+`CMakeLists.txt`または`cmake-registration.cmake`としてmaterializeする。source packageは
+`template-bundle-manifest.toml`の`experiment-scaffold` exportにも含める。
+
+creatorはtopic packageと既存registry serializerが作るregistryをprivate staging pathへ準備し、
+topicをrenameした後に同じdirectoryでregistryをatomic replaceする。publish failure時は新topicを取り除き、
+明示`--force`で退避した既存topicを戻す。既存`--force` authorityとPython default behaviorを保つ。
+`--dry-run`は選択profileに応じたtarget file inventoryを表示する。
+
+`root-aggregate`の`cmake-registration.cmake`はroot manifestからincludeできるrequest fileであり、creatorは
+project root CMakeLists.txtを変更しない。consumer ownerによるincludeとnative configure/build/runの確認は
+このAgentCanon source changeでは主張しない。
 
 ## Skill route
 
 ```text
 .codex/personal/skills/experiment-lifecycle/SKILL.md
   -> agents/skills/experiment-lifecycle.md#Topic Preparation
-  -> python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+  -> bootstrap.sh tool run create-experiment-topic -- <topic> [profile selection]
   -> tools/experiments/lifecycle/create_experiment_topic.py
-  -> templates/experiments/_template/
+  -> templates/experiments/_template/ or _cpp_template/
   -> experiments/registry.toml
 ```
 
@@ -151,10 +214,14 @@ catalog/tool command packetはtopic preparation commandをrequired commandとし
 
 | failure | result |
 | --- | --- |
-| template root/README/provenance missing | creatorがwrite前にfail |
-| topic/registry identity collision |既存topicとregistryを保持してfail |
+| selected template file missing | creatorがwrite前にfail |
+| topic path exists without `--force`, or registry identity collides | existing target stateを保持してfail |
+| topic or `experiments` path is a symlink | creatorがwrite前にfail |
+| staged registry publication fails | new topicを取り除き、既存topicとregistryを維持 |
+| explicit `--force` publication fails | new topicを取り除き、退避した既存topicとregistryを復元 |
 | incomplete config/provenance | summary state=`incomplete`、raw executionなし |
-| case registry/worker failure | typed failed case、summary failure evidenceを保持 |
+| Python case registry/worker failure | typed failed case、summary failure evidenceを保持 |
+| C++ multi-case config is missing, empty, or invalid | case adapterがnative process起動前にfail |
 | visualization unavailable/requested | status=`blocked`、run successへ昇格しない |
 | summary atomic write/readback failure | old artifactを保持してnon-zero |
 | raw/summary path escape | artifact publish前にreject |
@@ -163,8 +230,12 @@ catalog/tool command packetはtopic preparation commandをrequired commandとし
 
 ```text
 necessary_presence:
-  README.md, provenance.toml, run.py, cases.py, visualization.py,
-  config.yaml, report/.gitkeep, result/.gitkeep
+  Python: README.md, provenance.toml, run.py, cases.py, visualization.py,
+          config.yaml, report/.gitkeep, result/.gitkeep
+  C++ single-case: README.md, provenance.toml, config.yaml, <topic>.cpp,
+                   run.py, visualization.py, selected CMake surface, report/.gitkeep,
+                   result/.gitkeep; cases.py absent
+  C++ multi-case: C++ single-case plus cases.py
 
 forbidden_presence:
   templates/documents/experiment,
@@ -172,7 +243,11 @@ forbidden_presence:
   visualize.ipynb, root-level topic summary.json/cases.jsonl fallback
 
 sufficient_behavior:
-  dry-run exact inventory,
+  dry-run profile-specific exact inventory and force replacement readback,
+  C++ single-case lacks cases.py and emits one selected CMake surface,
+  C++ multi-case requires configured cases and launches the same native target,
+  source-free export contains both template packages,
+  creator publishes topic and registry together,
   materialized incomplete/success/failure run,
   result/<run-id>/raw and summary readback,
   atomic artifact/checksum tests,
@@ -196,9 +271,11 @@ python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 | ETC-003 | `visualization.py` | status and old notebook absence |
 | ETC-004/006 | `run.py` | atomic summary/raw tree tests |
 | ETC-007 | public/canonical skill、catalog/tool commands | routing alignment check |
+| C++ profile | `_cpp_template/`、creator、template export manifest | selected CMake output、single/multi-case inventory、native launcher boundary |
 
 ## DIC status
 
 ETC-001〜ETC-008はowner、target path、state、failure semantics、validationが固定され、implementation-ready
-である。旧fileをcompatibility import、copy、symlinkとして残す変更、sibling raw path、第二visualization
-entry、document template fallbackはdesign driftとしてrejectする。
+である。C++ profileはconsumer-selected CMake surfaceとsource-free package boundaryを持つ。旧fileを
+compatibility import、copy、symlinkとして残す変更、sibling raw path、第二visualization entry、document
+template fallbackはdesign driftとしてrejectする。

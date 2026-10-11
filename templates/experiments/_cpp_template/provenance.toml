@@ -1,0 +1,6 @@
+schema_version = 1
+topic = "<topic>"
+native_target = "<topic>"
+cmake_profile = "<cmake-profile>"
+case_mode = "<case-mode>"
+status = "draft"
