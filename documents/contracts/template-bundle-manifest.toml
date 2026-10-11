@@ -14,6 +14,76 @@ roots = ["templates/code"]
 [profiles.experiment-scaffold]
 roots = ["templates/experiments/_template"]
 
+[profiles.codex-user]
+# This is a bounded source-free Codex consumer package, not a source checkout.
+# The exporter maps tracked role views into the plugin's agents/ root, pairs
+# materialized skill discovery metadata with canonical skill bodies, and
+# composes guidance/AGENTS.md from ROOT_AGENTS.md.
+producer = "tools/agent/templates/template_bundle.py"
+roots = [
+  "ROOT_AGENTS.md",
+  "documents/runtime/runtime-profiles-and-check-matrix.json",
+  "schemas/agent-canon/skill-catalog.schema.json",
+  "schemas/agent-canon/skill-dependencies.schema.json",
+  "schemas/agent-canon/tool-catalog.schema.json",
+  "references/README.md",
+  "references/agent-canon-technology-bibliography.md",
+  "bootstrap.sh",
+  "bootstrap/host/lifecycle/entrypoint.sh",
+  "bootstrap/host/manifest.toml",
+  ".codex/agents",
+  ".codex/hooks",
+  ".codex/hooks.json",
+  ".codex/personal/skills",
+  "agents/skills",
+  "tools/__init__.py",
+  "tools/agent/__init__.py",
+  "tools/agent/orchestration/__init__.py",
+  "tools/agent/skills/__init__.py",
+  "tools/agent/templates/__init__.py",
+  "tools/agent/templates/entrypoint_composer.py",
+  "tools/agent/templates/template_bundle.py",
+  "tools/agent/orchestration/capability_route.py",
+  "tools/agent/orchestration/mid_task_user_input_policy.py",
+  "tools/agent/orchestration/prompt_capture.py",
+  "tools/agent/orchestration/prompt_classifier.py",
+  "tools/agent/orchestration/route.py",
+  "tools/agent/orchestration/subagent_selection.py",
+  "tools/agent/orchestration/team_config.py",
+  "tools/agent/orchestration/tool_selection.py",
+  "tools/agent/orchestration/workflow_context.py",
+  "tools/agent/skills/skill_lane_detector.py",
+  "tools/agent/skills/skill_dependency_map.py",
+  "tools/agent/skills/skill_route_catalog.py",
+  "tools/catalog.yaml",
+  "tools/repository/__init__.py",
+  "tools/repository/workspace/parent_root_side_effects.py",
+  "tools/repository/workspace/workspace_scope.py",
+  "tools/runtime/__init__.py",
+  "tools/runtime/archive/__init__.py",
+  "tools/runtime/archive/behavior_event_assembly.py",
+  "tools/runtime/archive/log_repository_identity.py",
+  "tools/runtime/archive/runtime_log_paths.py",
+  "tools/runtime/archive/work_log.py",
+  "tools/runtime/artifacts/__init__.py",
+  "tools/runtime/artifacts/artifact_identity.py",
+  "tools/runtime/artifacts/runtime_artifacts.py",
+  "tools/runtime/authority/__init__.py",
+  "tools/runtime/authority/hook_retirement.py",
+  "tools/runtime/authority/hook_safety.py",
+  "tools/runtime/authority/mutation_authority.py",
+  "tools/runtime/authority/writer_target.py",
+  "tools/runtime/container/__init__.py",
+  "tools/runtime/container/bootstrap_runtime.py",
+  "tools/runtime/container/execution_resource_projection.py",
+  "tools/runtime/lifecycle/__init__.py",
+  "tools/runtime/lifecycle/update_lifecycle_contract.py",
+  "tools/runtime/lifecycle/workflow_monitor.py",
+  "tools/runtime/source/__init__.py",
+  "tools/runtime/source/agent_canon_source_root.py",
+  "tools/runtime/values.py",
+]
+
 [profiles.static-seed]
 roots = []
 producer = "tools/runtime/source/export_static_seed.py"

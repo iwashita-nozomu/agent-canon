@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import io
 import hashlib
 import fcntl
 import multiprocessing
@@ -11,6 +12,7 @@ import signal
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 from typing import Any
 
@@ -914,6 +916,99 @@ def test_codex_launch_binds_session_root_to_runtime(
     assert (manager.paths.codex_home / "sessions").is_dir()
 
 
+def test_codex_hook_admission_requires_explicit_trusted_project_config(
+    tmp_path: Path,
+) -> None:
+    """Hook admission reads user trust without changing or echoing its config."""
+    project = tmp_path / "trusted project"
+    project.mkdir()
+    untrusted = tmp_path / "untrusted"
+    untrusted.mkdir()
+    trusted_config = (
+        f"[projects.{json.dumps(str(project))}]\n"
+        'trust_level = "trusted"\n'
+        "secret_setting = 'never echo this value'\n"
+    ).encode()
+    payload = json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(project),
+            "prompt": "private prompt content",
+        }
+    ).encode()
+
+    admitted = bootstrap_runtime_module._trusted_project_from_hook_input(
+        trusted_config + b"\0" + payload
+    )
+    assert admitted == str(project)
+    assert "never echo" not in admitted
+    assert "private prompt" not in admitted
+
+    untrusted_config = (
+        f"[projects.{json.dumps(str(untrusted))}]\n"
+        'trust_level = "untrusted"\n'
+    ).encode()
+    assert (
+        bootstrap_runtime_module._trusted_project_from_hook_input(
+            untrusted_config + b"\0" + payload.replace(
+                str(project).encode(), str(untrusted).encode()
+            )
+        )
+        is None
+    )
+    assert (
+        bootstrap_runtime_module._trusted_project_from_hook_input(
+            b"not TOML\0" + payload
+        )
+        is None
+    )
+    assert (
+        bootstrap_runtime_module._trusted_project_from_hook_input(
+            trusted_config + b"\0" + b"not JSON"
+        )
+        is None
+    )
+
+
+def test_codex_hook_cli_delegates_raw_event_to_canonical_dispatcher(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The resident entry passes the event bytes to the packaged dispatcher."""
+    captured: dict[str, object] = {}
+    dispatcher = types.ModuleType("hook_dispatcher")
+
+    def dispatch_event(event: str, payload: bytes) -> int:
+        captured.update({"event": event, "payload": payload})
+        return 23
+
+    setattr(dispatcher, "dispatch_event", dispatch_event)
+    monkeypatch.setitem(sys.modules, "hook_dispatcher", dispatcher)
+    raw_payload = b'{"hook_event_name":"UserPromptSubmit","cwd":"/tmp/project"}'
+    monkeypatch.setattr(
+        bootstrap_runtime_module.sys,
+        "stdin",
+        types.SimpleNamespace(buffer=io.BytesIO(raw_payload)),
+    )
+
+    result = bootstrap_runtime_module.main(
+        [
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(tmp_path),
+            "--runtime-root",
+            str(tmp_path / "runtime"),
+            "codex",
+            "hook",
+            "--event",
+            "UserPromptSubmit",
+        ]
+    )
+
+    assert result == 23
+    assert captured == {"event": "UserPromptSubmit", "payload": raw_payload}
+
+
 def test_structured_tool_environment_rejects_private_log_self_claim(
     tmp_path: Path,
 ) -> None:
@@ -1585,6 +1680,20 @@ def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
     assert (
         build_parser().parse_args(base + ["codex", "prepare"]).codex_operation
         == "prepare"
+    )
+    assert (
+        build_parser()
+        .parse_args(
+            base + ["codex", "hook-admission", "--event", "UserPromptSubmit"]
+        )
+        .codex_operation
+        == "hook-admission"
+    )
+    assert (
+        build_parser()
+        .parse_args(base + ["codex", "hook", "--event", "PostToolUse"])
+        .codex_operation
+        == "hook"
     )
     assert (
         build_parser()
