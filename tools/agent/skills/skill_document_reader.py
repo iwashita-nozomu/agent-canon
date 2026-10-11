@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Reads only selected Skill section bodies in bounded UTF-8 chunks, leaving branches deferred.
+# responsibility Reads selected canonical Skill bodies in bounded UTF-8 chunks and reports exact file EOF.
 # upstream design ../../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
 # downstream implementation ../../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py loads selected canonical bodies through file EOF
 # @dependency-end
-"""Read selected Skill sections without expanding child branches or requiring file EOF."""
+"""Read selected Skill sections or canonical bodies through bounded UTF-8 chunks."""
 
 from __future__ import annotations
 
@@ -263,6 +264,21 @@ class SkillDocumentReader:
             chunks.append(current)
             offset = current.next_offset
         return tuple(chunks)
+
+    def read_document(self, *, max_bytes: int = DEFAULT_MAX_BYTES) -> str:
+        """Read the complete document through the existing bounded chunk API."""
+        chunks: list[str] = []
+        offset = 0
+        while True:
+            chunk = self.chunk(offset=offset, max_bytes=max_bytes)
+            if chunk.byte_start != offset or chunk.next_offset <= offset:
+                raise SkillDocumentError("read_incomplete", str(self.path))
+            chunks.append(chunk.text)
+            if chunk.file_eof:
+                if chunk.byte_end != len(self.data):
+                    raise SkillDocumentError("read_incomplete", str(self.path))
+                return "".join(chunks)
+            offset = chunk.next_offset
 
 
 def _read_owner_spec(value: str) -> tuple[Path, str]:

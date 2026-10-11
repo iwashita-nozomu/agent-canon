@@ -99,6 +99,14 @@ work, then makespan. Model only real dependency or collision edges, dispatch
 ready non-conflicting work, and wait only when no useful work is ready. Time
 limits and prompt keywords do not cut scope.
 
+When AgentCanon's run graph is active, `bootstrap_agent_run.py` is the single
+transition owner. It reads only selected canonical Skills and hard prerequisites
+through file EOF before making dependent dispatch ready. Execute only its ready
+ToolCalls; a spawn result means launched, while the child's actual completion
+result is required before dependents become ready. Re-enter the same run with
+those results. Wave-monitor rows are readback, not readiness authority; `task_close.py`
+remains the terminal predicate.
+
 Review a candidate once. Repair accepted in-scope findings and recheck only
 affected evidence; reopen review only when new contract, reachable-behavior, or
 structural-contradiction evidence changes the candidate. Repeating the same

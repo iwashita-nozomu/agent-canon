@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -22,6 +23,7 @@ import sys
 import tempfile
 import unittest
 from atexit import register
+from contextlib import redirect_stdout
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
@@ -38,6 +40,8 @@ from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
     materialize_generated_completeness_receipt,
 )
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
+    ToolExecutionResult,
+    advance_execution_graph,
     codex_runtime_max_threads,
     default_quality_check_agent_types,
     recommended_dynamic_expansion_wave_slots,
@@ -51,9 +55,11 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     resolve_active_design_packet_config,
 )
 from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
+    check_schedule_artifact,
     check_completion_coverage,
     evaluate_completion_boundary,
     project_completion_coverage,
+    wave_reconciliation_blockers,
 )
 from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
 from tools.runtime.lifecycle.task_close import (  # noqa: E402
@@ -63,6 +69,7 @@ from tools.runtime.lifecycle.task_close import (  # noqa: E402
 )
 from tools.agent.orchestration.team_config import (  # noqa: E402
     AgentTypeSelection,
+    SubagentWaveSlot,
     load_task_catalog,
     load_team_config,
     select_roles,
@@ -77,6 +84,13 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
     materialize_reservation_release_receipt,
 )
 from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
+from tools.runtime.lifecycle.bootstrap_agent_run import (  # noqa: E402
+    main as bootstrap_agent_run,
+    read_selected_skill_documents,
+    serialized_skill_document_reads,
+)
+from tools.runtime.lifecycle.workflow_monitor import parse_token_fields  # noqa: E402
+from tools.agent.skills.skill_route_catalog import SkillRoutingRule  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
@@ -1124,6 +1138,386 @@ class BootstrapAndCloseTest(unittest.TestCase):
         parent_env.start()
         self.addCleanup(parent_env.stop)
 
+    def test_skill_graph_reads_only_selected_hard_prerequisites_to_file_eof(self) -> None:
+        """A shared prerequisite is read once; related branches remain unloaded."""
+        documents = read_selected_skill_documents(
+            ("$subagent-bootstrap", "$direct-luna-communication"),
+            PROJECT_ROOT,
+        )
+        skill_ids = [skill for skill, _, _ in documents]
+
+        self.assertEqual(len(skill_ids), len(set(skill_ids)))
+        self.assertEqual(
+            set(skill_ids),
+            {
+                "agent-orchestration",
+                "codex-task-workflow",
+                "subagent-bootstrap",
+                "direct-luna-communication",
+            },
+        )
+        self.assertNotIn("result-artifact-writeout", skill_ids)
+        for _, canonical_path, content in documents:
+            self.assertTrue(canonical_path.startswith("agents/skills/"))
+            self.assertEqual(
+                content.encode("utf-8"),
+                (PROJECT_ROOT / canonical_path).read_bytes(),
+            )
+
+    def test_skill_graph_reuses_unchanged_body_and_rereads_changed_body(self) -> None:
+        """The graph reuses unchanged EOF text and refreshes only changed source."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
+            source_root = Path(temporary)
+            skill_path = source_root / "agents/skills/selected.md"
+            skill_path.parent.mkdir(parents=True)
+            skill_path.write_text("# Selected\n\nfirst body\n", encoding="utf-8")
+            rule = SkillRoutingRule(
+                skill="selected",
+                canonical_doc="agents/skills/selected.md",
+                reason="selected test skill",
+                stage_policy="all",
+                triggers=(),
+                capabilities=(),
+                related_skills=(),
+            )
+            with (
+                patch(
+                    "tools.runtime.lifecycle.bootstrap_agent_run.load_skill_route_rules",
+                    return_value=(rule,),
+                ),
+                patch(
+                    "tools.runtime.lifecycle.bootstrap_agent_run.derive_skill_invocation_order",
+                    return_value=("selected",),
+                ),
+            ):
+                initial = read_selected_skill_documents(("$selected",), source_root)
+                initial_digest = hashlib.sha256(initial[0][2].encode("utf-8")).hexdigest()
+                read_state = serialized_skill_document_reads(initial)
+                prior_graph = {"skill_document_reads": read_state}
+                with patch(
+                    "tools.runtime.lifecycle.bootstrap_agent_run.SkillDocumentReader.read_document",
+                    side_effect=AssertionError("unchanged skill body should be reused"),
+                ):
+                    unchanged = read_selected_skill_documents(
+                        ("$selected",),
+                        source_root,
+                        existing_graph=prior_graph,
+                    )
+                self.assertEqual(unchanged, initial)
+
+                skill_path.write_text(
+                    "# Selected\n\nchanged body\n", encoding="utf-8"
+                )
+                refreshed = read_selected_skill_documents(
+                    ("$selected",),
+                    source_root,
+                    existing_graph=prior_graph,
+                )
+            self.assertEqual(refreshed[0][2], "# Selected\n\nchanged body\n")
+            self.assertNotEqual(
+                initial_digest,
+                hashlib.sha256(refreshed[0][2].encode("utf-8")).hexdigest(),
+            )
+
+    def test_bootstrap_blocks_dispatch_when_skill_read_fails(self) -> None:
+        """An incomplete selected Skill read leaves the execution graph unstarted."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
+            workspace_root = Path(temporary) / "workspace"
+            report_root = Path(temporary) / "reports"
+            workspace_root.mkdir()
+            report_root.mkdir()
+            seed_workspace_config(workspace_root)
+            calls: list[tuple[str, str]] = []
+            output = io.StringIO()
+            with (
+                patch(
+                    "tools.runtime.lifecycle.bootstrap_agent_run.read_selected_skill_documents",
+                    side_effect=RuntimeError("skill_readback:incomplete"),
+                ),
+                redirect_stdout(output),
+            ):
+                code = bootstrap_agent_run(
+                    [
+                        "--task",
+                        "academic draft",
+                        "--task-id",
+                        "T10",
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        "skill-read-blocks-execution",
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-root",
+                        str(report_root),
+                    ],
+                    spawn=lambda agent_type, prompt: (
+                        calls.append((agent_type, prompt)) or "unexpected-agent"
+                    ),
+                )
+            self.assertEqual(code, 1)
+            self.assertIn("skill_execution_graph_read_failed", output.getvalue())
+            self.assertEqual(calls, [])
+            self.assertFalse(
+                (report_root / "skill-read-blocks-execution").exists()
+            )
+
+    def test_execution_graph_waits_for_actual_completion_before_dependent_dispatch(
+        self,
+    ) -> None:
+        """A successful launch is pending; only its child result unlocks a wave."""
+        intake = (
+            SubagentWaveSlot("explorer", "explorer_worker", "worker"),
+            SubagentWaveSlot("planner", "planner_worker", "execution_planner"),
+        )
+        implementation = (SubagentWaveSlot("implementer", "worker", "worker"),)
+        waves = (intake, implementation)
+        no_result: dict[str, dict[str, ToolExecutionResult]] = {}
+
+        first = advance_execution_graph(waves, no_result)
+
+        self.assertEqual(first.status, "ready")
+        self.assertEqual(first.ready_slots, intake)
+
+        launch_results = {
+            slot.executable_identity: {
+                "spawn_result": ToolExecutionResult(False, f"agent-{index}")
+            }
+            for index, slot in enumerate(intake, start=1)
+        }
+        launched = advance_execution_graph(waves, launch_results)
+        self.assertEqual(launched.status, "waiting")
+        self.assertEqual(launched.waiting_identities, tuple(s.executable_identity for s in intake))
+
+        first_identity = intake[0].executable_identity
+        second_identity = intake[1].executable_identity
+        completed_first = {
+            first_identity: {
+                **launch_results[first_identity],
+                "completion_result": ToolExecutionResult(False, "exploration result"),
+            },
+            second_identity: {
+                **launch_results[second_identity],
+                "completion_result": ToolExecutionResult(False, "plan result"),
+            },
+        }
+        second = advance_execution_graph(waves, completed_first)
+
+        self.assertEqual(second.status, "ready")
+        self.assertEqual(second.ready_slots, implementation)
+        self.assertEqual(
+            {identity for identity, _ in second.completed_results},
+            {first_identity, second_identity},
+        )
+
+        failed = dict(completed_first)
+        failed[first_identity] = {
+            **launch_results[first_identity],
+            "completion_result": ToolExecutionResult(True, "agent failed"),
+        }
+        stopped = advance_execution_graph(waves, failed)
+        self.assertEqual(stopped.status, "failed")
+        self.assertEqual(stopped.failed_identities, (first_identity,))
+        self.assertEqual(stopped.ready_slots, ())
+        with self.assertRaisesRegex(RuntimeError, "dependent_node_before_ready"):
+            advance_execution_graph(
+                waves,
+                {
+                    implementation[0].executable_identity: {
+                        "spawn_result": ToolExecutionResult(False, "agent-3")
+                    }
+                },
+            )
+        with self.assertRaisesRegex(RuntimeError, "duplicate_role_instance"):
+            advance_execution_graph(((intake[0], intake[0]),), no_result)
+
+    def test_bootstrap_reenters_same_run_from_callback_and_child_results(self) -> None:
+        """The callback launches one ready wave; returned work unlocks the next."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
+            workspace_root = Path(temporary) / "workspace"
+            report_root = Path(temporary) / "reports"
+            workspace_root.mkdir()
+            report_root.mkdir()
+            seed_workspace_config(workspace_root)
+            run_id = "execution-graph-callback-result"
+            args = [
+                "--task",
+                "academic draft",
+                "--task-id",
+                "T10",
+                "--owner",
+                "codex",
+                "--workspace-root",
+                str(workspace_root),
+                "--report-root",
+                str(report_root),
+                "--run-id",
+                run_id,
+            ]
+            spawned: list[tuple[str, str]] = []
+
+            def spawn(agent_type: str, prompt: str) -> str:
+                agent_id = f"agent-{len(spawned) + 1}"
+                spawned.append((agent_type, prompt))
+                return agent_id
+
+            first_output = io.StringIO()
+            with redirect_stdout(first_output):
+                first_code = bootstrap_agent_run(args, spawn=spawn)
+
+            self.assertEqual(first_code, 0)
+            self.assertTrue(spawned)
+            self.assertIn("EXECUTION_GRAPH_STATUS=waiting", first_output.getvalue())
+            self.assertIn("ACTIVE_SKILL_DOCUMENTS_JSON=", first_output.getvalue())
+            self.assertIn(
+                (PROJECT_ROOT / "agents/skills/agent-orchestration.md").read_text(
+                    encoding="utf-8"
+                ),
+                spawned[0][1],
+            )
+            spawn_line = next(
+                line
+                for line in first_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
+            )
+            spawn_results = json.loads(spawn_line.split("=", 1)[1])
+            results = {
+                identity: {
+                    **result,
+                    "completion_result": {
+                        "isError": False,
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"completed {identity}",
+                            }
+                        ],
+                    },
+                }
+                for identity, result in spawn_results.items()
+            }
+            second_output = io.StringIO()
+            with redirect_stdout(second_output):
+                second_code = bootstrap_agent_run(
+                    [*args, "--execution-results", json.dumps(results)]
+                )
+
+            self.assertEqual(second_code, 0)
+            self.assertIn("EXECUTION_GRAPH_STATUS=ready", second_output.getvalue())
+            ready_line = next(
+                line
+                for line in second_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+            )
+            ready_calls = json.loads(ready_line.split("=", 1)[1])
+            self.assertEqual(len(ready_calls), 1)
+            self.assertIn(
+                "completed " + next(iter(spawn_results)),
+                ready_calls[0]["arguments"]["input"],
+            )
+            run_dirs = [path for path in report_root.iterdir() if path.is_dir()]
+            self.assertEqual([path.name for path in run_dirs], [run_id])
+            report_dir = report_root / run_id
+            manifest_path = report_dir / "team_manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            graph = manifest["run"]["execution_graph"]
+            wave_identities = {"WAVE-1": graph["initial_wave_role_instances"]}
+            for wave in graph["later_stage_waves"]:
+                if wave["wave_id"] != "none":
+                    wave_identities[wave["wave_id"]] = [
+                        item.split(":team_manifest.yaml#roles.", 1)[0]
+                        for item in wave["role_instances"]
+                    ]
+            current_output = second_output.getvalue()
+            while "EXECUTION_GRAPH_STATUS=ready" in current_output:
+                wave_index = int(
+                    next(
+                        line.split("=", 1)[1]
+                        for line in current_output.splitlines()
+                        if line.startswith("EXECUTION_GRAPH_WAVE_INDEX=")
+                    )
+                )
+                identities = wave_identities[f"WAVE-{wave_index}"]
+                self.assertTrue(identities)
+                wave_results = {
+                    identity: {
+                        "spawn_result": {
+                            "isError": False,
+                            "content": [
+                                {"type": "text", "text": f"agent-{identity}"}
+                            ],
+                        },
+                        "completion_result": {
+                            "isError": False,
+                            "content": [
+                                {"type": "text", "text": f"completed {identity}"}
+                            ],
+                        },
+                    }
+                    for identity in identities
+                }
+                current_output = io.StringIO()
+                with redirect_stdout(current_output):
+                    current_code = bootstrap_agent_run(
+                        [*args, "--execution-results", json.dumps(wave_results)]
+                    )
+                self.assertEqual(current_code, 0, current_output.getvalue())
+                current_output = current_output.getvalue()
+            self.assertIn("EXECUTION_GRAPH_STATUS=awaiting_closeout", current_output)
+
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            graph = manifest["run"]["execution_graph"]
+            state = graph["result_readback"]
+            expected_wave_ids = sorted(
+                (
+                    wave_id
+                    for wave_id, identities in wave_identities.items()
+                    if identities
+                ),
+                key=lambda wave_id: int(wave_id.removeprefix("WAVE-")),
+            )
+            self.assertEqual(state["completed_wave_ids"], expected_wave_ids)
+            self.assertEqual(state["status"], "awaiting_closeout")
+            monitoring = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+            recorded_wave_ids = [
+                parse_token_fields(line).get("wave_id")
+                for line in monitoring.splitlines()
+                if line.strip().startswith("- wave_event=")
+            ]
+            self.assertEqual(recorded_wave_ids, expected_wave_ids)
+            self.assertEqual(
+                wave_reconciliation_blockers(
+                    monitoring,
+                    {"agent_wave_ledger_status": "applicable"},
+                    report_dir,
+                    workspace_root,
+                ),
+                [],
+            )
+            schedule = (report_dir / "schedule.md").read_text(encoding="utf-8")
+            self.assertNotIn(
+                "schedule.md:agent_wave_ledger_empty",
+                check_schedule_artifact(schedule),
+            )
+
+            graph["result_readback"]["status"] = "ready"
+            manifest_path.write_text(
+                yaml.safe_dump(manifest, sort_keys=False),
+                encoding="utf-8",
+            )
+            closeout_blockers = wave_reconciliation_blockers(
+                monitoring,
+                {"agent_wave_ledger_status": "applicable"},
+                report_dir,
+                workspace_root,
+            )
+            self.assertIn(
+                "team_manifest.yaml:execution_graph_results_incomplete:ready",
+                closeout_blockers,
+            )
+
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """Retired repository synchronization wrappers are absent."""
         self.assertFalse((PROJECT_ROOT / "tools" / "sync_agent_canon.sh").exists())
@@ -1277,42 +1671,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "do_not_read",
             },
             {str(field) for field in raw_same_role_fields},
-        )
-
-    def assert_initial_wave_execution_gate(self, report_dir: Path) -> None:
-        """Assert generated run bundles expose the parent wave execution gate."""
-        schedule_text = (report_dir / "schedule.md").read_text(encoding="utf-8")
-        monitoring_text = (report_dir / "workflow_monitoring.md").read_text(
-            encoding="utf-8"
-        )
-        expected_schedule = (
-            "| WAVE-1 | parent | parent_runtime_authority_required | "
-            "bootstrap_initial_intake_wave |"
-        )
-        self.assertIn(expected_schedule, schedule_text)
-        self.assertIn(
-            "requirements_organizer:pending_explicit_runtime_spawn_authority",
-            schedule_text,
-        )
-        self.assertNotIn(
-            "explorer:pending_explicit_runtime_spawn_authority", schedule_text
-        )
-        self.assertNotIn(
-            "execution_planner:pending_explicit_runtime_spawn_authority",
-            schedule_text,
-        )
-        self.assertIn("Role Instances", schedule_text)
-        self.assertIn("role_instances=none", monitoring_text)
-        self.assertIn("blocked_authority_required", schedule_text)
-        self.assertIn("wave_event=recorded wave_id=WAVE-1", monitoring_text)
-        self.assertIn("event_kind=authority_blocker", monitoring_text)
-        self.assertIn(
-            "spawn_authority=parent_runtime_authority_required", monitoring_text
-        )
-        self.assertIn("status=blocked_authority_required", monitoring_text)
-        self.assertIn(
-            "handoff_artifacts=team_manifest.yaml#run.spawn_wave_recommendation",
-            monitoring_text,
         )
 
     def assert_role_prompt_includes(
@@ -2276,7 +2634,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 )
             )
             self.assertEqual(
-                manifest["run"]["spawn_wave_recommendation"]["agent_type_selections"],
+                manifest["run"]["execution_graph"]["agent_type_selections"],
                 [
                     {
                         "role_id": "implementer",
@@ -2459,32 +2817,18 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            dynamic_waves_match = re.search(
-                r"^RECOMMENDED_DYNAMIC_EXPANSION_WAVES=(.+)$",
-                result.stdout,
-                re.M,
+            self.assertIn("EXECUTION_GRAPH_STATUS=ready", result.stdout)
+            self.assertIn("EXECUTION_GRAPH_WAVE_INDEX=1", result.stdout)
+            ready_calls_line = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
             )
-            self.assertIsNotNone(dynamic_waves_match)
-            dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
+            ready_calls = json.loads(ready_calls_line.split("=", 1)[1])
+            self.assertEqual(len(ready_calls), 1)
+            self.assertEqual(ready_calls[0]["arguments"]["role"], "manager")
             self.assertEqual(
-                dynamic_waves,
-                "WAVE-2=detailed_designer;WAVE-3=worker",
-            )
-            self.assertNotIn("ship_reviewer", dynamic_waves)
-            role_instances_match = re.search(
-                r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
-                result.stdout,
-                re.M,
-            )
-            self.assertIsNotNone(role_instances_match)
-            role_instances = cast(re.Match[str], role_instances_match).group(1)
-            self.assertIn(
-                "WAVE-2=designer:designer_detailed_designer:detailed_designer",
-                role_instances,
-            )
-            self.assertIn(
-                "WAVE-3=implementer:implementer_worker:worker",
-                role_instances,
+                ready_calls[0]["arguments"]["agent_type"], "requirements_organizer"
             )
             manifest_text = (
                 report_root / "test-academic-wave-order" / "team_manifest.yaml"
@@ -2492,9 +2836,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             manifest = yaml.safe_load(manifest_text)
             wave_ids = [
                 wave["wave_id"]
-                for wave in manifest["run"]["spawn_wave_recommendation"][
-                    "dynamic_expansion_waves"
-                ]
+                for wave in manifest["run"]["execution_graph"]["later_stage_waves"]
                 if any(
                     "citation_evidence_reviewer" in item
                     for item in wave["role_instances"]
@@ -2870,8 +3212,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn(
                 f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
             )
-            self.assertIn("RECOMMENDED_INITIAL_SUBAGENT_WAVE=", result.stdout)
-            self.assertIn("RECOMMENDED_DYNAMIC_EXPANSION_WAVES=", result.stdout)
+            self.assertIn("EXECUTION_GRAPH_STATUS=ready", result.stdout)
+            self.assertIn("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=", result.stdout)
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
 
             manifest = yaml.safe_load(
@@ -2947,9 +3289,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("START_DECLARATION=workflow=Unspecified", result.stdout)
             self.assertIn("TASK_ID_ROUTE_STATUS=missing", result.stdout)
             self.assertIn("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes", result.stdout)
-            self.assertIn("TASK_ID_ROUTE_RECOMMENDED_TASK_IDS=T11,T12", result.stdout)
             self.assertIn(
-                "SUBAGENT_FANOUT_EXPECTATION=blocked_until_task_id_or_explicit_family",
+                "SUBAGENT_FANOUT_STATUS=not_selected_without_task_id",
                 result.stdout,
             )
             manifest_text = (

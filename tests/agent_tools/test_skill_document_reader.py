@@ -73,6 +73,18 @@ class SkillDocumentReaderTest(unittest.TestCase):
                 [chunk.byte_start for chunk in chunks[1:]],
             )
 
+    def test_read_document_delivers_all_content_through_file_eof(self) -> None:
+        """Execution callers can require the canonical body, not section metadata."""
+        expected = "# Skill\nintro あいうえお\n## Branch\nselected body\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = self.write_document(Path(temporary), expected)
+            reader = SkillDocumentReader(path)
+
+            actual = reader.read_document(max_bytes=7)
+
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual.encode("utf-8"), path.read_bytes())
+
     def test_utf8_boundary_never_splits_multibyte_character(self) -> None:
         """A byte limit ending inside UTF-8 backs off to a character boundary."""
         with tempfile.TemporaryDirectory() as temporary:

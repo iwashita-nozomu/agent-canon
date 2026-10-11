@@ -90,7 +90,7 @@ class DocStartTest(unittest.TestCase):
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn(
                 "role_topology",
-                manifest["run"]["spawn_wave_recommendation"],
+                manifest["run"]["execution_graph"],
             )
 
     def test_doc_start_paper(self) -> None:
@@ -161,7 +161,7 @@ class DocStartTest(unittest.TestCase):
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn(
                 "role_topology",
-                manifest["run"]["spawn_wave_recommendation"],
+                manifest["run"]["execution_graph"],
             )
 
     def test_doc_start_explicit_terra_is_review_only(self) -> None:

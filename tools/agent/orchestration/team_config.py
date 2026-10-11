@@ -127,6 +127,7 @@ class StageWave:
     id: str
     stage_class: str
     role_ids: tuple[str, ...]
+    activation: str = "always"
 
 
 @dataclass(frozen=True)
@@ -359,6 +360,10 @@ def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
                 "stage_waves[].stage_class",
             ),
             role_ids=as_string_tuple(wave.get("role_ids"), "stage_waves[].role_ids"),
+            activation=as_optional_string(
+                wave.get("activation"), "stage_waves[].activation"
+            )
+            or "always",
         )
         for wave in waves
     )
