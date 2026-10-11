@@ -1138,7 +1138,7 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: pending
+      parity: verified
       parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false

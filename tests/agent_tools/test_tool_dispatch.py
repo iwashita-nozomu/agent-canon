@@ -78,6 +78,7 @@ class ToolDispatchTest(unittest.TestCase):
                 "generate-agent-improvement-guide",
                 "generate-agent-runtime-dashboard",
                 "issue-sync",
+                "quarto",
                 "route",
                 "skill-document-reader",
                 "template-bundle",
