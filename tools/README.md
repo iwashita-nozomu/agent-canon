@@ -82,6 +82,10 @@ is verified:
   tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
 
+Catalog-declared native CLI commands use the same route and execute their fixed
+argv prefix directly inside the authenticated tool container; they do not add
+host executables or shell-command dispatch.
+
 Invoke the prescribed command first; the dispatcher retains its admission checks.
 Only after a relevant failure, follow [bootstrap](../agents/skills/agent-canon-bootstrap.md)
 for route diagnosis and authorized target/lifecycle repair. Do not prepend `status`

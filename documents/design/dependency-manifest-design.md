@@ -60,6 +60,22 @@ annotation is deliberately authored.
 - すべての generated / binary artifact を同じ manifest で管理しない
 - write-capable subagent の並列数を増やすための設計ではない
 
+## APT Package Version Selection
+
+`apt-package` record は `version` を省略すると、declared Ubuntu
+distribution の repository candidate を installer に選択させます。
+Installer は version constraint なしで package を install し、`dpkg-query`
+で観測した version を receipt の `resolved_package_version` に記録します。
+image verification は manifest の未指定値ではなく、この receipt version と
+live dpkg state を照合します。これは build ごとの実際の package 解決を記録する
+契約であり、将来の repository index が同じ version を返す保証ではありません。
+
+`apt-package` に `version` が明示される場合は引き続き exact version constraint
+として install/verify します。`apt-repository`、NPM、PIPX、release asset、Rust
+toolchain など、owner が version pin を要求する method では version は必須です。
+第三者 artifact や compatibility が pin を必要とする dependency は明示 pin を
+保持し、distribution-managed mode を代用しません。
+
 ## Mounted Language-Server Dependency Contract
 
 共有 code analysis の LSP サーバーは product image の依存ではなく、

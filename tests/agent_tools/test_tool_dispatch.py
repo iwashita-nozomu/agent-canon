@@ -23,6 +23,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import yaml
+
 from tools.runtime.dispatch import tool_dispatch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -32,12 +33,11 @@ class ToolDispatchTest(unittest.TestCase):
     """Exercise the dispatcher without starting Docker or a resident runtime."""
 
     def test_repository_inventory_is_typed_and_versioned(self) -> None:
-        """The repository publishes every Python/Rust catalog surface."""
+        """The repository publishes typed Python, Rust, and native catalog surfaces."""
         specs, schema = tool_dispatch.load_specs(PROJECT_ROOT)
         self.assertEqual(schema["version"], 2)
-        self.assertGreaterEqual(len(specs), 110)
         for spec in specs.values():
-            self.assertIn(spec.runtime, {"python", "rust"})
+            self.assertIn(spec.runtime, {"python", "rust", "native"})
             self.assertIsInstance(spec.argv, tuple)
             self.assertTrue(spec.argv)
             self.assertEqual(spec.execution_plane, "tool-container")
@@ -52,6 +52,8 @@ class ToolDispatchTest(unittest.TestCase):
             self.assertTrue(spec.parity_fixture)
         self.assertEqual(specs["rust-docs"].argv[:2], ("tools/bin/agent-canon", "docs"))
         self.assertEqual(specs["rust-python-module-groups-check"].runtime, "rust")
+        self.assertEqual(specs["quarto"].runtime, "native")
+        self.assertEqual(specs["quarto"].argv, ("quarto",))
 
     def test_inventory_is_stable_json(self) -> None:
         """Inventory output has one versioned row per normalized surface."""
@@ -76,6 +78,7 @@ class ToolDispatchTest(unittest.TestCase):
                 "generate-agent-improvement-guide",
                 "generate-agent-runtime-dashboard",
                 "issue-sync",
+                "quarto",
                 "route",
                 "skill-document-reader",
                 "template-bundle",
@@ -236,6 +239,86 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(status, 0)
         container_run.assert_called_once_with(PROJECT_ROOT, spec, ("--help",))
 
+    def test_native_tool_route_selects_container_executor(self) -> None:
+        """Native catalog runtimes use the same authenticated container route."""
+        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
+        with patch.object(
+            tool_dispatch, "_run_container_spec", return_value=0
+        ) as container_run:
+            status = tool_dispatch._run_spec(
+                PROJECT_ROOT,
+                spec,
+                ("pandoc", "--version"),
+                require_parity=False,
+                container_exec=True,
+            )
+
+        self.assertEqual(status, 0)
+        container_run.assert_called_once_with(
+            PROJECT_ROOT, spec, ("pandoc", "--version")
+        )
+
+    def test_native_runtime_does_not_require_a_python_or_rust_source_path(self) -> None:
+        """A native executable can use its existing catalog owner document path."""
+        root = self._minimal_root(
+            dispatch={
+                "runtime": "native",
+                "argv": ["quarto"],
+                "parity": "pending",
+            },
+            path="documents/native-command.md",
+        )
+
+        spec = tool_dispatch.load_specs(root)[0]["echo"]
+
+        self.assertEqual(spec.runtime, "native")
+        self.assertEqual(spec.path, "documents/native-command.md")
+
+    def test_native_tool_builds_the_existing_typed_bootstrap_request(self) -> None:
+        """The host route carries a native argv through the existing request envelope."""
+        root = self._minimal_root(
+            dispatch={
+                "runtime": "native",
+                "argv": ["quarto"],
+                "output_root": "external-runtime",
+                "side_effect": "external-artifact",
+                "parity": "pending",
+            },
+            path="documents/native-command.md",
+        )
+        spec = tool_dispatch.load_specs(root)[0]["echo"]
+        runtime = Path(os.environ["AGENT_CANON_RUNTIME_ROOT"])
+        target = Path(os.environ["AGENT_CANON_TARGET_ROOT"])
+        output = runtime / "tool-output"
+
+        command, environment = tool_dispatch._bootstrap_command(
+            root,
+            runtime,
+            spec,
+            ("pandoc", "paper.md"),
+            target,
+            output,
+        )
+        request = json.loads(command[command.index("--request-json") + 1])
+
+        self.assertNotIn("runtime", request)
+        self.assertEqual(request["argv"], ["quarto", "pandoc", "paper.md"])
+        self.assertEqual(request["child_args"], ["pandoc", "paper.md"])
+        self.assertEqual(
+            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "native"
+        )
+        self.assertEqual(environment["AGENT_CANON_RUNTIME_ROOT"], str(runtime))
+
+    def test_native_arguments_remain_relative_to_registered_target(self) -> None:
+        """Only catalog-owned source paths are rebased into the image source."""
+        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
+        args = ("pandoc", "--bibliography", "tools/catalog.yaml")
+
+        self.assertEqual(
+            tool_dispatch._resolve_container_argv(PROJECT_ROOT, spec, args),
+            ["quarto", *args],
+        )
+
     def test_unknown_dispatch_option_is_rejected_before_catalog_lookup(self) -> None:
         """Dispatcher options cannot be smuggled into a child command."""
         error = io.StringIO()
@@ -248,9 +331,22 @@ class ToolDispatchTest(unittest.TestCase):
 
     def test_cli_requires_explicit_external_runtime(self) -> None:
         """The public route cannot fall back to source-local cache state."""
-        error = io.StringIO()
-        with contextlib.redirect_stderr(error):
-            status = tool_dispatch.main(("run", "route", "--", "--help"))
+        root_environment = (
+            "AGENT_CANON_CONTROL_PARENT_ROOT",
+            "AGENT_CANON_RUNTIME_ROOT",
+            "AGENT_CANON_TARGET_ROOT",
+            "AGENT_CANON_MOUNT_REGISTRY",
+            "AGENT_CANON_OUTPUT_ROOT",
+        )
+        previous = {key: os.environ.get(key) for key in root_environment}
+        try:
+            for key in root_environment:
+                os.environ.pop(key, None)
+            error = io.StringIO()
+            with contextlib.redirect_stderr(error):
+                status = tool_dispatch.main(("run", "route", "--", "--help"))
+        finally:
+            self._restore_environment(previous)
         self.assertEqual(status, 2)
         self.assertIn("runtime-root-required", error.getvalue())
 
@@ -465,6 +561,9 @@ class ToolDispatchTest(unittest.TestCase):
                         _image / "image-dependencies"
                     ),
                     "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
+                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:" + "0" * 64,
+                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
+                    + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                 }
@@ -596,12 +695,19 @@ class ToolDispatchTest(unittest.TestCase):
             for key in (
                 "AGENT_CANON_CONTROL_PARENT_ROOT",
                 "AGENT_CANON_RUNTIME_ROOT",
+                "AGENT_CANON_TARGET_ROOT",
+                "AGENT_CANON_MOUNT_REGISTRY",
+                "AGENT_CANON_OUTPUT_ROOT",
             )
         }
         self.addCleanup(self._restore_environment, previous)
         os.environ["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(control)
         os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
         os.environ["AGENT_CANON_TARGET_ROOT"] = str(root)
+        # The fixture's state.json owns its targets; do not inherit the
+        # resident's read-only mount registry for a different checkout.
+        os.environ.pop("AGENT_CANON_MOUNT_REGISTRY", None)
+        os.environ.pop("AGENT_CANON_OUTPUT_ROOT", None)
         (runtime / "state.json").write_text(
             json.dumps({"targets": {"fixture": {"root": str(root)}}}),
             encoding="utf-8",

@@ -1,6 +1,6 @@
 # @dependency-start
 # contract environment
-# responsibility Defines the stable shared AgentCanon Python, Rust, LSP, and native diagnostic environment image.
+# responsibility Defines the stable shared AgentCanon Python, Rust, LSP, document-rendering, and native diagnostic environment image.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # upstream design ../../../documents/design/cpp-debugging.md native diagnostic provisioning and execution boundary
 # upstream design ../../../documents/design/runtime-debugging.md system and Python diagnostic selection
@@ -23,6 +23,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIPX_BIN_DIR=/usr/local/bin \
     PIPX_MAN_DIR=/usr/local/share/man \
     AGENT_CANON_IMAGE_DEPENDENCIES_ROOT=/usr/local/share/agent-canon/image-dependencies \
+    PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer \
+    PUPPETEER_CHROME_SKIP_DOWNLOAD=true \
     PATH=/var/lib/agent-canon/cache/bin:/usr/local/share/agent-canon/toolchains/cargo/bin:/usr/local/bin:/usr/bin:/bin
 
 LABEL org.opencontainers.image.title="AgentCanon shared tool runtime" \
@@ -51,7 +53,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     export PATH="$CARGO_HOME/bin:$PATH"; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates git nodejs=18.19.1+dfsg-6ubuntu5 npm=9.2.0~ds1-2 \
+      ca-certificates git \
       python3.12 python3-packaging python3-yaml build-essential curl gdb valgrind \
       strace lsof procps util-linux; \
     case "$TARGETOS/$TARGETARCH" in \
@@ -74,7 +76,7 @@ RUN --mount=type=bind,source=bootstrap/container/image/dependencies.toml,target=
     printf 'agent-canon-runtime/v1\n' > /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     chmod 0444 /usr/local/share/agent-canon/runtime/.agent-canon-runtime; \
     rm -rf /var/lib/agent-canon/cache/cargo-target /root/.npm /root/.cache /tmp/* /usr/local/bin/rustup-init; \
-    DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove npm pipx; \
+    DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove pipx; \
     rm -rf /var/lib/apt/lists/*
 
 # Only the fixed container adapter is copied into the image.  The current

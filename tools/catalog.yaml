@@ -26,6 +26,7 @@ runtime_schema:
   runtimes:
     - python
     - rust
+    - native
   execution_planes:
     - tool-container
   cwd_policies:
@@ -1092,7 +1093,7 @@ entries:
 
   - id: semantic-provider-html-report
     public: true
-    summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
+    summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
     path: tools/analysis/search/reporting/semantic_provider_html_report.py
     family: agent_tools
     role: docs
@@ -1112,6 +1113,43 @@ entries:
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
       - tests/agent_tools/test_semantic_provider_html_report.py
+
+  - id: quarto
+    summary: Runs Quarto's native CLI in the shared tool container for registered project inputs and external artifacts.
+    path: tools/runtime/dispatch/tool_dispatch.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: bootstrap.sh --control-parent-root <root> tool run --root <registered-project> quarto -- <quarto-args...>
+    writes: true
+    dispatch:
+      runtime: native
+      argv: [quarto]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
+      parity: verified
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - agents/skills/paper-writing.md
+      - agents/skills/html-output.md
+      - documents/contracts/quarto-html-output.toml
+    tests:
+      - tests/agent_tools/test_tool_dispatch.py
+      - tests/agent_tools/test_paper_writing_citeproc.py
 
   - id: prose-reasoning-graph
     public: true

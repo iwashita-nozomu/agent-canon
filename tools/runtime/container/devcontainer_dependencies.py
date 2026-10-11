@@ -1160,7 +1160,7 @@ class DependencyRecord:
     id: str
     package: str
     method: Method
-    version: str
+    version: str | None
     source: str
     verification: VerificationSpec
     deps: tuple[str, ...]
@@ -1827,8 +1827,15 @@ def _validate_method_values(record: DependencyRecord) -> None:
                     f"{record.id}.executable_owner_packages has unsupported package: "
                     f"{owner_package}"
                 )
-        if VERSION_TOKEN_RE.fullmatch(record.version) is None:
+        if (
+            record.version is not None
+            and VERSION_TOKEN_RE.fullmatch(record.version) is None
+        ):
             raise DependencyError(f"{record.id}.version has an unsupported apt value")
+        if record.method is Method.APT_REPOSITORY and record.version is None:
+            raise DependencyError(
+                f"{record.id}.version is required for apt-repository packages"
+            )
         if record.method is Method.APT_REPOSITORY:
             _validate_https_url(record.source, f"{record.id}.source")
             if record.repository_suite is None:
@@ -1928,10 +1935,12 @@ def _validate_method_values(record: DependencyRecord) -> None:
         ) is None and not record.source.startswith("https://"):
             raise DependencyError(f"{record.id}.source has an unsupported apt value")
     elif record.method is Method.NPM_GLOBAL:
+        assert record.version is not None
         if SEMVER_RE.fullmatch(record.version) is None:
             raise DependencyError(f"{record.id}.version must be an exact version")
         _validate_https_url(record.source, f"{record.id}.source")
     elif record.method is Method.PIPX:
+        assert record.version is not None
         try:
             Version(record.version)
         except InvalidVersion as exc:
@@ -1940,6 +1949,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
             ) from exc
         _validate_https_url(record.source, f"{record.id}.source")
     elif record.method is Method.RELEASE_ASSET:
+        assert record.version is not None
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
             raise DependencyError(
                 f"{record.id}.version has an unsupported release value"
@@ -1948,25 +1958,32 @@ def _validate_method_values(record: DependencyRecord) -> None:
         for asset in (record.asset, *[value for _, value in record.assets]):
             if asset is not None:
                 _validate_safe_asset_path(asset, f"{record.id}.asset")
+                if record.archive_format == "deb" and not asset.endswith(".deb"):
+                    raise DependencyError(
+                        f"{record.id}.asset must name a .deb file"
+                    )
         for arch, _ in record.assets:
             if arch not in {"x86_64", "aarch64"}:
                 raise DependencyError(
                     f"{record.id}.assets has an unsupported architecture"
                 )
         assert record.archive_format is not None
-        if record.archive_format not in {"binary", "tar.gz", "tar.xz", "tar"}:
+        if record.archive_format not in {"binary", "deb", "tar.gz", "tar.xz", "tar"}:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
         assert record.extract is not None
         _validate_safe_member(record.extract, f"{record.id}.extract")
-        if (record.archive_format == "binary") != (record.extract == "none"):
+        if (record.archive_format in {"binary", "deb"}) != (
+            record.extract == "none"
+        ):
             raise DependencyError(
-                f"{record.id}: binary release assets require extract=none"
+                f"{record.id}: binary and .deb release assets require extract=none"
             )
         assert record.destination is not None
         _validate_absolute_path(
             record.destination, f"{record.id}.destination", prefix="/usr/local/bin"
         )
     elif record.method is Method.RUST_TOOLCHAIN:
+        assert record.version is not None
         if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", record.version) is None:
             raise DependencyError(f"{record.id}.version must be an exact Rust version")
         _validate_https_url(record.source, f"{record.id}.source")
@@ -1978,6 +1995,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
                 f"{record.id}.components contains an unsupported component"
             )
     elif record.method is Method.LEAN_TOOLCHAIN:
+        assert record.version is not None
         if (
             re.fullmatch(r"leanprover/lean4:v[0-9]+\.[0-9]+\.[0-9]+", record.version)
             is None
@@ -2029,6 +2047,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
         if record.commit is not None and COMMIT_RE.fullmatch(record.commit) is None:
             raise DependencyError(f"{record.id}.commit must be a full 40-hex commit")
     elif record.method is Method.BROWSER_INSTALL:
+        assert record.version is not None
         if record.browser not in {"chromium", "firefox", "webkit"}:
             raise DependencyError(f"{record.id}.browser is unsupported")
         if SEMVER_RE.fullmatch(record.version) is None:
@@ -2111,7 +2130,6 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "id",
         "package",
         "method",
-        "version",
         "source",
         "verification",
         "deps",
@@ -2129,6 +2147,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
     method_value = _string(record_data["method"], f"{record_id}.method")
     if method_value not in METHODS:
         raise DependencyError(f"{path}: {record_id}: unsupported method {method_value}")
+    version = _optional_string(record_data.get("version"), f"{record_id}.version")
+    if version is None and method_value != Method.APT_PACKAGE.value:
+        raise DependencyError(f"{path}: {record_id}: version is required")
     record_package = _string(record_data["package"], f"{record_id}.package")
     failure_policy = _string(
         record_data["failure_policy"], f"{record_id}.failure_policy"
@@ -2150,7 +2171,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         id=record_id,
         package=record_package,
         method=Method(method_value),
-        version=_string(record_data["version"], f"{record_id}.version"),
+        version=version,
         source=_string(record_data["source"], f"{record_id}.source"),
         platform=_optional_string(record_data.get("platform"), f"{record_id}.platform"),
         platforms=tuple(
@@ -3406,6 +3427,7 @@ class Installer:
         self._active_record: DependencyRecord | None = None
         self._active_phase = "image-install"
         self._active_owner = "image-installer"
+        self._resolved_package_versions: dict[str, str] = {}
 
     def _operation_for(self, argv: Sequence[str], *, phase: str) -> str:
         """Derive only the closed operation id for an active owner edge."""
@@ -3802,6 +3824,7 @@ class Installer:
         unavailable: set[str] = set()
         for record_id in order:
             record = by_id[record_id]
+            self._resolved_package_versions.pop(record.id, None)
             receipt = _receipt_path(receipts, record.id)
             active_source = (
                 record.method is Method.CARGO_SOURCE_BUILD
@@ -3842,6 +3865,11 @@ class Installer:
                         record,
                         workspace=workspace,
                         expected_source_identity=self._receipt_source_identity(receipt),
+                        expected_resolved_package_version=(
+                            self._receipt_resolved_apt_package_version(
+                                receipt, record
+                            )
+                        ),
                         strict_executables=True,
                         allow_network=False,
                     )
@@ -3856,6 +3884,7 @@ class Installer:
                     receipt.unlink(missing_ok=True)
                     repair = True
                 else:
+                    self._resolved_package_versions.pop(record.id, None)
                     completed.append(record.id)
                     continue
             else:
@@ -3863,6 +3892,15 @@ class Installer:
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
                 if self._image_owned:
+                    if (
+                        record.method is Method.APT_PACKAGE
+                        and record.version is None
+                    ):
+                        self.verify(
+                            record,
+                            workspace=workspace,
+                            allow_network=False,
+                        )
                     source_identity = (
                         record.source_identity
                         if record.method is Method.CARGO_SOURCE_BUILD
@@ -3962,6 +4000,10 @@ class Installer:
                 or not output
             ):
                 return False
+        try:
+            Installer._resolved_apt_package_version(record, payload)
+        except DependencyError:
+            return False
         return (
             payload.get("schema") == "agent-canon.tool-dependency-receipt"
             and payload.get("record_id") == record.id
@@ -4048,7 +4090,20 @@ class Installer:
         *,
         workspace: Path,
     ) -> str | None:
-        """Probe one receipt-bound runtime executable without its package manager."""
+        """Verify receipt-owned installed state and any executable contract."""
+        self._active_record = record
+        self._active_phase = "image-verify"
+        self._active_owner = "typed-verifier"
+        expected_package_version = self._resolved_apt_package_version(
+            record, payload
+        )
+        if expected_package_version is not None:
+            self._verify_apt_package(
+                record,
+                workspace=workspace,
+                expected_resolved_version=expected_package_version,
+                verify_executable=False,
+            )
         spec = record.verification
         bindings = payload.get("executable_bindings")
         expected_names = _executable_binding_names(record, image_owned=True)
@@ -4109,6 +4164,35 @@ class Installer:
             return self._verification_output(result, record.id)
         self._require_output(result, spec.output_contains, record.id)
         return self._verification_output(result, record.id)
+
+    @staticmethod
+    def _resolved_apt_package_version(
+        record: DependencyRecord, payload: Mapping[str, object]
+    ) -> str | None:
+        """Read the version captured for an unpinned apt-package record."""
+        if record.method is not Method.APT_PACKAGE or record.version is not None:
+            return None
+        value = payload.get("resolved_package_version")
+        if not isinstance(value, str) or VERSION_TOKEN_RE.fullmatch(value) is None:
+            raise DependencyError(
+                f"{record.id}: resolved dpkg package version is missing or invalid"
+            )
+        return value
+
+    @staticmethod
+    def _receipt_resolved_apt_package_version(
+        path: Path, record: DependencyRecord
+    ) -> str | None:
+        """Read one unpinned apt version after its receipt passed identity checks."""
+        if record.method is not Method.APT_PACKAGE or record.version is not None:
+            return None
+        try:
+            parsed: object = json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise DependencyError(f"{record.id}: apt receipt is unreadable") from exc
+        if not is_string_object_dict(parsed):
+            raise DependencyError(f"{record.id}: apt receipt is malformed")
+        return Installer._resolved_apt_package_version(record, parsed)
 
     @staticmethod
     def _receipt_bindings(path: Path) -> dict[str, object]:
@@ -4180,6 +4264,13 @@ class Installer:
                 key: dict(value) for key, value in (executable_bindings or {}).items()
             },
         }
+        if record.method is Method.APT_PACKAGE and record.version is None:
+            resolved_version = self._resolved_package_versions.pop(record.id, None)
+            if resolved_version is None:
+                raise DependencyError(
+                    f"{record.id}: unpinned apt package lacks observed dpkg version"
+                )
+            payload["resolved_package_version"] = resolved_version
         repository_packages = _repository_packages_payload(record)
         if repository_packages is not None:
             payload["repository_packages"] = repository_packages
@@ -4358,13 +4449,18 @@ class Installer:
         self._active_owner = "image-installer"
         method = record.method
         if method is Method.APT_PACKAGE:
+            package_spec = (
+                record.package
+                if record.version is None
+                else f"{record.package}={record.version}"
+            )
             command = [
                 "apt-get",
                 "install",
                 "-y",
                 "--no-install-recommends",
                 "--no-remove",
-                f"{record.package}={record.version}",
+                package_spec,
             ]
             if repair:
                 command.insert(2, "--reinstall")
@@ -4374,6 +4470,7 @@ class Installer:
                 privileged=True,
             )
         elif method is Method.APT_REPOSITORY:
+            assert record.version is not None
             self._install_apt_repository(record, workspace, repair=repair)
             if _repository_package_payload(record) is not None:
                 return
@@ -4393,6 +4490,7 @@ class Installer:
                 privileged=True,
             )
         elif method is Method.NPM_GLOBAL:
+            assert record.version is not None
             toolchain = (
                 self._image_npm_toolchain()
                 if self._image_owned
@@ -4419,6 +4517,7 @@ class Installer:
                 privileged=True,
             )
         elif method is Method.PIPX:
+            assert record.version is not None
             command = [
                 "pipx",
                 "install",
@@ -4434,8 +4533,11 @@ class Installer:
                 env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
-            self._install_release_asset(record, workspace=workspace)
+            self._install_release_asset(
+                record, workspace=workspace, repair=repair
+            )
         elif method is Method.RUST_TOOLCHAIN:
+            assert record.version is not None
             tool_env = self._with_tool_paths(None)
             self._run(
                 [
@@ -4497,6 +4599,7 @@ class Installer:
                 env=tool_env,
             )
         elif method is Method.LEAN_TOOLCHAIN:
+            assert record.version is not None
             tool_env = self._with_tool_paths(None)
             self._run(
                 [
@@ -4615,6 +4718,7 @@ class Installer:
         *,
         workspace: Path,
         expected_source_identity: str | None = None,
+        expected_resolved_package_version: str | None = None,
         strict_executables: bool = False,
         allow_network: bool = True,
     ) -> str | None:
@@ -4635,9 +4739,18 @@ class Installer:
                 )
 
         def verify_apt_package(item: DependencyRecord, *, workspace: Path) -> None:
-            self._verify_apt_package(
+            resolved_version = self._verify_apt_package(
                 item, workspace=workspace, strict_executable=strict_executables
             )
+            if item.version is None:
+                if (
+                    expected_resolved_package_version is not None
+                    and resolved_version != expected_resolved_package_version
+                ):
+                    raise DependencyError(
+                        f"{item.id}: installed dpkg version differs from its receipt"
+                    )
+                self._resolved_package_versions[item.id] = resolved_version
 
         def verify_apt_repository(item: DependencyRecord, *, workspace: Path) -> None:
             self._verify_apt_repository(
@@ -4716,8 +4829,10 @@ class Installer:
         record: DependencyRecord,
         *,
         workspace: Path,
+        expected_resolved_version: str | None = None,
         strict_executable: bool = False,
-    ) -> None:
+        verify_executable: bool = True,
+    ) -> str:
         """Verify the dpkg database and any record-owned executable contract.
 
         The installed dpkg database is the container trust boundary. Official
@@ -4735,17 +4850,25 @@ class Installer:
         )
         fields = result.stdout.strip().split("\t")
         package_name = fields[2].partition(":")[0] if len(fields) == 3 else ""
+        observed_version = fields[1] if len(fields) == 3 else ""
         if (
             len(fields) != 3
             or fields[0] != "install ok installed"
-            or fields[1] != record.version
             or package_name != record.package
+            or (
+                record.version is not None
+                and observed_version != record.version
+            )
+            or (
+                expected_resolved_version is not None
+                and observed_version != expected_resolved_version
+            )
         ):
             raise DependencyError(
                 f"{record.id}: dpkg package/version/owned state mismatch"
             )
         executable = record.verification.executable
-        if executable is not None:
+        if executable is not None and verify_executable:
             assert record.verification.output_contains is not None
             command = [executable, *record.verification.args]
             if strict_executable:
@@ -4762,6 +4885,7 @@ class Installer:
                 record.verification.output_contains,
                 record.id,
             )
+        return observed_version
 
     def _verify_apt_repository(
         self,
@@ -4885,6 +5009,7 @@ class Installer:
         workspace: Path,
         strict_executable: bool = False,
     ) -> None:
+        assert record.version is not None
         toolchain = resolve_npm_toolchain(workspace)
         npm_env = {"PATH": toolchain.path}
         result = self._capture(
@@ -4944,6 +5069,7 @@ class Installer:
     def _verify_pipx_package(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
+        assert record.version is not None
         result = self._capture(
             ["pipx", "runpip", record.package, "show", record.package],
             workspace=workspace,
@@ -4985,6 +5111,7 @@ class Installer:
     def _verify_rust_toolchain(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
+        assert record.version is not None
         active = self._capture(
             ["rustup", "show", "active-toolchain"], workspace=workspace
         )
@@ -5042,6 +5169,7 @@ class Installer:
     def _verify_lean_toolchain(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
+        assert record.version is not None
         active = self._capture(["elan", "show"], workspace=workspace)
         installed = self._capture(["elan", "toolchain", "list"], workspace=workspace)
         if record.version not in active.stdout or not any(
@@ -5331,7 +5459,7 @@ class Installer:
                 self._run(command, workspace=workspace, privileged=True)
 
     def _install_release_asset(
-        self, record: DependencyRecord, *, workspace: Path
+        self, record: DependencyRecord, *, workspace: Path, repair: bool = False
     ) -> None:
         assert record.destination is not None
         asset_map = dict(record.assets)
@@ -5400,9 +5528,28 @@ class Installer:
                         f"{record.id}: extracted destination not found"
                     )
                 candidate = matches[0]
-            self._run_install_file(
-                candidate, Path(record.destination), workspace=workspace
-            )
+            if record.archive_format == "deb":
+                self._run_install_deb(candidate, workspace=workspace, repair=repair)
+            else:
+                self._run_install_file(
+                    candidate, Path(record.destination), workspace=workspace
+                )
+
+    def _run_install_deb(
+        self, package: Path, *, workspace: Path, repair: bool = False
+    ) -> None:
+        """Install one checksum-verified release .deb through the image apt owner."""
+        command = [
+            "apt-get",
+            "install",
+            "-y",
+            "--no-install-recommends",
+            "--no-remove",
+            str(package),
+        ]
+        if repair:
+            command.insert(2, "--reinstall")
+        self._run(command, workspace=workspace, privileged=True)
 
     def _run_install_file(
         self, source: Path, destination: Path, *, workspace: Path
@@ -5611,6 +5758,13 @@ def resolve_verified_executable(
         or payload.get("repository_package") != _repository_package_payload(record)
     ):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
+    manifest_version = record.version
+    if manifest_version is None:
+        manifest_version = Installer._resolved_apt_package_version(record, payload)
+        if manifest_version is None:
+            raise DependencyError(
+                f"{record_id}: executable receipt lacks its resolved package version"
+            )
     installer = Installer()
     if payload.get("status") == "installed":
         observed = installer.verify_installed_receipt(
@@ -5618,7 +5772,7 @@ def resolve_verified_executable(
         )
         return VerifiedExecutable(
             record_id=record.id,
-            manifest_version=record.version,
+            manifest_version=manifest_version,
             executable=executable,
             absolute_path=binding["absolute_path"],
             record_fingerprint=record.fingerprint(),
@@ -5632,6 +5786,11 @@ def resolve_verified_executable(
     installer.verify(
         record,
         workspace=workspace,
+        expected_resolved_package_version=(
+            manifest_version
+            if record.method is Method.APT_PACKAGE and record.version is None
+            else None
+        ),
         strict_executables=True,
         allow_network=False,
     )
@@ -5649,7 +5808,7 @@ def resolve_verified_executable(
         raise DependencyError(f"{record_id}: executable receipt path or output drift")
     return VerifiedExecutable(
         record_id=record.id,
-        manifest_version=record.version,
+        manifest_version=manifest_version,
         executable=executable,
         absolute_path=live["absolute_path"],
         record_fingerprint=record.fingerprint(),

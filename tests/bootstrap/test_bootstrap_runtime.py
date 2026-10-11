@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import fcntl
 import multiprocessing
 import os
@@ -31,6 +32,7 @@ from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     run,
 )
 from tools.runtime.archive.runtime_exchange_cleanup import clear_exchange  # noqa: E402
+from tools.runtime.dispatch import tool_dispatch  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -645,7 +647,7 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     )
     manager = BootstrapRuntime(control, runtime_root, repository_root=REPOSITORY_ROOT)
     manager._ensure_layout()
-    digest = "target-structured"
+    digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
     target_record = {
         "digest": digest,
         "host_root": str(target),
@@ -750,6 +752,55 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     assert mapped["AGENT_CANON_OUTPUT_ROOT"] == "/var/lib/agent-canon/runtime/reports"
     assert mapped["AGENT_CANON_HOOK_ARCHIVE_DIR"] == "/var/lib/agent-canon/private-log"
     assert "AWS_SECRET_ACCESS_KEY" not in mapped
+
+    # Exercise the real host dispatcher request through the resident receiver.
+    # The runtime type is already in the allowlisted child environment; it is
+    # not a field in the receiver's request schema.
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control))
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
+    monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(target))
+    monkeypatch.setattr(
+        tool_dispatch, "_registered_roots", lambda _runtime: (target.resolve(),)
+    )
+    native_spec = tool_dispatch.load_specs(REPOSITORY_ROOT)[0]["quarto"]
+    native_output = runtime_root / "tool-output"
+    native_command, _native_environment = tool_dispatch._bootstrap_command(
+        REPOSITORY_ROOT,
+        runtime_root,
+        native_spec,
+        ("pandoc", "paper.md"),
+        target,
+        native_output,
+    )
+    native_request = json.loads(
+        native_command[native_command.index("--request-json") + 1]
+    )
+    assert "runtime" not in native_request
+    captured.clear()
+    native_args = build_parser().parse_args(
+        [
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--control-parent-root",
+            str(control),
+            "--runtime-root",
+            str(runtime_root),
+            "exec",
+            "--target-digest",
+            digest,
+            "--request-json",
+            json.dumps(native_request),
+        ]
+    )
+
+    assert run(native_args) == {"code": "completed"}
+    assert captured["catalog_id"] == "quarto"
+    assert captured["argv"] == ["pandoc", "paper.md"]
+    assert captured["root"] == Path(f"/targets/{digest}")
+    assert captured["environment"]["AGENT_CANON_DISPATCH_RUNTIME"] == "native"
+    assert captured["environment"]["AGENT_CANON_OUTPUT_ROOT"] == (
+        "/var/lib/agent-canon/runtime/tool-output"
+    )
 
 
 def test_container_control_rejects_unallowlisted_structured_tool_environment(

@@ -162,6 +162,32 @@
         "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "written_paths": []
       }
+    },
+    {
+      "id": "quarto",
+      "probe_args": ["pandoc", "--version"],
+      "observed": {
+        "argv": ["quarto"],
+        "cwd": "target-root",
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "written_paths": []
+      },
+      "legacy_result": {
+        "exit_code": 0,
+        "stdout_sha256": "c2067b33c8e3c74ac7b84517f22b6918b4d5d50aaeac67e68a0ad0fcf7ac818d",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      },
+      "container_result": {
+        "exit_code": 0,
+        "stdout_sha256": "c2067b33c8e3c74ac7b84517f22b6918b4d5d50aaeac67e68a0ad0fcf7ac818d",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "written_paths": []
+      }
     }
   ]
 }
