@@ -733,7 +733,6 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
     request = {
         "schema": "agent-canon.tool-exec-request.v1",
         "tool_id": spec.tool_id,
-        "runtime": spec.runtime,
         # Keep catalog paths logical. Bootstrap maps the source mount and the
         # image-owned Rust binary; host absolute paths must never leak into a
         # container request.

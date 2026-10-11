@@ -300,6 +300,7 @@ class ToolDispatchTest(unittest.TestCase):
         )
         request = json.loads(command[command.index("--request-json") + 1])
 
+        self.assertNotIn("runtime", request)
         self.assertEqual(request["argv"], ["quarto", "pandoc", "paper.md"])
         self.assertEqual(request["child_args"], ["pandoc", "paper.md"])
         self.assertEqual(
