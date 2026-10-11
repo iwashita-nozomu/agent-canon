@@ -2287,7 +2287,9 @@ def compact_role_prompt_contract(
         f"{role.id} for {family_name}; {write_scope}; use supplied handoff context and "
         "named accessible packets, respect supplied path boundaries, and use the "
         "subagent startup route and repo tool route fields when present. The parent "
-        "owns execution-graph progression; return the assigned result inline."
+        "owns execution-graph progression; return the assigned result inline. For "
+        "requirements and intake assignments, include the objective, non-goals, "
+        "constraints, and completion conditions in that handoff."
         f" Include checkout_identity in every handoff where Git state matters;{writer_target}."
         f" {reuse_instruction}"
     )

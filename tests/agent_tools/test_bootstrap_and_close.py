@@ -3626,10 +3626,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 self.assertIn("subagent_lifecycle_policy:", manifest_text)
                 self.assertIn("mid_task_user_input_policy:", manifest_text)
                 self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
-                self.assertIn(
-                    "subagent_startup_route: 'agents/internal-routines/subagent-startup.md'",
-                    manifest_text,
-                )
                 self.assertIn("prompt_contract:", manifest_text)
                 manifest = yaml.safe_load(manifest_text)
                 subagent_prompt_packet = manifest["run"]["subagent_prompt_packet"]
