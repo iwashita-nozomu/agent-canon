@@ -11,7 +11,7 @@ downstream implementation ../../tools/analysis/dependencies/scan_dependency_head
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
-downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
+downstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP artifacts and bounded query projections
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
@@ -94,6 +94,12 @@ package の受入れ前に照合します。URL の欠落、取得失敗、diges
 署名付き source line の drift、または executable/version の drift は
 warning に降格せず typed failure とします。Rust の `rust-src` は component
 verification の対象ですが、独立 executable probe は持ちません。
+
+`platforms` は shared manifest 内の record ごとの対応 OCI target を表し、
+plan は現在の target に対応する record のみを選択します。別 target の
+record を除いた結果、残る record がその provider に依存していれば provider
+解決を失敗させます。単一の exact `platform` は選択条件ではなく strict pin の
+ままです。
 Immutable な apt artifact を固定する record は
 `repository_package_url` と `repository_package_sha256` を必ず対で持ちます。
 URL は HTTPS の `.deb`、SHA-256 は 64 桁 hex とし、installer は signed
@@ -409,11 +415,11 @@ downstream<TAB>implementation<TAB>tools/example.py<TAB>tests/tools/test_example.
 - `source` and `target` are repo-relative normalized paths
 - rows are sorted and de-duplicated before writing
 
-Dependency facts remain distinct from code `import`, `include`, and `symbol`
-facts, although all relation families share the same validated Graph DSL
-storage. `scan_code_dependencies.sh` is the sole code-relation producer and is
-invoked once by graph build with an authoritative paths file. Consumers never
-invoke it or reconstruct its rows.
+This dependency graph contains declared header facts only. SCIP code
+definitions/references remain a separate evidence source: the optional
+`scip_index.py` API reads/writes standard `index.scip` artifacts and returns a
+bounded query projection, but does not write a Graph DSL relation or persistent
+code-graph mirror. The dependency graph build does not invoke a code indexer.
 
 Completeness is explicit. Unresolved targets, ambiguous bindings, uncovered
 eligible sources, and excluded sources are persisted as typed sets. A published
@@ -482,6 +488,13 @@ each member of `mu F`. Validation applies `F` once more to decide fixed-point
 equality and requires a typed predecessor at depth `n-1` for every non-seed
 member; closure and generatedness together decide leastness. Direction, depth,
 or result-size thresholds are not completeness substitutes.
+
+For a seeded `query --path <path>` response without `--all`, nodes whose path
+matches the seed start at depth zero. `direction` selects traversal over the
+fact's `from`/`to` endpoints (`outgoing`, `incoming`, or `both`); `depth` is the
+maximum number of traversed relations. Each returned node carries its minimum
+distance as `minimum_depth`. The existing `query --all` route remains an
+unseeded full graph projection and does not assign path-relative depths.
 
 `input_fingerprint` binds the source snapshot, schema/profile pair, and
 authoritative producer identities/content. Runtime-dashboard rows are a
@@ -600,28 +613,17 @@ even when only A is selected and B/C are unchanged.
 
 ## Tool Split
 
-Code dependency extraction is deliberately separate from dependency manifest validation.
-`scan_code_dependencies.sh` is the compatibility command surface, while
-`lsp_code_analysis.py scan-legacy` owns the canonical code-relation projection.
-The shell wrapper delegates normal scans to that LSP command and uses its
-lexical extractor only when `--lexical-only` is explicit.
-The LSP adapter reads language syntax through server capabilities such as
-document symbols, definitions, references, and call hierarchy; the explicit
-lexical route still reads Python imports, local C/C++ includes, and shell source
-statements.
+Code dependency evidence remains separate from dependency-manifest validation.
+`scip_index.py` writes the standard SCIP artifact using a selected native
+producer and projects bounded definitions, references, and explicitly declared
+implementation relationships through the official SCIP reader. Point LSP
+analysis and diagnostics remain owned by
+`lsp_code_analysis.py analyze` and are not repository-wide SCIP indexing.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
-Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
-
-### `scan_code_dependencies.sh`
-
-Responsibilities:
-
-- delegate the normal scan to the canonical LSP `scan-legacy` report
-- keep output independent from manifest upstream/downstream edges
-- support explicit path lists and `--changed`
-- provide pre-edit evidence for [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)
-- require `--lexical-only` for the compatibility extractor and fail closed when
-  the canonical LSP server is unavailable
+Keep the evidence meanings separate: SCIP records indexed symbol occurrences,
+while header dependency evidence answers which design, implementation,
+environment, and test context must be read. References are not call edges, and
+an unsupported or unindexed target is not evidence of no references.
 
 ### `scan_dependency_headers.sh`
 

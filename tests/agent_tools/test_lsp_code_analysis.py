@@ -591,74 +591,6 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("absolute path", result.stderr)
 
-    def test_scan_failure_writes_failed_atomic_report_without_footer(self) -> None:
-        """An explicitly missing LSP executable fails without lexical downgrade."""
-        with tempfile.TemporaryDirectory() as tmp:
-            workspace = Path(tmp)
-            root = workspace / "source"
-            runtime = workspace / "runtime"
-            root.mkdir()
-            runtime.mkdir()
-            source = root / "main.py"
-            source.write_text("import missing\n", encoding="utf-8")
-            report_path = runtime / "analysis.json"
-            missing_server = runtime / "missing-pyright-langserver"
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TOOL),
-                    "scan-legacy",
-                    "--root",
-                    str(root),
-                    "--files",
-                    "main.py",
-                    "--server",
-                    f"python={missing_server}",
-                    "--runtime-root",
-                    str(runtime),
-                    "--analysis-json",
-                    str(report_path),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 1)
-            self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
-            payload = json.loads(report_path.read_text(encoding="utf-8"))
-            self.assertEqual(payload["status"], "failed")
-
-    def test_changed_scan_with_clean_git_root_has_no_files(self) -> None:
-        """Changed mode does not fall back to scanning default surfaces."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            subprocess.run(["git", "init", "-b", "main"], cwd=root, check=True, capture_output=True)
-            result = subprocess.run(
-                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--changed", "--lexical-only"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=0")
-
-    def test_lexical_only_preserves_seven_columns(self) -> None:
-        """Legacy lexical output retains its seven tab-separated columns."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            source = root / "main.py"
-            source.write_text("import package.module\n", encoding="utf-8")
-            result = subprocess.run(
-                [sys.executable, str(TOOL), "scan-legacy", "--root", str(root), "--files", "main.py", "--lexical-only", "--print-unresolved"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            row = next(line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY"))
-            self.assertEqual(len(row.split("\t")), 7)
-            self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
-
     def test_lexical_candidates_resolve_local_modules_and_utf16_columns(self) -> None:
         """Lexical candidates resolve local modules and use LSP character units."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -670,8 +602,8 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(candidates[0].target, "package.py")
             self.assertEqual(candidates[0].position["character"], 7)
 
-    def test_python_ast_import_rows_preserve_modules_symbols_and_positions(self) -> None:
-        """Python lexical projection keeps module and every imported symbol row."""
+    def test_python_lexical_candidates_preserve_modules_symbols_and_positions(self) -> None:
+        """Point-analysis lexical candidates preserve local module source ranges."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for relative in (
@@ -775,36 +707,6 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(observed, expected)
             self.assertNotIn("legacy_kind", candidates[0].as_json())
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TOOL),
-                    "scan-legacy",
-                    "--root",
-                    str(root),
-                    "--files",
-                    *(path.relative_to(root).as_posix() for path in source_paths),
-                    "--lexical-only",
-                    "--print-unresolved",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            rows = [
-                line.split("\t")
-                for line in result.stdout.splitlines()
-                if line.startswith("CODE_DEPENDENCY\t")
-            ]
-            self.assertEqual(len(rows), len(expected))
-            self.assertTrue(all(len(row) == 7 for row in rows))
-            self.assertEqual(
-                sorted((row[3], row[2], row[4], row[5]) for row in rows),
-                sorted((item[0], item[1], item[3], item[2]) for item in expected),
-            )
-            self.assertIn("CODE_DEPENDENCY_SCAN=pass files=3", result.stdout)
-
     def test_malformed_document_symbol_has_no_partial_pass(self) -> None:
         """Malformed required facts never produce a partial successful report."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -817,33 +719,26 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(report.status, "failed")
             self.assertEqual(report.error["code"], "malformed-response")
 
-    def test_outside_symbol_information_fails_as_atomic_cli_report(self) -> None:
-        """A SymbolInformation outside root returns typed failure JSON, not a traceback."""
+    def test_outside_symbol_information_fails_as_point_lsp_report(self) -> None:
+        """A SymbolInformation outside root returns typed point-report failure JSON."""
         with tempfile.TemporaryDirectory() as tmp:
-            workspace = Path(tmp)
-            root = workspace / "source"
-            runtime = workspace / "runtime"
-            root.mkdir()
-            runtime.mkdir()
+            root = Path(tmp)
             source = root / "main.py"
             source.write_text("def main():\n    return 1\n", encoding="utf-8")
             server = write_fake_server(root, outside_symbol=True)
-            report_path = runtime / "analysis.json"
             result = subprocess.run(
                 [
                     sys.executable,
                     str(TOOL),
-                    "scan-legacy",
+                    "analyze",
                     "--root",
                     str(root),
                     "--files",
                     "main.py",
                     "--server",
                     f"python={sys.executable} -u {server}",
-                    "--analysis-json",
-                    str(report_path),
-                    "--runtime-root",
-                    str(runtime),
+                    "--format",
+                    "json",
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -852,9 +747,8 @@ class LspCodeAnalysisTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("AGENT_SCAN=fail", result.stderr)
             self.assertNotIn("Traceback", result.stderr)
-            payload = json.loads(report_path.read_text(encoding="utf-8"))
+            payload = json.loads(result.stdout)
             self.assertEqual(payload["status"], "failed")
             self.assertEqual(payload["error"]["code"], "path-escape")
 

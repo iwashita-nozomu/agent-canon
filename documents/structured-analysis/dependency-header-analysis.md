@@ -10,7 +10,7 @@ upstream design ../../tools/analysis/dependencies/render_dependency_manifest_gra
 upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh emits dependency manifest graph artifacts
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph storage and query projections
 upstream implementation ../../tools/analysis/dependencies/graph_client.py exposes typed Python graph responses
-upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts code dependency evidence separately
+upstream implementation ../../tools/analysis/dependencies/scip_index.py projects bounded SCIP symbol/reference evidence separately
 @dependency-end
 -->
 
@@ -39,7 +39,7 @@ dependency header の整合を同じ検証面で扱えるようにすること�
 | Canonical graph query | `agent-canon graph query --all --relation dependency --direction both --depth 0` | typed manifest facts with provenance。 |
 | Manifest context | `agent-canon graph context --path <repo-path>` | parser-owned present/contract/responsibility items。 |
 | Dependency graph report | `render_dependency_manifest_graph.py` | review-readable graph summary。 |
-| Code dependency output | `scan_code_dependencies.sh` | import/include/source evidence。manifest graph とは別。 |
+| SCIP code projection | `scip_index.py query` | Selected standard index definitions/references。manifest graph とは別で、unsupported/unindexed targets are not absence evidence. |
 
 ## Adapter Boundary
 

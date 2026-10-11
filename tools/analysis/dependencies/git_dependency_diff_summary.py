@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Summarizes Git diffs together with existing dependency expansion tools.
 # upstream design ../../../documents/design/dependency-manifest-design.md defines dependency graph and code dependency separation.
-# upstream implementation ./scan_code_dependencies.sh extracts code dependency edges.
+# upstream implementation ./scip_index.py provides native SCIP impact evidence.
 # upstream implementation ./run_repo_dependency_review.sh expands dependency-header graph evidence.
 # downstream implementation ../../../tests/agent_tools/test_git_dependency_diff_summary.py tests summary behavior.
 # downstream design ../../../documents/tools/git_dependency_diff_summary.md documents command usage.
@@ -26,6 +26,8 @@ from typing import TypeAlias, cast
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
+from tools.analysis.code.lsp_code_analysis import language_for_path
+
 try:
     from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
         RuntimeArtifactBoundary,
@@ -39,27 +41,13 @@ except ImportError:
         runtime_artifact_boundary,
     )
 
-SCHEMA = "agent_canon.git_dependency_diff_summary.v1"
+SCHEMA = "agent_canon.git_dependency_diff_summary.v2"
 TOOL_DIR = Path(__file__).resolve().parent
 GIT_RENAME_OR_COPY_FIELD_COUNT = 3
 GIT_NUMSTAT_FIELD_COUNT = 3
 JsonObject: TypeAlias = dict[str, object]
 Summary: TypeAlias = dict[str, object]
 CommandMap: TypeAlias = dict[str, object]
-CODE_SUFFIXES = {
-    ".bash",
-    ".c",
-    ".cc",
-    ".cpp",
-    ".h",
-    ".hpp",
-    ".py",
-    ".rs",
-    ".sh",
-    ".zsh",
-}
-
-
 @dataclass(frozen=True)
 class CommandRecord:
     """Captured command result for summary artifacts."""
@@ -110,11 +98,10 @@ class DiffArtifacts:
 class DependencyArtifacts:
     """Dependency artifacts written by existing dependency tools."""
 
-    code_dependencies_path: Path
+    scip_impact_path: Path
     dependency_dir: Path
     commands: CommandMap
     status_code: int
-    code_analysis_path: Path | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,9 +146,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path for the selected stdout-format payload.",
     )
     parser.add_argument(
-        "--skip-code-dependencies",
+        "--scip-index",
+        type=Path,
+        action="append",
+        help="Optional per-language index.scip artifact; repeat for multiple languages.",
+    )
+    parser.add_argument(
+        "--skip-scip-impact",
+        dest="skip_scip_impact",
         action="store_true",
-        help="Skip scan_code_dependencies.sh.",
+        help="Skip the optional SCIP impact projection.",
     )
     parser.add_argument(
         "--skip-dependency-review",
@@ -382,16 +376,16 @@ def changed_file_list(rows: Sequence[ChangedPath]) -> list[str]:
     return sorted(paths)
 
 
-def code_scan_paths(root: Path, rows: Sequence[ChangedPath]) -> list[str]:
-    """Return existing source-like files suitable for code dependency scanning."""
-    candidates: list[str] = []
+def scip_target_paths(rows: Sequence[ChangedPath]) -> list[str]:
+    """Use the existing source-suffix mapping without invoking an LSP server."""
+    candidates: set[str] = set()
     for row in rows:
-        path = root / row.path
-        if row.status.startswith("D") or not path.is_file():
-            continue
-        if path.suffix in CODE_SUFFIXES:
-            candidates.append(row.path)
-    return sorted(set(candidates))
+        for value in (row.path, row.old_path):
+            if value is None:
+                continue
+            if language_for_path(Path(value)) is not None:
+                candidates.add(value)
+    return sorted(candidates)
 
 
 def write_text(
@@ -426,17 +420,6 @@ def run_capture(
     )
 
 
-def count_prefixed_lines(path: Path, prefix: str) -> int:
-    """Count artifact lines that start with a prefix."""
-    if not path.exists():
-        return 0
-    return sum(
-        1
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.startswith(prefix)
-    )
-
-
 def nonempty_line_count(path: Path) -> int:
     """Count non-empty lines in an artifact when it exists."""
     if not path.exists():
@@ -460,7 +443,6 @@ def render_markdown(summary: Summary) -> str:
         f"- Changed files: {totals['changed_files']}",
         f"- Added lines: {totals['additions']}",
         f"- Deleted lines: {totals['deletions']}",
-        f"- Code dependency edges: {totals['code_dependency_edges']}",
         f"- Dependency edit-scope lines: {totals['dependency_edit_scope_lines']}",
         "",
         "## Changed Files",
@@ -486,7 +468,7 @@ def render_markdown(summary: Summary) -> str:
             "",
             f"- Changed file list: `{artifacts['changed_files']}`",
             f"- Git stat: `{artifacts['git_stat']}`",
-            f"- Code dependency TSV: `{artifacts['code_dependencies']}`",
+            f"- SCIP impact projection: {artifacts['scip_impact']}",
             f"- Dependency review directory: `{artifacts['dependency_review_dir']}`",
             f"- Dependency graph TSV: `{artifacts['dependency_graph']}`",
             f"- Dependency edit scope: `{artifacts['dependency_edit_scope']}`",
@@ -535,48 +517,78 @@ def write_diff_artifacts(
     )
 
 
-def run_code_dependency_scan(
+def run_scip_impact(
     *,
     root: Path,
     report_dir: Path,
     rows: Sequence[ChangedPath],
+    index_paths: Sequence[Path] | None,
     skip: bool,
     boundary: RuntimeArtifactBoundary,
     env: dict[str, str],
 ) -> tuple[Path, CommandMap, int]:
-    """Run the existing code dependency scanner when source files changed."""
-    code_dependencies_path = report_dir / "code_dependencies.tsv"
-    code_analysis_path = report_dir / "code_analysis.json"
+    """Project bounded source facts from an explicitly selected SCIP index."""
+    scip_impact_path = report_dir / "scip_impact.json"
     commands: CommandMap = {}
     status_code = 0
     if skip:
-        write_text(code_dependencies_path, "", boundary)
-        write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "skipped"}) + "\n", boundary)
+        write_text(
+            scip_impact_path,
+            json.dumps({"status": "skipped", "capabilities": {"scip": "not-selected"}})
+            + "\n",
+            boundary,
+        )
     else:
-        scan_paths = code_scan_paths(root, rows)
-        if scan_paths:
+        target_paths = scip_target_paths(rows)
+        if not target_paths:
+            write_text(
+                scip_impact_path,
+                json.dumps(
+                    {
+                        "status": "no-selected-targets",
+                        "capabilities": {"scip": "not-needed"},
+                    }
+                )
+                + "\n",
+                boundary,
+            )
+        elif not index_paths:
+            write_text(
+                scip_impact_path,
+                json.dumps(
+                    {
+                        "status": "not-selected",
+                        "capabilities": {"scip": "not-selected"},
+                    }
+                )
+                + "\n",
+                boundary,
+            )
+        else:
+            command = [
+                sys.executable,
+                str(TOOL_DIR / "scip_index.py"),
+                "query",
+                "--root",
+                str(root),
+                "--runtime-root",
+                str(boundary.root),
+            ]
+            for index_path in index_paths:
+                command.extend(("--index", str(index_path)))
+            for path in target_paths:
+                command.extend(("--path", path))
             record = run_capture(
                 root=root,
-                command=[
-                    "bash",
-                    str(TOOL_DIR / "scan_code_dependencies.sh"),
-                    "--root",
-                    str(root),
-                    "--analysis-json",
-                    str(code_analysis_path),
-                    *scan_paths,
-                ],
-                stdout_path=code_dependencies_path,
-                stderr_path=report_dir / "code_dependencies.stderr.txt",
+                command=command,
+                stdout_path=scip_impact_path,
+                stderr_path=report_dir / "scip_impact.stderr.txt",
                 boundary=boundary,
                 env=env,
             )
-            commands["code_dependencies"] = asdict(record)
+            commands["scip_impact"] = asdict(record)
             status_code = max(status_code, record.returncode)
-        else:
-            write_text(code_dependencies_path, "", boundary)
-            write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "empty"}) + "\n", boundary)
-    return code_dependencies_path, commands, status_code
+    return scip_impact_path, commands, status_code
 
 
 def run_dependency_review(
@@ -639,9 +651,6 @@ def build_summary(
         "changed_files": len(rows),
         "additions": sum(row.additions or 0 for row in rows),
         "deletions": sum(row.deletions or 0 for row in rows),
-        "code_dependency_edges": count_prefixed_lines(
-            dependency_artifacts.code_dependencies_path, "CODE_DEPENDENCY\t"
-        ),
         "dependency_edit_scope_lines": nonempty_line_count(
             dependency_dir / "dependency_edit_scope.txt"
         ),
@@ -660,11 +669,7 @@ def build_summary(
             "report_dir": report_dir.as_posix(),
             "changed_files": diff_artifacts.changed_files_path.as_posix(),
             "git_stat": diff_artifacts.git_stat_path.as_posix(),
-            "code_dependencies": dependency_artifacts.code_dependencies_path.as_posix(),
-            "code_analysis": (
-                dependency_artifacts.code_analysis_path
-                or dependency_artifacts.code_dependencies_path.with_name("code_analysis.json")
-            ).as_posix(),
+            "scip_impact": dependency_artifacts.scip_impact_path.as_posix(),
             "dependency_review_dir": dependency_dir.as_posix(),
             "dependency_graph": (dependency_dir / "dependency_graph.tsv").as_posix(),
             "dependency_edit_scope": (
@@ -696,7 +701,6 @@ def emit(summary: Summary, output_format: str) -> str:
         f"GIT_DEPENDENCY_DIFF_SUMMARY={summary['status']}",
         f"GIT_DEPENDENCY_DIFF_SUMMARY_SCHEMA={summary['schema']}",
         f"GIT_DEPENDENCY_DIFF_SUMMARY_CHANGED_FILES={totals['changed_files']}",
-        f"GIT_DEPENDENCY_DIFF_SUMMARY_CODE_EDGES={totals['code_dependency_edges']}",
         f"GIT_DEPENDENCY_DIFF_SUMMARY_EDIT_SCOPE_LINES={totals['dependency_edit_scope_lines']}",
         f"GIT_DEPENDENCY_DIFF_SUMMARY_JSON={artifacts['summary_json']}",
         f"GIT_DEPENDENCY_DIFF_SUMMARY_MARKDOWN={artifacts['summary_markdown']}",
@@ -725,15 +729,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         dependency_dir = report_dir / "dependency-review"
         diff = diff_spec_from_args(args)
         diff_artifacts = write_diff_artifacts(root, report_dir, diff, boundary)
-        code_path, code_commands, code_status = run_code_dependency_scan(
+        scip_impact_path, scip_commands, scip_status = run_scip_impact(
             root=root,
             report_dir=report_dir,
             rows=diff_artifacts.rows,
-            skip=args.skip_code_dependencies,
+            index_paths=args.scip_index,
+            skip=args.skip_scip_impact,
             boundary=boundary,
             env=env,
         )
-        code_analysis_path = report_dir / "code_analysis.json"
         dependency_commands, dependency_status = run_dependency_review(
             root=root,
             report_dir=report_dir,
@@ -744,12 +748,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             boundary=boundary,
             env=env,
         )
-        status = max(code_status, dependency_status)
+        status = max(scip_status, dependency_status)
         dependency_artifacts = DependencyArtifacts(
-            code_dependencies_path=code_path,
-            code_analysis_path=code_analysis_path,
+            scip_impact_path=scip_impact_path,
             dependency_dir=dependency_dir,
-            commands={**code_commands, **dependency_commands},
+            commands={**scip_commands, **dependency_commands},
             status_code=status,
         )
         summary = build_summary(

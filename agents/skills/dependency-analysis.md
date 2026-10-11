@@ -8,8 +8,8 @@ upstream design ../../documents/design/dependency-manifest-design.md defines dep
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
 upstream design ../../documents/tools/lsp_code_analysis.md owns LSP relation evidence and capability limits
-upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh extracts file-level code dependency evidence
-upstream implementation ../../tools/analysis/code/helper_function_inventory.py extracts Python function-level call graph context
+upstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP index and bounded query operations
+upstream implementation ../../tools/analysis/code/helper_function_inventory.py provides Python helper-role and naming evidence
 @dependency-end
 -->
 
@@ -31,7 +31,7 @@ upstream implementation ../../tools/analysis/code/helper_function_inventory.py e
 
 ## Purpose
 
-依存 manifest の header / scan / format / graph tool と、実コード依存 scanner を目的別に起動します。
+依存 manifest の header / scan / format / graph tool と、必要時の SCIP index/query を目的別に起動します。
 code dependency と header dependency は別 evidence として扱い、修正箇所選定や subagent handoff では両方を structured `Change Impact Packet` manifest に統合します。大量の依存情報そのものは artifact path に置き、LLM-visible context には planning に必要な selected excerpt、summary、artifact path を載せます。
 
 ## Use When
@@ -40,8 +40,8 @@ code dependency と header dependency は別 evidence として扱い、修正�
 - `@dependency-start` / `@dependency-end` block を追加・修正した
 - dependency edge、reverse edge、kind、cycle の問題を診断したい
 - closeout 前に dependency manifest evidence を揃えたい
-- 修正箇所の妥当性検証のため、import / include / source 関係を header dependency と別に確認したい
-- code 変更の commit evidence として、file-level dependency と関数 / public entrypoint 単位の call-site evidence を揃えたい
+- repository-wide symbol/reference evidence が修正範囲を変え得るため、native SCIP indexを明示的に使いたい
+- Python helperのrole/name evidenceが設計判断に必要で、helper inventoryのproperty-specific結果を確認したい
 - repo-wide search の responsibility-based candidate と bounded `git grep` hit から、どの file を編集・確認すべきか dependency graph で展開したい
 - design document の implementation-backed claim、DSL / standard-form assumption、parent-doc alignment を dependency header evidence と比較したい
 - requested object / file / finding を変える前に、call site、依存先、依存元、tests、docs、config、log / Info 面をまとめた影響範囲 packet を作りたい
@@ -54,11 +54,20 @@ conditional routes, not one command sequence. A changed-file gate applies when
 changed headers or their gate are in scope, graph checks when edges change, and
 a full migration inventory only for a repository-wide migration question.
 
-Code dependency surface:
+SCIP index/query surface. Use only when repository-wide symbol/reference evidence can change scope:
 
 ```bash
-bash tools/analysis/dependencies/scan_code_dependencies.sh --changed
+python3 tools/analysis/dependencies/scip_index.py query \
+  --root . \
+  --runtime-root <external-runtime-root> \
+  --index <runtime-relative-path>/index.scip \
+  --path <source-path>
 ```
+
+Build an index only when the project owner supplies the required language input.
+See [SCIP index and query](../../documents/tools/scip_index.md) for the selected
+Python environment, C/C++ compile-database, and output arguments; languages
+without a qualified native producer remain unsupported.
 
 Function-level Python dependency surface:
 
@@ -244,9 +253,9 @@ that fix; unresolved required verification still prevents a verified closeout.
 
 ## Interpretation
 
-- code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。header edge を実行・build reachability や caller の証拠に読み替えず、code edge を design ownership や文書の正本性に読み替えません。両者を結合するのは Change Impact Packet の影響範囲整理だけです。
-- Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
-- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従います。関連が修正・移行・validation の判断に影響する場合は既存LSP利用手順や対象source evidenceでたどり、問題があれば修正します。`scan_code_dependencies.sh` の実コード依存と header dependency の design / docs / tests は区別し、関連全体の事前調査を原因修正の開始条件にしません。
+- SCIP definitions/references と dependency-header evidence は別 evidence として記録します。SCIP references は caller/callee relation や build reachability を意味せず、header edge は source symbol resolution を意味しません。両者を結合するのは Change Impact Packet の影響範囲整理だけです。
+- Python helperのrole、name alignment、redundancy evidenceには `helper_function_inventory.py --changed --all-functions` を使います。そのAST-derived local call hintsはSCIP symbol/reference evidenceではありません。`HELPER_INVENTORY_FILES=0` は対象 Python file がないことだけを示します。
+- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従います。関連が修正・移行・validation の判断に影響する場合はpoint LSP利用手順、selected SCIP projection、または対象source evidenceでたどります。unsupported / unindexed targetをreference absenceと扱わず、header dependencyのdesign / docs / testsとも区別します。
 - `required_action` や solution proposal より先に causal ambiguity と owner / fix / validation を変え得る alternative の有無を判定します。該当時だけ cause-evidence note を完成させ、incoming callers/entrypoints、owning mechanism/state/guards、downstream consumers/side effects/cleanup、sibling implementations/tests/docs/config を evidence-linked にたどります。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が原因候補になり得る場合だけ latest remote/Issue/branch history を追加します。
 - 原因探索の最終目標は、原因となるコードの具体的な一か所の特定です。[Cause Investigation Surface](#cause-investigation-surface) に従い、source snapshot、path、symbol、該当行/block と、入力/状態から現象に至る因果根拠を既存記録に残します。候補一覧・原因分類・症状の発生地点だけでは完了しません。一か所と因果関係を特定し、判断を変え得る代替を disconfirmed / bounded にしたら、その原因箇所の修正へ進みます。十分な静的根拠に追加実行を要求せず、未特定は `cause_unproven` とし、根拠なく一つに断定しません。
 - activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
@@ -317,8 +326,9 @@ shared context と child owner から個別に導出します。child ごとの�
 Packet には次を含めます。
 
 - `requested_target`: `path:start-end:qualname`、file、または finding id
-- `code_dependency_surface`: static に見える import / include / source edge、
-  function / public entrypoint 単位の direct callees、direct callers、re-export / public import surface
+- `code_dependency_surface`: selected SCIP definition/reference facts,
+  explicit implementation relationships, and source index references. Keep helper-role
+  evidence property-specific; do not convert references into a call graph.
 - `header_dependency_surface`: dependency manifest の upstream / downstream
   design、implementation、environment、test、workflow edge
 - `search_surface`: responsibility-based context、text search が seed の場合の
@@ -399,7 +409,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    and decision there; return to hypothesis selection when evidence rejects or
    leaves that hypothesis inconclusive.
 1. Choose the mode that answers the task without hiding dependency evidence:
-   - code dependency surface: run `scan_code_dependencies.sh`
+   - code dependency surface: when repository-wide symbol/reference closure can change scope, query an explicitly selected external SCIP index with `scip_index.py`; do not make whole-repository indexing a default step
    - changed-file closeout gate: use `--changed`
    - explicit file review: pass file paths explicitly
    - repo migration inventory: run full scan without `--changed`

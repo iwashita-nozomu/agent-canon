@@ -40,7 +40,6 @@ CHECKER = (
 MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
-path: tools/analysis/dependencies/scan_code_dependencies.sh
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
@@ -238,7 +237,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/skills/dependency-analysis.md": (
-        "scan_code_dependencies.sh\n"
+        "scip_index.py\n"
         "Before closeout, run "
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
