@@ -1,10 +1,10 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents the canonical LSP 3.17 code-analysis command and report.
+responsibility Documents the canonical LSP 3.17 code-analysis command, transport boundary, and report.
 upstream design ../structured-analysis/code-analysis.md structured-analysis boundary
 upstream design ../design/dependency-manifest-design.md dependency evidence separation
-downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns protocol and report
+downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns process lifecycle and report
 downstream implementation ../../tools/analysis/search/search.py consumes selected in-memory facts
 downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies golden behavior
 @dependency-end
@@ -36,17 +36,26 @@ ambient discovery は使いません。`--server LANGUAGE=/absolute/executable .
 明示 caller override としてのみ許可され、report provenance に記録されます。
 Python、C/C++、Bash、Rust はそれぞれ `pyright-langserver --stdio`、
 `clangd-18`、`bash-language-server start`、`rust-analyzer` です。
-required `documentSymbolProvider` が提供されない、protocol framing が壊れる、
-timeout が発生する、または process が終了する場合、report は `status=failed` と
-typed error を持ち、partial facts は成功扱いになりません。
+
+JSON-RPC stream framing と request correlation は public
+`python-lsp-jsonrpc` の `JsonRpcStreamReader`、`JsonRpcStreamWriter`、`Endpoint` が
+担当します。shared image dependency manifest は Ubuntu package
+`python3-pylsp-jsonrpc` version `1.1.2-1` を宣言します。この宣言は特定の runtime
+image に package が既に展開済みであることを示すものではありません。adapter は
+既存の verified server process とその stdio を library に渡し、request timeout、
+child cleanup、report と root-bound result validation を維持します。
+
+required `documentSymbolProvider` が提供されない、reader が protocol error を返す、
+request timeout が発生する、または server process が異常終了する場合、report は
+`status=failed` と typed error を持ち、partial facts は成功扱いになりません。
 
 位置は常に UTF-16 で、URI は root-relative POSIX path に正規化します。root 外の
 位置は `path-escape` で失敗します。optional capability は capability matrix に
 `supported_facts`、`supported_empty`、`unsupported` として記録されます。
 
-push diagnostics は capability flag を仮定せず、短い quiet/drain 区間で受信した
-通知だけを `supported_empty` として記録します。pull diagnostics は
-`diagnosticProvider` が広告された場合だけ `supported_facts` になります。
+push diagnostics は capability flag を仮定せず、background reader が短い
+quiet/drain 区間内に受信した通知だけを `supported_empty` として記録します。pull
+diagnostics は `diagnosticProvider` が広告された場合だけ `supported_facts` になります。
 
 `--files` を省略した場合は point-analysis owner の bounded source surfaces から
 対象を検出し、`--files` を値なしで明示した場合は空選択として扱います。

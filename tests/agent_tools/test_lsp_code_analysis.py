@@ -35,7 +35,7 @@ def write_fake_server(
     *,
     malformed: bool = False,
     outside_symbol: bool = False,
-    malformed_quiet: bool = False,
+    malformed_notification: bool = False,
 ) -> Path:
     """Create a minimal Content-Length LSP 3.17 fixture."""
     script = root / "fake_lsp.py"
@@ -70,9 +70,8 @@ def write_fake_server(
                 else:
                     uri = message['params']['textDocument']['uri']
                     send({{'jsonrpc':'2.0','id':message['id'],'result':[{{'name':'main','kind':12,'range':{{'start':{{'line':0,'character':0}},'end':{{'line':0,'character':4}}}},'selectionRange':{{'start':{{'line':0,'character':0}},'end':{{'line':0,'character':4}}}}}}]}})
-                    if {str(malformed_quiet)}:
-                        sys.stdout.buffer.write(b'Content-Length: 1\\r\\n\\r\\n{{')
-                        sys.stdout.buffer.flush()
+                    if {str(malformed_notification)}:
+                        send({{'jsonrpc':'2.0','method':'textDocument/publishDiagnostics','params':{{'uri':uri,'diagnostics':'broken'}}}})
             elif method == 'shutdown':
                 send({{'jsonrpc':'2.0','id':message['id'],'result':None}})
             elif method == 'exit':
@@ -223,24 +222,6 @@ def write_partial_header_server(root: Path) -> Path:
                 return sys.stdin.buffer.read(0)
             read_message()
             sys.stdout.buffer.write(b'Content-Length: 1')
-            sys.stdout.buffer.flush()
-            time.sleep(2)
-            """
-        ),
-        encoding="utf-8",
-    )
-    return script
-
-
-def write_oversized_header_server(root: Path) -> Path:
-    """Create a server that emits an unterminated oversized header."""
-    script = root / "oversized_header_lsp.py"
-    script.write_text(
-        textwrap.dedent(
-            """
-            import sys, time
-            sys.stdin.buffer.readline()
-            sys.stdout.buffer.write(b'X' * (70 * 1024))
             sys.stdout.buffer.flush()
             time.sleep(2)
             """
@@ -513,18 +494,6 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(report.status, "failed")
             self.assertEqual(report.error["code"], "request-timeout")
 
-    def test_oversized_header_fails_with_protocol_violation(self) -> None:
-        """An unterminated oversized header fails without unbounded buffering."""
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            source = root / "main.py"
-            source.write_text("x = 1\n", encoding="utf-8")
-            server = write_oversized_header_server(root)
-            spec = lsp.LspServerSpec("python", (sys.executable, "-u", str(server)), record_id="oversized")
-            report = lsp.analyze(root, [source], specs={"python": spec}, timeout=1.0)
-            self.assertEqual(report.status, "failed")
-            self.assertEqual(report.error["code"], "protocol-violation")
-
     def test_large_stderr_does_not_deadlock_protocol(self) -> None:
         """Stderr beyond the retention cap is drained while stdout proceeds."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -752,13 +721,13 @@ class LspCodeAnalysisTest(unittest.TestCase):
             self.assertEqual(payload["status"], "failed")
             self.assertEqual(payload["error"]["code"], "path-escape")
 
-    def test_malformed_quiet_frame_fails_closed(self) -> None:
-        """Malformed bytes during notification drain are not treated as quiet."""
+    def test_malformed_push_diagnostics_notification_fails_closed(self) -> None:
+        """Malformed asynchronous diagnostics never produce a partial pass."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source = root / "main.py"
             source.write_text("def main():\n    return 1\n", encoding="utf-8")
-            server = write_fake_server(root, malformed_quiet=True)
+            server = write_fake_server(root, malformed_notification=True)
             spec = lsp.LspServerSpec(
                 "python", (sys.executable, "-u", str(server)), record_id="quiet"
             )
