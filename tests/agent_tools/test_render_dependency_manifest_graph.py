@@ -377,7 +377,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertIn("Complete dependency edge list (505)", rendered_html)
             self.assertIn("node-505.md", rendered_html)
 
-    def test_committed_tree_layer_includes_isolated_paths_and_preserves_relations(self) -> None:
+    def test_committed_tree_layer_includes_isolated_paths_and_preserves_relations(
+        self,
+    ) -> None:
         """Tracked paths add structural evidence without changing dependency rows."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -389,14 +391,21 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             (root / "docs" / "target.md").write_text("target\n", encoding="utf-8")
             (root / "deep" / "nested.md").write_text("nested\n", encoding="utf-8")
             (root / "isolated.txt").write_text("no dependency rows\n", encoding="utf-8")
-            (root / "worktree-missing.md").write_text("committed, then removed\n", encoding="utf-8")
+            (root / "worktree-missing.md").write_text(
+                "committed, then removed\n", encoding="utf-8"
+            )
             (root / "aliases" / "linked.md").symlink_to("../src/connected.md")
             graph = root / "source.tsv"
             write_graph(
                 graph,
                 [
                     ("upstream", "design", "src/connected.md", "docs/target.md"),
-                    ("downstream", "implementation", "src/connected.md", "worktree-missing.md"),
+                    (
+                        "downstream",
+                        "implementation",
+                        "src/connected.md",
+                        "worktree-missing.md",
+                    ),
                 ],
             )
             base_revision = initialize_git_fixture(root)
@@ -412,7 +421,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             )
             head_revision = commit_fixture(root, "add later path and gitlink")
             (root / "worktree-missing.md").unlink()
-            (root / "untracked-only.md").write_text("not in selected tree\n", encoding="utf-8")
+            (root / "untracked-only.md").write_text(
+                "not in selected tree\n", encoding="utf-8"
+            )
 
             ir_out = root / "graph.ir.json"
             markdown_out = root / "graph.md"
@@ -457,16 +468,24 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertEqual(isolated_entry["object_type"], "blob")
             self.assertRegex(isolated_entry["object_id"], r"^[0-9a-f]{40,64}$")
             symlink_entry = nodes["aliases/linked.md"]["payload_json"]["git_tree_entry"]
-            self.assertEqual((symlink_entry["mode"], symlink_entry["object_type"]), ("120000", "blob"))
+            self.assertEqual(
+                (symlink_entry["mode"], symlink_entry["object_type"]),
+                ("120000", "blob"),
+            )
             gitlink_entry = nodes["vendor/module"]["payload_json"]["git_tree_entry"]
-            self.assertEqual((gitlink_entry["mode"], gitlink_entry["object_type"]), ("160000", "commit"))
+            self.assertEqual(
+                (gitlink_entry["mode"], gitlink_entry["object_type"]),
+                ("160000", "commit"),
+            )
             self.assertEqual(gitlink_entry["object_id"], base_revision)
             self.assertIn("later-only.md", nodes)
             self.assertNotIn("untracked-only.md", nodes)
             self.assertFalse(any(path.startswith("vendor/module/") for path in nodes))
             self.assertTrue(nodes["worktree-missing.md"]["broken"])
             self.assertFalse(nodes["worktree-missing.md"]["payload_json"]["exists"])
-            self.assertIn("git_tree_entry", nodes["worktree-missing.md"]["payload_json"])
+            self.assertIn(
+                "git_tree_entry", nodes["worktree-missing.md"]["payload_json"]
+            )
 
             dependency_edges = [
                 edge for edge in graph_ir["edges"] if edge["relation"] != "contains"

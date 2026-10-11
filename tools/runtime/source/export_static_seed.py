@@ -195,7 +195,9 @@ def _run_git(source_root: Path, *args: str) -> bytes:
     )
     if result.returncode != 0:
         detail = result.stderr.decode("utf-8", errors="replace").strip()
-        raise StaticSeedError(f"git {' '.join(args)} failed: {detail or 'unknown error'}")
+        raise StaticSeedError(
+            f"git {' '.join(args)} failed: {detail or 'unknown error'}"
+        )
     return result.stdout
 
 
@@ -204,7 +206,9 @@ def _resolve_commit(source_root: Path, source_ref: str) -> str:
     commit = _run_git(source_root, "rev-parse", "--verify", f"{source_ref}^{{commit}}")
     value = commit.decode("ascii", errors="strict").strip()
     if not OBJECT_ID_RE.fullmatch(value):
-        raise StaticSeedError(f"resolved source commit has an invalid object ID: {value!r}")
+        raise StaticSeedError(
+            f"resolved source commit has an invalid object ID: {value!r}"
+        )
     return value
 
 
@@ -226,7 +230,9 @@ def _load_tree(source_root: Path, commit: str) -> dict[str, GitTreeEntry]:
                 path=path,
             )
         except (UnicodeDecodeError, ValueError) as exc:
-            raise StaticSeedError("committed tree contains an unsupported path record") from exc
+            raise StaticSeedError(
+                "committed tree contains an unsupported path record"
+            ) from exc
         if path in entries:
             raise StaticSeedError(f"committed tree contains duplicate path: {path}")
         entries[path] = entry
@@ -276,9 +282,13 @@ def _validate_relative_path(raw_path: str) -> str:
     path = PurePosixPath(raw_path)
     normalized = path.as_posix()
     if path.is_absolute() or normalized != raw_path:
-        raise StaticSeedError(f"allowlisted path is not canonical and relative: {raw_path!r}")
+        raise StaticSeedError(
+            f"allowlisted path is not canonical and relative: {raw_path!r}"
+        )
     if any(part in {"", ".", ".."} for part in path.parts):
-        raise StaticSeedError(f"allowlisted path escapes or aliases the seed root: {raw_path!r}")
+        raise StaticSeedError(
+            f"allowlisted path escapes or aliases the seed root: {raw_path!r}"
+        )
     return normalized
 
 
@@ -296,8 +306,12 @@ def _validate_path_surface(path: str) -> None:
             raise StaticSeedError(f"allowlisted path is a forbidden surface: {path}")
     for component in PurePosixPath(path).parts:
         lowered = component.lower()
-        if lowered in FORBIDDEN_SECRET_COMPONENTS or lowered.endswith(FORBIDDEN_SECRET_SUFFIXES):
-            raise StaticSeedError(f"allowlisted path may contain secret material: {path}")
+        if lowered in FORBIDDEN_SECRET_COMPONENTS or lowered.endswith(
+            FORBIDDEN_SECRET_SUFFIXES
+        ):
+            raise StaticSeedError(
+                f"allowlisted path may contain secret material: {path}"
+            )
 
 
 def _validate_content(path: str, content: bytes) -> None:
@@ -306,11 +320,15 @@ def _validate_content(path: str, content: bytes) -> None:
     for marker in FORBIDDEN_CONTENT_MARKERS:
         if marker in lowered:
             label = marker.decode("ascii", errors="replace")
-            raise StaticSeedError(f"allowlisted file contains forbidden marker {label!r}: {path}")
+            raise StaticSeedError(
+                f"allowlisted file contains forbidden marker {label!r}: {path}"
+            )
     try:
         parsed = tomllib.loads(content.decode("utf-8", errors="strict"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        raise StaticSeedError(f"allowlisted file is not valid UTF-8 TOML: {path}") from exc
+        raise StaticSeedError(
+            f"allowlisted file is not valid UTF-8 TOML: {path}"
+        ) from exc
     _validate_toml_keys(path, parsed)
 
 
@@ -336,7 +354,9 @@ def _validate_toml_keys(path: str, value: object, *, prefix: str = "") -> None:
             key = raw_key.lower()
             qualified = f"{prefix}.{raw_key}" if prefix else raw_key
             if key in FORBIDDEN_TOML_KEYS:
-                raise StaticSeedError(f"allowlisted TOML contains forbidden key {qualified!r}: {path}")
+                raise StaticSeedError(
+                    f"allowlisted TOML contains forbidden key {qualified!r}: {path}"
+                )
             _validate_toml_keys(path, child, prefix=qualified)
     elif isinstance(value, list):
         for index, child in enumerate(cast(list[object], value)):
@@ -355,7 +375,9 @@ def _parse_allowlist(content: bytes) -> tuple[str, tuple[str, ...]]:
     unknown = set(manifest) - ALLOWLIST_KEYS
     missing = ALLOWLIST_KEYS - set(manifest)
     if unknown:
-        raise StaticSeedError(f"{ALLOWLIST_PATH} has unsupported keys: {sorted(unknown)}")
+        raise StaticSeedError(
+            f"{ALLOWLIST_PATH} has unsupported keys: {sorted(unknown)}"
+        )
     if missing:
         raise StaticSeedError(f"{ALLOWLIST_PATH} is missing keys: {sorted(missing)}")
     if manifest["version"] != 1:
@@ -371,7 +393,9 @@ def _parse_allowlist(content: bytes) -> tuple[str, tuple[str, ...]]:
         raise StaticSeedError(f"{ALLOWLIST_PATH} files must not be empty")
     normalized = tuple(_validate_relative_path(path) for path in files)
     if normalized != tuple(sorted(normalized)):
-        raise StaticSeedError(f"{ALLOWLIST_PATH} files must be lexicographically sorted")
+        raise StaticSeedError(
+            f"{ALLOWLIST_PATH} files must be lexicographically sorted"
+        )
     if len(set(normalized)) != len(normalized):
         raise StaticSeedError(f"{ALLOWLIST_PATH} files contain duplicates")
     return source_repository, normalized
@@ -406,7 +430,9 @@ def _validate_codex_config(files: tuple[StaticSeedFile, ...]) -> None:
                 f"Codex role {role!r} must resolve to its same-named seed file: {resolved}"
             )
         if resolved not in by_path:
-            raise StaticSeedError(f"Codex role {role!r} references an unexported file: {resolved}")
+            raise StaticSeedError(
+                f"Codex role {role!r} references an unexported file: {resolved}"
+            )
         referenced.add(resolved)
     exported_roles = {path for path in by_path if path.startswith(".codex/agents/")}
     if referenced != exported_roles:
@@ -426,7 +452,9 @@ def load_export_plan(source_root: Path, source_ref: str) -> StaticSeedPlan:
         allowlist_entry.mode != REGULAR_NONEXECUTABLE_MODE
         or allowlist_entry.object_type != "blob"
     ):
-        raise StaticSeedError(f"{ALLOWLIST_PATH} must be a regular non-executable tracked file")
+        raise StaticSeedError(
+            f"{ALLOWLIST_PATH} must be a regular non-executable tracked file"
+        )
     source_repository, paths = _parse_allowlist(
         _read_blob(root, allowlist_entry.object_id)
     )
@@ -436,7 +464,9 @@ def load_export_plan(source_root: Path, source_ref: str) -> StaticSeedPlan:
         _validate_path_surface(path)
         entry = tree.get(path)
         if entry is None:
-            raise StaticSeedError(f"allowlisted path is not tracked in source commit: {path}")
+            raise StaticSeedError(
+                f"allowlisted path is not tracked in source commit: {path}"
+            )
         if entry.mode != REGULAR_NONEXECUTABLE_MODE or entry.object_type != "blob":
             raise StaticSeedError(
                 f"allowlisted path must be a regular non-executable tracked file: {path} "

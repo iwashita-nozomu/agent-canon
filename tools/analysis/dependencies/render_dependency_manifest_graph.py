@@ -657,9 +657,7 @@ def build_report(
 ) -> GraphReport:
     """Build typed dependency diagnostics alongside one committed source tree."""
     try:
-        tracked_tree_revision, tree_entries = load_committed_tree(
-            root, source_revision
-        )
+        tracked_tree_revision, tree_entries = load_committed_tree(root, source_revision)
     except StaticSeedError as error:
         raise ValueError(f"unable to read selected Git tree: {error}") from error
     tracked_tree_entries = tuple(tree_entries[path] for path in sorted(tree_entries))
@@ -763,9 +761,7 @@ def render_markdown(report: GraphReport) -> str:
         )
     lines.append("```")
 
-    directory_ids = {
-        path: f"D{index}" for index, path in enumerate(directory_nodes)
-    }
+    directory_ids = {path: f"D{index}" for index, path in enumerate(directory_nodes)}
     path_ids = {
         entry.path: f"P{index}"
         for index, entry in enumerate(report.tracked_tree_entries)
@@ -896,13 +892,10 @@ def path_display(path: str) -> DisplayRecord:
     }
 
 
-def graph_fingerprint(
-    edges: tuple[Edge, ...], *, tracked_tree_revision: str
-) -> str:
+def graph_fingerprint(edges: tuple[Edge, ...], *, tracked_tree_revision: str) -> str:
     """Return a stable fingerprint for relation rows and the selected Git tree."""
     parts = [
-        f"{edge.direction}\t{edge.kind}\t{edge.source}\t{edge.target}"
-        for edge in edges
+        f"{edge.direction}\t{edge.kind}\t{edge.source}\t{edge.target}" for edge in edges
     ]
     parts.append(f"git-tree-revision\t{tracked_tree_revision}")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()

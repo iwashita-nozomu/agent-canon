@@ -165,7 +165,9 @@ def iter_bootstrap_doc_findings(root: Path) -> list[str]:
                             f"{relative_path}:{line_no}: default consumer contract references live runtime marker: {marker}"
                         )
 
-    bootstrap_text = scanned_default_docs.get(Path("documents/contracts/template-bootstrap.md"))
+    bootstrap_text = scanned_default_docs.get(
+        Path("documents/contracts/template-bootstrap.md")
+    )
     if bootstrap_text is not None:
         lowered = bootstrap_text.lower()
         for marker in DEFAULT_BOOTSTRAP_REQUIRED_MARKERS:
@@ -182,7 +184,9 @@ def _is_regular_file(path: Path) -> bool:
     return path.is_file() and not path.is_symlink()
 
 
-def _load_mapping(path: Path, findings: list[str], label: str) -> Mapping[str, object] | None:
+def _load_mapping(
+    path: Path, findings: list[str], label: str
+) -> Mapping[str, object] | None:
     """Load one TOML mapping and record parse/type failures."""
     try:
         value = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -216,7 +220,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
     for relative_path in STATIC_SEED_FORBIDDEN_PATHS:
         path = root / relative_path
         if path.exists() or path.is_symlink():
-            findings.append(f"{relative_path}: live AgentCanon consumer surface is forbidden")
+            findings.append(
+                f"{relative_path}: live AgentCanon consumer surface is forbidden"
+            )
 
     provenance_path = root / PROVENANCE_PATH
     if not _is_regular_file(provenance_path):
@@ -249,12 +255,19 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
                 f"{PROVENANCE_PATH}: source_repository must be {CANONICAL_SOURCE_REPOSITORY}"
             )
         source_commit = provenance.get("source_commit")
-        if not isinstance(source_commit, str) or not OBJECT_ID_RE.fullmatch(source_commit):
-            findings.append(f"{PROVENANCE_PATH}: source_commit must be a lowercase Git object ID")
+        if not isinstance(source_commit, str) or not OBJECT_ID_RE.fullmatch(
+            source_commit
+        ):
+            findings.append(
+                f"{PROVENANCE_PATH}: source_commit must be a lowercase Git object ID"
+            )
 
     codex_root = root / ".codex"
     agents_root = codex_root / "agents"
-    for relative_path, path in ((Path(".codex"), codex_root), (Path(".codex/agents"), agents_root)):
+    for relative_path, path in (
+        (Path(".codex"), codex_root),
+        (Path(".codex/agents"), agents_root),
+    ):
         if not path.is_dir() or path.is_symlink():
             findings.append(f"{relative_path}: expected a regular directory")
 
@@ -271,7 +284,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if not isinstance(raw_agents, Mapping):
             findings.append(".codex/config.toml: [agents] table is required")
         else:
-            for raw_role, raw_value in cast(Mapping[object, object], raw_agents).items():
+            for raw_role, raw_value in cast(
+                Mapping[object, object], raw_agents
+            ).items():
                 if not isinstance(raw_role, str) or not isinstance(raw_value, Mapping):
                     continue
                 role_table = cast(Mapping[object, object], raw_value)
@@ -290,7 +305,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
                 referenced_roles.add(resolved)
                 role_path = root / PurePosixPath(resolved)
                 if not _is_regular_file(role_path):
-                    findings.append(f"{resolved}: expected a regular referenced role file")
+                    findings.append(
+                        f"{resolved}: expected a regular referenced role file"
+                    )
 
     actual_roles: set[str] = set()
     if agents_root.is_dir() and not agents_root.is_symlink():
@@ -345,7 +362,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
             if isinstance(value, str):
                 lowered = value.lower().encode("utf-8")
                 found_prefixes.update(
-                    prefix for prefix in STATIC_SEED_FORBIDDEN_PREFIXES if prefix in lowered
+                    prefix
+                    for prefix in STATIC_SEED_FORBIDDEN_PREFIXES
+                    if prefix in lowered
                 )
             elif isinstance(value, Mapping):
                 mapping = cast(Mapping[object, object], value)
