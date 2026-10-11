@@ -119,7 +119,6 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | --- | --- | --- | --- |
 | `agent-canon` Rust CLI | docs check、semantic index、structured analysis などの統一 CLI。 | `tools/runtime/dispatch/agent-canon/Cargo.toml`, `tools/bin/agent-canon` | local: Apache-2.0 |
 | `markdownlint-cli2` 0.17.2 | Markdown style rules called by the AgentCanon docs check. | `bootstrap/container/image/dependencies.toml`, `.markdownlint-cli2.jsonc` | upstream: MIT |
-| `markdownlint-cli2-formatter-json` 0.0.8 | Structured markdownlint findings consumed by the AgentCanon docs check. | `bootstrap/container/image/dependencies.toml` | upstream: MIT |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rust-src`, `rust-analyzer` | AgentCanon Rust CLI の build と language-server support。 | `bootstrap/container/image/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
 | `clangd-18` (Ubuntu 24.04 Noble package) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clangd-18> |
 | `scip` 0.10.0 | Official SCIP stats, lint, and print/readback CLI for standard index.scip artifacts. | `bootstrap/container/image/dependencies.toml` (`scip-cli`) | upstream: [Apache-2.0](https://github.com/scip-code/scip/blob/v0.10.0/LICENSE) |

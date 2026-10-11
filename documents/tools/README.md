@@ -26,10 +26,9 @@ project commands.
 ## Public command routes
 
 - `bootstrap.sh ... tool run --root <target> <catalog-id> -- <args...>` runs a
-  parity-verified catalog entry.
-- `bootstrap.sh ... exec --root <target> -- <argv...>` retains argv-only
-  compatibility for AgentCanon tools that are still classified as
-  `legacy-route`.
+  typed catalog entry through the authenticated runtime.
+- `bootstrap.sh ... exec --root <target> -- <argv...>` runs an explicit argv
+  command selected by the caller.
 - `bootstrap.sh ... eval collect` and `eval sync` own evaluation collection and
   publication to `agent-canon-log`.
 - `bootstrap.sh ... codex prepare|launch` owns the isolated runtime-local Codex

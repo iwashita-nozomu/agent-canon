@@ -117,6 +117,8 @@ AGENT_CANON_STATIC_RUNTIME_ROOT="$(runtime_boundary_root "${AGENT_CANON_STATIC_R
 export AGENT_CANON_RUNTIME_ROOT="${AGENT_CANON_STATIC_RUNTIME_ROOT}"
 export TMPDIR="$(runtime_boundary_path "${TMPDIR:-${AGENT_CANON_STATIC_RUNTIME_ROOT}/tmp}")"
 mkdir -p "${TMPDIR}"
+export XDG_CACHE_HOME="$(runtime_boundary_path "${AGENT_CANON_STATIC_RUNTIME_ROOT}/cache")"
+mkdir -p "${XDG_CACHE_HOME}"
 export PYTHONDONTWRITEBYTECODE=1
 
 run_full() {

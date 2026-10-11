@@ -161,26 +161,26 @@ global link projection; the resident does not enumerate or validate global
 skills. Uninstall removes the AgentCanon-owned skills directory link only.
 After update, launch a new session.
 
-## Tool and compatibility route
+## Tool route
 
 Preserve the existing public Rust command shape. Do not add flat global Python
-executables. A Python/Rust catalog entry may use:
+executables. A catalog entry uses its typed route:
 
 ```bash
-"$BOOTSTRAP" "${COMMON[@]}" tool run --root <project-root> <verified-catalog-id> -- <args...>
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
-only after schema-v2 parity evidence verifies argv, cwd, stdin/stdout/stderr,
-exit/signal behavior, and written paths. The dispatcher rejects shell command
-strings, unknown ids, and unverified entries. Until parity is verified, keep
-the legacy exact command and invoke it through its owner or:
+The dispatcher validates the typed descriptor, registered target, authenticated
+runtime, and requested output capability when the command runs. It rejects
+shell command strings and unknown ids. For a caller-selected direct command,
+use the explicit argv route:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" exec --root <registered-project> -- <existing-command> <args...>
 ```
 
-Do not infer that every internal Python file is public. A parity failure is a
-compatibility finding, not permission to silently change the command plane.
+Do not infer that every internal Python file is public, and keep Rust
+first-class commands on their existing public shape.
 
 ## Side-effect and eval rules
 
