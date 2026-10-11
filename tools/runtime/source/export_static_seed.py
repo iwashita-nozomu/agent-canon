@@ -6,6 +6,7 @@
 # upstream design ../../../documents/contracts/static-seed-allowlist.toml canonical exact-path allowlist
 # downstream design ../../../documents/tools/export_static_seed.md command and failure semantics
 # downstream implementation ../../../tests/agent_tools/test_export_static_seed.py verifies deterministic, forbidden-surface, and source-hidden behavior
+# downstream implementation ../../analysis/dependencies/render_dependency_manifest_graph.py uses committed-tree identities for optional structural graph input
 # @dependency-end
 """Export the canonical static AgentCanon seed from a committed source snapshot."""
 
@@ -231,6 +232,15 @@ def _load_tree(source_root: Path, commit: str) -> dict[str, GitTreeEntry]:
             raise StaticSeedError(f"committed tree contains duplicate path: {path}")
         entries[path] = entry
     return entries
+
+
+def load_committed_tree(
+    source_root: Path, source_ref: str
+) -> tuple[str, dict[str, GitTreeEntry]]:
+    """Return the complete Git tree and resolved commit without reading the worktree."""
+    root = source_root.resolve()
+    commit = _resolve_commit(root, source_ref)
+    return commit, _load_tree(root, commit)
 
 
 def _read_blob(source_root: Path, object_id: str) -> bytes:

@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
+# upstream implementation ../../runtime/source/export_static_seed.py reads complete committed Git trees for the optional tracked-path layer.
 # upstream design ../../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
 # downstream design ../../../documents/tools/render_dependency_manifest_graph.md documents report generation.
 # downstream implementation ../../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
@@ -21,12 +22,19 @@ import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from tools.runtime.source.export_static_seed import (
+    GitTreeEntry,
+    StaticSeedError,
+    load_committed_tree,
+)
 
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
@@ -107,6 +115,8 @@ class GraphReport:
     orphan_nodes: tuple[str, ...]
     broken_targets: tuple[str, ...]
     high_degree_nodes: tuple[tuple[str, int], ...]
+    tracked_tree_revision: str
+    tracked_tree_entries: tuple[GitTreeEntry, ...] = ()
 
     @property
     def cycles(self) -> tuple[tuple[str, ...], ...]:
@@ -289,6 +299,7 @@ class SourceEnvelope(TypedDict):
     origin_kind: str
     origin_locator: str
     graph_tsv_sha256: str
+    git_tree_revision: str
 
 
 class CheckerEnvelope(TypedDict):
@@ -322,6 +333,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="Repository root.")
     parser.add_argument("--graph-tsv", help="Existing dependency graph TSV to render.")
+    parser.add_argument(
+        "--source-revision",
+        default="HEAD",
+        help="Git commit-ish for the tracked-path structure layer (default: HEAD).",
+    )
     parser.add_argument("--scope", choices=("full", "changed"), default="full")
     parser.add_argument(
         "--bundle-dir", help="Write the fixed six-file dependency graph bundle."
@@ -527,10 +543,13 @@ def directory_display(path: str) -> DisplayRecord:
 
 def directory_containment(
     paths: tuple[str, ...],
+    *,
+    child_kinds: Mapping[str, str] | None = None,
 ) -> tuple[tuple[str, ...], tuple[ContainmentEdge, ...]]:
     """Infer directory nodes and containment edges from repository paths."""
     directory_paths: set[str] = set()
     edge_set: set[ContainmentEdge] = set()
+    typed_child_kinds = child_kinds or {}
     for path in paths:
         if not is_repo_path_token(path):
             continue
@@ -558,7 +577,7 @@ def directory_containment(
                 target=path,
                 parent_path=parent_dir,
                 child_path=path,
-                child_kind="repo_path",
+                child_kind=typed_child_kinds.get(path, "repo_path"),
             )
         )
     directory_order = tuple(
@@ -568,6 +587,22 @@ def directory_containment(
         sorted(edge_set, key=lambda edge: (edge.source, edge.target, edge.child_kind))
     )
     return directory_order, edge_order
+
+
+def containment_paths(report: GraphReport) -> tuple[str, ...]:
+    """Return only committed-tree paths for containment edges."""
+    return tuple(entry.path for entry in report.tracked_tree_entries)
+
+
+def tracked_child_kinds(report: GraphReport) -> dict[str, str]:
+    """Classify committed symlinks and gitlinks without following their targets."""
+    child_kinds: dict[str, str] = {}
+    for entry in report.tracked_tree_entries:
+        if entry.mode == "120000":
+            child_kinds[entry.path] = "symlink"
+        elif entry.mode == "160000" and entry.object_type == "commit":
+            child_kinds[entry.path] = "gitlink"
+    return child_kinds
 
 
 def detect_cycles(edges: tuple[Edge, ...]) -> tuple[tuple[str, ...], ...]:
@@ -614,8 +649,20 @@ def detect_direction_cycles(
     return detect_cycles(tuple(edge for edge in edges if edge.direction == direction))
 
 
-def build_report(root: Path, edges: tuple[Edge, ...]) -> GraphReport:
-    """Build graph diagnostics."""
+def build_report(
+    root: Path,
+    edges: tuple[Edge, ...],
+    *,
+    source_revision: str = "HEAD",
+) -> GraphReport:
+    """Build typed dependency diagnostics alongside one committed source tree."""
+    try:
+        tracked_tree_revision, tree_entries = load_committed_tree(
+            root, source_revision
+        )
+    except StaticSeedError as error:
+        raise ValueError(f"unable to read selected Git tree: {error}") from error
+    tracked_tree_entries = tuple(tree_entries[path] for path in sorted(tree_entries))
     node_set = {edge.source for edge in edges} | {edge.target for edge in edges}
     degree = Counter[str]()
     incoming = Counter[str]()
@@ -640,30 +687,46 @@ def build_report(root: Path, edges: tuple[Edge, ...]) -> GraphReport:
         orphan_nodes=orphan_nodes,
         broken_targets=broken,
         high_degree_nodes=high_degree,
+        tracked_tree_revision=tracked_tree_revision,
+        tracked_tree_entries=tracked_tree_entries,
     )
 
 
 def render_markdown(report: GraphReport) -> str:
     """Render Markdown summary."""
-    directory_nodes, containment_edges = directory_containment(report.nodes)
+    paths = containment_paths(report)
+    directory_nodes, containment_edges = directory_containment(
+        paths, child_kinds=tracked_child_kinds(report)
+    )
+    all_path_nodes = set(report.nodes) | set(paths)
     lines = [
         "# Dependency Manifest Graph Report",
         "",
         f"- nodes: {len(report.nodes)}",
         f"- edges: {len(report.edges)}",
-        f"- directory nodes: {len(directory_nodes)}",
-        f"- containment edges: {len(containment_edges)}",
-        f"- total IR nodes: {len(report.nodes) + len(directory_nodes)}",
-        f"- total IR edges: {len(report.edges) + len(containment_edges)}",
-        f"- upstream cycles: {len(report.upstream_cycles)}",
-        f"- downstream cycles: {len(report.downstream_cycles)}",
-        f"- broken targets: {len(report.broken_targets)}",
-        "",
-        "## High Degree Nodes",
-        "",
-        "| Path | Degree |",
-        "| --- | ---: |",
     ]
+    lines.extend(
+        [
+            f"- tracked paths: {len(report.tracked_tree_entries)}",
+            f"- source revision: {report.tracked_tree_revision}",
+        ]
+    )
+    lines.extend(
+        [
+            f"- directory nodes: {len(directory_nodes)}",
+            f"- containment edges: {len(containment_edges)}",
+            f"- total IR nodes: {len(all_path_nodes) + len(directory_nodes)}",
+            f"- total IR edges: {len(report.edges) + len(containment_edges)}",
+            f"- upstream cycles: {len(report.upstream_cycles)}",
+            f"- downstream cycles: {len(report.downstream_cycles)}",
+            f"- broken targets: {len(report.broken_targets)}",
+            "",
+            "## High Degree Nodes",
+            "",
+            "| Path | Degree |",
+            "| --- | ---: |",
+        ]
+    )
     lines.extend(
         f"| `{path}` | {degree} |" for path, degree in report.high_degree_nodes
     )
@@ -699,6 +762,46 @@ def render_markdown(report: GraphReport) -> str:
             f"    {node_ids[edge.source]} -->|{edge_label}| {node_ids[edge.target]}"
         )
     lines.append("```")
+
+    directory_ids = {
+        path: f"D{index}" for index, path in enumerate(directory_nodes)
+    }
+    path_ids = {
+        entry.path: f"P{index}"
+        for index, entry in enumerate(report.tracked_tree_entries)
+    }
+    child_kinds = tracked_child_kinds(report)
+    lines.extend(
+        [
+            "",
+            "## Committed Git Tree Containment",
+            "",
+            f"Source commit: `{report.tracked_tree_revision}`. These `contains` relations are repository structure, not dependency edges.",
+            "",
+            "```mermaid",
+            "flowchart TD",
+        ]
+    )
+    lines.extend(
+        f'    {directory_ids[path]}["{html.escape(path, quote=True)}"]'
+        for path in directory_nodes
+    )
+    lines.extend(
+        f'    {path_ids[entry.path]}["{html.escape(entry.path, quote=True)} ({html.escape(child_kinds.get(entry.path, "repo_path"), quote=True)})"]'
+        for entry in report.tracked_tree_entries
+    )
+    for edge in containment_edges:
+        source_id = directory_ids[edge.parent_path]
+        target_id = (
+            directory_ids[edge.child_path]
+            if edge.child_kind == "directory"
+            else path_ids[edge.child_path]
+        )
+        edge_label = html.escape(f"contains:{edge.child_kind}", quote=True).replace(
+            "|", "&#124;"
+        )
+        lines.append(f"    {source_id} -->|{edge_label}| {target_id}")
+    lines.append("```")
     return "\n".join(lines) + "\n"
 
 
@@ -710,8 +813,14 @@ def dot_id(value: str) -> str:
 def render_dot(report: GraphReport) -> str:
     """Render Graphviz DOT."""
     lines = ["digraph dependency_manifest {", "  rankdir=LR;"]
-    for node in report.nodes:
+    paths = containment_paths(report)
+    directory_paths, containment_edges = directory_containment(
+        paths, child_kinds=tracked_child_kinds(report)
+    )
+    for node in sorted(set(report.nodes) | set(paths)):
         lines.append(f"  {dot_id(node)};")
+    for path in directory_paths:
+        lines.append(f"  {dot_id(directory_id(path))};")
     for edge in report.edges:
         label = (
             edge.kind
@@ -720,6 +829,12 @@ def render_dot(report: GraphReport) -> str:
         )
         lines.append(
             f"  {dot_id(edge.source)} -> {dot_id(edge.target)} [label={dot_id(label)}];"
+        )
+    for edge in containment_edges:
+        containment_label = dot_id(f"contains:{edge.child_kind}")
+        lines.append(
+            f"  {dot_id(edge.source)} -> {dot_id(edge.target)} "
+            f"[label={containment_label}];"
         )
     lines.append("}")
     return "\n".join(lines) + "\n"
@@ -781,14 +896,16 @@ def path_display(path: str) -> DisplayRecord:
     }
 
 
-def graph_fingerprint(edges: tuple[Edge, ...]) -> str:
-    """Return a stable content fingerprint for dependency edges."""
-    return hashlib.sha256(
-        "\n".join(
-            f"{edge.direction}\t{edge.kind}\t{edge.source}\t{edge.target}"
-            for edge in edges
-        ).encode("utf-8")
-    ).hexdigest()
+def graph_fingerprint(
+    edges: tuple[Edge, ...], *, tracked_tree_revision: str
+) -> str:
+    """Return a stable fingerprint for relation rows and the selected Git tree."""
+    parts = [
+        f"{edge.direction}\t{edge.kind}\t{edge.source}\t{edge.target}"
+        for edge in edges
+    ]
+    parts.append(f"git-tree-revision\t{tracked_tree_revision}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
 def dependency_node_record(
@@ -797,14 +914,42 @@ def dependency_node_record(
     incoming: Counter[str],
     outgoing: Counter[str],
     broken_targets: set[str],
+    tree_entry: GitTreeEntry | None = None,
+    tree_revision: str | None = None,
 ) -> GraphNodeRecord:
-    """Return an IR node record for one dependency graph artifact path."""
+    """Return one path node with separate optional committed-tree identity."""
     display = path_display(node)
     group = path_group(node)
     degree = incoming[node] + outgoing[node]
+    tree_entry_payload: dict[str, str] | None = None
+    if tree_entry is not None:
+        assert tree_revision is not None
+        tree_entry_payload = {
+            "revision": tree_revision,
+            "mode": tree_entry.mode,
+            "object_type": tree_entry.object_type,
+            "object_id": tree_entry.object_id,
+        }
+    payload: dict[str, object] = {
+        "path": node,
+        "group": group,
+        "display": display,
+        "exists": node not in broken_targets,
+        "metrics": {
+            "incoming": incoming[node],
+            "outgoing": outgoing[node],
+            "degree": degree,
+        },
+    }
+    if tree_entry_payload is not None:
+        payload["git_tree_entry"] = tree_entry_payload
     return {
         "id": node,
-        "document_id": "dependency-manifest-graph",
+        "document_id": (
+            f"git-tree:{tree_revision}"
+            if tree_entry is not None
+            else "dependency-manifest-graph"
+        ),
         "layer": "artifact",
         "kind": "repo_path",
         "label": display["label"],
@@ -819,17 +964,7 @@ def dependency_node_record(
         "outgoing": outgoing[node],
         "degree": degree,
         "broken": node in broken_targets,
-        "payload_json": {
-            "path": node,
-            "group": group,
-            "display": display,
-            "exists": node not in broken_targets,
-            "metrics": {
-                "incoming": incoming[node],
-                "outgoing": outgoing[node],
-                "degree": degree,
-            },
-        },
+        "payload_json": payload,
     }
 
 
@@ -838,6 +973,7 @@ def directory_node_record(
     *,
     incoming: Counter[str],
     outgoing: Counter[str],
+    tree_revision: str,
 ) -> GraphNodeRecord:
     """Return an IR node record for one inferred repository directory."""
     display = directory_display(directory_path)
@@ -846,7 +982,7 @@ def directory_node_record(
     degree = incoming[node_id] + outgoing[node_id]
     return {
         "id": node_id,
-        "document_id": "dependency-manifest-graph",
+        "document_id": f"git-tree:{tree_revision}",
         "layer": "artifact",
         "kind": "directory",
         "label": display["label"],
@@ -913,12 +1049,14 @@ def dependency_source_item_id(index: int, edge: Edge) -> str:
 
 def containment_edge_records(
     edges: tuple[ContainmentEdge, ...],
+    *,
+    tree_revision: str,
 ) -> list[GraphEdgeRecord]:
     """Return IR edge records for inferred directory containment."""
     return [
         {
             "id": f"contains:{index:06d}",
-            "document_id": "dependency-manifest-graph",
+            "document_id": f"git-tree:{tree_revision}",
             "layer": "artifact",
             "kind": "contains",
             "relation": "contains",
@@ -993,78 +1131,116 @@ def graph_ir(report: GraphReport, *, source_locator: str | None = None) -> Graph
     for edge in report.edges:
         outgoing[edge.source] += 1
         incoming[edge.target] += 1
-    directory_paths, containment = directory_containment(report.nodes)
+    containment = containment_paths(report)
+    directory_paths, containment_edges = directory_containment(
+        containment, child_kinds=tracked_child_kinds(report)
+    )
     containment_incoming = Counter[str]()
     containment_outgoing = Counter[str]()
-    for edge in containment:
+    for edge in containment_edges:
         containment_outgoing[edge.source] += 1
         containment_incoming[edge.target] += 1
     broken_targets = set(report.broken_targets)
+    tracked_by_path = {entry.path: entry for entry in report.tracked_tree_entries}
     nodes: list[GraphNodeRecord] = [
         dependency_node_record(
-            node, incoming=incoming, outgoing=outgoing, broken_targets=broken_targets
+            node,
+            incoming=incoming,
+            outgoing=outgoing,
+            broken_targets=broken_targets,
+            tree_entry=tracked_by_path.get(node),
+            tree_revision=report.tracked_tree_revision,
         )
-        for node in report.nodes
+        for node in sorted(set(report.nodes) | set(tracked_by_path))
     ]
     nodes.extend(
         directory_node_record(
-            path, incoming=containment_incoming, outgoing=containment_outgoing
+            path,
+            incoming=containment_incoming,
+            outgoing=containment_outgoing,
+            tree_revision=report.tracked_tree_revision,
         )
         for path in directory_paths
     )
     dependency_edges = dependency_edge_records(report.edges)
-    containment_edges = containment_edge_records(containment)
-    edges = dependency_edges + containment_edges
+    containment_records = containment_edge_records(
+        containment_edges, tree_revision=report.tracked_tree_revision
+    )
+    edges = dependency_edges + containment_records
     source = source_locator or BUNDLE_GRAPH_TSV_LOCATOR
+    graph_source: dict[str, str] = {
+        "kind": "dependency_manifest_graph_tsv",
+        "path": source,
+        "authority": f"{CHECKER_AUTHORITY} --graph-tsv",
+        "git_tree_revision": report.tracked_tree_revision,
+    }
+    documents: list[dict[str, str]] = [
+        {
+            "id": "dependency-manifest-graph",
+            "kind": "dependency_manifest_graph_tsv",
+            "title": "Dependency Manifest Graph",
+            "source_locator": source,
+            "created_at": "unknown",
+        }
+    ]
+    metadata = [
+        {
+            "name": "created_at",
+            "value": "unknown",
+        },
+        {
+            "name": "adapter",
+            "value": "tools/analysis/dependencies/render_dependency_manifest_graph.py",
+        },
+        {
+            "name": "checker_authority",
+            "value": CHECKER_AUTHORITY,
+        },
+        {
+            "name": "checker_pass_fail_authority",
+            "value": "checker",
+        },
+    ]
+    documents.append(
+        {
+            "id": f"git-tree:{report.tracked_tree_revision}",
+            "kind": "git_tree_inventory",
+            "title": "Tracked Git Tree",
+            "source_locator": f"git-commit:{report.tracked_tree_revision}",
+            "created_at": "unknown",
+        }
+    )
+    metadata.append(
+        {
+            "name": "git_tree_revision",
+            "value": report.tracked_tree_revision,
+        }
+    )
+    summary: dict[str, int] = {
+        "nodes": len(report.nodes),
+        "edges": len(report.edges),
+        "directoryNodes": len(directory_paths),
+        "containmentEdges": len(containment_edges),
+        "totalNodes": len(nodes),
+        "totalEdges": len(edges),
+        "upstreamCycles": len(report.upstream_cycles),
+        "downstreamCycles": len(report.downstream_cycles),
+        "cycles": len(report.cycles),
+        "brokenTargets": len(report.broken_targets),
+    }
+    summary["trackedPaths"] = len(report.tracked_tree_entries)
     return {
         "schema": GRAPH_IR_SCHEMA,
         "version": 2,
-        "id": f"dependency-manifest:{graph_fingerprint(report.edges)[:16]}",
+        "id": (
+            "dependency-manifest:"
+            f"{graph_fingerprint(report.edges, tracked_tree_revision=report.tracked_tree_revision)[:16]}"
+        ),
         "producer": "tools/analysis/dependencies/render_dependency_manifest_graph.py",
-        "source": {
-            "kind": "dependency_manifest_graph_tsv",
-            "path": source,
-            "authority": f"{CHECKER_AUTHORITY} --graph-tsv",
-        },
-        "documents": [
-            {
-                "id": "dependency-manifest-graph",
-                "kind": "dependency_manifest_graph_tsv",
-                "title": "Dependency Manifest Graph",
-                "source_locator": source,
-                "created_at": "unknown",
-            }
-        ],
-        "metadata": [
-            {
-                "name": "created_at",
-                "value": "unknown",
-            },
-            {
-                "name": "adapter",
-                "value": "tools/analysis/dependencies/render_dependency_manifest_graph.py",
-            },
-            {
-                "name": "checker_authority",
-                "value": CHECKER_AUTHORITY,
-            },
-            {
-                "name": "checker_pass_fail_authority",
-                "value": "checker",
-            },
-        ],
-        "summary": {
-            "nodes": len(report.nodes),
-            "edges": len(report.edges),
-            "directoryNodes": len(directory_paths),
-            "containmentEdges": len(containment),
-            "totalNodes": len(nodes),
-            "totalEdges": len(edges),
-            "upstreamCycles": len(report.upstream_cycles),
-            "downstreamCycles": len(report.downstream_cycles),
-            "cycles": len(report.cycles),
-            "brokenTargets": len(report.broken_targets),
-        },
+        "source": graph_source,
+        "documents": documents,
+        "metadata": metadata,
+        "summary": summary,
         "nodes": nodes,
         "edges": edges,
         "diagnostics": graph_diagnostics(report),
@@ -2595,6 +2771,7 @@ def render_html(
     edge_table = edge_table_html(report)
     directory_table = directory_table_html(report)
     summary = payload["summary"]
+    path_node_count = len(payload["nodes"])
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -2607,8 +2784,9 @@ def render_html(
   <header>
     <h1>{page_title}</h1>
     <div class="metrics">
-      <div class="metric"><span>nodes</span><strong>{len(report.nodes)}</strong></div>
-      <div class="metric"><span>edges</span><strong>{len(report.edges)}</strong></div>
+      <div class="metric"><span>path nodes</span><strong>{path_node_count}</strong></div>
+      <div class="metric"><span>dependency edges</span><strong>{len(report.edges)}</strong></div>
+      <div class="metric"><span>tracked paths</span><strong>{len(report.tracked_tree_entries)}</strong></div>
       <div class="metric"><span>directories</span><strong>{int(summary["directoryNodes"])}</strong></div>
       <div class="metric"><span>contains</span><strong>{int(summary["containmentEdges"])}</strong></div>
       <div class="metric"><span>cycles</span><strong>{len(report.cycles)}</strong></div>
@@ -2618,9 +2796,9 @@ def render_html(
   <section class="graph-workbench" aria-label="Dependency graph workbench">
     <h2>Dependency Map</h2>
     <p class="muted">
-      The territory map groups paths by repository area. The full graph map keeps
-      every node and edge in a fixed viewport, with zoom changing the graph view
-      rather than moving the page layout.
+      The territory map groups dependency endpoints and committed tracked paths
+      by repository area. The graph view keeps path nodes and dependency edges;
+      committed directory containment is listed separately below.
     </p>
     <div class="graph-stage-grid">
       <section class="overview-pane" aria-label="Code territory map">
@@ -2646,13 +2824,13 @@ def render_html(
       </section>
     </div>
     <details class="edge-table">
-      <summary>Complete node list ({len(report.nodes)})</summary>
+      <summary>Complete path node list ({path_node_count})</summary>
       <div class="table-wrap">
 {node_table}
       </div>
     </details>
     <details class="edge-table">
-      <summary>Complete edge list ({len(report.edges)})</summary>
+      <summary>Complete dependency edge list ({len(report.edges)})</summary>
       <div class="table-wrap">
 {edge_table}
       </div>
@@ -2711,23 +2889,28 @@ def render_html(
 
 def graph_summary(report: GraphReport) -> dict[str, int]:
     """Return the public summary envelope fields."""
-    return {
+    summary = {
         "node_count": len(report.nodes),
         "edge_count": len(report.edges),
         "upstream_cycle_count": len(report.upstream_cycles),
         "downstream_cycle_count": len(report.downstream_cycles),
         "orphan_node_count": len(report.orphan_nodes),
         "broken_target_count": len(report.broken_targets),
+        "tracked_path_count": len(report.tracked_tree_entries),
     }
+    return summary
 
 
-def source_envelope(root: Path, graph_input: GraphInput) -> SourceEnvelope:
+def source_envelope(
+    root: Path, graph_input: GraphInput, report: GraphReport
+) -> SourceEnvelope:
     """Return the deterministic source envelope."""
     return {
         "root": normalized_cli_token(root),
         "origin_kind": graph_input.origin_kind,
         "origin_locator": graph_input.origin_locator,
         "graph_tsv_sha256": sha256_bytes(graph_input.path.read_bytes()),
+        "git_tree_revision": report.tracked_tree_revision,
     }
 
 
@@ -2789,7 +2972,7 @@ def build_manifest(
         "schema": BUNDLE_SCHEMA,
         "status": "fail" if report.broken_targets else "pass",
         "scope": scope,
-        "source": source_envelope(root, graph_input),
+        "source": source_envelope(root, graph_input, report),
         "checker": checker_envelope(graph_input),
         "summary": graph_summary(report),
         "artifacts": [
@@ -2806,6 +2989,7 @@ def write_bundle(
     graph_tsv: Path | None,
     bundle_dir: Path,
     title: str,
+    source_revision: str = "HEAD",
 ) -> tuple[OutputEnvelope, GraphReport]:
     """Write a fixed dependency graph bundle through an absent-target transaction."""
     target_dir = bundle_dir.resolve()
@@ -2828,7 +3012,11 @@ def write_bundle(
                 origin_kind="supplied",
                 origin_locator=normalized_cli_token(supplied),
             )
-        report = build_report(root, load_edges(graph_input.path))
+        report = build_report(
+            root,
+            load_edges(graph_input.path),
+            source_revision=source_revision,
+        )
         ir_payload = graph_ir(report, source_locator=BUNDLE_GRAPH_TSV_LOCATOR)
         rendered_outputs = render_outputs(
             report,
@@ -2964,7 +3152,7 @@ def build_projection_envelope(
         "schema": PROJECTION_SCHEMA,
         "status": "fail" if report.broken_targets else "pass",
         "scope": scope,
-        "source": source_envelope(root, graph_input),
+        "source": source_envelope(root, graph_input, report),
         "checker": checker_envelope(graph_input),
         "summary": graph_summary(report),
         "artifacts": [
@@ -2981,6 +3169,7 @@ def write_projection(
     graph_tsv: Path | None,
     paths: dict[str, Path],
     title: str,
+    source_revision: str = "HEAD",
 ) -> tuple[OutputEnvelope, GraphReport]:
     """Write selected named projections through sibling atomic replaces."""
     temp_tsv: Path | None = None
@@ -2998,7 +3187,11 @@ def write_projection(
                 origin_kind="supplied",
                 origin_locator=normalized_cli_token(supplied),
             )
-        report = build_report(root, load_edges(graph_input.path))
+        report = build_report(
+            root,
+            load_edges(graph_input.path),
+            source_revision=source_revision,
+        )
         ir_payload = graph_ir(report, source_locator=graph_input.origin_locator)
         outputs = render_outputs(
             report,
@@ -3074,6 +3267,7 @@ def main() -> int:
                 graph_tsv=graph_tsv,
                 bundle_dir=Path(args.bundle_dir),
                 title=args.title,
+                source_revision=args.source_revision,
             )
         except ValueError as error:
             parser.error(str(error))
@@ -3090,6 +3284,7 @@ def main() -> int:
             graph_tsv=graph_tsv,
             paths=selected_projection_paths,
             title=args.title,
+            source_revision=args.source_revision,
         )
     except ValueError as error:
         parser.error(str(error))
