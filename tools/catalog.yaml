@@ -856,6 +856,44 @@ entries:
     tests:
       - tests/agent_tools/test_template_bundle.py
 
+  - id: create-experiment-topic
+    public: true
+    summary: Materializes one selected experiment topic package and its registry entry in an explicit target.
+    path: tools/experiments/lifecycle/create_experiment_topic.py
+    family: experiments
+    role: experiment
+    status: canonical
+    audience: user
+    placement: user_entrypoint
+    command: python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+    writes: true
+    dispatch:
+      runtime: python
+      argv: [python3, tools/experiments/lifecycle/create_experiment_topic.py]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: explicit-target-write
+      output_root: explicit-target
+      written_paths: []
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/tools/create_experiment_topic.md
+      - documents/design/experiment-topic-template.md
+      - documents/contracts/template-bundle-manifest.toml
+      - agents/skills/experiment-lifecycle.md
+    tests:
+      - tests/agent_tools/test_tool_catalog.py
+      - tests/agent_tools/test_tool_dispatch.py
+      - tests/tools/test_run_managed_experiment.py
+
   - id: run-accumulated-agent-evals
     summary: Runs registered AgentCanon eval producers with append-only accumulation before archive validation.
     path: eval/producers/run_accumulated_agent_evals.py

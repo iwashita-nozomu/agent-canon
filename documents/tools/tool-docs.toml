@@ -167,6 +167,14 @@ language = "python"
 summary = "Deterministic source-to-consumer root AGENTS.md composition documentation."
 
 [[tool]]
+id = "create-experiment-topic"
+classification = "public"
+tool = "tools/experiments/lifecycle/create_experiment_topic.py"
+doc = "documents/tools/create_experiment_topic.md"
+language = "python"
+summary = "Creates a selected Python or C++ experiment topic and registers it in an explicit parent target."
+
+[[tool]]
 id = "dependency-module-change"
 classification = "public"
 tool = "tools/repository/workspace/dependency_module_change.py"
