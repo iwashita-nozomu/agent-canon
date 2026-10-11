@@ -50,6 +50,41 @@ def write_graph(path: Path, rows: list[tuple[str, str, str, str]]) -> None:
     )
 
 
+def run_git(root: Path, *args: str) -> str:
+    """Run one Git command for an isolated renderer fixture."""
+    result = subprocess.run(
+        ("git", "-C", str(root), *args),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr)
+    return result.stdout.strip()
+
+
+def commit_fixture(root: Path, message: str) -> str:
+    """Commit the fixture index without relying on global Git identity."""
+    run_git(
+        root,
+        "-c",
+        "user.name=Graph Renderer Test",
+        "-c",
+        "user.email=graph-renderer@example.invalid",
+        "commit",
+        "-qm",
+        message,
+    )
+    return run_git(root, "rev-parse", "HEAD")
+
+
+def initialize_git_fixture(root: Path) -> str:
+    """Create the committed source snapshot required by the renderer."""
+    run_git(root, "init", "-q")
+    run_git(root, "add", "-A")
+    return commit_fixture(root, "renderer fixture")
+
+
 def sha256_file(path: Path) -> str:
     """Return a file's lowercase SHA-256 digest."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -86,6 +121,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             checker.chmod(0o755)
             (root / "a.md").write_text("a\n", encoding="utf-8")
             (root / "b.md").write_text("b\n", encoding="utf-8")
+            initialize_git_fixture(root)
             bundle = root / "bundle"
             result = run_renderer(
                 "--root",
@@ -145,6 +181,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             (root / "b.md").write_text("b\n", encoding="utf-8")
             graph = root / "source.tsv"
             write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+            initialize_git_fixture(root)
             bundle = root / "copied"
 
             result = run_renderer(
@@ -199,6 +236,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 encoding="utf-8",
             )
             checker.chmod(0o755)
+            initialize_git_fixture(root)
             bundle = root / "bundle"
 
             result = run_renderer(
@@ -218,6 +256,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             (root / "a.md").write_text("a\n", encoding="utf-8")
             graph = root / "graph.tsv"
             write_graph(graph, [("upstream", "design", "a.md", "missing.md")])
+            initialize_git_fixture(root)
             bundle = root / "bundle"
 
             result = run_renderer(
@@ -247,6 +286,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             (root / "b.md").write_text("b\n", encoding="utf-8")
             graph = root / "graph.tsv"
             write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+            initialize_git_fixture(root)
             text_bundle = root / "text-bundle"
             json_bundle = root / "json-bundle"
 
@@ -293,6 +333,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 for index in range(505)
             ]
             write_graph(graph, rows)
+            initialize_git_fixture(root)
             html_out = root / "graph.html"
 
             result = run_renderer(
@@ -332,9 +373,172 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertIn('"aria-label": `Inspect ${node.id}`', rendered_html)
             self.assertIn('event.key === "Enter" || event.key === " "', rendered_html)
             self.assertIn("<noscript>", rendered_html)
-            self.assertIn("Complete node list (506)", rendered_html)
-            self.assertIn("Complete edge list (505)", rendered_html)
+            self.assertIn("Complete path node list (507)", rendered_html)
+            self.assertIn("Complete dependency edge list (505)", rendered_html)
             self.assertIn("node-505.md", rendered_html)
+
+    def test_committed_tree_layer_includes_isolated_paths_and_preserves_relations(
+        self,
+    ) -> None:
+        """Tracked paths add structural evidence without changing dependency rows."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "src").mkdir()
+            (root / "docs").mkdir()
+            (root / "deep").mkdir()
+            (root / "aliases").mkdir()
+            (root / "src" / "connected.md").write_text("source\n", encoding="utf-8")
+            (root / "docs" / "target.md").write_text("target\n", encoding="utf-8")
+            (root / "deep" / "nested.md").write_text("nested\n", encoding="utf-8")
+            (root / "isolated.txt").write_text("no dependency rows\n", encoding="utf-8")
+            (root / "worktree-missing.md").write_text(
+                "committed, then removed\n", encoding="utf-8"
+            )
+            (root / "aliases" / "linked.md").symlink_to("../src/connected.md")
+            graph = root / "source.tsv"
+            write_graph(
+                graph,
+                [
+                    ("upstream", "design", "src/connected.md", "docs/target.md"),
+                    (
+                        "downstream",
+                        "implementation",
+                        "src/connected.md",
+                        "worktree-missing.md",
+                    ),
+                ],
+            )
+            base_revision = initialize_git_fixture(root)
+
+            (root / "later-only.md").write_text("later commit\n", encoding="utf-8")
+            run_git(root, "add", "later-only.md")
+            run_git(
+                root,
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"160000,{base_revision},vendor/module",
+            )
+            head_revision = commit_fixture(root, "add later path and gitlink")
+            (root / "worktree-missing.md").unlink()
+            (root / "untracked-only.md").write_text(
+                "not in selected tree\n", encoding="utf-8"
+            )
+
+            ir_out = root / "graph.ir.json"
+            markdown_out = root / "graph.md"
+            dot_out = root / "graph.dot"
+            html_out = root / "graph.html"
+            result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--ir-out",
+                str(ir_out),
+                "--markdown-out",
+                str(markdown_out),
+                "--dot-out",
+                str(dot_out),
+                "--html-out",
+                str(html_out),
+                "--format",
+                "json",
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            envelope = json.loads(result.stdout)
+            self.assertEqual(envelope["summary"]["node_count"], 3)
+            self.assertEqual(envelope["summary"]["edge_count"], 2)
+            self.assertEqual(envelope["summary"]["tracked_path_count"], 9)
+            self.assertEqual(envelope["summary"]["broken_target_count"], 1)
+
+            graph_ir = json.loads(ir_out.read_text(encoding="utf-8"))
+            self.assertEqual(graph_ir["source"]["git_tree_revision"], head_revision)
+            self.assertEqual(graph_ir["summary"]["nodes"], 3)
+            self.assertEqual(graph_ir["summary"]["edges"], 2)
+            self.assertEqual(graph_ir["summary"]["trackedPaths"], 9)
+            self.assertEqual(graph_ir["summary"]["totalNodes"], 15)
+            nodes = {node["id"]: node for node in graph_ir["nodes"]}
+            self.assertEqual(nodes["isolated.txt"]["layer"], "artifact")
+            self.assertEqual(nodes["isolated.txt"]["kind"], "repo_path")
+            isolated_entry = nodes["isolated.txt"]["payload_json"]["git_tree_entry"]
+            self.assertEqual(isolated_entry["revision"], head_revision)
+            self.assertEqual(isolated_entry["mode"], "100644")
+            self.assertEqual(isolated_entry["object_type"], "blob")
+            self.assertRegex(isolated_entry["object_id"], r"^[0-9a-f]{40,64}$")
+            symlink_entry = nodes["aliases/linked.md"]["payload_json"]["git_tree_entry"]
+            self.assertEqual(
+                (symlink_entry["mode"], symlink_entry["object_type"]),
+                ("120000", "blob"),
+            )
+            gitlink_entry = nodes["vendor/module"]["payload_json"]["git_tree_entry"]
+            self.assertEqual(
+                (gitlink_entry["mode"], gitlink_entry["object_type"]),
+                ("160000", "commit"),
+            )
+            self.assertEqual(gitlink_entry["object_id"], base_revision)
+            self.assertIn("later-only.md", nodes)
+            self.assertNotIn("untracked-only.md", nodes)
+            self.assertFalse(any(path.startswith("vendor/module/") for path in nodes))
+            self.assertTrue(nodes["worktree-missing.md"]["broken"])
+            self.assertFalse(nodes["worktree-missing.md"]["payload_json"]["exists"])
+            self.assertIn(
+                "git_tree_entry", nodes["worktree-missing.md"]["payload_json"]
+            )
+
+            dependency_edges = [
+                edge for edge in graph_ir["edges"] if edge["relation"] != "contains"
+            ]
+            containment_edges = [
+                edge for edge in graph_ir["edges"] if edge["relation"] == "contains"
+            ]
+            self.assertEqual(len(dependency_edges), 2)
+            self.assertEqual(
+                [edge["payload_json"]["row"] for edge in dependency_edges], [0, 1]
+            )
+            child_kinds = {
+                edge["payload_json"]["childPath"]: edge["payload_json"]["childKind"]
+                for edge in containment_edges
+            }
+            self.assertEqual(child_kinds["aliases/linked.md"], "symlink")
+            self.assertEqual(child_kinds["vendor/module"], "gitlink")
+            self.assertEqual(child_kinds["deep/nested.md"], "repo_path")
+            markdown = markdown_out.read_text(encoding="utf-8")
+            self.assertNotIn("untracked-only.md", markdown)
+            self.assertIn("## Committed Git Tree Containment", markdown)
+            self.assertIn("isolated.txt", markdown)
+            self.assertIn("contains:gitlink", markdown)
+            dot = dot_out.read_text(encoding="utf-8")
+            self.assertIn('"isolated.txt"', dot)
+            self.assertIn('"contains:symlink"', dot)
+            self.assertIn('"contains:gitlink"', dot)
+            rendered_html = html_out.read_text(encoding="utf-8")
+            self.assertIn("Complete path node list (9)", rendered_html)
+            self.assertIn("isolated.txt", rendered_html)
+            self.assertIn("gitlink", rendered_html)
+
+            old_ir_out = root / "old-tree.ir.json"
+            old_result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--source-revision",
+                base_revision,
+                "--ir-out",
+                str(old_ir_out),
+                "--format",
+                "json",
+            )
+            self.assertEqual(old_result.returncode, 0, old_result.stderr)
+            old_ir = json.loads(old_ir_out.read_text(encoding="utf-8"))
+            self.assertEqual(old_ir["source"]["git_tree_revision"], base_revision)
+            self.assertEqual(old_ir["summary"]["trackedPaths"], 7)
+            old_nodes = {node["id"] for node in old_ir["nodes"]}
+            self.assertNotIn("later-only.md", old_nodes)
+            self.assertNotIn("vendor/module", old_nodes)
+            self.assertNotIn("untracked-only.md", old_nodes)
 
     def test_empty_tsv_is_valid_but_malformed_tsv_fails_before_output(self) -> None:
         """A header-only empty graph is valid; malformed native rows are not dropped."""
@@ -343,6 +547,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             graph = root / "graph.tsv"
             html_out = root / "empty.html"
             write_graph(graph, [])
+            initialize_git_fixture(root)
 
             empty_result = run_renderer(
                 "--root",
@@ -389,6 +594,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             root = Path(temp_dir)
             graph = root / "graph.tsv"
             write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+            initialize_git_fixture(root)
             html_out = root / "graph.html"
             result = run_renderer(
                 "--root",
@@ -424,6 +630,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             (root / "nested").mkdir()
             sentinel = root / "same.out"
             sentinel.write_text("sentinel\n", encoding="utf-8")
+            initialize_git_fixture(root)
             result = run_renderer(
                 "--root",
                 str(root),

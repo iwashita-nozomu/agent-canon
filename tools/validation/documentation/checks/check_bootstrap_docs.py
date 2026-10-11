@@ -165,7 +165,9 @@ def iter_bootstrap_doc_findings(root: Path) -> list[str]:
                             f"{relative_path}:{line_no}: default consumer contract references live runtime marker: {marker}"
                         )
 
-    bootstrap_text = scanned_default_docs.get(Path("documents/contracts/template-bootstrap.md"))
+    bootstrap_text = scanned_default_docs.get(
+        Path("documents/contracts/template-bootstrap.md")
+    )
     if bootstrap_text is not None:
         lowered = bootstrap_text.lower()
         for marker in DEFAULT_BOOTSTRAP_REQUIRED_MARKERS:
@@ -182,7 +184,9 @@ def _is_regular_file(path: Path) -> bool:
     return path.is_file() and not path.is_symlink()
 
 
-def _load_mapping(path: Path, findings: list[str], label: str) -> Mapping[str, object] | None:
+def _load_mapping(
+    path: Path, findings: list[str], label: str
+) -> Mapping[str, object] | None:
     """Load one TOML mapping and record parse/type failures."""
     try:
         value = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -216,7 +220,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
     for relative_path in STATIC_SEED_FORBIDDEN_PATHS:
         path = root / relative_path
         if path.exists() or path.is_symlink():
-            findings.append(f"{relative_path}: live AgentCanon consumer surface is forbidden")
+            findings.append(
+                f"{relative_path}: live AgentCanon consumer surface is forbidden"
+            )
 
     provenance_path = root / PROVENANCE_PATH
     if not _is_regular_file(provenance_path):
@@ -249,12 +255,19 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
                 f"{PROVENANCE_PATH}: source_repository must be {CANONICAL_SOURCE_REPOSITORY}"
             )
         source_commit = provenance.get("source_commit")
-        if not isinstance(source_commit, str) or not OBJECT_ID_RE.fullmatch(source_commit):
-            findings.append(f"{PROVENANCE_PATH}: source_commit must be a lowercase Git object ID")
+        if not isinstance(source_commit, str) or not OBJECT_ID_RE.fullmatch(
+            source_commit
+        ):
+            findings.append(
+                f"{PROVENANCE_PATH}: source_commit must be a lowercase Git object ID"
+            )
 
     codex_root = root / ".codex"
     agents_root = codex_root / "agents"
-    for relative_path, path in ((Path(".codex"), codex_root), (Path(".codex/agents"), agents_root)):
+    for relative_path, path in (
+        (Path(".codex"), codex_root),
+        (Path(".codex/agents"), agents_root),
+    ):
         if not path.is_dir() or path.is_symlink():
             findings.append(f"{relative_path}: expected a regular directory")
 
@@ -271,7 +284,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if not isinstance(raw_agents, Mapping):
             findings.append(".codex/config.toml: [agents] table is required")
         else:
-            for raw_role, raw_value in cast(Mapping[object, object], raw_agents).items():
+            for raw_role, raw_value in cast(
+                Mapping[object, object], raw_agents
+            ).items():
                 if not isinstance(raw_role, str) or not isinstance(raw_value, Mapping):
                     continue
                 role_table = cast(Mapping[object, object], raw_value)
@@ -290,7 +305,9 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
                 referenced_roles.add(resolved)
                 role_path = root / PurePosixPath(resolved)
                 if not _is_regular_file(role_path):
-                    findings.append(f"{resolved}: expected a regular referenced role file")
+                    findings.append(
+                        f"{resolved}: expected a regular referenced role file"
+                    )
 
     actual_roles: set[str] = set()
     if agents_root.is_dir() and not agents_root.is_symlink():
@@ -309,6 +326,14 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if extra:
             findings.append(f".codex/agents: unreferenced role files: {extra}")
 
+    toml_payloads: dict[str, Mapping[str, object]] = {}
+    if config is not None:
+        toml_payloads[".codex/config.toml"] = config
+    for relative in sorted(actual_roles):
+        role_payload = _load_mapping(root / PurePosixPath(relative), findings, relative)
+        if role_payload is not None:
+            toml_payloads[relative] = role_payload
+
     # Scan every config/role payload, including an unreferenced role that will
     # also be reported by the exact-closure gate.
     controlled_files = {
@@ -322,12 +347,38 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if not _is_regular_file(path):
             continue
         lowered = path.read_bytes().lower()
-        for marker in (*STATIC_SEED_FORBIDDEN_CONTENT, *STATIC_SEED_FORBIDDEN_PREFIXES):
+        for marker in STATIC_SEED_FORBIDDEN_CONTENT:
             if marker in lowered:
                 findings.append(
                     f"{relative}: static seed contains forbidden runtime marker: "
                     f"{marker.decode('utf-8', errors='replace')}"
                 )
+
+    for relative, payload in sorted(toml_payloads.items()):
+        pending: list[object] = [payload]
+        found_prefixes: set[bytes] = set()
+        while pending:
+            value = pending.pop()
+            if isinstance(value, str):
+                lowered = value.lower().encode("utf-8")
+                found_prefixes.update(
+                    prefix
+                    for prefix in STATIC_SEED_FORBIDDEN_PREFIXES
+                    if prefix in lowered
+                )
+            elif isinstance(value, Mapping):
+                mapping = cast(Mapping[object, object], value)
+                for key, child in mapping.items():
+                    if isinstance(key, str):
+                        pending.append(key)
+                    pending.append(child)
+            elif isinstance(value, list):
+                pending.extend(value)
+        for marker in sorted(found_prefixes):
+            findings.append(
+                f"{relative}: static seed contains forbidden runtime marker: "
+                f"{marker.decode('utf-8', errors='replace')}"
+            )
     return findings
 
 

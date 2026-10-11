@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents native dependency graph inputs, bundles, and output projections.
 upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders native graph reports.
+upstream implementation ../../tools/runtime/source/export_static_seed.py resolves committed tree entries for repository structure.
 upstream design ../design/dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
@@ -50,6 +51,10 @@ python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
 
 - `--scope` is passed to `check_dependency_graph.sh` when the renderer generates
   its input TSV. `full` is the default and `changed` is explicit.
+- `--source-revision <commit-ish>` selects the committed Git tree used for
+  repository structure; it defaults to `HEAD`. The renderer reads the local
+  commit object only and does not fetch. The tracked-path structure is the full
+  selected commit even when dependency TSV scope is `changed`.
 - Pass `--graph-tsv <path>` to render an existing checker TSV. In this mode the
   TSV rows are the renderer input and `--scope` does not filter them.
 - Without `--graph-tsv`, the renderer runs `check_dependency_graph.sh` with
@@ -80,6 +85,18 @@ the checker that produced the TSV.
 The Graph IR `nodes` and `edges` tables retain the parsed relation and source
 locators used to produce each projection. An embedded prose workflow may
 summarize a claim, but it cannot promote that summary into a new dependency row.
+
+The renderer also reads the complete tracked path set from the selected Git
+tree through the existing committed-tree reader. Tracked files that have no
+dependency edge still appear as `artifact` nodes, and inferred directory
+containment appears as `artifact` edges with relation/kind `contains`. These
+structural edges are separate from TSV dependency rows and do not affect the
+checker, orphan, cycle, or broken-target diagnostics. Symlinks and gitlinks are
+leaf paths; the renderer records their Git mode, object type, object ID, and
+selected revision without following them. Untracked/worktree-only paths are
+excluded from committed-tree entries and containment; dependency TSV endpoints
+retain their existing relation nodes and diagnostics. The source envelope,
+Git-tree document, and node payloads retain the selected commit for readback.
 
 ## Bundle Outputs
 
@@ -151,6 +168,9 @@ The Graph IR schema is `agent_canon.graph_ir.v2`. Its `documents` records source
 projections, `metadata` records deterministic producer and checker context, and
 `diagnostics` records renderer observations. Directional cycles are represented
 as separate `cycles.upstream` and `cycles.downstream` arrays.
+Dependency `summary.nodes`/`summary.edges` continue to count relation endpoints
+and TSV rows. `summary.trackedPaths` and `summary.totalNodes`/`summary.totalEdges`
+also describe the committed-tree structure layer.
 
 ## Final-artifact readback order
 
@@ -202,6 +222,7 @@ TSVはrendererが読み取り用snapshotとしてcaptureしてから、bundle tr
 ```bash
 python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
   --root . \
+  --source-revision HEAD \
   --ir-out reports/dependency_graph.ir.json \
   --markdown-out reports/dependency_graph.md \
   --dot-out reports/dependency_graph.dot \
