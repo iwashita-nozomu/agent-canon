@@ -2034,6 +2034,10 @@ class BootstrapRuntime:
                         "container_control_missing_identity",
                         "resident container identity was not provided",
                     )
+                current_container = _container_resource_state(self)["container"]
+                state.setdefault("resources", {}).setdefault("container", {}).update(
+                    current_container
+                )
                 environment = {
                     "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
                     "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
