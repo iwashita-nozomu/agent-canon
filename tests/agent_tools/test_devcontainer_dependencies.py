@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -21,6 +22,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -53,6 +55,7 @@ from tools.runtime.container.devcontainer_dependencies import (
     manifest_sources,
     parse_record,
     safe_extract_tar,
+    safe_extract_zip,
     select_record_ids,
     validate_runtime_identity,
 )
@@ -2994,6 +2997,91 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
         self.assertEqual(install_call[-1], "/usr/local/bin/rustup-init")
 
+    def test_zip_release_asset_installs_verified_member(self) -> None:
+        """A checksum-pinned ZIP member reaches the existing executable owner."""
+        content = b"pinned-vl-convert"
+        archive_bytes = io.BytesIO()
+        with zipfile.ZipFile(archive_bytes, "w") as stream:
+            member = zipfile.ZipInfo("vl-convert")
+            member.create_system = 3
+            member.external_attr = (stat.S_IFREG | 0o755) << 16
+            stream.writestr(member, content)
+        payload = archive_bytes.getvalue()
+        parsed = parse_record(
+            record(
+                "vl-convert",
+                method="release-asset",
+                version="1.9.0",
+                checksum=hashlib.sha256(payload).hexdigest(),
+                asset="vl-convert_linux-64.zip",
+                archive_format="zip",
+                extract="vl-convert",
+                destination="/usr/local/bin/vl-convert",
+                source="https://example.test/releases/v1.9.0",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        installed_bytes: list[bytes] = []
+
+        def download(url: str, destination: Path, **_: object) -> None:
+            self.assertEqual(
+                url,
+                "https://example.test/releases/v1.9.0/vl-convert_linux-64.zip",
+            )
+            destination.write_bytes(payload)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_authentic_git(root)
+            installer = Installer(runner, image_owned=True)
+            install_file = installer._run_install_file
+
+            def capture_install(
+                source: Path,
+                destination: Path,
+                *,
+                workspace: Path,
+            ) -> None:
+                installed_bytes.append(source.read_bytes())
+                install_file(source, destination, workspace=workspace)
+
+            with (
+                mock.patch(
+                    "tools.runtime.container.devcontainer_dependencies._download",
+                    side_effect=download,
+                ),
+                mock.patch.object(
+                    installer, "_run_install_file", side_effect=capture_install
+                ),
+            ):
+                installer.install_record(parsed, workspace=root)
+
+        self.assertEqual(installed_bytes, [content])
+        install_call = next(call for call in runner.calls if call[0] == "install")
+        self.assertEqual(install_call[1:4], ("-D", "-m", "0755"))
+        self.assertEqual(install_call[-1], "/usr/local/bin/vl-convert")
+
+    def test_safe_zip_extraction_rejects_traversal_and_symlinks(self) -> None:
+        """ZIP release assets cannot escape extraction or create links."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            traversal = root / "traversal.zip"
+            with zipfile.ZipFile(traversal, "w") as stream:
+                stream.writestr("../outside", b"x")
+            with self.assertRaisesRegex(DependencyError, "escapes"):
+                safe_extract_zip(traversal, root / "traversal-extract")
+
+            symlink = root / "symlink.zip"
+            with zipfile.ZipFile(symlink, "w") as stream:
+                member = zipfile.ZipInfo("link")
+                member.create_system = 3
+                member.external_attr = (stat.S_IFLNK | 0o777) << 16
+                stream.writestr(member, "outside")
+            with self.assertRaisesRegex(DependencyError, "unsafe archive member"):
+                safe_extract_zip(symlink, root / "symlink-extract")
+
     def test_deb_release_asset_is_verified_before_apt_install(self) -> None:
         content = b"pinned-renderer-deb"
         package_url = "https://example.test/releases/tool.deb"
@@ -3344,6 +3432,8 @@ class DependencyModelTests(unittest.TestCase):
                 "zizmor",
                 "python3-pytest",
                 "quarto",
+                "puppeteer-unzip",
+                "vl-convert",
                 "lychee",
                 "puppeteer",
                 "mermaid-cli",
