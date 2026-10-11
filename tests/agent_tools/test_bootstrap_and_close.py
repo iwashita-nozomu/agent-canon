@@ -3647,12 +3647,29 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 )
                 self.assertNotIn("tool_command_packet_command", subagent_prompt_packet)
                 self.assertNotIn("tool_commands", subagent_prompt_packet)
+                # The configured physical requirements_organizer is read-only;
+                # its prompt returns requirements inline while graph progression
+                # and write authority stay with the parent.
+                roles_by_id = {role["id"]: role for role in manifest["roles"]}
+                manager_prompt = roles_by_id["manager"]["prompt_contract"][
+                    "assignment_prompt"
+                ]
+                self.assertIn("inline handoff", manager_prompt)
+                self.assertIn("non-goals", manager_prompt)
+                self.assertIn("completion conditions", manager_prompt)
+                self.assertIn("parent owns execution-graph progression", manager_prompt)
+                self.assertIn("when present", manager_prompt)
+                self.assertIn("respect supplied path boundaries", manager_prompt)
+                self.assertIn(
+                    "bounded writer when the physical sandbox and handoff permit writes; "
+                    "otherwise inline handoff",
+                    manager_prompt,
+                )
                 self.assert_role_prompt_includes(
                     manifest,
                     "implementer",
                     {"abstract_design_frame", "design_to_implementation_trace"},
                 )
-                roles_by_id = {role["id"]: role for role in manifest["roles"]}
                 implementer_entries = roles_by_id["implementer"]["document_packet"][
                     "role_specific_read_before_work"
                 ]
