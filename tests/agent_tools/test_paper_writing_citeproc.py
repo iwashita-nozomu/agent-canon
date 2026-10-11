@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import subprocess
@@ -282,3 +283,89 @@ def test_local_citations_render_and_unknown_key_fails_natively(
 
     assert failed_status != 0, failure_output.out + failure_output.err
     assert "unknown-source" in failure_output.out + failure_output.err
+
+
+def test_quarto_render_reads_back_citations_with_local_svg_asset(
+    tmp_path: Path,
+    monkeypatch,
+    capfd,
+) -> None:
+    """One native HTML render contains both local citeproc output and asset data."""
+    output_root = _configure_native_tool_route(tmp_path, monkeypatch)
+    (tmp_path / "_quarto.yml").write_text(
+        "project:\n  type: default\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "references.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "alpha",
+                    "type": "article-journal",
+                    "author": [{"family": "Alpha", "given": "Ada"}],
+                    "title": "Local asset citation fixture",
+                    "container-title": "Fixture Journal",
+                    "issued": {"date-parts": [[2020]]},
+                }
+            ],
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "local-author-date.csl").write_text(
+        CSL_AUTHOR_DATE,
+        encoding="utf-8",
+    )
+    asset_bytes = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2">'
+        b'<title>local-asset-citation-fixture</title>'
+        b'<rect width="2" height="2" fill="#123456"/></svg>\n'
+    )
+    (tmp_path / "figure.svg").write_bytes(asset_bytes)
+    source = tmp_path / "paper.qmd"
+    source.write_text(
+        "---\n"
+        'title: "Citation and local asset"\n'
+        "bibliography: references.json\n"
+        "csl: local-author-date.csl\n"
+        "format:\n"
+        "  html:\n"
+        "    embed-resources: true\n"
+        "execute:\n"
+        "  enabled: false\n"
+        "---\n\n"
+        "A local citation [@alpha].\n\n"
+        "![Local asset](figure.svg)\n",
+        encoding="utf-8",
+    )
+
+    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
+    output = output_root / "citation-with-asset.html"
+    render_status = tool_dispatch.run_container_tool(
+        PROJECT_ROOT,
+        spec,
+        [
+            "render",
+            source.name,
+            "--to",
+            "html",
+            "--no-execute",
+            "--output-dir",
+            str(output_root),
+            "--output",
+            output.name,
+        ],
+    )
+    render_output = capfd.readouterr()
+
+    assert render_status == 0, render_output.out + render_output.err
+    assert output.is_file()
+    rendered = output.read_text(encoding="utf-8")
+    assert "Alpha 2020" in rendered
+    assert "LOCAL STYLE: Local asset citation fixture" in rendered
+    asset_data_uri = (
+        "data:image/svg+xml;base64,"
+        + base64.b64encode(asset_bytes).decode("ascii")
+    )
+    assert asset_data_uri in rendered
+    assert "[@alpha]" not in rendered
