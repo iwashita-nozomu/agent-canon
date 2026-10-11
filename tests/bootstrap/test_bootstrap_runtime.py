@@ -373,6 +373,7 @@ def _ready_runtime_with_target(
     state = manager._new_state()
     state.update(state="ready", generation_counter=1, current_generation="generation-0001")
     target_record = manager._target_record(target, "read-only")
+    target_record["host_root"] = str(target)
     state["targets"] = {target_record["digest"]: target_record}
     resources = manager._resource_records()
     resources["image"].update(
@@ -1094,6 +1095,28 @@ def test_exec_receipt_uses_current_host_container_identity(
 
     assert result["resource_ids"]["container"]["id"] == container_id
     assert manager._read_state()["resources"]["container"]["id"] == container_id
+
+
+def test_exec_passes_registered_host_root_to_resident_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exec environment carries the already-registered host target root."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+    observed: dict[str, str] = {}
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident")
+
+    def capture_environment(
+        argv: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        bootstrap_runtime_module.subprocess, "run", capture_environment
+    )
+    manager.exec(target, ["agent-canon", "ok"])
+
+    assert observed["AGENT_CANON_TARGET_HOST_ROOT"] == str(target)
 
 
 @pytest.mark.parametrize("argv", [["python3", "-m", "pytest"], ["ruff", "format"]])

@@ -1375,10 +1375,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 check=True,
             )
             checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
+            host_checkout = "/host-visible/checkout"
             writer_targets = json.dumps(
                 {
                     "implementer": {
-                        "checkout_root": checkout_identity["git_root"],
+                        "checkout_root": host_checkout,
                         "branch": checkout_identity["branch"],
                         "remote": checkout_identity["remote"],
                         "allowed_paths": ["paper/draft.md"],
@@ -1410,7 +1411,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 return agent_id
 
             first_output = io.StringIO()
-            with redirect_stdout(first_output):
+            target_environment = {
+                "AGENT_CANON_TARGET_ROOT": str(workspace_root),
+                "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
+            }
+            with patch.dict(os.environ, target_environment), redirect_stdout(
+                first_output
+            ):
                 first_code = bootstrap_agent_run(args, spawn=spawn)
 
             self.assertEqual(first_code, 0)
@@ -1445,7 +1452,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 for identity, result in spawn_results.items()
             }
             second_output = io.StringIO()
-            with redirect_stdout(second_output):
+            with patch.dict(os.environ, target_environment), redirect_stdout(
+                second_output
+            ):
                 second_code = bootstrap_agent_run(
                     [*args, "--execution-results", json.dumps(results)]
                 )
@@ -1459,6 +1468,28 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             ready_calls = json.loads(ready_line.split("=", 1)[1])
             self.assertEqual(len(ready_calls), 1)
+            self.assertIn(
+                "native collaboration.spawn_agent operation",
+                ready_calls[0]["intent"],
+            )
+            self.assertNotIn(
+                "raw spawn_agent is not an admission path",
+                ready_calls[0]["intent"],
+            )
+            self.assertIn(
+                "native collaboration.spawn_agent operation",
+                ready_calls[0]["arguments"]["input"],
+            )
+            self.assertNotIn(
+                "raw spawn_agent is not an admission path",
+                ready_calls[0]["arguments"]["input"],
+            )
+            ready_identity = ready_calls[0]["arguments"]["checkout_identity"]
+            self.assertEqual(ready_identity["cwd"], host_checkout)
+            self.assertEqual(ready_identity["git_root"], host_checkout)
+            self.assertEqual(ready_identity["branch"], checkout_identity["branch"])
+            self.assertEqual(ready_identity["head"], checkout_identity["head"])
+            self.assertEqual(ready_identity["remote"], checkout_identity["remote"])
             self.assertIn(
                 "completed " + next(iter(spawn_results)),
                 ready_calls[0]["arguments"]["input"],
@@ -1503,7 +1534,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     for identity in identities
                 }
                 current_output = io.StringIO()
-                with redirect_stdout(current_output):
+                with patch.dict(os.environ, target_environment), redirect_stdout(
+                    current_output
+                ):
                     current_code = bootstrap_agent_run(
                         [*args, "--execution-results", json.dumps(wave_results)]
                     )

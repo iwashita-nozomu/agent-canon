@@ -2055,6 +2055,9 @@ class BootstrapRuntime:
                     "RUFF_CACHE_DIR": RUFF_CACHE_DESTINATION,
                 }
                 environment.update(extra_environment or {})
+                environment["AGENT_CANON_TARGET_HOST_ROOT"] = active_target[
+                    "host_root"
+                ]
                 result = _run_resident_command(
                     list(argv),
                     cwd=f"/targets/{target['digest']}",
