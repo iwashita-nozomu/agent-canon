@@ -117,7 +117,7 @@ from tools.runtime.authority.writer_target import (
     WriterTargetError,
     parse_writer_target,
 )
-from tools.runtime.lifecycle.workflow_monitor import append_monitoring, parse_token_fields
+from tools.runtime.lifecycle.workflow_monitor import append_monitoring
 from tools.runtime.manifest.manifest_rendering import (
     checkout_identity_policy_output_lines,
     contract_complete_implementation_policy_output_lines,
@@ -1380,7 +1380,6 @@ def execution_wave_readback_rows(
     active_budget: int,
     workspace_root: Path,
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
-    already_recorded_wave_ids: frozenset[str] = frozenset(),
 ) -> tuple[str, ...]:
     """Project successful host results into the existing actual-wave readback."""
     rows: list[str] = []
@@ -1395,8 +1394,6 @@ def execution_wave_readback_rows(
             for slot in wave
         ):
             break
-        if f"WAVE-{index}" in already_recorded_wave_ids:
-            continue
         allowed_paths = sorted(
             {
                 path
@@ -2124,25 +2121,12 @@ def main(
 
     if resuming_run:
         try:
-            monitoring_path = context.report_dir / "workflow_monitoring.md"
-            prior_monitoring = (
-                monitoring_path.read_text(encoding="utf-8")
-                if monitoring_path.is_file()
-                else ""
-            )
-            already_recorded_wave_ids = frozenset(
-                fields["wave_id"]
-                for line in prior_monitoring.splitlines()
-                if line.strip().startswith("- wave_event=")
-                if (fields := parse_token_fields(line)).get("wave_id")
-            )
             readback_rows = execution_wave_readback_rows(
                 execution_waves,
                 execution_results,
                 active_budget=context.workflow_active_spawn_budget or 0,
                 workspace_root=workspace_root,
                 writer_targets=writer_targets,
-                already_recorded_wave_ids=already_recorded_wave_ids,
             )
             if readback_rows:
                 append_monitoring(

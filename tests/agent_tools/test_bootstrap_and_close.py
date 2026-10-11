@@ -55,6 +55,7 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     resolve_active_design_packet_config,
 )
 from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
+    actual_wave_event_fields,
     check_schedule_artifact,
     check_completion_coverage,
     evaluate_completion_boundary,
@@ -90,7 +91,6 @@ from tools.runtime.lifecycle.bootstrap_agent_run import (  # noqa: E402
     read_selected_skill_documents,
     serialized_skill_document_reads,
 )
-from tools.runtime.lifecycle.workflow_monitor import parse_token_fields  # noqa: E402
 from tools.agent.skills.skill_route_catalog import SkillRoutingRule  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = (
@@ -1530,9 +1530,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8"
             )
             recorded_wave_ids = [
-                parse_token_fields(line).get("wave_id")
-                for line in monitoring.splitlines()
-                if line.strip().startswith("- wave_event=")
+                row["wave_id"] for row in actual_wave_event_fields(monitoring)
             ]
             self.assertEqual(recorded_wave_ids, expected_wave_ids)
             self.assertEqual(

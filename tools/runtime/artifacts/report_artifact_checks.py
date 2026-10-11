@@ -3039,9 +3039,11 @@ def actual_wave_event_fields(workflow_monitoring_text: str) -> list[dict[str, st
         if stripped.startswith("## "):
             in_section = stripped == "## Actual Wave Events"
             continue
-        if not in_section or not stripped.startswith("- wave_event="):
+        if not in_section:
             continue
-        rows.append(token_fields(stripped))
+        fields = token_fields(stripped)
+        if fields.get("wave_event") == "recorded":
+            rows.append(fields)
     return rows
 
 
