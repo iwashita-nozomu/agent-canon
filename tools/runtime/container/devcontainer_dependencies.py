@@ -39,6 +39,7 @@ import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from collections import OrderedDict, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -1968,7 +1969,14 @@ def _validate_method_values(record: DependencyRecord) -> None:
                     f"{record.id}.assets has an unsupported architecture"
                 )
         assert record.archive_format is not None
-        if record.archive_format not in {"binary", "deb", "tar.gz", "tar.xz", "tar"}:
+        if record.archive_format not in {
+            "binary",
+            "deb",
+            "tar.gz",
+            "tar.xz",
+            "tar",
+            "zip",
+        }:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
         assert record.extract is not None
         _validate_safe_member(record.extract, f"{record.id}.extract")
@@ -3288,6 +3296,35 @@ def safe_extract_tar(archive: Path, destination: Path) -> None:
             with source, target.open("wb") as output:
                 shutil.copyfileobj(source, output)
             target.chmod(member.mode & 0o777)
+
+
+def safe_extract_zip(archive: Path, destination: Path) -> None:
+    """Extract regular ZIP members only, rejecting traversal and links."""
+    destination.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(archive) as stream:
+        members = stream.infolist()
+        for member in members:
+            if not member.filename:
+                raise DependencyError("unsafe archive member: empty ZIP name")
+            _safe_member_path(destination, member.filename)
+            mode = member.external_attr >> 16
+            file_type = stat.S_IFMT(mode)
+            allowed_types = (
+                {0, stat.S_IFDIR} if member.is_dir() else {0, stat.S_IFREG}
+            )
+            if file_type not in allowed_types:
+                raise DependencyError(f"unsafe archive member: {member.filename}")
+        for member in members:
+            target = _safe_member_path(destination, member.filename)
+            if member.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with stream.open(member) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            mode = (member.external_attr >> 16) & 0o777
+            if mode:
+                target.chmod(mode)
 
 
 def _receipt_path(receipts: Path, record_id: str) -> Path:
@@ -5513,7 +5550,10 @@ class Installer:
                 raise DependencyError(f"{record.id}: release checksum mismatch")
             extracted = root / "extract"
             if record.extract != "none":
-                safe_extract_tar(archive, extracted)
+                if record.archive_format == "zip":
+                    safe_extract_zip(archive, extracted)
+                else:
+                    safe_extract_tar(archive, extracted)
                 candidate = extracted / record.destination.lstrip("/")
             else:
                 candidate = archive
