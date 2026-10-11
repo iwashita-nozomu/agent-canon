@@ -25,79 +25,24 @@ Reuse unchanged context and evidence rather than restarting discovery.
 ## Always-On Boundary
 
 The latest explicit user agreement defines the requested outcome, acceptance, and
-authority. Before working, confirm the directory, branch, and dependency HEADs;
-recheck changed premises only. Preserve unknown Git state and user data. Authority
-for the task does not authorize unrelated changes or publication.
+authority. Confirm the checkout and relevant revision; preserve unknown Git state
+and user data. Task authority does not authorize unrelated changes or publication.
 
-For a local repair, judge the target code, current diff, and governing contract;
-do not make use-site or out-of-scope investigation a prerequisite. State what
-required behavior the target cannot meet and the operation that demonstrates it.
-Treat failure reports and review claims as hypotheses; use the selected
-implementation owner's reachability/remedy guidance.
-If those target facts cannot resolve a concrete decision, name the missing fact
-and the smallest reference needed. For a request that explicitly crosses modules
-or migrates an API, investigate only dependencies and consumers within that
-declared scope. Separate observations, inferences, and unresolved
-decision-relevant premises.
+For a local repair, start from the target code, diff, and governing contract;
+do not make use-site or out-of-scope investigation a prerequisite. If those facts
+cannot resolve a concrete decision, state the missing fact and smallest reference
+needed. For an explicitly cross-module change or API migration, use only its
+declared dependency scope.
 
-Carry the requested outcome and authority through cause discovery; do not turn
-preliminary paths, slices, or non-goals into a completion ceiling. After cause
-and guarantee are established, derive the necessary edit and validation closure
-from evidence, updating an active handoff or write boundary when material facts
-change. Partition only for demonstrated independent responsibilities, collisions,
-or blockers.
-Choose the mechanism from the established cause, applicable constraints, and
-guarantee that must hold after the change. A procedure, role, artifact, or stage
-used by an earlier task is not a reason to repeat it; reuse it only when the
-current cause and guarantee require it.
-At nonobvious code boundaries, keep the concrete necessity, guaranteed behavior
-or effect boundary, and owning responsibility readable in a concise comment or
-docstring; reference the actual design owner where useful. Use this selectively:
-do not restate names or invent rationale. If necessity or ownership is unclear,
-investigate or reconsider the implementation.
-After a failure, separate
-source cause, oracle/specification, fixture, and transport/environment causes;
-repair the owning source first, and change test inputs or wiring only for an
-established API/layout/specification migration or demonstrably incorrect test.
-Test changes include include/imports, configuration, fixtures, and skips: do not
-alter them for pass-only purposes. Record an authorized test correction's reason,
-commit, and result in the existing delivery record.
-For numerical problems, establish the equations, assumptions, and convergence
-behavior before changing implementation structure or tolerances.
-
-For a known selected CLI, API, helper, or configured composition, use its
-existing owner and reuse results while inputs and required guarantees match;
-do not copy or rebuild that flow or rerun unchanged work. Investigate only an
-unknown entrypoint, failed invocation, or unmet behavior; implement only
-demonstrated gaps and rerun affected operations/checks when inputs or failure
-conditions change. Keep one exposed API per functional responsibility. A repair
-must not add a condition-specific branch, guard, bypass, or fallback. Correct the
-existing mechanism, input, ordering, or ownership that leaves the requirement
-unmet, while preserving established domain and external-boundary behavior.
-When multiple paths exist, use the most recently incorporated implementation as
-the starting point, migrate necessary consumers, and remove obsolete paths and
-exclusive support. Keep committed history in Git, not backup implementations.
-
-Use the owner's execution route and configured defaults. AgentCanon tools and
-product verification have separate environments. Successful execution needs no
-extra preflight. After failure, inspect facts that determine the next action;
-retry only with a changed premise and existing authority. Unavailable required
-verification remains unverified; it does not justify a manual backend switch.
-Use configured Git/GitHub and connected transport routes first. Do not discover,
-generate, copy, link, or agent-configure SSH keys/agents/auth files. On an
-authentication failure, return the observed error to its source, transport, or
-environment owner instead of creating a private recovery path.
-
-Capture reusable findings in their owning topic or authorized log, with the
-revision, command, observed result, and evidence location. Report AgentCanon
-runtime defects to the responsible repository's Issue route; distinguish an
-observation from an established cause. Keep private evidence with its owner.
-
-Remove unneeded task-owned temporary files, checkouts, containers, and exclusive
-superseded resources. Preserve shared resources and unknown state. For a
-protocol-confirmed failed experiment, use its storage owner to remove
-experiment-only code and artifacts while retaining concise findings; preserve
-successful/shared results and failures not established by the protocol.
+Carry authorized work through the requested outcome. Use the selected owner's
+existing mechanism and configured route, preserve established behavior and
+external boundaries, and reuse unchanged evidence. A failed result does not by
+itself identify a cause: distinguish source, contract/oracle, fixture, and
+transport/environment. Do not alter tests or switch routes merely to obtain a
+pass. Keep observations, causes, and unverified results distinct.
+Use configured Git/GitHub transports. Do not discover, create, copy, link, or
+configure credentials or auth agents; return authentication failures to their
+transport owner.
 
 ## Runtime Owner Map
 
@@ -115,30 +60,18 @@ The selected workflow owns execution, delegation, and validation. Activate desig
 research, or specialist routes only when their conditions apply. AgentCanon source
 maintenance does not authorize editing a consumer's generated instructions.
 
-Continue through required implementation, migration, retirement, verification,
-and authorized delivery. For an authorized implementation or repair request,
-include pre-existing failures within its scope in the required work; diagnosis
-alone does not complete the request, and skipped or no-op checks do not establish
-runtime behavior. A checkpoint or draft PR is not completion. Honor an explicit
-step boundary or pause. If blocked, identify the failed operation,
-unverified property, and next owner/action, and finish independent required work.
-Do not silently omit requested implementation. Unsupported or hypothetical
-concerns alone do not establish inability. Keep independent problems in separate
-repair units. Each owner carries its active unit through the requested result and
-its required check before taking another; independent units may proceed in
-parallel. If a requested part remains infeasible after using a standard in-scope
-alternative, report the concrete evidenced reason, its effect and remaining
-unimplemented scope, and a viable alternative. Caution or extra checks alone do
-not establish inability.
+For authorized implementation or repair, complete the requested in-scope outcome,
+including existing failures; diagnosis, checkpoints, and no-op checks alone do
+not complete it. Honor explicit stop boundaries. Keep independent problems in
+separate repair units: each owner carries its active unit through the requested
+result and required check before taking another; independent units may proceed in
+parallel. If blocked, report the failed operation, unverified property, and next
+owner/action, and finish independent work.
 
-Consider commit and push separately, preserving mixed work and publication scope.
-Report implemented, verified, published, and applied states accurately; include
-material limits and accessible evidence without exposing secrets.
-Before asserting feasibility, cause, or completion, establish the claim from
-relevant source, a checked derivation, or the owner's actual execution path.
-A proposal, a name, a written rule, or an unverified worker declaration is not
-proof that it works. Resolve the necessary in-scope facts; if uncertainty remains,
-state it rather than giving an untested confirmation. This adds no blanket test gate.
+Report commit and push separately, and distinguish implemented, verified,
+published, and applied states. Ground claims in source, a checked derivation, or
+the owner's operation; state material uncertainty and limits without exposing
+secrets.
 
 ## Validation Routing
 

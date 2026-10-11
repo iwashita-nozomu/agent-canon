@@ -61,11 +61,11 @@ failure_policy = "fail"
 [[records]]
 id = "basedpyright"
 package = "basedpyright"
-method = "pipx"
+method = "npm-global"
 version = "1.40.2"
-source = "https://pypi.org/simple"
-verification = { kind = "pipx-package", executable = "basedpyright", args = ["--version"], output_contains = "1.40.2" }
-deps = ["pipx"]
+source = "https://registry.npmjs.org/basedpyright"
+verification = { kind = "npm-package", executable = "basedpyright", args = ["--version"], output_contains = "1.40.2" }
+deps = ["node"]
 provides = ["basedpyright"]
 failure_policy = "fail"
 

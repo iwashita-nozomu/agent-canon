@@ -1073,6 +1073,90 @@ def test_exec_preserves_nonzero_command_exit_and_redacts_output(
     assert "<redacted>" in receipt["details"]["stderr_preview"]
 
 
+@pytest.mark.parametrize("container_id", ["resident", "resident-replaced"])
+def test_exec_receipt_uses_current_host_container_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_id: str,
+) -> None:
+    """Publish the host-read resident ID, including after replacement."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", container_id)
+    monkeypatch.setattr(
+        bootstrap_runtime_module.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 0, stdout="", stderr=""
+        ),
+    )
+
+    result = manager.exec(target, ["agent-canon", "ok"])
+
+    assert result["resource_ids"]["container"]["id"] == container_id
+    assert manager._read_state()["resources"]["container"]["id"] == container_id
+
+
+@pytest.mark.parametrize("host_bound", [False, True])
+def test_exec_projects_registered_host_root_only_for_host_bound_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host_bound: bool
+) -> None:
+    """Host identity metadata is projected only for a host-bound target record."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+    exec_root = target
+    if host_bound:
+        host_digest = "target-digest"
+        container_root = Path(f"/targets/{host_digest}")
+        existing_no_symlink = bootstrap_runtime_module._existing_no_symlink
+
+        def mounted_target(path: Path, *, field: str) -> Path:
+            if path == container_root:
+                return path
+            return existing_no_symlink(path, field=field)
+
+        monkeypatch.setattr(
+            bootstrap_runtime_module, "_existing_no_symlink", mounted_target
+        )
+        target_record = manager._target_record(
+            container_root,
+            "read-only",
+            host_root=str(target),
+            host_digest=host_digest,
+        )
+        state = manager._read_state()
+        state["targets"] = {host_digest: target_record}
+        state["generations"]["generation-0001"]["targets"] = {
+            host_digest: target_record
+        }
+        manager._write_mounts(state)
+        manager._write_mount_manifest(state)
+        manager._write_state(state)
+        monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", host_digest)
+        exec_root = container_root
+
+    observed: dict[str, str] = {}
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident")
+
+    def capture_environment(
+        argv: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        observed.update(kwargs["env"])
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        bootstrap_runtime_module.subprocess, "run", capture_environment
+    )
+    manager.exec(
+        exec_root,
+        ["agent-canon", "ok"],
+        extra_environment={"AGENT_CANON_TARGET_HOST_ROOT": "/caller-provided"},
+    )
+
+    if host_bound:
+        assert observed["AGENT_CANON_TARGET_HOST_ROOT"] == str(target)
+    else:
+        assert "AGENT_CANON_TARGET_HOST_ROOT" not in observed
+
+
 @pytest.mark.parametrize("argv", [["python3", "-m", "pytest"], ["ruff", "format"]])
 def test_exec_accepts_native_commands_for_standalone_source(argv: list[str]) -> None:
     """A source topic checkout uses the resident despite a different install path."""
