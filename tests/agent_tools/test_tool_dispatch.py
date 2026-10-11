@@ -1015,7 +1015,7 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
     input_path.write_text(
         json.dumps(
             {
-                "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json",
+                "$schema": "https://vega.github.io/schema/vega-lite/v6.1.json",
                 "description": "A static renderer smoke input with no domain data.",
                 "data": {"values": [{"label": "renderer smoke"}]},
                 "mark": "text",
@@ -1035,7 +1035,7 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
             "--output",
             str(output_path),
             "--vl-version",
-            "6.4.1",
+            "6.1",
         ),
     )
     assert rendered == 0
@@ -1056,7 +1056,7 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
             "--output",
             str(failed_output),
             "--vl-version",
-            "6.4.1",
+            "6.1",
         ),
     )
     failure_output = capfd.readouterr()

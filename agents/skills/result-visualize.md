@@ -182,7 +182,7 @@ conversion failure; do not add a second schema validator or output wrapper.
 ```bash
 OUTPUT=/var/lib/agent-canon/runtime/tool-output/<figure-id>.svg
 "$BOOTSTRAP" "${COMMON[@]}" tool run --root "$PROJECT_ROOT" vl-convert -- \
-  vl2svg --input "$SPEC" --output "$OUTPUT" --vl-version 6.4.1
+  vl2svg --input "$SPEC" --output "$OUTPUT" --vl-version 6.1
 ```
 
 The existing `html-output` owner may consume the resulting static SVG as an
