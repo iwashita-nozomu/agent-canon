@@ -20,22 +20,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from tools.runtime.artifacts.runtime_artifacts import (
-        RUNTIME_ROOT_ENV,
-        RuntimeRootRequired,
-        SourceLocalArtifact,
-        RuntimeSymlinkEscape,
-        runtime_artifact_boundary,
-    )
-except ImportError:  # direct script/module execution
-    from tools.runtime.artifacts.runtime_artifacts import (  # type: ignore[no-redef]
-        RUNTIME_ROOT_ENV,
-        RuntimeRootRequired,
-        SourceLocalArtifact,
-        RuntimeSymlinkEscape,
-        runtime_artifact_boundary,
-    )
+from tools.runtime.artifacts.runtime_artifacts import (
+    RUNTIME_ROOT_ENV,
+    RuntimeRootRequired,
+    SourceLocalArtifact,
+    RuntimeSymlinkEscape,
+    runtime_artifact_boundary,
+)
 
 try:
     from .parent_root_side_effects import (
