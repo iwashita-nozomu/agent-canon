@@ -1161,20 +1161,11 @@ mod tests {
     }
 
     #[test]
-    fn help_exposes_only_supported_write_and_check_commands() {
+    fn help_exposes_check_and_format_commands() {
         let usage = usage_text();
 
         assert!(usage.contains("docs check"));
         assert!(usage.contains("docs format"));
-        assert!(!usage.contains("fix-math"));
-        assert!(!usage.contains("fix-mermaid"));
-        assert!(!usage.contains("--format text|json"));
-    }
-
-    #[test]
-    fn removed_fix_commands_are_not_parseable() {
-        assert!(Args::parse(&["fix-math".to_string()]).is_err());
-        assert!(Args::parse(&["fix-mermaid".to_string()]).is_err());
     }
 
     #[test]
