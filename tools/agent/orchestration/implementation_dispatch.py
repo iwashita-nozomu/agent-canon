@@ -120,9 +120,8 @@ def _stage_wave_is_active(
     if stage_wave.activation == "always":
         return True
     if stage_wave.activation == "conditional_math_intent_packet":
-        return (
-            math_intent_route_id is not None
-            and any(role_id in roles_by_id for role_id in stage_wave.role_ids)
+        return math_intent_route_id is not None and any(
+            role_id in roles_by_id for role_id in stage_wave.role_ids
         )
     if stage_wave.activation == "explicit_enable_or_full_team_or_comprehensive_family":
         return workflow_family_id == "comprehensive_development" or any(
@@ -239,7 +238,11 @@ def advance_execution_graph(
         if "completion_result" in result and result["spawn_result"].is_error:
             raise RuntimeError(f"execution_result:completed_failed_spawn:{identity}")
         completion = result.get("completion_result")
-        if completion is not None and not completion.is_error and not completion.text.strip():
+        if (
+            completion is not None
+            and not completion.is_error
+            and not completion.text.strip()
+        ):
             raise RuntimeError(f"execution_result:completion_result_empty:{identity}")
         publication = result.get("publication_result")
         if (

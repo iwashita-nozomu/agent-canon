@@ -435,9 +435,7 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
         )
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         run = manifest["run"]
-        assert run["execution_graph"]["initial_wave_agent_types"] == [
-            "worker"
-        ]
+        assert run["execution_graph"]["initial_wave_agent_types"] == ["worker"]
         dispatch = run["issue_worker_dispatch"]
         assert dispatch["status"] == "spawned"
         assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
@@ -446,9 +444,7 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
                 **spawn_results[role_identity],
                 "completion_result": {
                     "isError": False,
-                    "content": [
-                        {"type": "text", "text": "publisher completed"}
-                    ],
+                    "content": [{"type": "text", "text": "publisher completed"}],
                 },
             }
         }

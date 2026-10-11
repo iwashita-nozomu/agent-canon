@@ -2271,7 +2271,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         if isinstance(later_stage_waves, list):
             for wave in require_list(
                 cast(object, later_stage_waves),
-            f"task {task_id} execution graph later_stage_waves must be a list",
+                f"task {task_id} execution graph later_stage_waves must be a list",
             ):
                 if not isinstance(wave, dict):
                     continue

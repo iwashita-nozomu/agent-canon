@@ -1309,16 +1309,14 @@ def manifest_run_lines(
             math_intent_route_id=math_intent_route_id,
         )
         lines.append("  execution_graph:")
+        lines.append("    controller: 'tools/runtime/lifecycle/bootstrap_agent_run.py'")
         lines.append(
-            "    controller: 'tools/runtime/lifecycle/bootstrap_agent_run.py'"
+            "    node_source: 'agents/task_catalog.yaml role_topology_defaults.stage_waves'"
         )
-        lines.append("    node_source: 'agents/task_catalog.yaml role_topology_defaults.stage_waves'")
         lines.append("    readiness_source: actual_host_tool_results")
         lines.append("    skill_read_source: canonical_doc")
         lines.append(f"    task_id: {spec.task_id or 'none'}")
-        lines.append(
-            f"    math_intent_route_id: {math_intent_route_id or 'none'}"
-        )
+        lines.append(f"    math_intent_route_id: {math_intent_route_id or 'none'}")
         lines.append("    selected_role_ids:")
         if spec.roles:
             for role in spec.roles:
@@ -1356,9 +1354,7 @@ def manifest_run_lines(
         if expansion_wave_slots:
             for index, wave in enumerate(expansion_wave_slots, start=2):
                 lines.append(f"      - wave_id: WAVE-{index}")
-                lines.append(
-                    f"        depends_on: WAVE-{index - 1}"
-                )
+                lines.append(f"        depends_on: WAVE-{index - 1}")
                 lines.append("        agent_types:")
                 for slot in wave:
                     lines.append(f"          - {slot.agent_type}")

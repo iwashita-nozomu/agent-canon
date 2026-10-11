@@ -323,12 +323,15 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the reader CLI."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("index", "chunk", "admit"),
+        "command",
+        choices=("index", "chunk", "admit"),
         help="index lists headings; chunk returns text; admit reports EOF metadata only.",
     )
     parser.add_argument("--path", type=Path, help="Markdown document path.")
     parser.add_argument("--heading", help="Exact heading or unique heading title.")
-    parser.add_argument("--offset", type=int, default=0, help="Zero-based file byte offset.")
+    parser.add_argument(
+        "--offset", type=int, default=0, help="Zero-based file byte offset."
+    )
     parser.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     parser.add_argument(
         "--owner",
@@ -345,9 +348,14 @@ def _render_text(value: object) -> str:
     """Render a compact human-readable response without losing chunk text."""
     if isinstance(value, (DocumentChunk, SkillReadAdmission)):
         payload = value.as_json()
-        return "\n".join(f"{key}={json.dumps(item, ensure_ascii=False)}" for key, item in payload.items())
+        return "\n".join(
+            f"{key}={json.dumps(item, ensure_ascii=False)}"
+            for key, item in payload.items()
+        )
     if isinstance(value, tuple):
-        return json.dumps([item.as_json() for item in value], ensure_ascii=False, indent=2)
+        return json.dumps(
+            [item.as_json() for item in value], ensure_ascii=False, indent=2
+        )
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 

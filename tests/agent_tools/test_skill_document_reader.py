@@ -48,14 +48,19 @@ class SkillDocumentReaderTest(unittest.TestCase):
             reader = SkillDocumentReader(path)
             headings = reader.index()
 
-            self.assertEqual([item.heading for item in headings], ["# Intro", "## Details", "### Nested", "## End"])
+            self.assertEqual(
+                [item.heading for item in headings],
+                ["# Intro", "## Details", "### Nested", "## End"],
+            )
             self.assertEqual(headings[1].section_end, headings[2].byte_start)
             self.assertEqual(headings[2].section_end, headings[3].byte_start)
 
     def test_section_chunks_are_bounded_and_continue_to_section_eof(self) -> None:
         """A section can be consumed with next_offset until section EOF."""
         with tempfile.TemporaryDirectory() as temporary:
-            path = self.write_document(Path(temporary), "## Details\n0123456789\nabcdefghij\n## End\n")
+            path = self.write_document(
+                Path(temporary), "## Details\n0123456789\nabcdefghij\n## End\n"
+            )
             reader = SkillDocumentReader(path)
 
             chunks = reader.read_section("## Details", max_bytes=9)
@@ -92,16 +97,30 @@ class SkillDocumentReaderTest(unittest.TestCase):
             reader = SkillDocumentReader(path)
             heading = reader.find_heading("詳細")
 
-            chunk = reader.chunk(heading=heading.heading, max_bytes=heading.byte_end - heading.byte_start + 2)
+            chunk = reader.chunk(
+                heading=heading.heading,
+                max_bytes=heading.byte_end - heading.byte_start + 2,
+            )
 
-            self.assertLessEqual(chunk.byte_end - chunk.byte_start, heading.byte_end - heading.byte_start + 2)
-            self.assertEqual(chunk.text.encode("utf-8"), reader.data[chunk.byte_start : chunk.byte_end])
-            self.assertEqual(reader.data[chunk.byte_start : chunk.byte_end].decode("utf-8"), chunk.text)
+            self.assertLessEqual(
+                chunk.byte_end - chunk.byte_start,
+                heading.byte_end - heading.byte_start + 2,
+            )
+            self.assertEqual(
+                chunk.text.encode("utf-8"),
+                reader.data[chunk.byte_start : chunk.byte_end],
+            )
+            self.assertEqual(
+                reader.data[chunk.byte_start : chunk.byte_end].decode("utf-8"),
+                chunk.text,
+            )
 
     def test_file_eof_is_distinct_from_section_eof(self) -> None:
         """The final section reaches both EOF flags; an earlier one does not."""
         with tempfile.TemporaryDirectory() as temporary:
-            path = self.write_document(Path(temporary), "## First\none\n## Last\n最後\n")
+            path = self.write_document(
+                Path(temporary), "## First\none\n## Last\n最後\n"
+            )
             reader = SkillDocumentReader(path)
 
             first = reader.read_section("First", max_bytes=100)[-1]
@@ -126,7 +145,9 @@ class SkillDocumentReaderTest(unittest.TestCase):
             root = Path(temporary)
             skill = self.write_document(root, "## Common\nconstraints\n## Later\n")
             owner = root / "owner.md"
-            owner.write_text("## Operation\nbody\n### Recovery\nunread\n", encoding="utf-8")
+            owner.write_text(
+                "## Operation\nbody\n### Recovery\nunread\n", encoding="utf-8"
+            )
             result = admit_implementation_read(
                 ((skill, "Common"), (owner, "Operation")), max_bytes=8
             )
@@ -153,7 +174,17 @@ class SkillDocumentReaderTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = self.write_document(Path(temporary), "## Operation\n日本語\n")
             chunk_result = subprocess.run(
-                [sys.executable, str(READER), "chunk", "--path", str(path), "--heading", "Operation", "--max-bytes", "10"],
+                [
+                    sys.executable,
+                    str(READER),
+                    "chunk",
+                    "--path",
+                    str(path),
+                    "--heading",
+                    "Operation",
+                    "--max-bytes",
+                    "10",
+                ],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -166,15 +197,24 @@ class SkillDocumentReaderTest(unittest.TestCase):
             self.assertIn("file_eof", chunk)
 
             missing_result = subprocess.run(
-                [sys.executable, str(READER), "chunk", "--path", str(path), "--heading", "Missing"],
+                [
+                    sys.executable,
+                    str(READER),
+                    "chunk",
+                    "--path",
+                    str(path),
+                    "--heading",
+                    "Missing",
+                ],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(missing_result.returncode, 2)
-            self.assertIn("SKILL_DOCUMENT_READER_ERROR=heading_not_found", missing_result.stderr)
-
+            self.assertIn(
+                "SKILL_DOCUMENT_READER_ERROR=heading_not_found", missing_result.stderr
+            )
 
     def test_admission_projection_keeps_metadata_without_repeating_text(self) -> None:
         """Only the serialized body is removed; all positions and EOF flags survive."""
@@ -183,7 +223,10 @@ class SkillDocumentReaderTest(unittest.TestCase):
             owner = root / "owner.md"
             sections = ("First", "Second", "Last")
             owner.write_text(
-                "".join(f"## {heading}\n" + "本文を再送しない\n" * 400 for heading in sections),
+                "".join(
+                    f"## {heading}\n" + "本文を再送しない\n" * 400
+                    for heading in sections
+                ),
                 encoding="utf-8",
             )
             result = admit_implementation_read(
@@ -198,25 +241,40 @@ class SkillDocumentReaderTest(unittest.TestCase):
             self.assertEqual(projection["owner_sections"], expected)
             self.assertEqual(projection["implementation_read"], "ready")
             self.assertEqual(set(projection), {"owner_sections", "implementation_read"})
-            self.assertEqual([entry["file_eof"] for entry in expected], [False, False, True])
+            self.assertEqual(
+                [entry["file_eof"] for entry in expected], [False, False, True]
+            )
 
     def test_cli_admit_omits_text_in_json_and_text_formats(self) -> None:
         """Both output formats share the metadata projection, including empty inputs."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             owner = root / "owner.md"
-            owner.write_text("## Operation\nBODY_MUST_NOT_BE_REPEATED\n", encoding="utf-8")
+            owner.write_text(
+                "## Operation\nBODY_MUST_NOT_BE_REPEATED\n", encoding="utf-8"
+            )
             for owners, status in (
                 (["--owner", f"{owner}#Operation"], "ready"),
                 ([], "locked"),
             ):
                 outputs = []
                 for output_format in ("json", "text"):
-                    with self.subTest(status=status, owners=bool(owners), format=output_format):
+                    with self.subTest(
+                        status=status, owners=bool(owners), format=output_format
+                    ):
                         result = subprocess.run(
-                            [sys.executable, str(READER), "admit",
-                             *owners, "--format", output_format],
-                            cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                            [
+                                sys.executable,
+                                str(READER),
+                                "admit",
+                                *owners,
+                                "--format",
+                                output_format,
+                            ],
+                            cwd=PROJECT_ROOT,
+                            check=False,
+                            capture_output=True,
+                            text=True,
                         )
                         self.assertEqual(result.returncode, 0, result.stderr)
                         if output_format == "json":
@@ -224,7 +282,10 @@ class SkillDocumentReaderTest(unittest.TestCase):
                         else:
                             payload = {
                                 key: json.loads(value)
-                                for key, value in (line.split("=", 1) for line in result.stdout.splitlines())
+                                for key, value in (
+                                    line.split("=", 1)
+                                    for line in result.stdout.splitlines()
+                                )
                             }
                         outputs.append(payload)
                         self.assertEqual(payload["implementation_read"], status)
@@ -244,16 +305,38 @@ class SkillDocumentReaderTest(unittest.TestCase):
                 parts = []
                 while True:
                     result = subprocess.run(
-                        [sys.executable, str(READER), "chunk", "--path", str(path),
-                         "--heading", "Operation", "--offset", str(offset),
-                         "--max-bytes", "17", "--format", output_format],
-                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                        [
+                            sys.executable,
+                            str(READER),
+                            "chunk",
+                            "--path",
+                            str(path),
+                            "--heading",
+                            "Operation",
+                            "--offset",
+                            str(offset),
+                            "--max-bytes",
+                            "17",
+                            "--format",
+                            output_format,
+                        ],
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
-                    payload = json.loads(result.stdout) if output_format == "json" else {
-                        key: json.loads(value)
-                        for key, value in (line.split("=", 1) for line in result.stdout.splitlines())
-                    }
+                    payload = (
+                        json.loads(result.stdout)
+                        if output_format == "json"
+                        else {
+                            key: json.loads(value)
+                            for key, value in (
+                                line.split("=", 1)
+                                for line in result.stdout.splitlines()
+                            )
+                        }
+                    )
                     self.assertEqual(payload["byte_start"], offset)
                     self.assertGreater(payload["next_offset"], offset)
                     self.assertLessEqual(len(payload["text"].encode("utf-8")), 17)
@@ -272,9 +355,19 @@ class SkillDocumentReaderTest(unittest.TestCase):
             for body, heading, limit, error in (
                 (b"", "Operation", "4096", "heading_not_found"),
                 (b"## Operation\nbody\n", "Missing", "4096", "heading_not_found"),
-                (b"## Operation\n## Operation\n", "Operation", "4096", "heading_ambiguous"),
+                (
+                    b"## Operation\n## Operation\n",
+                    "Operation",
+                    "4096",
+                    "heading_ambiguous",
+                ),
                 (b"## Operation\n\xff", "Operation", "4096", "invalid_utf8"),
-                ("## Operation\n日本語\n".encode("utf-8"), "Operation", "1", "max_bytes_splits_utf8"),
+                (
+                    "## Operation\n日本語\n".encode("utf-8"),
+                    "Operation",
+                    "1",
+                    "max_bytes_splits_utf8",
+                ),
                 (b"## Operation\n", "Operation", "0", "invalid_max_bytes"),
                 (None, "Operation", "4096", "read_failed"),
             ):
@@ -284,14 +377,23 @@ class SkillDocumentReaderTest(unittest.TestCase):
                     else:
                         owner.write_bytes(body)
                     result = subprocess.run(
-                        [sys.executable, str(READER), "admit",
-                         "--owner", f"{owner}#{heading}", "--max-bytes", limit],
-                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                        [
+                            sys.executable,
+                            str(READER),
+                            "admit",
+                            "--owner",
+                            f"{owner}#{heading}",
+                            "--max-bytes",
+                            limit,
+                        ],
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
                     self.assertEqual(result.returncode, 2)
                     self.assertEqual(result.stdout, "")
                     self.assertIn(f"SKILL_DOCUMENT_READER_ERROR={error}", result.stderr)
-
 
     def test_parent_and_nested_branches_are_read_only_when_selected(self) -> None:
         """Large parent chunks never preload alternatives or nested recovery."""
@@ -308,17 +410,23 @@ class SkillDocumentReaderTest(unittest.TestCase):
             for heading in ("Operation", "A", "Retry A", "B", "Closeout"):
                 with self.subTest(heading=heading):
                     chunks = reader.read_section(heading, max_bytes=100_000)
-                    self.assertEqual("".join(chunk.text for chunk in chunks), parts[heading])
+                    self.assertEqual(
+                        "".join(chunk.text for chunk in chunks), parts[heading]
+                    )
                     self.assertTrue(chunks[-1].section_eof)
                     self.assertEqual(chunks[-1].file_eof, heading == "Closeout")
 
     def test_continuation_cannot_cross_into_an_unselected_child(self) -> None:
         """A parent offset cannot be reused to silently continue into children."""
         with tempfile.TemporaryDirectory() as temporary:
-            path = self.write_document(Path(temporary), "## Common\nrules\n### Child\nbody\n")
+            path = self.write_document(
+                Path(temporary), "## Common\nrules\n### Child\nbody\n"
+            )
             reader = SkillDocumentReader(path)
             parent = reader.read_section("Common", max_bytes=7)[-1]
-            self.assertEqual(parent.next_offset, reader.find_heading("Child").byte_start)
+            self.assertEqual(
+                parent.next_offset, reader.find_heading("Child").byte_start
+            )
             with self.assertRaisesRegex(SkillDocumentError, "offset_at_eof"):
                 reader.chunk(heading="Common", offset=parent.next_offset)
             with self.assertRaisesRegex(SkillDocumentError, "offset_out_of_section"):
@@ -354,7 +462,10 @@ class SkillDocumentReaderTest(unittest.TestCase):
                 with self.subTest(args=args):
                     result = subprocess.run(
                         [sys.executable, str(READER), *args, "--path", str(path)],
-                        cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
                     )
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertNotIn("DEFERRED_RECOVERY", result.stdout)
@@ -372,7 +483,10 @@ class SkillDocumentReaderTest(unittest.TestCase):
         """Removed CLI admission cannot silently restore whole-file reading."""
         result = subprocess.run(
             [sys.executable, str(READER), "admit", "--compact", "skill.md"],
-            cwd=PROJECT_ROOT, check=False, capture_output=True, text=True,
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
         )
         self.assertEqual(result.returncode, 2)
         self.assertIn("unrecognized arguments", result.stderr)
