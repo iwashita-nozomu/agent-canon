@@ -23,7 +23,7 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 
 ## Execution-Time-Aware Plan（実行時間を考慮した計画）
 
-<!-- 下記の canonical owner を射影し、scheduling policy を再記述したり duration cutoff を追加したりしません。 -->
+<!-- 下記の canonical owner を射影し、scheduling policy を再記述したり duration cutoff を追加したりしません。AgentCanon execution graph が active な run では ready_set / dispatch_batch / wait_reason は actual ToolCall transition の readback であり、parent が手動で波や完了を決定しません。 -->
 
 - Owner contract: `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
 - Executable scheduling fields: `dependency_dag`, `responsibility_completeness`, `correctness`, `decision_relevant_total_work`, `makespan_objective`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`, `candidate_epoch`, `blocking_finding_ids`, `focused_recheck`, `terminal_state`.
@@ -87,7 +87,7 @@ presence/compatibility/DAG closure and does not rerun owner commands.
 
 ## Agent Wave Ledger（agent wave ledger）
 
-<!-- wave route を選択した場合の authoritative fanout ledger です。Intake Responsibility Wave は total cap ではなく intake responsibility slice なので、catalog にあるだけでは intake row を作りません。selected または実際に skipped/delegated した wave だけを追加します。planned row に event がなければ Status または Skipped Roles / Rationale を `overplanning`、`logging_gap`、`unresolved` のいずれかに分類し、overplanning/unresolved は backfill せず logging_gap は validation blocker とします。mid-task user addition は same_active_task_delta、scope_or_contract_change、new_task に分類し、durable coordination/resumption evidence が必要なら `python3 tools/runtime/lifecycle/workflow_monitor.py --mid-task-user-input ...` を優先します。`Delegated Policy Ref` は指定された team_manifest path を指します。 -->
+<!-- Agent Wave Ledger は team_manifest.yaml の execution_graph.result_readback と workflow_monitor.py の Actual Wave Events を表示する欄です。readiness / completion は run manifest の実 ToolCall result で判断し、この表から wave を追加・完了扱いしません。mid-task user additions は既存の workflow_monitor.py route で記録し、その変更後の graph transition を同じ run に渡します。`Delegated Policy Ref` は指定された team_manifest path を指します。 -->
 
 | Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |
 | ------- | ------------------ | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | -------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | -------------------- | ------ |

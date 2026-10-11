@@ -7,6 +7,7 @@ version: 1
 # downstream design ../canonical/CODEX_WORKFLOW.md consumes the skill catalog during task routing
 # downstream implementation ../../tools/agent/skills/skill_route_catalog.py parses complete rule and capability metadata
 # downstream implementation ../../tools/agent/orchestration/route.py consumes routing and dependency-derived skill order
+# downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py reads selected canonical documents from this catalog
 # downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates public skill catalog consistency
 # downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
