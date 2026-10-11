@@ -287,6 +287,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "pyright-language-server",
         "bash-language-server",
         "markdownlint-cli2",
+        "gnupg",
         "node",
         "quarto",
         "lychee",
@@ -363,6 +364,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
     node = next(record for record in records if record["id"] == "node")
     assert node["method"] == "apt-repository"
     assert node["version"] == "22.23.3-1nodesource1"
+    assert "gnupg" in node["deps"]
     quarto = next(record for record in records if record["id"] == "quarto")
     assert quarto["version"] == "1.10.19"
     lychee = next(record for record in records if record["id"] == "lychee")
