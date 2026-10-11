@@ -105,7 +105,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `check-dependency-header-format` | `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-headers` | `python3 tools/validation/semantic/dependencies/check_dependency_headers.py` | explicitly selected files の dependency manifest declaration を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
-| `scan-code-dependencies` | `bash tools/analysis/dependencies/scan_code_dependencies.sh` | Python import、C/C++ include、shell source など code-level dependency edge を抽出します。 | no | local: Apache-2.0 |
+| `scip-index` | `python3 tools/analysis/dependencies/scip_index.py` | Runs a selected native SCIP indexer and projects bounded definitions, references, and implementations. | yes | local: Apache-2.0 |
 | `render-dependency-manifest-graph` | `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
@@ -120,6 +120,9 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `markdownlint-cli2` 0.17.2 | Markdown style rules called by the AgentCanon docs check. | `bootstrap/container/image/dependencies.toml`, `.markdownlint-cli2.jsonc` | upstream: MIT |
 | Rust toolchain: `rustup`, `cargo`, `rustc`, `rust-src`, `rust-analyzer` | AgentCanon Rust CLI の build と language-server support。 | `bootstrap/container/image/dependencies.toml` | upstream: Apache-2.0 OR MIT for official Rust projects; verify component repository |
 | `clangd-18` (Ubuntu 24.04 Noble package) | C/C++ language-server analysis in the shared runtime。 | `bootstrap/container/image/dependencies.toml` (`clangd-language-server`) | upstream: Apache-2.0 WITH LLVM-exception; package metadata: <https://packages.ubuntu.com/noble/clangd-18> |
+| `scip` 0.10.0 | Official SCIP stats, lint, and print/readback CLI for standard index.scip artifacts. | `bootstrap/container/image/dependencies.toml` (`scip-cli`) | upstream: [Apache-2.0](https://github.com/scip-code/scip/blob/v0.10.0/LICENSE) |
+| `@sourcegraph/scip-python` 0.6.6 | Native Python SCIP indexer; requires a project-owned Python environment input. | `bootstrap/container/image/dependencies.toml` (`scip-python`) | upstream: [MIT](https://github.com/sourcegraph/scip-python/blob/scip/LICENSE.txt) |
+| `scip-clang` 0.4.0 | Native C/C++ SCIP indexer for explicit JSON compile databases on Linux x86_64. | `bootstrap/container/image/dependencies.toml` (`scip-clang`) | upstream: [Apache-2.0](https://github.com/sourcegraph/scip-clang/blob/v0.4.0/LICENSE) |
 | `jq` | JSON / JSONL の compact extraction と CI evidence 整形。 | `agent-canon-environment.toml`, `.devcontainer/dependencies.toml` | upstream: MIT for `jq`; docs are CC BY 3.0 |
 | `experiment-runner-admitted` | ExperimentRunnerのmerged provider。admitted request/result、UUID visibility、child lifecycleを提供します。 | `agent-canon-environment.toml`, `documents/experiments/gpu-admission-r5-ordered-integration-interface.json` | consumer-provided runtime; AgentCanon does not install or import it |
 | Node.js 22.23.3 + npm | manifest-selected npm tools, Quarto-associated Mermaid validation, and Puppeteer runtime. | NodeSource `node` record in `bootstrap/container/image/dependencies.toml`; `/usr/local` remains the typed npm-global prefix | upstream: MIT for Node.js core; Artistic-2.0 for bundled npm; review package notices |

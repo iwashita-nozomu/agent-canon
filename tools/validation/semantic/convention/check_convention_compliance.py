@@ -104,10 +104,6 @@ TOOL_GATES = {
         "tools/analysis/dependencies/run_repo_dependency_review.sh",
         (TOOL_CATALOG_PATH,),
     ),
-    "code_dependency_scan": (
-        "tools/analysis/dependencies/scan_code_dependencies.sh",
-        (TOOL_CATALOG_PATH,),
-    ),
     "notebook_quality": (
         "tools/validation/notebooks/notebook_quality.py",
         (TOOL_CATALOG_PATH,),

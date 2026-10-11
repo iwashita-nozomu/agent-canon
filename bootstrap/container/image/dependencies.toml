@@ -81,6 +81,17 @@ provides = ["pyright", "pyright-langserver"]
 failure_policy = "fail"
 
 [[records]]
+id = "scip-python"
+package = "@sourcegraph/scip-python"
+method = "npm-global"
+version = "0.6.6"
+source = "https://registry.npmjs.org/@sourcegraph%2fscip-python"
+verification = { kind = "npm-package", executable = "scip-python", args = ["--help"], output_contains = "scip-python" }
+deps = ["node"]
+provides = ["scip-python"]
+failure_policy = "fail"
+
+[[records]]
 id = "bash-language-server"
 package = "bash-language-server"
 method = "npm-global"
@@ -504,6 +515,39 @@ executable_owner_packages = ["clangd-18"]
 verification = { kind = "apt-package", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.3" }
 deps = []
 provides = ["clangd-18"]
+failure_policy = "fail"
+
+[[records]]
+id = "scip-clang"
+package = "scip-clang"
+method = "release-asset"
+version = "0.4.0"
+platforms = ["linux/amd64"]
+source = "https://github.com/sourcegraph/scip-clang/releases/download/v0.4.0"
+assets = { x86_64 = "scip-clang-x86_64-linux" }
+checksums = { x86_64 = "06fd18c576f979a726c651594644ec4a35db4f471f2160b3f72eb89fa6001784" }
+archive_format = "binary"
+extract = "none"
+destination = "/usr/local/bin/scip-clang"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/scip-clang", args = ["--version"], output_contains = "0.4.0" }
+deps = []
+provides = ["scip-clang"]
+failure_policy = "fail"
+
+[[records]]
+id = "scip-cli"
+package = "scip"
+method = "release-asset"
+version = "0.10.0"
+source = "https://github.com/scip-code/scip/releases/download/v0.10.0"
+assets = { aarch64 = "scip-linux-arm64.tar.gz", x86_64 = "scip-linux-amd64.tar.gz" }
+checksums = { aarch64 = "6ab677dc2c4bf2955975d0530766152e45daaa988f9404068d8adecacd0bb24c", x86_64 = "eeb28ebbff443c01609fb1691809958f3f0c7a8651af689a5bc8560061cd8ab0" }
+archive_format = "tar.gz"
+extract = "scip"
+destination = "/usr/local/bin/scip"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/scip", args = ["--version"], output_contains = "v0.10.0" }
+deps = []
+provides = ["scip"]
 failure_policy = "fail"
 
 [[records]]

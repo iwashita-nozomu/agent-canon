@@ -1006,9 +1006,7 @@ class DependencyModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             image_root = root / "image-root"
-            runner = FakeRunner(
-                package_versions={"system-library": resolved_version}
-            )
+            runner = FakeRunner(package_versions={"system-library": resolved_version})
             image_install_plan(
                 plan,
                 workspace=root,
@@ -1017,9 +1015,7 @@ class DependencyModelTests(unittest.TestCase):
                 identity=identity,
             )
             apt_install = next(
-                call
-                for call in runner.calls
-                if call[:2] == ("apt-get", "install")
+                call for call in runner.calls if call[:2] == ("apt-get", "install")
             )
             self.assertEqual(
                 apt_install,
@@ -2764,6 +2760,88 @@ class DependencyModelTests(unittest.TestCase):
                             manifest=manifest,
                         )
 
+    def test_release_asset_uses_its_declared_absolute_executable_path(self) -> None:
+        """Release assets resolve by their exact verification path, not record ID."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / "dependencies.toml"
+            content = b"pinned-release-asset"
+            checksum = hashlib.sha256(content).hexdigest()
+            write_manifest(
+                manifest,
+                [
+                    record(
+                        "scip-cli",
+                        method="release-asset",
+                        version="1.0.0",
+                        source="https://example.test/releases/v1.0.0",
+                        assets={"aarch64": "scip", "x86_64": "scip"},
+                        checksums={"aarch64": checksum, "x86_64": checksum},
+                        archive_format="binary",
+                        extract="none",
+                        destination="/usr/local/bin/scip",
+                        provides=["scip"],
+                    )
+                ],
+            )
+            plan = load_plan(root, manifest=manifest)
+            image_root = root / "image"
+            image_root.mkdir()
+            receipts = image_root / "receipts"
+            runner = FakeRunner()
+
+            def download(url: str, destination: Path, **_: object) -> None:
+                del url
+                destination.write_bytes(content)
+
+            with mock.patch.object(
+                dependency_module, "_download", side_effect=download
+            ):
+                Installer(
+                    runner, image_owned=True, image_owned_root=image_root
+                ).install(plan, workspace=root, receipts=receipts)
+
+            receipt = receipts / "scip-cli.json"
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(payload["executable_bindings"], {})
+            with mock.patch.object(
+                dependency_module, "Installer", lambda: Installer(runner)
+            ):
+                resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    receipts,
+                    "scip-cli",
+                    "scip",
+                    manifest=manifest,
+                )
+                with self.assertRaisesRegex(
+                    DependencyError, "does not match its declared absolute path"
+                ):
+                    dependency_module.resolve_verified_executable(
+                        root,
+                        receipts,
+                        "scip-cli",
+                        "scip-cli",
+                        manifest=manifest,
+                    )
+                payload["status"] = "pass"
+                receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+                pass_resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    receipts,
+                    "scip-cli",
+                    "scip",
+                    manifest=manifest,
+                )
+
+            self.assertEqual(resolved.absolute_path, "/usr/local/bin/scip")
+            self.assertEqual(resolved.executable, "scip")
+            self.assertEqual(resolved.verification_output, "1.0.0")
+            self.assertEqual(pass_resolved.absolute_path, "/usr/local/bin/scip")
+            self.assertEqual(pass_resolved.executable, "scip")
+            self.assertEqual(pass_resolved.verification_output, "1.0.0")
+            self.assertIn(("/usr/local/bin/scip", "--version"), runner.calls)
+
     def test_secondary_npm_binding_is_structural_not_a_help_probe(self) -> None:
         """A secondary provider may reject generic help while remaining bound."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -3141,9 +3219,7 @@ class DependencyModelTests(unittest.TestCase):
                     parsed, workspace=root
                 )
                 installs = [
-                    call
-                    for call in runner.calls
-                    if call[:2] == ("apt-get", "install")
+                    call for call in runner.calls if call[:2] == ("apt-get", "install")
                 ]
                 self.assertEqual(len(installs), 1)
                 self.assertEqual(
@@ -3156,7 +3232,9 @@ class DependencyModelTests(unittest.TestCase):
                 mismatched = replace(
                     parsed, checksum=hashlib.sha256(b"different deb").hexdigest()
                 )
-                with self.assertRaisesRegex(DependencyError, "release checksum mismatch"):
+                with self.assertRaisesRegex(
+                    DependencyError, "release checksum mismatch"
+                ):
                     Installer(runner, image_owned=True).install_record(
                         mismatched, workspace=root
                     )
@@ -3371,10 +3449,17 @@ class DependencyModelTests(unittest.TestCase):
 
     def test_canonical_manifest_matches_complete_default_image_record_set(self) -> None:
         """Default image selection matches the complete canonical manifest."""
-        plan = load_plan(
-            ROOT,
-            manifest=ROOT / "bootstrap" / "container" / "image" / "dependencies.toml",
-        )
+        with mock.patch.object(
+            dependency_module.platform, "machine", return_value="x86_64"
+        ):
+            plan = load_plan(
+                ROOT,
+                manifest=ROOT
+                / "bootstrap"
+                / "container"
+                / "image"
+                / "dependencies.toml",
+            )
         ids = {item.id for item in plan.records}
         self.assertEqual(
             ids,
@@ -3385,6 +3470,7 @@ class DependencyModelTests(unittest.TestCase):
                 "ruff",
                 "basedpyright",
                 "pyright-language-server",
+                "scip-python",
                 "bash-language-server",
                 "markdownlint-cli2",
                 "gnupg",
@@ -3426,6 +3512,8 @@ class DependencyModelTests(unittest.TestCase):
                 "jq",
                 "tree",
                 "clangd-language-server",
+                "scip-clang",
+                "scip-cli",
                 "rust-toolchain",
                 "shellcheck",
                 "actionlint",
@@ -3452,6 +3540,105 @@ class DependencyModelTests(unittest.TestCase):
             "pyyaml",
         ):
             self.assertNotIn(removed, ids)
+
+    def test_scip_manifest_records_are_pinned_and_typed(self) -> None:
+        """SCIP providers declare native executables, versions, and artifacts."""
+        with mock.patch.object(
+            dependency_module.platform, "machine", return_value="x86_64"
+        ):
+            plan = load_plan(
+                ROOT,
+                manifest=ROOT
+                / "bootstrap"
+                / "container"
+                / "image"
+                / "dependencies.toml",
+            )
+
+        scip_python = plan.by_id()["scip-python"]
+        self.assertEqual(scip_python.method.value, "npm-global")
+        self.assertEqual(scip_python.package, "@sourcegraph/scip-python")
+        self.assertEqual(scip_python.version, "0.6.6")
+        self.assertEqual(scip_python.deps, ("node",))
+
+        scip_clang = plan.by_id()["scip-clang"]
+        self.assertEqual(scip_clang.method.value, "release-asset")
+        self.assertEqual(scip_clang.version, "0.4.0")
+        self.assertEqual(scip_clang.platforms, ("linux/amd64",))
+        self.assertEqual(scip_clang.archive_format, "binary")
+        self.assertEqual(dict(scip_clang.assets), {"x86_64": "scip-clang-x86_64-linux"})
+        self.assertEqual(len(dict(scip_clang.checksums)["x86_64"]), 64)
+
+        scip_cli = plan.by_id()["scip-cli"]
+        self.assertEqual(scip_cli.method.value, "release-asset")
+        self.assertEqual(scip_cli.version, "0.10.0")
+        self.assertEqual(scip_cli.archive_format, "tar.gz")
+        # Release-asset architecture maps own platform coverage for this record.
+        supported_architectures = {"aarch64", "x86_64"}
+        self.assertEqual(set(dict(scip_cli.assets)), supported_architectures)
+        self.assertEqual(set(dict(scip_cli.checksums)), supported_architectures)
+        self.assertTrue(
+            all(len(value) == 64 for value in dict(scip_cli.checksums).values())
+        )
+
+    def test_platform_scoped_records_follow_the_selected_oci_architecture(self) -> None:
+        """The shared manifest selects only records supported by this OCI target."""
+        manifest = ROOT / "bootstrap" / "container" / "image" / "dependencies.toml"
+
+        with mock.patch.object(
+            dependency_module.platform, "machine", return_value="x86_64"
+        ):
+            amd64_plan = load_plan(ROOT, manifest=manifest)
+        with mock.patch.object(
+            dependency_module.platform, "machine", return_value="aarch64"
+        ):
+            arm64_plan = load_plan(ROOT, manifest=manifest)
+
+        self.assertIn("scip-clang", amd64_plan.by_id())
+        self.assertNotIn("scip-clang", arm64_plan.by_id())
+        for record_id in ("scip-python", "scip-cli"):
+            self.assertIn(record_id, amd64_plan.by_id())
+            self.assertIn(record_id, arm64_plan.by_id())
+        self.assertEqual(
+            validate_runtime_identity(
+                arm64_plan, RuntimeIdentity("ubuntu", "24.04", "linux/arm64")
+            ).platform,
+            "linux/arm64",
+        )
+
+    def test_platform_scoped_provider_cannot_disappear_from_dependency_closure(
+        self,
+    ) -> None:
+        """Filtering an unavailable provider keeps its consumer fail-closed."""
+        source = Path("platform-dependency.toml")
+        provider = parse_record(
+            record(
+                "amd64-only",
+                method="apt-package",
+                source="ubuntu:24.04",
+                platforms=["linux/amd64"],
+            ),
+            path=source,
+            index=0,
+        )
+        consumer = parse_record(
+            record(
+                "consumer",
+                method="apt-package",
+                source="ubuntu:24.04",
+                deps=["amd64-only"],
+            ),
+            path=source,
+            index=1,
+        )
+
+        with mock.patch.object(
+            dependency_module.platform, "machine", return_value="aarch64"
+        ):
+            with self.assertRaisesRegex(
+                DependencyError, "missing dependency: consumer -> amd64-only"
+            ):
+                build_plan((loaded_manifest(source, (provider, consumer)),))
 
     def test_puppeteer_runtime_closure_is_distribution_managed_and_ordered(
         self,

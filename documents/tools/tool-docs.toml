@@ -140,7 +140,7 @@ classification = "public"
 tool = "tools/analysis/dependencies/git_dependency_diff_summary.py"
 doc = "documents/tools/git_dependency_diff_summary.md"
 language = "python"
-summary = "Git diff and dependency expansion summary documentation."
+summary = "Git diff, optional SCIP impact, and dependency-header expansion summary documentation."
 
 [[tool]]
 id = "check-semantic-responsibility-contract"
