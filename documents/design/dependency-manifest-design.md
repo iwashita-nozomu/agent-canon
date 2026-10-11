@@ -489,6 +489,13 @@ equality and requires a typed predecessor at depth `n-1` for every non-seed
 member; closure and generatedness together decide leastness. Direction, depth,
 or result-size thresholds are not completeness substitutes.
 
+For a seeded `query --path <path>` response without `--all`, nodes whose path
+matches the seed start at depth zero. `direction` selects traversal over the
+fact's `from`/`to` endpoints (`outgoing`, `incoming`, or `both`); `depth` is the
+maximum number of traversed relations. Each returned node carries its minimum
+distance as `minimum_depth`. The existing `query --all` route remains an
+unseeded full graph projection and does not assign path-relative depths.
+
 `input_fingerprint` binds the source snapshot, schema/profile pair, and
 authoritative producer identities/content. Runtime-dashboard rows are a
 non-authorizing observation projection: when present, its immutable producer

@@ -21,7 +21,7 @@ use crate::structured_analysis::{initialize_graph_schema, validate_graph_connect
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -3227,6 +3227,11 @@ fn require_current_root_graph_reader(args: &GraphArgs) -> Result<(), GraphError>
 
 fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
     require_current_root_graph_reader(args)?;
+    if !matches!(args.direction.as_str(), "outgoing" | "incoming" | "both") {
+        return Err(GraphError::Usage(
+            "direction must be outgoing, incoming, or both".to_string(),
+        ));
+    }
     let status = read_graph_status(args)?;
     if status.get("status").and_then(Value::as_str) != Some("fresh") {
         return Ok(
@@ -3239,23 +3244,112 @@ fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
         .map_err(|error| GraphError::Io(error.to_string()))?;
     let graph_root = graph_root_for_args(args)?;
     let (all_nodes, all_facts) = load_graph_records(&graph_root)?;
-    let nodes = all_nodes
-        .into_iter()
-        .filter(|value| {
-            args.path
-                .as_ref()
-                .map(|path| value.get("path").and_then(Value::as_str) == Some(path))
-                .unwrap_or(true)
-                || args.all
-        })
-        .collect::<Vec<_>>();
-    let facts = all_facts
+    let relation_facts = all_facts
         .into_iter()
         .filter(|value| {
             args.relation == "all"
                 || value.get("kind").and_then(Value::as_str) == Some(args.relation.as_str())
         })
         .collect::<Vec<_>>();
+    let (nodes, facts) =
+        if args.all || args.path.is_none() {
+            (all_nodes, relation_facts)
+        } else {
+            let seed_path = args.path.as_deref().unwrap_or_default();
+            let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
+            for fact in &relation_facts {
+                let from = fact.get("from").and_then(Value::as_str).ok_or_else(|| {
+                    GraphError::Validation("query fact has no source ID".to_string())
+                })?;
+                let to = fact.get("to").and_then(Value::as_str).ok_or_else(|| {
+                    GraphError::Validation("query fact has no target ID".to_string())
+                })?;
+                match args.direction.as_str() {
+                    "outgoing" => {
+                        adjacency
+                            .entry(from.to_string())
+                            .or_default()
+                            .insert(to.to_string());
+                    }
+                    "incoming" => {
+                        adjacency
+                            .entry(to.to_string())
+                            .or_default()
+                            .insert(from.to_string());
+                    }
+                    "both" => {
+                        adjacency
+                            .entry(from.to_string())
+                            .or_default()
+                            .insert(to.to_string());
+                        adjacency
+                            .entry(to.to_string())
+                            .or_default()
+                            .insert(from.to_string());
+                    }
+                    _ => unreachable!("query direction validated above"),
+                }
+            }
+
+            let mut minimum_depth = BTreeMap::<String, usize>::new();
+            let mut queue = VecDeque::<String>::new();
+            for node in &all_nodes {
+                if node.get("path").and_then(Value::as_str) != Some(seed_path) {
+                    continue;
+                }
+                let node_id = node
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?
+                    .to_string();
+                if minimum_depth.insert(node_id.clone(), 0).is_none() {
+                    queue.push_back(node_id);
+                }
+            }
+            while let Some(current) = queue.pop_front() {
+                let current_depth = minimum_depth[&current];
+                if current_depth >= args.depth {
+                    continue;
+                }
+                let next_depth = current_depth + 1;
+                for next in adjacency.get(&current).into_iter().flatten() {
+                    match minimum_depth.get(next) {
+                        Some(previous) if *previous <= next_depth => continue,
+                        _ => {
+                            minimum_depth.insert(next.clone(), next_depth);
+                            queue.push_back(next.clone());
+                        }
+                    }
+                }
+            }
+
+            let selected_node_ids = minimum_depth.keys().cloned().collect::<BTreeSet<_>>();
+            let mut nodes = Vec::new();
+            for mut node in all_nodes {
+                let node_id = node
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?;
+                let Some(depth) = minimum_depth.get(node_id).copied() else {
+                    continue;
+                };
+                let object = node.as_object_mut().ok_or_else(|| {
+                    GraphError::Validation("query node is not an object".to_string())
+                })?;
+                object.insert("minimum_depth".to_string(), json!(depth));
+                nodes.push(node);
+            }
+            let facts = relation_facts
+                .into_iter()
+                .filter(|fact| {
+                    let from = fact.get("from").and_then(Value::as_str);
+                    let to = fact.get("to").and_then(Value::as_str);
+                    from.is_some_and(|id| selected_node_ids.contains(id))
+                        && to.is_some_and(|id| selected_node_ids.contains(id))
+                })
+                .collect::<Vec<_>>();
+            (nodes, facts)
+        };
     Ok(
         json!({"schema":"agent-canon.graph.query.v1","command":"query","status":"fresh","profile":args.profile,"root":root,"path":args.path,"all":args.all,"relation":args.relation,"direction":args.direction,"depth":args.depth,"graph_fingerprint":status["graph_fingerprint"],"nodes":nodes,"facts":facts,"reason":Value::Null,"exit_code":0}),
     )
@@ -4167,6 +4261,215 @@ mod tests {
         let status = read_graph_status(&args).expect("runtime-present status");
         assert_eq!(status["status"], "stale");
         assert_eq!(status["probe_reason"], "runtime_evidence_changed");
+    }
+
+    #[test]
+    fn seeded_query_applies_relation_direction_depth_and_minimum_depth() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove active runtime pointer");
+        let documents = [
+            (
+                "src/seed.md",
+                concat!(
+                    "<!--\n",
+                    "@dependency-start\n",
+                    "contract design\n",
+                    "responsibility Seeds a directed query fixture.\n",
+                    "downstream design branch.md branch\n",
+                    "downstream design shortcut.md shortcut\n",
+                    "downstream design leaf.md direct leaf\n",
+                    "@dependency-end\n",
+                    "-->\n",
+                ),
+            ),
+            (
+                "src/branch.md",
+                concat!(
+                    "<!--\n",
+                    "@dependency-start\n",
+                    "contract design\n",
+                    "responsibility Adds a longer path through the fixture.\n",
+                    "downstream design shortcut.md shortcut\n",
+                    "downstream design leaf.md leaf\n",
+                    "@dependency-end\n",
+                    "-->\n",
+                ),
+            ),
+            (
+                "src/shortcut.md",
+                concat!(
+                    "<!--\n",
+                    "@dependency-start\n",
+                    "contract design\n",
+                    "responsibility Adds a second path through the fixture.\n",
+                    "downstream design leaf.md leaf\n",
+                    "@dependency-end\n",
+                    "-->\n",
+                ),
+            ),
+            (
+                "src/leaf.md",
+                concat!(
+                    "<!--\n",
+                    "@dependency-start\n",
+                    "contract design\n",
+                    "responsibility Extends the query fixture beyond the first depth.\n",
+                    "downstream design tail.md tail\n",
+                    "@dependency-end\n",
+                    "-->\n",
+                ),
+            ),
+            ("src/tail.md", "# Query tail\n"),
+        ];
+        for (path, content) in documents {
+            fs::write(fixture.root.join(path), content).expect("query fixture document");
+        }
+        fixture_git(
+            &fixture.root,
+            &[
+                "add",
+                "src/seed.md",
+                "src/branch.md",
+                "src/shortcut.md",
+                "src/leaf.md",
+                "src/tail.md",
+            ],
+        );
+        fixture_git(&fixture.root, &["commit", "-qm", "seeded query fixture"]);
+
+        let mut args = graph_args(&fixture.root);
+        args.path = Some("src/seed.md".to_string());
+        args.relation = "dependency".to_string();
+        args.direction = "outgoing".to_string();
+        args.depth = 1;
+        let build = build_graph_with_failure(&args).expect("query fixture graph build");
+        assert_eq!(build["status"], "fresh");
+
+        let query = query_graph(&args).expect("one-edge seeded query");
+        let depths = query["nodes"]
+            .as_array()
+            .expect("seeded nodes")
+            .iter()
+            .map(|node| {
+                (
+                    node.get("path")
+                        .and_then(Value::as_str)
+                        .expect("node path")
+                        .to_string(),
+                    node.get("minimum_depth")
+                        .and_then(Value::as_u64)
+                        .expect("minimum query depth"),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(
+            depths,
+            BTreeMap::from([
+                ("src/branch.md".to_string(), 1),
+                ("src/leaf.md".to_string(), 1),
+                ("src/seed.md".to_string(), 0),
+                ("src/shortcut.md".to_string(), 1),
+            ])
+        );
+        let selected_ids = query["nodes"]
+            .as_array()
+            .expect("seeded nodes")
+            .iter()
+            .filter_map(|node| node.get("id").and_then(Value::as_str))
+            .collect::<BTreeSet<_>>();
+        assert!(query["facts"]
+            .as_array()
+            .is_some_and(|facts| facts.iter().all(|fact| {
+                fact.get("kind").and_then(Value::as_str) == Some("dependency")
+                    && fact
+                        .get("from")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+                    && fact
+                        .get("to")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+            })));
+
+        args.depth = 0;
+        let seed_only = query_graph(&args).expect("zero-depth seeded query");
+        let seed_only_nodes = seed_only["nodes"].as_array().expect("seed-only nodes");
+        assert_eq!(seed_only_nodes.len(), 1);
+        assert_eq!(seed_only_nodes[0]["path"], "src/seed.md");
+        assert_eq!(seed_only_nodes[0]["minimum_depth"], 0);
+
+        args.depth = 2;
+        let deeper = query_graph(&args).expect("two-edge seeded query");
+        assert_eq!(
+            deeper["nodes"]
+                .as_array()
+                .expect("deeper nodes")
+                .iter()
+                .find(|node| node.get("path").and_then(Value::as_str) == Some("src/leaf.md"))
+                .and_then(|node| node.get("minimum_depth"))
+                .and_then(Value::as_u64),
+            Some(1)
+        );
+        assert_eq!(
+            deeper["nodes"]
+                .as_array()
+                .expect("deeper nodes")
+                .iter()
+                .find(|node| node.get("path").and_then(Value::as_str) == Some("src/tail.md"))
+                .and_then(|node| node.get("minimum_depth"))
+                .and_then(Value::as_u64),
+            Some(2)
+        );
+
+        args.path = Some("src/leaf.md".to_string());
+        args.direction = "incoming".to_string();
+        args.depth = 1;
+        let incoming = query_graph(&args).expect("incoming seeded query");
+        let incoming_paths = incoming["nodes"]
+            .as_array()
+            .expect("incoming nodes")
+            .iter()
+            .filter_map(|node| node.get("path").and_then(Value::as_str))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            incoming_paths,
+            BTreeSet::from([
+                "src/branch.md",
+                "src/leaf.md",
+                "src/seed.md",
+                "src/shortcut.md",
+            ])
+        );
+
+        args.path = Some("src/branch.md".to_string());
+        args.direction = "both".to_string();
+        let bidirectional = query_graph(&args).expect("bidirectional seeded query");
+        let bidirectional_paths = bidirectional["nodes"]
+            .as_array()
+            .expect("bidirectional nodes")
+            .iter()
+            .filter_map(|node| node.get("path").and_then(Value::as_str))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(
+            bidirectional_paths,
+            BTreeSet::from([
+                "src/branch.md",
+                "src/leaf.md",
+                "src/seed.md",
+                "src/shortcut.md",
+            ])
+        );
+
+        args.all = true;
+        args.depth = 0;
+        let full = query_graph(&args).expect("full graph query remains unseeded");
+        assert!(full["nodes"]
+            .as_array()
+            .expect("full graph nodes")
+            .iter()
+            .all(|node| node.get("minimum_depth").is_none()));
     }
 
     #[test]
