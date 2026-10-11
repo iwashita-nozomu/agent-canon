@@ -4,10 +4,9 @@
   "title": "AgentCanon public skill catalog",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "tool_runtime", "skill_families"],
+  "required": ["version", "skill_families"],
   "properties": {
     "version": { "const": 1 },
-    "tool_runtime": { "$ref": "#/$defs/toolRuntime" },
     "skill_families": {
       "type": "array",
       "items": { "$ref": "#/$defs/skillFamily" }
@@ -82,46 +81,6 @@
           "items": { "$ref": "#/$defs/capability" },
           "uniqueItems": true
         }
-      }
-    },
-    "toolRuntime": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "schema_version",
-        "catalog",
-        "command",
-        "execution",
-        "environment",
-        "parity_fields",
-        "parity_policy",
-        "legacy_policy"
-      ],
-      "properties": {
-        "schema_version": { "const": 2 },
-        "catalog": { "const": "tools/catalog.yaml" },
-        "command": { "$ref": "#/$defs/nonEmptyString" },
-        "execution": { "$ref": "#/$defs/nonEmptyString" },
-        "environment": { "$ref": "#/$defs/nonEmptyString" },
-        "parity_fields": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {
-            "enum": [
-              "argv",
-              "cwd",
-              "stdin",
-              "stdout",
-              "stderr",
-              "exit",
-              "signal",
-              "written_paths"
-            ]
-          }
-        },
-        "parity_policy": { "const": "verified-only" },
-        "legacy_policy": { "const": "retain-until-parity" }
       }
     },
     "skillFamily": {
