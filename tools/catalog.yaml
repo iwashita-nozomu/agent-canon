@@ -1370,8 +1370,6 @@ entries:
       side_effect: read-only
       output_root: none
       written_paths: []
-      parity: pending
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
