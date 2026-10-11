@@ -1616,10 +1616,12 @@ def main(argv: list[str]) -> int:
                         ]
                     )
                 state_path.write_text(json.dumps(lifecycle), encoding="utf-8")
-                exchange_root = Path(runtime_mount["Source"])
-                if runtime_mount["Destination"] != "/var/lib/agent-canon/runtime":
-                    exchange_root /= "runtime"
-                exchange_root /= "exchange"
+                # The lifecycle adapter maps AGENT_CANON_EXCHANGE_ROOT to
+                # /var/lib/agent-canon/exchange, independent of the controller
+                # state path at /var/lib/agent-canon/runtime. Keep the removal
+                # projection on the same volume path used by target-add and
+                # the host projection exporter.
+                exchange_root = Path(runtime_mount["Source"]) / "exchange"
                 exchange_root.mkdir(parents=True, exist_ok=True)
                 (exchange_root / "mounts.tsv").write_text(
                     "\n".join(mount_rows) + ("\n" if mount_rows else ""),
