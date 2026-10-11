@@ -127,7 +127,7 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             self.assertFalse((root / ".agent-canon").exists())
 
     def test_explicit_persisted_graph_commands_still_require_runtime(self) -> None:
-        """Only explicit build/status and non-source relations invoke the runtime."""
+        """Build/status and seeded or non-source queries invoke the runtime."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.fixture(root)
@@ -143,6 +143,13 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                     relation="owner",
                     direction="both",
                     depth=0,
+                )
+            with self.assertRaisesRegex(GraphClientError, "process launch failed"):
+                client.query(
+                    path="documents/design/feature.md",
+                    relation="dependency",
+                    direction="outgoing",
+                    depth=1,
                 )
 
     def test_dependency_target_escape_is_rejected_without_runtime_fallback(self) -> None:
