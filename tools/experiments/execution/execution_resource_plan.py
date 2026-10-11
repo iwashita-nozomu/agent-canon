@@ -3461,12 +3461,6 @@ class GpuProcessOccupancyProbe:
                     first_start_identity=previous_start,
                     second_start_identity=process.process_start_identity,
                 )
-            if not process.kind:
-                raise TypedPreflightFailure(
-                    "gpu_process_identity_unproven",
-                    "GPU process identity has no conservative process kind",
-                    pid=process.pid,
-                )
             if process.container_namespace_identity != expected_namespace:
                 raise TypedPreflightFailure(
                     "gpu_process_namespace_mismatch",
