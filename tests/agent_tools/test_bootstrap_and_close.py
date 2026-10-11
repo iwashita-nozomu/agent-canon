@@ -1415,8 +1415,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_TARGET_ROOT": str(workspace_root),
                 "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
             }
-            with patch.dict(os.environ, target_environment), redirect_stdout(
-                first_output
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(first_output),
             ):
                 first_code = bootstrap_agent_run(args, spawn=spawn)
 
@@ -1452,8 +1453,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 for identity, result in spawn_results.items()
             }
             second_output = io.StringIO()
-            with patch.dict(os.environ, target_environment), redirect_stdout(
-                second_output
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(second_output),
             ):
                 second_code = bootstrap_agent_run(
                     [*args, "--execution-results", json.dumps(results)]
@@ -1534,8 +1536,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     for identity in identities
                 }
                 current_output = io.StringIO()
-                with patch.dict(os.environ, target_environment), redirect_stdout(
-                    current_output
+                with (
+                    patch.dict(os.environ, target_environment),
+                    redirect_stdout(current_output),
                 ):
                     current_code = bootstrap_agent_run(
                         [*args, "--execution-results", json.dumps(wave_results)]
@@ -1585,22 +1588,17 @@ class BootstrapAndCloseTest(unittest.TestCase):
             monitoring_before = monitoring_path.read_bytes()
             schedule_before = schedule_path.read_bytes()
             empty_output = io.StringIO()
-            with patch.dict(os.environ, target_environment), redirect_stdout(
-                empty_output
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(empty_output),
             ):
-                empty_code = bootstrap_agent_run(
-                    [*args, "--execution-results", "{}"]
-                )
+                empty_code = bootstrap_agent_run([*args, "--execution-results", "{}"])
             self.assertEqual(empty_code, 0, empty_output.getvalue())
             self.assertIn(
                 "EXECUTION_GRAPH_STATUS=awaiting_closeout", empty_output.getvalue()
             )
-            empty_manifest = yaml.safe_load(
-                manifest_path.read_text(encoding="utf-8")
-            )
-            empty_readback = empty_manifest["run"]["execution_graph"][
-                "result_readback"
-            ]
+            empty_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            empty_readback = empty_manifest["run"]["execution_graph"]["result_readback"]
             self.assertEqual(empty_readback, prior_readback)
             self.assertEqual(monitoring_path.read_bytes(), monitoring_before)
             self.assertEqual(schedule_path.read_bytes(), schedule_before)
@@ -1665,8 +1663,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 empty_run_id,
             ]
             initial_output = io.StringIO()
-            with patch.dict(os.environ, target_environment), redirect_stdout(
-                initial_output
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(initial_output),
             ):
                 initial_code = bootstrap_agent_run(empty_args)
             self.assertEqual(initial_code, 0, initial_output.getvalue())
@@ -1679,10 +1678,27 @@ class BootstrapAndCloseTest(unittest.TestCase):
             initial_calls = json.loads(initial_ready_line.split("=", 1)[1])
             self.assertEqual(len(initial_calls), 1)
             run_dir = report_root / empty_run_id
-            manifest_path = run_dir / "team_manifest.yaml"
-            initial_manifest = yaml.safe_load(
-                manifest_path.read_text(encoding="utf-8")
+            initial_input = initial_calls[0]["arguments"]["input"]
+            self.assertIn("Role document packet: manager", initial_input)
+            self.assertIn(host_checkout, initial_input)
+            self.assertNotIn(str(workspace_root), initial_input)
+            self.assertNotIn(str(report_root), initial_input)
+            initial_identity = initial_calls[0]["arguments"]["checkout_identity"]
+            self.assertIn(
+                json.dumps(initial_identity, ensure_ascii=False, sort_keys=True),
+                initial_input,
             )
+            for artifact_name in (
+                "intent_brief.md",
+                "user_request_contract.md",
+                "schedule.md",
+            ):
+                artifact_content = (run_dir / artifact_name).read_text(encoding="utf-8")
+                self.assertTrue(artifact_content.strip(), artifact_name)
+                self.assertIn(f"Role document: manager/{artifact_name}", initial_input)
+                self.assertIn(artifact_content, initial_input)
+            manifest_path = run_dir / "team_manifest.yaml"
+            initial_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             initial_readback = initial_manifest["run"]["execution_graph"][
                 "result_readback"
             ]
@@ -1694,8 +1710,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
             schedule_before = schedule_path.read_bytes()
 
             refreshed_output = io.StringIO()
-            with patch.dict(os.environ, target_environment), redirect_stdout(
-                refreshed_output
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(refreshed_output),
             ):
                 refreshed_code = bootstrap_agent_run(
                     [*empty_args, "--execution-results", "{}"]

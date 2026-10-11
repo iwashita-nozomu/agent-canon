@@ -64,6 +64,7 @@ from tools.agent.orchestration.packets import (
     parse_active_design_packet_input,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
+    role_specific_document_entries,
 )
 from tools.runtime.values import is_string_object_dict, is_string_object_mapping
 from tools.agent.orchestration.team_config import (
@@ -416,6 +417,81 @@ def skill_document_context(
     )
 
 
+def role_document_packet_context(
+    *,
+    config: TeamConfig,
+    role: Role,
+    report_dir: Path,
+    workspace_root: Path,
+    agentcanon_source_root: Path,
+    prepared: PreparedRunBundle,
+    skill_documents: tuple[tuple[str, str, str], ...],
+    existing_run: bool,
+) -> str:
+    """Render this role's selected document packet without container paths."""
+    packet = resolve_role_document_packet(
+        config,
+        role,
+        report_dir,
+        workspace_root,
+        prepared.active_design_packet,
+        agentcanon_source_root,
+    )
+    prepared_files = dict(prepared.files)
+    report_root = report_dir.resolve(strict=False)
+    source_root = agentcanon_source_root.resolve()
+    selected_skill_paths = {
+        (source_root / Path(path)).resolve() for _, path, _ in skill_documents
+    }
+    entries: list[str] = []
+    for entry in role_specific_document_entries(packet):
+        path = entry.path.resolve()
+        if path.is_relative_to(report_root):
+            relative_path = path.relative_to(report_root).as_posix()
+            if existing_run:
+                content = (
+                    path.read_text(encoding="utf-8")
+                    if path.is_file()
+                    else "(not present in this run bundle; no file content supplied)"
+                )
+            else:
+                content_bytes = prepared_files.get(relative_path)
+                content = (
+                    content_bytes.decode("utf-8")
+                    if content_bytes is not None
+                    else "(not emitted by this prepared run bundle; no file content supplied)"
+                )
+        elif path.is_relative_to(source_root):
+            if path in selected_skill_paths:
+                continue
+            relative_path = path.relative_to(source_root).as_posix()
+            reader = SkillDocumentReader(path)
+            if entry.sections:
+                content = "\n\n".join(
+                    "".join(
+                        chunk.text for chunk in reader.read_section(section.heading)
+                    )
+                    for section in entry.sections
+                )
+            else:
+                content = reader.read_document()
+        else:
+            raise RuntimeError(f"execution_graph:role_document_root_invalid:{role.id}")
+        entries.append(
+            f"===== Role document: {role.id}/{relative_path} =====\n{content}"
+        )
+    if not entries:
+        return f"===== Role document packet: {role.id} (no role-specific entries) ====="
+    return "\n\n".join(
+        (
+            f"===== Role document packet: {role.id} =====\n"
+            f"must_cite_before_edit: {str(packet.must_cite_before_edit).lower()}\n"
+            f"notes: {packet.notes or '(none)'}",
+            *entries,
+        )
+    )
+
+
 def materialize_execution_tool_calls(
     *,
     transition: ExecutionGraphTransition,
@@ -430,6 +506,7 @@ def materialize_execution_tool_calls(
     writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
     math_intent_route: str | None,
     math_intent_packet: MathematicalIntentPacket | None,
+    role_document_contexts: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, object], ...]:
     """Materialize actual host spawn ToolCalls for the graph's ready wave."""
     if not transition.ready_slots:
@@ -456,6 +533,12 @@ def materialize_execution_tool_calls(
         identity["cwd"] = host_root
         identity["git_root"] = host_root
     skill_context = skill_document_context(skill_documents)
+    host_identity_context = (
+        "Host checkout_identity for native filesystem access:\n"
+        + json.dumps(identity, ensure_ascii=False, sort_keys=True)
+        + "\nUse the host paths in this identity; container-only paths are unavailable."
+    )
+    role_document_contexts = role_document_contexts or {}
     result_context = "\n\n".join(
         f"===== Completed role instance {role_identity} =====\n{output}"
         for role_identity, output in completed_results
@@ -473,6 +556,8 @@ def materialize_execution_tool_calls(
             f"Run {run_id}; task: {task}\n"
             f"Selected role: {slot.role_id}; agent type: {slot.agent_type}.\n"
             f"{role_prompt_contract(role, family)}\n\n"
+            f"{host_identity_context}\n\n"
+            f"{role_document_contexts.get(slot.role_id, '')}\n\n"
             f"{skill_context}\n\n"
             f"Prior completed graph-node results:\n{result_context or '(none)'}"
         )
@@ -1869,6 +1954,7 @@ def main(
             raise RuntimeError("execution_result:publication_not_applicable")
         execution_tool_calls: tuple[dict[str, object], ...] = ()
         execution_spawn_results: tuple[tuple[str, str], ...] = ()
+        deferred_tool_call_transition: ExecutionGraphTransition | None = None
         if execution_transition.ready_slots:
             if (
                 context.workflow_family_id == "issue_worker_publication"
@@ -1949,20 +2035,23 @@ def main(
                         )
                         execution_tool_calls = ()
                 else:
-                    execution_tool_calls = materialize_execution_tool_calls(
-                        transition=execution_transition,
-                        roles=roles,
-                        task=args.task,
-                        run_id=context.run_id,
-                        workspace_root=workspace_root,
-                        workflow_family_id=context.workflow_family_id,
-                        catalog=catalog,
-                        skill_documents=skill_documents,
-                        completed_results=execution_transition.completed_results,
-                        writer_targets=writer_targets,
-                        math_intent_route=context.math_intent_route,
-                        math_intent_packet=math_intent_packet,
-                    )
+                    if spawn is None:
+                        deferred_tool_call_transition = execution_transition
+                    else:
+                        execution_tool_calls = materialize_execution_tool_calls(
+                            transition=execution_transition,
+                            roles=roles,
+                            task=args.task,
+                            run_id=context.run_id,
+                            workspace_root=workspace_root,
+                            workflow_family_id=context.workflow_family_id,
+                            catalog=catalog,
+                            skill_documents=skill_documents,
+                            completed_results=execution_transition.completed_results,
+                            writer_targets=writer_targets,
+                            math_intent_route=context.math_intent_route,
+                            math_intent_packet=math_intent_packet,
+                        )
         if spawn is not None and execution_transition.ready_slots:
             prompts: dict[str, str] = {}
             for slot, call in zip(
@@ -2121,6 +2210,48 @@ def main(
     except (RuntimeError, OSError, WriterTargetError) as exc:
         print(str(exc), flush=True)
         return 1
+    if deferred_tool_call_transition is not None:
+        try:
+            roles_by_id = {role.id: role for role in roles}
+            role_document_contexts: dict[str, str] = {}
+            for slot in deferred_tool_call_transition.ready_slots:
+                role = roles_by_id.get(slot.role_id)
+                if role is None:
+                    raise RuntimeError(f"execution_graph:role_missing:{slot.role_id}")
+                role_document_contexts[slot.role_id] = role_document_packet_context(
+                    config=config,
+                    role=role,
+                    report_dir=context.report_dir,
+                    workspace_root=workspace_root,
+                    agentcanon_source_root=repository_roots.agentcanon_source_root,
+                    prepared=prepared,
+                    skill_documents=skill_documents,
+                    existing_run=resuming_run,
+                )
+            execution_tool_calls = materialize_execution_tool_calls(
+                transition=deferred_tool_call_transition,
+                roles=roles,
+                task=args.task,
+                run_id=context.run_id,
+                workspace_root=workspace_root,
+                workflow_family_id=context.workflow_family_id,
+                catalog=catalog,
+                skill_documents=skill_documents,
+                completed_results=deferred_tool_call_transition.completed_results,
+                writer_targets=writer_targets,
+                math_intent_route=context.math_intent_route,
+                math_intent_packet=math_intent_packet,
+                role_document_contexts=role_document_contexts,
+            )
+        except (
+            RuntimeError,
+            OSError,
+            SkillDocumentError,
+            ValueError,
+            WriterTargetError,
+        ) as exc:
+            print(str(exc), flush=True)
+            return 1
     active_pointer = context.report_root / ".active_run"
     review_roles = selected_review_roles(roles)
     workflow_context_result: StoreResult | None = None
@@ -2146,9 +2277,7 @@ def main(
     if resuming_run:
         try:
             prior_completed_wave_ids = set(
-                completed_execution_wave_ids(
-                    execution_waves, prior_execution_results
-                )
+                completed_execution_wave_ids(execution_waves, prior_execution_results)
             )
             current_completed_wave_ids = set(
                 completed_execution_wave_ids(execution_waves, execution_results)
