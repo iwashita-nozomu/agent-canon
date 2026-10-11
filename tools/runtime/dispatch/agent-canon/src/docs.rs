@@ -299,7 +299,11 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
         .current_dir(root)
         .arg("--config")
         .arg(root.join("tools/validation/documentation/config/lychee.toml"));
-    command.args(files);
+    command.args(
+        files
+            .iter()
+            .map(|path| path.strip_prefix(root).unwrap_or(path)),
+    );
     run_native_command("lychee", &mut command)
 }
 
