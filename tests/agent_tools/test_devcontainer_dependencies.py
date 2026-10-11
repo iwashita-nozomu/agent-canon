@@ -1691,6 +1691,7 @@ class DependencyModelTests(unittest.TestCase):
                 f"PATH={trusted_path}",
                 f"{oci_bin}/npm",
                 "install",
+                "--force",
                 "--global",
                 "--prefix",
                 "/usr/local",

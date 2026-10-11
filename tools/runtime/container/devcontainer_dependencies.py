@@ -4529,15 +4529,15 @@ class Installer:
                 if self._image_owned
                 else resolve_npm_toolchain(workspace)
             )
+            # Later manifest records must be able to own colliding global bins.
             npm_args = [
                 "install",
+                "--force",
                 "--global",
                 "--prefix",
                 NPM_GLOBAL_PREFIX,
                 f"{record.package}@{record.version}",
             ]
-            if repair:
-                npm_args.insert(1, "--force")
             command = [
                 NPM_ENV_EXECUTABLE,
                 f"PATH={toolchain.path}",
