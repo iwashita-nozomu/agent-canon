@@ -1109,9 +1109,6 @@ def set_section_status(
 
 def infer_tool_warning_status(lines: list[str]) -> str:
     """Infer aggregate ledger status from the latest row for each warning_id."""
-    start = section_start(lines, "## Tool Warnings")
-    if start == -1:
-        return ""
     section = "\n".join(markdown_section_lines(lines, "## Tool Warnings"))
     latest: dict[str, str] = {}
     for line in section.splitlines():
