@@ -40,6 +40,37 @@ access date, the claim used, known limitations, adoption or exclusion decision,
 and whether a downloaded artifact was retained or intentionally left outside the
 tracked tree.
 
+## DOI Metadata Capture
+
+When a DOI is already known, run this lookup from the host shell to retrieve
+bibliographic metadata from Crossref as raw CSL JSON:
+
+```bash
+bash tools/analysis/documents/literature_metadata.sh "10.1234/example.doi" \
+  > /tmp/example.csl.json 2> /tmp/example.provenance.md
+```
+
+The host shell is the network caller for this command; it does not change the
+shared tool runtime's network configuration. It sends the DOI to Crossref's
+versioned `/v1/works/{doi}/transform` route with
+`Accept: application/vnd.citationstyles.csl+json`. It writes the
+provider response bytes unchanged to stdout and writes provider, DOI, request
+URL, retrieval time, request digest, and response digest to stderr. It uses the
+host's existing `curl` and a host `sha256sum` or `shasum`; it does not perform
+broader discovery, maintain a cache, or fetch full text. The request digest
+covers the GET method, Accept header, and exact encoded request URL. A failed
+HTTP request exits nonzero without writing response bytes.
+
+Keep the raw response only when it is useful to the research record, and record
+its path and the provenance fields in the existing Markdown source note. Add
+the claim used, limitations, and adoption or exclusion decision there as usual.
+The Crossref REST API serves metadata deposited by members, so verify the source
+identity against the publication and do not treat metadata as evidence for its
+claims. See [Crossref content negotiation](https://www.crossref.org/documentation/retrieve-metadata/content-negotiation/)
+for the CSL media type and single-record response, and the
+[Crossref REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/)
+for its metadata source (both accessed 2026-10-11).
+
 ## External PDF / HTML Capture
 
 Use the reference materializer for consulted PDF or HTML sources:
