@@ -67,8 +67,8 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 DOI が既知の source では、host shell から
 [Crossref CSL lookup](../../tools/analysis/documents/literature_metadata.sh) を使って書誌
 metadata を取得できます。bare DOI を渡し、stdout の raw CSL JSON と stderr の
-provenance block を別々に保存します。provider、DOI、source URL、取得時刻、request/response
-digest、および raw artifact の場所は既存の [reference note guidance](../../references/README.md)
+provenance block を別々に保存します。provider、DOI、source URL、取得時刻、および raw
+artifact の場所は既存の [reference note guidance](../../references/README.md)
 に従って記録します。metadata は source identity の手掛かりであり、claim の根拠や採否を
 自動で決めるものではありません。source の確認、contrary evidence、adoption/exclusion は
 この Skill が引き続き扱います。

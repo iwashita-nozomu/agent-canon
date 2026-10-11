@@ -5,6 +5,4 @@ canonical_interchange = "csl-json"
 identity_priority = ["doi"]
 
 [provenance]
-retain_raw_response_digest = true
-retain_request_digest = true
 retrieval_time_in_content_identity = false

@@ -39,35 +39,10 @@ url_encode_doi() {
   printf '%s' "$encoded"
 }
 
-sha256_stdin() {
-  local digest_line
-  if command -v sha256sum >/dev/null 2>&1; then
-    digest_line=$(sha256sum) || return
-  elif command -v shasum >/dev/null 2>&1; then
-    digest_line=$(shasum -a 256) || return
-  else
-    printf 'literature metadata lookup requires sha256sum or shasum for provenance.\n' >&2
-    return 127
-  fi
-  printf '%s\n' "${digest_line%% *}"
-}
-
 encoded_doi=$(url_encode_doi "$doi")
 source_url="https://api.crossref.org/v1/works/${encoded_doi}/transform"
-request_material=$(printf 'GET\nAccept: %s\n%s' "$accept" "$source_url")
-request_sha256=$(printf '%s' "$request_material" | sha256_stdin)
 
-response_file=''
-cleanup() {
-  if [[ -n $response_file ]]; then
-    rm -f "$response_file"
-  fi
-}
-trap cleanup EXIT
-
-response_file=$(mktemp "${TMPDIR:-/tmp}/agent-canon-literature-metadata.XXXXXX")
-
-# Buffer the provider response so a failed HTTP transfer cannot look like a complete CSL record.
+# A nonzero curl exit means callers must discard any response bytes already streamed to stdout.
 curl \
   --fail \
   --location \
@@ -79,18 +54,9 @@ curl \
   --proto '=https' \
   --proto-redir '=https' \
   --header "Accept: $accept" \
-  --output "$response_file" \
   "$source_url"
 
-if [[ ! -s $response_file ]]; then
-  printf 'Crossref returned an empty CSL response for DOI %s.\n' "$doi" >&2
-  exit 1
-fi
-
-content_sha256=$(sha256_stdin < "$response_file")
 retrieved_at_utc=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-
-cat "$response_file"
 
 printf '%s\n' \
   '## Metadata' \
@@ -98,6 +64,4 @@ printf '%s\n' \
   '- source_kind: csl-json' \
   "- doi: $doi" \
   "- source_url: $source_url" \
-  "- retrieved_at_utc: $retrieved_at_utc" \
-  "- request_sha256: $request_sha256" \
-  "- content_sha256: $content_sha256" >&2
+  "- retrieved_at_utc: $retrieved_at_utc" >&2

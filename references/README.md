@@ -54,12 +54,10 @@ The host shell is the network caller for this command; it does not change the
 shared tool runtime's network configuration. It sends the DOI to Crossref's
 versioned `/v1/works/{doi}/transform` route with
 `Accept: application/vnd.citationstyles.csl+json`. It writes the
-provider response bytes unchanged to stdout and writes provider, DOI, request
-URL, retrieval time, request digest, and response digest to stderr. It uses the
-host's existing `curl` and a host `sha256sum` or `shasum`; it does not perform
-broader discovery, maintain a cache, or fetch full text. The request digest
-covers the GET method, Accept header, and exact encoded request URL. A failed
-HTTP request exits nonzero without writing response bytes.
+provider response bytes unchanged to stdout and writes provider, DOI, source URL,
+and retrieval time to stderr. It uses the host's existing `curl`; it does not
+perform broader discovery, maintain a cache, or fetch full text. A nonzero exit
+means retrieval failed; discard any response bytes already written to stdout.
 
 Keep the raw response only when it is useful to the research record, and record
 its path and the provenance fields in the existing Markdown source note. Add
