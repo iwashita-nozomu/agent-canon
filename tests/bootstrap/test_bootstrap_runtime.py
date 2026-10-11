@@ -1073,6 +1073,29 @@ def test_exec_preserves_nonzero_command_exit_and_redacts_output(
     assert "<redacted>" in receipt["details"]["stderr_preview"]
 
 
+@pytest.mark.parametrize("container_id", ["resident", "resident-replaced"])
+def test_exec_receipt_uses_current_host_container_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_id: str,
+) -> None:
+    """Publish the host-read resident ID, including after replacement."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+    monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", container_id)
+    monkeypatch.setattr(
+        bootstrap_runtime_module.subprocess,
+        "run",
+        lambda argv, **_kwargs: subprocess.CompletedProcess(
+            argv, 0, stdout="", stderr=""
+        ),
+    )
+
+    result = manager.exec(target, ["agent-canon", "ok"])
+
+    assert result["resource_ids"]["container"]["id"] == container_id
+    assert manager._read_state()["resources"]["container"]["id"] == container_id
+
+
 @pytest.mark.parametrize("argv", [["python3", "-m", "pytest"], ["ruff", "format"]])
 def test_exec_accepts_native_commands_for_standalone_source(argv: list[str]) -> None:
     """A source topic checkout uses the resident despite a different install path."""
