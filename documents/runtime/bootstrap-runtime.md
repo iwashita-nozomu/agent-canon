@@ -104,7 +104,7 @@ The command family is:
 "$BOOTSTRAP" "${COMMON[@]}" target add --root <project-root> --mode read-only
 "$BOOTSTRAP" "${COMMON[@]}" codex prepare
 "$BOOTSTRAP" "${COMMON[@]}" codex launch --project-root <project-root>
-"$BOOTSTRAP" "${COMMON[@]}" tool run --root <project-root> <verified-catalog-id> -- <args...>
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root <project-root> <catalog-id> -- <args...>
 "$BOOTSTRAP" "${COMMON[@]}" eval collect --root <project-root> --run-id <run-id>
 "$BOOTSTRAP" "${COMMON[@]}" eval sync --run-id <run-id>
 "$BOOTSTRAP" "${COMMON[@]}" stop
@@ -308,14 +308,10 @@ to both cases.
 
 Rust first-class commands keep their existing public shape, for example
 `agent-canon docs check` and `agent-canon semantic-index`. Python tools do not
-gain flat global executables. A catalog entry is runnable through
-`tool run` only after its versioned schema-v2 parity record verifies argv,
-cwd, standard streams, exit/signal behavior, and written paths. The
-dispatcher rejects shell command strings and unknown catalog entries.
-
-Until parity is verified, an internal Python file is not exposed through the
-public bootstrap command family. Do not infer that an internal Python file is
-a public catalog command.
+gain flat global executables. A catalog entry is runnable through `tool run`
+using its typed descriptor and the normal registered-target/runtime checks. The
+dispatcher rejects shell command strings and unknown catalog entries. Do not
+infer that an internal Python file is a public catalog command.
 
 ## Evaluation and archive route
 

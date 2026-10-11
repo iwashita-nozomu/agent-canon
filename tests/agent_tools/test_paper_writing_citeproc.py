@@ -107,7 +107,7 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
     return output_root
 
 
-def test_quarto_native_argv_matches_direct_probe_and_parity_record(
+def test_quarto_native_argv_matches_direct_probe_in_same_environment(
     tmp_path: Path,
     monkeypatch,
     capfd,
@@ -126,12 +126,10 @@ def test_quarto_native_argv_matches_direct_probe_and_parity_record(
         check=False,
         capture_output=True,
     )
-    routed_status = tool_dispatch._run_spec(
+    routed_status = tool_dispatch.run_container_tool(
         PROJECT_ROOT,
         spec,
         probe_args,
-        require_parity=False,
-        container_exec=True,
     )
     routed_output = capfd.readouterr()
     direct_result = {
@@ -150,41 +148,8 @@ def test_quarto_native_argv_matches_direct_probe_and_parity_record(
     }
     assert output_root.is_dir()
     assert routed_result == direct_result
-    fixture_path = (
-        PROJECT_ROOT / "tools/fixtures/tool_dispatch/public-command-parity.json"
-    )
-    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
-    row = next(
-        (entry for entry in fixture["entries"] if entry.get("id") == "quarto"),
-        None,
-    )
-    if row is None:
-        raise AssertionError(
-            json.dumps(
-                {
-                    "id": "quarto",
-                    "probe_args": list(probe_args),
-                    "observed": {
-                        "argv": list(spec.argv),
-                        "cwd": spec.cwd_policy,
-                        "stdin": spec.stdin_policy,
-                        "stdout": spec.stdout_policy,
-                        "stderr": spec.stderr_policy,
-                        "exit": spec.exit_policy,
-                        "signal": spec.signal_policy,
-                        "written_paths": list(spec.written_paths),
-                    },
-                    "legacy_result": direct_result,
-                    "container_result": routed_result,
-                },
-                sort_keys=True,
-            )
-        )
-    tool_dispatch._check_parity_fixture(PROJECT_ROOT, spec)
-    assert row["probe_args"] == list(probe_args)
-    # The stored result hashes document their measured environment; HOME/TMPDIR
-    # can change Pandoc's version output. Live parity is the same-run comparison
-    # above, where both routes receive this test's identical environment.
+    # HOME/TMPDIR can change Pandoc's version output, so compare both actual
+    # routes in this test's identical environment rather than a saved receipt.
 
 
 def test_local_citations_render_and_unknown_key_fails_natively(
