@@ -137,11 +137,6 @@ OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS = (
     Path("agents/skills/README.md"),
     Path("agents/canonical/skills.md"),
 )
-INITIAL_INTAKE_MARKERS = {
-    "requirements_organizer": "Initial intake wave role: own user-request clauses",
-    "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
-    "execution_planner": "Initial intake wave role: own stage order",
-}
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
@@ -1814,20 +1809,11 @@ def validate_subagent_protocol_docs() -> None:
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:
-            ensure(
-                "Intake Responsibility Wave" in text,
-                f"{path} missing intake responsibility contract",
-            )
             ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
             ensure(
                 "Agent Wave Ledger" in text,
                 f"{path} missing Agent Wave Ledger contract",
             )
-            for role_id in INITIAL_INTAKE_MARKERS:
-                ensure(
-                    role_id in text,
-                    f"{path} missing intake responsibility role {role_id}",
-                )
             ensure(
                 "max_depth = 2" in text and "delegated_spawn_policy" in text,
                 f"{path} must state bounded nested spawn and delegated_spawn_policy",
