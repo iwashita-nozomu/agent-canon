@@ -338,14 +338,11 @@ container 内で直接起動し、child argument を shell 評価しません。
 宣言された `external-runtime` output root は dispatcher が validation 後に作成します。
 shell command string を dispatcher authority にしません。
 
-catalog runtime inventory は command id、現行 entrypoint、help digest、parity fixture を
-versioned fixture として固定します。Public CLI inventory は Rust clap tree と public
-Python catalog から取得し、差分がある間は Python catalog v2 cutover を禁止します。
-
-`tools/fixtures/tool_dispatch/public-command-parity.json` は catalog Python / Rust / native
-command の direct argv と typed dispatcher route の argv、cwd、stdout、stderr、exit
-code、signal、written paths を記録します。fixture が通らない entry は従来の route を
-維持し、cutover しません。全 internal Python file を自動的に public catalog 化しません。
+catalog runtime inventory は command id、現行 entrypoint、runtime、argv、cwd、stream、
+exit/signal、side-effect、output policy を typed descriptor として保持します。Dispatcher
+は実行時に registered target、authenticated image/runtime、許可された environment、output
+root を検証し、native command の exit と streams をそのまま caller へ返します。全
+internal Python file を自動的に public catalog 化しません。
 
 ## Shell/Container Adapter Registry
 
@@ -589,7 +586,6 @@ source-local runtime default docs/tests
 - task launch と target add を barrier で競合させ、maintenance admission close 後に
   task reservation が増えず、active zero/readback 前に old stop しない concurrency test。
 - `tests/bootstrap/test_bootstrap_runtime.py` でsource read-only mountとsource tree before/after byte/status一致。
-- public CLI parity matrix。
 - local bare `agent-canon-log` publication E2E。
 - install/start/status/codex/tool/eval/stop/gc/uninstall fresh journey。
 - container/image/lock/tmp cleanup、system prune不使用。
@@ -600,7 +596,6 @@ source-local runtime default docs/tests
 | --- | --- | --- |
 | evidence | lifecycle and cleanup behavior | `tests/bootstrap/test_bootstrap_runtime.py` |
 | evidence | image and typed entrypoint | `tests/tools/test_bootstrap_container_contract.py` |
-| evidence | catalog parity | `tools/fixtures/tool_dispatch/public-command-parity.json` |
 | evidence | eval archive publication | `tests/agent_tools/test_runtime_log_archive_git.py` |
 | boundary | Docker build/runtime capability | Docker CLI/daemon is a host capability; AgentCanon reports Docker exit/stderr and does not preflight host architecture or UID/GID |
 | assumption | remote embedding authority | `AGENT_CANON_EMBEDDING_ALLOWED_ENDPOINTS` is explicit and empty by default |
