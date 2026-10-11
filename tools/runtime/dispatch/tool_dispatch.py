@@ -2,12 +2,12 @@
 # @dependency-start
 # contract tool
 # responsibility Dispatches versioned AgentCanon catalog entries through typed tool run without shell evaluation.
-# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md catalog v2 and parity cutover
+# upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md typed catalog and runtime boundary
 # upstream design ../../catalog.yaml typed runtime catalog
 # downstream implementation ../../bin/agent-canon stable CLI namespace
 # downstream implementation ../../../tests/agent_tools/test_tool_dispatch.py dispatcher contract tests
 # @dependency-end
-"""Run a parity-verified AgentCanon tool from the versioned catalog.
+"""Run a typed AgentCanon tool from the versioned catalog.
 
 The existing catalog checker owns the legacy catalog shape.  This module owns
 the additive runtime descriptor and deliberately uses ``subprocess`` with an
@@ -35,7 +35,6 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 SCHEMA_VERSION = 2
-PARITY_SCHEMA = "agent-canon-tool-parity/v2"
 CONTAINER_MARKER = b"agent-canon-tool-container/v1\n"
 RUNTIME_MARKER = b"agent-canon-runtime/v1\n"
 CONTAINER_MARKER_NAME = ".agent-canon-tool-container"
@@ -51,7 +50,6 @@ ALLOWED_EXITS = frozenset({"propagate", "normalize-signal"})
 ALLOWED_SIGNALS = frozenset({"propagate", "normalize-signal"})
 ALLOWED_EFFECTS = frozenset({"read-only", "external-artifact", "explicit-target-write"})
 ALLOWED_OUTPUT_ROOTS = frozenset({"none", "external-runtime", "explicit-target"})
-ALLOWED_PARITY = frozenset({"verified", "pending", "legacy"})
 ISSUE_SYNC_RECEIPT_OPTIONS = frozenset(
     {
         "--help",
@@ -146,8 +144,6 @@ class ToolSpec:
     side_effect_policy: str
     output_root: str
     written_paths: tuple[str, ...]
-    parity: str
-    parity_fixture: str
 
     def inventory_row(self) -> dict[str, object]:
         """Return a stable JSON-compatible inventory row."""
@@ -167,8 +163,6 @@ class ToolSpec:
             "side_effect": self.side_effect_policy,
             "output_root": self.output_root,
             "written_paths": list(self.written_paths),
-            "parity": self.parity,
-            "parity_fixture": self.parity_fixture,
         }
 
 
@@ -240,7 +234,6 @@ def _runtime_for(path: str) -> str:
 
 def _spec_from_entry(
     entry: Mapping[str, object],
-    runtime_schema: Mapping[str, object],
 ) -> ToolSpec | None:
     """Normalize one catalog entry, or skip non-runtime support entries."""
     raw_id = entry.get("id")
@@ -290,10 +283,6 @@ def _spec_from_entry(
         raise DispatchError("output-root-mismatch", raw_id)
     if effect == "read-only" and output != "none":
         raise DispatchError("output-root-mismatch", raw_id)
-    default_parity = runtime_schema.get("default_parity", "legacy")
-    parity = _enum(dispatch.get("parity", default_parity), ALLOWED_PARITY, field=f"entry:{raw_id}:parity")
-    fixture = dispatch.get("parity_fixture", runtime_schema.get("parity_fixture", ""))
-    fixture_value = _safe_relative(_string(fixture, field=f"entry:{raw_id}:parity_fixture"), field=f"entry:{raw_id}:parity_fixture")
     return ToolSpec(
         tool_id=raw_id,
         path=path,
@@ -310,8 +299,6 @@ def _spec_from_entry(
         side_effect_policy=effect,
         output_root=output,
         written_paths=written_paths,
-        parity=parity,
-        parity_fixture=fixture_value,
     )
 
 
@@ -336,7 +323,7 @@ def load_specs(root: Path) -> tuple[dict[str, ToolSpec], Mapping[str, object]]:
     specs: dict[str, ToolSpec] = {}
     for index, raw_entry in enumerate(raw_entries, start=1):
         entry = _mapping(raw_entry, field=f"entries[{index}]")
-        spec = _spec_from_entry(entry, schema)
+        spec = _spec_from_entry(entry)
         if spec is None:
             continue
         if spec.tool_id in specs:
@@ -353,7 +340,7 @@ def load_specs(root: Path) -> tuple[dict[str, ToolSpec], Mapping[str, object]]:
             raise DispatchError("invalid-rust-selector", identifier)
         command["dispatch"] = {"argv": ["tools/bin/agent-canon", selector]}
         command["runtime"] = "rust"
-        spec = _spec_from_entry(command, schema)
+        spec = _spec_from_entry(command)
         if spec is None:
             raise DispatchError("invalid-rust-inventory", identifier)
         if spec.tool_id in specs:
@@ -364,85 +351,8 @@ def load_specs(root: Path) -> tuple[dict[str, ToolSpec], Mapping[str, object]]:
     return specs, schema
 
 
-def _check_parity_fixture(root: Path, spec: ToolSpec) -> None:
-    """Require an exact measured route record before a descriptor cuts over."""
-    if spec.parity != "verified":
-        raise DispatchError("legacy-route", f"{spec.tool_id}:{spec.parity}")
-    fixture_path = root / spec.parity_fixture
-    if not fixture_path.is_file():
-        raise DispatchError("missing-parity-fixture", f"{spec.tool_id}:{spec.parity_fixture}")
-    try:
-        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise DispatchError("invalid-parity-fixture", f"{spec.tool_id}:{error}") from error
-    if not isinstance(payload, Mapping) or payload.get("schema") != PARITY_SCHEMA:
-        raise DispatchError("invalid-parity-fixture", f"{spec.tool_id}:schema")
-    entries = payload.get("entries")
-    if not isinstance(entries, list):
-        raise DispatchError("invalid-parity-fixture", f"{spec.tool_id}:entries")
-    row = next((row for row in entries if isinstance(row, Mapping) and row.get("id") == spec.tool_id), None)
-    if row is None:
-        raise DispatchError("parity-not-recorded", spec.tool_id)
-    expected: dict[str, object] = {
-        "argv": list(spec.argv),
-        "cwd": spec.cwd_policy,
-        "stdin": spec.stdin_policy,
-        "stdout": spec.stdout_policy,
-        "stderr": spec.stderr_policy,
-        "exit": spec.exit_policy,
-        "signal": spec.signal_policy,
-        "written_paths": list(spec.written_paths),
-    }
-    observed = row.get("observed", row)
-    if not isinstance(observed, Mapping):
-        raise DispatchError("invalid-parity-fixture", f"{spec.tool_id}:observed")
-    missing = sorted(key for key in expected if key not in observed)
-    if missing:
-        raise DispatchError("parity-incomplete", f"{spec.tool_id}:{','.join(missing)}")
-    for key, value in expected.items():
-        if observed.get(key) != value:
-            raise DispatchError(
-                "parity-mismatch",
-                f"{spec.tool_id}:{key}:expected={value!r}:observed={observed.get(key)!r}",
-            )
-    probe_args = row.get("probe_args")
-    if (
-        isinstance(probe_args, (str, bytes))
-        or not isinstance(probe_args, list)
-        or any(not isinstance(item, str) or "\x00" in item for item in probe_args)
-    ):
-        raise DispatchError("parity-incomplete", f"{spec.tool_id}:probe_args")
-    result_fields = {
-        "exit_code",
-        "stdout_sha256",
-        "stderr_sha256",
-        "written_paths",
-    }
-    measured: dict[str, Mapping[str, object]] = {}
-    for route_name in ("legacy_result", "container_result"):
-        result = row.get(route_name)
-        if not isinstance(result, Mapping) or set(result) != result_fields:
-            raise DispatchError("parity-incomplete", f"{spec.tool_id}:{route_name}")
-        if not isinstance(result.get("exit_code"), int):
-            raise DispatchError("parity-incomplete", f"{spec.tool_id}:{route_name}:exit_code")
-        for digest_name in ("stdout_sha256", "stderr_sha256"):
-            digest = result.get(digest_name)
-            if (
-                not isinstance(digest, str)
-                or len(digest) != 64
-                or any(char not in "0123456789abcdef" for char in digest)
-            ):
-                raise DispatchError("parity-incomplete", f"{spec.tool_id}:{route_name}:{digest_name}")
-        paths = result.get("written_paths")
-        if not isinstance(paths, list) or any(not isinstance(path, str) for path in paths):
-            raise DispatchError("parity-incomplete", f"{spec.tool_id}:{route_name}:written_paths")
-        measured[route_name] = result
-    if measured["legacy_result"] != measured["container_result"]:
-        raise DispatchError("parity-result-mismatch", spec.tool_id)
-
-
 def _validate_child_route(spec: ToolSpec, args: Sequence[str]) -> None:
-    """Keep the verified IssueSync route on body-free receipt operations."""
+    """Keep IssueSync child arguments on body-free receipt operations."""
     if spec.tool_id != "issue-sync":
         return
     options = {token for token in args if token.startswith("--")}
@@ -771,7 +681,7 @@ def _bootstrap_command(root: Path, runtime: Path, spec: ToolSpec, args: Sequence
 
 
 def _run_container_spec(root: Path, spec: ToolSpec, args: Sequence[str]) -> int:
-    """Execute an already verified tool inside the authenticated image only."""
+    """Execute a typed tool inside the authenticated image only."""
     _validate_container_context(root)
     runtime_value = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
     if not runtime_value:
@@ -821,12 +731,9 @@ def _run_spec(
     spec: ToolSpec,
     args: Sequence[str],
     *,
-    require_parity: bool,
     container_exec: bool = False,
 ) -> int:
     """Build a typed request or execute only inside an authenticated image."""
-    if require_parity:
-        _check_parity_fixture(root, spec)
     _validate_child_route(spec, args)
     if container_exec:
         return _run_container_spec(root, spec, args)
@@ -851,13 +758,13 @@ def _run_spec(
 
 
 def run_tool(root: Path, spec: ToolSpec, args: Sequence[str]) -> int:
-    """Ask bootstrap to execute one parity-verified catalog entry."""
-    return _run_spec(root, spec, args, require_parity=True)
+    """Ask bootstrap to execute one typed catalog entry."""
+    return _run_spec(root, spec, args)
 
 
 def run_container_tool(root: Path, spec: ToolSpec, args: Sequence[str]) -> int:
-    """Run one parity-verified catalog entry inside the tool container."""
-    return _run_spec(root, spec, args, require_parity=True, container_exec=True)
+    """Run one typed catalog entry inside the authenticated tool container."""
+    return _run_spec(root, spec, args, container_exec=True)
 
 
 def run_rust_cli(root: Path, args: Sequence[str]) -> int:

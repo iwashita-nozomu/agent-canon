@@ -35,15 +35,15 @@ parent workspace.
 
 ## Tool commands
 
-Use a catalog ID when parity is verified:
+Use a catalog ID for a typed public tool command:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" tool run --root "$TARGET" route -- --list
 ```
 
-Use the retained argv-only compatibility route for a catalog entry that is
-still classified as `legacy-route`. The command runs inside the resident tool
-container with the target as its working directory:
+Use the explicit argv-only route for a caller-selected command. The command
+runs inside the resident tool container with the target as its working
+directory:
 
 ```bash
 "$BOOTSTRAP" "${COMMON[@]}" exec --root "$TARGET" -- \
