@@ -100,9 +100,8 @@ FORBIDDEN_CONTENT_MARKERS = (
     b"vendor/agent-canon",
     b"wget ",
 )
-# Exact producer-path prefixes rejected after case normalization.  This gate
-# runs for every allowlisted blob while the immutable plan is built, before a
-# destination directory can be created.
+# Exact producer-path prefixes rejected from parsed TOML keys and string values.
+# Comments are source metadata, not runtime path references.
 FORBIDDEN_CONTENT_PREFIXES = (
     b"agents/skills/",
     b"agents/model_profiles.toml",
@@ -304,12 +303,6 @@ def _validate_path_surface(path: str) -> None:
 def _validate_content(path: str, content: bytes) -> None:
     """Reject runtime imports, updater state, secrets, and network behavior."""
     lowered = content.lower()
-    for prefix in FORBIDDEN_CONTENT_PREFIXES:
-        if prefix in lowered:
-            label = prefix.decode("ascii", errors="replace")
-            raise StaticSeedError(
-                f"allowlisted file contains forbidden producer prefix {label!r}: {path}"
-            )
     for marker in FORBIDDEN_CONTENT_MARKERS:
         if marker in lowered:
             label = marker.decode("ascii", errors="replace")
@@ -321,13 +314,25 @@ def _validate_content(path: str, content: bytes) -> None:
     _validate_toml_keys(path, parsed)
 
 
+def _validate_producer_path_text(path: str, value: str) -> None:
+    """Reject source-only producer paths in TOML data, not owner comments."""
+    lowered = value.lower().encode("utf-8")
+    for prefix in FORBIDDEN_CONTENT_PREFIXES:
+        if prefix in lowered:
+            label = prefix.decode("ascii", errors="replace")
+            raise StaticSeedError(
+                f"allowlisted TOML contains forbidden producer prefix {label!r}: {path}"
+            )
+
+
 def _validate_toml_keys(path: str, value: object, *, prefix: str = "") -> None:
-    """Reject executable, network, state, and secret-bearing TOML keys recursively."""
+    """Reject forbidden TOML keys and source-only path strings recursively."""
     if isinstance(value, Mapping):
         mapping = cast(Mapping[object, object], value)
         for raw_key, child in mapping.items():
             if not isinstance(raw_key, str):
                 raise StaticSeedError(f"TOML key is not a string in {path}")
+            _validate_producer_path_text(path, raw_key)
             key = raw_key.lower()
             qualified = f"{prefix}.{raw_key}" if prefix else raw_key
             if key in FORBIDDEN_TOML_KEYS:
@@ -336,6 +341,8 @@ def _validate_toml_keys(path: str, value: object, *, prefix: str = "") -> None:
     elif isinstance(value, list):
         for index, child in enumerate(cast(list[object], value)):
             _validate_toml_keys(path, child, prefix=f"{prefix}[{index}]")
+    elif isinstance(value, str):
+        _validate_producer_path_text(path, value)
 
 
 def _parse_allowlist(content: bytes) -> tuple[str, tuple[str, ...]]:

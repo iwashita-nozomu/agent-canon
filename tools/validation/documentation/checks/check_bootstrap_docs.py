@@ -309,6 +309,14 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if extra:
             findings.append(f".codex/agents: unreferenced role files: {extra}")
 
+    toml_payloads: dict[str, Mapping[str, object]] = {}
+    if config is not None:
+        toml_payloads[".codex/config.toml"] = config
+    for relative in sorted(actual_roles):
+        role_payload = _load_mapping(root / PurePosixPath(relative), findings, relative)
+        if role_payload is not None:
+            toml_payloads[relative] = role_payload
+
     # Scan every config/role payload, including an unreferenced role that will
     # also be reported by the exact-closure gate.
     controlled_files = {
@@ -322,12 +330,36 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if not _is_regular_file(path):
             continue
         lowered = path.read_bytes().lower()
-        for marker in (*STATIC_SEED_FORBIDDEN_CONTENT, *STATIC_SEED_FORBIDDEN_PREFIXES):
+        for marker in STATIC_SEED_FORBIDDEN_CONTENT:
             if marker in lowered:
                 findings.append(
                     f"{relative}: static seed contains forbidden runtime marker: "
                     f"{marker.decode('utf-8', errors='replace')}"
                 )
+
+    for relative, payload in sorted(toml_payloads.items()):
+        pending: list[object] = [payload]
+        found_prefixes: set[bytes] = set()
+        while pending:
+            value = pending.pop()
+            if isinstance(value, str):
+                lowered = value.lower().encode("utf-8")
+                found_prefixes.update(
+                    prefix for prefix in STATIC_SEED_FORBIDDEN_PREFIXES if prefix in lowered
+                )
+            elif isinstance(value, Mapping):
+                mapping = cast(Mapping[object, object], value)
+                for key, child in mapping.items():
+                    if isinstance(key, str):
+                        pending.append(key)
+                    pending.append(child)
+            elif isinstance(value, list):
+                pending.extend(value)
+        for marker in sorted(found_prefixes):
+            findings.append(
+                f"{relative}: static seed contains forbidden runtime marker: "
+                f"{marker.decode('utf-8', errors='replace')}"
+            )
     return findings
 
 

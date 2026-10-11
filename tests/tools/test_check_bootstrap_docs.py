@@ -244,8 +244,8 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout)
             self.assertIn("static seed must not contain symlinks", result.stdout)
 
-    def test_static_seed_consumer_scans_every_config_and_role_payload_for_exact_prefixes(self) -> None:
-        """The source-free gate applies the case-normalized prefix set to every payload."""
+    def test_static_seed_consumer_scans_toml_values_for_exact_prefixes(self) -> None:
+        """The source-free gate rejects producer paths in runtime TOML data."""
         prefixes = (
             "AgEnTs/SkIlLs/",
             "AgEnTs/MoDeL_PrOfIlEs.ToMl",
@@ -254,7 +254,6 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             "../../ToOlS/",
         )
         payloads = (
-            Path("agent-canon-static-seed.json"),
             Path(".codex/config.toml"),
             Path(".codex/agents/worker.toml"),
             Path(".codex/agents/rogue.toml"),
@@ -266,15 +265,45 @@ class CheckBootstrapDocsTest(unittest.TestCase):
                     self.write_static_seed_consumer(root)
                     path = root / payload
                     if payload.name == "rogue.toml":
-                        self.write_file(path, 'name = "rogue"\n')
-                    original = path.read_text(encoding="utf-8")
-                    if path.suffix == ".json":
-                        path.write_text(original + f"\n/* {prefix}payload */\n", encoding="utf-8")
+                        self.write_file(
+                            path,
+                            'name = "rogue"\n'
+                            f'developer_instructions = "{prefix}payload"\n',
+                        )
                     else:
-                        path.write_text(original + f"\n# {prefix}payload\n", encoding="utf-8")
+                        original = path.read_text(encoding="utf-8")
+                        field = (
+                            'description = "Implements a bounded change."'
+                            if payload.name == "config.toml"
+                            else 'developer_instructions = "Implement the bounded change."'
+                        )
+                        replacement = (
+                            f'description = "{prefix}payload"'
+                            if payload.name == "config.toml"
+                            else f'developer_instructions = "{prefix}payload"'
+                        )
+                        path.write_text(
+                            original.replace(field, replacement), encoding="utf-8"
+                        )
                     result = self.run_cli(root, "--static-seed-consumer")
                     self.assertEqual(result.returncode, 1, result.stdout)
                     self.assertIn("static seed contains forbidden runtime marker", result.stdout)
+
+    def test_static_seed_consumer_ignores_dependency_header_comments(self) -> None:
+        """Source ownership comments are not runtime TOML path references."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_static_seed_consumer(root)
+            config = root / ".codex" / "config.toml"
+            config.write_text(
+                "# downstream design ../agents/skills/tokens.md token-aware runtime modes\n"
+                + config.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+
+            result = self.run_cli(root, "--static-seed-consumer")
+
+            self.assertEqual(result.returncode, 0, result.stdout)
 
 
 if __name__ == "__main__":
