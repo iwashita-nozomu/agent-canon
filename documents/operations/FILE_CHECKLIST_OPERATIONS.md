@@ -80,7 +80,7 @@ bash tools/validation/ci/checks/run_python_quality_checks.sh
 ```bash
 bash tools/validation/dependencies/docker_dependency_validator.sh
 python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py
-bash bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
+bash bootstrap.sh --control-parent-root <root> install
 ```
 
 確認:

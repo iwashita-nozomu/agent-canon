@@ -54,7 +54,7 @@ _agent_canon_json_error() {
 _agent_canon_usage() {
   cat <<'USAGE'
 usage: bootstrap.sh [--repository-root PATH] --control-parent-root PATH
-                    [--runtime-root PATH] [--manifest PATH] OPERATION [OPTIONS]
+                    [--manifest PATH] OPERATION [OPTIONS]
 
 OPERATION: install | update | start | status | stop | rollback | uninstall |
            sync | scheduler | target | tool | template | codex | eval | task | gc
@@ -4490,8 +4490,6 @@ bootstrap_host_entrypoint() {
   AGENT_CANON_REPOSITORY_ROOT=
   AGENT_CANON_CONTROL_ROOT=
   AGENT_CANON_CONTROL_ROOT_REQUEST=
-  AGENT_CANON_RUNTIME_ROOT=
-  AGENT_CANON_RUNTIME_REQUEST=
   AGENT_CANON_MANIFEST=
   AGENT_CANON_IMAGE_REF=
   AGENT_CANON_ACTIVE_IMAGE_ID=
@@ -4506,7 +4504,6 @@ bootstrap_host_entrypoint() {
     case "$1" in
       --repository-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; repository_request=$2; shift 2 ;;
       --control-parent-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_CONTROL_ROOT_REQUEST=$2; shift 2 ;;
-      --runtime-root) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_RUNTIME_REQUEST=$2; AGENT_CANON_RUNTIME_ROOT=$2; shift 2 ;;
       --manifest) [[ $# -ge 2 ]] || _agent_canon_json_error argument_missing "$1"; AGENT_CANON_MANIFEST=$2; shift 2 ;;
       --help|-h)
         if ((${#command_args[@]} == 0)); then
@@ -4565,7 +4562,6 @@ bootstrap_host_entrypoint() {
       _agent_canon_json_error repository_root_invalid "sync install root is not an existing directory"
     fi
   fi
-  [[ -n "$AGENT_CANON_RUNTIME_ROOT" ]] || AGENT_CANON_RUNTIME_ROOT="$AGENT_CANON_REPOSITORY_ROOT/.runtime"
   _agent_canon_validate_roots
   AGENT_CANON_DOCKER_CMD=${AGENT_CANON_DOCKER:-docker}
   export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
