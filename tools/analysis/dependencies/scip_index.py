@@ -45,9 +45,7 @@ ROLE_NAMES = (
 )
 DEFAULT_RESULT_LIMIT = 200
 MAX_RESULT_LIMIT = 1000
-IMAGE_RECEIPT_ROOT = Path(
-    "/usr/local/share/agent-canon/image-dependencies/receipts"
-)
+IMAGE_RECEIPT_ROOT = Path("/usr/local/share/agent-canon/image-dependencies/receipts")
 IMAGE_MANIFEST_ROOT = Path("/usr/local/share/agent-canon/runtime")
 INDEXER_RECORDS = {
     "scip": ("scip-cli", "scip"),
@@ -121,9 +119,7 @@ def _repository_root() -> Path:
 def _manifest_and_receipts() -> tuple[Path, Path]:
     """Use the image manifest and receipt owner selected by the runtime."""
     repo_root = _repository_root()
-    manifest_override = os.environ.get(
-        "AGENT_CANON_DEPENDENCY_MANIFEST", ""
-    ).strip()
+    manifest_override = os.environ.get("AGENT_CANON_DEPENDENCY_MANIFEST", "").strip()
     if manifest_override:
         manifest = Path(manifest_override).expanduser().resolve()
     else:
@@ -140,9 +136,7 @@ def _manifest_and_receipts() -> tuple[Path, Path]:
     if IMAGE_RECEIPT_ROOT.is_dir():
         receipts = IMAGE_RECEIPT_ROOT
     else:
-        configured = os.environ.get(
-            "AGENT_CANON_DEPENDENCY_RECEIPTS", ""
-        ).strip()
+        configured = os.environ.get("AGENT_CANON_DEPENDENCY_RECEIPTS", "").strip()
         if not configured:
             raise ToolUnavailable(
                 "shared tool dependency receipts are unavailable; start bootstrap.sh"
@@ -275,9 +269,7 @@ def _producer_command(
             f"--supplementary-output-dir={supplementary_output}",
         ]
     else:
-        raise UnsupportedCapability(
-            f"no qualified native SCIP producer for {language}"
-        )
+        raise UnsupportedCapability(f"no qualified native SCIP producer for {language}")
     return tool, command
 
 
@@ -305,7 +297,11 @@ def index_project(args: argparse.Namespace) -> dict[str, Any]:
     python_environment = args.python_environment
     compile_database = args.compile_database
     if args.language == "python":
-        if not args.project_name or not args.project_version or python_environment is None:
+        if (
+            not args.project_name
+            or not args.project_version
+            or python_environment is None
+        ):
             raise RequiredProjectInput(
                 "Python indexing requires --project-name, --project-version, "
                 "and --python-environment from the project environment owner"
@@ -318,9 +314,7 @@ def index_project(args: argparse.Namespace) -> dict[str, Any]:
             raise RequiredProjectInput(
                 "C/C++ indexing requires --compile-database from the project build owner"
             )
-        compile_database = _regular_input(
-            root, compile_database, "compile database"
-        )
+        compile_database = _regular_input(root, compile_database, "compile database")
     boundary, destination = _output_path(root, args.runtime_root, args.output)
     env = root_capability_environment(
         source_root=root,
@@ -387,8 +381,11 @@ def _relative_source_path(value: object) -> str:
     """Validate a SCIP document path and return its canonical POSIX spelling."""
     if not isinstance(value, str) or not value:
         raise IndexDataError("SCIP document has no relative_path")
-    if value.startswith("/") or "\\" in value or "//" in value or any(
-        part in {"", ".", ".."} for part in value.split("/")
+    if (
+        value.startswith("/")
+        or "\\" in value
+        or "//" in value
+        or any(part in {"", ".", ".."} for part in value.split("/"))
     ):
         raise IndexDataError(f"SCIP document path is not canonical: {value}")
     path = PurePosixPath(value)
@@ -475,7 +472,10 @@ def _range_value(value: object) -> dict[str, dict[str, int]] | None:
                 single.get("start_character"),
                 single.get("end_character"),
             )
-            if all(isinstance(field, int) and not isinstance(field, bool) for field in fields):
+            if all(
+                isinstance(field, int) and not isinstance(field, bool)
+                for field in fields
+            ):
                 line, start, end = fields
                 return {
                     "start": {"line": line, "character": start},
@@ -489,7 +489,10 @@ def _range_value(value: object) -> dict[str, dict[str, int]] | None:
                 multi.get("end_line"),
                 multi.get("end_character"),
             )
-            if all(isinstance(field, int) and not isinstance(field, bool) for field in fields):
+            if all(
+                isinstance(field, int) and not isinstance(field, bool)
+                for field in fields
+            ):
                 start_line, start_character, end_line, end_character = fields
                 return {
                     "start": {"line": start_line, "character": start_character},
@@ -525,9 +528,7 @@ def _occurrence_rows(index: LoadedIndex, source_root: Path) -> list[dict[str, An
     prefix = "" if prefix_path == Path(".") else prefix_path.as_posix()
     rows: list[dict[str, Any]] = []
     for document in index.documents:
-        relative_path = (
-            f"{prefix}/{document.path}" if prefix else document.path
-        )
+        relative_path = f"{prefix}/{document.path}" if prefix else document.path
         for occurrence in document.occurrences:
             symbol = occurrence.get("symbol")
             if not isinstance(symbol, str) or not symbol:
@@ -547,9 +548,7 @@ def _occurrence_rows(index: LoadedIndex, source_root: Path) -> list[dict[str, An
                     "range": _range_value(occurrence),
                     "symbol": symbol,
                     "symbol_roles": roles_value,
-                    "roles": [
-                        name for bit, name in ROLE_NAMES if roles_value & bit
-                    ],
+                    "roles": [name for bit, name in ROLE_NAMES if roles_value & bit],
                     "language": document.language,
                     "text_encoding": index.text_encoding,
                 }
@@ -575,8 +574,10 @@ def _path_selection(path: str) -> str:
 
 
 def _matches_target(document_path: str, target: str) -> bool:
-    return target == "." or document_path == target or document_path.startswith(
-        target + "/"
+    return (
+        target == "."
+        or document_path == target
+        or document_path.startswith(target + "/")
     )
 
 
@@ -615,9 +616,7 @@ def _implementation_targets(
 def query_indexes(args: argparse.Namespace) -> dict[str, Any]:
     """Project definitions, references, and declared implementation relations."""
     source_root = args.root.resolve()
-    boundary = runtime_artifact_boundary(
-        source_root, args.runtime_root, create=False
-    )
+    boundary = runtime_artifact_boundary(source_root, args.runtime_root, create=False)
     env = root_capability_environment(
         source_root=source_root,
         runtime_root=boundary.root,
@@ -696,8 +695,7 @@ def query_indexes(args: argparse.Namespace) -> dict[str, Any]:
     directory_targets = {
         target
         for target in targets
-        if target == "."
-        or (source_root / Path(*PurePosixPath(target).parts)).is_dir()
+        if target == "." or (source_root / Path(*PurePosixPath(target).parts)).is_dir()
     }
     if targets and not target_documents:
         status = "unindexed-target"
@@ -731,8 +729,7 @@ def query_indexes(args: argparse.Namespace) -> dict[str, Any]:
             "implementations": len(implementations),
         },
         "truncated": any(
-            len(values) > limit
-            for values in (definitions, references, implementations)
+            len(values) > limit for values in (definitions, references, implementations)
         )
         or any(
             len(values) > limit
@@ -758,15 +755,15 @@ def query_indexes(args: argparse.Namespace) -> dict[str, Any]:
                 "not-selected"
                 if not targets
                 else (
-                    "partial"
-                    if unindexed_targets or directory_targets
-                    else "indexed"
+                    "partial" if unindexed_targets or directory_targets else "indexed"
                 )
             ),
             "source_freshness": "unverified",
             "implementations": (
                 "declared"
-                if any(implementations_by_target.get(symbol) for symbol in selected_symbols)
+                if any(
+                    implementations_by_target.get(symbol) for symbol in selected_symbols
+                )
                 else "not-represented"
             ),
             "callers": "not-represented",
@@ -776,7 +773,9 @@ def query_indexes(args: argparse.Namespace) -> dict[str, Any]:
     return result
 
 
-def _index_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def _index_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
     parser = subparsers.add_parser("index", help="write a native index.scip artifact")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--runtime-root", type=Path, required=True)
@@ -788,8 +787,12 @@ def _index_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser
     parser.add_argument("--compile-database", type=Path)
 
 
-def _query_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
-    parser = subparsers.add_parser("query", help="project bounded facts from index.scip")
+def _query_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    parser = subparsers.add_parser(
+        "query", help="project bounded facts from index.scip"
+    )
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--runtime-root", type=Path, required=True)
     parser.add_argument("--index", type=Path, action="append", required=True)
@@ -835,9 +838,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.limit < 1:
                 raise ScipIndexError("--limit must be positive")
             if args.limit > MAX_RESULT_LIMIT:
-                raise ScipIndexError(
-                    f"--limit must not exceed {MAX_RESULT_LIMIT}"
-                )
+                raise ScipIndexError(f"--limit must not exceed {MAX_RESULT_LIMIT}")
             payload = query_indexes(args)
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
         return 0
