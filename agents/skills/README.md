@@ -49,13 +49,14 @@ second omission/granularity policy.
 
 | 所有者・用途 | 正本と公開方法 |
 | --- | --- |
-| AgentCanon public skill | `research-workflow` のような hyphen-case。本文はこの directory、列挙は `catalog.yaml`。保守時に `.codex/personal/skills/<skill>/SKILL.md` を生成し、正本と同じ commit で Git 配布する。Codex は管理された `~/.agents/skills/` directory link から読む。利用時には生成せず、`.codex/config.toml` に同じ inventory を列挙しない。 |
-| runtime-internal shim | `_runtime-helper` のような先頭 underscore。所有者は呼出元 workflow / role / public skill であり、public catalog・public table・`.codex/config.toml` には列挙しない。 |
-| workflow-only routine | `agents/internal-routines/`。Codex discovery shim が必要な場合だけ runtime-internal lane を使う。 |
-| parent repository 固有 skill | parent 自身の `.agents/skills/<skill>/SKILL.md`。subtree-owned skill も含む。 |
+| AgentCanon public skill | plain hyphen-case。公開にはcanonical docと `catalog.yaml` の登録を使う。 |
+| runtime-internal shim | 先頭 underscore。呼出元workflow / role / public skillが所有し、public catalogには登録しない。 |
+| workflow-only routine | workflow内の手順であり、Codex discoveryが必要でなければ独立Skillにしない。 |
+| parent repository 固有 skill | 公開・配置はparentまたはsubtree ownerが決める。 |
 
-生成先、native discovery、repository 固有入口の詳細は [Skill Paths](../canonical/skills.md#skill-paths) を参照します。
-public への追加・昇格は [Updating Skills](#updating-skills) の同一変更で行います。
+source / adapter / installed / repository-owned のpathと、選択済みSkillの読取は
+[Skill Paths](../canonical/skills.md#skill-paths) が所有します。publicへの追加・昇格は
+[Updating Skills](#updating-skills) の同一変更で行います。
 
 ## Public Skill Surface
 
