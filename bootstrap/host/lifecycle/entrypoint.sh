@@ -3774,7 +3774,7 @@ _agent_canon_ensure_start_resident() {
     _agent_canon_classify_existing_container "$container"
     _agent_canon_validate_target_manifest "$AGENT_CANON_STATE_ROOT/mounts.tsv"
     if _agent_canon_validate_existing_container "$container" \
-      "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 0 >/dev/null 2>/dev/null; then
+      "$AGENT_CANON_STATE_ROOT/mounts.tsv" 1 >/dev/null 2>/dev/null; then
       _agent_canon_ensure_container
     else
       # Start has no new image candidate. Reuse the active image through the
