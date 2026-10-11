@@ -3206,7 +3206,6 @@ class DependencyModelTests(unittest.TestCase):
                 "pyright-language-server",
                 "bash-language-server",
                 "markdownlint-cli2",
-                "markdownlint-cli2-formatter-json",
                 "gnupg",
                 "node",
                 "puppeteer-fonts-liberation",
