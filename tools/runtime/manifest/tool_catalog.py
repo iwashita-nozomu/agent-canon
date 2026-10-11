@@ -604,7 +604,6 @@ def validate_catalog(root: Path) -> CatalogReport:
     entries: list[Mapping[str, object]] = []
     rows: list[CatalogRow] = []
     ids: set[str] = set()
-    paths: set[str] = set()
     for index, raw_entry in enumerate(entries_raw, start=1):
         entry = as_mapping(raw_entry)
         if entry is None:
@@ -622,9 +621,8 @@ def validate_catalog(root: Path) -> CatalogReport:
             if entry_id in ids:
                 findings.append(Finding("entry", path, f"duplicate-id:{entry_id}"))
             ids.add(entry_id)
-        if path in paths:
-            findings.append(Finding("entry", path, "duplicate-path"))
-        paths.add(path)
+        # Multiple catalog IDs may share one generic implementation adapter.
+        # Entry identity is the ID; path validity is checked independently.
         findings.extend(
             check_entry(
                 root, entry, families, statuses, roles, audiences, placements, defaults

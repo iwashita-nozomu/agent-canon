@@ -340,6 +340,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "actionlint",
         "zizmor",
         "quarto",
+        "vl-convert",
         "lychee",
         "puppeteer",
         "mermaid-cli",
