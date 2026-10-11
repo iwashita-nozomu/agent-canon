@@ -1220,7 +1220,7 @@ def persist_execution_graph_readback(
         run["issue_worker_dispatch"] = {
             key: value
             for key, value in issue_worker_dispatch.items()
-            if key not in {"tool_call", "spawn_tool_call"}
+            if key not in {"tool_call", "spawn_tool_call"} or value is None
         }
     updated = dict(payload)
     updated["run"] = run
@@ -1853,6 +1853,7 @@ def main(
         ):
             raise RuntimeError("execution_result:publication_not_applicable")
         execution_tool_calls: tuple[dict[str, object], ...] = ()
+        execution_spawn_results: tuple[tuple[str, str], ...] = ()
         if execution_transition.ready_slots:
             if (
                 context.workflow_family_id == "issue_worker_publication"
@@ -1872,18 +1873,64 @@ def main(
                     else None
                 )
                 if is_string_object_mapping(issue_spawn_call):
-                    issue_call = dict(issue_spawn_call)
-                    issue_arguments = issue_call.get("arguments")
-                    if not is_string_object_mapping(issue_arguments) or not isinstance(
-                        issue_arguments.get("input"), str
-                    ):
-                        raise RuntimeError("execution_graph:issue_worker_prompt_missing")
-                    issue_arguments = dict(issue_arguments)
-                    issue_arguments["input"] += "\n\n" + skill_document_context(
-                        skill_documents
-                    )
-                    issue_call["arguments"] = issue_arguments
-                    execution_tool_calls = (issue_call,)
+                    if spawn is None:
+                        issue_call = dict(issue_spawn_call)
+                        issue_arguments = issue_call.get("arguments")
+                        if not is_string_object_mapping(
+                            issue_arguments
+                        ) or not isinstance(issue_arguments.get("input"), str):
+                            raise RuntimeError(
+                                "execution_graph:issue_worker_prompt_missing"
+                            )
+                        issue_arguments = dict(issue_arguments)
+                        issue_arguments["input"] += "\n\n" + skill_document_context(
+                            skill_documents
+                        )
+                        issue_call["arguments"] = issue_arguments
+                        execution_tool_calls = (issue_call,)
+                    else:
+                        if len(execution_transition.ready_slots) != 1:
+                            raise RuntimeError(
+                                "execution_graph:issue_worker_wave_must_be_singleton"
+                            )
+                        issue_spawn = dispatch_issue_worker(
+                            context.issue_worker_candidate or {},
+                            args.task,
+                            lambda role, prompt: spawn(
+                                role,
+                                prompt + "\n\n" + skill_document_context(skill_documents),
+                            ),
+                            workspace_root=workspace_root,
+                            agentcanon_source_root=repository_roots.agentcanon_source_root,
+                        )
+                        if (
+                            issue_spawn.status != "spawned"
+                            or not issue_spawn.publisher_agent_id
+                        ):
+                            raise RuntimeError(
+                                "execution_graph:issue_worker_spawn_failed:"
+                                + issue_spawn.status
+                            )
+                        issue_worker_dispatch = issue_spawn.as_dict()
+                        publisher_slot = execution_transition.ready_slots[0]
+                        publisher_id = issue_spawn.publisher_agent_id
+                        execution_spawn_results = (
+                            (publisher_slot.executable_identity, publisher_id),
+                        )
+                        execution_results = {
+                            **execution_results,
+                            publisher_slot.executable_identity: {
+                                "spawn_result": ToolExecutionResult(
+                                    is_error=False,
+                                    text=publisher_id,
+                                )
+                            },
+                        }
+                        execution_transition = advance_execution_graph(
+                            execution_waves,
+                            execution_results,
+                        )
+                        execution_tool_calls = ()
                 else:
                     execution_tool_calls = materialize_execution_tool_calls(
                         transition=execution_transition,
@@ -1899,7 +1946,6 @@ def main(
                         math_intent_route=context.math_intent_route,
                         math_intent_packet=math_intent_packet,
                     )
-        execution_spawn_results: tuple[tuple[str, str], ...] = ()
         if spawn is not None and execution_transition.ready_slots:
             prompts: dict[str, str] = {}
             for slot, call in zip(
@@ -2017,7 +2063,7 @@ def main(
         manifest_issue_worker_dispatch = {
             key: value
             for key, value in issue_worker_dispatch.items()
-            if key not in {"tool_call", "spawn_tool_call"}
+            if key not in {"tool_call", "spawn_tool_call"} or value is None
         }
     run_spec = RunBundleSpec(
         config=config,

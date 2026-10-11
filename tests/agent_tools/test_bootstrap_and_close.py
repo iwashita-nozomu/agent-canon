@@ -62,6 +62,7 @@ from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     wave_reconciliation_blockers,
 )
 from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
+from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
 from tools.runtime.lifecycle.task_close import (  # noqa: E402
     _child_closeout_evidence,
     document_structure_evidence_ready,
@@ -1339,6 +1340,51 @@ class BootstrapAndCloseTest(unittest.TestCase):
             workspace_root.mkdir()
             report_root.mkdir()
             seed_workspace_config(workspace_root)
+            subprocess.run(
+                ["git", "init", "--quiet", "--initial-branch=test/execution-graph"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Execution Graph Test"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "execution-graph@example.invalid"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://github.com/iwashita-nozomu/agent-canon.git",
+                ],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "add", "-A"], cwd=workspace_root, check=True
+            )
+            subprocess.run(
+                ["git", "commit", "--quiet", "-m", "test: seed graph writer target"],
+                cwd=workspace_root,
+                check=True,
+            )
+            checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
+            writer_targets = json.dumps(
+                {
+                    "implementer": {
+                        "checkout_root": checkout_identity["git_root"],
+                        "branch": checkout_identity["branch"],
+                        "remote": checkout_identity["remote"],
+                        "allowed_paths": ["paper/draft.md"],
+                    }
+                }
+            )
             run_id = "execution-graph-callback-result"
             args = [
                 "--task",
@@ -1353,6 +1399,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 str(report_root),
                 "--run-id",
                 run_id,
+                "--writer-targets",
+                writer_targets,
             ]
             spawned: list[tuple[str, str]] = []
 
