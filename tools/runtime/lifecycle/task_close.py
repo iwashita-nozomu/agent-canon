@@ -6,7 +6,8 @@
 # upstream implementation ../../agent/orchestration/tool_calls.py materializes close-agent ToolCalls
 # upstream implementation ../../agent/orchestration/capacity_handshake.py owns lifecycle state, reservations, and postorder release
 # upstream implementation ../values.py refines decoded runtime artifact containers
-# upstream implementation ../artifacts/report_artifact_checks.py validates schedule and work log artifacts
+# upstream implementation ../artifacts/report_artifact_checks.py validates graph result readback and work log artifacts
+# upstream implementation ../manifest/manifest_rendering.py declares the selected execution graph
 # upstream implementation ./update_lifecycle_contract.py owns gate, cleanup, handback, and terminal ToolCall identities.
 # upstream implementation ../../agent/orchestration/packets.py owns owner-local receipt normalization and compatibility.
 # upstream design ../../../templates/agents/closeout_gate.md defines closeout status contract
@@ -1625,7 +1626,6 @@ def main() -> int:
     owner_receipt_decision = owner_receipt_closeout_consumer(report_dir)
     update_lifecycle_decision = update_lifecycle_closeout_consumer(report_dir)
     wave_reconciliation = wave_reconciliation_blockers(
-        schedule_text,
         workflow_monitoring_text,
         subagent_lifecycle,
         report_dir,

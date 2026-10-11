@@ -137,11 +137,6 @@ OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS = (
     Path("agents/skills/README.md"),
     Path("agents/canonical/skills.md"),
 )
-INITIAL_INTAKE_MARKERS = {
-    "requirements_organizer": "Initial intake wave role: own user-request clauses",
-    "explorer": "Initial intake wave role: own evidence, reuse, and stale-surface inventory",
-    "execution_planner": "Initial intake wave role: own stage order",
-}
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
@@ -1814,20 +1809,11 @@ def validate_subagent_protocol_docs() -> None:
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:
-            ensure(
-                "Intake Responsibility Wave" in text,
-                f"{path} missing intake responsibility contract",
-            )
             ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
             ensure(
                 "Agent Wave Ledger" in text,
                 f"{path} missing Agent Wave Ledger contract",
             )
-            for role_id in INITIAL_INTAKE_MARKERS:
-                ensure(
-                    role_id in text,
-                    f"{path} missing intake responsibility role {role_id}",
-                )
             ensure(
                 "max_depth = 2" in text and "delegated_spawn_policy" in text,
                 f"{path} must state bounded nested spawn and delegated_spawn_policy",
@@ -2157,12 +2143,6 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         == "allowed_with_bounded_packet",
         f"task {task_id} manifest delegated child spawn policy mismatch",
     )
-    wave_record_command = str(delegated_spawn_policy.get("wave_record_command", ""))
-    ensure(
-        "workflow_monitor.py" in wave_record_command
-        and "--subagent-wave" in wave_record_command,
-        f"task {task_id} manifest missing subagent wave record command",
-    )
     required_fields = require_string_list(
         delegated_spawn_policy.get("handoff_required_fields"),
         f"task {task_id} manifest delegated spawn handoff fields incomplete",
@@ -2219,15 +2199,15 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         expected_same_role_fields.issubset(set(same_role_required_fields)),
         f"task {task_id} manifest same-role required fields incomplete",
     )
-    spawn_wave_recommendation = require_mapping(
-        run.get("spawn_wave_recommendation"),
-        f"task {task_id} manifest missing run.spawn_wave_recommendation",
+    execution_graph = require_mapping(
+        run.get("execution_graph"),
+        f"task {task_id} manifest missing run.execution_graph",
     )
     initial_wave = require_string_list(
-        spawn_wave_recommendation.get("initial_wave_agent_types"),
-        f"task {task_id} manifest must recommend at least one initial agent type",
+        execution_graph.get("initial_wave_agent_types"),
+        f"task {task_id} execution graph must expose initial agent types",
     )
-    dynamic_expansion_waves = spawn_wave_recommendation.get("dynamic_expansion_waves")
+    later_stage_waves = execution_graph.get("later_stage_waves")
     manifest_roles = manifest.get("roles")
     total_agent_candidates: list[str] = []
     if isinstance(manifest_roles, list):
@@ -2257,29 +2237,29 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     if task_id != "T15":
         ensure(
             len(initial_wave) >= 1,
-            f"task {task_id} manifest must recommend at least one initial agent type",
+            f"task {task_id} execution graph must expose initial agent types",
         )
     if expected_active > MIN_DYNAMIC_SPAWN_BUDGET and len(total_agent_candidates) > len(
         initial_wave
     ):
         dynamic_agent_candidates: list[str] = []
-        if isinstance(dynamic_expansion_waves, list):
+        if isinstance(later_stage_waves, list):
             for wave in require_list(
-                cast(object, dynamic_expansion_waves),
-                f"task {task_id} manifest dynamic_expansion_waves must be a list",
+                cast(object, later_stage_waves),
+                f"task {task_id} execution graph later_stage_waves must be a list",
             ):
                 if not isinstance(wave, dict):
                     continue
                 wave = require_mapping(
                     cast(object, wave),
-                    f"task {task_id} dynamic expansion wave must be a mapping",
+                    f"task {task_id} later-stage wave must be a mapping",
                 )
                 agent_types = wave.get("agent_types")
                 role_instances = wave.get("role_instances")
                 if isinstance(role_instances, list):
                     for raw_identity in require_string_list(
                         cast(object, role_instances),
-                        f"task {task_id} dynamic expansion role_instances must be a list",
+                        f"task {task_id} later-stage role_instances must be a list",
                     ):
                         identity = raw_identity.split(":", 3)
                         ensure(
@@ -2296,19 +2276,19 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
                         dynamic_agent_candidates.append(agent_type)
         ensure(
             len(dynamic_agent_candidates) >= 1,
-            f"task {task_id} manifest must expose dynamic expansion waves",
+            f"task {task_id} execution graph must expose later-stage waves",
         )
         ensure(
             initial_wave == ["requirements_organizer"],
-            f"task {task_id} manifest must use the active intake responsibility wave",
+            f"task {task_id} execution graph must use the active intake responsibility wave",
         )
         ensure(
             len(set(initial_wave + dynamic_agent_candidates)) > len(initial_wave),
-            f"task {task_id} manifest must not collapse multi-agent work to intake responsibility",
+            f"task {task_id} execution graph must not collapse multi-agent work to intake responsibility",
         )
     ensure(
         len(initial_wave) <= expected_active,
-        f"task {task_id} manifest initial wave exceeds active spawn budget",
+        f"task {task_id} execution graph initial wave exceeds active spawn budget",
     )
     write_scope_policy = require_mapping(
         run.get("write_scope_policy"),
