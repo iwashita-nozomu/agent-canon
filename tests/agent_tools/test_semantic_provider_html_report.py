@@ -9,15 +9,133 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "search" / "reporting" / "semantic_provider_html_report.py"
+
+
+def event_string(event: dict[str, object], name: str) -> str:
+    value = event.get(name)
+    if not isinstance(value, str):
+        raise AssertionError(f"event field {name} is not text")
+    return value
+
+
+def event_argv(event: dict[str, object]) -> list[str]:
+    value = event.get("argv")
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise AssertionError("event argv is not a string list")
+    return cast(list[str], value)
+
+
+def install_fake_renderers(root: Path) -> tuple[Path, Path]:
+    """Create CLI fakes that record Quarto inputs and Lychee's selected path."""
+    bin_dir = root / "bin"
+    bin_dir.mkdir()
+    events = root / "events.jsonl"
+    events.touch()
+    quarto = bin_dir / "quarto"
+    quarto.write_text(
+        """#!python-executable
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+
+args = sys.argv[1:]
+events_path = Path(os.environ["FAKE_RENDER_EVENTS"])
+
+def record(item):
+    with events_path.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(item) + "\\n")
+
+def project_for(source):
+    for parent in (source.parent, *source.parents):
+        if (parent / "_quarto.yml").is_file():
+            return parent
+    return None
+
+if args == ["--version"]:
+    print("1.10.19")
+elif args == ["pandoc", "--version"]:
+    print("pandoc 3.4.0.1")
+elif args[0] == "inspect":
+    source = Path(args[1])
+    inspect_output = Path(args[2])
+    figure = source.parent / "provider-delta.svg"
+    project = project_for(source)
+    project_config = (
+        (project / "_quarto.yml").read_text(encoding="utf-8")
+        if project is not None
+        else None
+    )
+    resources = json.loads(
+        os.environ.get("FAKE_INSPECT_RESOURCES", '["provider-delta.svg"]')
+    )
+    inspect_output.write_text(
+        json.dumps(
+            {
+                "resources": resources,
+                "formats": {"html": {}},
+                "project": str(project) if project else None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    record({"kind": "inspect", "argv": args, "source_path": str(source), "project": str(project) if project else None, "project_config": project_config, "source": source.read_text(encoding="utf-8"), "figure": figure.read_text(encoding="utf-8")})
+elif args[0] == "render":
+    render_status = int(os.environ.get("FAKE_RENDER_STATUS", "0"))
+    if render_status:
+        print("fake render failure", file=sys.stderr)
+        raise SystemExit(render_status)
+    source = Path(args[1])
+    project = project_for(source)
+    if project is not None and os.environ.get("FAKE_PROJECT_MARKER"):
+        project_config = (project / "_quarto.yml").read_text(encoding="utf-8")
+        if "pre-render:" in project_config:
+            Path(os.environ["FAKE_PROJECT_MARKER"]).write_text("hook-ran", encoding="utf-8")
+    output_name = args[args.index("--output") + 1]
+    output_dir = Path(args[args.index("--output-dir") + 1])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source.parent / "provider-delta.svg", output_dir / "provider-delta.svg")
+    output = output_dir / output_name
+    output.write_text(
+        '<html><body><img src="provider-delta.svg"></body></html>\\n',
+        encoding="utf-8",
+    )
+    record({"kind": "render", "argv": args, "source_path": str(source), "project": str(project) if project else None})
+else:
+    raise SystemExit(2)
+""".replace("#!python-executable", f"#!{sys.executable}"),
+        encoding="utf-8",
+    )
+    quarto.chmod(0o755)
+    lychee = bin_dir / "lychee"
+    lychee.write_text(
+        """#!python-executable
+import json
+import os
+import sys
+from pathlib import Path
+
+with Path(os.environ["FAKE_RENDER_EVENTS"]).open("a", encoding="utf-8") as stream:
+    stream.write(json.dumps({"kind": "lychee", "argv": sys.argv[1:]}) + "\\n")
+raise SystemExit(int(os.environ.get("FAKE_LYCHEE_STATUS", "0")))
+""".replace("#!python-executable", f"#!{sys.executable}"),
+        encoding="utf-8",
+    )
+    lychee.chmod(0o755)
+    return bin_dir, events
 
 
 def sample_compare_report() -> dict[str, object]:
@@ -85,71 +203,251 @@ def sample_compare_report() -> dict[str, object]:
 class SemanticProviderHtmlReportTest(unittest.TestCase):
     """Verify semantic provider report rendering."""
 
-    def test_render_html_report(self) -> None:
-        """The CLI renders a self-contained HTML report with escaped evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            compare_json = root / "compare.json"
-            output = root / "report.html"
+    def run_report(
+        self,
+        root: Path,
+        report: dict[str, object],
+        output: Path,
+        *,
+        embed_resources: bool = False,
+        source_text: str | None = None,
+        missing_source: bool = False,
+        quarto_available: bool = True,
+        render_status: int = 0,
+        lychee_status: int = 0,
+        tmpdir: Path | None = None,
+        project_marker: Path | None = None,
+        inspect_resources: list[str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], list[dict[str, object]]]:
+        compare_json = root / "compare.json"
+        if not missing_source:
             compare_json.write_text(
-                json.dumps(sample_compare_report()),
+                source_text if source_text is not None else json.dumps(report),
                 encoding="utf-8",
             )
+        bin_dir, event_path = install_fake_renderers(root)
+        if not quarto_available:
+            (bin_dir / "quarto").unlink()
+        env = os.environ.copy()
+        env["PATH"] = str(bin_dir)
+        env["FAKE_RENDER_EVENTS"] = str(event_path)
+        env["FAKE_RENDER_STATUS"] = str(render_status)
+        env["FAKE_LYCHEE_STATUS"] = str(lychee_status)
+        if inspect_resources is not None:
+            env["FAKE_INSPECT_RESOURCES"] = json.dumps(inspect_resources)
+        if tmpdir is not None:
+            env["TMPDIR"] = str(tmpdir)
+        if project_marker is not None:
+            env["FAKE_PROJECT_MARKER"] = str(project_marker)
+        argv = [
+            sys.executable,
+            str(SCRIPT),
+            "--compare-json",
+            str(compare_json),
+            "--output",
+            str(output),
+        ]
+        if embed_resources:
+            argv.append("--embed-resources")
+        result = subprocess.run(
+            argv,
+            cwd=PROJECT_ROOT,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        events: list[dict[str, object]] = []
+        for line in event_path.read_text(encoding="utf-8").splitlines():
+            parsed: object = json.loads(line)
+            if not isinstance(parsed, dict):
+                raise AssertionError("fake renderer event is not an object")
+            events.append(cast(dict[str, object], parsed))
+        return result, events
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--compare-json",
-                    str(compare_json),
-                    "--output",
-                    str(output),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+    def test_render_html_report(self) -> None:
+        """The CLI delegates static HTML rendering and preserves report facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            output = root / "report.html"
+            result, events = self.run_report(root, sample_compare_report(), output)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("SEMANTIC_PROVIDER_HTML_REPORT=", result.stdout)
-            html = output.read_text(encoding="utf-8")
-            self.assertIn("Provider Delta To Shared Candidate Logic", html)
-            self.assertIn("deterministic-dense-v1", html)
-            self.assertIn("deterministic-sparse-v1", html)
-            self.assertIn("candidate_logic_authority=shared_responsibility_bucket", html)
-            self.assertIn("documents/&lt;script&gt;.md", html)
-            self.assertNotIn("documents/<script>.md", html)
+            result_line = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("SEMANTIC_PROVIDER_HTML_REPORT_RESULT=")
+            )
+            receipt = json.loads(result_line.split("=", 1)[1])
+            self.assertEqual(receipt["status"], "rendered")
+            self.assertEqual(
+                receipt["configuration"]["project"], {"type": "default"}
+            )
+            self.assertEqual(receipt["validation"]["lychee"], "pass")
+            self.assertEqual(receipt["quarto_version"], "1.10.19")
+            self.assertEqual(receipt["pandoc_version"], "pandoc 3.4.0.1")
+            self.assertEqual(
+                receipt["output_sha256"],
+                hashlib.sha256(output.read_bytes()).hexdigest(),
+            )
+            self.assertTrue(receipt["asset_sha256"])
+            source = event_string(events[0], "source")
+            self.assertIn("Provider Delta To Shared Candidate Logic", source)
+            self.assertIn("deterministic-dense-v1", source)
+            self.assertIn("deterministic-sparse-v1", source)
+            self.assertIn(
+                "candidate_logic_authority=shared_responsibility_bucket",
+                source,
+            )
+            self.assertIn(
+                "`documents/left.md:document:1-8|documents/<script>.md:document:1-8`",
+                source,
+            )
+            render_argv = event_argv(events[1])
+            self.assertIn("--no-execute", render_argv)
+            self.assertIn("--to", render_argv)
+            self.assertEqual(events[-1]["kind"], "lychee")
+            self.assertIn("--config", event_argv(events[-1]))
+            self.assertIn('src="provider-delta.svg"', output.read_text(encoding="utf-8"))
+            self.assertTrue((root / "provider-delta.svg").is_file())
 
     def test_missing_search_section_is_allowed(self) -> None:
-        """A compare report without query search still renders."""
+        """A compare report without query search is still rendered by Quarto."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             report = sample_compare_report()
             report["search"] = None
-            compare_json = root / "compare.json"
             output = root / "report.html"
-            compare_json.write_text(json.dumps(report), encoding="utf-8")
+            result, events = self.run_report(root, report, output)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("search not recorded", event_string(events[0], "figure"))
+            self.assertIn(
+                "Search comparison was not recorded",
+                event_string(events[0], "source"),
+            )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--compare-json",
-                    str(compare_json),
-                    "--output",
-                    str(output),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
+    def test_inspect_resource_list_may_omit_inline_svg(self) -> None:
+        """Rendered output and Lychee validate SVGs omitted by inspect metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            output = root / "report.html"
+            result, events = self.run_report(
+                root,
+                sample_compare_report(),
+                output,
+                inspect_resources=[],
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            html = output.read_text(encoding="utf-8")
-            self.assertIn("search not recorded", html)
-            self.assertIn("search comparison was not recorded", html)
+            result_line = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("SEMANTIC_PROVIDER_HTML_REPORT_RESULT=")
+            )
+            receipt = json.loads(result_line.split("=", 1)[1])
+            self.assertEqual(receipt["resources"], [])
+            self.assertEqual(receipt["validation"]["lychee"], "pass")
+            self.assertTrue((root / "provider-delta.svg").is_file())
+            self.assertEqual(events[-1]["kind"], "lychee")
+
+    def test_embedded_resources_are_explicit_opt_in(self) -> None:
+        """Resource embedding only appears in Quarto metadata when requested."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            output = root / "embedded.html"
+            result, events = self.run_report(
+                root, sample_compare_report(), output, embed_resources=True
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn(
+                "embed-resources: true", event_string(events[0], "source")
+            )
+            result_line = next(
+                line
+                for line in result.stdout.splitlines()
+                if line.startswith("SEMANTIC_PROVIDER_HTML_REPORT_RESULT=")
+            )
+            receipt = json.loads(result_line.split("=", 1)[1])
+            self.assertTrue(receipt["configuration"]["embed-resources"])
+
+    def test_staging_ignores_quarto_project_from_tmpdir(self) -> None:
+        """A caller TMPDIR cannot expose parent Quarto render hooks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            project = root / "caller-project"
+            project.mkdir()
+            marker = project / "pre-render-ran.txt"
+            project_config = (
+                "project:\n"
+                "  type: default\n"
+                "  pre-render: touch pre-render-ran.txt\n"
+            )
+            (project / "_quarto.yml").write_text(project_config, encoding="utf-8")
+            nested_tmp = project / "tmp"
+            nested_tmp.mkdir()
+            output = project / "report.html"
+            result, events = self.run_report(
+                project,
+                sample_compare_report(),
+                output,
+                tmpdir=nested_tmp,
+                project_marker=marker,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(output.is_file())
+            self.assertFalse(marker.exists())
+            inspect_event = next(event for event in events if event["kind"] == "inspect")
+            render_event = next(event for event in events if event["kind"] == "render")
+            generated_source = Path(event_string(inspect_event, "source_path"))
+            generated_project = generated_source.parent
+            self.assertEqual(inspect_event["project"], str(generated_project))
+            self.assertEqual(render_event["project"], str(generated_project))
+            self.assertIn(project.resolve(), generated_source.parents)
+            self.assertEqual(
+                inspect_event["project_config"],
+                "project:\n  type: default\n",
+            )
+
+    def test_failure_states_distinguish_source_renderer_render_and_validation(self) -> None:
+        """The CLI keeps owning failure states distinct at its native boundaries."""
+        cases = (
+            ("missing_asset", 1, True, None, True, 0, 0),
+            ("invalid_source", 1, False, "not json", True, 0, 0),
+            ("renderer_unavailable", 1, False, None, False, 0, 0),
+            ("render_failed", 7, False, None, True, 7, 0),
+            ("validation_failed", 1, False, None, True, 0, 1),
+        )
+        for (
+            expected_status,
+            expected_exit_code,
+            missing,
+            source_text,
+            has_quarto,
+            render_status,
+            lychee_status,
+        ) in cases:
+            with self.subTest(status=expected_status), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                result, _ = self.run_report(
+                    root,
+                    sample_compare_report(),
+                    root / "report.html",
+                    missing_source=missing,
+                    source_text=source_text,
+                    quarto_available=has_quarto,
+                    render_status=render_status,
+                    lychee_status=lychee_status,
+                )
+                self.assertEqual(result.returncode, expected_exit_code)
+                result_line = next(
+                    line
+                    for line in result.stdout.splitlines()
+                    if line.startswith("SEMANTIC_PROVIDER_HTML_REPORT_RESULT=")
+                )
+                receipt = json.loads(result_line.split("=", 1)[1])
+                self.assertEqual(receipt["status"], expected_status)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ bootstrap-owned ignored `.runtime/` under the install checkout:
 
 | Plane | Owner | Examples | Side-effect rule |
 | --- | --- | --- | --- |
-| `tool-container` | shared AgentCanon runtime | Rust CLI, Python tools, LSP | one non-root container; source read-only; external artifacts |
+| `tool-container` | shared AgentCanon runtime | Rust CLI, Python tools, LSP, catalog-native CLI | one non-root container; source read-only; external artifacts |
 | `host-adapter` | bootstrap/host | Docker, Git/archive, Codex launch | typed allowlist; credentials stay host-side |
 | `project-container` | parent project | product build, test runner, GPU | project-owned Docker/test contract |
 | `source` | AgentCanon checkout | policy/docs/design edits | explicit mutation only; no runtime output |
@@ -81,6 +81,10 @@ is verified:
 ./bootstrap.sh --control-parent-root <root> \
   tool run --root <project-root> <verified-catalog-id> -- <args...>
 ```
+
+Catalog-declared native CLI commands use the same route and execute their fixed
+argv prefix directly inside the authenticated tool container; they do not add
+host executables or shell-command dispatch.
 
 Invoke the prescribed command first; the dispatcher retains its admission checks.
 Only after a relevant failure, follow [bootstrap](../agents/skills/agent-canon-bootstrap.md)
