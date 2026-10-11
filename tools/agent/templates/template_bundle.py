@@ -139,9 +139,10 @@ def _codex_user_payload(
     root: Path,
     commit: str,
     entries: list[tuple[str, str]],
-) -> tuple[dict[str, bytes], list[dict[str, str]]]:
+) -> tuple[dict[str, bytes], dict[str, str], list[dict[str, str]]]:
     """Build the one source-free Codex package from existing canonical views."""
     payload: dict[str, bytes] = {}
+    payload_modes: dict[str, str] = {}
     install_files: list[dict[str, str]] = []
     root_guidance: bytes | None = None
     skill_frontmatter: dict[str, bytes] = {}
@@ -164,6 +165,7 @@ def _codex_user_payload(
             if destination in payload:
                 raise TemplateBundleError("Codex bundle agent destination is duplicated")
             payload[destination] = content
+            payload_modes[destination] = mode
             install_files.append(
                 {
                     "component": "agent",
@@ -189,6 +191,7 @@ def _codex_user_payload(
                     canonical_skills[skill] = content
             continue
         payload[source_path] = content
+        payload_modes[source_path] = mode
 
     if set(skill_frontmatter) != set(canonical_skills):
         raise TemplateBundleError("Codex skill views and canonical owners differ")
@@ -243,8 +246,10 @@ def _codex_user_payload(
     payload["marketplace.json"] = (
         json.dumps(marketplace, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode()
+    for path in payload:
+        payload_modes.setdefault(path, "100644")
     install_files.sort(key=lambda item: (item["destination"], item["bundle_path"]))
-    return payload, install_files
+    return payload, payload_modes, install_files
 
 
 def _codex_user_bundle_digest(
@@ -294,7 +299,9 @@ def bundle_identity(root: Path, source_ref: str, profile: str) -> dict[str, Any]
         digest.update(hashlib.sha256(content).digest() + b"\0")
     source_bundle_digest = digest.hexdigest()
     if profile == CODEX_USER_PROFILE:
-        payload, install_files = _codex_user_payload(root, commit, entries)
+        payload, _payload_modes, install_files = _codex_user_payload(
+            root, commit, entries
+        )
         source_tree = _git(root, "rev-parse", "--verify", f"{commit}^{{tree}}").decode().strip()
         return {
             "schema": CODEX_USER_SCHEMA,
@@ -367,13 +374,15 @@ def export_bundle(*, source_root: Path, source_ref: str, profile: str, output: P
                 for item in _manifest(source_root, identity["source_commit"])[0]["profiles"][profile]["roots"]
             ],
         )
-        payload, install_files = _codex_user_payload(
+        payload, payload_modes, install_files = _codex_user_payload(
             source_root, identity["source_commit"], entries
         )
         for path, content in sorted(payload.items()):
             destination = output.joinpath(*PurePosixPath(path).parts)
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(content)
+            if payload_modes[path] == "100755":
+                destination.chmod(0o755)
         bundle_manifest = _codex_user_manifest(identity, payload, install_files)
         (output / CODEX_USER_MANIFEST).write_text(
             json.dumps(bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

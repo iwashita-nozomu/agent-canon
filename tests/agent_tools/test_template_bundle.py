@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -80,6 +81,7 @@ def test_codex_user_profile_exports_source_free_plugin_and_verified_projection(
     assert identity["bundle_digest"] == repeated["bundle_digest"]
     assert identity["source_bundle_digest"] == repeated["source_bundle_digest"]
     assert not (first / ".git").exists()
+    assert stat.S_IMODE((first / "bootstrap.sh").stat().st_mode) == 0o755
     assert not (first / "tests").exists()
     assert not (first / "documents" / "design").exists()
     assert (
