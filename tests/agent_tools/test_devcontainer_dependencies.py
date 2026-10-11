@@ -3279,22 +3279,22 @@ class DependencyModelTests(unittest.TestCase):
         records = plan.by_id()
         expected = {
             "puppeteer-fonts-liberation": ("fonts-liberation", "1:2.1.5-3"),
-            "puppeteer-libasound2t64": ("libasound2t64", "1.2.11-1build2"),
+            "puppeteer-libasound2t64": ("libasound2t64", "1.2.11-1ubuntu0.3"),
             "puppeteer-libatk-bridge2.0-0t64": (
                 "libatk-bridge2.0-0t64",
                 "2.52.0-1build1",
             ),
             "puppeteer-libatk1.0-0t64": ("libatk1.0-0t64", "2.52.0-1build1"),
             "puppeteer-libcairo2": ("libcairo2", "1.18.0-3build1"),
-            "puppeteer-libcups2t64": ("libcups2t64", "2.4.7-1.2ubuntu7"),
-            "puppeteer-libdbus-1-3": ("libdbus-1-3", "1.14.10-4ubuntu4"),
-            "puppeteer-libexpat1": ("libexpat1", "2.6.1-2build1"),
+            "puppeteer-libcups2t64": ("libcups2t64", "2.4.7-1.2ubuntu7.14"),
+            "puppeteer-libdbus-1-3": ("libdbus-1-3", "1.14.10-4ubuntu4.1"),
+            "puppeteer-libexpat1": ("libexpat1", "2.6.1-2ubuntu0.6"),
             "puppeteer-libfontconfig1": ("libfontconfig1", "2.15.0-1.1ubuntu2"),
-            "puppeteer-libgbm1": ("libgbm1", "24.0.5-1ubuntu1"),
-            "puppeteer-libglib2.0-0t64": ("libglib2.0-0t64", "2.80.0-6ubuntu1"),
-            "puppeteer-libgtk-3-0t64": ("libgtk-3-0t64", "3.24.41-4ubuntu1"),
+            "puppeteer-libgbm1": ("libgbm1", "25.2.8-0ubuntu0.24.04.4"),
+            "puppeteer-libglib2.0-0t64": ("libglib2.0-0t64", "2.80.0-6ubuntu3.9"),
+            "puppeteer-libgtk-3-0t64": ("libgtk-3-0t64", "3.24.41-4ubuntu1.3"),
             "puppeteer-libnspr4": ("libnspr4", "2:4.35-1.1build1"),
-            "puppeteer-libnss3": ("libnss3", "2:3.98-1build1"),
+            "puppeteer-libnss3": ("libnss3", "2:3.98-1ubuntu0.2"),
             "puppeteer-libpango-1.0-0": ("libpango-1.0-0", "1.52.1+ds-1build1"),
             "puppeteer-libpangocairo-1.0-0": (
                 "libpangocairo-1.0-0",
@@ -3315,7 +3315,7 @@ class DependencyModelTests(unittest.TestCase):
             "puppeteer-libxss1": ("libxss1", "1:1.2.3-1build3"),
             "puppeteer-libxtst6": ("libxtst6", "2:1.2.3-1.1build1"),
             "puppeteer-lsb-release": ("lsb-release", "12.0-2"),
-            "puppeteer-wget": ("wget", "1.21.4-1ubuntu4"),
+            "puppeteer-wget": ("wget", "1.21.4-1ubuntu4.5"),
             "puppeteer-xdg-utils": ("xdg-utils", "1.1.3-4.1ubuntu3"),
         }
         self.assertEqual(
@@ -3323,7 +3323,7 @@ class DependencyModelTests(unittest.TestCase):
             ("node", *expected),
         )
         self.assertEqual(plan.providers_for("node"), ("gnupg",))
-        self.assertEqual(records["gnupg"].version, "2.4.4-2ubuntu17")
+        self.assertEqual(records["gnupg"].version, "2.4.4-2ubuntu17.6")
         for record_id, (package, version) in expected.items():
             record = records[record_id]
             self.assertEqual(record.package, package)
