@@ -18,13 +18,11 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 
 ## Reader Map
 
-局所 refactor は対象、差分、既存契約から始めます。design の実装追跡や clause
-fingerprint は、設計変更・drift 判断、または unresolved owner がその参照を必要とする場合に
-使います。refactor の change mapping と review はこの skill の owner ですが、design
-drift invariant は routine に委譲します。一般原則の意味、競合時の優先順位、KISS / YAGNI /
-DRY、abstraction admission は
+局所 refactor は対象、差分、既存契約から始めます。refactor の change mapping と review は
+この skill の owner であり、design drift invariant は routine に委譲します。一般原則の意味、
+競合時の優先順位、KISS / YAGNI / DRY、abstraction admission は
 [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
-が所有し、その判断が必要な場合に参照します。
+が所有します。
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
   explicit scope, deltas, and review gates.
@@ -42,8 +40,8 @@ DRY、abstraction admission は
 
 通常の置換・統合と重複旧実装の廃止に
 [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
-を適用します。差分量ではなく SEP-06 の完成後のコードスペースを基準に設計し、不要な旧コードの
-削除と必要な usage-surface repair を同じ修正で閉じます。別の廃止依頼や利用者ゼロを待たず、
+を適用します。差分量ではなく SEP-06 の完成後のコードスペースを基準に設計し、依頼に含まれる
+旧コード削除と必要な usage-surface repair を同じ修正で閉じます。別の廃止依頼や利用者ゼロを待たず、
 無関係な改善は加えません。挙動保存は旧実装・旧構造の温存を意味しません。
 
 ## Software Engineering Principle Route
@@ -133,13 +131,9 @@ accepting a path or dependency-direction change.
    most recently incorporated implementation, and existing reuse evidence. A
    prior refactor sequence is not a reason to repeat its stages.
 2. Use the target and contract to select the owner, replaceable unit, mechanism,
-   and validation route. Follow callers and effects only when a concrete
-   unresolved fact could change that decision. Use `dependency-analysis` when a
-   cause or explicitly requested consumer migration remains unresolved; for a
-   bounded local edit, reuse the existing owner evidence.
-3. For a structural refactor, fix the canonical root first, then update only the
-   callers, tests, docs, and generated consumers affected by the requested
-   structural change. Remove obsolete entrypoints, wrappers, aliases, and
+   and validation route.
+3. For a structural refactor, fix the canonical root and update the surfaces in
+   the requested change. Remove obsolete entrypoints, wrappers, aliases, and
    exclusive support under RC-09. Keep API/structure mapping only where the
    change actually moves or deletes a public surface.
 4. Preserve the agreed behavior and failure semantics. Add `structure-planning`,
@@ -186,9 +180,8 @@ are conditional on the changed surface; they do not replace the owning review.
 ## Runtime Contract Clauses
 
 For replacement or duplicate retirement, apply RC-09: retain the canonical
-mechanism, migrate necessary callers, and remove obsolete support. Use
-`dependency-analysis` or `tool-finding-report` only when their existing owner is
-needed to decide the root or an unresolved risk. Use the selected static or
+mechanism and remove obsolete support. A caller migration belongs to the change
+only when that migration is explicitly requested. Use the selected static or
 targeted validation route, inspect the resulting diff, and hand back unavailable
 or unrelated work to its owner. Do not add a new packet, field list, approval
 stage, full scan, or review gate in this skill.

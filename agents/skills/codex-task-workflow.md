@@ -32,12 +32,9 @@ handoff unless the route requires one.
 
 ## Owner-First Readback
 
-Use the applicable root instructions and selected Skill. Follow only linked
-owners needed for the current decision, and preserve settled context across
-phases. For a local change, start with the target, diff, and governing contract.
-Follow callers or consumers only when a concrete unresolved fact could change the
-implementation boundary. For an explicitly cross-module/API migration, trace
-dependencies within its declared scope.
+Use the applicable root instructions and selected Skill. Preserve settled
+context across phases. For a local change, use the target, current diff, and
+governing contract to select the next action.
 
 ## Stages
 

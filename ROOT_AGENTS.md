@@ -29,18 +29,16 @@ authority. Before working, confirm the directory, branch, and dependency HEADs;
 recheck changed premises only. Preserve unknown Git state and user data. Authority
 for the task does not authorize unrelated changes or publication.
 
-For a local repair, start with the target code, current diff, governing contract,
-and observed failure. State what required behavior the target cannot meet and the
-operation that demonstrates it. Follow a caller or control/data path only when
-the target leaves a specific unresolved fact and that path is needed to settle
-whether the owner, mechanism, guarantee, scope, or validation changes. Treat
-failure reports and review claims as hypotheses; use the selected implementation
-owner's reachability/remedy guidance.
-When a concrete decision still depends on another file, identify the missing
-fact and the smallest reference needed to resolve it; do not widen the read or
-edit scope implicitly. For a request that explicitly crosses modules or migrates
-an API, trace only the dependencies and consumers within that declared scope.
-Separate observations, inferences, and unresolved decision-relevant premises.
+For a local repair, judge the target code, current diff, and governing contract;
+do not make use-site or out-of-scope investigation a prerequisite. State what
+required behavior the target cannot meet and the operation that demonstrates it.
+Treat failure reports and review claims as hypotheses; use the selected
+implementation owner's reachability/remedy guidance.
+If those target facts cannot resolve a concrete decision, name the missing fact
+and the smallest reference needed. For a request that explicitly crosses modules
+or migrates an API, investigate only dependencies and consumers within that
+declared scope. Separate observations, inferences, and unresolved
+decision-relevant premises.
 
 Carry the requested outcome and authority through cause discovery; do not turn
 preliminary paths, slices, or non-goals into a completion ceiling. After cause

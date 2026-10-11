@@ -19,9 +19,7 @@ upstream implementation ../../tools/analysis/code/helper_function_inventory.py p
   change-impact evidence before choosing or validating edit scope.
 - Section path: Purpose and Use When explain the trigger; Required Commands
   lists the operational tool surface; Interpretation, Change Impact Packet, and
-  Core References define how outputs feed planning and handoff. For a local cause
-  repair, use Root-Cause Repair Scope to fix the cause and inspect only relations
-  that can change that repair or its validation.
+  Core References define how selected outputs feed planning and handoff.
 - Use when: dependency manifests, changed-file gates, graph edges, reverse
   edges, source references, or repair-planning packets are needed.
 - Boundary: code dependency evidence and dependency-header evidence remain
@@ -33,7 +31,7 @@ upstream implementation ../../tools/analysis/code/helper_function_inventory.py p
 ## Purpose
 
 依存 manifest の header / scan / format / graph tool と、必要時の SCIP index/query を、依存関係が判断に影響するときだけ目的別に起動します。
-code dependency と header dependency は別 evidence として扱います。cross-surface の修正計画や依存 evidence を要する subagent handoff で Change Impact Packet を使う場合は両者を別 section に記録し、選択範囲に必要な excerpt と summary だけを載せます。局所修正の対象選定に packet は要求しません。
+code dependency と header dependency は別 evidence として扱います。Change Impact Packet を使う cross-surface 修正計画や handoff では両者を別 section に記録し、選択範囲に必要な excerpt と summary だけを載せます。局所修正の対象選定に packet は要求しません。
 
 ## Use When
 
@@ -45,7 +43,7 @@ code dependency と header dependency は別 evidence として扱います。cr
 - Python helperのrole/name evidenceが設計判断に必要で、helper inventoryのproperty-specific結果を確認したい
 - repo-wide search の responsibility-based candidate と bounded `git grep` hit から、どの file を編集・確認すべきか dependency graph で展開したい
 - design document の implementation-backed claim、DSL / standard-form assumption、parent-doc alignment を dependency header evidence と比較したい
-- 明示された cross-module/API migration、または対象内で判断できない具体的な依存関係について、必要な範囲の影響 evidence を整理したい
+- 明示された cross-module/API migration の影響 evidence を整理したい
 - refactor-loop や implementation subagent に渡す repair batch / handoff context を機械的に作りたい
 
 ## Required Commands
@@ -134,67 +132,37 @@ cause proof instead; no additional cause-evidence note is required. Rejected,
 duplicate, already-covered, and unreachable findings retain their
 reason/evidence without activating cause investigation.
 
-For a local cause investigation, start with the target code, current diff, and
-governing contract. Pinpoint the expression, branch, call, state update, or
-smallest relevant block that fails its obligation, and explain how the observed
-input/state produces the failure. A caller path is needed only when the target
-and observation do not establish a decision-relevant fact. A module name,
-candidate list, stack frame, or error/log emission site alone is not cause
-identification.
+For cause investigation, start with the target code, current diff, and governing
+contract. Pinpoint the expression, branch, call, state update, or smallest
+relevant block that fails its obligation, and explain how the observed input/state
+produces the failure. A module name, candidate list, stack frame, or error/log
+emission site alone is not cause identification.
 
 Support the cause with source/specification evidence, mathematical or engineering
 reasoning, or targeted observations; sufficient static proof does not require an
 extra run. Distinguish the cause from where its effects become visible. Keep
-independent failures separate. An unresolved cause remains `cause_unproven` with
-the missing fact and the smallest next reference or check that can resolve it.
+independent failures separate. An unresolved cause remains `cause_unproven`;
+preserve its uncertainty in the existing record.
 
 Fix the identified causal location next; identification is not a separate
-stopping point. After the edit, inspect related code only when evidence shows it
-could change the repair, an explicitly requested migration, or selected
-validation. Use the existing note and handoff; do not add a schema, checker, or
-report.
+stopping point. Then compare the target diff with the required behavior, run the
+selected validation, and report the result. Use the existing note and handoff;
+do not add a schema, checker, or report.
 
-When causal ambiguity could change the owner, fix surface, or validation, record
-a compact cause-evidence note before acting. It has no fixed schema or candidate
-count: use only evidence-linked edges needed to resolve that decision and record
-the applicable evidence needed to establish:
+When causal alternatives could change the owner, mechanism, or validation, record
+the observed input/state, source location, relevant supporting or refuting
+evidence, and resulting action in the existing note. Keep the record limited to
+what establishes that decision; do not create fields or a packet for a direct
+cause proof.
 
-- `Observation` and the current source snapshot;
-- `Incoming Callers/Entrypoints`: callers, public imports, dispatchers,
-  parsers, workflow triggers, and configuration entrypoints that can reach the
-  target;
-- `Owning Mechanism/State/Guards`: the state owner, transition/mechanism,
-  invariants, guard predicates, and duplicated or over-strict checks;
-- `Downstream Consumers/Side Effects/Cleanup`: consumers, writes, process or
-  resource effects, failures, rollback, and cleanup paths;
-- `Sibling Implementations/Tests/Docs/Config`: comparable code and all
-  evidence-linked test, documentation, and configuration surfaces;
-- `Temporal Evidence`: latest remote/default branch, Issue/PR, and branch
-  history only when snapshot drift or a recent/stale surface is plausible;
-- `Reachability and Overcheck Analysis`: proof or targeted evidence for each
-  disputed branch or guard. A statically impossible branch is recorded as
-  `reason_code=unreachable_branch`; an unnecessary or duplicate guard is
-  recorded as `reason_code=overcheck`;
-- `Alternative Disposition`, `Selected Cause`, `Expected Mechanism`, and
-  `Action Derivation` connecting the cause to the owner, fix, contract, and
-  validation route.
-
-These are evidence dimensions rather than a mandatory ceremony for every
-packet. Mark an inapplicable dimension as bounded when supported; do not survey
-callers, consumers, siblings, or history unless that evidence can change the
-decision.
-
-The breadth is evidence-driven: do not impose an arbitrary full-repository
-scan or fixed candidate count. For code causes, stop when the local cause and
-relevant input/state are established and alternatives that could change the
-owner, fix surface, or validation are disconfirmed or bounded. Expand to linked
-paths only as needed to resolve such an alternative.
+Do not impose a full-repository scan or fixed candidate count. Stop when the
+cause and its relevant input/state are established and decision-changing
+alternatives are resolved or recorded as uncertain.
 A static type/schema/parser/compiler/state invariant may establish a single
-cause; record its concrete location and why the narrower traversal is complete.
+cause; record its concrete location and evidence.
 Do not turn a symptom into a fix merely because its file appears in the search
 result. Derive the immediate owning edit and its targeted validation from the
-supported cause. Do not require a full related-surface survey before that edit;
-trace related code after the cause is fixed, as specified below.
+supported cause.
 
 The cause-to-action sequence is ordered, not a list of independent checks:
 
@@ -203,43 +171,25 @@ The cause-to-action sequence is ordered, not a list of independent checks:
    proof may go straight to `direct_cause_proof`; a duplicate,
    already-covered, or unreachable finding may close with its reason and
    evidence. Those dispositions do not require a new cause search.
-3. When the cause is not direct or a plausible alternative could change the
-   owner, fix surface, or validation route, inspect the smallest evidence-linked
-   path that can resolve it. Do not survey callers, consumers, or sibling
-   surfaces as a default.
-4. Compare only alternatives that could change that decision and record each
-   as `disconfirmed`, `bounded`, or selected with its supporting evidence.
-5. Fix the concrete causal location using the supported mechanism, then follow
-   the related-code route below when affected relations could change the repair
-   or validation. An unresolved cause stays analysis work; it does not become a
-   symptom-level action or a completed cause search.
+3. Compare only alternatives that could change the owner, fix, or validation,
+   and record their evidence in the existing note when needed.
+4. Fix the concrete causal location using the supported mechanism. An unresolved
+   cause stays analysis work; it does not become a symptom-level action or a
+   completed cause search.
 
 ## Root-Cause Repair Scope After Cause Selection
 
-The cause fix precedes related-code follow-up. Revisit only relations that
-evidence shows can change the repair, an explicitly requested migration, or
-selected validation; do not separate diagnosis from repair or widen a local
-repair based on possible relationships alone.
+For a local cause repair, fix the identified cause, compare the target diff with
+the required behavior, run the selected validation, and report the result.
 
 1. Correct the identified expression, branch, call, state update, or missing
    operation at its owner. Preserve the governing contract with the simplest
    sufficient change. Do not suppress the symptom with a wrapper, compatibility
    shim, weakened oracle, or caller workaround that leaves the root cause intact.
-2. After that edit, use LSP or code-dependency evidence only when a specific
-   relation could change the repair, an explicitly requested migration, or
-   selected validation. Otherwise use the target and the narrow source/test
-   evidence already available. A relation alone is not a reason to inspect or
-   edit another path.
-3. Fix concrete problems on a relation only when the repair changes that
-   relation or the requested migration includes it. Recheck evidence bearing on
-   the defect or correction; leave sound and out-of-scope code unchanged. Do not
-   synchronize consumers that the requested change does not affect.
-4. Run the existing formatter and targeted validation for the final changes.
-   Complete the repair when the cause is fixed and the inspected related paths
-   have no unresolved problems caused by that defect or its correction. Record
-   the actual changes, relation evidence, validation, and any remaining
-   verification in the existing Issue/PR. Preserve explicit read-only and
-   write-authority boundaries.
+2. Inspect the final target diff against the required behavior and contract.
+3. Run the selected validation and report the observed result, changes, and
+   remaining uncertainty in the existing Issue/PR. Preserve explicit read-only
+   and write-authority boundaries.
 
 LSP establishes symbol relations, not program correctness. Check the actual
 contracts and behavior at those locations. Preserve unsupported/failed/partial
@@ -253,11 +203,11 @@ that fix; unresolved required verification still prevents a verified closeout.
 
 - SCIP definitions/references と dependency-header evidence は別 evidence として記録します。SCIP references は caller/callee relation や build reachability を意味せず、header edge は source symbol resolution を意味しません。両者を結合するのは Change Impact Packet の影響範囲整理だけです。
 - Python helperのrole、name alignment、redundancy evidenceには `helper_function_inventory.py --changed --all-functions` を使います。そのAST-derived local call hintsはSCIP symbol/reference evidenceではありません。`HELPER_INVENTORY_FILES=0` は対象 Python file がないことだけを示します。
-- 原因箇所を特定したらまずそこを修正し、[Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection) に従います。関連が修正・移行・validation の判断に影響する場合はpoint LSP利用手順、selected SCIP projection、または対象source evidenceでたどります。unsupported / unindexed targetをreference absenceと扱わず、header dependencyのdesign / docs / testsとも区別します。
-- `required_action` や solution proposal より先に、対象と現在の契約で判断できるかを確かめます。owner / fix / validation を変え得る具体的な曖昧さがある場合だけ、その判断に必要な evidence-linked relation をたどり、cause-evidence note に残します。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が判断を変え得る場合だけ latest remote/Issue/branch history を追加します。
+- 原因箇所を特定したら修正し、対象差分と選択した validation を確認します。LSP / SCIP は依頼された依存分析に必要な場合だけ使い、未対応 index の結果を reference absence と扱いません。
+- 複数の因果仮説が owner / fix / validation を変え得る場合は、観測、候補、比較根拠、選択した原因を既存記録に残します。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。
 - 原因探索の最終目標は、原因となるコードの具体的な一か所の特定です。[Cause Investigation Surface](#cause-investigation-surface) に従い、source snapshot、path、symbol、該当行/block と、入力/状態から現象に至る因果根拠を既存記録に残します。候補一覧・原因分類・症状の発生地点だけでは完了しません。一か所と因果関係を特定し、判断を変え得る代替を disconfirmed / bounded にしたら、その原因箇所の修正へ進みます。十分な静的根拠に追加実行を要求せず、未特定は `cause_unproven` とし、根拠なく一つに断定しません。
 - activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
-- 複数の因果仮説を比較して修正箇所を選ぶ task では、この skill の `Cause Investigation Surface` と `Root-Cause Repair Scope` に従って既存 packet に `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を記録してから実装します。直接原因を示す十分な証明や reason/evidence-only disposition にはこの比較記録を追加しません。
+- 複数の因果仮説を比較して修正箇所を選ぶ task では、比較に必要な evidence を既存 packet に記録します。直接原因の証明や reason/evidence-only disposition には追加記録を要求しません。
 - 既存 hypothesis packet を使った場合は、原因修正後の関連確認と対象検証のうち判断に必要な evidence を `Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` として残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
 - changed-file header / scan / format failure は fix-now blocker です。
 - default graph failure は孤立 manifest、自己参照、または cycle を示すため fix-now blocker です。
@@ -270,15 +220,14 @@ that fix; unresolved required verification still prevents a verified closeout.
 
 ## Change Impact Packet
 
-`dependency-analysis` は、依存 evidence を集めるだけでなく、修正計画の入力になる
+`dependency-analysis` は、選択された cross-surface 修正計画や handoff の入力になる
 structured `Change Impact Packet` manifest の正本です。これは LLM が依存
 graph 全体を prose 化する場所ではありません。tool output は JSON / TSV /
-Markdown artifact として保存し、packet には path、count、object id、現在の
-repair batch に必要な selected excerpt と structured summary を載せます。`refactor-loop`、
-implementation handoff、原因仮説の fix-surface 選定では、raw text-search hit、raw
-finding、単一 file 名だけを subagent に渡しません。原因修正では特定した箇所と因果根拠から
-最初の変更を導き、修正後に得たLSP関連と必要な追加修正を同じpacketへ反映します。
-packet全体の事前完成を、特定済みの原因箇所を直す前提にしません。
+Markdown artifact として保存し、packet には path、count、object id、選択範囲に
+必要な selected excerpt と structured summary を載せます。`refactor-loop` や dependency
+evidence を要する handoff では、raw text-search hit、raw finding、単一 file 名だけを
+subagent に渡しません。局所原因修正は特定した箇所と因果根拠から直接開始し、packet や
+LSP 探索を前提にしません。
 
 Change Impact Packet の scope candidates や repair slices を形成する前に、
 code-cleanup から渡された一つの shared current+historical asset universe を
@@ -299,7 +248,6 @@ known な `allowed_paths` は各 child の role / module に応じて個別に�
 
 この節は、依頼が明示的に複数の Git roots / modules をまたぐ変更や API migration を
 含む場合、または既知の dependency repository の移行が依頼範囲に含まれる場合に使います。
-局所変更で consumer の有無を調査して cross-module 範囲を推測しません。
 
 該当する範囲だけ、involved roots に限定して、各 root の `.gitmodules`、
 dependency / package / build manifest、import / include / source / build edge、
@@ -391,17 +339,14 @@ The runtime discovery adapter delegates these required operating clauses to this
 
 1. Read [documents/design/dependency-manifest-design.md](../../documents/design/dependency-manifest-design.md)
    when dependency-header format, graph semantics, or tool ownership affects the decision.
-1. If the task selects or justifies a fix surface, read this skill's `Cause Investigation Surface` and `Root-Cause Repair Scope`; use `change-review` for the findings-first review after the owner is selected.
+1. For an unresolved cause, use this skill's `Cause Investigation Surface`; use `change-review` when a findings-first review is selected after the owner is known.
 1. When competing causal hypotheses could change the fix surface, record the
    comparison in the existing packet before implementation; direct cause proofs
    and reason/evidence-only dispositions do not need that comparison.
-1. Apply [Cause Investigation Surface](#cause-investigation-surface) before deriving
-   an action: use its conditional cause-evidence note or direct cause proof,
-   preserving the reason/evidence-only dispositions. For code causes, identify
-   the concrete causal location and supported mechanism, then fix that location
-   and follow [Root-Cause Repair Scope](#root-cause-repair-scope-after-cause-selection)
-   for relations that could affect the repair or validation. Do not stop at cause
-   identification or treat unsupported LSP results as absence of problems.
+1. Apply [Cause Investigation Surface](#cause-investigation-surface) to establish
+   an unresolved cause. For code causes, identify the location and mechanism,
+   fix the cause, inspect the target diff, and run selected validation. Do not
+   treat unsupported LSP results as proof that no relation exists.
 1. When an existing hypothesis packet is used, record its post-change evidence
    and decision there; return to hypothesis selection when evidence rejects or
    leaves that hypothesis inconclusive.
