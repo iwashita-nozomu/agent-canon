@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Owns bounded LSP file discovery, language mapping, one-shot analysis, and deterministic code facts.
+# responsibility Owns bounded LSP file discovery, verified server selection, one-shot analysis, and deterministic code facts.
 # upstream design ../../../documents/structured-analysis/code-analysis.md code-analysis boundary
 # upstream design ../../../documents/tools/lsp_code_analysis.md LSP adapter contract
+# upstream implementation ../../../bootstrap/container/image/dependencies.toml pins the public JSON-RPC transport runtime
 # upstream implementation ../../runtime/authority/tool_path_policy.py filters retired tool paths
 # downstream implementation ../../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
 # downstream implementation ../search/search.py consumes in-memory code-deps facts
 # @dependency-end
-"""Small, dependency-free LSP 3.17 code-analysis adapter.
+"""Bounded LSP 3.17 code-analysis adapter.
 
 The adapter intentionally owns only a single analysis request.  It does not
 maintain an index or discover servers from the host PATH: callers provide an
 exact command (or use the language map installed by the shared tool-runtime
-manifest).  The wire implementation is deliberately boring so fake servers
-can exercise it in unit tests.
+manifest).  ``python-lsp-jsonrpc`` owns stream framing and request correlation;
+this adapter retains process lifecycle, request timeouts, and report validation.
 """
 
 from __future__ import annotations
@@ -24,13 +25,13 @@ import ast
 import json
 import os
 import re
-import select
 import shlex
 import subprocess
 import sys
 import threading
 import time
 from collections.abc import Iterable, Mapping, Sequence
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -42,9 +43,7 @@ from tools.runtime.authority.tool_path_policy import is_retired_legacy_tool_path
 SCHEMA_VERSION = "agent-canon.lsp-code-analysis.v1"
 LSP_VERSION = "3.17"
 DEFAULT_TIMEOUT_SECONDS = 15.0
-DEFAULT_MAX_FRAME_BYTES = 16 * 1024 * 1024
 DEFAULT_STDERR_BYTES = 64 * 1024
-DEFAULT_MAX_HEADER_BYTES = 64 * 1024
 IMAGE_RECEIPT_ROOT = Path(
     "/usr/local/share/agent-canon/image-dependencies/receipts"
 )
@@ -484,7 +483,7 @@ class CodeAnalysisReport:
 
 
 class LspProcessSession:
-    """Content-Length JSON-RPC transport and lifecycle owner."""
+    """One bounded server process using library-owned JSON-RPC streams."""
 
     def __init__(
         self,
@@ -492,23 +491,39 @@ class LspProcessSession:
         root: Path,
         *,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
-        max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES,
     ) -> None:
-        """Configure one bounded stdlib subprocess session."""
+        """Configure one process session with a bounded request wait."""
         self.spec = spec
         self.root = root.resolve()
         self.timeout = timeout
-        self.max_frame_bytes = max_frame_bytes
         self.process: subprocess.Popen[bytes] | None = None
-        self._next_id = 1
+        self._endpoint: Any = None
+        self._stream_reader: Any = None
+        self._stream_writer: Any = None
+        self._request_count = 0
         self._stderr = bytearray()
         self._stderr_thread: threading.Thread | None = None
-        self._stdout_buffer = bytearray()
+        self._reader_thread: threading.Thread | None = None
+        self._reader_condition = threading.Condition()
+        self._reader_failure: LspAnalysisError | None = None
+        self._reader_closed = False
+        self._last_message_at = time.monotonic()
         self.lifecycle: list[str] = []
         self.published_diagnostics: list[Mapping[str, Any]] = []
 
     def start(self) -> None:
         """Start the exact server command in the analysis root."""
+        try:
+            from pylsp_jsonrpc.endpoint import Endpoint
+            from pylsp_jsonrpc.streams import (
+                JsonRpcStreamReader,
+                JsonRpcStreamWriter,
+            )
+        except ImportError as exc:
+            raise ServerUnavailable(
+                "python-lsp-jsonrpc is unavailable in this runtime"
+            ) from exc
+
         try:
             self.process = subprocess.Popen(
                 list(self.spec.command),
@@ -520,9 +535,123 @@ class LspProcessSession:
             )
         except OSError as exc:
             raise ServerUnavailable(f"unable to start {self.spec.command[0]}") from exc
-        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
-        self._stderr_thread.start()
+        if self.process.stdin is None or self.process.stdout is None:
+            self._stop_process(self.process)
+            raise ServerUnavailable("LSP process pipes could not be opened")
+
+        try:
+            self._stream_reader = JsonRpcStreamReader(self.process.stdout)
+            self._stream_writer = JsonRpcStreamWriter(
+                self.process.stdin, ensure_ascii=False, separators=(",", ":")
+            )
+            self._endpoint = Endpoint(
+                self._server_request_handlers(), self._write_message
+            )
+            self._stderr_thread = threading.Thread(
+                target=self._drain_stderr, daemon=True
+            )
+            self._stderr_thread.start()
+            self._reader_thread = threading.Thread(
+                target=self._read_messages, daemon=True
+            )
+            self._reader_thread.start()
+        except Exception as exc:
+            self._stop_process(self.process)
+            if self._stderr_thread is not None:
+                self._stderr_thread.join(timeout=0.2)
+            if self._reader_thread is not None:
+                self._reader_thread.join(timeout=0.2)
+            if self._endpoint is not None:
+                self._endpoint.shutdown()
+            raise ServerUnavailable("unable to initialize LSP JSON-RPC streams") from exc
         self.lifecycle.append("created")
+
+    def _server_request_handlers(self) -> dict[str, Any]:
+        """Answer the bounded server requests needed by current language servers."""
+        return {
+            "client/registerCapability": self._ignore_server_request,
+            "client/unregisterCapability": self._ignore_server_request,
+            "$/progress": self._ignore_server_request,
+            "window/workDoneProgress/create": self._ignore_server_request,
+            "workspace/configuration": self._workspace_configuration,
+            "workspace/workspaceFolders": self._workspace_folders,
+            "textDocument/publishDiagnostics": self._publish_diagnostics,
+        }
+
+    @staticmethod
+    def _ignore_server_request(params: Any) -> None:
+        del params
+        return None
+
+    @staticmethod
+    def _workspace_configuration(params: Any) -> list[None]:
+        items = params.get("items", []) if isinstance(params, Mapping) else []
+        return [None] * len(items)
+
+    def _workspace_folders(self, params: Any) -> list[dict[str, str]]:
+        del params
+        return [{"uri": _file_uri(self.root), "name": self.root.name}]
+
+    def _publish_diagnostics(self, params: Any) -> None:
+        try:
+            self._consume_notification(
+                {"method": "textDocument/publishDiagnostics", "params": params}
+            )
+        except LspAnalysisError as exc:
+            self._record_reader_failure(exc)
+
+    def _read_messages(self) -> None:
+        """Feed server messages to the public JSON-RPC endpoint."""
+        try:
+            self._stream_reader.listen(self._consume_message)
+        except Exception as exc:
+            self._record_reader_failure(
+                ProtocolViolation(
+                    f"LSP JSON-RPC reader failed ({type(exc).__name__})"
+                )
+            )
+        finally:
+            with self._reader_condition:
+                self._reader_closed = True
+                self._reader_condition.notify_all()
+
+    def _consume_message(self, message: Any) -> None:
+        with self._reader_condition:
+            self._last_message_at = time.monotonic()
+            self._reader_condition.notify_all()
+        if not isinstance(message, Mapping):
+            self._record_reader_failure(
+                MalformedResponse("LSP JSON-RPC message must be an object")
+            )
+            return
+        try:
+            self._endpoint.consume(message)
+        except Exception as exc:
+            self._record_reader_failure(
+                ProtocolViolation(
+                    f"LSP JSON-RPC dispatch failed ({type(exc).__name__})"
+                )
+            )
+
+    def _record_reader_failure(self, error: LspAnalysisError) -> None:
+        with self._reader_condition:
+            if self._reader_failure is None:
+                self._reader_failure = error
+            self._reader_condition.notify_all()
+
+    def _raise_reader_failure(self) -> None:
+        with self._reader_condition:
+            failure = self._reader_failure
+        if failure is not None:
+            raise failure
+
+    def _write_message(self, message: Mapping[str, Any]) -> None:
+        if self._stream_writer is None:
+            raise ProtocolViolation("LSP process is not running")
+        try:
+            self._stream_writer.write(message)
+        except Exception as exc:
+            raise ProtocolViolation("LSP JSON-RPC write failed") from exc
 
     def _drain_stderr(self) -> None:
         """Drain bounded server stderr so protocol output cannot deadlock."""
@@ -540,141 +669,6 @@ class LspProcessSession:
             if remaining > 0:
                 self._stderr.extend(chunk[:remaining])
 
-    def _readline_timeout(
-        self,
-        stream: Any,
-        deadline: float,
-        max_bytes: int,
-    ) -> bytes:
-        """Read one header line without blocking on a partial line."""
-        while True:
-            if time.monotonic() >= deadline:
-                raise RequestTimeout("LSP frame header timed out")
-            newline = self._stdout_buffer.find(b"\n")
-            if newline >= 0:
-                if newline + 1 > max_bytes:
-                    raise ProtocolViolation("LSP header exceeds configured limit")
-                line = bytes(self._stdout_buffer[: newline + 1])
-                del self._stdout_buffer[: newline + 1]
-                return line
-            if len(self._stdout_buffer) >= max_bytes:
-                raise ProtocolViolation("LSP header exceeds configured limit")
-            remaining = max(0.0, deadline - time.monotonic())
-            if remaining <= 0:
-                raise RequestTimeout("LSP frame header timed out")
-            try:
-                ready, _, _ = select.select([stream.fileno()], [], [], remaining)
-            except (OSError, ValueError) as exc:
-                raise ProtocolViolation("LSP stdout is not selectable") from exc
-            if not ready:
-                raise RequestTimeout("LSP frame header timed out")
-            try:
-                read_size = min(4096, max_bytes - len(self._stdout_buffer))
-                if read_size <= 0:
-                    raise ProtocolViolation("LSP header exceeds configured limit")
-                chunk = stream.read(read_size)
-            except OSError as exc:  # pragma: no cover - platform I/O
-                raise ProtocolViolation("LSP frame header read failed") from exc
-            if not chunk:
-                raise ProtocolViolation("LSP server closed stdout")
-            self._stdout_buffer.extend(chunk)
-
-    def _read_payload_timeout(self, stream: Any, length: int, deadline: float) -> bytes:
-        """Read one bounded body without allowing a stalled server to hang."""
-        if time.monotonic() >= deadline:
-            raise RequestTimeout("LSP frame payload timed out")
-        payload = bytearray()
-        if self._stdout_buffer:
-            take = min(length, len(self._stdout_buffer))
-            payload.extend(self._stdout_buffer[:take])
-            del self._stdout_buffer[:take]
-        while len(payload) < length:
-            remaining = max(0.0, deadline - time.monotonic())
-            if remaining <= 0:
-                raise RequestTimeout("LSP frame payload timed out")
-            try:
-                ready, _, _ = select.select([stream.fileno()], [], [], remaining)
-            except (OSError, ValueError) as exc:
-                raise ProtocolViolation("LSP stdout is not selectable") from exc
-            if not ready:
-                raise RequestTimeout("LSP frame payload timed out")
-            chunk = stream.read(length - len(payload))
-            if not chunk:
-                raise ProtocolViolation("truncated LSP payload")
-            payload.extend(chunk)
-        return payload
-
-    def _read_message(self, deadline: float | None = None) -> Mapping[str, Any]:
-        if self.process is None or self.process.stdout is None:
-            raise ProtocolViolation("LSP process is not running")
-        deadline = deadline if deadline is not None else time.monotonic() + self.timeout
-        headers: dict[str, str] = {}
-        header_bytes = 0
-        while True:
-            remaining_header = DEFAULT_MAX_HEADER_BYTES - header_bytes
-            if remaining_header <= 0:
-                raise ProtocolViolation("LSP headers exceed configured limit")
-            line = self._readline_timeout(self.process.stdout, deadline, remaining_header)
-            header_bytes += len(line)
-            if not line:
-                raise ProtocolViolation("LSP server closed stdout")
-            if line in (b"\r\n", b"\n"):
-                break
-            try:
-                key, value = line.decode("ascii").split(":", 1)
-            except (UnicodeDecodeError, ValueError) as exc:
-                raise ProtocolViolation("malformed LSP header") from exc
-            normalized_key = key.lower().strip()
-            if normalized_key in headers:
-                raise ProtocolViolation("duplicate LSP header")
-            headers[normalized_key] = value.strip()
-        try:
-            raw_length = headers["content-length"]
-            if re.fullmatch(r"[0-9]+", raw_length) is None:
-                raise ValueError("non-numeric content length")
-            length = int(raw_length)
-        except (KeyError, ValueError) as exc:
-            raise ProtocolViolation("missing Content-Length") from exc
-        if length < 0 or length > self.max_frame_bytes:
-            raise ProtocolViolation("LSP frame exceeds configured limit")
-        payload = self._read_payload_timeout(self.process.stdout, length, deadline)
-        try:
-            value = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise MalformedResponse("invalid LSP JSON payload") from exc
-        if not isinstance(value, Mapping):
-            raise MalformedResponse("LSP payload must be an object")
-        return value
-
-    def _send(self, message: Mapping[str, Any]) -> None:
-        if self.process is None or self.process.stdin is None:
-            raise ProtocolViolation("LSP process is not running")
-        payload = json.dumps(message, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        if len(payload) > self.max_frame_bytes:
-            raise ProtocolViolation("outbound LSP frame exceeds configured limit")
-        try:
-            self.process.stdin.write(f"Content-Length: {len(payload)}\r\n\r\n".encode("ascii"))
-            self.process.stdin.write(payload)
-            self.process.stdin.flush()
-        except OSError as exc:
-            raise ProtocolViolation("LSP stdin write failed") from exc
-
-    def _respond_to_server_request(self, message: Mapping[str, Any]) -> bool:
-        if "method" not in message or "id" not in message:
-            return False
-        method = str(message["method"])
-        params = message.get("params")
-        if method in {"client/registerCapability", "client/unregisterCapability", "$/progress", "window/workDoneProgress/create"}:
-            self._send({"jsonrpc": "2.0", "id": message["id"], "result": None})
-        elif method == "workspace/configuration":
-            items = params.get("items", []) if isinstance(params, Mapping) else []
-            self._send({"jsonrpc": "2.0", "id": message["id"], "result": [None] * len(items)})
-        elif method == "workspace/workspaceFolders":
-            self._send({"jsonrpc": "2.0", "id": message["id"], "result": [{"uri": _file_uri(self.root), "name": self.root.name}]})
-        else:
-            self._send({"jsonrpc": "2.0", "id": message["id"], "error": {"code": -32601, "message": "Method not found"}})
-        return True
-
     def _consume_notification(self, message: Mapping[str, Any]) -> None:
         """Store push diagnostics while ignoring unrelated notifications."""
         if message.get("method") == "textDocument/publishDiagnostics":
@@ -691,49 +685,95 @@ class LspProcessSession:
             self.published_diagnostics.append(params)
 
     def drain_notifications(self, quiet_seconds: float = 0.05) -> None:
-        """Drain asynchronous notifications until a bounded quiet interval."""
-        previous_timeout = self.timeout
-        self.timeout = quiet_seconds
-        try:
+        """Wait until the reader observes a bounded quiet interval."""
+        deadline = time.monotonic() + self.timeout
+        with self._reader_condition:
+            quiet_since = time.monotonic()
             while True:
-                try:
-                    message = self._read_message(time.monotonic() + quiet_seconds)
-                except RequestTimeout:
-                    break
-                if self._respond_to_server_request(message):
-                    continue
-                if "method" in message:
-                    self._consume_notification(message)
-        finally:
-            self.timeout = previous_timeout
+                self._raise_reader_failure()
+                if self._reader_closed:
+                    raise ProtocolViolation("LSP server closed stdout")
+                if self.process is not None and self.process.poll() is not None:
+                    raise ProtocolViolation(
+                        "LSP server exited while draining notifications"
+                    )
+                now = time.monotonic()
+                last_message_at = max(quiet_since, self._last_message_at)
+                quiet_remaining = quiet_seconds - (now - last_message_at)
+                if quiet_remaining <= 0:
+                    return
+                deadline_remaining = deadline - now
+                if deadline_remaining <= 0:
+                    raise RequestTimeout("LSP notifications did not become quiet")
+                self._reader_condition.wait(min(quiet_remaining, deadline_remaining))
 
     def request(self, method: str, params: Any) -> Any:
-        """Send one request and service server-initiated requests."""
-        request_id = self._next_id
-        self._next_id += 1
-        self._send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
+        """Send one request through the endpoint and enforce its time limit."""
+        if self.process is None or self._endpoint is None:
+            raise ProtocolViolation("LSP process is not running")
+        if self.process.poll() is not None:
+            raise ProtocolViolation("LSP server exited before responding")
+        self._raise_reader_failure()
+        try:
+            future = self._endpoint.request(method, params)
+        except Exception as exc:
+            raise ProtocolViolation(f"LSP {method} request could not be sent") from exc
+        self._request_count += 1
         deadline = time.monotonic() + self.timeout
         while True:
-            if time.monotonic() > deadline:
+            self._raise_reader_failure()
+            if future.done():
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    raise ProtocolViolation(f"LSP {method} failed: {exc}") from exc
+                self._raise_reader_failure()
+                return result
+            if self._reader_closed:
+                raise ProtocolViolation("LSP server closed stdout")
+            if self.process.poll() is not None:
+                raise ProtocolViolation("LSP server exited before responding")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 raise RequestTimeout(f"LSP request timed out: {method}")
-            message = self._read_message(deadline)
-            if self._respond_to_server_request(message):
+            try:
+                result = future.result(timeout=min(remaining, 0.05))
+            except FutureTimeoutError:
                 continue
-            # Publish-diagnostics is a notification.  Keep it available to
-            # the caller without making notifications part of request order.
-            if message.get("method") == "textDocument/publishDiagnostics":
-                self._consume_notification(message)
-                continue
-            if message.get("id") != request_id:
-                continue
-            if "error" in message:
-                error = message["error"]
-                raise ProtocolViolation(f"LSP {method} failed: {error}")
-            return message.get("result")
+            except Exception as exc:
+                raise ProtocolViolation(f"LSP {method} failed: {exc}") from exc
+            self._raise_reader_failure()
+            return result
 
     def notify(self, method: str, params: Any) -> None:
-        """Send a JSON-RPC notification without allocating a request ID."""
-        self._send({"jsonrpc": "2.0", "method": method, "params": params})
+        """Send one notification through the JSON-RPC endpoint."""
+        if self.process is None or self._endpoint is None:
+            raise ProtocolViolation("LSP process is not running")
+        if self.process.poll() is not None:
+            raise ProtocolViolation("LSP server exited before notification")
+        self._raise_reader_failure()
+        try:
+            self._endpoint.notify(method, params)
+        except Exception as exc:
+            raise ProtocolViolation(f"LSP {method} notification could not be sent") from exc
+
+    @staticmethod
+    def _stop_process(process: subprocess.Popen[bytes]) -> None:
+        if process.poll() is None:
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                process.wait()
+                return
+            try:
+                process.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    process.wait()
+                    return
+                process.wait(timeout=1.0)
 
     def close(self, *, failed: bool = False) -> None:
         """Shutdown cleanly or terminate/kill after a typed failure."""
@@ -752,16 +792,23 @@ class LspProcessSession:
                 try:
                     self.process.wait(timeout=min(1.0, self.timeout))
                 except subprocess.TimeoutExpired:
-                    self.process.terminate()
-                    try:
-                        self.process.wait(timeout=1.0)
-                    except subprocess.TimeoutExpired:
-                        self.process.kill()
-                        self.process.wait(timeout=1.0)
+                    self._stop_process(self.process)
             self.lifecycle.append("exit")
         finally:
+            if self.process.poll() is None:
+                self._stop_process(self.process)
             if self._stderr_thread is not None:
                 self._stderr_thread.join(timeout=0.2)
+            if self._reader_thread is not None:
+                self._reader_thread.join(timeout=0.2)
+            if self._endpoint is not None:
+                self._endpoint.shutdown()
+            for stream in (self.process.stdin, self.process.stdout, self.process.stderr):
+                if stream is not None:
+                    try:
+                        stream.close()
+                    except OSError:
+                        pass
             if not failed and self.process.returncode not in (None, 0):
                 raise ServerExitNonzero(
                     f"{self.spec.language_id} server exited with {self.process.returncode}"
@@ -1205,7 +1252,6 @@ def analyze(
     *,
     specs: Mapping[str, LspServerSpec] | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
-    max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES,
 ) -> CodeAnalysisReport:
     """Analyze files and return a complete report or a typed failure report."""
     root = root.resolve()
@@ -1239,7 +1285,7 @@ def analyze(
             spec = specs.get(language) or LspServerSpec.for_language(language, root=root)
             server_json = spec.as_json()
             servers.append(server_json)
-            with LspProcessSession(spec, root, timeout=timeout, max_frame_bytes=max_frame_bytes) as session:
+            with LspProcessSession(spec, root, timeout=timeout) as session:
                 session.lifecycle.append("initialize(sent)")
                 initialize = session.request(
                     "initialize",
@@ -1396,7 +1442,7 @@ def analyze(
                     "version": spec.version,
                     "resolution": spec.resolution,
                     "verificationOutput": spec.verification_output,
-                    "requestIds": session._next_id - 1,
+                    "requestIds": session._request_count,
                 }
         lifecycle["state"] = "complete"
     except LspAnalysisError as exc:

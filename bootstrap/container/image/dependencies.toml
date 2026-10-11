@@ -692,3 +692,16 @@ verification = { kind = "apt-package", executable = "pytest", args = ["--version
 deps = []
 provides = ["pytest"]
 failure_policy = "fail"
+
+[[records]]
+# LSP analysis uses the public package for JSON-RPC stream framing and
+# request correlation.
+id = "python3-pylsp-jsonrpc"
+package = "python3-pylsp-jsonrpc"
+method = "apt-package"
+version = "1.1.2-1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = ["python-lsp-jsonrpc"]
+failure_policy = "fail"
