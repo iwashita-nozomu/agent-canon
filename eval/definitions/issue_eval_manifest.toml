@@ -83,7 +83,7 @@ protects = [
   "apply and ensure-latest are not presented as competing canonical routes",
 ]
 expected_route = [
-  "bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+  "bootstrap.sh --control-parent-root <parent> status",
   "AgentCanon source PR and merged main readback",
 ]
 forbidden_route = [

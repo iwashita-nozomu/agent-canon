@@ -150,9 +150,9 @@ bootstrapを前提にしません。文書のみの変更は文書・参照整�
 image buildや実機acceptanceを実施したとは報告しません。
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> install
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> start
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> status
+./bootstrap.sh --control-parent-root <root> install
+./bootstrap.sh --control-parent-root <root> start
+./bootstrap.sh --control-parent-root <root> status
 ```
 
 - bootstrap container contract testと実lifecycle readbackをcompletion evidenceにします。

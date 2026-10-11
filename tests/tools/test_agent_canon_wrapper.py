@@ -76,7 +76,11 @@ def test_wrapper_submits_rust_request_to_bootstrap(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
-    assert request[request.index("exec") :] == [
+    assert request == [
+        "--repository-root",
+        str(source.resolve()),
+        "--control-parent-root",
+        str(control),
         "exec",
         "--root",
         str(source.resolve()),
@@ -88,17 +92,17 @@ def test_wrapper_submits_rust_request_to_bootstrap(tmp_path: Path) -> None:
     assert not (source / ".agent-canon").exists()
 
 
-def test_wrapper_leaves_missing_runtime_to_bootstrap(tmp_path: Path) -> None:
-    """Rust requests let bootstrap create or migrate the runtime root."""
+def test_wrapper_uses_control_root_for_rust_request(tmp_path: Path) -> None:
+    """Rust requests select their runtime through the control-root contract."""
     source, control, _runtime, bootstrap = _fixture(tmp_path)
-    legacy_runtime = tmp_path / "home" / "workspace" / "agent-canon-runtime" / "host"
+    runtime_override = tmp_path / "unused-runtime-override"
     result = subprocess.run(
         [str(source / "tools/bin/agent-canon"), "--version"],
         cwd=source,
         env={
             "PATH": os.environ["PATH"],
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
-            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_override),
         },
         check=False,
         capture_output=True,
@@ -106,8 +110,12 @@ def test_wrapper_leaves_missing_runtime_to_bootstrap(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
-    assert request[request.index("--runtime-root") + 1] == str(legacy_runtime)
-    assert request[-5:] == [
+    assert request == [
+        "--repository-root",
+        str(source.resolve()),
+        "--control-parent-root",
+        str(control),
+        "exec",
         "--root",
         str(source.resolve()),
         "--",
@@ -117,7 +125,7 @@ def test_wrapper_leaves_missing_runtime_to_bootstrap(tmp_path: Path) -> None:
     assert not (source / ".agent-canon").exists()
 
 
-def test_symlinked_dotfiles_wrapper_uses_source_root_and_legacy_runtime(
+def test_symlinked_dotfiles_wrapper_uses_source_and_control_roots(
     tmp_path: Path,
 ) -> None:
     """A dotfiles symlink submits the source-root request without host checks."""
@@ -127,7 +135,6 @@ def test_symlinked_dotfiles_wrapper_uses_source_root_and_legacy_runtime(
     dotfiles.mkdir(parents=True)
     link = dotfiles / "agent-canon"
     link.symlink_to(source / "tools/bin/agent-canon")
-    legacy_runtime = home / "workspace" / "agent-canon-runtime" / "host"
     result = subprocess.run(
         [str(link), "--version"],
         cwd=source,
@@ -135,7 +142,6 @@ def test_symlinked_dotfiles_wrapper_uses_source_root_and_legacy_runtime(
             "PATH": os.environ["PATH"],
             "HOME": str(home),
             "AGENT_CANON_CONTROL_PARENT_ROOT": str(home),
-            "AGENT_CANON_RUNTIME_ROOT": str(legacy_runtime),
         },
         check=False,
         capture_output=True,
@@ -143,9 +149,12 @@ def test_symlinked_dotfiles_wrapper_uses_source_root_and_legacy_runtime(
     )
     assert result.returncode == 0, result.stderr
     request = json.loads((tmp_path / "request.json").read_text(encoding="utf-8"))
-    assert request[request.index("--repository-root") + 1] == str(source.resolve())
-    assert request[request.index("--runtime-root") + 1] == str(legacy_runtime)
-    assert request[-5:] == [
+    assert request == [
+        "--repository-root",
+        str(source.resolve()),
+        "--control-parent-root",
+        str(home),
+        "exec",
         "--root",
         str(source.resolve()),
         "--",
