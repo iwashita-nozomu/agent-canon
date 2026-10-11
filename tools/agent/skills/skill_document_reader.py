@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Reads only selected Skill section bodies in bounded UTF-8 chunks, leaving branches deferred.
+# responsibility Reads selected canonical Skill bodies in bounded UTF-8 chunks and reports exact file EOF.
 # upstream design ../../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
 # downstream implementation ../../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py loads selected canonical bodies through file EOF
 # @dependency-end
-"""Read selected Skill sections without expanding child branches or requiring file EOF."""
+"""Read selected Skill sections or canonical bodies through bounded UTF-8 chunks."""
 
 from __future__ import annotations
 
@@ -264,6 +265,21 @@ class SkillDocumentReader:
             offset = current.next_offset
         return tuple(chunks)
 
+    def read_document(self, *, max_bytes: int = DEFAULT_MAX_BYTES) -> str:
+        """Read the complete document through the existing bounded chunk API."""
+        chunks: list[str] = []
+        offset = 0
+        while True:
+            chunk = self.chunk(offset=offset, max_bytes=max_bytes)
+            if chunk.byte_start != offset or chunk.next_offset <= offset:
+                raise SkillDocumentError("read_incomplete", str(self.path))
+            chunks.append(chunk.text)
+            if chunk.file_eof:
+                if chunk.byte_end != len(self.data):
+                    raise SkillDocumentError("read_incomplete", str(self.path))
+                return "".join(chunks)
+            offset = chunk.next_offset
+
 
 def _read_owner_spec(value: str) -> tuple[Path, str]:
     """Parse one ``path#heading`` owner section reference."""
@@ -307,12 +323,15 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the reader CLI."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("index", "chunk", "admit"),
+        "command",
+        choices=("index", "chunk", "admit"),
         help="index lists headings; chunk returns text; admit reports EOF metadata only.",
     )
     parser.add_argument("--path", type=Path, help="Markdown document path.")
     parser.add_argument("--heading", help="Exact heading or unique heading title.")
-    parser.add_argument("--offset", type=int, default=0, help="Zero-based file byte offset.")
+    parser.add_argument(
+        "--offset", type=int, default=0, help="Zero-based file byte offset."
+    )
     parser.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     parser.add_argument(
         "--owner",
@@ -329,9 +348,14 @@ def _render_text(value: object) -> str:
     """Render a compact human-readable response without losing chunk text."""
     if isinstance(value, (DocumentChunk, SkillReadAdmission)):
         payload = value.as_json()
-        return "\n".join(f"{key}={json.dumps(item, ensure_ascii=False)}" for key, item in payload.items())
+        return "\n".join(
+            f"{key}={json.dumps(item, ensure_ascii=False)}"
+            for key, item in payload.items()
+        )
     if isinstance(value, tuple):
-        return json.dumps([item.as_json() for item in value], ensure_ascii=False, indent=2)
+        return json.dumps(
+            [item.as_json() for item in value], ensure_ascii=False, indent=2
+        )
     return json.dumps(value, ensure_ascii=False, indent=2)
 
 

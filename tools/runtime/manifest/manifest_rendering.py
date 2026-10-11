@@ -28,14 +28,6 @@ import yaml
 
 from tools.runtime.values import is_object_list, is_string_object_dict
 
-from tools.repository.workspace.parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
-)
-
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity
 
 from tools.agent.orchestration.route import decide_skills, load_skill_route_rules
@@ -60,10 +52,7 @@ from tools.agent.orchestration.packets import (
     selected_role_outputs,
 )
 
-from tools.repository.workspace.workspace_scope import (
-    resolve_role_write_scope,
-    schedule_wave_row,
-)
+from tools.repository.workspace.workspace_scope import resolve_role_write_scope
 
 from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
 from tools.runtime.authority.writer_target import parse_writer_target
@@ -100,7 +89,6 @@ from tools.agent.orchestration.implementation_dispatch import (
     default_quality_check_agent_types,
     default_quality_check_role_ids,
     recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
     recommended_initial_subagent_wave_slots,
     workflow_spawn_budget,
 )
@@ -234,14 +222,6 @@ DEFERRED_SPAWN_ROLE_IDS = {
     "verifier",
     "auditor",
 }
-
-STANDARD_AGENT_WAVE_SEQUENCE = ("selected_stages_only",)
-
-STANDARD_AGENT_WAVE_SEQUENCE_SOURCE = (
-    "agents/canonical/CODEX_SUBAGENTS.md#Wave Plan Contract"
-)
-
-STANDARD_AGENT_WAVE_SEQUENCE_GATE = "selected_stage_evidence"
 
 USER_FACING_LANGUAGE_POLICY_SOURCE = "AGENTS.md#Template Context"
 
@@ -535,7 +515,7 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "team_manifest_path",
     "user_facing_language_policy",
     "contract_complete_implementation_policy",
-    "standard_wave_sequence",
+    "execution_graph",
     "pre_handoff_scope_policy",
     "reuse_survey",
     "pre_handoff_gate_status",
@@ -623,15 +603,6 @@ def coordination_capability_policy_output_lines() -> tuple[str, ...]:
         "COORDINATION_CAPABILITY_EFFECTIVE_OPERATIONS=none",
         "COORDINATION_CAPABILITY_EVIDENCE_REF=none",
         "COORDINATION_CAPABILITY_TRANSPORT=durable_artifact",
-    )
-
-
-def standard_agent_wave_sequence_output_lines() -> tuple[str, ...]:
-    """Return machine-readable stdout lines for the standard Agent Wave order."""
-    return (
-        f"STANDARD_AGENT_WAVE_SEQUENCE={','.join(STANDARD_AGENT_WAVE_SEQUENCE)}",
-        f"STANDARD_AGENT_WAVE_SEQUENCE_SOURCE={STANDARD_AGENT_WAVE_SEQUENCE_SOURCE}",
-        f"STANDARD_AGENT_WAVE_SEQUENCE_GATE={STANDARD_AGENT_WAVE_SEQUENCE_GATE}",
     )
 
 
@@ -843,29 +814,6 @@ def suggested_public_skills(
     return tuple(dict.fromkeys(selected))
 
 
-def subagent_wave_record_command(
-    report_dir: Path | str = "<run-report-dir>",
-    *,
-    layout: str = "standalone",
-) -> str:
-    """Return the canonical command for recording a spawned subagent wave."""
-    argv = (
-        "python3",
-        "tools/runtime/lifecycle/workflow_monitor.py",
-        "--report-dir",
-        str(report_dir),
-        "--subagent-wave",
-        "wave_id=<WAVE-N> parent_or_delegate=<parent-or-role> spawn_authority=<authority> "
-        "trigger=<trigger> budget_before=<used/limit> budget_after=<used/limit> "
-        "runtime_max_threads=<n> runtime_max_depth=<n> spawned_roles=<roles-or-none> "
-        "role_instances=<role_id:instance_id:agent_type:packet> skipped_roles=<roles-or-none> "
-        "allowed_paths=<paths> do_not_read=<paths> write_scope=<scope> "
-        "validation_route=<route> review_gate=<gate> handoff_artifacts=<artifacts> status=<status>",
-    )
-    del layout
-    return shlex.join(list(argv))
-
-
 def public_command_for_layout(
     command: Sequence[str] | str,
     layout: str,
@@ -1065,190 +1013,6 @@ def required_output_templates_missing(
     )
 
 
-def write_initial_wave_execution_gate(spec: RunBundleSpec) -> None:
-    """Record the parent runtime gate for the first recommended subagent wave."""
-    if not spec.workflow_family_id:
-        return
-    if spec.task_catalog is None:
-        raise RuntimeError("task catalog is required for initial wave materialization")
-    active_subagents, _max_write_subagents = workflow_spawn_budget(
-        spec.task_catalog,
-        spec.workflow_family_id,
-        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
-    )
-    initial_wave = recommended_initial_subagent_wave(
-        spec.roles,
-        active_subagents,
-        spec.task_catalog,
-        spec.agent_type_selections,
-        _required_spec_source_root(spec) / ".codex" / "agents",
-        workflow_family_id=spec.workflow_family_id,
-        issue_worker_candidate=spec.issue_worker_candidate,
-        math_intent_route_id=math_intent_route_id_for_spec(spec),
-    )
-    if not initial_wave:
-        return
-    row = initial_wave_gate_fields(
-        initial_wave=initial_wave,
-        active_subagents=active_subagents,
-        runtime_root=spec.workspace_root,
-    )
-    append_markdown_section_line(
-        spec.report_dir / "schedule.md",
-        "## Agent Wave Ledger",
-        schedule_wave_row(row),
-    )
-    append_markdown_section_line(
-        spec.report_dir / "workflow_monitoring.md",
-        "## Actual Wave Events",
-        workflow_wave_event_line(row),
-    )
-
-
-def initial_wave_execution_gate_lines(
-    spec: RunBundleSpec,
-) -> tuple[tuple[str, str, str], ...]:
-    """Return the initial-wave lines without writing a report artifact."""
-    if not spec.workflow_family_id:
-        return ()
-    if spec.task_catalog is None:
-        raise RuntimeError("task catalog is required for initial wave materialization")
-    active_subagents, _max_write_subagents = workflow_spawn_budget(
-        spec.task_catalog,
-        spec.workflow_family_id,
-        include_math_intent=math_intent_route_id_for_spec(spec) is not None,
-    )
-    initial_wave = recommended_initial_subagent_wave(
-        spec.roles,
-        active_subagents,
-        spec.task_catalog,
-        spec.agent_type_selections,
-        _required_spec_source_root(spec) / ".codex" / "agents",
-        workflow_family_id=spec.workflow_family_id,
-        issue_worker_candidate=spec.issue_worker_candidate,
-        math_intent_route_id=math_intent_route_id_for_spec(spec),
-    )
-    if not initial_wave:
-        return ()
-    row = initial_wave_gate_fields(
-        initial_wave=initial_wave,
-        active_subagents=active_subagents,
-        runtime_root=spec.workspace_root,
-    )
-    return (
-        ("schedule.md", "## Agent Wave Ledger", schedule_wave_row(row)),
-        (
-            "workflow_monitoring.md",
-            "## Actual Wave Events",
-            workflow_wave_event_line(row),
-        ),
-    )
-
-
-def initial_wave_gate_fields(
-    *,
-    initial_wave: tuple[str, ...],
-    active_subagents: int,
-    runtime_root: Path = ROOT,
-) -> dict[str, str]:
-    """Return one schedule/monitor row for a parent-executed WAVE-1 gate."""
-    skipped_roles = ",".join(initial_wave) + ":pending_explicit_runtime_spawn_authority"
-    active_budget = f"{active_subagents}/{active_subagents}"
-    return {
-        "wave_id": "WAVE-1",
-        "parent_or_delegate": "parent",
-        "spawn_authority": "parent_runtime_authority_required",
-        "trigger": "bootstrap_initial_intake_wave",
-        "budget_before": active_budget,
-        "budget_after": active_budget,
-        "runtime_max_threads": str(codex_runtime_max_threads(runtime_root)),
-        "runtime_max_depth": str(codex_runtime_max_depth(runtime_root)),
-        "spawned_roles": "none",
-        "role_instances": "none",
-        "skipped_roles": skipped_roles,
-        "allowed_paths": "team_manifest.yaml,schedule.md,workflow_monitoring.md,user_request_contract.md",
-        "do_not_read": "broad_raw_logs,unrelated_reports",
-        "write_scope": "read_only_intake_until_parent_updates_wave_row",
-        "validation_route": "parent_spawn_or_skip_update_required",
-        "review_gate": "parent_execution_gate",
-        "handoff_artifacts": (
-            "team_manifest.yaml#run.spawn_wave_recommendation,"
-            "team_manifest.yaml#run.standard_wave_sequence"
-        ),
-        "delegated_policy_ref": "team_manifest.yaml#run.delegated_spawn_policy",
-        "status": "blocked_authority_required",
-    }
-
-
-def workflow_wave_event_line(row: dict[str, str]) -> str:
-    """Return a workflow_monitoring.md Actual Wave Events token row."""
-    fields = (
-        ("wave_event", "recorded"),
-        ("wave_id", row["wave_id"]),
-        ("event_kind", "authority_blocker"),
-        ("spawn_authority", row["spawn_authority"]),
-        ("trigger", row["trigger"]),
-        ("budget_before", row["budget_before"]),
-        ("budget_after", row["budget_after"]),
-        ("runtime_max_threads", row["runtime_max_threads"]),
-        ("runtime_max_depth", row["runtime_max_depth"]),
-        ("spawned_roles", row["spawned_roles"]),
-        ("role_instances", row["role_instances"]),
-        ("skipped_roles", row["skipped_roles"]),
-        ("allowed_paths", row["allowed_paths"]),
-        ("do_not_read", row["do_not_read"]),
-        ("write_scope", row["write_scope"]),
-        ("validation_route", row["validation_route"]),
-        ("review_gate", row["review_gate"]),
-        ("handoff_artifacts", row["handoff_artifacts"]),
-        ("status", row["status"]),
-    )
-    return "- " + " ".join(f"{key}={value}" for key, value in fields)
-
-
-def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
-    """Append one line to a level-2 Markdown section if it is not already present."""
-    if not path.is_file():
-        return
-    text = path.read_text(encoding="utf-8")
-    if line in text:
-        return
-    lines = text.splitlines()
-    in_section = False
-    insert_at = len(lines)
-    for index, existing_line in enumerate(lines):
-        stripped = existing_line.strip()
-        if not stripped.startswith("## "):
-            continue
-        if in_section:
-            insert_at = index
-            break
-        in_section = stripped == heading
-    if not in_section:
-        lines.extend(("", heading, "", line))
-    else:
-        while insert_at > 0 and not lines[insert_at - 1].strip():
-            insert_at -= 1
-        lines.insert(insert_at, line)
-    rendered = ("\n".join(lines) + "\n").encode("utf-8")
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent, explicit_root=parent, purpose="manifest-rendering"
-            )
-        )
-        ParentRootSideEffectBoundary().write_parent_owned_file(
-            attestation, path, rendered, "manifest-rendering"
-        )
-        return
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        "manifest-rendering: explicit parent root is required",
-    )
-
-
 def build_manifest(
     spec: RunBundleSpec,
     capacity_runtime: CapacityRuntime | None = None,
@@ -1421,13 +1185,6 @@ def manifest_run_lines(
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: optional_diagnostic",
             f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
-            "  standard_wave_sequence:",
-            "    activation: candidate_sequence_selected_per_wave",
-            f"    source: {STANDARD_AGENT_WAVE_SEQUENCE_SOURCE!r}",
-            "    stages:",
-            *(f"      - {stage}" for stage in STANDARD_AGENT_WAVE_SEQUENCE),
-            "    gate_order: 'selected_stages_only'",
-            "    edit_handoff_rule: 'selected owner-critical edit stage only; no fixed plan-review-edit sequence'",
             *manifest_user_facing_language_policy_lines(),
             *manifest_contract_complete_implementation_policy_lines(
                 spec.task,
@@ -1519,6 +1276,13 @@ def manifest_run_lines(
         lines.append("    initial_three_agent_intake_is_total_cap: false")
         lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
         writer_targets = spec.writer_targets
+        graph_issue_worker_candidate = spec.issue_worker_candidate
+        if (
+            spec.workflow_family_id == "issue_worker_publication"
+            and spec.issue_worker_dispatch is not None
+            and spec.issue_worker_dispatch.get("status") not in {"pending", "spawned"}
+        ):
+            graph_issue_worker_candidate = None
         initial_slots = recommended_initial_subagent_wave_slots(
             spec.roles,
             active_subagents,
@@ -1526,7 +1290,7 @@ def manifest_run_lines(
             spec.agent_type_selections,
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=spec.issue_worker_candidate,
+            issue_worker_candidate=graph_issue_worker_candidate,
             writer_targets=writer_targets,
             math_intent_route_id=math_intent_route_id,
         )
@@ -1540,15 +1304,25 @@ def manifest_run_lines(
             spec.agent_type_selections,
             _required_spec_source_root(spec) / ".codex" / "agents",
             workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=spec.issue_worker_candidate,
+            issue_worker_candidate=graph_issue_worker_candidate,
             writer_targets=writer_targets,
             math_intent_route_id=math_intent_route_id,
         )
-        lines.append("  spawn_wave_recommendation:")
+        lines.append("  execution_graph:")
+        lines.append("    controller: 'tools/runtime/lifecycle/bootstrap_agent_run.py'")
         lines.append(
-            "    source: 'stage-ready AgentCanon wave policy filtered by workflow spawn budget'"
+            "    node_source: 'agents/task_catalog.yaml role_topology_defaults.stage_waves'"
         )
-        lines.append("    standard_sequence_ref: run.standard_wave_sequence")
+        lines.append("    readiness_source: actual_host_tool_results")
+        lines.append("    skill_read_source: canonical_doc")
+        lines.append(f"    task_id: {spec.task_id or 'none'}")
+        lines.append(f"    math_intent_route_id: {math_intent_route_id or 'none'}")
+        lines.append("    selected_role_ids:")
+        if spec.roles:
+            for role in spec.roles:
+                lines.append(f"      - {role.id}")
+        else:
+            lines[-1] = "    selected_role_ids: []"
         lines.append("    initial_wave_id: WAVE-1")
         lines.append("    initial_wave_role_ids:")
         if initial_wave_slots:
@@ -1556,6 +1330,12 @@ def manifest_run_lines(
                 lines.append(f"      - {slot.role_id}")
         else:
             lines[-1] = "    initial_wave_role_ids: []"
+        lines.append("    initial_wave_role_instances:")
+        if initial_wave_slots:
+            for slot in initial_wave_slots:
+                lines.append(f"      - {slot.executable_identity}")
+        else:
+            lines[-1] = "    initial_wave_role_instances: []"
         lines.append("    initial_wave_agent_types:")
         if initial_wave:
             for agent_type in initial_wave:
@@ -1570,13 +1350,11 @@ def manifest_run_lines(
                 lines.append(f"        evidence: {selection.evidence!r}")
         else:
             lines.append("    agent_type_selections: []")
-        lines.append("    dynamic_expansion_waves:")
+        lines.append("    later_stage_waves:")
         if expansion_wave_slots:
             for index, wave in enumerate(expansion_wave_slots, start=2):
                 lines.append(f"      - wave_id: WAVE-{index}")
-                lines.append(
-                    "        standard_sequence_ref: run.standard_wave_sequence"
-                )
+                lines.append(f"        depends_on: WAVE-{index - 1}")
                 lines.append("        agent_types:")
                 for slot in wave:
                     lines.append(f"          - {slot.agent_type}")
@@ -1588,9 +1366,14 @@ def manifest_run_lines(
                     )
         else:
             lines.append("      - wave_id: none")
-            lines.append("        standard_sequence_ref: run.standard_wave_sequence")
+            lines.append("        depends_on: []")
             lines.append("        agent_types: []")
             lines.append("        role_instances: []")
+        lines.append("    result_readback:")
+        lines.append("      status: pending")
+        lines.append("      completed_wave_ids: []")
+        lines.append("      role_results: {}")
+        lines.append("    skill_document_reads: {}")
         lines.append("    writer_targets:")
         if writer_targets:
             for owner, raw_target in sorted(writer_targets.items()):
@@ -1616,15 +1399,6 @@ def manifest_run_lines(
         lines.append(
             "    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'"
         )
-        lines.append(
-            f"    wave_record_command: {subagent_wave_record_command(spec.report_dir, layout=getattr(spec.repository_roots, 'layout', 'standalone'))!r}"
-        )
-        lines.append("    expansion_triggers:")
-        lines.append("      - new_independent_stage")
-        lines.append("      - review_finding_opens_independent_scope")
-        lines.append(f"      - {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
-        lines.append("      - disjoint_write_scope_available")
-        lines.append("      - blocked_role_replacement")
         lines.append("    validation_failure_triage_policy:")
         lines.append(f"      trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
         lines.append("      triage_write_scope: read_only_until_cause_identified")
@@ -1710,14 +1484,12 @@ def manifest_run_lines(
             "or escalation"
         )
         lines.append(
-            "      - run delegated_spawn_policy.wave_record_command after any "
-            "actual parent or delegated child spawn; delegated child waves must "
-            "include remaining_spawn_budget"
+            "      - re-enter bootstrap_agent_run with the same run id and actual "
+            "spawn/completion ToolCall results before a dependent node is ready"
         )
         lines.append(
-            "      - selected schedule.md Agent Wave Ledger row with spawn_authority, "
-            "budget, runtime ceilings, paths, validation_route, review_gate, "
-            "handoff_artifacts, and delegated policy ref"
+            "      - runtime graph projects completed wave results to schedule.md and "
+            "workflow_monitoring.md; those rows are readback, not readiness authority"
         )
         lines.append(
             "      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles"
@@ -2011,7 +1783,6 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
         "    enabled: false",
         f"    source: {DEFAULT_QUALITY_CHECK_POLICY_SOURCE!r}",
         "    activation: owner_critical_or_distinct_unresolved_claim_or_risk",
-        "    wave_sequence_ref: run.standard_wave_sequence (selected stages only)",
         "    role_topology_ref: 'agents/task_catalog.yaml#role_topology_defaults.role_families.review'",
         "    stages:",
     ]
@@ -2391,6 +2162,7 @@ def render_subagent_prompt_packet(
         f"{indent}  decision_sufficiency_packet_ref: "
         "'run.decision_sufficiency.packet_ref'"
     )
+    lines.append(f"{indent}  execution_graph_ref: 'run.execution_graph'")
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(f"{indent}  native_argv: 'run.repo_tool_routing_policy'")
     lines.append(
@@ -2461,6 +2233,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
+        "Work only on the node dispatched by run.execution_graph; report the actual "
+        "completion result and do not treat a spawn id or monitor row as completion. "
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
         "run.repo_tool_routing_policy tool_route, native argv, process result, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "

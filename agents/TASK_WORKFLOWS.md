@@ -34,7 +34,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | stage topology and required roles | `agents/task_catalog.yaml` `role_topology_defaults.stage_waves`; `workflow_families[].roles` |
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
 | role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
-| run bundle, declared workflow / skills / review, and dynamic wave ledger | `bootstrap_agent_run.py`; `workflow_monitor.py` |
+| selected Skills, execution readiness, and same-run result transitions | `bootstrap_agent_run.py`; `skill_document_reader.py`; `workflow_monitor.py` |
 | skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
 | implementation stage and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
 | active design packet schema | [agents/COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md); `agents/agents_config.json#artifacts.active_design_packet` |
@@ -57,12 +57,19 @@ reader path changes.
 - tool catalog match surface
 - review roles
 - document packets
-- initial wave recommendation
-- dynamic expansion waves
-- wave-record command
+- selected canonical Skill bodies read through file EOF
+- current execution-graph status and ready ToolCalls
+- same-run result input route for actual host/child results
 - validation route
 
 Subagent handoffs carry that machine-readable packet and the run bundle paths.
+The runtime dispatches only the ready graph frontier. A launch result is not a
+completion result; subsequent stages wait for actual child results passed with
+the same run ID. `workflow_monitor.py` projects those results into the existing
+wave event readback; it does not decide readiness. The run manifest's
+`execution_graph.result_readback` retains the actual results used to unlock
+each node and is the closeout input; a monitoring or schedule status alone
+cannot establish graph completion.
 Tool routing is carried through `team_manifest.yaml` under
 `run.repo_tool_routing_policy`. Selected tools are invoked through their existing
 CLI, API, script, or Make entrypoint with native argv and retain the configured
@@ -104,7 +111,11 @@ repository-wide template or policy.
 
 The selected task family and Skill packets define the production stage graph;
 the active packet's typed entries provide its selected graph anchors and
-materialization reader path.
+materialization reader path. `bootstrap_agent_run.py` is the sole dispatcher:
+it loads selected canonical Skill documents and required prerequisites through
+EOF, dispatches non-conflicting ready nodes via existing ToolCalls, and advances
+only from actual host results. Hooks remain partial observations and do not
+control scheduling. `task_close.py` remains the sole terminal predicate.
 
 ## Workflow Family Reader Paths
 
@@ -124,17 +135,21 @@ authority, and validation prohibitions stay with their canonical owners;
 [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) selects the active
 validation matrix for the changed path and risk class.
 
-## Dynamic Wave Evidence
+## Execution Result Readback
 
-Wave state is recorded in run bundle artifacts:
+The runtime uses actual results for graph readiness. Run-local execution
+results and readback stay in existing artifacts:
 
-- `schedule.md` `Agent Wave Ledger`
-- `workflow_monitoring.md` `Actual Wave Events`
+- `team_manifest.yaml` `run.execution_graph.result_readback` is read by task
+  closeout as the execution-result owner
+- `workflow_monitoring.md` `Actual Wave Events` is the matching event readback
+- `schedule.md` `Agent Wave Ledger` is a display projection only
 - `team_manifest.yaml` `run.delegated_spawn_policy`
 - `team_manifest.yaml` `run.subagent_lifecycle_policy`
 
 The runtime cap is in `.codex/config.toml`; family budgets are in
-`agents/task_catalog.yaml`.
+`agents/task_catalog.yaml`. Do not add a parallel wave planner or use these
+readback rows as completion authority.
 
 ## Validation
 

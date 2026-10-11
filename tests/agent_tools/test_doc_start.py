@@ -90,7 +90,7 @@ class DocStartTest(unittest.TestCase):
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn(
                 "role_topology",
-                manifest["run"]["spawn_wave_recommendation"],
+                manifest["run"]["execution_graph"],
             )
 
     def test_doc_start_paper(self) -> None:
@@ -155,13 +155,15 @@ class DocStartTest(unittest.TestCase):
             self.assertTrue((report_dir / "notation_definition_review.md").is_file())
             self.assertTrue((report_dir / "logic_gap_review.md").is_file())
             self.assertTrue((report_dir / "document_flow_review.md").is_file())
-            manifest_text = (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(
+                encoding="utf-8"
+            )
             manifest = yaml.safe_load(manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("prompt_contract:", manifest_text)
             self.assertIn(
                 "role_topology",
-                manifest["run"]["spawn_wave_recommendation"],
+                manifest["run"]["execution_graph"],
             )
 
     def test_doc_start_explicit_terra_is_review_only(self) -> None:

@@ -36,9 +36,6 @@ from tools.runtime.manifest.manifest_rendering import has_template as _has_templ
 from tools.runtime.manifest.manifest_rendering import (
     render_template as _render_template,
 )
-from tools.runtime.manifest.manifest_rendering import (
-    initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
-)
 
 if __package__:
     from .packets import (
@@ -183,6 +180,9 @@ else:
 
 if __package__:
     from .implementation_dispatch import (
+        ExecutionGraphTransition,
+        ToolExecutionResult,
+        advance_execution_graph,
         agent_type_selection_map,
         capacity_runtime_for_spec,
         capacity_start_output_lines,
@@ -198,6 +198,7 @@ if __package__:
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
+        parse_tool_execution_result,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
         validate_writer_handoff_waves,
@@ -206,6 +207,9 @@ if __package__:
     )
 else:
     from tools.agent.orchestration.implementation_dispatch import (
+        ExecutionGraphTransition,
+        ToolExecutionResult,
+        advance_execution_graph,
         agent_type_selection_map,
         capacity_runtime_for_spec,
         capacity_start_output_lines,
@@ -221,6 +225,7 @@ else:
         recommended_dynamic_expansion_waves,
         recommended_initial_subagent_wave,
         recommended_initial_subagent_wave_slots,
+        parse_tool_execution_result,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
         validate_writer_handoff_waves,
@@ -242,8 +247,6 @@ from tools.runtime.manifest.manifest_rendering import (
     repo_tool_routing_policy_output_lines,
     required_output_templates_missing,
     same_role_subagent_policy_output_lines,
-    standard_agent_wave_sequence_output_lines,
-    subagent_wave_record_command,
     suggested_public_skills,
     user_facing_language_policy_output_lines,
     writer_target_policy_output_lines,
@@ -299,30 +302,6 @@ class PreparedRunBundle:
     files: tuple[tuple[str, bytes], ...]
     created_files: tuple[str, ...]
     active_design_packet: ActiveDesignPacketConfig
-
-
-def _append_section_line(text: str, heading: str, line: str) -> str:
-    """Apply one manifest section line to a rendered buffer."""
-    if line in text:
-        return text
-    lines = text.splitlines()
-    in_section = False
-    insert_at = len(lines)
-    for index, existing in enumerate(lines):
-        stripped = existing.strip()
-        if not stripped.startswith("## "):
-            continue
-        if in_section:
-            insert_at = index
-            break
-        in_section = stripped == heading
-    if not in_section:
-        lines.extend(("", heading, "", line))
-    else:
-        while insert_at > 0 and not lines[insert_at - 1].strip():
-            insert_at -= 1
-        lines.insert(insert_at, line)
-    return "\n".join(lines) + "\n"
 
 
 def run_workflow_family(spec: RunBundleSpec) -> dict[str, object] | None:
@@ -462,12 +441,6 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
         roles=authority_roles,
     )
     created_files.append(_AUTHORITY_FILE_NAME)
-    for relative, heading, line in _initial_wave_execution_gate_lines(spec):
-        rendered[relative] = _append_section_line(
-            rendered.get(relative, ""), heading, line
-        )
-        if relative not in created_files:
-            created_files.append(relative)
     unique_created_files = tuple(dict.fromkeys(created_files))
     return PreparedRunBundle(
         files=tuple((path, rendered[path].encode("utf-8")) for path in rendered),
@@ -530,6 +503,10 @@ __all__ = (
     "capacity_runtime_for_spec",
     "dispatch_fixed_implementation",
     "dispatch_subagent_wave",
+    "advance_execution_graph",
+    "ExecutionGraphTransition",
+    "ToolExecutionResult",
+    "parse_tool_execution_result",
     "recommended_initial_subagent_wave",
     "recommended_initial_subagent_wave_slots",
     "recommended_dynamic_expansion_waves",
@@ -577,10 +554,8 @@ __all__ = (
     "pre_handoff_scope_policy_output_lines",
     "repo_tool_routing_policy_output_lines",
     "same_role_subagent_policy_output_lines",
-    "standard_agent_wave_sequence_output_lines",
     "user_facing_language_policy_output_lines",
     "language_review_candidates",
-    "subagent_wave_record_command",
     "resolve_report_root",
     "resolve_report_bundle_artifact_path",
     "resolve_role_write_scope",

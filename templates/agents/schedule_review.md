@@ -25,7 +25,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Subagent Adequacy Review（subagent 妥当性レビュー）
 
-<!-- 選択した subagent が requirements、research、planning、design、implementation に適切か確認します。Agent Wave Ledger に spawn_budget、allowed_paths、do_not_read、write_scope、review_gate、closeout evidence path のいずれかがない場合は revise とします。 -->
+<!-- 選択した role が実行 graph の owner として適切か、ready ToolCall と実結果が同じ run に結び付いているかを確認します。Agent Wave Ledger は result readback であり、欠けた予定行を手動で追加して graph readiness を上書きしません。 -->
 
 ## Completion Boundary Review（完了境界レビュー）
 
