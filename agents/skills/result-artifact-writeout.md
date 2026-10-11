@@ -5,7 +5,7 @@ contract skill
 responsibility Owns durable file identity, semantic role, content checksum, no-overwrite behavior, and readback for result artifacts that actually exist.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/ARTIFACT_PLACEMENT.md run-local and durable artifact placement
-upstream design experiment-lifecycle.md failed experiment disposition and physical-cause retention owner
+upstream design retention.md explicit experiment-artifact retention disposition and preservation conditions
 upstream design ../../documents/experiments/experiment-report-style.md experiment report artifact policy
 upstream design prose-reasoning-graph.md prose graph output artifact contract
 downstream implementation ../../.codex/personal/skills/result-artifact-writeout/SKILL.md exposes this workflow as a runtime skill
@@ -160,7 +160,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Use append-only JSONL or a unique file path for repeated hook, skill eval, prompt eval, checker, or experiment runs; do not overwrite detailed results.
 1. Include stable grouping fields such as payload/input fingerprint, hook/tool name, status, exit code, branch, commit, and runtime namespace when available.
 1. For experiment outputs, persist only producer-selected files that actually exist under `experiments/<topic>/result/<run-id>/`; bind them to the lifecycle run reference and record semantic role, checksum, no-overwrite result, and readback. Create `experiments/<topic>/report/<run-id>.md` only when `$report-writing` is selected.
-1. For formal experiment retention, `$experiment-lifecycle` owns run identity, terminal status, and the explicit retention decision. Archive with `python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"` only when requested. The source checkout remains unchanged.
+1. For formal experiment artifacts, `$experiment-lifecycle` owns run identity, terminal status, and restart decision; `$retention` owns the explicit `retain|archive|external|delete-after-use|defer` disposition. Use `python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"` only when archive is selected and requested. The source checkout remains unchanged.
 1. For run-local task evidence, write under `reports/agents/<run-id>/` and include the artifact path in the final response or handoff.
 1. To find the exact report placement for the current repo, run `python3 tools/runtime/archive/runtime_log_archive_git.py status` and read `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`, `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR`.
 1. For normal cross-run retention of run-local agent reports, do not hand-generate an archive report. Use `python3 tools/runtime/archive/runtime_log_archive_git.py sync`; it copies `reports/agents/` into `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>`.
