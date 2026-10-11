@@ -715,9 +715,6 @@ def main() -> int:
                 resource_path = source_directory / resource_path
             if not resource_path.is_file():
                 missing_resources.append(resource)
-        # Inspect does not enumerate every inline image; this renderer owns this SVG.
-        if not figure_path.is_file() and figure_path.name not in missing_resources:
-            missing_resources.append(figure_path.name)
         if missing_resources:
             return failed(
                 "missing_asset",
