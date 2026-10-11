@@ -384,11 +384,38 @@ def test_minimal_plan_runs_without_research_verdict_or_review(tmp_path: Path) ->
     shutil.copytree(TEMPLATE_ROOT, topic_dir)
     _write_minimal_topic(topic_dir)
     result, summary = _run_topic(topic_dir)
+    run_dir = topic_dir / "result" / "run"
+    config_text = (topic_dir / "config.yaml").read_text(encoding="utf-8")
+    config_snapshot_path = run_dir / "summary" / "config_snapshot.json"
+    config_snapshot = json.loads(config_snapshot_path.read_text(encoding="utf-8"))
+    artifact_manifest = json.loads(
+        (run_dir / "summary" / "artifact-manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    config_snapshot_artifact = next(
+        artifact
+        for artifact in artifact_manifest["artifacts"]
+        if artifact["path"] == "summary/config_snapshot.json"
+    )
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert summary["state"] == "success"
     assert "execution_evidence" in summary
     assert "validation_oracle" not in summary
+    assert config_snapshot["path"] == "config.yaml"
+    assert config_snapshot["state"] == "present"
+    assert config_snapshot["content"] == config_text
+    assert config_snapshot["sha256"] == hashlib.sha256(
+        config_text.encode("utf-8")
+    ).hexdigest()
+    assert config_snapshot["completion"] == summary["completion_provenance"]
+    assert "summary/config_snapshot.json" in summary["preserved_artifacts"]
+    config_snapshot_bytes = config_snapshot_path.read_bytes()
+    assert config_snapshot_artifact["sha256"] == hashlib.sha256(
+        config_snapshot_bytes
+    ).hexdigest()
+    assert config_snapshot_artifact["size_bytes"] == len(config_snapshot_bytes)
 
 
 def test_failed_case_preserves_failure_evidence_and_artifact_readback(
