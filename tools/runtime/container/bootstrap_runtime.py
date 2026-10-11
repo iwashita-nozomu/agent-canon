@@ -2055,6 +2055,7 @@ class BootstrapRuntime:
                     "RUFF_CACHE_DIR": RUFF_CACHE_DESTINATION,
                 }
                 environment.update(extra_environment or {})
+                environment.pop("AGENT_CANON_TARGET_HOST_ROOT", None)
                 host_root = active_target.get("host_root")
                 if host_root is not None:
                     environment["AGENT_CANON_TARGET_HOST_ROOT"] = host_root

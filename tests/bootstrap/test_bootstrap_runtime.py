@@ -1145,7 +1145,11 @@ def test_exec_projects_registered_host_root_only_for_host_bound_target(
     monkeypatch.setattr(
         bootstrap_runtime_module.subprocess, "run", capture_environment
     )
-    manager.exec(exec_root, ["agent-canon", "ok"])
+    manager.exec(
+        exec_root,
+        ["agent-canon", "ok"],
+        extra_environment={"AGENT_CANON_TARGET_HOST_ROOT": "/caller-provided"},
+    )
 
     if host_bound:
         assert observed["AGENT_CANON_TARGET_HOST_ROOT"] == str(target)
