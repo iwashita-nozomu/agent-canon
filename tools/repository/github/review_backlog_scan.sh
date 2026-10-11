@@ -4,7 +4,7 @@
 # responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
 # upstream implementation ../../analysis/code/file_surface_inventory.py writes inventory reports
 # upstream implementation ../../analysis/dependencies/run_repo_dependency_review.sh validates dependency manifests
-# upstream implementation ../../analysis/dependencies/scan_code_dependencies.sh extracts code dependency edges
+# upstream implementation ../../analysis/dependencies/scip_index.py projects native SCIP impact evidence
 # upstream implementation ../../validation/code/oop/python/readability.py writes Python OOP readability reports
 # upstream implementation ../../validation/code/oop/cpp/readability.py writes C++ OOP readability reports
 # downstream design ../../README.md documents the review backlog scan entrypoint
@@ -28,6 +28,7 @@ SEMANTIC_LLM_MODEL="${AGENT_CANON_SEMANTIC_INDEX_LLM_MODEL:-}"
 SEMANTIC_LLM_URL="${AGENT_CANON_SEMANTIC_INDEX_EMBEDDING_URL:-}"
 SEMANTIC_LLM_DIM="${AGENT_CANON_SEMANTIC_INDEX_LLM_DIM:-0}"
 SEMANTIC_LLM_BATCH="${AGENT_CANON_SEMANTIC_INDEX_LLM_BATCH:-16}"
+declare -a SCIP_INDEXES=()
 declare -a REQUESTED_CHECKS=()
 
 fail_runtime_boundary() {
@@ -118,9 +119,11 @@ Usage:
                          [--semantic-top-k N] [--semantic-min-score SCORE]
                          [--semantic-llm-provider NAME --semantic-llm-model NAME]
                          [--semantic-embedding-url URL]
+                         [--scip-index PATH ...]
                          [--check NAME ...] [--fail-on-findings]
 
 Runs integrated review scans and writes JSON/Markdown/log artifacts under REPORT_DIR.
+The code-dependencies check accepts repeated per-language external SCIP indexes.
 The selected checkout is the only scan scope. Default checks are all checks.
 
 Checks:
@@ -178,6 +181,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --semantic-embedding-batch)
       SEMANTIC_LLM_BATCH="$2"
+      shift 2
+      ;;
+    --scip-index)
+      SCIP_INDEXES+=("$2")
       shift 2
       ;;
     --fail-on-findings)
@@ -343,7 +350,8 @@ run_stale_search() {
 }
 
 run_scope_checks() {
-  local scope_name scope_root paths excludes native_paths
+  local scope_name scope_root paths excludes native_paths scip_output index_path
+  local -a index_args
   while IFS=$'\t' read -r scope_name scope_root; do
     [[ -n "$scope_name" && -n "$scope_root" ]] || continue
     paths=(python include src tools tests mcp)
@@ -355,12 +363,27 @@ run_scope_checks() {
       fi
     done
     if has_check code-dependencies; then
-      record_command \
-        "code-dependencies:${scope_name}" \
-        "$REPORT_DIR/code_dependencies_${scope_name}.txt" \
-        bash "$TOOL_DIR/analysis/dependencies/scan_code_dependencies.sh" \
-          --root "$scope_root" \
-          --analysis-json "$REPORT_DIR/code_analysis_${scope_name}.json"
+      scip_output="$REPORT_DIR/scip_impact_$scope_name.json"
+      if [[ ${#SCIP_INDEXES[@]} -gt 0 ]]; then
+        index_args=()
+        for index_path in "${SCIP_INDEXES[@]}"; do
+          index_args+=(--index "$index_path")
+        done
+        record_command \
+          "code-dependencies:$scope_name" \
+          "$scip_output" \
+          python3 "$TOOL_DIR/analysis/dependencies/scip_index.py" \
+            query \
+            --root "$scope_root" \
+            --runtime-root "$RUNTIME_ROOT" \
+            "${index_args[@]}" \
+            --path .
+      else
+        record_command \
+          "code-dependencies:$scope_name" \
+          "$scip_output" \
+          printf '%s\n' '{"status":"not-selected","capabilities":{"scip":"not-selected"}}'
+      fi
     fi
     if has_check dependency-review; then
       record_command \
@@ -547,6 +570,7 @@ upstream implementation ../../tools/analysis/code/file_surface_inventory.py gene
 
 - file_inventory_json: $REPORT_DIR/file_surface_inventory.json
 - file_inventory_markdown: $REPORT_DIR/file_surface_inventory.md
+- scip_impact_pattern: $REPORT_DIR/scip_impact_<scope>.json
 - semantic_index_db_pattern: $REPORT_DIR/semantic_index_<scope>.sqlite
 - semantic_index_merge_candidates_pattern: $REPORT_DIR/semantic_index_merge_candidates_<scope>.jsonl
 - semantic_index_thin_docs_pattern: $REPORT_DIR/semantic_index_thin_docs_<scope>.jsonl

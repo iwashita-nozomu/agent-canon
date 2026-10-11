@@ -38,10 +38,6 @@ from typing import Any
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from tools.runtime.authority.tool_path_policy import is_retired_legacy_tool_path
-from tools.runtime.artifacts.runtime_artifacts import (
-    RuntimeArtifactError,
-    runtime_artifact_boundary,
-)
 
 SCHEMA_VERSION = "agent-canon.lsp-code-analysis.v1"
 LSP_VERSION = "3.17"
@@ -1441,129 +1437,24 @@ def _files_from_args(root: Path, values: Sequence[str] | None) -> list[Path]:
     return list(discover_lsp_files(root))
 
 
-def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: bool = False) -> list[str]:
-    lines: list[str] = []
-    for candidate in report.lexical_candidates:
-        if candidate.target.startswith("external:") and not print_unresolved:
-            continue
-        source_path = root / candidate.source
-        language = language_for_path(source_path) or "unknown"
-        if language in {"c", "cpp"}:
-            output_language, kind = "c-family", "include"
-        elif language == "shellscript":
-            output_language, kind = "shell", "source"
-        elif language == "python":
-            output_language = "python"
-            try:
-                source_line = source_path.read_text(encoding="utf-8").splitlines()[candidate.position.get("line", 0) if candidate.position else 0]
-            except (OSError, UnicodeDecodeError, IndexError):
-                source_line = candidate.token
-            kind = candidate.legacy_kind or (
-                "from-import-symbol" if source_line.lstrip().startswith("from ") else "import"
-            )
-        else:
-            output_language, kind = language, "lexical"
-        try:
-            raw = source_path.read_text(encoding="utf-8").splitlines()[candidate.position.get("line", 0) if candidate.position else 0]
-        except (OSError, UnicodeDecodeError, IndexError):
-            raw = candidate.token
-        lines.append(f"CODE_DEPENDENCY\t{output_language}\t{kind}\t{candidate.source}\t{candidate.target}\t{candidate.token}\t{raw}")
-    for relation in report.relations:
-        lines.append(f"CODE_DEPENDENCY\tlsp\t{relation.orientation}\t{relation.source}\t{relation.target}\t\t")
-    return lines
-
-
-def _write_report_atomic(
-    report: CodeAnalysisReport,
-    root: Path,
-    destination: Path,
-    runtime_root: Path | None,
-) -> None:
-    """Persist a report only through the explicit external runtime boundary."""
-    boundary = runtime_artifact_boundary(root, runtime_root, create=True)
-    destination = boundary.resolve(destination)
-    payload = (
-        json.dumps(report.as_json(root), ensure_ascii=False, indent=2) + "\n"
-    ).encode("utf-8")
-    boundary.atomic_write_bytes(destination, payload)
-
-
-def _lexical_only_report(root: Path, files: Sequence[Path]) -> CodeAnalysisReport:
-    """Build a validated lexical report without starting a language server."""
-    root = root.resolve()
-    resolved: list[Path] = []
-    for path in files:
-        raw_path = path
-        candidate_path = raw_path if raw_path.is_absolute() else root / raw_path
-        if candidate_path.is_symlink() or _contains_symlink(candidate_path, root):
-            return _failed_report(root, (), PathEscape(f"noncanonical or symlink file path is not allowed: {candidate_path}"), {})
-        candidate = candidate_path.resolve()
-        try:
-            candidate.relative_to(root)
-        except ValueError:
-            return _failed_report(root, (), PathEscape(str(candidate)), {})
-        if not candidate.is_file():
-            return _failed_report(root, (), ServerUnavailable(f"file not found: {candidate}"), {})
-        resolved.append(candidate)
-    resolved = sorted(set(resolved), key=lambda item: item.relative_to(root).as_posix())
-    locators = tuple(item.relative_to(root).as_posix() for item in resolved)
-    return CodeAnalysisReport(
-        root=root.as_posix(),
-        files=locators,
-        servers=(),
-        capabilities={},
-        lexical_candidates=tuple(_lexical_candidates(root, resolved)),
-        lifecycle={"state": "lexical-only"},
-        status="complete",
-        provenance={"schema": SCHEMA_VERSION, "protocol": LSP_VERSION},
-    )
-
-
 def build_parser() -> argparse.ArgumentParser:
-    """Build the analyze and legacy command parser."""
+    """Build the point-analysis command parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for name in ("analyze", "scan-legacy"):
-        sub = subparsers.add_parser(name)
-        sub.add_argument("--root", type=Path, default=Path.cwd())
-        sub.add_argument("--files", nargs="*", default=None)
-        sub.add_argument("--server", action="append", default=[], metavar="LANGUAGE=COMMAND")
-        sub.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
-        sub.add_argument("--format", choices=("json", "text"), default="json")
-        if name == "scan-legacy":
-            sub.add_argument("--changed", action="store_true", help="Analyze changed and untracked paths.")
-            sub.add_argument("--print-unresolved", action="store_true", help="Retained legacy flag; unresolved candidates are emitted.")
-            sub.add_argument("--paths-file", type=Path, default=None)
-            sub.add_argument("--analysis-json", type=Path, default=None)
-            sub.add_argument("--runtime-root", type=Path, default=None)
-            sub.add_argument("--lexical-only", action="store_true")
+    sub = subparsers.add_parser("analyze")
+    sub.add_argument("--root", type=Path, default=Path.cwd())
+    sub.add_argument("--files", nargs="*", default=None)
+    sub.add_argument("--server", action="append", default=[], metavar="LANGUAGE=COMMAND")
+    sub.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    sub.add_argument("--format", choices=("json", "text"), default="json")
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the selected analysis command and return its status."""
+    """Run one bounded point-LSP analysis request."""
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
-    files: list[Path]
-    if args.command == "scan-legacy" and args.paths_file is not None:
-        if args.files or args.changed:
-            print("scan-legacy: --paths-file cannot be combined with --changed or --files", file=sys.stderr)
-            return 2
-        try:
-            files = [Path(line.strip()) for line in args.paths_file.read_text(encoding="utf-8").splitlines() if line.strip()]
-        except (OSError, UnicodeDecodeError) as exc:
-            print(f"scan-legacy: unable to read --paths-file: {exc}", file=sys.stderr)
-            return 2
-    elif args.command == "scan-legacy" and args.changed:
-        try:
-            changed = subprocess.run(["git", "diff", "--name-only", "HEAD", "--"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
-            untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
-            candidates = tuple(value for value in [*changed, *untracked] if value)
-            files = list(discover_lsp_files(root, candidates)) if candidates else []
-        except OSError:
-            files = []
-    else:
-        files = _files_from_args(root, args.files)
+    files = _files_from_args(root, args.files)
     files = [path if path.is_absolute() else root / path for path in files]
     try:
         specs = _parse_server_specs(args.server)
@@ -1571,32 +1462,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"LSP_ANALYSIS=fail\nLSP_ANALYSIS_ERROR={exc}", file=sys.stderr)
         return 2
     try:
-        report = (
-            _lexical_only_report(root, files)
-            if args.command == "scan-legacy" and args.lexical_only
-            else analyze(root, files, specs=specs, timeout=args.timeout)
-        )
+        report = analyze(root, files, specs=specs, timeout=args.timeout)
     except (LspAnalysisError, ValueError) as exc:
         error = exc if isinstance(exc, LspAnalysisError) else LspAnalysisError(str(exc))
         report = _failed_report(root, (), error, {})
-    if args.command == "scan-legacy":
-        if args.analysis_json is not None:
-            try:
-                _write_report_atomic(
-                    report, root, args.analysis_json, args.runtime_root
-                )
-            except RuntimeArtifactError as exc:
-                print(f"LSP_ANALYSIS=fail\nLSP_ANALYSIS_ERROR={exc}", file=sys.stderr)
-                return 2
-        lines = _legacy_lines(report, root, print_unresolved=bool(args.print_unresolved))
-        if report.status != "complete":
-            print(f"AGENT_SCAN=fail\t{report.error or {}}", file=sys.stderr)
-            return 1
-        output = "\n".join(lines)
-        if output:
-            print(output)
-        print(f"CODE_DEPENDENCY_SCAN=pass files={len(report.files)}")
-        return 0
     payload = report.as_json(root)
     if args.format == "json":
         print(json.dumps(payload, ensure_ascii=False, indent=2))
