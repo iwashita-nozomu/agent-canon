@@ -16,16 +16,18 @@ downstream implementation ./skill-dependencies.yaml public skill dependency DAG
 
 ## Purpose
 
-Clean the complete owning responsibility, including affected consumers and
-obsolete support, rather than choosing a minimum diff or deleting whole files
-without understanding their contents.
+Clean the requested responsibility from its current source and contract. Include
+other files only when the requested retirement or current evidence shows they
+are affected; do not survey or edit possible consumers by default.
 
 ## Route
 
-1. Start from the agreed final behavior and most recently incorporated path. Read
-   actual control flow and compare existing capabilities before adding code.
-2. Follow callers and effects through [dependency-analysis](dependency-analysis.md)
-   only while the cause or migration boundary remains unresolved.
+1. Start from the agreed final behavior, target source, current diff, and most
+   recently incorporated path. Read control flow in the target and compare
+   existing capabilities before adding code.
+2. Use [dependency-analysis](dependency-analysis.md) for a concrete unresolved
+   cause or migration boundary; follow callers and effects only as far as needed
+   to settle it.
 3. Retire superseded entrypoints, implementation, exclusive support, fixtures, and
    docs together, migrating necessary consumers to the retained owner. RC-09 owns
    retirement; do not add a compatibility layer as a cleanup step.
@@ -34,7 +36,8 @@ without understanding their contents.
 5. For numerical code, establish equations and convergence semantics before
    deletion. Use [refactor-loop](refactor-loop.md) for structural migration and
    [change-review](change-review.md) for the resulting contract and missed deletions.
-6. Validate changed guarantees and consumer connections, not the retired path.
+6. Validate changed guarantees and only those consumer connections included in
+   the requested migration; do not expand validation to possible consumers.
 
 Use existing dependency and reference tools only for unresolved questions.
 No new inventory, handoff schema, or full-repository scan is required by cleanup.

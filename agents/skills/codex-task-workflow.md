@@ -34,8 +34,10 @@ handoff unless the route requires one.
 
 Use the applicable root instructions and selected Skill. Follow only linked
 owners needed for the current decision, and preserve settled context across
-phases. Trace actual callers or consumers when they can change the
-implementation boundary.
+phases. For a local change, start with the target, diff, and governing contract.
+Follow callers or consumers only when a concrete unresolved fact could change the
+implementation boundary. For an explicitly cross-module/API migration, trace
+dependencies within its declared scope.
 
 ## Stages
 

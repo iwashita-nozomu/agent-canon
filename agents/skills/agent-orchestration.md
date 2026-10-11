@@ -32,8 +32,11 @@ owner, workflow, delegation, or execution route.
 
 Classify the requested operation as advisory/read-only or repository-changing.
 Read the applicable repository instructions and selected owner. For unresolved
-choices, inspect current source, callers, state, and constraints only far enough
-to settle ownership, required behavior, scope, and validation.
+choices, inspect the target source, current diff, and governing contract first.
+Follow a caller or linked file only when those facts leave a concrete question
+that could change ownership, required behavior, scope, or validation. If the
+request explicitly spans modules or migrates an API, trace the dependencies
+within that declared scope.
 
 Use the [task catalog](../task_catalog.yaml) for workflow family, role, and
 execution-route decisions. Public Skill identity and prerequisites come from the
@@ -59,10 +62,12 @@ workflow.
 
 ## Owner-First Read Trace
 
-Start with the applicable root instructions and selected Skill. Follow a linked
-owner or caller only when it can change the current ownership, implementation,
-scope, or validation decision. Reuse settled context; search only when the owner
-or mechanism remains unresolved.
+Start with the applicable root instructions and selected Skill. For a local
+change, use the target and current contract to settle the implementation first.
+Follow a linked owner or caller only when a concrete unresolved fact could change
+ownership, implementation, scope, or validation. Reuse settled context; do not
+expand reads or edits from a link alone. For an explicitly cross-module change or
+API migration, follow dependencies within its declared scope.
 
 ## Local Capability Priority
 

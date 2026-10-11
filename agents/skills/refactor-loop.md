@@ -18,12 +18,13 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 
 ## Reader Map
 
-refactor target trace を固定する前に、owning design を read し、routine の
-clause fingerprint と implementation trace を参照します。refactor の change
-mapping と review はこの skill の owner ですが、design drift invariant は
-routine に委譲します。一般原則の意味、競合時の優先順位、KISS / YAGNI / DRY、
-abstraction admission は [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
-が所有し、この skill では refactor 固有の実行 contract だけを追加します。
+局所 refactor は対象、差分、既存契約から始めます。design の実装追跡や clause
+fingerprint は、設計変更・drift 判断、または unresolved owner がその参照を必要とする場合に
+使います。refactor の change mapping と review はこの skill の owner ですが、design
+drift invariant は routine に委譲します。一般原則の意味、競合時の優先順位、KISS / YAGNI /
+DRY、abstraction admission は
+[documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
+が所有し、その判断が必要な場合に参照します。
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
   explicit scope, deltas, and review gates.
@@ -128,18 +129,19 @@ accepting a path or dependency-direction change.
 
 ## Procedure
 
-1. Start from the current cause, required guarantee, most recently incorporated
-   implementation, and existing reuse evidence. A prior refactor sequence is not
-   a reason to repeat its stages.
-2. Follow callers and effects only far enough to select the owning responsibility,
-   replaceable unit, mechanism, and validation route. Use `dependency-analysis`
-   when that boundary or consumer migration remains unresolved; for a bounded
-   non-split edit, keep the existing owner evidence.
-3. For a structural refactor, fix the canonical root first, then update the
-   affected callers, tests, docs, and generated consumers in the same owning unit.
-   Remove obsolete entrypoints, wrappers, aliases, and exclusive support under
-   RC-09. Keep API/structure mapping only where the change actually moves or
-   deletes a public surface.
+1. Start from the current target, diff, governing contract, required guarantee,
+   most recently incorporated implementation, and existing reuse evidence. A
+   prior refactor sequence is not a reason to repeat its stages.
+2. Use the target and contract to select the owner, replaceable unit, mechanism,
+   and validation route. Follow callers and effects only when a concrete
+   unresolved fact could change that decision. Use `dependency-analysis` when a
+   cause or explicitly requested consumer migration remains unresolved; for a
+   bounded local edit, reuse the existing owner evidence.
+3. For a structural refactor, fix the canonical root first, then update only the
+   callers, tests, docs, and generated consumers affected by the requested
+   structural change. Remove obsolete entrypoints, wrappers, aliases, and
+   exclusive support under RC-09. Keep API/structure mapping only where the
+   change actually moves or deletes a public surface.
 4. Preserve the agreed behavior and failure semantics. Add `structure-planning`,
    `tool-finding-report`, or a domain reviewer only when the changed contract or
    unresolved risk requires that owner. Prompt/doc/static-contract changes use the
@@ -155,13 +157,14 @@ accepting a path or dependency-direction change.
 
 ## Shared-structure order
 
-For a refactor spanning a shared source and consumers, use the dependency edges to
-order only the required changes: establish the target contract, update the canonical
-source and any inseparable consumers, publish when a dependent checkout requires that
-revision, then migrate and validate affected consumers. Source publication and
-consumer adoption remain separate claims. Independent consumers may proceed in
-parallel when their inputs and write scopes are ready; keep dependent changes in one
-commit only when they cannot be validated independently.
+For a request that explicitly spans a shared source and consumers, use the declared
+dependency edges to order only the required changes: establish the target contract,
+update the canonical source and inseparable consumers, publish when a dependent
+checkout requires that revision, then migrate and validate consumers affected by
+that request. Source publication and consumer adoption remain separate claims.
+Independent consumers may proceed in parallel when their inputs and write scopes
+are ready; keep dependent changes in one commit only when they cannot be validated
+independently.
 
 ## Subagent Routing
 

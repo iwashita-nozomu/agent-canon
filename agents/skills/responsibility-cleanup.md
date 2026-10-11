@@ -18,9 +18,10 @@ downstream implementation ../../.codex/config.toml host skill configuration
 
 ## Purpose
 
-責務単位 cleanup の入口です。必要な範囲で `tree -a -J --noreport` または既存 scope
-evidence を使い、source/view/generated/project/personal の境界、dependency closure、
-replaceable responsibility、specialist dispatch、統合、再レビューを
+責務単位 cleanup の入口です。対象と既存 scope evidence から局所か repository-wide かを
+判断し、必要な場合だけ `tree -a -J --noreport` や既存 scope evidence を使って
+source/view/generated/project/personal の境界、dependency closure、replaceable responsibility、
+specialist dispatch、統合、再レビューを
 [`responsibility-cleanup`](../../documents/design/responsibility-cleanup.md)
 の RC-01..RC-08 に接続します。
 
@@ -32,7 +33,7 @@ replaceable responsibility、specialist dispatch、統合、再レビューを
 
 ## Route
 
-1. Determine whether the request is local or repository-wide. Use `tree -a -J --noreport` and structure/scope checkers only when the relevant owner, boundary, or reverse relation is unresolved; a repo-wide inventory follows [project-review](../internal-routines/project-review.md).
+1. Determine whether the requested change is local or repository-wide from the target and existing contract. Use `tree -a -J --noreport` and structure/scope checkers only when a concrete unresolved owner, boundary, or reverse relation could change the work; a repo-wide inventory follows [project-review](../internal-routines/project-review.md).
 2. Close the affected unit by owner, dependency, public contract, selected validation, and rollback. Use the write-capable handoff boundary in `agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary` when a writer handoff is selected.
 3. Route only changed surfaces: environment cleanup to `environment-cleanup`, code cleanup to `code-cleanup`, and general skill authoring to the host `$skill-creator`. For AgentCanon registration or distribution changes, read [Updating Skills](README.md#updating-skills) before those operations.
 4. Reuse `document-canon-cleanup`, `worktree-health`, `agent-log-analysis`, `runtime-log-repair`, or `result-artifact-writeout` only when the selected unit includes those responsibilities.
