@@ -70,8 +70,11 @@ README/provenanceの第二copy source、compatibility copy、symlink、fallback 
 `topic.cpp`をnative targetにし、`run.py`を実行境界、`visualization.py`をraw output readerに限定する。
 固定一件caseでは`cases.py`を作らない。明示的にmulti-caseを選んだ時だけ、既存`CaseSpec` field contract
 のinput adapterをmaterializeし、`run.py`がnon-empty case configを列挙して同じC++ targetへ渡す。
-Python case workerやempty/example registryは生成しない。starter targetはdraftを維持し、native experimentが
-実装されるまで実行失敗を返す。生成だけでscientific resultを宣言しない。
+Python case workerやempty/example registryは生成しない。C++ sourceはconfig pathとoptional case identityを
+持つ`experiment::Request`、raw output stringを返す`experiment::Result`、CLI process boundaryを定義する。
+consumerはselected CMake targetへ含まれる`topic.cpp`で`experiment::run(const experiment::Request&)`を
+実装する。config/result schemaとalgorithmはconsumer-ownedのままにする。registryはdraftのままにし、
+生成だけでbuild・run・scientific resultの完了を宣言しない。
 
 ## Clauses
 

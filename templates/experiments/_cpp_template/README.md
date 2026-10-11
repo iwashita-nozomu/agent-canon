@@ -5,9 +5,13 @@ and data-processing implementation. `run.py` only launches that executable and
 copies its standard output into the managed run's raw directory. It does not
 build the executable or provide a Python calculation fallback.
 
-The generated registry entry remains `draft`. The starter executable exits with
-an error until this topic's native experiment is implemented, so creating the
-package does not claim a completed experiment or a scientific result.
+The generated registry entry remains `draft`. `topic.cpp` defines the process
+boundary and request/result types. The consumer supplies the definition of
+`experiment::run(const experiment::Request&)` in that file; the selected CMake
+target already includes it. That function owns native data decoding and experiment logic. The
+linker requires this consumer definition, so package creation does not claim a
+completed experiment or scientific result. The request contains only the config
+path and optional case identity; the consumer owns config and result formats.
 
 The selected CMake profile is `<cmake-profile>`:
 

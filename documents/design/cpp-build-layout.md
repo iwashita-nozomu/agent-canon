@@ -113,6 +113,12 @@ materializeします。`consumer-local` はtopic-local `CMakeLists.txt`を、`ro
 root manifestからincludeするtarget registration requestを生成します。profileの選択、root manifestの
 編集、configure/build commandはproject ownerの責務です。
 
+生成された`<topic>.cpp`は、`experiment::run(const experiment::Request&)`のrequest/result型とCLI
+process boundaryを定義し、consumer-owned function definitionを呼び出します。両profileの初期targetはこの
+source fileを含むため、consumerはfunction bodyを同じfileへ実装します。別source fileへ分ける場合は
+selected CMake targetのownerがそのsourceを追加します。このcontractはconfigやdomain resultのschemaを
+選ばず、数値処理、decode、metricsはconsumer implementationが所有します。
+
 ## Scope and evidence
 
 この C++ design correction は AgentCanon source の CMake build/test を主張しません。現在の

@@ -54,6 +54,8 @@ publication, and a publication failure restores the prior topic and leaves the
 registry unchanged.
 
 The source-free `experiment-scaffold` template export contains both package
-templates. A generated parent topic has no dependency on the AgentCanon checkout,
-runtime, or network. The C++ starter target exits with an error until its native
-experiment is implemented; its registry status stays `draft`.
+templates. Generated parent files do not import or reference the AgentCanon
+checkout, runtime, or network. The C++ process boundary requires the consumer to
+define `experiment::run(const experiment::Request&)` in the generated `topic.cpp`;
+both selected CMake surfaces already include that source. The function owns native
+data decoding and experiment logic, while the topic registry starts as `draft`.
