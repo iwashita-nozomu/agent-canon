@@ -400,6 +400,7 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 graph,
                 [
                     ("upstream", "design", "src/connected.md", "docs/target.md"),
+                    ("upstream", "reference", "src/connected.md", "docs/target.md"),
                     (
                         "downstream",
                         "implementation",
@@ -434,6 +435,8 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
                 str(root),
                 "--graph-tsv",
                 str(graph),
+                "--source-revision",
+                head_revision,
                 "--ir-out",
                 str(ir_out),
                 "--markdown-out",
@@ -449,14 +452,14 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             envelope = json.loads(result.stdout)
             self.assertEqual(envelope["summary"]["node_count"], 3)
-            self.assertEqual(envelope["summary"]["edge_count"], 2)
+            self.assertEqual(envelope["summary"]["edge_count"], 3)
             self.assertEqual(envelope["summary"]["tracked_path_count"], 9)
             self.assertEqual(envelope["summary"]["broken_target_count"], 1)
 
             graph_ir = json.loads(ir_out.read_text(encoding="utf-8"))
             self.assertEqual(graph_ir["source"]["git_tree_revision"], head_revision)
             self.assertEqual(graph_ir["summary"]["nodes"], 3)
-            self.assertEqual(graph_ir["summary"]["edges"], 2)
+            self.assertEqual(graph_ir["summary"]["edges"], 3)
             self.assertEqual(graph_ir["summary"]["trackedPaths"], 9)
             self.assertEqual(graph_ir["summary"]["totalNodes"], 15)
             nodes = {node["id"]: node for node in graph_ir["nodes"]}
@@ -493,10 +496,19 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             containment_edges = [
                 edge for edge in graph_ir["edges"] if edge["relation"] == "contains"
             ]
-            self.assertEqual(len(dependency_edges), 2)
+            self.assertEqual(len(dependency_edges), 3)
             self.assertEqual(
-                [edge["payload_json"]["row"] for edge in dependency_edges], [0, 1]
+                [edge["payload_json"]["row"] for edge in dependency_edges],
+                [0, 1, 2],
             )
+            reference_edge = next(
+                edge for edge in dependency_edges if edge["label"] == "reference"
+            )
+            self.assertEqual(
+                (reference_edge["relation"], reference_edge["label"]),
+                ("upstream", "reference"),
+            )
+            self.assertEqual(reference_edge["payload_json"]["row"], 1)
             child_kinds = {
                 edge["payload_json"]["childPath"]: edge["payload_json"]["childKind"]
                 for edge in containment_edges
@@ -517,6 +529,24 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertIn("Complete path node list (9)", rendered_html)
             self.assertIn("isolated.txt", rendered_html)
             self.assertIn("gitlink", rendered_html)
+
+            repeated_ir_out = root / "repeated-graph.ir.json"
+            repeated_result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--source-revision",
+                head_revision,
+                "--ir-out",
+                str(repeated_ir_out),
+                "--format",
+                "json",
+            )
+            self.assertEqual(repeated_result.returncode, 0, repeated_result.stderr)
+            repeated_ir = json.loads(repeated_ir_out.read_text(encoding="utf-8"))
+            for logical_mapping in ("source", "documents", "nodes", "edges"):
+                self.assertEqual(repeated_ir[logical_mapping], graph_ir[logical_mapping])
 
             old_ir_out = root / "old-tree.ir.json"
             old_result = run_renderer(
