@@ -77,6 +77,8 @@ template の直接コピーや別 scaffold fallback は使いません。
 長時間 GPU run の開始/延長や crash 後の rerun では、既存ログ・最後の進捗・run identity
 を確認し、今回の失敗原因を調べるのに必要な bounded 診断を選びます。compile と run を
 分ける設計ならそれぞれの resource、期限、停止条件、永続保存先を確認してから実行します。
+クラッシュ報告後、原因と安全性を裏付ける根拠が未確定な間は同じ高負荷設定を再実行せず、
+次の判断は既存ログと bounded 診断の結果に基づけます。
 小さな確認の成功だけで長時間 rerun を自動起動しません。
 topic に mini-runner、scheduler、独自 signal 回収、partial-resume protocol を追加せず、managed runner/scheduler owner に handoff します。
 
