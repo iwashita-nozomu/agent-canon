@@ -146,6 +146,24 @@ class CapacityHandshakeConsumerBinding:
         "record_lifecycle_transition",
         "materialize_closeout_packet",
     )
+    provider_type_ids: tuple[str, ...] = (
+        "LifecycleStatus",
+        "DescendantLifecycleRecord",
+        "CapacityLedger",
+        "LifecycleTransitionRecord",
+        "LedgerWriteResult",
+        "ParentChildEdge",
+        "DescendantTopologyReadback",
+        "CloseoutPacket",
+        "CloseAgentCallRecord",
+        "LifecycleCloseoutFailure",
+    )
+    duplicate_definition_policy: str = "forbidden"
+
+    @property
+    def shape_id(self) -> str:
+        """Return the stable consumer-binding schema identifier."""
+        return "capacity_handshake_consumer_binding_v1"
 
 
 @dataclass(frozen=True)
@@ -288,24 +306,6 @@ def advance_execution_graph(
         wave_index=None,
         completed_results=tuple(completed),
     )
-    provider_type_ids: tuple[str, ...] = (
-        "LifecycleStatus",
-        "DescendantLifecycleRecord",
-        "CapacityLedger",
-        "LifecycleTransitionRecord",
-        "LedgerWriteResult",
-        "ParentChildEdge",
-        "DescendantTopologyReadback",
-        "CloseoutPacket",
-        "CloseAgentCallRecord",
-        "LifecycleCloseoutFailure",
-    )
-    duplicate_definition_policy: str = "forbidden"
-
-    @property
-    def shape_id(self) -> str:
-        """Return the stable consumer-binding schema identifier."""
-        return "capacity_handshake_consumer_binding_v1"
 
 
 @dataclass
