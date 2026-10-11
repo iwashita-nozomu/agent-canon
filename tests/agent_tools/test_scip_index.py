@@ -30,16 +30,27 @@ if str(PROJECT_ROOT) not in sys.path:
 import tools.analysis.dependencies.scip_index as scip_index  # noqa: E402
 
 
-def occurrence(symbol: str, role: int, start: int, end: int) -> dict[str, Any]:
+def occurrence(
+    symbol: str, role: int, start: int, end: int, *, typed: bool = False
+) -> dict[str, Any]:
     """Return a small official JSON occurrence."""
+    range_fields: dict[str, Any] = (
+        {
+            "TypedRange": {
+                "single_line_range": {
+                    "line": 1,
+                    "start_character": start,
+                    "end_character": end,
+                }
+            }
+        }
+        if typed
+        else {"range": [1, start, end]}
+    )
     return {
-        "singleLineRange": {
-            "startLine": 1,
-            "startCharacter": start,
-            "endCharacter": end,
-        },
+        **range_fields,
         "symbol": symbol,
-        "symbolRoles": role,
+        "symbol_roles": role,
     }
 
 
@@ -60,33 +71,35 @@ class ScipIndexTest(unittest.TestCase):
             implementation_symbol = "scip-python python demo 0.1.0 pkg.impl/FastRun#"
             payload = {
                 "metadata": {
-                    "projectRoot": root.as_uri(),
-                    "toolInfo": {"name": "scip-python", "version": "0.6.6"},
-                    "textDocumentEncoding": "UTF16",
+                    "project_root": root.as_uri(),
+                    "tool_info": {"name": "scip-python", "version": "0.6.6"},
+                    "text_document_encoding": 1,
                 },
                 "documents": [
                     {
-                        "relativePath": "pkg/api.py",
+                        "relative_path": "pkg/api.py",
                         "language": "python",
-                        "occurrences": [occurrence(target_symbol, 1, 4, 7)],
+                        "occurrences": [
+                            occurrence(target_symbol, 1, 4, 7, typed=True)
+                        ],
                         "symbols": [
                             {"symbol": target_symbol, "relationships": []}
                         ],
                     },
                     {
-                        "relativePath": "pkg/use.py",
+                        "relative_path": "pkg/use.py",
                         "language": "python",
                         "occurrences": [occurrence(target_symbol, 8, 11, 14)],
                         "symbols": [],
                     },
                     {
-                        "relativePath": "pkg/ref_only.py",
+                        "relative_path": "pkg/ref_only.py",
                         "language": "python",
                         "occurrences": [occurrence(target_symbol, 8, 2, 8)],
                         "symbols": [],
                     },
                     {
-                        "relativePath": "pkg/impl.py",
+                        "relative_path": "pkg/impl.py",
                         "language": "python",
                         "occurrences": [
                             occurrence(implementation_symbol, 1, 0, 8)
@@ -97,14 +110,14 @@ class ScipIndexTest(unittest.TestCase):
                                 "relationships": [
                                     {
                                         "symbol": target_symbol,
-                                        "isImplementation": True,
+                                        "is_implementation": True,
                                     }
                                 ],
                             }
                         ],
                     },
                     {
-                        "relativePath": "pkg/unrelated.py",
+                        "relative_path": "pkg/unrelated.py",
                         "language": "python",
                         "occurrences": [
                             occurrence(
@@ -117,7 +130,7 @@ class ScipIndexTest(unittest.TestCase):
                         "symbols": [],
                     },
                 ],
-                "externalSymbols": [],
+                "external_symbols": [],
             }
             args = SimpleNamespace(
                 root=root,
@@ -164,6 +177,7 @@ class ScipIndexTest(unittest.TestCase):
                 [item["path"] for item in result["definitions"]],
                 ["pkg/api.py"],
             )
+            self.assertEqual(result["definitions"][0]["range"]["start"]["line"], 1)
             self.assertEqual(
                 [item["path"] for item in result["references"]],
                 ["pkg/use.py", "pkg/ref_only.py"],
@@ -209,12 +223,12 @@ class ScipIndexTest(unittest.TestCase):
             index_path.write_bytes(b"official-scip-index")
             payload = {
                 "metadata": {
-                    "projectRoot": root.as_uri(),
-                    "toolInfo": {"name": "rust-analyzer", "version": "1.89.0"},
+                    "project_root": root.as_uri(),
+                    "tool_info": {"name": "rust-analyzer", "version": "1.89.0"},
                 },
                 "documents": [
                     {
-                        "relativePath": "src/lib.rs",
+                        "relative_path": "src/lib.rs",
                         "language": "rust",
                         "occurrences": [],
                         "symbols": [],

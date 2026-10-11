@@ -368,7 +368,7 @@ def index_project(args: argparse.Namespace) -> dict[str, Any]:
 def _index_project_root(value: object) -> Path:
     """Decode the standard SCIP project-root URI."""
     if not isinstance(value, str) or not value:
-        raise IndexDataError("SCIP index is missing metadata.projectRoot")
+        raise IndexDataError("SCIP index is missing metadata.project_root")
     parsed = urlparse(value)
     if parsed.scheme == "file":
         if parsed.netloc or parsed.query or parsed.fragment:
@@ -387,7 +387,7 @@ def _index_project_root(value: object) -> Path:
 def _relative_source_path(value: object) -> str:
     """Validate a SCIP document path and return its canonical POSIX spelling."""
     if not isinstance(value, str) or not value:
-        raise IndexDataError("SCIP document has no relativePath")
+        raise IndexDataError("SCIP document has no relative_path")
     if value.startswith("/") or "\\" in value or "//" in value or any(
         part in {"", ".", ".."} for part in value.split("/")
     ):
@@ -432,7 +432,7 @@ def _load_index(
     metadata = payload.get("metadata")
     if not isinstance(metadata, Mapping):
         raise IndexDataError("SCIP index is missing metadata")
-    tool_info = metadata.get("toolInfo")
+    tool_info = metadata.get("tool_info")
     if not isinstance(tool_info, Mapping):
         tool_info = {}
     raw_documents = _mapping_sequence(payload.get("documents"), "documents")
@@ -440,7 +440,7 @@ def _load_index(
     for document in raw_documents:
         documents.append(
             IndexDocument(
-                path=_relative_source_path(document.get("relativePath")),
+                path=_relative_source_path(document.get("relative_path")),
                 language=str(document.get("language", "")),
                 occurrences=_mapping_sequence(
                     document.get("occurrences"), "occurrences"
@@ -449,29 +449,32 @@ def _load_index(
             )
         )
     external_symbols = _mapping_sequence(
-        payload.get("externalSymbols"), "externalSymbols"
+        payload.get("external_symbols"), "external_symbols"
     )
     return LoadedIndex(
         path=target,
         digest=boundary.digest(target),
-        project_root=_index_project_root(metadata.get("projectRoot")),
+        project_root=_index_project_root(metadata.get("project_root")),
         tool_name=str(tool_info.get("name", "")),
         tool_version=str(tool_info.get("version", "")),
-        text_encoding=str(metadata.get("textDocumentEncoding", "")),
+        text_encoding=str(metadata.get("text_document_encoding", "")),
         documents=tuple(documents),
         external_symbols=external_symbols,
     )
 
 
 def _range_value(value: object) -> dict[str, dict[str, int]] | None:
-    """Normalize SCIP's standard typed or legacy occurrence ranges."""
+    """Normalize typed or legacy ranges from the official SCIP CLI JSON."""
     if isinstance(value, Mapping):
-        single = value.get("singleLineRange")
+        typed_range = value.get("TypedRange")
+        if not isinstance(typed_range, Mapping):
+            typed_range = {}
+        single = typed_range.get("single_line_range")
         if isinstance(single, Mapping):
             fields = (
-                single.get("startLine"),
-                single.get("startCharacter"),
-                single.get("endCharacter"),
+                single.get("line"),
+                single.get("start_character"),
+                single.get("end_character"),
             )
             if all(isinstance(field, int) and not isinstance(field, bool) for field in fields):
                 line, start, end = fields
@@ -479,13 +482,13 @@ def _range_value(value: object) -> dict[str, dict[str, int]] | None:
                     "start": {"line": line, "character": start},
                     "end": {"line": line, "character": end},
                 }
-        multi = value.get("multiLineRange")
+        multi = typed_range.get("multi_line_range")
         if isinstance(multi, Mapping):
             fields = (
-                multi.get("startLine"),
-                multi.get("startCharacter"),
-                multi.get("endLine"),
-                multi.get("endCharacter"),
+                multi.get("start_line"),
+                multi.get("start_character"),
+                multi.get("end_line"),
+                multi.get("end_character"),
             )
             if all(isinstance(field, int) and not isinstance(field, bool) for field in fields):
                 start_line, start_character, end_line, end_character = fields
@@ -530,14 +533,14 @@ def _occurrence_rows(index: LoadedIndex, source_root: Path) -> list[dict[str, An
             symbol = occurrence.get("symbol")
             if not isinstance(symbol, str) or not symbol:
                 continue
-            roles_value = occurrence.get("symbolRoles", 0)
+            roles_value = occurrence.get("symbol_roles", 0)
             if (
                 not isinstance(roles_value, int)
                 or isinstance(roles_value, bool)
                 or roles_value < 0
             ):
                 raise IndexDataError(
-                    f"invalid symbolRoles for {relative_path}: {roles_value!r}"
+                    f"invalid symbol_roles for {relative_path}: {roles_value!r}"
                 )
             rows.append(
                 {
@@ -600,7 +603,7 @@ def _implementation_targets(
                 continue
             for relationship in relationships:
                 target_symbol = relationship.get("symbol")
-                is_implementation = relationship.get("isImplementation", False)
+                is_implementation = relationship.get("is_implementation", False)
                 if (
                     isinstance(target_symbol, str)
                     and target_symbol
