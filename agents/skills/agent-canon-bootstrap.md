@@ -15,7 +15,8 @@ downstream implementation ../../tests/tools/test_bootstrap_container_contract.py
 -->
 
 Use this skill when AgentCanon's shared Python, Rust, or language-server tool
-runtime must be installed, started, inspected, targeted, updated, or removed.
+runtime must be installed, started, inspected, targeted, updated, or removed,
+or when its optional source-free Codex user bundle is exported or operated.
 It is also the owner for the user path from an explicit project target to a
 namespaced `agent-canon tool run` request and for collecting the resulting eval
 evidence.
@@ -75,6 +76,38 @@ evidence.
   uninstall. Project hooks and
   authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
   state remain outside this link set. `codex prepare` remains runtime-local.
+- The optional `codex-user` template profile is a source-free Codex plugin
+  package. Export it from a source-backed AgentCanon checkout with the existing
+  `template export` route and install/enable it through Codex's marketplace
+  manager; plugin hooks and skills remain under Codex's plugin owner. The
+  shared resident is still provisioned by the source-backed bootstrap
+  lifecycle; the bundle does not build or install a separate runtime. It ships
+  the existing Bash host adapter and resident controller source, so a hook
+  does not require an AgentCanon Git checkout or host Python. It
+  reads the user's `CODEX_HOME/config.toml` trust entry without changing it;
+  only a project with `trust_level = "trusted"` is added by the existing
+  read-only `target add` operation. The fixed plugin root is separately
+  registered read-only through the same target owner as the runtime source.
+  Untrusted or absent project trust runs the user hook without registering or
+  mounting that project. Registrations persist until the existing `target remove`
+  operation removes them; `codex bundle-uninstall` removes the bundle's own
+  target. Use
+  `codex bundle-install`/`codex bundle-uninstall` only for the profile's copied
+  agent and guidance files; their hashes are recorded by the existing
+  `global-links.tsv` owner. Run bundle-uninstall before removing the plugin
+  through Codex if those copies are no longer wanted. These commands do not
+  install or remove the plugin, mutate plugin cache, or edit config/trust settings. From a source-backed
+  install, the selected checkout must already be a read-only target; the
+  existing route exports under the control runtime, outside source:
+
+  ```bash
+  "$BOOTSTRAP" "${COMMON[@]}" template export \
+    --root <registered-agent-canon-source> --profile codex-user \
+    --output codex-user
+  BUNDLE="$ROOT/.runtime/template-exports/codex-user"
+  # Add marketplace.json and install/enable with Codex's official plugin manager.
+  bash "$BUNDLE/bootstrap.sh" --control-parent-root "$ROOT" codex bundle-install
+  ```
 - `install` and `sync` use one source transition under `replacement.lock`:
   `git -C <install-root> fetch origin main` followed by
   `git -C <install-root> checkout --force -B main FETCH_HEAD`. It publishes
@@ -110,10 +143,14 @@ plane, and owner from its result; success needs no route preflight.
 If a tool fails, diagnose only the relevant route: use `status` for an unresolved
 runtime failure or target readback for a target rejection. A tool-plane failure
 does not establish a project-code failure. Install/start or add a target only
-for an explicit lifecycle request or an authorized repair. Targets remain
-read-only; authoring uses the tool's output and host publication. Read back the
-changed target or generation, retry only when the owner permits it, and retain
-the one-container/image limit and task-created resource IDs for cleanup.
+for an explicit lifecycle request or an authorized repair, except that the
+source-free Codex hook registers its current project read-only after the
+resident confirms the user's existing Codex trust entry. That hook never edits
+trust settings; use the existing target removal route when that registration is
+no longer wanted. Targets remain read-only; authoring uses the tool's output
+and host publication. Read back the changed target or generation, retry only
+when the owner permits it, and retain the one-container/image limit and
+task-created resource IDs for cleanup.
 
 Eval collection is its own selected branch: run registered producers, collect
 the run bundle, sync through the archive adapter, and verify remote repository
