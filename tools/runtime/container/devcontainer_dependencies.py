@@ -1960,9 +1960,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
             if asset is not None:
                 _validate_safe_asset_path(asset, f"{record.id}.asset")
                 if record.archive_format == "deb" and not asset.endswith(".deb"):
-                    raise DependencyError(
-                        f"{record.id}.asset must name a .deb file"
-                    )
+                    raise DependencyError(f"{record.id}.asset must name a .deb file")
         for arch, _ in record.assets:
             if arch not in {"x86_64", "aarch64"}:
                 raise DependencyError(
@@ -1980,9 +1978,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
         assert record.extract is not None
         _validate_safe_member(record.extract, f"{record.id}.extract")
-        if (record.archive_format in {"binary", "deb"}) != (
-            record.extract == "none"
-        ):
+        if (record.archive_format in {"binary", "deb"}) != (record.extract == "none"):
             raise DependencyError(
                 f"{record.id}: binary and .deb release assets require extract=none"
             )
@@ -2561,7 +2557,7 @@ def build_plan(
     *,
     base_capabilities: Iterable[str] = BASE_CAPABILITIES,
 ) -> DependencyPlan:
-    """Validate providers, dependencies, and cycles before any side effect."""
+    """Select this target's records and validate their closure before side effects."""
     records = merge_records(manifests)
     if not records:
         raise DependencyError("merged dependency plan must contain at least one record")
@@ -2573,6 +2569,9 @@ def build_plan(
         "arm64": "arm64",
     }
     runtime_platform = f"linux/{machine_alias.get(machine, machine)}"
+    # The canonical manifest spans OCI targets. A plural platform set selects
+    # records for this target; dependencies on omitted records still fail below.
+    selected_records: list[DependencyRecord] = []
     for record in records:
         if record.platform is not None and record.platform != runtime_platform:
             raise DependencyError(
@@ -2581,9 +2580,13 @@ def build_plan(
                 "no compatibility fallback is defined"
             )
         if record.platforms and runtime_platform not in record.platforms:
-            raise DependencyError(
-                f"dependency record {record.id} does not support {runtime_platform}"
-            )
+            continue
+        selected_records.append(record)
+    records = tuple(selected_records)
+    if not records:
+        raise DependencyError(
+            f"no dependency records support runtime platform {runtime_platform}"
+        )
     by_id = {record.id: record for record in records}
     providers: dict[str, list[str]] = {}
     for record in records:
@@ -3901,9 +3904,7 @@ class Installer:
                         workspace=workspace,
                         expected_source_identity=self._receipt_source_identity(receipt),
                         expected_resolved_package_version=(
-                            self._receipt_resolved_apt_package_version(
-                                receipt, record
-                            )
+                            self._receipt_resolved_apt_package_version(receipt, record)
                         ),
                         strict_executables=True,
                         allow_network=False,
@@ -3927,10 +3928,7 @@ class Installer:
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
                 if self._image_owned:
-                    if (
-                        record.method is Method.APT_PACKAGE
-                        and record.version is None
-                    ):
+                    if record.method is Method.APT_PACKAGE and record.version is None:
                         self.verify(
                             record,
                             workspace=workspace,
@@ -4129,9 +4127,7 @@ class Installer:
         self._active_record = record
         self._active_phase = "image-verify"
         self._active_owner = "typed-verifier"
-        expected_package_version = self._resolved_apt_package_version(
-            record, payload
-        )
+        expected_package_version = self._resolved_apt_package_version(record, payload)
         if expected_package_version is not None:
             self._verify_apt_package(
                 record,
@@ -4570,9 +4566,7 @@ class Installer:
                 env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
-            self._install_release_asset(
-                record, workspace=workspace, repair=repair
-            )
+            self._install_release_asset(record, workspace=workspace, repair=repair)
         elif method is Method.RUST_TOOLCHAIN:
             assert record.version is not None
             tool_env = self._with_tool_paths(None)
@@ -4892,10 +4886,7 @@ class Installer:
             len(fields) != 3
             or fields[0] != "install ok installed"
             or package_name != record.package
-            or (
-                record.version is not None
-                and observed_version != record.version
-            )
+            or (record.version is not None and observed_version != record.version)
             or (
                 expected_resolved_version is not None
                 and observed_version != expected_resolved_version
@@ -5830,13 +5821,9 @@ def resolve_verified_executable(
     installer = Installer()
     if release_asset_path is not None:
         verification_output = (
-            installer.verify_installed_receipt(
-                record, payload, workspace=workspace
-            )
+            installer.verify_installed_receipt(record, payload, workspace=workspace)
             if payload.get("status") == "installed"
-            else installer._absolute_executable_output(
-                record, workspace=workspace
-            )
+            else installer._absolute_executable_output(record, workspace=workspace)
         )
         if verification_output is None:
             raise DependencyError(
@@ -6103,10 +6090,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if order_output is not None:
             print("AGENT_CANON_TOOL_DEPENDENCY_ORDER=" + ",".join(order_output))
         if completed_output is not None:
-            print(
-                "AGENT_CANON_TOOL_DEPENDENCY_COMPLETED="
-                + ",".join(completed_output)
-            )
+            print("AGENT_CANON_TOOL_DEPENDENCY_COMPLETED=" + ",".join(completed_output))
     return exit_status
 
 

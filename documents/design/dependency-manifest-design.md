@@ -94,6 +94,12 @@ package の受入れ前に照合します。URL の欠落、取得失敗、diges
 署名付き source line の drift、または executable/version の drift は
 warning に降格せず typed failure とします。Rust の `rust-src` は component
 verification の対象ですが、独立 executable probe は持ちません。
+
+`platforms` は shared manifest 内の record ごとの対応 OCI target を表し、
+plan は現在の target に対応する record のみを選択します。別 target の
+record を除いた結果、残る record がその provider に依存していれば provider
+解決を失敗させます。単一の exact `platform` は選択条件ではなく strict pin の
+ままです。
 Immutable な apt artifact を固定する record は
 `repository_package_url` と `repository_package_sha256` を必ず対で持ちます。
 URL は HTTPS の `.deb`、SHA-256 は 64 桁 hex とし、installer は signed
