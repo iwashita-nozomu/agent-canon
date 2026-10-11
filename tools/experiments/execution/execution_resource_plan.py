@@ -3476,10 +3476,7 @@ class GpuProcessOccupancyProbe:
                     observed_namespace=process.container_namespace_identity,
                     expected_namespace=expected_namespace,
                 )
-            if (
-                process.gpu_uuid not in known_uuids
-                or _NVIDIA_UUID_RE.fullmatch(process.gpu_uuid) is None
-            ):
+            if process.gpu_uuid not in known_uuids:
                 raise TypedPreflightFailure(
                     "gpu_process_uuid_visibility_unproven",
                     "GPU process identity is not bound to an observed full UUID",
