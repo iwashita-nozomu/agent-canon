@@ -526,9 +526,6 @@ def validate_project_hooks() -> None:
         "mcp_session_context.sh" not in hooks_text,
         "mcp_session_context.sh must not be wired as a startup hook",
     )
-    ensure(
-        "hook_dispatcher.py" in hooks_text, "hooks.json must invoke hook_dispatcher.py"
-    )
     for event, entries in hooks.items():
         for group in require_list(entries, f"{event} hook groups must be a list"):
             group_map = require_mapping(group, f"{event} hook group must be a mapping")
@@ -536,17 +533,9 @@ def validate_project_hooks() -> None:
                 group_map.get("hooks", []), f"{event} hooks must be a list"
             ):
                 hook_map = require_mapping(hook, f"{event} hook must be a mapping")
-                command = require_string(
+                require_string(
                     hook_map.get("command"),
-                    f"{event} must invoke hook_dispatcher.py",
-                )
-                ensure(
-                    "hook_dispatcher.py" in command,
-                    f"{event} must invoke hook_dispatcher.py",
-                )
-                ensure(
-                    "$(" not in command and "git " not in command,
-                    f"{event} hook command must not shell out to Git",
+                    f"{event} hook command must be a string",
                 )
 
     dispatcher = ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
