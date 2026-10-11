@@ -86,13 +86,14 @@ _agent_canon_remove_global_links
     assert system_sentinel.read_text(encoding="utf-8") == "system\n"
 
 
-def test_source_free_codex_bundle_registers_only_trusted_project_targets(
+def test_codex_hook_routes_register_only_trusted_project_targets(
     tmp_path: Path,
 ) -> None:
-    """Bundled hooks reuse the resident, target API, and exact owned file cleanup."""
+    """Both hook routes reuse the resident and target API with exact file cleanup."""
     home = tmp_path / "home"
     control = tmp_path / "control"
     repository = tmp_path / "agent-canon"
+    source_worktree = tmp_path / "agent-canon-worktree"
     bundle = tmp_path / "codex-plugin"
     codex_home = tmp_path / "codex-home"
     trusted = tmp_path / "trusted-project"
@@ -114,6 +115,7 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
         **os.environ,
         "HOME": str(home),
         "CODEX_HOME": str(codex_home),
+        "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(state_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
@@ -135,6 +137,104 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
         timeout=120,
     )
     assert installed.returncode == 0, installed.stderr
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "worktree",
+            "add",
+            "--detach",
+            str(source_worktree),
+            "HEAD",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    trusted_config = (
+        f"[projects.{json.dumps(str(source_worktree))}]\n"
+        'trust_level = "trusted"\n'
+        f"[projects.{json.dumps(str(trusted))}]\n"
+        'trust_level = "trusted"\n'
+        f"[projects.{json.dumps(str(untrusted))}]\n"
+        'trust_level = "untrusted"\n'
+    )
+    codex_config = codex_home / "config.toml"
+    codex_config.parent.mkdir(parents=True, exist_ok=True)
+    codex_config.write_text(trusted_config, encoding="utf-8")
+    config_before = codex_config.read_bytes()
+
+    source_hooks = json.loads(
+        (source_worktree / ".codex/hooks.json").read_text(encoding="utf-8")
+    )
+    source_command = source_hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0][
+        "command"
+    ]
+    source_roots = (repository, source_worktree)
+    source_bytecode_before = {
+        (str(root), path.relative_to(root).as_posix())
+        for root in source_roots
+        for path in root.rglob("__pycache__")
+    }
+    source_hook = subprocess.run(
+        ["bash", "-c", source_command],
+        cwd=source_worktree / "tests",
+        input=json.dumps(
+            {
+                "hook_event_name": "UserPromptSubmit",
+                "cwd": str(source_worktree),
+                "prompt": "a harmless fixture prompt",
+            }
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert source_hook.returncode == 0, source_hook.stderr
+    assert source_hook.stdout == ""
+    assert source_hook.stderr == ""
+    assert codex_config.read_bytes() == config_before
+    mounts = control / ".runtime" / "container-state" / "mounts.tsv"
+    assert {
+        line.split("\t")[2] for line in mounts.read_text(encoding="utf-8").splitlines()
+    } == {str(source_worktree.resolve())}
+    source_bytecode_after = {
+        (str(root), path.relative_to(root).as_posix())
+        for root in source_roots
+        for path in root.rglob("__pycache__")
+    }
+    assert source_bytecode_after == source_bytecode_before
+    runtime_root = control / ".runtime"
+    assert not list(runtime_root.glob(".bootstrap.stdout.*"))
+    assert not list(runtime_root.glob(".bootstrap.stderr.*"))
+    assert not list(runtime_root.glob(".manifest-projection.*"))
+    source_target_removed = subprocess.run(
+        [
+            str(source_worktree / "bootstrap.sh"),
+            "--control-parent-root",
+            str(control),
+            "target",
+            "remove",
+            "--root",
+            str(source_worktree),
+            "--mode",
+            "read-only",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+        timeout=120,
+    )
+    assert source_target_removed.returncode == 0, source_target_removed.stderr
+    assert mounts.read_text(encoding="utf-8") == ""
+    assert not list(runtime_root.glob(".bootstrap.stdout.*"))
+    assert not list(runtime_root.glob(".bootstrap.stderr.*"))
+
     exported = subprocess.run(
         [
             sys.executable,
@@ -157,6 +257,31 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
     assert exported.returncode == 0, exported.stderr
 
     bundle_common = [str(bundle / "bootstrap.sh"), "--control-parent-root", str(control)]
+    bundle_manifest = bundle / "codex-user-bundle.json"
+    bundle_digest_before_collision = hashlib.sha256(
+        bundle_manifest.read_bytes()
+    ).hexdigest()
+    for invalid_codex_home in (bundle, bundle / "nested-codex-home"):
+        collision = subprocess.run(
+            [*bundle_common, "codex", "bundle-install"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**environment, "CODEX_HOME": str(invalid_codex_home)},
+            timeout=120,
+        )
+        assert collision.returncode == 2
+        assert "codex_install_path_invalid" in collision.stderr
+        assert not (bundle / "AGENTS.md").exists()
+        if invalid_codex_home != bundle:
+            assert not invalid_codex_home.exists()
+        assert not list(runtime_root.glob(".bootstrap.stdout.*"))
+        assert not list(runtime_root.glob(".bootstrap.stderr.*"))
+        assert not list(runtime_root.glob(".codex-bundle-install.*"))
+        assert hashlib.sha256(bundle_manifest.read_bytes()).hexdigest() == (
+            bundle_digest_before_collision
+        )
+
     global_links = control / ".runtime" / "container-state" / "global-links.tsv"
     link_record = (
         f"link\t{home / '.agents/skills'}\t"
@@ -182,6 +307,11 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
     install_receipt = json.loads(bundle_install.stdout)
     assert install_receipt["operation"] == "codex_bundle_install"
     assert install_receipt["files"] > 1
+    assert not list(runtime_root.glob(".codex-bundle-install.*"))
+    assert not list(runtime_root.glob(".bundle-files.*"))
+    assert not list(runtime_root.glob(".global-links.*"))
+    assert not list(codex_home.rglob(".agent-canon-bundle-install.*"))
+    assert not list(codex_home.rglob(".agent-canon-bundle-backup.*"))
     manifest_lines = global_links.read_text(encoding="utf-8").splitlines()
     assert link_record.rstrip("\n") in manifest_lines
     assert config_record.rstrip("\n") in manifest_lines
@@ -211,17 +341,6 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
             if line.startswith("bundle-file\t")
         ]
     ) == install_receipt["files"]
-
-    trusted_config = (
-        f"[projects.{json.dumps(str(trusted))}]\n"
-        'trust_level = "trusted"\n'
-        f"[projects.{json.dumps(str(untrusted))}]\n"
-        'trust_level = "untrusted"\n'
-    )
-    codex_config = codex_home / "config.toml"
-    codex_config.parent.mkdir(parents=True, exist_ok=True)
-    codex_config.write_text(trusted_config, encoding="utf-8")
-    config_before = codex_config.read_bytes()
 
     def run_hook(project: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -298,6 +417,8 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
     )
     assert conflicted.returncode == 2
     assert installed_guidance.read_text(encoding="utf-8") == "user-owned edit\n"
+    assert not list(runtime_root.glob(".global-links-validate.*"))
+    assert not list(runtime_root.glob(".global-links-remove.*"))
     installed_guidance.write_bytes((bundle / "guidance/AGENTS.md").read_bytes())
     removed_bundle = subprocess.run(
         [*bundle_common, "codex", "bundle-uninstall"],
@@ -310,6 +431,8 @@ def test_source_free_codex_bundle_registers_only_trusted_project_targets(
     assert removed_bundle.returncode == 0, removed_bundle.stderr
     assert not installed_guidance.exists()
     assert not installed_agent.exists()
+    assert not list(runtime_root.glob(".global-links-validate.*"))
+    assert not list(runtime_root.glob(".global-links-remove.*"))
     assert not any(
         line.startswith("bundle-file\t")
         for line in global_links.read_text(encoding="utf-8").splitlines()

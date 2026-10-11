@@ -466,7 +466,9 @@ class CodexHooksTest(unittest.TestCase):
                 hook["command"]
                 for hook in cast("list[dict[str, object]]", prompt_group["hooks"])
             ],
-            ["python3 .codex/hooks/hook_dispatcher.py UserPromptSubmit"],
+            [
+                'bash "$(git rev-parse --show-toplevel)/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}" codex hook UserPromptSubmit'
+            ],
         )
         self.assertEqual(pre_tool_group["matcher"], "Bash|apply_patch|python|python3")
         self.assertEqual(
@@ -474,7 +476,9 @@ class CodexHooksTest(unittest.TestCase):
                 hook["command"]
                 for hook in cast("list[dict[str, object]]", pre_tool_group["hooks"])
             ],
-            ["python3 .codex/hooks/hook_dispatcher.py PreToolUse"],
+            [
+                'bash "$(git rev-parse --show-toplevel)/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}" codex hook PreToolUse'
+            ],
         )
         post_matcher = cast(str, post_tool_group["matcher"])
         self.assertTrue(
@@ -490,7 +494,9 @@ class CodexHooksTest(unittest.TestCase):
                 hook["command"]
                 for hook in cast("list[dict[str, object]]", post_tool_group["hooks"])
             ],
-            ["python3 .codex/hooks/hook_dispatcher.py PostToolUse"],
+            [
+                'bash "$(git rev-parse --show-toplevel)/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}" codex hook PostToolUse'
+            ],
         )
 
         contract = self._contract()

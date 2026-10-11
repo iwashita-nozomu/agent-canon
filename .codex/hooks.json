@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/hook_dispatcher.py UserPromptSubmit",
+            "command": "bash \"$(git rev-parse --show-toplevel)/bootstrap.sh\" --control-parent-root \"${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}\" codex hook UserPromptSubmit",
             "timeout": 40,
             "statusMessage": "Running prompt safety contract"
           }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/hook_dispatcher.py PreToolUse",
+            "command": "bash \"$(git rev-parse --show-toplevel)/bootstrap.sh\" --control-parent-root \"${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}\" codex hook PreToolUse",
             "timeout": 35,
             "statusMessage": "Running destructive Git safety contract"
           }
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/hooks/hook_dispatcher.py PostToolUse",
+            "command": "bash \"$(git rev-parse --show-toplevel)/bootstrap.sh\" --control-parent-root \"${AGENT_CANON_CONTROL_PARENT_ROOT:-$HOME}\" codex hook PostToolUse",
             "timeout": 600,
             "statusMessage": "Running execution-resource projection contract"
           }

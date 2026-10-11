@@ -108,7 +108,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 ## Hook Context
 
 - project-local hook は `.codex/hooks.json` で宣言し、project config に stable feature flag を重ねません。
-- `hooks.json` は active event ごとに dispatcher を一回だけ起動し、コマンド自体に Git の root 探索や child subprocess を含めません。active events は `UserPromptSubmit`、`PreToolUse`、`PostToolUse` だけです。legacy `Stop` は dispatcher が inactive no-op として受け付けますが、`hooks.json` には登録しません。
+- `hooks.json` は active event ごとに host shell adapter を起動し、hook cwd の Git worktree にある `bootstrap.sh` を解決して元の payload を共有 resident dispatcher へ渡します。active events は `UserPromptSubmit`、`PreToolUse`、`PostToolUse` だけです。legacy `Stop` は dispatcher が inactive no-op として受け付けますが、`hooks.json` には登録しません。
 - `HOOK_EVENT_CONTRACTS` がイベント、matcher、failure semantics、telemetry を canonical typed table として所有します。`python3 .codex/hooks/hook_dispatcher.py --contract` は active/inactive event、matcher、failure、telemetry、retired route table を readback します。
 - `UserPromptSubmit` は pure owner `tools/runtime/authority/hook_safety.py` の secret matcher だけを使い、高確信の private key / API key を block します。`PreToolUse` は同じ owner の destructive Git parser だけを使い、block payload の command 情報は `operation` と `command_sha256` に限定します。retired child tombstones は `tools/runtime/authority/hook_retirement.py` が単独で所有します。
 - `PostToolUse` は managed execution resource producer の成功した exact projection だけを in-process validator で forward します。malformed payload、validator failure、spool failure は fail-open です。

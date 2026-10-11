@@ -4365,11 +4365,10 @@ _agent_canon_apply_context_defaults() {
 
 _agent_canon_codex_target_add() {
   local target_root=$1
-  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 &&
-     -f "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" &&
+  [[ -f "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" &&
      ! -L "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" ]] || {
-    _agent_canon_json_error codex_bundle_missing \
-      "source-free Codex bundle host entrypoint is unavailable"
+    _agent_canon_json_error codex_hook_source_missing \
+      "Codex hook host entrypoint is unavailable"
     return 2
   }
   bash "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" \
@@ -4500,9 +4499,10 @@ _agent_canon_global_bundle_file_record_write() {
 _agent_canon_codex_hook() {
   local event=$1 payload= codex_home codex_config container admission admission_rc=0
   local project_root project_digest project_container_root
-  [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]] || {
-    _agent_canon_json_error codex_bundle_missing \
-      "Codex hook runtime requires the source-free user bundle"
+  [[ -f "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" &&
+     ! -L "$AGENT_CANON_REPOSITORY_ROOT/bootstrap.sh" ]] || {
+    _agent_canon_json_error codex_hook_source_missing \
+      "canonical Codex hook host entrypoint is unavailable"
     return 2
   }
   case "$event" in
@@ -4514,22 +4514,27 @@ _agent_canon_codex_hook() {
   # temporary file.
   IFS= read -r -d '' payload || :
 
-  # The existing target transaction switches the resident's source mount to
-  # this packaged closure. Project targets are added separately only after
-  # resident trust admission.
-  _agent_canon_codex_target_add "$AGENT_CANON_REPOSITORY_ROOT" || return $?
+  # A bundle uses its existing target transaction to switch the fixed source
+  # mount to the packaged closure. A source-backed install already owns that
+  # mount. In either mode, project targets are added only after resident trust
+  # admission.
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    _agent_canon_codex_target_add "$AGENT_CANON_REPOSITORY_ROOT" || return $?
+  fi
   unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
     AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
     AGENT_CANON_TARGET_PENDING_DIGEST
   container=$(_agent_canon_container_name)
   _agent_canon_use_active_image "$container" || return $?
   container=$(_agent_canon_ensure_container) || return $?
-  if ! _agent_canon_container_exec "$container" \
-    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
-    verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
-    _agent_canon_json_error codex_bundle_invalid \
-      "Codex user bundle integrity readback failed"
-    return 2
+  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    if ! _agent_canon_container_exec "$container" \
+      python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
+      verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
+      _agent_canon_json_error codex_bundle_invalid \
+        "Codex user bundle integrity readback failed"
+      return 2
+    fi
   fi
 
   codex_home=${CODEX_HOME:-$HOME/.codex}
@@ -4625,6 +4630,10 @@ _agent_canon_codex_bundle_install_locked() {
       "Codex user bundle integrity readback failed"
     return 2
   fi
+  source_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || {
+    rm -f -- "$records"
+    return 2
+  }
   codex_home=${CODEX_HOME:-$HOME/.codex}
   [[ "$codex_home" == /* && ! -L "$codex_home" ]] || {
     rm -f -- "$records"
@@ -4632,10 +4641,22 @@ _agent_canon_codex_bundle_install_locked() {
       "Codex home must be an absolute non-symlink directory"
     return 2
   }
+  codex_home=$(realpath -m -- "$codex_home") || {
+    rm -f -- "$records"
+    return 2
+  }
+  [[ "$codex_home" != "$source_root" && "$codex_home" != "$source_root"/* ]] || {
+    rm -f -- "$records"
+    _agent_canon_json_error codex_install_path_invalid \
+      "Codex installation root must be outside the source-free bundle"
+    return 2
+  }
   mkdir -p -- "$codex_home" || { rm -f -- "$records"; return 2; }
   codex_home=$(realpath -e -- "$codex_home") || { rm -f -- "$records"; return 2; }
-  source_root=$(realpath -e -- "$AGENT_CANON_REPOSITORY_ROOT") || {
+  [[ "$codex_home" != "$source_root" && "$codex_home" != "$source_root"/* ]] || {
     rm -f -- "$records"
+    _agent_canon_json_error codex_install_path_invalid \
+      "Codex installation root must be outside the source-free bundle"
     return 2
   }
   local bundle_headers=0

@@ -545,10 +545,13 @@ configuration reference owns the operator-facing routing policy.
 
 Template-specific hook behavior:
 
-- `hooks.json` registers one relative `hook_dispatcher.py` command for each of
-  `UserPromptSubmit`, `PreToolUse`, and `PostToolUse`. The dispatcher performs
-  one bounded parse and stays in-process: it does not spawn children, invoke
-  Git, inspect a repository root, or use a network.
+- `hooks.json` registers one `bootstrap.sh codex hook <event>` command for each
+  of `UserPromptSubmit`, `PreToolUse`, and `PostToolUse`. The command resolves
+  `bootstrap.sh` from the current Git worktree, so it also works when the hook
+  runs from a repository subdirectory. The host adapter hands the original
+  event to the existing shared resident and its canonical
+  `hook_dispatcher.py`; the dispatcher performs one bounded parse and stays
+  in-process, without child processes, Git, or network access.
 - `HOOK_EVENT_CONTRACTS` is the canonical typed table for active/inactive
   events, matchers, failure semantics, and telemetry. Read it with
   `python3 .codex/hooks/hook_dispatcher.py --contract`.

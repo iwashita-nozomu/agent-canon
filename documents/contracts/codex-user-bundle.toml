@@ -49,6 +49,7 @@ aggregate_sha256 = true
 [install]
 reject_unowned_collision = true
 reject_symlink_traversal = true
+reject_codex_home_inside_bundle = true
 remove_modified_owned_files = false
 read_back_installed_hashes = true
 agent_guidance_install_command = "bootstrap.sh codex bundle-install"
