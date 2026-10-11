@@ -754,8 +754,6 @@ def validate_update_transaction(value: object) -> dict[str, object]:
         "update_transaction.gate_verdict_evidence_refs",
         pattern=_EVIDENCE,
     )
-    if len(gate_refs) > len(GATE_IDS):
-        _fail("lifecycle:gate_evidence_count_invalid")
     passed_gate_refs = tuple(
         cast(Mapping[str, object], seen[gate_id]["binding"])["evidence_ref"]
         for gate_id in GATE_IDS
