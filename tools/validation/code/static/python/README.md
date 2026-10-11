@@ -15,7 +15,7 @@ Python review uses existing canonical tools rather than parallel wrappers.
 Default commands:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+./bootstrap.sh --control-parent-root <root> \
   exec --root <target> -- basedpyright \
   --project /usr/local/share/agent-canon/runtime/tools/validation/code/config/basedpyright-explicit-any.json \
   <target>

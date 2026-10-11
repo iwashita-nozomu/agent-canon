@@ -18,10 +18,10 @@ if [ -n "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
   canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
 fi
 
-runtime_root="${AGENT_CANON_RUNTIME_ROOT:-${canon_root}/.runtime}"
 control_root="${AGENT_CANON_CONTROL_PARENT_ROOT:-}"
 
 if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
+  runtime_root="${AGENT_CANON_RUNTIME_ROOT:-${canon_root}/.runtime}"
   if [ -z "$control_root" ]; then
     echo "agent-canon requires AGENT_CANON_CONTROL_PARENT_ROOT" >&2
     exit 2
@@ -49,15 +49,13 @@ if [ "${1:-}" = "tool" ] && [ "${2:-}" = "run" ]; then
 fi
 
 # Rust CLI operations are lifecycle requests, not dispatcher catalog paths.
-# Leave runtime existence, including the historical runtime location, to the
-# bootstrap owner. It canonicalizes legacy input to the source-owned runtime
-# before selecting the resident image and executing the image-owned binary.
+# Bootstrap derives runtime storage from the explicit control-parent root.
 bootstrap="${canon_root}/bootstrap.sh"
 if [ ! -x "$bootstrap" ]; then
   echo "agent-canon bootstrap is unavailable" >&2
   exit 2
 fi
-bootstrap_args=("$bootstrap" --repository-root "$canon_root" --runtime-root "$runtime_root")
+bootstrap_args=("$bootstrap" --repository-root "$canon_root")
 if [ -n "$control_root" ]; then
   bootstrap_args+=(--control-parent-root "$control_root")
 fi

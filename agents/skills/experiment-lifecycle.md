@@ -47,11 +47,9 @@ template の直接コピーや別 scaffold fallback は使いません。
    `result/<run-id>/raw/` と `result/<run-id>/summary/` に渡す。`visualization.py` は artifact reader/renderer で、launcher や config 正本ではない。
 5. spot、都合のよい subset、途中停止や partial run は formal evidence にしない。停止は `Stop Reason:` と `Restart Decision:` を残し、rerun は新しい run identity で最初から行う。
 
-## Failed experiment cleanup
+## Failed-run evidence and retention
 
-実行中、未実施、終端未確認だけでは失敗と断定しません。失敗が確定したら、その run 専用の code/config と raw、summary、log、checkpoint、図表、report を削除します。
-共有実装・入力、成功 run、独立した有効 case は残します。保持できる唯一の例外は、支配式・仕様・既存観測で物理的限界が原因だと説明できる場合です。NaN/Inf、未収束、OOM、timeout、crash だけではその根拠になりません。
-削除不能な対象は具体的な owner/action とともに記録し、削除済みとは報告しません。
+失敗の確定は terminal status を定めるもので、既存 artifact の削除を指示しません。失敗だけを理由に run artifact を削除せず、既存の明示的な処分判断と readback 条件は [retention](retention.md) に従います。原因が未確定なら、その不確実性だけで evidence を破棄せず、既存の retention 判断に委ねます。
 
 ## Long GPU or crash branch
 

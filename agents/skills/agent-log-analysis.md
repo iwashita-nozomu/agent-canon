@@ -93,7 +93,6 @@ owner を使います。tool が AgentCanon root と mounted log archive を解�
 
 ```bash
 ./bootstrap.sh --control-parent-root <control-parent-root> \
-  --runtime-root <runtime-root> \
   tool run --root <registered-source-root> generate-agent-runtime-dashboard -- \
   --root . \
   --compact-out reports/agent-runtime-dashboard/agent-log-analysis-compact.md \

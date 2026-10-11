@@ -30,9 +30,9 @@ The only supported lifecycle entrypoint is top-level `bootstrap.sh`:
 ```
 
 The control root is an authorized parent repository. The effective runtime is
-always the bootstrap-owned `<install-root>/.runtime/` directory and is ignored
-by Git. The historical `--runtime-root` option is migration-compatible input
-only and never changes new runtime placement. The private log checkout is the
+always the bootstrap-owned `<control-parent-root>/.runtime/` directory and is
+ignored by Git. The host lifecycle command has no separate runtime-root
+override. The private log checkout is the
 install root's sibling `<install-root-parent>/agent-canon-log`; it is not
 derived from the control root. Do not use
 an arbitrary AgentCanon source directory, an implicit current-directory state directory,
