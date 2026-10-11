@@ -133,9 +133,10 @@ OFFICIAL_SYSTEM_SKILLS = (
     "skill-creator",
     "skill-installer",
 )
-OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS = (
-    Path("agents/skills/README.md"),
-    Path("agents/canonical/skills.md"),
+OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER = Path("agents/skills/README.md")
+OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX = Path("agents/canonical/skills.md")
+OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK = (
+    "[Official System Skill Delegation](../skills/README.md#official-system-skill-delegation)"
 )
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
@@ -1708,22 +1709,34 @@ def validate_official_system_skill_delegation(
             f"move official system skill local shim to host-provided delegation: {shim.relative_to(root)}",
         )
 
-    for relative_path in OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS:
-        path = root / relative_path
+    owner_path = root / OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER
+    ensure(
+        owner_path.is_file(),
+        "official system skill delegation owner missing: "
+        f"{OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER}",
+    )
+    owner_text = owner_path.read_text(encoding="utf-8")
+    ensure(
+        "Official System Skill Delegation" in owner_text,
+        "agents/skills/README.md missing official system skill delegation section",
+    )
+    for skill_id in OFFICIAL_SYSTEM_SKILLS:
         ensure(
-            path.is_file(),
-            f"official system skill delegation doc missing: {relative_path}",
+            f"${skill_id}" in owner_text,
+            f"{OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER} missing official system skill route: ${skill_id}",
         )
-        text = path.read_text(encoding="utf-8")
-        ensure(
-            "Official System Skill Delegation" in text,
-            f"{relative_path} missing official system skill delegation section",
-        )
-        for skill_id in OFFICIAL_SYSTEM_SKILLS:
-            ensure(
-                f"${skill_id}" in text,
-                f"{relative_path} missing official system skill route: ${skill_id}",
-            )
+
+    index_path = root / OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
+    ensure(
+        index_path.is_file(),
+        "canonical skill index missing: "
+        f"{OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX}",
+    )
+    index_text = index_path.read_text(encoding="utf-8")
+    ensure(
+        OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK in index_text,
+        "agents/canonical/skills.md must link to the official system skill delegation owner",
+    )
 
 
 _STALE_GENERATED_ROLE_AUTHORITY_PATTERNS = (

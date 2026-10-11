@@ -1039,13 +1039,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         *,
         missing_skill: str | None = None,
     ) -> None:
-        """Create the official system skill delegation docs for checker fixtures."""
+        """Create the delegation owner and canonical index fixture."""
         skill_lines = [
             f"- ${skill}"
             for skill in runtime_alignment.OFFICIAL_SYSTEM_SKILLS
             if skill != missing_skill
         ]
-        text = "\n".join(
+        owner_text = "\n".join(
             (
                 "# Fixture",
                 "",
@@ -1054,10 +1054,17 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 *skill_lines,
             )
         )
-        for relative_path in runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_DOCS:
-            path = root / relative_path
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding="utf-8")
+        owner_path = root / runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER
+        owner_path.parent.mkdir(parents=True, exist_ok=True)
+        owner_path.write_text(owner_text, encoding="utf-8")
+
+        index_path = root / runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        index_path.write_text(
+            "# Fixture\n\n"
+            f"{runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK}\n",
+            encoding="utf-8",
+        )
 
     def test_official_system_skills_stay_out_of_public_catalog(self) -> None:
         """Host-provided skills must not be re-declared as AgentCanon public skills."""
@@ -1077,13 +1084,26 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 PROJECT_ROOT,
             )
 
-    def test_official_system_skill_delegation_docs_must_name_every_route(self) -> None:
-        """Delegation docs carry the official system skill routing map."""
+    def test_official_system_skill_delegation_owner_maps_routes_and_index_links(self) -> None:
+        """One document owns system skill routes and the canonical index links to it."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_official_skill_delegation_docs(root, missing_skill="imagegen")
 
             with self.assertRaisesRegex(RuntimeError, "missing official system skill route"):
+                runtime_alignment.validate_official_system_skill_delegation(
+                    {"skill_families": []},
+                    root,
+                )
+
+            self.write_official_skill_delegation_docs(root)
+            runtime_alignment.validate_official_system_skill_delegation(
+                {"skill_families": []},
+                root,
+            )
+            index_path = root / runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
+            index_path.write_text("# Fixture\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "must link to the official system skill delegation owner"):
                 runtime_alignment.validate_official_system_skill_delegation(
                     {"skill_families": []},
                     root,
