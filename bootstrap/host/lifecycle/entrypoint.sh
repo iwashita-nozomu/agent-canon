@@ -4514,25 +4514,39 @@ _agent_canon_codex_hook() {
   # temporary file.
   IFS= read -r -d '' payload || :
 
+  unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
+    AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
+    AGENT_CANON_TARGET_PENDING_DIGEST
   # A bundle uses its existing target transaction to switch the fixed source
   # mount to the packaged closure. A source-backed install already owns that
   # mount. In either mode, project targets are added only after resident trust
   # admission.
   if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
     _agent_canon_codex_target_add "$AGENT_CANON_REPOSITORY_ROOT" || return $?
-  fi
-  unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
-    AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
-    AGENT_CANON_TARGET_PENDING_DIGEST
-  container=$(_agent_canon_container_name)
-  _agent_canon_use_active_image "$container" || return $?
-  container=$(_agent_canon_ensure_container) || return $?
-  if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+    container=$(_agent_canon_container_name)
+    _agent_canon_use_active_image "$container" || return $?
+    container=$(_agent_canon_ensure_container) || return $?
     if ! _agent_canon_container_exec "$container" \
       python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
       verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
       _agent_canon_json_error codex_bundle_invalid \
         "Codex user bundle integrity readback failed"
+      return 2
+    fi
+  else
+    # The existing resident may be mounted from the installed source while a
+    # local hook runs from a topic worktree. Use its owned current mount for
+    # read-only trust admission; the trusted target transaction switches the
+    # source mount to the hook's current worktree only afterward.
+    container=$(_agent_canon_container_name)
+    _agent_canon_use_active_image "$container" || return $?
+    _agent_canon_classify_existing_container "$container" || return $?
+    local resident_running
+    resident_running=$("$AGENT_CANON_DOCKER_CMD" container inspect \
+      --format '{{.State.Running}}' "$container" 2>/dev/null || printf false)
+    if [[ "$resident_running" != true ]]; then
+      _agent_canon_json_error runtime_unavailable \
+        "source-backed Codex hooks require the existing resident to be running"
       return 2
     fi
   fi
@@ -4575,19 +4589,24 @@ _agent_canon_codex_hook() {
     AGENT_CANON_TARGET_DIGEST=$project_digest
     export AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
       AGENT_CANON_TARGET_DIGEST
+    container=$(_agent_canon_container_name)
+    _agent_canon_use_active_image "$container" || return $?
+    container=$(_agent_canon_ensure_container) || return $?
   elif [[ "$admission" == untrusted ]]; then
     unset AGENT_CANON_TARGET_HOST_ROOT AGENT_CANON_TARGET_CONTAINER_ROOT \
       AGENT_CANON_TARGET_DIGEST AGENT_CANON_TARGET_PENDING_SOURCE \
       AGENT_CANON_TARGET_PENDING_DIGEST
+    if [[ "${AGENT_CANON_SOURCE_FREE_BUNDLE:-0}" == 1 ]]; then
+      container=$(_agent_canon_container_name)
+      _agent_canon_use_active_image "$container" || return $?
+      container=$(_agent_canon_ensure_container) || return $?
+    fi
   else
     _agent_canon_json_error codex_hook_admission_invalid \
       "resident trust admission returned an invalid result"
     return 2
   fi
 
-  container=$(_agent_canon_container_name)
-  _agent_canon_use_active_image "$container" || return $?
-  container=$(_agent_canon_ensure_container) || return $?
   printf '%s' "$payload" | _agent_canon_container_exec "$container" --stdin \
     python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/runtime/container/bootstrap_runtime.py" \
     --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
