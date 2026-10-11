@@ -117,13 +117,6 @@ def resolve_action_log_path(workspace_root: Path, scope_file: Path) -> Path | No
     if path.is_absolute():
         return path
 
-    repo_guess = run_optional(["git", "rev-parse", "--show-toplevel"], cwd=workspace_root)
-    if repo_guess.returncode == 0:
-        return (Path(repo_guess.stdout.strip()).resolve() / path).resolve()
-
-    for ancestor in (workspace_root, *workspace_root.parents):
-        if (ancestor / path.parent).exists() or (ancestor / "notes").is_dir():
-            return (ancestor / path).resolve()
     return (workspace_root / path).resolve()
 
 
