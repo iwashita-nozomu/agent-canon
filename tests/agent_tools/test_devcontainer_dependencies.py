@@ -2761,6 +2761,92 @@ class DependencyModelTests(unittest.TestCase):
                             manifest=manifest,
                         )
 
+    def test_release_asset_uses_its_declared_absolute_executable_path(self) -> None:
+        """Release assets resolve by their exact verification path, not record ID."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / "dependencies.toml"
+            content = b"pinned-release-asset"
+            checksum = hashlib.sha256(content).hexdigest()
+            write_manifest(
+                manifest,
+                [
+                    record(
+                        "scip-cli",
+                        method="release-asset",
+                        version="1.0.0",
+                        source="https://example.test/releases/v1.0.0",
+                        assets={"aarch64": "scip", "x86_64": "scip"},
+                        checksums={"aarch64": checksum, "x86_64": checksum},
+                        archive_format="binary",
+                        extract="none",
+                        destination="/usr/local/bin/scip",
+                        provides=["scip"],
+                    )
+                ],
+            )
+            plan = load_plan(root, manifest=manifest)
+            image_root = root / "image"
+            image_root.mkdir()
+            receipts = image_root / "receipts"
+            runner = FakeRunner()
+
+            def download(
+                url: str, destination: Path, **_: object
+            ) -> None:
+                del url
+                destination.write_bytes(content)
+
+            with mock.patch.object(
+                dependency_module, "_download", side_effect=download
+            ):
+                Installer(
+                    runner, image_owned=True, image_owned_root=image_root
+                ).install(plan, workspace=root, receipts=receipts)
+
+            receipt = receipts / "scip-cli.json"
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(payload["executable_bindings"], {})
+            with mock.patch.object(
+                dependency_module, "Installer", lambda: Installer(runner)
+            ):
+                resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    receipts,
+                    "scip-cli",
+                    "scip",
+                    manifest=manifest,
+                )
+                with self.assertRaisesRegex(
+                    DependencyError, "does not match its declared absolute path"
+                ):
+                    dependency_module.resolve_verified_executable(
+                        root,
+                        receipts,
+                        "scip-cli",
+                        "scip-cli",
+                        manifest=manifest,
+                    )
+                payload["status"] = "pass"
+                receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+                pass_resolved = dependency_module.resolve_verified_executable(
+                    root,
+                    receipts,
+                    "scip-cli",
+                    "scip",
+                    manifest=manifest,
+                )
+
+            self.assertEqual(resolved.absolute_path, "/usr/local/bin/scip")
+            self.assertEqual(resolved.executable, "scip")
+            self.assertEqual(
+                resolved.verification_output, "1.0.0"
+            )
+            self.assertEqual(pass_resolved.absolute_path, "/usr/local/bin/scip")
+            self.assertEqual(pass_resolved.executable, "scip")
+            self.assertEqual(pass_resolved.verification_output, "1.0.0")
+            self.assertIn(("/usr/local/bin/scip", "--version"), runner.calls)
+
     def test_secondary_npm_binding_is_structural_not_a_help_probe(self) -> None:
         """A secondary provider may reject generic help while remaining bound."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -3392,9 +3478,11 @@ class DependencyModelTests(unittest.TestCase):
         scip_cli = plan.by_id()["scip-cli"]
         self.assertEqual(scip_cli.method.value, "release-asset")
         self.assertEqual(scip_cli.version, "0.10.0")
-        self.assertEqual(scip_cli.platforms, ("linux/amd64", "linux/arm64"))
         self.assertEqual(scip_cli.archive_format, "tar.gz")
-        self.assertEqual(set(dict(scip_cli.assets)), {"aarch64", "x86_64"})
+        # Release-asset architecture maps own platform coverage for this record.
+        supported_architectures = {"aarch64", "x86_64"}
+        self.assertEqual(set(dict(scip_cli.assets)), supported_architectures)
+        self.assertEqual(set(dict(scip_cli.checksums)), supported_architectures)
         self.assertTrue(
             all(len(value) == 64 for value in dict(scip_cli.checksums).values())
         )

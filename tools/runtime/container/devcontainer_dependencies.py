@@ -4135,6 +4135,8 @@ class Installer:
                 raise DependencyError(
                     f"{record.id}: installed executable is missing or not executable: {name}"
                 )
+        if spec.kind is VerificationKind.ABSOLUTE_EXECUTABLE:
+            return self._absolute_executable_output(record, workspace=workspace)
         if spec.kind is VerificationKind.CARGO_BINARY:
             absolute = payload.get("binary_path")
         elif spec.executable is not None:
@@ -5095,18 +5097,28 @@ class Installer:
         )
         self._require_output(executable, spec.output_contains, record.id)
 
-    def _verify_absolute_executable(
+    def _absolute_executable_output(
         self, record: DependencyRecord, *, workspace: Path
-    ) -> None:
+    ) -> str:
+        """Verify and return output from the manifest-declared absolute path."""
+        self._active_record = record
+        self._active_phase = "image-verify"
+        self._active_owner = "typed-verifier"
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         path = Path(spec.path)
-        if not path.is_file() or not os.access(path, os.X_OK):
+        if not self._path_is_regular_executable(path):
             raise DependencyError(
                 f"{record.id}: executable is missing or not executable: {path}"
             )
         result = self._capture([str(path), *spec.args], workspace=workspace)
         self._require_output(result, spec.output_contains, record.id)
+        return self._verification_output(result, record.id)
+
+    def _verify_absolute_executable(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
+        self._absolute_executable_output(record, workspace=workspace)
 
     def _verify_rust_toolchain(
         self, record: DependencyRecord, *, workspace: Path
@@ -5704,7 +5716,20 @@ def resolve_verified_executable(
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
     payload = parsed
     image_owned_receipt = payload.get("status") == "installed"
-    if executable not in _executable_binding_names(
+    release_asset_path: str | None = None
+    if record.method is Method.RELEASE_ASSET:
+        path = record.verification.path
+        if (
+            record.verification.kind is not VerificationKind.ABSOLUTE_EXECUTABLE
+            or path is None
+            or path != record.destination
+            or Path(path).name != executable
+        ):
+            raise DependencyError(
+                f"{record_id}: requested executable does not match its declared absolute path"
+            )
+        release_asset_path = path
+    elif executable not in _executable_binding_names(
         record, image_owned=image_owned_receipt
     ):
         raise DependencyError(
@@ -5745,7 +5770,6 @@ def resolve_verified_executable(
             "absolute_path": absolute_path,
             "verification_output": verification_output,
         }
-    binding = validated_bindings[executable]
     if (
         payload.get("schema") != "agent-canon.tool-dependency-receipt"
         or payload.get("status") not in {"installed", "pass"}
@@ -5766,6 +5790,30 @@ def resolve_verified_executable(
                 f"{record_id}: executable receipt lacks its resolved package version"
             )
     installer = Installer()
+    if release_asset_path is not None:
+        verification_output = (
+            installer.verify_installed_receipt(
+                record, payload, workspace=workspace
+            )
+            if payload.get("status") == "installed"
+            else installer._absolute_executable_output(
+                record, workspace=workspace
+            )
+        )
+        if verification_output is None:
+            raise DependencyError(
+                f"{record_id}: release-asset verification output is unavailable"
+            )
+        return VerifiedExecutable(
+            record_id=record.id,
+            manifest_version=manifest_version,
+            executable=executable,
+            absolute_path=release_asset_path,
+            record_fingerprint=record.fingerprint(),
+            plan_fingerprint=plan.fingerprint,
+            verification_output=verification_output,
+        )
+    binding = validated_bindings[executable]
     if payload.get("status") == "installed":
         observed = installer.verify_installed_receipt(
             record, payload, workspace=workspace
