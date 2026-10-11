@@ -1579,6 +1579,32 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 check_schedule_artifact(schedule),
             )
 
+            prior_readback = deepcopy(state)
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            schedule_path = report_dir / "schedule.md"
+            monitoring_before = monitoring_path.read_bytes()
+            schedule_before = schedule_path.read_bytes()
+            empty_output = io.StringIO()
+            with patch.dict(os.environ, target_environment), redirect_stdout(
+                empty_output
+            ):
+                empty_code = bootstrap_agent_run(
+                    [*args, "--execution-results", "{}"]
+                )
+            self.assertEqual(empty_code, 0, empty_output.getvalue())
+            self.assertIn(
+                "EXECUTION_GRAPH_STATUS=awaiting_closeout", empty_output.getvalue()
+            )
+            empty_manifest = yaml.safe_load(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            empty_readback = empty_manifest["run"]["execution_graph"][
+                "result_readback"
+            ]
+            self.assertEqual(empty_readback, prior_readback)
+            self.assertEqual(monitoring_path.read_bytes(), monitoring_before)
+            self.assertEqual(schedule_path.read_bytes(), schedule_before)
+
             graph["result_readback"]["status"] = "ready"
             manifest_path.write_text(
                 yaml.safe_dump(manifest, sort_keys=False),
@@ -1616,6 +1642,98 @@ class BootstrapAndCloseTest(unittest.TestCase):
             local_identity = local_ready_calls[0]["arguments"]["checkout_identity"]
             self.assertEqual(local_identity["cwd"], str(workspace_root))
             self.assertEqual(local_identity["git_root"], str(workspace_root))
+
+            empty_run_id = "execution-graph-empty-result-refresh"
+            empty_args = [
+                "--task",
+                (
+                    "Build the AgentCanon Skill traversal for the current Goal: "
+                    "read selected Skills and hard prerequisites fully, use the "
+                    "existing run graph after designated work to select the next "
+                    "instruction, and keep /root as orchestrator without broad "
+                    "implementation."
+                ),
+                "--task-id",
+                "T12",
+                "--owner",
+                "/root",
+                "--workspace-root",
+                str(workspace_root),
+                "--report-root",
+                str(report_root),
+                "--run-id",
+                empty_run_id,
+            ]
+            initial_output = io.StringIO()
+            with patch.dict(os.environ, target_environment), redirect_stdout(
+                initial_output
+            ):
+                initial_code = bootstrap_agent_run(empty_args)
+            self.assertEqual(initial_code, 0, initial_output.getvalue())
+            self.assertIn("EXECUTION_GRAPH_STATUS=ready", initial_output.getvalue())
+            initial_ready_line = next(
+                line
+                for line in initial_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+            )
+            initial_calls = json.loads(initial_ready_line.split("=", 1)[1])
+            self.assertEqual(len(initial_calls), 1)
+            run_dir = report_root / empty_run_id
+            manifest_path = run_dir / "team_manifest.yaml"
+            initial_manifest = yaml.safe_load(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            initial_readback = initial_manifest["run"]["execution_graph"][
+                "result_readback"
+            ]
+            self.assertEqual(initial_readback["status"], "ready")
+            self.assertEqual(initial_readback["role_results"], {})
+            monitoring_path = run_dir / "workflow_monitoring.md"
+            schedule_path = run_dir / "schedule.md"
+            monitoring_before = monitoring_path.read_bytes()
+            schedule_before = schedule_path.read_bytes()
+
+            refreshed_output = io.StringIO()
+            with patch.dict(os.environ, target_environment), redirect_stdout(
+                refreshed_output
+            ):
+                refreshed_code = bootstrap_agent_run(
+                    [*empty_args, "--execution-results", "{}"]
+                )
+            self.assertEqual(refreshed_code, 0, refreshed_output.getvalue())
+            self.assertIn("EXECUTION_GRAPH_STATUS=ready", refreshed_output.getvalue())
+            refreshed_ready_line = next(
+                line
+                for line in refreshed_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+            )
+            refreshed_calls = json.loads(refreshed_ready_line.split("=", 1)[1])
+            self.assertEqual(len(refreshed_calls), 1)
+            self.assertEqual(
+                refreshed_calls[0]["token_id"], initial_calls[0]["token_id"]
+            )
+            refreshed_identity = refreshed_calls[0]["arguments"]["checkout_identity"]
+            self.assertEqual(refreshed_identity["cwd"], host_checkout)
+            self.assertEqual(refreshed_identity["git_root"], host_checkout)
+            self.assertEqual(
+                json.loads(
+                    next(
+                        line
+                        for line in refreshed_output.getvalue().splitlines()
+                        if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
+                    ).split("=", 1)[1]
+                ),
+                {},
+            )
+            refreshed_manifest = yaml.safe_load(
+                manifest_path.read_text(encoding="utf-8")
+            )
+            refreshed_readback = refreshed_manifest["run"]["execution_graph"][
+                "result_readback"
+            ]
+            self.assertEqual(refreshed_readback, initial_readback)
+            self.assertEqual(monitoring_path.read_bytes(), monitoring_before)
+            self.assertEqual(schedule_path.read_bytes(), schedule_before)
 
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """Retired repository synchronization wrappers are absent."""
