@@ -278,7 +278,7 @@ _agent_canon_sync_operation() (
   # delivery of already-pending runtime artifacts.
   set +e
   local install_root=${AGENT_CANON_REPOSITORY_ROOT:-}
-  local candidate_image_ref candidate_image_id rc=0 source_rc=0 hook_rc=0 eval_rc=0 feedback_rc=0 archive_rc=0 container eval_request_ids eval_run_id
+  local candidate_image_ref rc=0 source_rc=0 hook_rc=0 eval_rc=0 feedback_rc=0 archive_rc=0 container eval_request_ids eval_run_id
   local sync_index=1 sync_token
   while ((sync_index < ${#command_args[@]})); do
     sync_token=${command_args[sync_index]}
@@ -323,21 +323,13 @@ _agent_canon_sync_operation() (
     candidate_image_ref=$AGENT_CANON_IMAGE_REF
     if _agent_canon_image ""; then
       candidate_image_ref=$AGENT_CANON_IMAGE_REF
-      if candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
-        --format '{{.Id}}' "$candidate_image_ref"); then
-        if _agent_canon_replace_resident_locked \
-          "$candidate_image_ref" "$candidate_image_id" update; then
-          :
-        else
-          source_rc=$?
-          ((source_rc != 0)) || source_rc=2
-          _agent_canon_source_sync_failure resident_update_failed \
-            "source advanced but resident replacement failed"
-        fi
+      if _agent_canon_replace_resident_locked "$candidate_image_ref" update; then
+        :
       else
-        _agent_canon_source_sync_failure source_image_unavailable \
-          "source advanced but the exact GHCR image could not be inspected"
-        source_rc=2
+        source_rc=$?
+        ((source_rc != 0)) || source_rc=2
+        _agent_canon_source_sync_failure resident_update_failed \
+          "source advanced but resident replacement failed"
       fi
     else
       source_rc=$?
@@ -2940,7 +2932,7 @@ _agent_canon_prepare_forced_update_locked() {
 }
 
 _agent_canon_update_locked() {
-  local requested_ref=${1:-} candidate_image_ref candidate_image_id rc
+  local requested_ref=${1:-} candidate_image_ref rc
   set +e
   _agent_canon_prepare_forced_update_locked
   rc=$?
@@ -2958,17 +2950,10 @@ _agent_canon_update_locked() {
     return "$rc"
   fi
   candidate_image_ref=$AGENT_CANON_IMAGE_REF
-  if ! candidate_image_id=$({
-    "$AGENT_CANON_DOCKER_CMD" image inspect --format '{{.Id}}' "$candidate_image_ref"
-  }); then
-    _agent_canon_discard_pending_rollback_plan || :
-    _agent_canon_json_error candidate_image_missing "candidate resident image could not be inspected"
-    return 2
-  fi
   set +e
   (
     set -e
-    _agent_canon_replace_resident_locked "$candidate_image_ref" "$candidate_image_id" update
+    _agent_canon_replace_resident_locked "$candidate_image_ref" update
   )
   rc=$?
   set -e
@@ -2983,9 +2968,9 @@ _agent_canon_update_locked() {
 }
 
 _agent_canon_replace_resident_locked() {
-  local candidate_image_ref=$1 candidate_image_id=$2
-  local replacement_operation=${3:-update}
-  local clean_install_prepared=${4:-0}
+  local candidate_image_ref=$1
+  local replacement_operation=${2:-update}
+  local clean_install_prepared=${3:-0}
   local old_image_id old_image_ref old_container candidate restored rc
   local old_container_present=0 current_resident_valid=0 clean_install=0 old_quiesced=0
   local old_container_removed=0 old_container_id old_container_runtime old_container_control stale_target_pruned=
@@ -3758,14 +3743,8 @@ _agent_canon_install_locked() {
   AGENT_CANON_ALLOW_BUILD=1
   export AGENT_CANON_ALLOW_BUILD
   _agent_canon_image "${1:-}"
-  local candidate_image_ref=$AGENT_CANON_IMAGE_REF candidate_image_id
-  if ! candidate_image_id=$("$AGENT_CANON_DOCKER_CMD" image inspect \
-    --format '{{.Id}}' "$candidate_image_ref"); then
-    _agent_canon_json_error candidate_image_missing "candidate resident image could not be inspected"
-    return 2
-  fi
-  _agent_canon_replace_resident_locked \
-    "$candidate_image_ref" "$candidate_image_id" install 1
+  local candidate_image_ref=$AGENT_CANON_IMAGE_REF
+  _agent_canon_replace_resident_locked "$candidate_image_ref" install 1
 }
 
 _agent_canon_install() {
@@ -3774,14 +3753,14 @@ _agent_canon_install() {
 }
 
 _agent_canon_replace_resident() {
-  local candidate_image_ref=$1 candidate_image_id=$2
-  local replacement_operation=${3:-update}
-  if [[ -z "$candidate_image_ref" || -z "$candidate_image_id" ]]; then
+  local candidate_image_ref=$1
+  local replacement_operation=${2:-update}
+  if [[ -z "$candidate_image_ref" ]]; then
     _agent_canon_json_error replacement_identity_missing "candidate resident image identity is incomplete"
     return 2
   fi
   _agent_canon_with_replacement_lock _agent_canon_replace_resident_locked \
-    "$candidate_image_ref" "$candidate_image_id" "$replacement_operation"
+    "$candidate_image_ref" "$replacement_operation"
 }
 
 _agent_canon_update() {
@@ -3801,8 +3780,7 @@ _agent_canon_ensure_start_resident() {
       # Start has no new image candidate. Reuse the active image through the
       # same serialized replacement path so stale mounts/security are rebuilt
       # from the current manifest before the requested start transition.
-      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" \
-        "$AGENT_CANON_EXPECTED_IMAGE_ID" start >/dev/null
+      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" start >/dev/null
       printf '%s\n' "$container"
     fi
   else

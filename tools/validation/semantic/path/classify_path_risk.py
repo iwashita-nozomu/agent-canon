@@ -216,9 +216,9 @@ def main() -> int:
     """Run classifier."""
     args = build_parser().parse_args()
     paths = normalize_paths(args.path, args.paths_file)
-    risks = classify(paths)
     units = select_static_gate_units(paths, full_confidence=args.full_confidence)
     if args.format == "json":
+        risks = classify(paths)
         print(
             json.dumps(
                 {
@@ -233,6 +233,7 @@ def main() -> int:
     elif args.format == "github-output":
         print(render_github_output(paths, units), end="")
     else:
+        risks = classify(paths)
         print(render_text(paths, risks, units), end="")
     return 0
 

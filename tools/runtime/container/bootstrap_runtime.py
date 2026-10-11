@@ -3220,8 +3220,6 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
     if operation in {"install", "update", "start", "stop", "uninstall"}:
         with runtime.locked():
             state = runtime._read_state()
-            if operation in {"install", "update"}:
-                runtime._prune_stale_targets(state)
             before = str(state.get("state"))
             resources = state.setdefault("resources", {})
             resources.update(_container_resource_state(runtime))
@@ -3262,6 +3260,7 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                     CONTAINER_RUNTIME_DIR,
                 ]
             elif operation == "update":
+                runtime._prune_stale_targets(state)
                 state["state"] = "ready"
                 previous_image_id = os.environ.get("AGENT_CANON_PREVIOUS_IMAGE_ID")
                 if previous_image_id:
@@ -3284,7 +3283,6 @@ def _container_control_run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     state["rollback_generation"] = previous_generation
                     state["current_generation"] = current_generation
-                if previous_image_id:
                     state.update(active_task_count=0, tasks={})
                 state["manifest_digest"] = runtime.manifest_digest
             elif operation == "start":
