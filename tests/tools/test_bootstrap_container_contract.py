@@ -82,7 +82,7 @@ def test_dockerfile_is_digest_pinned_without_agentcanon_user_policy() -> None:
     assert "nodejs=18.19.1" not in text
     assert "npm=9.2.0" not in text
     assert "PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer" in text
-    assert "PUPPETEER_SKIP_CHROME_DOWNLOAD=true" in text
+    assert "PUPPETEER_CHROME_SKIP_DOWNLOAD=true" in text
     assert "apt-get purge" in text
     assert "materialize" not in text
     assert "AGENT_CANON_SOURCE_ROOT=/opt/agent-canon/source" in text
@@ -294,6 +294,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "puppeteer",
         "mermaid-cli",
         "puppeteer-fonts-liberation",
+        "puppeteer-unzip",
         "puppeteer-libasound2t64",
         "puppeteer-libatk-bridge2.0-0t64",
         "puppeteer-libatk1.0-0t64",
