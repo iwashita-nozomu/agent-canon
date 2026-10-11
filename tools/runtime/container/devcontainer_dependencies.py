@@ -3309,9 +3309,7 @@ def safe_extract_zip(archive: Path, destination: Path) -> None:
             _safe_member_path(destination, member.filename)
             mode = member.external_attr >> 16
             file_type = stat.S_IFMT(mode)
-            allowed_types = (
-                {0, stat.S_IFDIR} if member.is_dir() else {0, stat.S_IFREG}
-            )
+            allowed_types = {0, stat.S_IFDIR} if member.is_dir() else {0, stat.S_IFREG}
             if file_type not in allowed_types:
                 raise DependencyError(f"unsafe archive member: {member.filename}")
         for member in members:

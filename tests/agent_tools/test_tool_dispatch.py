@@ -906,9 +906,7 @@ def _native_vl_convert_route(
 
     monkeypatch.setenv("AGENT_CANON_EXECUTION_PLANE", "tool-container")
     monkeypatch.setenv("AGENT_CANON_IMAGE_ROOT", str(image_root))
-    monkeypatch.setenv(
-        "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT", str(dependencies_root)
-    )
+    monkeypatch.setenv("AGENT_CANON_IMAGE_DEPENDENCIES_ROOT", str(dependencies_root))
     monkeypatch.setenv("AGENT_CANON_RUNTIME_TOOLS_ROOT", str(PROJECT_ROOT))
     monkeypatch.setenv(
         "AGENT_CANON_IMAGE_MARKER_DIGEST",
