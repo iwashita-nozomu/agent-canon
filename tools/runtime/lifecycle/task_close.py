@@ -781,9 +781,7 @@ def current_diff_ref(workspace: Path) -> str:
 
 def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
     """Return source-tree Markdown paths changed in the current checkout."""
-    return tuple(
-        path for path in changed_file_paths(workspace) if path.endswith(".md")
-    )
+    return tuple(path for path in changed_file_paths(workspace) if path.endswith(".md"))
 
 
 def changed_file_paths(workspace: Path) -> tuple[str, ...]:
@@ -1601,7 +1599,6 @@ def main() -> int:
 
     closeout_checks = {
         "verification_status": verification.get("status") == "pass",
-        "verification_unlock": verification.get("user_completion_report") == "unlocked",
         "closeout_verifier_status": closeout.get("verifier_status") == "pass",
         "closeout_auditor_status": closeout.get("auditor_status") == "resolved",
         "verifier_child_provenance": child_closeout_ready,
@@ -1838,7 +1835,6 @@ def main() -> int:
 
     print(f"REPORT_DIR={report_dir}")
     print(f"VERIFICATION_STATUS={verification.get('status', '')}")
-    print(f"VERIFICATION_UNLOCK={verification.get('user_completion_report', '')}")
     print(f"CLOSEOUT_VERIFIER_STATUS={closeout.get('verifier_status', '')}")
     print(f"CLOSEOUT_AUDITOR_STATUS={closeout.get('auditor_status', '')}")
     print(f"VERIFIER_CHILD_PROVENANCE={'pass' if child_closeout_ready else 'fail'}")

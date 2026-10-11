@@ -1413,6 +1413,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             first_output = io.StringIO()
             target_environment = {
+                "AGENT_CANON_PARENT_ROOT": str(parent_root),
                 "AGENT_CANON_TARGET_ROOT": str(workspace_root),
                 "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
             }
@@ -3819,30 +3820,208 @@ class BootstrapAndCloseTest(unittest.TestCase):
     def test_task_close_accepts_unlocked_bundle(self) -> None:
         """task_close should pass after verification and closeout statuses are resolved."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-ready"
-            report_dir = report_root / run_id
+            parent_root = Path(tmp_dir) / "parent"
+            workspace_root = parent_root
+            report_root = parent_root / "reports" / "agents"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            report_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
+            subprocess.run(
+                ["git", "init", "-q", "--initial-branch=test/closeout"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Task Close Test"],
+                cwd=workspace_root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "task-close@example.invalid"],
+                cwd=workspace_root,
+                check=True,
+            )
             subprocess.run(
                 [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "closeout ready smoke",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(PROJECT_ROOT),
-                    "--report-root",
-                    str(report_root),
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://github.com/iwashita-nozomu/agent-canon.git",
                 ],
-                cwd=PROJECT_ROOT,
+                cwd=workspace_root,
                 check=True,
-                capture_output=True,
-                text=True,
             )
-            (report_dir / "verification.txt").write_text(
+            subprocess.run(["git", "add", "-A"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "commit",
+                    "--quiet",
+                    "-m",
+                    "test: seed task close workspace",
+                ],
+                cwd=workspace_root,
+                check=True,
+            )
+            environment = {
+                **os.environ,
+                "AGENT_CANON_PARENT_ROOT": str(parent_root),
+            }
+            run_id = "test-task-close-ready"
+            report_dir = report_root / run_id
+            args = [
+                "--task",
+                "closeout ready smoke",
+                "--task-id",
+                "T12",
+                "--owner",
+                "codex",
+                "--run-id",
+                run_id,
+                "--workspace-root",
+                str(workspace_root),
+                "--report-root",
+                str(report_root),
+            ]
+            checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
+            host_checkout = str(workspace_root)
+            target_environment = {
+                "AGENT_CANON_TARGET_ROOT": str(workspace_root),
+                "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
+            }
+            writer_targets = json.dumps(
+                {
+                    "implementer": {
+                        "schema": "agent-canon.writer-target.v1",
+                        "checkout_root": host_checkout,
+                        "branch": checkout_identity["branch"],
+                        "remote": checkout_identity["remote"],
+                        "allowed_paths": ["src/closeout-fixture.md"],
+                    }
+                }
+            )
+            spawned: list[str] = []
+
+            def spawn(_agent_type: str, _prompt: str) -> str:
+                agent_id = f"closeout-agent-{len(spawned) + 1}"
+                spawned.append(agent_id)
+                return agent_id
+
+            first_output = io.StringIO()
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(first_output),
+            ):
+                first_code = bootstrap_agent_run(args, spawn=spawn)
+            self.assertEqual(first_code, 0, first_output.getvalue())
+            self.assertTrue(spawned)
+            first_spawn_line = next(
+                line
+                for line in first_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
+            )
+            first_spawn_results = json.loads(first_spawn_line.split("=", 1)[1])
+            first_results = {
+                identity: {
+                    **result,
+                    "completion_result": {
+                        "isError": False,
+                        "content": [{"type": "text", "text": f"completed {identity}"}],
+                    },
+                }
+                for identity, result in first_spawn_results.items()
+            }
+            # Keep this closeout fixture on the canonical T12 graph route; child
+            # outcomes here are synthetic test results, not production execution.
+            resumed_args = [*args, "--writer-targets", writer_targets]
+            current_output = io.StringIO()
+            with (
+                patch.dict(os.environ, target_environment),
+                redirect_stdout(current_output),
+            ):
+                current_code = bootstrap_agent_run(
+                    [*resumed_args, "--execution-results", json.dumps(first_results)]
+                )
+            self.assertEqual(current_code, 0, current_output.getvalue())
+            current_text = current_output.getvalue()
+            manifest_path = report_dir / "team_manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            graph = manifest["run"]["execution_graph"]
+            wave_identities = {"WAVE-1": graph["initial_wave_role_instances"]}
+            for wave in graph["later_stage_waves"]:
+                if wave["wave_id"] != "none":
+                    wave_identities[wave["wave_id"]] = [
+                        item.split(":team_manifest.yaml#roles.", 1)[0]
+                        for item in wave["role_instances"]
+                    ]
+            while "EXECUTION_GRAPH_STATUS=ready" in current_text:
+                wave_index = int(
+                    next(
+                        line.split("=", 1)[1]
+                        for line in current_text.splitlines()
+                        if line.startswith("EXECUTION_GRAPH_WAVE_INDEX=")
+                    )
+                )
+                identities = wave_identities[f"WAVE-{wave_index}"]
+                self.assertTrue(identities)
+                ready_calls = json.loads(
+                    next(
+                        line.split("=", 1)[1]
+                        for line in current_text.splitlines()
+                        if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+                    )
+                )
+                writer_call = next(
+                    (
+                        call
+                        for call in ready_calls
+                        if call["arguments"]["role"] == "implementer"
+                    ),
+                    None,
+                )
+                if writer_call is not None:
+                    target = writer_call["arguments"]["writer_target"]
+                    self.assertEqual(target["checkout_root"], host_checkout)
+                    self.assertEqual(target["branch"], checkout_identity["branch"])
+                    self.assertEqual(target["remote"], checkout_identity["remote"])
+                    self.assertEqual(
+                        target["allowed_paths"], ["src/closeout-fixture.md"]
+                    )
+                wave_results = {
+                    identity: {
+                        "spawn_result": {
+                            "isError": False,
+                            "content": [{"type": "text", "text": f"agent-{identity}"}],
+                        },
+                        "completion_result": {
+                            "isError": False,
+                            "content": [
+                                {"type": "text", "text": f"completed {identity}"}
+                            ],
+                        },
+                    }
+                    for identity in identities
+                }
+                next_output = io.StringIO()
+                with (
+                    patch.dict(os.environ, target_environment),
+                    redirect_stdout(next_output),
+                ):
+                    current_code = bootstrap_agent_run(
+                        [
+                            *resumed_args,
+                            "--execution-results",
+                            json.dumps(wave_results),
+                        ]
+                    )
+                self.assertEqual(current_code, 0, next_output.getvalue())
+                current_text = next_output.getvalue()
+            self.assertIn("EXECUTION_GRAPH_STATUS=awaiting_closeout", current_text)
+            graph_schedule = (report_dir / "schedule.md").read_bytes()
+            graph_monitoring = (report_dir / "workflow_monitoring.md").read_bytes()
+            verification_path = report_dir / "verification.txt"
+            verification_path.write_text(
                 "\n".join(
                     [
                         f"run_id={run_id}",
@@ -3850,7 +4029,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "owner=codex",
                         "created_at_utc=2026-04-08T00:00:00Z",
                         "status=pass",
-                        "user_completion_report=unlocked",
                         "closeout_gate_status=resolved",
                         "",
                     ]
@@ -3905,7 +4083,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- mapping_error_sets_empty: yes",
                         "- typed_owner_boundary_status: pass",
                         "- canonical_dispatcher_schema_status: pass",
-                        *ready_closeout_evidence_lines(),
+                        *ready_closeout_evidence_lines(workspace=workspace_root),
                     ]
                 ),
                 encoding="utf-8",
@@ -3916,8 +4094,75 @@ class BootstrapAndCloseTest(unittest.TestCase):
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
             write_ready_completion_coverage(report_dir, run_id)
-            write_ready_diff_check_artifact(report_dir)
-            write_ready_closeout_bundle(report_dir, run_id)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            # The fixture owns plan and warning-free sections; bootstrap owns
+            # the wave ledger and actual-wave rows.
+            schedule_path = report_dir / "schedule.md"
+            schedule_text = schedule_path.read_text(encoding="utf-8")
+            graph_schedule_text = graph_schedule.decode("utf-8")
+            schedule_heading = "## Agent Wave Ledger"
+            schedule_prefix, _, _ = schedule_text.partition(schedule_heading)
+            _, graph_ledger_heading, graph_ledger = graph_schedule_text.partition(
+                schedule_heading
+            )
+            schedule_path.write_text(
+                schedule_prefix + graph_ledger_heading + graph_ledger,
+                encoding="utf-8",
+            )
+            monitoring_path = report_dir / "workflow_monitoring.md"
+            warning_heading = "## Tool Warnings"
+            monitoring_lines = graph_monitoring.decode("utf-8").splitlines()
+            ready_monitoring_lines = monitoring_path.read_text(
+                encoding="utf-8"
+            ).splitlines()
+            ready_warning_start = next(
+                index
+                for index, line in enumerate(ready_monitoring_lines)
+                if line.strip() == warning_heading
+            )
+            ready_warning_section = ready_monitoring_lines[ready_warning_start:]
+            warning_start = next(
+                (
+                    index
+                    for index, line in enumerate(monitoring_lines)
+                    if line.strip() == warning_heading
+                ),
+                None,
+            )
+            if warning_start is None:
+                monitoring_lines.extend(["", *ready_warning_section])
+            else:
+                warning_end = next(
+                    (
+                        index
+                        for index in range(warning_start + 1, len(monitoring_lines))
+                        if monitoring_lines[index].strip().startswith("## ")
+                    ),
+                    len(monitoring_lines),
+                )
+                monitoring_lines = (
+                    monitoring_lines[:warning_start]
+                    + ready_warning_section
+                    + monitoring_lines[warning_end:]
+                )
+            monitoring_path.write_text(
+                "\n".join(monitoring_lines).rstrip() + "\n",
+                encoding="utf-8",
+            )
+            verification_lines = [
+                line
+                for line in verification_path.read_text(encoding="utf-8").splitlines()
+                if not line.startswith("user_completion_report=")
+            ]
+            verification_path.write_text(
+                "\n".join(verification_lines) + "\n",
+                encoding="utf-8",
+            )
+            self.assertNotIn(
+                "user_completion_report=",
+                verification_path.read_text(encoding="utf-8"),
+            )
 
             result = subprocess.run(
                 [
@@ -3926,14 +4171,40 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                 ],
-                cwd=PROJECT_ROOT,
+                cwd=workspace_root,
+                env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+
+            verification_path.write_text(
+                verification_path.read_text(encoding="utf-8").replace(
+                    "status=pass", "status=pending"
+                ),
+                encoding="utf-8",
+            )
+            pending_verification = subprocess.run(
+                [
+                    sys.executable,
+                    str(TASK_CLOSE_SCRIPT),
+                    "--report-dir",
+                    str(report_dir),
+                ],
+                cwd=workspace_root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(pending_verification.returncode, 0)
+            self.assertIn("CLOSEOUT_READY=no", pending_verification.stdout)
+            self.assertIn("verification_status", pending_verification.stdout)
+            self.assertNotIn("verification_unlock", pending_verification.stdout)
 
     def test_task_close_rejects_forged_verifier_or_parent_evidence(self) -> None:
         """Closeout cannot pass with a forged child receipt or mutation claim."""
