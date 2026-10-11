@@ -1595,6 +1595,28 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 closeout_blockers,
             )
 
+            local_args = [*args]
+            local_args[local_args.index("--run-id") + 1] = (
+                "execution-graph-local-target"
+            )
+            local_output = io.StringIO()
+            with patch.dict(
+                os.environ, {"AGENT_CANON_TARGET_ROOT": str(workspace_root)}
+            ):
+                os.environ.pop("AGENT_CANON_TARGET_HOST_ROOT", None)
+                with redirect_stdout(local_output):
+                    local_code = bootstrap_agent_run(local_args)
+            self.assertEqual(local_code, 0, local_output.getvalue())
+            local_ready_line = next(
+                line
+                for line in local_output.getvalue().splitlines()
+                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+            )
+            local_ready_calls = json.loads(local_ready_line.split("=", 1)[1])
+            local_identity = local_ready_calls[0]["arguments"]["checkout_identity"]
+            self.assertEqual(local_identity["cwd"], str(workspace_root))
+            self.assertEqual(local_identity["git_root"], str(workspace_root))
+
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """Retired repository synchronization wrappers are absent."""
         self.assertFalse((PROJECT_ROOT / "tools" / "sync_agent_canon.sh").exists())

@@ -373,7 +373,6 @@ def _ready_runtime_with_target(
     state = manager._new_state()
     state.update(state="ready", generation_counter=1, current_generation="generation-0001")
     target_record = manager._target_record(target, "read-only")
-    target_record["host_root"] = str(target)
     state["targets"] = {target_record["digest"]: target_record}
     resources = manager._resource_records()
     resources["image"].update(
@@ -1097,11 +1096,43 @@ def test_exec_receipt_uses_current_host_container_identity(
     assert manager._read_state()["resources"]["container"]["id"] == container_id
 
 
-def test_exec_passes_registered_host_root_to_resident_process(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("host_bound", [False, True])
+def test_exec_projects_registered_host_root_only_for_host_bound_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host_bound: bool
 ) -> None:
-    """The exec environment carries the already-registered host target root."""
+    """Host identity metadata is projected only for a host-bound target record."""
     manager, target = _ready_runtime_with_target(tmp_path)
+    exec_root = target
+    if host_bound:
+        host_digest = "target-digest"
+        container_root = Path(f"/targets/{host_digest}")
+        existing_no_symlink = bootstrap_runtime_module._existing_no_symlink
+
+        def mounted_target(path: Path, *, field: str) -> Path:
+            if path == container_root:
+                return path
+            return existing_no_symlink(path, field=field)
+
+        monkeypatch.setattr(
+            bootstrap_runtime_module, "_existing_no_symlink", mounted_target
+        )
+        target_record = manager._target_record(
+            container_root,
+            "read-only",
+            host_root=str(target),
+            host_digest=host_digest,
+        )
+        state = manager._read_state()
+        state["targets"] = {host_digest: target_record}
+        state["generations"]["generation-0001"]["targets"] = {
+            host_digest: target_record
+        }
+        manager._write_mounts(state)
+        manager._write_mount_manifest(state)
+        manager._write_state(state)
+        monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", host_digest)
+        exec_root = container_root
+
     observed: dict[str, str] = {}
     monkeypatch.setenv("AGENT_CANON_CONTAINER_ID", "resident")
 
@@ -1114,9 +1145,12 @@ def test_exec_passes_registered_host_root_to_resident_process(
     monkeypatch.setattr(
         bootstrap_runtime_module.subprocess, "run", capture_environment
     )
-    manager.exec(target, ["agent-canon", "ok"])
+    manager.exec(exec_root, ["agent-canon", "ok"])
 
-    assert observed["AGENT_CANON_TARGET_HOST_ROOT"] == str(target)
+    if host_bound:
+        assert observed["AGENT_CANON_TARGET_HOST_ROOT"] == str(target)
+    else:
+        assert "AGENT_CANON_TARGET_HOST_ROOT" not in observed
 
 
 @pytest.mark.parametrize("argv", [["python3", "-m", "pytest"], ["ruff", "format"]])

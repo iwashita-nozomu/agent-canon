@@ -446,10 +446,13 @@ def materialize_execution_tool_calls(
     )
     identity = resolve_checkout_identity(workspace_root).as_dict()
     target_root = os.environ.get("AGENT_CANON_TARGET_ROOT")
-    if target_root and workspace_root == Path(target_root).resolve(strict=False):
-        host_root = str(
-            Path(os.environ["AGENT_CANON_TARGET_HOST_ROOT"]).resolve(strict=False)
-        )
+    host_root = os.environ.get("AGENT_CANON_TARGET_HOST_ROOT")
+    if (
+        target_root
+        and host_root
+        and workspace_root == Path(target_root).resolve(strict=False)
+    ):
+        host_root = str(Path(host_root).resolve(strict=False))
         identity["cwd"] = host_root
         identity["git_root"] = host_root
     skill_context = skill_document_context(skill_documents)
