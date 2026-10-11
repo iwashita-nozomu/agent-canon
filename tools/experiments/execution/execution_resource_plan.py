@@ -3372,7 +3372,6 @@ class GpuProcessOccupancyProbe:
         if (
             len(physical_set) != len(physical_uuids)
             or len(mig_set) != len(mig_uuids)
-            or physical_set & mig_set
             or any(
                 _NVIDIA_UUID_RE.fullmatch(uuid) is None or not uuid.startswith("GPU-")
                 for uuid in physical_uuids
