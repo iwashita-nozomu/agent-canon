@@ -349,6 +349,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "puppeteer",
         "mermaid-cli",
         "python3-pytest",
+        "python3-pylsp-jsonrpc",
     }
     assert not ids & {"github-cli", "codex-cli"}
     assert {record["method"] for record in records} <= {
