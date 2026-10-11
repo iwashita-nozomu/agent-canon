@@ -2,9 +2,10 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents the semantic provider HTML report renderer.
+responsibility Documents the Quarto-backed semantic provider HTML report route.
 upstream design ./semantic_index.md defines semantic provider comparison and candidate authority boundaries
 upstream design ../../agents/skills/html-output.md owns HTML artifact generation and validation
+upstream environment ../../bootstrap/container/image/dependencies.toml supplies Quarto, embedded Pandoc, and the offline link checker
 upstream design ../prose-reasoning-graph/dsl-spec.md defines shared graph visualization projection and adapter contract
 upstream implementation ../../tools/analysis/search/reporting/semantic_provider_html_report.py renders provider comparison HTML
 downstream implementation ../../tests/agent_tools/test_semantic_provider_html_report.py tests renderer behavior
@@ -12,8 +13,10 @@ downstream implementation ../../tests/agent_tools/test_semantic_provider_html_re
 -->
 
 `tools/analysis/search/reporting/semantic_provider_html_report.py` renders
-`agent-canon semantic-index compare-providers` JSON as a self-contained HTML
-report.
+`agent-canon semantic-index compare-providers` JSON as a static HTML report
+through the installed Quarto CLI and its embedded Pandoc. Quarto owns general
+document layout, HTML serialization, and local-resource handling; the report
+tool supplies comparison facts and its domain-specific SVG figure.
 
 This report is the semantic-provider comparison adapter for the shared graph
 visualization contract. `agent-canon semantic-index compare-providers` owns
@@ -40,6 +43,20 @@ python3 tools/analysis/search/reporting/semantic_provider_html_report.py \
   --output reports/agents/<run-id>/semantic_provider_compare.html
 ```
 
+The default output is static and does not execute code or start a server. Quarto
+is invoked with `--no-execute`; local assets remain beside the HTML so the report
+works without a network connection. The generated `.qmd` is rendered in an
+owned minimal Quarto project with no pre-render or post-render scripts, so a
+caller project's hooks are not inherited even when `TMPDIR` is nested there. Pass
+`--embed-resources` only when a single HTML file is needed. The command inspects the generated Quarto source, renders
+HTML, and checks local links with the repository's offline Lychee configuration.
+It prints a JSON readback with source/config/asset hashes, Quarto and embedded
+Pandoc versions, exact renderer argv, the output hash, and the validation result.
+
+Quarto/Pandoc diagnostics and failure status are preserved. The report command
+distinguishes missing input assets, invalid JSON/Quarto source, unavailable
+Quarto, rendering failure, and output validation failure.
+
 The first figure is `Provider Delta To Shared Candidate Logic`. It shows that
 left and right embedding providers can produce different search or merge
 candidate deltas while the authority remains the existing
@@ -47,4 +64,5 @@ responsibility-scoped candidate logic.
 
 The report is review evidence. Indexing, document classification, ownership
 labels, and merge/delete decisions stay with the semantic-index workflow and
-its reviewers.
+its reviewers. The SVG remains a local report asset and does not introduce a
+second general-purpose HTML renderer.
