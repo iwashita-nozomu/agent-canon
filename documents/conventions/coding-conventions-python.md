@@ -159,6 +159,6 @@ Markdown / JSON report の SOLID principle signal counts、OOP dimension、findi
 
 ## Markdown ファイル修正後
 
-変更文書の owner による検査選択は [md-style-check の Required Checks](../../agents/skills/md-style-check.md#required-checks)
+変更文書の owner による検査選択は [md-style-check Procedure](../../agents/skills/md-style-check.md#procedure)
 に従います。この Python 入口から別の汎用検査を必須化せず、選択された検査の失敗・実行不能を
 他の検査の成功で置き換えません。相対パスと参照先の整合も変更範囲で確認します。
