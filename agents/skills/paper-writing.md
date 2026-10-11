@@ -6,6 +6,8 @@ responsibility Documents paper-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable paper structure contract
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
+upstream design agent-canon-bootstrap.md registered-project shared-container command route
+upstream design ../../documents/contracts/quarto-html-output.toml Quarto/Pandoc provider version
 @dependency-end
 -->
 
@@ -55,6 +57,37 @@ python3 tools/analysis/documents/doc_start.py \
   --owner "codex" \
   --workspace-root "$PWD"
 ```
+
+## Citation rendering
+
+When a paper needs formatted citations, keep the author-selected bibliography and
+CSL style as local files and use Pandoc citation keys in the manuscript, such as
+`[@source-key]`. Run Quarto's embedded Pandoc through the existing shared
+container `exec` route for the already-registered paper project; do not depend
+on a host Quarto installation or add another renderer. The route uses the
+author-selected output format and preserves Pandoc's native exit status and
+diagnostics:
+
+```bash
+"$BOOTSTRAP" "${COMMON[@]}" exec --root "$PROJECT_ROOT" -- \
+  quarto pandoc "$MANUSCRIPT" \
+  --citeproc \
+  --bibliography "$BIBLIOGRAPHY" \
+  --csl "$CSL_STYLE" \
+  --to "$FORMAT" \
+  --standalone \
+  --output "$OUTPUT" \
+  --fail-if-warnings
+```
+
+`BOOTSTRAP` and `COMMON` use the existing [AgentCanon bootstrap route](agent-canon-bootstrap.md),
+and `PROJECT_ROOT` is the registered paper project. Keep bibliography and CSL
+paths local; source discovery or DOI metadata retrieval remains with
+`literature-survey`. A non-zero result or citeproc warning is a failed render,
+including an unresolved citation key; preserve the native output instead of
+normalizing it through a custom parser. Citeproc handles bibliographic lookup
+and formatting only: claim support, limitations, and citation/evidence review
+remain with the existing paper-writing notes and reviewer.
 
 ## Boundary
 
