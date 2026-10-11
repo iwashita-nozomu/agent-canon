@@ -4596,7 +4596,7 @@ class DependencyModelTests(unittest.TestCase):
             "PUPPETEER_CACHE_DIR=/usr/local/share/agent-canon/puppeteer",
             dockerfile,
         )
-        self.assertIn("PUPPETEER_SKIP_CHROME_DOWNLOAD=true", dockerfile)
+        self.assertIn("PUPPETEER_CHROME_SKIP_DOWNLOAD=true", dockerfile)
         self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
         self.assertIn("rm -rf /var/lib/apt/lists/*", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
