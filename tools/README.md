@@ -77,7 +77,7 @@ Python tools are not made into flat global executables. A public catalog entry
 is callable through the namespaced route using its typed descriptor:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+./bootstrap.sh --control-parent-root <root> \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 
@@ -97,7 +97,7 @@ does not infer that every internal Python file is a public command. For a
 caller-selected direct command, use the argv-only route:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> --runtime-root <runtime> \
+./bootstrap.sh --control-parent-root <root> \
   exec --root <registered-project> -- <existing-command> <args...>
 ```
 
