@@ -546,7 +546,9 @@ class RenderDependencyManifestGraphTest(unittest.TestCase):
             self.assertEqual(repeated_result.returncode, 0, repeated_result.stderr)
             repeated_ir = json.loads(repeated_ir_out.read_text(encoding="utf-8"))
             for logical_mapping in ("source", "documents", "nodes", "edges"):
-                self.assertEqual(repeated_ir[logical_mapping], graph_ir[logical_mapping])
+                self.assertEqual(
+                    repeated_ir[logical_mapping], graph_ir[logical_mapping]
+                )
 
             old_ir_out = root / "old-tree.ir.json"
             old_result = run_renderer(
