@@ -1151,6 +1151,40 @@ entries:
       - tests/agent_tools/test_tool_dispatch.py
       - tests/agent_tools/test_paper_writing_citeproc.py
 
+  - id: vl-convert
+    summary: Converts a selected native Vega-Lite specification to a static artifact with the official shared CLI.
+    path: tools/runtime/dispatch/tool_dispatch.py
+    family: agent_tools
+    role: helper
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: bootstrap.sh --control-parent-root <root> tool run --root <registered-project> vl-convert -- <vl-convert-args...>
+    writes: true
+    dispatch:
+      runtime: native
+      argv: [vl-convert]
+      execution_plane: tool-container
+      cwd: target-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
+      parity: pending
+      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - agents/skills/result-visualize.md
+    tests:
+      - tests/agent_tools/test_tool_dispatch.py
+
   - id: prose-reasoning-graph
     public: true
     summary: Builds SQLite-backed prose structure graphs and related projections in an explicit external runtime, with diagnostics, explanations, edit-operation plans, writing-skill handoff packets, and combined document checks with structured-analysis.

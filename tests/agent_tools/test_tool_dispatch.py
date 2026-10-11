@@ -54,6 +54,8 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(specs["rust-python-module-groups-check"].runtime, "rust")
         self.assertEqual(specs["quarto"].runtime, "native")
         self.assertEqual(specs["quarto"].argv, ("quarto",))
+        self.assertEqual(specs["vl-convert"].runtime, "native")
+        self.assertEqual(specs["vl-convert"].argv, ("vl-convert",))
 
     def test_inventory_is_stable_json(self) -> None:
         """Inventory output has one versioned row per normalized surface."""
@@ -860,6 +862,206 @@ class ToolDispatchTest(unittest.TestCase):
             os.environ.pop(key, None)
         else:
             os.environ[key] = value
+
+
+def _native_vl_convert_route(
+    tmp_path: Path,
+    monkeypatch,
+) -> tuple[Path, Path, Path]:
+    """Set up an isolated authenticated-tool context for a native render fixture."""
+    image_root = tmp_path / "image"
+    image_runtime = image_root / "runtime"
+    dependencies_root = image_root / "image-dependencies"
+    control_root = tmp_path / "control"
+    runtime_root = control_root / "runtime"
+    target_root = tmp_path / "target"
+    output_root = runtime_root / "tool-output"
+    home = runtime_root / "cache" / "home"
+    for directory in (
+        image_runtime,
+        dependencies_root,
+        runtime_root,
+        target_root,
+        home,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    marker_paths = (
+        image_root / tool_dispatch.CONTAINER_MARKER_NAME,
+        image_runtime / tool_dispatch.RUNTIME_MARKER_NAME,
+        dependencies_root / "plan.json",
+    )
+    marker_paths[0].write_bytes(tool_dispatch.CONTAINER_MARKER)
+    marker_paths[1].write_bytes(tool_dispatch.RUNTIME_MARKER)
+    marker_paths[2].write_text(
+        '{"schema":"agent-canon-test-image/v1"}\n', encoding="utf-8"
+    )
+    for marker in marker_paths:
+        marker.chmod(0o444)
+    (runtime_root / "state.json").write_text(
+        json.dumps({"targets": {"fixture": {"root": str(target_root)}}}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("AGENT_CANON_EXECUTION_PLANE", "tool-container")
+    monkeypatch.setenv("AGENT_CANON_IMAGE_ROOT", str(image_root))
+    monkeypatch.setenv(
+        "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT", str(dependencies_root)
+    )
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_TOOLS_ROOT", str(PROJECT_ROOT))
+    monkeypatch.setenv(
+        "AGENT_CANON_IMAGE_MARKER_DIGEST",
+        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "AGENT_CANON_RUNTIME_MARKER_DIGEST",
+        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
+    )
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control_root))
+    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
+    monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(target_root))
+    monkeypatch.setenv("AGENT_CANON_OUTPUT_ROOT", str(output_root))
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("AGENT_CANON_MOUNT_REGISTRY", raising=False)
+    return target_root, runtime_root, output_root
+
+
+def test_vl_convert_native_argv_matches_direct_probe_and_parity_record(
+    tmp_path: Path,
+    monkeypatch,
+    capfd,
+) -> None:
+    """The generic native route preserves the official renderer CLI contract."""
+    target_root, runtime_root, output_root = _native_vl_convert_route(
+        tmp_path, monkeypatch
+    )
+    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["vl-convert"]
+    probe_args = ("--version",)
+    environment = tool_dispatch._environment(
+        PROJECT_ROOT, spec, runtime_root, output_root
+    )
+    direct = subprocess.run(
+        [*spec.argv, *probe_args],
+        cwd=target_root,
+        env=environment,
+        check=False,
+        capture_output=True,
+    )
+    routed_status = tool_dispatch._run_spec(
+        PROJECT_ROOT,
+        spec,
+        probe_args,
+        require_parity=False,
+        container_exec=True,
+    )
+    routed_output = capfd.readouterr()
+    direct_result = {
+        "exit_code": direct.returncode,
+        "stdout_sha256": hashlib.sha256(direct.stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(direct.stderr).hexdigest(),
+        "written_paths": [],
+    }
+    routed_result = {
+        "exit_code": routed_status,
+        "stdout_sha256": hashlib.sha256(routed_output.out.encode("utf-8")).hexdigest(),
+        "stderr_sha256": hashlib.sha256(routed_output.err.encode("utf-8")).hexdigest(),
+        "written_paths": [],
+    }
+    assert routed_result == direct_result
+    parity_path = PROJECT_ROOT / spec.parity_fixture
+    fixture = json.loads(parity_path.read_text(encoding="utf-8"))
+    row = next(
+        (entry for entry in fixture["entries"] if entry.get("id") == spec.tool_id),
+        None,
+    )
+    if row is None:
+        raise AssertionError(
+            json.dumps(
+                {
+                    "id": spec.tool_id,
+                    "probe_args": list(probe_args),
+                    "observed": {
+                        "argv": list(spec.argv),
+                        "cwd": spec.cwd_policy,
+                        "stdin": spec.stdin_policy,
+                        "stdout": spec.stdout_policy,
+                        "stderr": spec.stderr_policy,
+                        "exit": spec.exit_policy,
+                        "signal": spec.signal_policy,
+                        "written_paths": list(spec.written_paths),
+                    },
+                    "legacy_result": direct_result,
+                    "container_result": routed_result,
+                },
+                sort_keys=True,
+            )
+        )
+    tool_dispatch._check_parity_fixture(PROJECT_ROOT, spec)
+    assert row["probe_args"] == list(probe_args)
+
+
+def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
+    tmp_path: Path,
+    monkeypatch,
+    capfd,
+) -> None:
+    """The native renderer emits SVG and preserves its invalid-input failure."""
+    target_root, runtime_root, output_root = _native_vl_convert_route(
+        tmp_path, monkeypatch
+    )
+    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["vl-convert"]
+    input_path = target_root / "figure.vl.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json",
+                "description": "A static renderer smoke input with no domain data.",
+                "data": {"values": [{"label": "renderer smoke"}]},
+                "mark": "text",
+                "encoding": {"text": {"field": "label", "type": "nominal"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_path = output_root / "figure.svg"
+    rendered = tool_dispatch.run_container_tool(
+        PROJECT_ROOT,
+        spec,
+        (
+            "vl2svg",
+            "--input",
+            input_path.name,
+            "--output",
+            str(output_path),
+            "--vl-version",
+            "6.4.1",
+        ),
+    )
+    assert rendered == 0
+    rendered_svg = output_path.read_bytes()
+    assert b"<svg" in rendered_svg[:512]
+    assert b"renderer smoke" in rendered_svg
+
+    invalid_path = target_root / "invalid.vl.json"
+    invalid_path.write_text("{", encoding="utf-8")
+    failed_output = output_root / "invalid.svg"
+    failure_status = tool_dispatch.run_container_tool(
+        PROJECT_ROOT,
+        spec,
+        (
+            "vl2svg",
+            "--input",
+            invalid_path.name,
+            "--output",
+            str(failed_output),
+            "--vl-version",
+            "6.4.1",
+        ),
+    )
+    failure_output = capfd.readouterr()
+    assert failure_status != 0
+    assert failure_output.err or failure_output.out
+    assert not failed_output.exists()
 
 
 if __name__ == "__main__":
