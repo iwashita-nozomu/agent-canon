@@ -241,7 +241,7 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 | RC-06 existing-owner reuse | `responsibility-cleanup` | [agents/skills/document-canon-cleanup.md](../../agents/skills/document-canon-cleanup.md), [agents/skills/worktree-health.md](../../agents/skills/worktree-health.md), [agents/skills/agent-log-analysis.md](../../agents/skills/agent-log-analysis.md), [agents/skills/runtime-log-repair.md](../../agents/skills/runtime-log-repair.md), [agents/skills/result-artifact-writeout.md](../../agents/skills/result-artifact-writeout.md) | reuse route と既存 receipt |
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
-| RC-09 replacement and duplicate retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Repeated Responsibility Review](../../agents/skills/change-review.md#repeated-responsibility-review) | 残す正本、旧実装・専用補助コードの削除、必要な利用側移行、変更契約の検証と具体的な残件 |
+| RC-09 replacement and duplicate retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Procedure](../../agents/skills/change-review.md#procedure) | 残す正本、旧実装・専用補助コードの削除、必要な利用側移行、変更契約の検証と具体的な残件 |
 
 ## Evidence And Assumption Ledger
 

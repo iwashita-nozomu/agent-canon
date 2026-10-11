@@ -6,6 +6,7 @@ version = 4
 name = "agent-canon"
 version = "0.1.0"
 dependencies = [
+ "pathdiff",
  "rusqlite",
  "serde",
  "serde_json",
@@ -227,6 +228,12 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "pkg-config"
