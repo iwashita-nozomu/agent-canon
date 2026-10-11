@@ -338,17 +338,12 @@ def owner_receipt_closeout_consumer(
 
 def _resolve_report_root(
     report_root: str | None,
-    workspace_root: Path,
     *,
     runtime_root: Path | str | None = None,
 ) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
-    # Keep report-root resolution tied to the requested workspace.  The
-    # parent capability below validates the resulting path and must not
-    # silently relocate lifecycle artifacts to the configured parent root.
     return resolve_report_root(
         report_root,
-        workspace_root,
         runtime_root=runtime_root,
     )
 
@@ -1493,7 +1488,6 @@ def main() -> int:
         report_dir = (
             _resolve_report_root(
                 args.report_root,
-                Path.cwd(),
                 runtime_root=args.runtime_root,
             )
             / str(args.run_id)
