@@ -53,13 +53,17 @@ in-memory `consumer-static` mode から生成します。live mode の
 `developer_instructions` と executable role fields は変更せず、static mode だけが
 producer path を source-neutral な clause と閉じた obligation fragment に置き換えます。
 `generated_role_view_v1`、`generated_role_profile_projection_v1`、既存の TOML/JSON
-field set、`projection_digest` は維持し、static TOML のコメントは schema marker と
+field set、`projection_digest` は維持し、static role TOML のコメントは schema marker と
 digest だけに限定します。
 
 materializer は `ConsumerStaticClauseProjection` と閉じた obligation table を検証し、
-prose keyword 探索を行いません。exporter と consumer checker は全 payload bytes を
-case-normalize して、`agents/skills/`、`agents/model_profiles.toml`、
-`tools/agent_tools/`、`../../agents/`、`../../tools/` の exact prefix を拒否します。
+prose keyword 探索を行いません。exporter と consumer checker は TOML の parsed key と
+string value に対して case-normalized exact-prefix 検査を行い、
+`agents/skills/`、`agents/model_profiles.toml`、`tools/agent_tools/`、
+`../../agents/`、`../../tools/` を runtime configuration から除外します。
+dependency header などの TOML comment は runtime value ではないため、この path 検査の
+対象外です。secret / network / updater marker の既存 byte 検査と、禁止 TOML key の
+構造検査は引き続き適用します。
 
 Projectionの詳細は [consumer-static設計](../design/static-seed-consumer-static-projection.md)、
 maintainerの実行・検証手順は [Static Seed Commands](../tools/export_static_seed.md) を参照します。
