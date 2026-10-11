@@ -931,7 +931,7 @@ _agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(callbacks)!r}; 
 _agent_canon_run_controller() {{ printf '%s\\n' controller >> {str(callbacks)!r}; return 0; }}
 _agent_canon_record_active_container() {{ printf '%s\\n' record >> {str(callbacks)!r}; return 0; }}
 _agent_canon_install_global_links() {{ printf '%s\\n' links >> {str(callbacks)!r}; return 0; }}
-_agent_canon_replace_resident candidate {candidate_id}
+_agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -4486,7 +4486,7 @@ _agent_canon_replace_resident_locked() {{
   sleep 0.15
   printf '%s end\\n' "$AGENT_CANON_TEST_LABEL" >> {str(events)!r}
 }}
-_agent_canon_replace_resident candidate sha256:candidate
+_agent_canon_replace_resident candidate
 """
     environment = {**os.environ, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
     first = subprocess.Popen(
@@ -4537,7 +4537,7 @@ AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
 _agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(marker)!r}; return 9; }}
 _agent_canon_record_active_container() {{ printf '%s\\n' active >> {str(marker)!r}; return 0; }}
-_agent_canon_replace_resident candidate sha256:candidate
+_agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -4577,7 +4577,7 @@ AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
 AGENT_CANON_DOCKER_CMD={str(docker)!r}
 _agent_canon_ensure_container() {{ printf '%s\\n' ensure >> {str(marker)!r}; return 9; }}
 _agent_canon_record_active_container() {{ printf '%s\\n' active >> {str(marker)!r}; return 0; }}
-_agent_canon_replace_resident candidate requested
+_agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -4631,7 +4631,7 @@ _agent_canon_write_rollback_plan() {{ :; }}
 _agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
 _agent_canon_run_controller() {{ return 9; }}
 _agent_canon_restore_candidate_failure() {{ return 7; }}
-_agent_canon_replace_resident candidate requested
+_agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -4719,7 +4719,7 @@ _agent_canon_ensure_container() {{ printf 'candidate\\n'; }}
     _agent_canon_record_active_container() {{ :; }}
     _agent_canon_install_global_links() {{ :; }}
     _agent_canon_publish_controller_projection() {{ :; }}
-    _agent_canon_replace_resident candidate requested
+    _agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
@@ -4780,7 +4780,7 @@ _agent_canon_use_active_image() {{
   export AGENT_CANON_IMAGE_REF AGENT_CANON_ACTIVE_IMAGE_ID AGENT_CANON_EXPECTED_IMAGE_ID
 }}
 _agent_canon_write_rollback_plan() {{ :; }}
-_agent_canon_replace_resident candidate requested
+_agent_canon_replace_resident candidate
 rc=$?
 printf 'rc=%s\\n' "$rc"
 exit "$rc"
