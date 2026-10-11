@@ -3387,10 +3387,10 @@ class DependencyModelTests(unittest.TestCase):
                 "pyright-language-server",
                 "bash-language-server",
                 "markdownlint-cli2",
-                "markdownlint-cli2-formatter-json",
                 "gnupg",
                 "node",
                 "puppeteer-fonts-liberation",
+                "puppeteer-unzip",
                 "puppeteer-libasound2t64",
                 "puppeteer-libatk-bridge2.0-0t64",
                 "puppeteer-libatk1.0-0t64",
@@ -4205,7 +4205,13 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertNotEqual(receipt_check.returncode, 0)
             self.assertIn("receipt source identity mismatch", receipt_check.stderr)
-            fake_cargo_home = root / "fake-cargo-home"
+            fake_cargo_home = Path(
+                tempfile.mkdtemp(
+                    prefix="agent-canon-fake-cargo-home-",
+                    dir=root.parent,
+                )
+            )
+            self.addCleanup(shutil.rmtree, fake_cargo_home)
             fake_bin = fake_cargo_home / "bin"
             fake_bin.mkdir(parents=True)
             cargo = fake_bin / "cargo"
@@ -4512,7 +4518,7 @@ class DependencyModelTests(unittest.TestCase):
             binary.chmod(0o755)
             runner = FakeRunner()
             with mock.patch.dict(
-                os.environ, {"HOME": str(root), "PATH": "/usr/bin"}, clear=False
+                os.environ, {"HOME": str(root), "PATH": "/usr/bin"}, clear=True
             ):
                 Installer(runner).install(
                     plan, workspace=root, receipts=root / "receipts"
