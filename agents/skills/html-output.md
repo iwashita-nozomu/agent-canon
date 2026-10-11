@@ -31,16 +31,35 @@ A listen socket is not required to prove a static artifact correct.
 ## Standard document rendering
 
 For AgentCanon's document and report route, delegate ordinary Markdown-to-HTML
-layout and serialization to the installed Quarto CLI. Inspect the source and
-its local resources with `quarto inspect`, then render with
-`quarto render <source> --to html --no-execute`. Quarto supplies its embedded
-Pandoc, so do not add a second Markdown parser or renderer. Code execution,
-network access, and a serving process remain disabled unless the request
-explicitly requires them. Embed resources only when a single-file artifact is
-requested, and validate the
-resulting links/assets with the existing offline link-check owner. Keep domain
-facts and specialized SVG/interactive visualizations with their existing
-owners.
+layout and serialization to the registered native Quarto command. Invoke the
+catalog entry `quarto` through `tool run` from the registered project; arguments
+after `--` are passed to the native CLI. Do not call Quarto through raw `exec`
+or a host installation. Inspect the source, then render it into the external
+runtime output directory rather than the read-only project target:
+
+```bash
+PROJECT_ROOT=/path/to/registered-project
+SOURCE=reports/example.qmd
+OUTPUT_DIR=/var/lib/agent-canon/runtime/tool-output
+OUTPUT_NAME=report-unique
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root "$PROJECT_ROOT" quarto -- \
+  inspect "$SOURCE"
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root "$PROJECT_ROOT" quarto -- \
+  render "$SOURCE" --to html --no-execute \
+  --output-dir "$OUTPUT_DIR" --output "${OUTPUT_NAME}.html"
+```
+
+Quarto supplies its embedded Pandoc, so do not add a second Markdown parser or
+renderer. Code execution, network access, and a serving process remain disabled
+unless the request explicitly requires them. Embed resources only when a
+single-file artifact is requested, and validate the resulting links/assets with
+the existing offline link-check owner. Keep domain facts and specialized
+SVG/interactive visualizations with their existing owners.
+
+`BOOTSTRAP` and `COMMON` use the existing
+[AgentCanon bootstrap route](agent-canon-bootstrap.md).
+`PROJECT_ROOT` is registered with the runtime, `SOURCE` is relative to that root,
+and `OUTPUT_NAME` should be unique for the requested artifact.
 
 ## Preview and serving
 
