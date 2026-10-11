@@ -61,11 +61,6 @@ DECISION_KEYS = (
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
 
 
-def _runtime_path(path: Path, runtime_root: Path | str | None = None) -> Path:
-    """Resolve one monitoring artifact through the external runtime boundary."""
-    return resolve_runtime_artifact_path(path, runtime_root=runtime_root)
-
-
 TOOL_WARNING_REQUIRED_KEYS = (
     "warning_id",
     "source_tool",
@@ -298,7 +293,7 @@ def locked_monitoring_artifact(
     runtime_root: Path | str | None = None,
 ) -> Iterator[IO[str]]:
     """Hold an exclusive lock while updating an external monitoring artifact."""
-    target = _runtime_path(path, runtime_root)
+    target = resolve_runtime_artifact_path(path, runtime_root=runtime_root)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -315,7 +310,7 @@ def locked_existing_artifact(
     runtime_root: Path | str | None = None,
 ) -> Iterator[IO[str]]:
     """Hold an exclusive lock while updating an existing artifact."""
-    target = _runtime_path(path, runtime_root)
+    target = resolve_runtime_artifact_path(path, runtime_root=runtime_root)
     with target.open("r+", encoding="utf-8") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
@@ -533,7 +528,9 @@ def default_monitoring_text(report_dir: Path) -> str:
 def resolve_report_dir(args: argparse.Namespace) -> Path:
     """Resolve the target run bundle directory."""
     if args.report_dir:
-        return _runtime_path(Path(str(args.report_dir)).resolve(), args.runtime_root)
+        return resolve_runtime_artifact_path(
+            Path(str(args.report_dir)).resolve(), runtime_root=args.runtime_root
+        )
     return (
         resolve_report_root(
             args.report_root,
@@ -1440,10 +1437,9 @@ def append_monitoring(
 ) -> Path:
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
-    _runtime_path(report_dir / "workflow_monitoring.md", runtime_root).parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    resolve_runtime_artifact_path(
+        report_dir / "workflow_monitoring.md", runtime_root=runtime_root
+    ).parent.mkdir(parents=True, exist_ok=True)
     for semantic_event in active_entries.semantic_events:
         append_ledger_event(
             report_dir,
@@ -1457,7 +1453,9 @@ def append_monitoring(
         subagent_wave_rows,
         runtime_root,
     )
-    path = _runtime_path(report_dir / "workflow_monitoring.md", runtime_root)
+    path = resolve_runtime_artifact_path(
+        report_dir / "workflow_monitoring.md", runtime_root=runtime_root
+    )
     with locked_monitoring_artifact(path, runtime_root) as handle:
         text = handle.read()
         if not text.strip():
