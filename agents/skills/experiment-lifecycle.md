@@ -29,6 +29,27 @@ topic 名と registry identity を決め、次の唯一の existing creator rout
 python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
 ```
 
+C++ を主実装とする場合も同じ creator を使い、consumer CMake owner が選んだ profile を明示します。
+
+```bash
+python3 tools/experiments/lifecycle/create_experiment_topic.py <topic> \
+  --template-profile cpp --cmake-profile <root-aggregate|consumer-local>
+```
+
+multi-case adapterが必要なtopicだけは、同じcommandに`--multi-case`を付けます。case inputは生成後に
+実データで設定し、未設定のempty/example registryは作りません。
+
+bootstrap の tool-container から親へ生成する場合は、親が既に明示的な target-write capability
+へ登録されていることを確認し、同じ creator の catalog route を使います。
+
+```bash
+bootstrap.sh --control-parent-root <control-root> tool run --root <parent-root> \
+  create-experiment-topic -- <topic> --template-profile cpp \
+  --cmake-profile <root-aggregate|consumer-local>
+```
+
+通常のsource-free `template export`はpackage filesのexport ownerのままです。
+
 作成後は、今回の変更・実行に関係する `run.py`、`cases.py`、`config.yaml`、
 `visualization.py`、`README.md` の責務と接続を確認します。順序は調べる依存に合わせます。
 template の直接コピーや別 scaffold fallback は使いません。
