@@ -104,9 +104,9 @@ OpenAI system skill の本文は host runtime が提供します。AgentCanon �
 
 ## Codex Defaults
 
-[AGENTS.md](../../AGENTS.md) と [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md) を先に読み、
-repo task の選択は [agent-orchestration](agent-orchestration.md) から始めます。
-上記 `route.py` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補とし、本文と catalog で責務を確認します。
+repo task の workflow / owner / validation route が未選択なら
+[agent-orchestration](agent-orchestration.md) から選びます。既知の owner と settled context は再利用し、
+下表は条件に合う既存 owner を選ぶ索引です。手順は選択した owner の正本に従います。
 編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙だけで mode を拡張しません。
 
 owner、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じる修正は通常の
@@ -146,9 +146,9 @@ execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wa
 | tool / hook / eval / skill / experiment 結果の書出し | [result-artifact-writeout](result-artifact-writeout.md)。raw / summary / manifest / unique path / overwrite policy を区別。 |
 | tool・checker・hook・static / structure analysis の report / repair packet | [tool-finding-report](tool-finding-report.md)。raw・structured full artifact、mechanical priority、任意 impact、prompt feedback decision を区別。finding の取捨選択は上位 workflow。 |
 | skill / tool / workflow / hook / eval 蓄積ログの分析 | [agent-log-analysis](agent-log-analysis.md)。既存 summary を再利用。不足は対象限定読取と制限の明示で扱い、archive 保守・dashboard 修理を前提にしない。 |
-| summary / prompt / run bundle / hook / routing / eval evidence から durable skill Issue を作る | [issue-finding-report](issue-finding-report.md)。抽象原因、重複検索、dependency-expanded edit scope、multi-agent partition を先に固定。 |
+| summary / prompt / run bundle / hook / routing / eval evidence から durable skill Issue を作る | [issue-finding-report](issue-finding-report.md)。観測と原因hypothesisを区別し、owner・mechanism・validationに応じてIssue境界を整理。 |
 | accumulated eval family の収集・修理を選択した | [agent-eval-accumulation](agent-eval-accumulation.md)。registered producer / compact checker / archive loop を使う。missing / stale / fail の観測・Issue 記録だけで再実行せず、eval report を手生成しない。 |
-| PR 処理・merge・conflict・ready 化・Issue triage・queue cleanup | [pr-processing](pr-processing.md)。mutation authority、merge order、validation evidence、Issue action table を先に固定。 |
+| PR 処理・merge・conflict・ready 化・Issue triage・queue cleanup | [pr-processing](pr-processing.md)。単独候補はfast path、queue planningは実際のdependency/conflictがある場合に選ぶ。 |
 | AgentCanon source・共有 bootstrap・parent の development clone 運用の更新 | [agent-canon-update](agent-canon-update.md)。source PR と parent change を分離し、parent に pin / vendor checkout / root projection を追加しない。 |
 | agent-runtime branch や AgentCanon pin 更新の分離が必要 | [agent-update-branch](agent-update-branch.md) |
 | report・status・eval / audit summary・decision brief・presentation narrative・PPT storyboard | [report-writing](report-writing.md)。source packet、visual asset plan、Report Quality Checklist を固定。 |
