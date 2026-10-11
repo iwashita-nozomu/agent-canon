@@ -222,11 +222,7 @@ fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
         match read_document_ast(root, path) {
             Ok(document) => {
                 findings.extend(check_workspace_absolute_links(root, path, &document.links));
-                findings.extend(check_markdown_math(
-                    path,
-                    &text,
-                    &document.math_fences,
-                ));
+                findings.extend(check_markdown_math(path, &text, &document.math_fences));
                 if document.has_mermaid {
                     succeeded &= run_mermaid_cli(root, path);
                 }
@@ -240,7 +236,11 @@ fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
     findings.extend(check_bootstrap_docs(root));
     findings.extend(check_runtime_profile_inventory(root));
     succeeded &= render_findings(&findings, root);
-    if succeeded { 0 } else { 1 }
+    if succeeded {
+        0
+    } else {
+        1
+    }
 }
 
 fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
@@ -749,11 +749,7 @@ fn math_finding(path: &Path, line: Option<usize>, message: &str) -> Finding {
         message: message.to_string(),
     }
 }
-fn check_workspace_absolute_links(
-    root: &Path,
-    source: &Path,
-    targets: &[String],
-) -> Vec<Finding> {
+fn check_workspace_absolute_links(root: &Path, source: &Path, targets: &[String]) -> Vec<Finding> {
     targets
         .iter()
         .filter(|target| workspace_absolute_target(root, target))
@@ -768,8 +764,7 @@ fn check_workspace_absolute_links(
 fn workspace_absolute_target(root: &Path, target: &str) -> bool {
     let target_path = target.split('#').next().unwrap_or(target);
     let raw = Path::new(target_path);
-    raw.is_absolute()
-        && (raw.starts_with(root) || map_absolute_workspace_path(root, raw).is_some())
+    raw.is_absolute() && (raw.starts_with(root) || map_absolute_workspace_path(root, raw).is_some())
 }
 
 fn map_absolute_workspace_path(root: &Path, path: &Path) -> Option<PathBuf> {
@@ -1167,7 +1162,10 @@ mod tests {
     #[test]
     fn workspace_absolute_link_policy_uses_ast_targets() {
         let root = Path::new("/repo");
-        assert!(workspace_absolute_target(root, "/repo/docs/guide.md#section"));
+        assert!(workspace_absolute_target(
+            root,
+            "/repo/docs/guide.md#section"
+        ));
         assert!(!workspace_absolute_target(root, "docs/guide.md"));
         assert!(!workspace_absolute_target(root, "/elsewhere/guide.md"));
     }
