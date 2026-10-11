@@ -140,7 +140,7 @@
       "owner": "W2 writer-owned",
       "operation": "delete-reference",
       "selector": "run_docs_checks.sh keyword entries in workflow/tool routing projections",
-      "desired_result": "remove routing recognition for the deleted forwarder; retain agent-canon docs check/format/fix-math/fix-mermaid recognition"
+      "desired_result": "remove routing recognition for the deleted forwarder; retain agent-canon docs check/format recognition"
     },
     {
       "path": "evidence/agent-evals/workflow_selection_eval.toml",

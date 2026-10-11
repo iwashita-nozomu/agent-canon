@@ -538,8 +538,6 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "agent-canon docs",
         "docs check",
         "docs format",
-        "docs fix-math",
-        "docs fix-mermaid",
         "docs-check",
         "markdownlint",
         "agentcanon 最新",
