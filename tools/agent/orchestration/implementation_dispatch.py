@@ -1,6 +1,6 @@
 # @dependency-start
 # contract tool
-# responsibility AgentTeam implementation dispatch owner module.
+# responsibility Owns capacity-aware ready-wave transition and existing AgentTeam dispatch validation.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ./capacity_handshake.py owns provider capacity transitions.
 # upstream implementation ./team_config.py owns shared configuration normalization.
@@ -10,6 +10,7 @@
 # downstream implementation ./agent_team.py facade consumes capacity APIs.
 # downstream implementation ../../runtime/manifest/manifest_rendering.py consumes capacity and closeout projections.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes capacity APIs.
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py advances the selected execution graph from host results.
 # @dependency-end
 """Own AgentTeam capacity derivation and implementation dispatch."""
 
@@ -63,6 +64,7 @@ if __package__:
         Role,
         RunBundleSpec,
         SubagentWaveSlot,
+        StageWave,
         TaskCatalog,
         TeamConfig,
         as_mapping_tuple,
@@ -78,6 +80,7 @@ else:
         Role,
         RunBundleSpec,
         SubagentWaveSlot,
+        StageWave,
         TaskCatalog,
         TeamConfig,
         as_mapping_tuple,
@@ -105,6 +108,28 @@ WRITE_CAPABLE_ROLE_IDS = {
     "implementer",
     "integration_executor",
 }
+
+
+def _stage_wave_is_active(
+    stage_wave: StageWave,
+    roles_by_id: Mapping[str, Role],
+    workflow_family_id: str | None,
+    math_intent_route_id: str | None,
+) -> bool:
+    """Evaluate the catalog-owned condition against already-selected roles."""
+    if stage_wave.activation == "always":
+        return True
+    if stage_wave.activation == "conditional_math_intent_packet":
+        return math_intent_route_id is not None and any(
+            role_id in roles_by_id for role_id in stage_wave.role_ids
+        )
+    if stage_wave.activation == "explicit_enable_or_full_team_or_comprehensive_family":
+        return workflow_family_id == "comprehensive_development" or any(
+            role_id in roles_by_id for role_id in stage_wave.role_ids
+        )
+    raise RuntimeError(
+        f"stage_wave_activation_unknown:{stage_wave.id}:{stage_wave.activation}"
+    )
 
 
 @dataclass(frozen=True)
@@ -138,6 +163,152 @@ class CapacityHandshakeConsumerBinding:
     def shape_id(self) -> str:
         """Return the stable consumer-binding schema identifier."""
         return "capacity_handshake_consumer_binding_v1"
+
+
+@dataclass(frozen=True)
+class ToolExecutionResult:
+    """One actual host ToolCall result, kept transient for graph advancement."""
+
+    is_error: bool
+    text: str
+
+
+@dataclass(frozen=True)
+class ExecutionGraphTransition:
+    """The next dispatch decision from actual host results for one run."""
+
+    status: str
+    wave_index: int | None
+    ready_slots: tuple[SubagentWaveSlot, ...] = ()
+    waiting_identities: tuple[str, ...] = ()
+    completed_results: tuple[tuple[str, str], ...] = ()
+    failed_identities: tuple[str, ...] = ()
+
+
+def parse_tool_execution_result(value: object) -> ToolExecutionResult:
+    """Read the host's standard ToolCall result without inferring completion."""
+    if not isinstance(value, Mapping):
+        raise RuntimeError("execution_result:must_be_tool_result")
+    is_error = value.get("isError", False)
+    content = value.get("content")
+    if not isinstance(is_error, bool) or not isinstance(content, list):
+        raise RuntimeError("execution_result:invalid_tool_result")
+    texts: list[str] = []
+    for block in content:
+        if not isinstance(block, Mapping):
+            raise RuntimeError("execution_result:invalid_content_block")
+        if block.get("type") != "text" or not isinstance(block.get("text"), str):
+            raise RuntimeError("execution_result:non_text_content_block")
+        texts.append(block["text"])
+    if not is_error and not texts:
+        raise RuntimeError("execution_result:successful_result_has_no_text")
+    return ToolExecutionResult(is_error=is_error, text="\n".join(texts))
+
+
+def advance_execution_graph(
+    waves: tuple[tuple[SubagentWaveSlot, ...], ...],
+    results: Mapping[str, Mapping[str, ToolExecutionResult]],
+) -> ExecutionGraphTransition:
+    """Return the earliest ready wave, gated by actual launch and child results.
+
+    The caller carries host results in its current context and supplies them on
+    the same run entrypoint. No monitoring status string is used as authority.
+    """
+    slots = tuple(slot for wave in waves for slot in wave)
+    identities = {slot.executable_identity for slot in slots}
+    if len(identities) != len(slots):
+        raise RuntimeError("execution_graph:duplicate_role_instance")
+    unknown = set(results) - identities
+    if unknown:
+        raise RuntimeError(
+            "execution_result:unknown_role_instance:" + ",".join(sorted(unknown))
+        )
+    for identity, result in results.items():
+        if set(result) - {
+            "spawn_result",
+            "completion_result",
+            "publication_result",
+        }:
+            raise RuntimeError(f"execution_result:invalid_fields:{identity}")
+        if "spawn_result" not in result:
+            raise RuntimeError(f"execution_result:spawn_result_missing:{identity}")
+        spawn_result = result["spawn_result"]
+        if not spawn_result.is_error and not spawn_result.text.strip():
+            raise RuntimeError(f"execution_result:spawn_result_empty:{identity}")
+        if "completion_result" in result and result["spawn_result"].is_error:
+            raise RuntimeError(f"execution_result:completed_failed_spawn:{identity}")
+        completion = result.get("completion_result")
+        if (
+            completion is not None
+            and not completion.is_error
+            and not completion.text.strip()
+        ):
+            raise RuntimeError(f"execution_result:completion_result_empty:{identity}")
+        publication = result.get("publication_result")
+        if (
+            publication is not None
+            and not publication.is_error
+            and not publication.text.strip()
+        ):
+            raise RuntimeError(f"execution_result:publication_result_empty:{identity}")
+
+    completed: list[tuple[str, str]] = []
+    failed: list[str] = []
+    for index, wave in enumerate(waves):
+        wave_results = [results.get(slot.executable_identity) for slot in wave]
+        for slot, result in zip(wave, wave_results, strict=True):
+            if result is None:
+                continue
+            spawn_result = result["spawn_result"]
+            completion_result = result.get("completion_result")
+            if spawn_result.is_error or (
+                completion_result is not None and completion_result.is_error
+            ):
+                failed.append(slot.executable_identity)
+            elif completion_result is not None:
+                completed.append((slot.executable_identity, completion_result.text))
+        if failed:
+            return ExecutionGraphTransition(
+                status="failed",
+                wave_index=index,
+                waiting_identities=(),
+                completed_results=tuple(completed),
+                failed_identities=tuple(failed),
+            )
+        if all(
+            result is not None and result.get("completion_result") is not None
+            for result in wave_results
+        ):
+            continue
+        if any(
+            results.get(slot.executable_identity) is not None
+            for later_wave in waves[index + 1 :]
+            for slot in later_wave
+        ):
+            raise RuntimeError("execution_result:dependent_node_before_ready")
+        if not any(result is not None for result in wave_results):
+            return ExecutionGraphTransition(
+                status="ready",
+                wave_index=index,
+                ready_slots=wave,
+                completed_results=tuple(completed),
+            )
+        waiting = tuple(
+            slot.executable_identity
+            for slot, result in zip(wave, wave_results, strict=True)
+            if result is None or result.get("completion_result") is None
+        )
+        return ExecutionGraphTransition(
+            status="waiting",
+            wave_index=index,
+            waiting_identities=waiting,
+            completed_results=tuple(completed),
+        )
+    return ExecutionGraphTransition(
+        status="awaiting_closeout",
+        wave_index=None,
+        completed_results=tuple(completed),
+    )
 
 
 @dataclass
@@ -1225,6 +1396,13 @@ def _initial_stage_wave_slots(
         raise RuntimeError(
             f"role_topology_defaults.stage_waves must include {stage_id} stage"
         )
+    if not _stage_wave_is_active(
+        intake_wave,
+        roles_by_id,
+        workflow_family_id,
+        math_intent_route_id,
+    ):
+        return ()
     available_agents = registered_codex_agent_types(agent_root)
     selections = agent_type_selection_map(agent_type_selections)
     slots = _materialize_stage_wave_slots(
@@ -1359,6 +1537,8 @@ def recommended_dynamic_expansion_wave_slots(
     math_intent_route_id: str | None = None,
 ) -> tuple[tuple[SubagentWaveSlot, ...], ...]:
     """Return executable follow-up role-instance waves inside the active budget."""
+    if workflow_family_id == "issue_worker_publication" and not issue_worker_candidate:
+        return ()
     initial_slots = _initial_stage_wave_slots(
         roles,
         active_subagents,
@@ -1386,6 +1566,13 @@ def recommended_dynamic_expansion_wave_slots(
     used_role_ids: set[str] = set()
     waves: list[tuple[SubagentWaveSlot, ...]] = []
     for stage_wave in stage_waves:
+        if not _stage_wave_is_active(
+            stage_wave,
+            roles_by_id,
+            workflow_family_id,
+            math_intent_route_id,
+        ):
+            continue
         stage_slots = _materialize_stage_wave_slots(
             roles_by_id,
             stage_wave.role_ids,

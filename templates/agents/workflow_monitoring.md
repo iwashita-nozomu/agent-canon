@@ -38,7 +38,7 @@ downstream implementation ../../tools/validation/semantic/tools/tool_rejection_p
 
 ## Actual Wave Events（実際の wave event）
 
-<!-- selected schedule.md Agent Wave Ledger event を簡潔な `wave_event=...` token row として mirror し、dynamic expansion を検索・確認可能にします。各 row に wave_id、event_kind、spawn_authority、trigger、budget_before/after、runtime_max_threads/depth、spawned_roles、role_instances、skipped_roles、allowed_paths、do_not_read、write_scope、validation_route、review_gate、handoff_artifacts、status を記録します。同一 role を区別する deterministic ledger は `role_id:instance_id:agent_type:input_packet` を使います。mid-task user input では input_classification、updated_packet、redispatch_action、target_agents、scope_status、lifecycle_policy_ref を追加し、subagent no-return investigation では agent_id、wait_status、last_known_status、evidence_pointer、resolution_decision を追加します。durable evidence が必要なら手編集より `workflow_monitor.py --mid-task-user-input` を優先します。 -->
+<!-- bootstrap_agent_run.py の execution graph が実 ToolCall と完了結果から作った wave event を簡潔な `wave_event=...` token row として mirror します。各 row に wave_id、event_kind、spawn_authority、trigger、budget_before/after、runtime_max_threads/depth、spawned_roles、role_instances、skipped_roles、allowed_paths、do_not_read、write_scope、validation_route、review_gate、handoff_artifacts、status を記録します。同一 role を区別する deterministic readback は `role_id:instance_id:agent_type` を使います。この section は実行 readback であり、ready-set / completion authority ではありません。mid-task user input では既存 `workflow_monitor.py --mid-task-user-input` route を使います。 -->
 
 ## Tool Warnings（tool warning）
 

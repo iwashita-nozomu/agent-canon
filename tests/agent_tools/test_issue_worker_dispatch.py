@@ -421,21 +421,104 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
             f"handoff_reason={handoff_reason!r}"
         )
         assert calls[0][0] == "publisher"
-        assert "ISSUE_WORKER_TOOL_CALL=" in output.getvalue()
-        assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=publisher" in output.getvalue()
-        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        run = manifest["run"]
-        assert run["spawn_wave_recommendation"]["initial_wave_agent_types"] == [
-            "worker"
-        ]
-        dispatch = run["issue_worker_dispatch"]
-        assert dispatch["status"] == "spawned"
-        assert dispatch["publisher_agent_id"] == "publisher-bootstrap-1"
-        assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
-        assert dispatch["tool_call"]["tool_id"] == "issue-worker"
-        assert dispatch["tool_call"]["arguments"]["publisher_agent_id"] == (
+        assert "ISSUE_WORKER_TOOL_CALL=" not in output.getvalue()
+        assert "EXECUTION_GRAPH_STATUS=waiting" in output.getvalue()
+        spawn_line = next(
+            line
+            for line in output.getvalue().splitlines()
+            if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
+        )
+        spawn_results = json.loads(spawn_line.split("=", 1)[1])
+        role_identity = next(iter(spawn_results))
+        assert spawn_results[role_identity]["spawn_result"]["content"][0]["text"] == (
             "publisher-bootstrap-1"
         )
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        run = manifest["run"]
+        assert run["execution_graph"]["initial_wave_agent_types"] == ["worker"]
+        dispatch = run["issue_worker_dispatch"]
+        assert dispatch["status"] == "spawned"
+        assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
+        completion = {
+            role_identity: {
+                **spawn_results[role_identity],
+                "completion_result": {
+                    "isError": False,
+                    "content": [{"type": "text", "text": "publisher completed"}],
+                },
+            }
+        }
+        next_output = io.StringIO()
+        with redirect_stdout(next_output):
+            next_code = bootstrap_main(
+                [
+                    "--task",
+                    "publish explicit feedback",
+                    "--task-id",
+                    "T15",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "--issue-worker-candidate",
+                    json.dumps(candidate),
+                    "--execution-results",
+                    json.dumps(completion),
+                ]
+            )
+        assert next_code == 0
+        assert "EXECUTION_GRAPH_STATUS=ready" in next_output.getvalue()
+        issue_call_line = next(
+            line
+            for line in next_output.getvalue().splitlines()
+            if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+        )
+        issue_calls = json.loads(issue_call_line.split("=", 1)[1])
+        assert issue_calls[0]["tool_id"] == "issue-worker"
+        assert issue_calls[0]["arguments"]["publisher_agent_id"] == (
+            "publisher-bootstrap-1"
+        )
+        completed = {
+            role_identity: {
+                **completion[role_identity],
+                "publication_result": {
+                    "isError": False,
+                    "content": [{"type": "text", "text": "issue sync result"}],
+                },
+            }
+        }
+        final_output = io.StringIO()
+        with redirect_stdout(final_output):
+            final_code = bootstrap_main(
+                [
+                    "--task",
+                    "publish explicit feedback",
+                    "--task-id",
+                    "T15",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--runtime-root",
+                    str(runtime_root),
+                    "--issue-worker-candidate",
+                    json.dumps(candidate),
+                    "--execution-results",
+                    json.dumps(completed),
+                ]
+            )
+        assert final_code == 0
+        assert "EXECUTION_GRAPH_STATUS=awaiting_closeout" in final_output.getvalue()
 
 
 def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
@@ -474,13 +557,12 @@ def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
 
         assert return_code == 0
         assert calls == []
-        assert "ISSUE_WORKER_TOOL_CALL=" not in output.getvalue()
-        assert "RECOMMENDED_INITIAL_SUBAGENT_ROLES=" in output.getvalue()
+        assert "EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=[]" in output.getvalue()
         manifest = yaml.safe_load(
             (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
         )
         run = manifest["run"]
-        assert run["spawn_wave_recommendation"]["initial_wave_role_ids"] == []
+        assert run["execution_graph"]["initial_wave_role_ids"] == []
         assert "issue_worker_dispatch" not in run
 
 
@@ -575,19 +657,27 @@ def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() ->
 
         assert result.returncode == 0, result.stderr
         assert "ISSUE_WORKER_DISPATCH_STATUS=pending" in result.stdout
-        assert "ISSUE_WORKER_SPAWN_TOOL_CALL=" in result.stdout
-        manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        assert "EXECUTION_GRAPH_STATUS=ready" in result.stdout
+        ready_line = next(
+            line
+            for line in result.stdout.splitlines()
+            if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
         )
-        dispatch = manifest["run"]["issue_worker_dispatch"]
-        assert dispatch["status"] == "pending"
-        spawn_tool_call = dispatch["spawn_tool_call"]
+        ready_calls = json.loads(ready_line.split("=", 1)[1])
+        assert len(ready_calls) == 1
+        spawn_tool_call = ready_calls[0]
         assert spawn_tool_call["tool_id"] == "spawn_agent"
         assert spawn_tool_call["arguments"]["role"] == "publisher"
         assert spawn_tool_call["arguments"]["agent_type"] == "worker"
         assert spawn_tool_call["arguments"]["checkout_identity"]["remote"] == (
             "iwashita-nozomu/agent-canon"
         )
+        manifest = yaml.safe_load(
+            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
+        )
+        dispatch = manifest["run"]["issue_worker_dispatch"]
+        assert dispatch["status"] == "pending"
+        assert "spawn_tool_call" not in dispatch
 
 
 def test_other_repository_candidate_is_no_mutation_handoff() -> None:

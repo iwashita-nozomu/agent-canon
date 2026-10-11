@@ -7,6 +7,7 @@
 # downstream design ../templates/agents/schedule.md execution-time-aware schedule projection
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # downstream implementation ../tools/agent/orchestration/route.py consumes exclusive execution routes
+# downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py evaluates selected role waves and actual results
 # @dependency-end
 version: 2
 

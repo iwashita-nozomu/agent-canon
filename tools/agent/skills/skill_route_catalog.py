@@ -7,6 +7,7 @@
 # upstream implementation ../../../agents/skills/skill-dependencies.yaml canonical public-skill dependency dictionary
 # downstream implementation ../orchestration/capability_route.py immutable capability decision consumer
 # downstream implementation ../orchestration/route.py public route composition and compatibility facade
+# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py reads selected canonical documents in dependency order
 # downstream implementation ../../validation/semantic/runtime/check_agent_runtime_alignment.py registration/path parity consumer
 # downstream implementation ../../../tests/agent_tools/test_route.py catalog-owned route tests
 # @dependency-end
@@ -82,6 +83,7 @@ class SkillRoutingRule:
     """One catalog-backed prompt and capability routing rule."""
 
     skill: str
+    canonical_doc: str
     reason: str
     stage_policy: str
     triggers: tuple[tuple[str, ...], ...]
@@ -665,6 +667,7 @@ def load_skill_route_rules(root: Path) -> tuple[SkillRoutingRule, ...]:
         rules.append(
             SkillRoutingRule(
                 skill=skill_id,
+                canonical_doc=cast(str, entry_mapping["canonical_doc"]),
                 reason=reason,
                 stage_policy=stage_policy,
                 triggers=trigger_groups(

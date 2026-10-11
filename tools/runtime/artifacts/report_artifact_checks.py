@@ -5,6 +5,8 @@
 # upstream design ../../../README.md shared automation index
 # upstream design ../../../documents/design/request-intent-and-update-relation.md run-bundle temporary-state and retention readback projection
 # upstream implementation ../archive/work_log.py reconstructs the canonical logical ledger
+# upstream implementation ../manifest/manifest_rendering.py declares selected execution graph nodes
+# upstream implementation ../lifecycle/bootstrap_agent_run.py persists actual graph ToolCall results
 # upstream implementation ../values.py refines decoded completion coverage containers
 # upstream implementation ../../agent/orchestration/mid_task_user_input_policy.py defines mid-task user input evidence policy
 # downstream implementation ../lifecycle/task_close.py consumes checked CompletionCoverage at closeout
@@ -26,6 +28,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import TypedDict, TypeGuard
+
+import yaml
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -104,22 +108,6 @@ REQUIRED_ACTUAL_WAVE_FIELDS = (
     "review_gate",
     "handoff_artifacts",
     "status",
-)
-WAVE_COMPARISON_FIELDS = (
-    ("Spawn Authority", "spawn_authority"),
-    ("Trigger", "trigger"),
-    ("Budget Before", "budget_before"),
-    ("Budget After", "budget_after"),
-    ("Runtime Max Threads", "runtime_max_threads"),
-    ("Runtime Max Depth", "runtime_max_depth"),
-    ("Role Instances", "role_instances"),
-    ("Allowed Paths", "allowed_paths"),
-    ("Do Not Read", "do_not_read"),
-    ("Write Scope", "write_scope"),
-    ("Validation Route", "validation_route"),
-    ("Review Gate", "review_gate"),
-    ("Handoff Artifacts", "handoff_artifacts"),
-    ("Status", "status"),
 )
 MECHANICALLY_REGENERATED_REPORT_ROOTS = (
     PurePosixPath("reports/agent-eval-runs"),
@@ -3051,9 +3039,11 @@ def actual_wave_event_fields(workflow_monitoring_text: str) -> list[dict[str, st
         if stripped.startswith("## "):
             in_section = stripped == "## Actual Wave Events"
             continue
-        if not in_section or not stripped.startswith("- wave_event="):
+        if not in_section:
             continue
-        rows.append(token_fields(stripped))
+        fields = token_fields(stripped)
+        if fields.get("wave_event") == "recorded":
+            rows.append(fields)
     return rows
 
 
@@ -3179,6 +3169,180 @@ def _actual_waves_by_id(
     return actual_by_id, blockers
 
 
+def _execution_graph_from_run(
+    report_dir: Path,
+) -> tuple[Mapping[str, object] | None, Mapping[str, object] | None, list[str]]:
+    """Read the existing run graph and its host-result readback for closeout."""
+    manifest_path = report_dir / "team_manifest.yaml"
+    try:
+        payload: object = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None, None, ["team_manifest.yaml:execution_graph_readback_unavailable"]
+    if not is_string_object_mapping(payload):
+        return None, None, ["team_manifest.yaml:execution_graph_manifest_invalid"]
+    raw_run = payload.get("run")
+    if not is_string_object_mapping(raw_run):
+        return None, None, ["team_manifest.yaml:execution_graph_run_missing"]
+    raw_graph = raw_run.get("execution_graph")
+    if not is_string_object_mapping(raw_graph):
+        return None, None, ["team_manifest.yaml:execution_graph_missing"]
+    raw_state = raw_graph.get("result_readback")
+    if not is_string_object_mapping(raw_state):
+        return (
+            raw_run,
+            raw_graph,
+            ["team_manifest.yaml:execution_graph_result_readback_missing"],
+        )
+    return raw_run, raw_graph, []
+
+
+def _execution_graph_waves(
+    graph: Mapping[str, object],
+) -> tuple[dict[str, tuple[str, ...]], list[str]]:
+    """Project declared wave role instances from the run's selected graph."""
+    waves: dict[str, tuple[str, ...]] = {}
+    blockers: list[str] = []
+    initial_roles = graph.get("initial_wave_role_ids")
+    initial_instances = graph.get("initial_wave_role_instances")
+    if not isinstance(initial_roles, list) or not isinstance(initial_instances, list):
+        return {}, ["team_manifest.yaml:execution_graph_initial_wave_invalid"]
+    if len(initial_roles) != len(initial_instances) or any(
+        not isinstance(role, str)
+        or not isinstance(identity, str)
+        or not role.strip()
+        or not identity.strip()
+        for role, identity in zip(initial_roles, initial_instances, strict=True)
+    ):
+        return {}, ["team_manifest.yaml:execution_graph_initial_wave_invalid"]
+    if initial_instances:
+        waves["WAVE-1"] = tuple(initial_instances)
+    raw_later_waves = graph.get("later_stage_waves")
+    if not isinstance(raw_later_waves, list):
+        return waves, ["team_manifest.yaml:execution_graph_later_waves_invalid"]
+    for raw_wave in raw_later_waves:
+        if not is_string_object_mapping(raw_wave):
+            blockers.append("team_manifest.yaml:execution_graph_later_wave_invalid")
+            continue
+        wave_id = raw_wave.get("wave_id")
+        raw_instances = raw_wave.get("role_instances")
+        if wave_id == "none" and raw_instances == []:
+            continue
+        if (
+            not isinstance(wave_id, str)
+            or not wave_id.strip()
+            or not isinstance(raw_instances, list)
+        ):
+            blockers.append("team_manifest.yaml:execution_graph_later_wave_invalid")
+            continue
+        identities: list[str] = []
+        for raw_identity in raw_instances:
+            if (
+                not isinstance(raw_identity, str)
+                or ":team_manifest.yaml#roles." not in raw_identity
+            ):
+                blockers.append(
+                    f"team_manifest.yaml:execution_graph_role_instance_invalid:{wave_id}"
+                )
+                identities = []
+                break
+            identities.append(raw_identity.split(":team_manifest.yaml#roles.", 1)[0])
+        if not identities:
+            blockers.append(
+                f"team_manifest.yaml:execution_graph_later_wave_empty:{wave_id}"
+            )
+            continue
+        if wave_id in waves:
+            blockers.append(
+                f"team_manifest.yaml:execution_graph_wave_duplicate:{wave_id}"
+            )
+            continue
+        waves[wave_id] = tuple(identities)
+    return waves, blockers
+
+
+def _execution_graph_result_blockers(
+    run: Mapping[str, object],
+    graph: Mapping[str, object],
+    expected_waves: Mapping[str, tuple[str, ...]],
+) -> list[str]:
+    """Require actual successful host results for every selected graph node."""
+    raw_state = graph.get("result_readback")
+    if not is_string_object_mapping(raw_state):
+        return ["team_manifest.yaml:execution_graph_result_readback_missing"]
+    blockers: list[str] = []
+    if raw_state.get("status") != "awaiting_closeout":
+        blockers.append(
+            "team_manifest.yaml:execution_graph_results_incomplete:"
+            f"{raw_state.get('status', 'missing')}"
+        )
+    expected_wave_ids = tuple(expected_waves)
+    completed_wave_ids = raw_state.get("completed_wave_ids")
+    if (
+        not isinstance(completed_wave_ids, list)
+        or any(not isinstance(wave_id, str) for wave_id in completed_wave_ids)
+        or set(completed_wave_ids) != set(expected_wave_ids)
+        or len(completed_wave_ids) != len(expected_wave_ids)
+    ):
+        blockers.append("team_manifest.yaml:execution_graph_completed_waves_mismatch")
+    raw_results = raw_state.get("role_results")
+    if not is_string_object_mapping(raw_results):
+        blockers.append("team_manifest.yaml:execution_graph_role_results_invalid")
+        raw_results = {}
+    expected_identities = {
+        identity for identities in expected_waves.values() for identity in identities
+    }
+    if set(raw_results) != expected_identities:
+        blockers.append("team_manifest.yaml:execution_graph_role_results_mismatch")
+    for identity in sorted(expected_identities):
+        raw_result = raw_results.get(identity)
+        if not is_string_object_mapping(raw_result):
+            blockers.append(
+                f"team_manifest.yaml:execution_graph_role_result_missing:{identity}"
+            )
+            continue
+        for field in ("spawn_result", "completion_result"):
+            raw_value = raw_result.get(field)
+            if not is_string_object_mapping(raw_value):
+                blockers.append(
+                    f"team_manifest.yaml:execution_graph_{field}_missing:{identity}"
+                )
+                continue
+            if (
+                raw_value.get("is_error") is not False
+                or not isinstance(raw_value.get("text"), str)
+                or not str(raw_value.get("text", "")).strip()
+            ):
+                blockers.append(
+                    f"team_manifest.yaml:execution_graph_{field}_unsuccessful:{identity}"
+                )
+    issue_dispatch = run.get("issue_worker_dispatch")
+    if is_string_object_mapping(issue_dispatch):
+        issue_status = issue_dispatch.get("status")
+        if issue_status in {"pending", "spawned"}:
+            blockers.append(
+                "team_manifest.yaml:issue_worker_publication_result_missing"
+            )
+        elif issue_status == "result_received":
+            publication_results = [
+                value.get("publication_result")
+                for value in raw_results.values()
+                if is_string_object_mapping(value)
+            ]
+            if not any(
+                is_string_object_mapping(result)
+                and result.get("is_error") is False
+                and isinstance(result.get("text"), str)
+                and str(result.get("text", "")).strip()
+                for result in publication_results
+            ):
+                blockers.append(
+                    "team_manifest.yaml:issue_worker_publication_result_invalid"
+                )
+        elif issue_status == "failed":
+            blockers.append("team_manifest.yaml:issue_worker_publication_failed")
+    return blockers
+
+
 def _actual_wave_field_blockers(
     wave_id: str,
     actual: dict[str, str],
@@ -3295,102 +3459,52 @@ def _mid_task_user_input_blockers(
     return blockers
 
 
-def _actual_wave_mismatch_blockers(
-    wave_id: str,
-    planned: dict[str, str],
-    actual: dict[str, str],
-) -> list[str]:
-    blockers: list[str] = []
-    for schedule_field, event_field in WAVE_COMPARISON_FIELDS:
-        planned_value = planned.get(schedule_field, "").strip()
-        if planned_value and planned_value != actual.get(event_field, "").strip():
-            blockers.append(
-                f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:{event_field}"
-            )
-    if _split_csv_field(planned.get("Spawned Roles", "")) != _split_csv_field(
-        actual.get("spawned_roles", "")
-    ):
-        blockers.append(
-            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:spawned_roles"
-        )
-    if _split_csv_field(planned.get("Role Instances", "")) != _split_csv_field(
-        actual.get("role_instances", "")
-    ):
-        blockers.append(
-            f"workflow_monitoring.md:actual_wave_mismatch:{wave_id}:role_instances"
-        )
-    return blockers
-
-
-class MissingActualWaveClassification(str, Enum):
-    """Exact classifications for planned waves with no actual event."""
-
-    OVERPLANNING = "overplanning"
-    LOGGING_GAP = "logging_gap"
-    UNRESOLVED = "unresolved"
-
-
-def _missing_actual_wave_classification(planned: dict[str, str]) -> str:
-    """Return one exact missing-wave enum value; invalid values are unresolved."""
-    candidates: list[MissingActualWaveClassification] = []
-    for field in ("Status", "Skipped Roles / Rationale"):
-        raw_value = planned.get(field, "").strip().lower()
-        try:
-            candidates.append(MissingActualWaveClassification(raw_value))
-        except ValueError:
-            continue
-    if not candidates or len(set(candidates)) != 1:
-        return MissingActualWaveClassification.UNRESOLVED.value
-    return candidates[0].value
-
-
 def wave_reconciliation_blockers(
-    schedule_text: str,
     workflow_monitoring_text: str,
     lifecycle_status: dict[str, str],
     report_dir: Path | None = None,
     workspace: Path | None = None,
 ) -> list[str]:
-    """Return blockers when planned subagent waves do not match observed events."""
-    planned_rows = markdown_table_dict_rows(schedule_text, "## Agent Wave Ledger")
-    planned_by_id = {
-        row.get("Wave ID", "").strip(): row
-        for row in planned_rows
-        if row.get("Wave ID", "").strip()
-    }
-    blockers: list[str] = []
-
+    """Require graph results and matching actual-wave readback before closeout."""
+    if report_dir is None:
+        return ["team_manifest.yaml:execution_graph_report_dir_missing"]
+    run, graph, graph_blockers = _execution_graph_from_run(report_dir)
+    blockers = list(graph_blockers)
+    if run is None or graph is None:
+        return blockers
+    expected_waves, wave_blockers = _execution_graph_waves(graph)
+    blockers.extend(wave_blockers)
+    blockers.extend(_execution_graph_result_blockers(run, graph, expected_waves))
+    actual_by_id, actual_id_blockers = _actual_waves_by_id(
+        actual_wave_event_fields(workflow_monitoring_text)
+    )
+    blockers.extend(actual_id_blockers)
     if lifecycle_status.get("agent_wave_ledger_status") == "not_applicable":
-        actual_rows = actual_wave_event_fields(workflow_monitoring_text)
-        if planned_by_id or actual_rows:
+        if expected_waves or actual_by_id:
             blockers.append(
                 "subagent_lifecycle:not_applicable_but_wave_evidence_present"
             )
         return blockers
 
-    actual_by_id, actual_id_blockers = _actual_waves_by_id(
-        actual_wave_event_fields(workflow_monitoring_text)
-    )
-    blockers.extend(actual_id_blockers)
-
-    for wave_id, planned in planned_by_id.items():
+    for wave_id, expected_identities in expected_waves.items():
         actual = actual_by_id.get(wave_id)
         if actual is None:
-            classification = _missing_actual_wave_classification(planned)
-            if classification in {"overplanning", "unresolved"}:
-                continue
-            if classification == "logging_gap":
-                blockers.append(
-                    f"workflow_monitoring.md:actual_wave_missing:{wave_id}:logging_gap"
-                )
-                continue
             blockers.append(f"workflow_monitoring.md:actual_wave_missing:{wave_id}")
             continue
         blockers.extend(
             _actual_wave_field_blockers(wave_id, actual, report_dir, workspace)
         )
-        blockers.extend(_actual_wave_mismatch_blockers(wave_id, planned, actual))
-    for wave_id in sorted(set(actual_by_id) - set(planned_by_id)):
+        if actual.get("status", "").strip() != "completed":
+            blockers.append(
+                f"workflow_monitoring.md:actual_wave_not_completed:{wave_id}"
+            )
+        if _split_csv_field(actual.get("role_instances", "")) != expected_identities:
+            blockers.append(
+                f"workflow_monitoring.md:actual_wave_role_instances_mismatch:{wave_id}"
+            )
+    for wave_id in sorted(set(actual_by_id) - set(expected_waves)):
+        if actual_by_id[wave_id].get("event_kind") == "mid_task_user_input":
+            continue
         blockers.append(f"workflow_monitoring.md:actual_wave_without_plan:{wave_id}")
     return blockers
 
@@ -3402,7 +3516,6 @@ def check_schedule_artifact(text: str) -> list[str]:
         ("## Stage Plan", "stage_plan_empty"),
         ("## Clause Coverage", "clause_coverage_empty"),
         ("## Planned Work Units", "planned_work_units_empty"),
-        ("## Agent Wave Ledger", "agent_wave_ledger_empty"),
     )
     for heading, slug in required_tables:
         if not table_body_rows(text, heading):
