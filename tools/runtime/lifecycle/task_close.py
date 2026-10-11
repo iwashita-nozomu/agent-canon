@@ -337,18 +337,6 @@ def owner_receipt_closeout_consumer(
     }
 
 
-def _resolve_report_root(
-    report_root: str | None,
-    *,
-    runtime_root: Path | str | None = None,
-) -> Path:
-    """Load the team CLI helper only for the CLI/report path."""
-    return resolve_report_root(
-        report_root,
-        runtime_root=runtime_root,
-    )
-
-
 def _runtime_validate(
     path: Path,
     purpose: str,
@@ -793,30 +781,9 @@ def current_diff_ref(workspace: Path) -> str:
 
 def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
     """Return source-tree Markdown paths changed in the current checkout."""
-    commands = (
-        ("git", "diff", "--name-only"),
-        ("git", "diff", "--cached", "--name-only"),
-        ("git", "ls-files", "--others", "--exclude-standard"),
+    return tuple(
+        path for path in changed_file_paths(workspace) if path.endswith(".md")
     )
-    paths: set[str] = set()
-    for command in commands:
-        result = subprocess.run(
-            list(command),
-            cwd=workspace,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            continue
-        for line in result.stdout.splitlines():
-            path = line.strip()
-            if not path.endswith(".md"):
-                continue
-            if path.startswith(("reports/", ".agent-canon/log-archive/")):
-                continue
-            paths.add(path)
-    return tuple(sorted(paths))
 
 
 def changed_file_paths(workspace: Path) -> tuple[str, ...]:
@@ -1487,10 +1454,7 @@ def main() -> int:
         report_dir = Path(args.report_dir).resolve()
     else:
         report_dir = (
-            _resolve_report_root(
-                args.report_root,
-                runtime_root=args.runtime_root,
-            )
+            resolve_report_root(args.report_root, runtime_root=args.runtime_root)
             / str(args.run_id)
         ).resolve()
     workspace = Path.cwd().resolve()
@@ -1570,8 +1534,8 @@ def main() -> int:
         closeout.get("diff_check_agent_complete", "").strip() == "not_applicable"
     )
     active_diff_ref = current_diff_ref(workspace)
-    changed_markdown = changed_markdown_paths(workspace)
     changed_all = changed_file_paths(workspace)
+    changed_markdown = tuple(path for path in changed_all if path.endswith(".md"))
     diff_check_route_unselected = (
         closeout.get("required_reviews_complete", "").strip() == "not_applicable"
         or diff_check.get("diff_check_agent_role", "").strip() == "not_applicable"
