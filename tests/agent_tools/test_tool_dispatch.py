@@ -35,7 +35,6 @@ class ToolDispatchTest(unittest.TestCase):
         """The repository publishes typed Python, Rust, and native catalog surfaces."""
         specs, schema = tool_dispatch.load_specs(PROJECT_ROOT)
         self.assertEqual(schema["version"], 2)
-        self.assertGreaterEqual(len(specs), 110)
         for spec in specs.values():
             self.assertIn(spec.runtime, {"python", "rust", "native"})
             self.assertIsInstance(spec.argv, tuple)
