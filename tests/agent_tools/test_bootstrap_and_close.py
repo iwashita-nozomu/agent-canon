@@ -1400,9 +1400,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 str(report_root),
                 "--run-id",
                 run_id,
-                "--writer-targets",
-                writer_targets,
             ]
+            # The initial wave contains no writer; pass its topic target only when
+            # re-entering after the first successful results unlock later waves.
+            resume_args = [*args, "--writer-targets", writer_targets]
             spawned: list[tuple[str, str]] = []
 
             def spawn(agent_type: str, prompt: str) -> str:
@@ -1458,7 +1459,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 redirect_stdout(second_output),
             ):
                 second_code = bootstrap_agent_run(
-                    [*args, "--execution-results", json.dumps(results)]
+                    [*resume_args, "--execution-results", json.dumps(results)]
                 )
 
             self.assertEqual(second_code, 0)
@@ -1479,7 +1480,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ready_calls[0]["intent"],
             )
             self.assertIn(
-                "native collaboration.spawn_agent operation",
+                "parent owns execution-graph progression",
+                ready_calls[0]["arguments"]["input"],
+            )
+            self.assertIn(
+                "return its actual result inline",
                 ready_calls[0]["arguments"]["input"],
             )
             self.assertNotIn(
@@ -1510,6 +1515,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         for item in wave["role_instances"]
                     ]
             current_output = second_output.getvalue()
+            writer_target_dispatched = False
+            writer_target_owner: str | None = None
+            writer_wave_id: str | None = None
             while "EXECUTION_GRAPH_STATUS=ready" in current_output:
                 wave_index = int(
                     next(
@@ -1520,6 +1528,37 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 )
                 identities = wave_identities[f"WAVE-{wave_index}"]
                 self.assertTrue(identities)
+                ready_tool_call_line = next(
+                    line
+                    for line in current_output.splitlines()
+                    if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+                )
+                ready_tool_calls = json.loads(ready_tool_call_line.split("=", 1)[1])
+                writer_tool_call = next(
+                    (
+                        call
+                        for call in ready_tool_calls
+                        if call["arguments"]["role"] == "implementer"
+                    ),
+                    None,
+                )
+                if writer_tool_call is not None:
+                    target = writer_tool_call["arguments"]["writer_target"]
+                    writer_target_owner = next(
+                        identity
+                        for identity in identities
+                        if identity.startswith("implementer:")
+                    )
+                    writer_wave_id = f"WAVE-{wave_index}"
+                    self.assertEqual(target["checkout_root"], host_checkout)
+                    self.assertEqual(target["branch"], checkout_identity["branch"])
+                    self.assertEqual(target["remote"], checkout_identity["remote"])
+                    self.assertEqual(target["allowed_paths"], ["paper/draft.md"])
+                    self.assertIn(
+                        "completed " + next(iter(spawn_results)),
+                        writer_tool_call["arguments"]["input"],
+                    )
+                    writer_target_dispatched = True
                 wave_results = {
                     identity: {
                         "spawn_result": {
@@ -1540,11 +1579,19 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     patch.dict(os.environ, target_environment),
                     redirect_stdout(current_output),
                 ):
+                    completion_args = (
+                        args if writer_tool_call is not None else resume_args
+                    )
                     current_code = bootstrap_agent_run(
-                        [*args, "--execution-results", json.dumps(wave_results)]
+                        [
+                            *completion_args,
+                            "--execution-results",
+                            json.dumps(wave_results),
+                        ]
                     )
                 self.assertEqual(current_code, 0, current_output.getvalue())
                 current_output = current_output.getvalue()
+            self.assertTrue(writer_target_dispatched)
             self.assertIn("EXECUTION_GRAPH_STATUS=awaiting_closeout", current_output)
 
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
@@ -1560,13 +1607,27 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertEqual(state["completed_wave_ids"], expected_wave_ids)
             self.assertEqual(state["status"], "awaiting_closeout")
+            self.assertTrue(writer_target_dispatched)
+            self.assertIsNotNone(writer_target_owner)
+            self.assertIsNotNone(writer_wave_id)
+            saved_writer_target = next(
+                entry
+                for entry in graph["writer_targets"]
+                if entry["owner"] == writer_target_owner
+            )
+            self.assertEqual(
+                saved_writer_target["target"]["allowed_paths"], ["paper/draft.md"]
+            )
             monitoring = (report_dir / "workflow_monitoring.md").read_text(
                 encoding="utf-8"
             )
-            recorded_wave_ids = [
-                row["wave_id"] for row in actual_wave_event_fields(monitoring)
-            ]
+            wave_events = actual_wave_event_fields(monitoring)
+            recorded_wave_ids = [row["wave_id"] for row in wave_events]
             self.assertEqual(recorded_wave_ids, expected_wave_ids)
+            writer_wave_event = next(
+                row for row in wave_events if row["wave_id"] == writer_wave_id
+            )
+            self.assertEqual(writer_wave_event["allowed_paths"], "paper/draft.md")
             self.assertEqual(
                 wave_reconciliation_blockers(
                     monitoring,

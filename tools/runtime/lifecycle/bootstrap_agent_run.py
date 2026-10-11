@@ -1307,6 +1307,7 @@ def persist_execution_graph_readback(
     transition: ExecutionGraphTransition,
     skill_documents: Sequence[tuple[str, str, str]],
     issue_worker_dispatch: Mapping[str, object] | None,
+    materialized_writer_targets: Mapping[str, WriterTarget],
 ) -> None:
     """Persist actual result nodes in the existing run manifest for closeout."""
     manifest_path = report_dir / "team_manifest.yaml"
@@ -1329,6 +1330,18 @@ def persist_execution_graph_readback(
         "role_results": serialized_execution_results(results),
     }
     graph["skill_document_reads"] = serialized_skill_document_reads(skill_documents)
+    raw_writer_targets = graph.get("writer_targets")
+    if not isinstance(raw_writer_targets, list):
+        raise RuntimeError("execution_result:writer_targets_missing")
+    recorded_owners = {
+        entry.get("owner") for entry in raw_writer_targets if isinstance(entry, Mapping)
+    }
+    for owner, target in sorted(materialized_writer_targets.items()):
+        if owner not in recorded_owners:
+            raw_writer_targets.append(
+                {"owner": owner, "target": parse_writer_target(target).as_dict()}
+            )
+    graph["writer_targets"] = raw_writer_targets
     run["execution_graph"] = graph
     if issue_worker_dispatch is not None:
         run["issue_worker_dispatch"] = {
@@ -1363,6 +1376,8 @@ def persist_execution_graph_readback(
         or not is_string_object_mapping(readback["run"].get("execution_graph"))
         or readback["run"]["execution_graph"].get("result_readback")
         != graph["result_readback"]
+        or readback["run"]["execution_graph"].get("writer_targets")
+        != graph["writer_targets"]
     ):
         raise RuntimeError("execution_result:run_manifest_readback_mismatch")
 
@@ -1378,7 +1393,6 @@ def validate_execution_graph_readback(
     selected_skills: tuple[str, ...],
     agent_type_selections: tuple[AgentTypeSelection, ...],
     waves: tuple[tuple[SubagentWaveSlot, ...], ...],
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None],
 ) -> None:
     """Reject resume inputs that would change the already-published graph."""
     raw_graph = run.get("execution_graph")
@@ -1464,21 +1478,13 @@ def validate_execution_graph_readback(
     raw_targets = graph.get("writer_targets")
     if not isinstance(raw_targets, list):
         raise RuntimeError("execution_result:writer_targets_missing")
-    expected_targets = [
-        {"owner": owner, "target": parse_writer_target(target).as_dict()}
-        for owner, target in sorted(writer_targets.items())
-    ]
-    observed_targets: list[dict[str, object]] = []
     for entry in raw_targets:
-        if not is_string_object_mapping(entry) or not is_string_object_mapping(
-            entry.get("target")
+        if (
+            not is_string_object_mapping(entry)
+            or not isinstance(entry.get("owner"), str)
+            or not is_string_object_mapping(entry.get("target"))
         ):
             raise RuntimeError("execution_result:writer_target_invalid")
-        observed_targets.append(
-            {"owner": entry.get("owner"), "target": dict(entry["target"])}
-        )
-    if observed_targets != expected_targets:
-        raise RuntimeError("execution_result:writer_targets_mismatch")
 
 
 def execution_wave_readback_rows(
@@ -1928,6 +1934,24 @@ def main(
         execution_waves = (initial_slots, *expansion_waves)
     if existing_run is not None:
         try:
+            saved_graph_targets = (
+                existing_graph.get("writer_targets")
+                if existing_graph is not None
+                else None
+            )
+            executable_identities = {
+                slot.executable_identity for wave in execution_waves for slot in wave
+            }
+            if isinstance(saved_graph_targets, list):
+                for entry in saved_graph_targets:
+                    if not is_string_object_mapping(entry):
+                        continue
+                    owner = entry.get("owner")
+                    target = entry.get("target")
+                    if owner in executable_identities and is_string_object_mapping(
+                        target
+                    ):
+                        writer_targets[str(owner)] = parse_writer_target(target)
             validate_execution_graph_readback(
                 existing_run,
                 workflow_family_id=context.workflow_family_id,
@@ -1938,7 +1962,6 @@ def main(
                 selected_skills=selected_skills,
                 agent_type_selections=agent_type_selections,
                 waves=execution_waves,
-                writer_targets=writer_targets,
             )
         except (RuntimeError, ValueError, WriterTargetError) as exc:
             print(str(exc), flush=True)
@@ -1954,6 +1977,7 @@ def main(
             raise RuntimeError("execution_result:publication_not_applicable")
         execution_tool_calls: tuple[dict[str, object], ...] = ()
         execution_spawn_results: tuple[tuple[str, str], ...] = ()
+        materialized_writer_target_calls: tuple[tuple[str, dict[str, object]], ...] = ()
         deferred_tool_call_transition: ExecutionGraphTransition | None = None
         if execution_transition.ready_slots:
             if (
@@ -2051,6 +2075,14 @@ def main(
                             writer_targets=writer_targets,
                             math_intent_route=context.math_intent_route,
                             math_intent_packet=math_intent_packet,
+                        )
+                        materialized_writer_target_calls = tuple(
+                            (slot.executable_identity, call)
+                            for slot, call in zip(
+                                execution_transition.ready_slots,
+                                execution_tool_calls,
+                                strict=True,
+                            )
                         )
         if spawn is not None and execution_transition.ready_slots:
             prompts: dict[str, str] = {}
@@ -2243,6 +2275,14 @@ def main(
                 math_intent_packet=math_intent_packet,
                 role_document_contexts=role_document_contexts,
             )
+            materialized_writer_target_calls = tuple(
+                (slot.executable_identity, call)
+                for slot, call in zip(
+                    deferred_tool_call_transition.ready_slots,
+                    execution_tool_calls,
+                    strict=True,
+                )
+            )
         except (
             RuntimeError,
             OSError,
@@ -2276,6 +2316,20 @@ def main(
 
     if resuming_run:
         try:
+            persisted_writer_targets: dict[str, WriterTarget] = {}
+            saved_graph_targets = (
+                existing_graph.get("writer_targets")
+                if existing_graph is not None
+                else None
+            )
+            if isinstance(saved_graph_targets, list):
+                for entry in saved_graph_targets:
+                    if not is_string_object_mapping(entry):
+                        continue
+                    owner = entry.get("owner")
+                    target = entry.get("target")
+                    if isinstance(owner, str) and is_string_object_mapping(target):
+                        persisted_writer_targets[owner] = parse_writer_target(target)
             prior_completed_wave_ids = set(
                 completed_execution_wave_ids(execution_waves, prior_execution_results)
             )
@@ -2290,7 +2344,7 @@ def main(
                 execution_results,
                 active_budget=context.workflow_active_spawn_budget or 0,
                 workspace_root=workspace_root,
-                writer_targets=writer_targets,
+                writer_targets=persisted_writer_targets,
             )
             readback_rows = tuple(
                 row
@@ -2325,6 +2379,14 @@ def main(
             and workflow_context_result.status == "stored"
         ):
             created_files = (*created_files, "skill_usage_context.json")
+    materialized_writer_targets: dict[str, WriterTarget] = {}
+    for owner, call in materialized_writer_target_calls:
+        arguments = call.get("arguments")
+        if not is_string_object_mapping(arguments):
+            continue
+        target = arguments.get("writer_target")
+        if is_string_object_mapping(target):
+            materialized_writer_targets[owner] = parse_writer_target(target)
     try:
         persist_execution_graph_readback(
             repository_roots.agentcanon_source_root,
@@ -2335,6 +2397,7 @@ def main(
             execution_transition,
             skill_documents,
             issue_worker_dispatch,
+            materialized_writer_targets,
         )
     except (RuntimeError, OSError, ValueError) as exc:
         print(str(exc), flush=True)
