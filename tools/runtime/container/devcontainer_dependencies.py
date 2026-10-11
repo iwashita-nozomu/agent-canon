@@ -1948,19 +1948,25 @@ def _validate_method_values(record: DependencyRecord) -> None:
         for asset in (record.asset, *[value for _, value in record.assets]):
             if asset is not None:
                 _validate_safe_asset_path(asset, f"{record.id}.asset")
+                if record.archive_format == "deb" and not asset.endswith(".deb"):
+                    raise DependencyError(
+                        f"{record.id}.asset must name a .deb file"
+                    )
         for arch, _ in record.assets:
             if arch not in {"x86_64", "aarch64"}:
                 raise DependencyError(
                     f"{record.id}.assets has an unsupported architecture"
                 )
         assert record.archive_format is not None
-        if record.archive_format not in {"binary", "tar.gz", "tar.xz", "tar"}:
+        if record.archive_format not in {"binary", "deb", "tar.gz", "tar.xz", "tar"}:
             raise DependencyError(f"{record.id}.archive_format is unsupported")
         assert record.extract is not None
         _validate_safe_member(record.extract, f"{record.id}.extract")
-        if (record.archive_format == "binary") != (record.extract == "none"):
+        if (record.archive_format in {"binary", "deb"}) != (
+            record.extract == "none"
+        ):
             raise DependencyError(
-                f"{record.id}: binary release assets require extract=none"
+                f"{record.id}: binary and .deb release assets require extract=none"
             )
         assert record.destination is not None
         _validate_absolute_path(
@@ -4434,7 +4440,9 @@ class Installer:
                 env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
-            self._install_release_asset(record, workspace=workspace)
+            self._install_release_asset(
+                record, workspace=workspace, repair=repair
+            )
         elif method is Method.RUST_TOOLCHAIN:
             tool_env = self._with_tool_paths(None)
             self._run(
@@ -5331,7 +5339,7 @@ class Installer:
                 self._run(command, workspace=workspace, privileged=True)
 
     def _install_release_asset(
-        self, record: DependencyRecord, *, workspace: Path
+        self, record: DependencyRecord, *, workspace: Path, repair: bool = False
     ) -> None:
         assert record.destination is not None
         asset_map = dict(record.assets)
@@ -5400,9 +5408,28 @@ class Installer:
                         f"{record.id}: extracted destination not found"
                     )
                 candidate = matches[0]
-            self._run_install_file(
-                candidate, Path(record.destination), workspace=workspace
-            )
+            if record.archive_format == "deb":
+                self._run_install_deb(candidate, workspace=workspace, repair=repair)
+            else:
+                self._run_install_file(
+                    candidate, Path(record.destination), workspace=workspace
+                )
+
+    def _run_install_deb(
+        self, package: Path, *, workspace: Path, repair: bool = False
+    ) -> None:
+        """Install one checksum-verified release .deb through the image apt owner."""
+        command = [
+            "apt-get",
+            "install",
+            "-y",
+            "--no-install-recommends",
+            "--no-remove",
+            str(package),
+        ]
+        if repair:
+            command.insert(2, "--reinstall")
+        self._run(command, workspace=workspace, privileged=True)
 
     def _run_install_file(
         self, source: Path, destination: Path, *, workspace: Path

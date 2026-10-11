@@ -1,6 +1,6 @@
 # @dependency-start
 # contract environment
-# responsibility Declares shared AgentCanon Python, Rust, LSP, and native workflow-checking image capabilities.
+# responsibility Declares shared AgentCanon Python, Rust, LSP, document-rendering, and workflow-checking image capabilities.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md shared tool runtime boundary
 # downstream implementation ./Dockerfile image-install and immutable receipts
 # downstream implementation ../../../tools/analysis/dependencies/dependency_plan.py typed dependency planner
@@ -114,6 +114,399 @@ provides = ["markdownlint-cli2-formatter-json"]
 failure_policy = "fail"
 
 [[records]]
+id = "gnupg"
+package = "gnupg"
+method = "apt-package"
+version = "2.4.4-2ubuntu17"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = ["gnupg"]
+failure_policy = "fail"
+
+[[records]]
+id = "node"
+package = "nodejs"
+method = "apt-repository"
+version = "22.23.3-1nodesource1"
+source = "https://deb.nodesource.com/node_22.x"
+platforms = ["linux/amd64", "linux/arm64"]
+key_url = "https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key"
+key_fingerprint = "6F71F525282841EEDAF851B42F59B5F99B1BE0B4"
+repository_suite = "nodistro"
+repository_components = ["main"]
+repository_package_urls = { amd64 = "https://deb.nodesource.com/node_22.x/pool/main/n/nodejs/nodejs_22.23.3-1nodesource1_amd64.deb", arm64 = "https://deb.nodesource.com/node_22.x/pool/main/n/nodejs/nodejs_22.23.3-1nodesource1_arm64.deb" }
+repository_package_sha256s = { amd64 = "31eef6210cb50f9031afb59e7f1ed741d40db5d39f0894372b19444f33c4996e", arm64 = "94daeb24f6121cc7b684b1bb025f098761f2af1625923283e8377506004dec56" }
+executable_owner_packages = ["nodejs"]
+verification = { kind = "apt-repository", executable = "node", args = ["--version"], output_contains = "v22.23.3" }
+deps = ["gnupg"]
+provides = ["node", "nodejs", "npm"]
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-fonts-liberation"
+package = "fonts-liberation"
+method = "apt-package"
+version = "1:2.1.5-3"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libasound2t64"
+package = "libasound2t64"
+method = "apt-package"
+version = "1.2.11-1build2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libatk-bridge2.0-0t64"
+package = "libatk-bridge2.0-0t64"
+method = "apt-package"
+version = "2.52.0-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libatk1.0-0t64"
+package = "libatk1.0-0t64"
+method = "apt-package"
+version = "2.52.0-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libcairo2"
+package = "libcairo2"
+method = "apt-package"
+version = "1.18.0-3build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libcups2t64"
+package = "libcups2t64"
+method = "apt-package"
+version = "2.4.7-1.2ubuntu7"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libdbus-1-3"
+package = "libdbus-1-3"
+method = "apt-package"
+version = "1.14.10-4ubuntu4"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libexpat1"
+package = "libexpat1"
+method = "apt-package"
+version = "2.6.1-2build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libfontconfig1"
+package = "libfontconfig1"
+method = "apt-package"
+version = "2.15.0-1.1ubuntu2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libgbm1"
+package = "libgbm1"
+method = "apt-package"
+version = "24.0.5-1ubuntu1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libglib2.0-0t64"
+package = "libglib2.0-0t64"
+method = "apt-package"
+version = "2.80.0-6ubuntu1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libgtk-3-0t64"
+package = "libgtk-3-0t64"
+method = "apt-package"
+version = "3.24.41-4ubuntu1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libnspr4"
+package = "libnspr4"
+method = "apt-package"
+version = "2:4.35-1.1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libnss3"
+package = "libnss3"
+method = "apt-package"
+version = "2:3.98-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libpango-1.0-0"
+package = "libpango-1.0-0"
+method = "apt-package"
+version = "1.52.1+ds-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libpangocairo-1.0-0"
+package = "libpangocairo-1.0-0"
+method = "apt-package"
+version = "1.52.1+ds-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libx11-6"
+package = "libx11-6"
+method = "apt-package"
+version = "2:1.8.7-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libx11-xcb1"
+package = "libx11-xcb1"
+method = "apt-package"
+version = "2:1.8.7-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxcb1"
+package = "libxcb1"
+method = "apt-package"
+version = "1.15-1ubuntu2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxcomposite1"
+package = "libxcomposite1"
+method = "apt-package"
+version = "1:0.4.5-1build3"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxcursor1"
+package = "libxcursor1"
+method = "apt-package"
+version = "1:1.2.1-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxdamage1"
+package = "libxdamage1"
+method = "apt-package"
+version = "1:1.1.6-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxext6"
+package = "libxext6"
+method = "apt-package"
+version = "2:1.3.4-1build2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxfixes3"
+package = "libxfixes3"
+method = "apt-package"
+version = "1:6.0.0-2build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxi6"
+package = "libxi6"
+method = "apt-package"
+version = "2:1.8.1-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxkbcommon0"
+package = "libxkbcommon0"
+method = "apt-package"
+version = "1.6.0-1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxrandr2"
+package = "libxrandr2"
+method = "apt-package"
+version = "2:1.5.2-2build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxrender1"
+package = "libxrender1"
+method = "apt-package"
+version = "0.9.10-1.1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxss1"
+package = "libxss1"
+method = "apt-package"
+version = "1:1.2.3-1build3"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-libxtst6"
+package = "libxtst6"
+method = "apt-package"
+version = "2:1.2.3-1.1build1"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-lsb-release"
+package = "lsb-release"
+method = "apt-package"
+version = "12.0-2"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-wget"
+package = "wget"
+method = "apt-package"
+version = "1.21.4-1ubuntu4"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer-xdg-utils"
+package = "xdg-utils"
+method = "apt-package"
+version = "1.1.3-4.1ubuntu3"
+source = "ubuntu:24.04"
+verification = { kind = "apt-package" }
+deps = []
+provides = []
+failure_policy = "fail"
+
+[[records]]
 id = "jq"
 package = "jq"
 method = "apt-package"
@@ -207,6 +600,60 @@ destination = "/usr/local/bin/zizmor"
 verification = { kind = "absolute-executable", path = "/usr/local/bin/zizmor", args = ["--version"], output_contains = "1.30.1" }
 deps = []
 provides = ["zizmor"]
+failure_policy = "fail"
+
+[[records]]
+id = "quarto"
+package = "quarto"
+method = "release-asset"
+version = "1.10.19"
+source = "https://github.com/quarto-dev/quarto-cli/releases/download/v1.10.19"
+assets = { aarch64 = "quarto-1.10.19-linux-arm64.deb", x86_64 = "quarto-1.10.19-linux-amd64.deb" }
+checksums = { aarch64 = "35bb613052da98bef92ec3b7de77c3405a8e546363c7d2aa3abe15a39efa5045", x86_64 = "7f0c4769e7f0e55f50d922f44b18db5118fb388d2b8fd27291fe1f8beafb43eb" }
+archive_format = "deb"
+extract = "none"
+destination = "/usr/local/bin/quarto"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/quarto", args = ["--version"], output_contains = "1.10.19" }
+deps = []
+provides = ["quarto"]
+failure_policy = "fail"
+
+[[records]]
+id = "lychee"
+package = "lychee"
+method = "release-asset"
+version = "0.24.2"
+source = "https://github.com/lycheeverse/lychee/releases/download/lychee-v0.24.2"
+assets = { aarch64 = "lychee-aarch64-unknown-linux-musl.tar.gz", x86_64 = "lychee-x86_64-unknown-linux-musl.tar.gz" }
+checksums = { aarch64 = "5d0b0e3aeab240f41920c633a6eaf97599be6eedda034b36e858ede7dba5e535", x86_64 = "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5" }
+archive_format = "tar.gz"
+extract = "lychee"
+destination = "/usr/local/bin/lychee"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/lychee", args = ["--version"], output_contains = "0.24.2" }
+deps = []
+provides = ["lychee"]
+failure_policy = "fail"
+
+[[records]]
+id = "puppeteer"
+package = "puppeteer"
+method = "npm-global"
+version = "25.13.0"
+source = "https://registry.npmjs.org/puppeteer"
+verification = { kind = "npm-package", executable = "puppeteer", args = ["--version"], output_contains = "25.13.0" }
+deps = ["node", "puppeteer-fonts-liberation", "puppeteer-libasound2t64", "puppeteer-libatk-bridge2.0-0t64", "puppeteer-libatk1.0-0t64", "puppeteer-libcairo2", "puppeteer-libcups2t64", "puppeteer-libdbus-1-3", "puppeteer-libexpat1", "puppeteer-libfontconfig1", "puppeteer-libgbm1", "puppeteer-libglib2.0-0t64", "puppeteer-libgtk-3-0t64", "puppeteer-libnspr4", "puppeteer-libnss3", "puppeteer-libpango-1.0-0", "puppeteer-libpangocairo-1.0-0", "puppeteer-libx11-6", "puppeteer-libx11-xcb1", "puppeteer-libxcb1", "puppeteer-libxcomposite1", "puppeteer-libxcursor1", "puppeteer-libxdamage1", "puppeteer-libxext6", "puppeteer-libxfixes3", "puppeteer-libxi6", "puppeteer-libxkbcommon0", "puppeteer-libxrandr2", "puppeteer-libxrender1", "puppeteer-libxss1", "puppeteer-libxtst6", "puppeteer-lsb-release", "puppeteer-wget", "puppeteer-xdg-utils"]
+provides = ["puppeteer"]
+failure_policy = "fail"
+
+[[records]]
+id = "mermaid-cli"
+package = "@mermaid-js/mermaid-cli"
+method = "npm-global"
+version = "12.0.0"
+source = "https://registry.npmjs.org/@mermaid-js/mermaid-cli"
+verification = { kind = "npm-package", executable = "mmdc", args = ["--version"], output_contains = "12.0.0" }
+deps = ["node", "puppeteer"]
+provides = ["mermaid-cli", "mmdc"]
 failure_policy = "fail"
 
 [[records]]

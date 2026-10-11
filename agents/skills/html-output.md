@@ -8,6 +8,7 @@ upstream design ../../documents/design/responsibility-rationale.md HTML artifact
 upstream design structure-planning.md optional structural-decision owner
 upstream design report-writing.md reader-facing report content owner
 upstream design code-visualization.md sole public visualization owner and typed projection contract
+upstream environment ../../bootstrap/container/image/dependencies.toml supplies the standard Quarto renderer and offline link checker
 downstream implementation ../../.codex/personal/skills/html-output/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
@@ -26,6 +27,20 @@ Use this skill when HTML/browser output is explicitly requested. Reports otherwi
 Validate the produced file and the properties needed by the request: referenced assets exist, internal links/IDs resolve where applicable, required data/content is present, and selected layout/render checks succeed. Use `code-visualization` for selected graph rendering/coverage.
 
 A listen socket is not required to prove a static artifact correct.
+
+## Standard document rendering
+
+For AgentCanon's document and report route, delegate ordinary Markdown-to-HTML
+layout and serialization to the installed Quarto CLI. Inspect the source and
+its local resources with `quarto inspect`, then render with
+`quarto render <source> --to html --no-execute`. Quarto supplies its embedded
+Pandoc, so do not add a second Markdown parser or renderer. Code execution,
+network access, and a serving process remain disabled unless the request
+explicitly requires them. Embed resources only when a single-file artifact is
+requested, and validate the
+resulting links/assets with the existing offline link-check owner. Keep domain
+facts and specialized SVG/interactive visualizations with their existing
+owners.
 
 ## Preview and serving
 

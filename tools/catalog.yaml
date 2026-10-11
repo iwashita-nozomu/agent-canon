@@ -1092,7 +1092,7 @@ entries:
 
   - id: semantic-provider-html-report
     public: true
-    summary: Renders semantic-index compare-providers JSON into a self-contained HTML projection report with the provider-delta-to-shared-candidate-logic figure.
+    summary: Renders semantic-index compare-providers JSON through Quarto as a static HTML projection report with the provider-delta-to-shared-candidate-logic SVG; local resources stay beside the HTML unless --embed-resources is requested.
     path: tools/analysis/search/reporting/semantic_provider_html_report.py
     family: agent_tools
     role: docs
