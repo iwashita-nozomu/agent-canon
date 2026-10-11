@@ -1360,24 +1360,6 @@ entries:
     tests:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
-  - id: scan-code-dependencies
-    summary: Compatibility launcher for bounded queries against a standard SCIP index.scip artifact.
-    path: tools/analysis/dependencies/scan_code_dependencies.sh
-    family: agent_tools
-    role: checker
-    status: compatibility_wrapper
-    command: bash tools/analysis/dependencies/scan_code_dependencies.sh
-    dispatch: {argv: ["bash", "tools/analysis/dependencies/scan_code_dependencies.sh"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/scip_index.md
-    tests:
-      - tests/agent_tools/test_dependency_manifest_tools.py
-
   - id: scip
     summary: Runs the official SCIP CLI against standard index.scip artifacts in the shared tool container.
     path: tools/runtime/dispatch/tool_dispatch.py

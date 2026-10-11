@@ -4,7 +4,6 @@
 # responsibility Runs a selected native SCIP indexer and projects bounded facts from its index.
 # upstream design ../../../documents/design/dependency-manifest-design.md keeps code and header evidence separate.
 # upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external artifact paths and hashes.
-# downstream implementation ./scan_code_dependencies.sh is the legacy query launcher.
 # downstream implementation ./git_dependency_diff_summary.py consumes selected impact projections.
 # downstream design ../../../agents/skills/dependency-analysis.md selects optional index/query use.
 # downstream implementation ../../../tests/agent_tools/test_scip_index.py verifies native index handling.

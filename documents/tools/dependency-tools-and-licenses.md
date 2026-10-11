@@ -105,7 +105,6 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `check-dependency-header-format` | `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-headers` | `python3 tools/validation/semantic/dependencies/check_dependency_headers.py` | explicitly selected files の dependency manifest declaration を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
-| `scan-code-dependencies` | `bash tools/analysis/dependencies/scan_code_dependencies.sh` | Compatibility launcher for a bounded query of an external SCIP index. | no | local: Apache-2.0 |
 | `scip-index` | `python3 tools/analysis/dependencies/scip_index.py` | Runs a selected native SCIP indexer and projects bounded definitions, references, and implementations. | yes | local: Apache-2.0 |
 | `render-dependency-manifest-graph` | `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 

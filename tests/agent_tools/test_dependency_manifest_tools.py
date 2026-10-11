@@ -9,7 +9,6 @@
 # upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh format checks
 # upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh graph checks
 # upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps
-# upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh launches a SCIP query
 # @dependency-end
 
 from __future__ import annotations
@@ -43,9 +42,6 @@ REPO_REVIEW = (
     / "analysis"
     / "dependencies"
     / "run_repo_dependency_review.sh"
-)
-CODE_SCAN = (
-    PROJECT_ROOT / "tools" / "analysis" / "dependencies" / "scan_code_dependencies.sh"
 )
 WORKFLOW_MONITOR = (
     PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
@@ -161,23 +157,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
-
-    def test_code_scan_launcher_requires_standard_scip_inputs(self) -> None:
-        """The legacy command only exposes the standard SCIP query route."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            result = subprocess.run(
-                ["bash", str(CODE_SCAN), "--help"],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=tool_environment(root),
-            )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("--index index.scip", result.stdout)
-            self.assertNotIn("--lexical-only", result.stdout)
-            self.assertIn("does not scan source text", result.stdout)
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""

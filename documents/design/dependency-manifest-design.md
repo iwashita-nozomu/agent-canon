@@ -11,7 +11,7 @@ downstream implementation ../../tools/analysis/dependencies/scan_dependency_head
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
-downstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh launches bounded queries against a selected standard SCIP index
+downstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP artifacts and bounded query projections
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
@@ -616,25 +616,14 @@ even when only A is selected and B/C are unchanged.
 Code dependency evidence remains separate from dependency-manifest validation.
 `scip_index.py` writes the standard SCIP artifact using a selected native
 producer and projects bounded definitions, references, and explicitly declared
-implementation relationships through the official SCIP reader. The
-`scan_code_dependencies.sh` path is only a compatibility launcher for that
-query; it no longer scans text, emits dependency TSV, or supplies a lexical
-fallback. Point LSP analysis and diagnostics remain owned by
+implementation relationships through the official SCIP reader. Point LSP
+analysis and diagnostics remain owned by
 `lsp_code_analysis.py analyze` and are not repository-wide SCIP indexing.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
 Keep the evidence meanings separate: SCIP records indexed symbol occurrences,
 while header dependency evidence answers which design, implementation,
 environment, and test context must be read. References are not call edges, and
 an unsupported or unindexed target is not evidence of no references.
-
-### `scan_code_dependencies.sh`
-
-Responsibilities:
-
-- pass an explicitly selected external `index.scip` and bounded target paths to `scip_index.py query`
-- keep output independent from manifest upstream/downstream edges
-- provide optional pre-edit evidence for [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)
-- never scan source text or fabricate unsupported-language coverage
 
 ### `scan_dependency_headers.sh`
 

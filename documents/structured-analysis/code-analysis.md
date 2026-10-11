@@ -6,7 +6,7 @@ upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
 upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
 upstream implementation ../../tools/analysis/code/lsp_code_analysis.py extracts canonical LSP code facts
-upstream implementation ../../tools/analysis/dependencies/scan_code_dependencies.sh launches bounded queries against selected SCIP evidence
+upstream implementation ../../tools/analysis/dependencies/scip_index.py owns optional native SCIP index/query evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end
 -->
@@ -32,9 +32,8 @@ Point code analysis uses LSP 3.17 JSON-RPC through
 `lsp_code_analysis.py analyze --format json`; it remains distinct from
 dependency-header evidence. Repository-wide symbol/reference evidence is an
 optional native SCIP index/query path selected through
-`scip_index.py` and the bounded Change Impact consumer. The compatibility
-`scan_code_dependencies.sh` launcher accepts a selected standard index; it does
-not scan source syntax or invoke LSP.
+`scip_index.py` and the bounded Change Impact consumer. This path is distinct
+from LSP diagnostics and dependency-header evidence.
 
 Canonical report schema は `agent-canon.lsp-code-analysis.v1` である。report は
 root-relative POSIX locator、UTF-16 position、language server record、capability
@@ -59,7 +58,10 @@ claim source freshness or call-graph completeness.
 - Evidence sources: [documents/structured-analysis/code-analysis.md](code-analysis.md) owns this scope.
 - Evidence sources: `tools/analysis/code/lsp_code_analysis.py` owns the LSP adapter and report.
 - Evidence sources: `bootstrap/container/image/dependencies.toml` and [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) provide manifest, receipt, and live-verification evidence.
-- Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`, `tests/agent_tools/test_dependency_manifest_tools.py`, `tests/agent_tools/test_search.py`, and `tests/agent_tools/test_git_dependency_diff_summary.py` cover protocol, scanner, consumer, and summary behavior.
+- Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`,
+  `tests/agent_tools/test_scip_index.py`, `tests/agent_tools/test_search.py`, and
+  `tests/agent_tools/test_git_dependency_diff_summary.py` cover LSP protocol,
+  SCIP index/query, consumer, and summary behavior.
 - Assumptions: the manifest receipt/live verifier is the authority for executable selection.
 - Assumptions: LSP 3.17 server responses are runtime evidence.
 - Assumptions: selected SCIP artifacts are reference evidence, not proof of
