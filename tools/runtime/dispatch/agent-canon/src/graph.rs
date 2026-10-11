@@ -3251,106 +3251,105 @@ fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
                 || value.get("kind").and_then(Value::as_str) == Some(args.relation.as_str())
         })
         .collect::<Vec<_>>();
-    let (nodes, facts) = if args.all || args.path.is_none() {
-        (all_nodes, relation_facts)
-    } else {
-        let seed_path = args.path.as_deref().unwrap_or_default();
-        let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
-        for fact in &relation_facts {
-            let from = fact
-                .get("from")
-                .and_then(Value::as_str)
-                .ok_or_else(|| GraphError::Validation("query fact has no source ID".to_string()))?;
-            let to = fact
-                .get("to")
-                .and_then(Value::as_str)
-                .ok_or_else(|| GraphError::Validation("query fact has no target ID".to_string()))?;
-            match args.direction.as_str() {
-                "outgoing" => {
-                    adjacency
-                        .entry(from.to_string())
-                        .or_default()
-                        .insert(to.to_string());
+    let (nodes, facts) =
+        if args.all || args.path.is_none() {
+            (all_nodes, relation_facts)
+        } else {
+            let seed_path = args.path.as_deref().unwrap_or_default();
+            let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
+            for fact in &relation_facts {
+                let from = fact.get("from").and_then(Value::as_str).ok_or_else(|| {
+                    GraphError::Validation("query fact has no source ID".to_string())
+                })?;
+                let to = fact.get("to").and_then(Value::as_str).ok_or_else(|| {
+                    GraphError::Validation("query fact has no target ID".to_string())
+                })?;
+                match args.direction.as_str() {
+                    "outgoing" => {
+                        adjacency
+                            .entry(from.to_string())
+                            .or_default()
+                            .insert(to.to_string());
+                    }
+                    "incoming" => {
+                        adjacency
+                            .entry(to.to_string())
+                            .or_default()
+                            .insert(from.to_string());
+                    }
+                    "both" => {
+                        adjacency
+                            .entry(from.to_string())
+                            .or_default()
+                            .insert(to.to_string());
+                        adjacency
+                            .entry(to.to_string())
+                            .or_default()
+                            .insert(from.to_string());
+                    }
+                    _ => unreachable!("query direction validated above"),
                 }
-                "incoming" => {
-                    adjacency
-                        .entry(to.to_string())
-                        .or_default()
-                        .insert(from.to_string());
-                }
-                "both" => {
-                    adjacency
-                        .entry(from.to_string())
-                        .or_default()
-                        .insert(to.to_string());
-                    adjacency
-                        .entry(to.to_string())
-                        .or_default()
-                        .insert(from.to_string());
-                }
-                _ => unreachable!("query direction validated above"),
             }
-        }
 
-        let mut minimum_depth = BTreeMap::<String, usize>::new();
-        let mut queue = VecDeque::<String>::new();
-        for node in &all_nodes {
-            if node.get("path").and_then(Value::as_str) != Some(seed_path) {
-                continue;
+            let mut minimum_depth = BTreeMap::<String, usize>::new();
+            let mut queue = VecDeque::<String>::new();
+            for node in &all_nodes {
+                if node.get("path").and_then(Value::as_str) != Some(seed_path) {
+                    continue;
+                }
+                let node_id = node
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?
+                    .to_string();
+                if minimum_depth.insert(node_id.clone(), 0).is_none() {
+                    queue.push_back(node_id);
+                }
             }
-            let node_id = node
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?
-                .to_string();
-            if minimum_depth.insert(node_id.clone(), 0).is_none() {
-                queue.push_back(node_id);
-            }
-        }
-        while let Some(current) = queue.pop_front() {
-            let current_depth = minimum_depth[&current];
-            if current_depth >= args.depth {
-                continue;
-            }
-            let next_depth = current_depth + 1;
-            for next in adjacency.get(&current).into_iter().flatten() {
-                match minimum_depth.get(next) {
-                    Some(previous) if *previous <= next_depth => continue,
-                    _ => {
-                        minimum_depth.insert(next.clone(), next_depth);
-                        queue.push_back(next.clone());
+            while let Some(current) = queue.pop_front() {
+                let current_depth = minimum_depth[&current];
+                if current_depth >= args.depth {
+                    continue;
+                }
+                let next_depth = current_depth + 1;
+                for next in adjacency.get(&current).into_iter().flatten() {
+                    match minimum_depth.get(next) {
+                        Some(previous) if *previous <= next_depth => continue,
+                        _ => {
+                            minimum_depth.insert(next.clone(), next_depth);
+                            queue.push_back(next.clone());
+                        }
                     }
                 }
             }
-        }
 
-        let selected_node_ids = minimum_depth.keys().cloned().collect::<BTreeSet<_>>();
-        let mut nodes = Vec::new();
-        for mut node in all_nodes {
-            let node_id = node
-                .get("id")
-                .and_then(Value::as_str)
-                .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?;
-            let Some(depth) = minimum_depth.get(node_id).copied() else {
-                continue;
-            };
-            let object = node
-                .as_object_mut()
-                .ok_or_else(|| GraphError::Validation("query node is not an object".to_string()))?;
-            object.insert("minimum_depth".to_string(), json!(depth));
-            nodes.push(node);
-        }
-        let facts = relation_facts
-            .into_iter()
-            .filter(|fact| {
-                let from = fact.get("from").and_then(Value::as_str);
-                let to = fact.get("to").and_then(Value::as_str);
-                from.is_some_and(|id| selected_node_ids.contains(id))
-                    && to.is_some_and(|id| selected_node_ids.contains(id))
-            })
-            .collect::<Vec<_>>();
-        (nodes, facts)
-    };
+            let selected_node_ids = minimum_depth.keys().cloned().collect::<BTreeSet<_>>();
+            let mut nodes = Vec::new();
+            for mut node in all_nodes {
+                let node_id = node
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| GraphError::Validation("query node has no ID".to_string()))?;
+                let Some(depth) = minimum_depth.get(node_id).copied() else {
+                    continue;
+                };
+                let object = node.as_object_mut().ok_or_else(|| {
+                    GraphError::Validation("query node is not an object".to_string())
+                })?;
+                object.insert("minimum_depth".to_string(), json!(depth));
+                nodes.push(node);
+            }
+            let facts = relation_facts
+                .into_iter()
+                .filter(|fact| {
+                    let from = fact.get("from").and_then(Value::as_str);
+                    let to = fact.get("to").and_then(Value::as_str);
+                    from.is_some_and(|id| selected_node_ids.contains(id))
+                        && to.is_some_and(|id| selected_node_ids.contains(id))
+                })
+                .collect::<Vec<_>>();
+            (nodes, facts)
+        };
     Ok(
         json!({"schema":"agent-canon.graph.query.v1","command":"query","status":"fresh","profile":args.profile,"root":root,"path":args.path,"all":args.all,"relation":args.relation,"direction":args.direction,"depth":args.depth,"graph_fingerprint":status["graph_fingerprint"],"nodes":nodes,"facts":facts,"reason":Value::Null,"exit_code":0}),
     )
@@ -4380,17 +4379,19 @@ mod tests {
             .iter()
             .filter_map(|node| node.get("id").and_then(Value::as_str))
             .collect::<BTreeSet<_>>();
-        assert!(query["facts"].as_array().is_some_and(|facts| facts.iter().all(|fact| {
-            fact.get("kind").and_then(Value::as_str) == Some("dependency")
-                && fact
-                    .get("from")
-                    .and_then(Value::as_str)
-                    .is_some_and(|id| selected_ids.contains(id))
-                && fact
-                    .get("to")
-                    .and_then(Value::as_str)
-                    .is_some_and(|id| selected_ids.contains(id))
-        })));
+        assert!(query["facts"]
+            .as_array()
+            .is_some_and(|facts| facts.iter().all(|fact| {
+                fact.get("kind").and_then(Value::as_str) == Some("dependency")
+                    && fact
+                        .get("from")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+                    && fact
+                        .get("to")
+                        .and_then(Value::as_str)
+                        .is_some_and(|id| selected_ids.contains(id))
+            })));
 
         args.depth = 0;
         let seed_only = query_graph(&args).expect("zero-depth seeded query");

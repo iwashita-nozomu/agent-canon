@@ -152,7 +152,9 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                     depth=1,
                 )
 
-    def test_dependency_target_escape_is_rejected_without_runtime_fallback(self) -> None:
+    def test_dependency_target_escape_is_rejected_without_runtime_fallback(
+        self,
+    ) -> None:
         """Invalid source paths fail closed instead of falling back to graph state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -237,14 +239,13 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                 root, executable=root / "missing-agent-canon"
             ).query(all_nodes=True)
             self.assertEqual(
-                {
-                    (fact.source, fact.target)
-                    for fact in projection.dependency_facts
-                },
+                {(fact.source, fact.target) for fact in projection.dependency_facts},
                 {("tools/consumer.py", "agents/skills/example.md")},
             )
             self.assertFalse(
-                (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").exists()
+                (
+                    root / ".codex" / "personal" / "skills" / "example" / "SKILL.md"
+                ).exists()
             )
             context = GraphClient(
                 root, executable=root / "missing-agent-canon"
@@ -269,13 +270,16 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
                 """,
             )
             with self.assertRaisesRegex(
-                GraphClientError, "source dependency projection failed: unknown generated skill view"
+                GraphClientError,
+                "source dependency projection failed: unknown generated skill view",
             ):
                 GraphClient(root, executable=root / "missing-agent-canon").query(
                     all_nodes=True
                 )
 
-    def test_generated_skill_glob_resolves_all_catalog_owners_without_views(self) -> None:
+    def test_generated_skill_glob_resolves_all_catalog_owners_without_views(
+        self,
+    ) -> None:
         """Registry-backed generated skill globs expand without reading ignored shims."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -317,10 +321,7 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             ).query(all_nodes=True)
 
             self.assertEqual(
-                {
-                    (fact.source, fact.target)
-                    for fact in projection.dependency_facts
-                },
+                {(fact.source, fact.target) for fact in projection.dependency_facts},
                 {
                     ("tools/consumer.py", "agents/skills/alpha.md"),
                     ("tools/consumer.py", "agents/skills/beta.md"),
