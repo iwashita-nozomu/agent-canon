@@ -497,7 +497,10 @@ def main() -> int:
         "  enabled: false\n"
         "---\n\n"
     )
-    config_sha256 = sha256_bytes(frontmatter.encode("utf-8"))
+    project_config = "project:\n  type: default\n"
+    config_sha256 = sha256_bytes(
+        (project_config + frontmatter).encode("utf-8")
+    )
     source_sha256 = sha256_bytes(source_bytes)
     asset_sha256 = sha256_bytes(figure_bytes)
 
@@ -575,6 +578,7 @@ def main() -> int:
     source_hash = source_sha256
     config = {
         "title": args.title,
+        "project": {"type": "default"},
         "format": "html",
         "embed-resources": args.embed_resources,
         "execute": {"enabled": False},
@@ -587,7 +591,7 @@ def main() -> int:
         render_directory = source_directory / "rendered"
         source_directory.mkdir()
         (source_directory / "_quarto.yml").write_text(
-            "project:\n  type: default\n",
+            project_config,
             encoding="utf-8",
         )
         source_document = source_directory / "semantic-provider-report.qmd"

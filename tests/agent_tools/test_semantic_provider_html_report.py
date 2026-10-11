@@ -266,6 +266,9 @@ class SemanticProviderHtmlReportTest(unittest.TestCase):
             )
             receipt = json.loads(result_line.split("=", 1)[1])
             self.assertEqual(receipt["status"], "rendered")
+            self.assertEqual(
+                receipt["configuration"]["project"], {"type": "default"}
+            )
             self.assertEqual(receipt["validation"]["lychee"], "pass")
             self.assertEqual(receipt["quarto_version"], "1.10.19")
             self.assertEqual(receipt["pandoc_version"], "pandoc 3.4.0.1")
