@@ -9,6 +9,7 @@ downstream implementation ./agents/README.md reusable agent artifact template so
 downstream implementation ./documents/README.md reader-facing document template source
 downstream implementation ./code/README.md materializable code and Docstring template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
+downstream implementation ./experiments/_cpp_template C++-first experiment package source
 downstream implementation ../tools/runtime/source/export_static_seed.py produces the exact default-consumer seed
 downstream implementation ../tools/agent/templates/code_template_rendering.py renders AgentCanon-internal code templates
 downstream implementation ../tools/agent/orchestration/agent_team.py renders AgentCanon-internal agent templates
@@ -42,7 +43,8 @@ to a fresh external directory and records the source commit and bundle digest.
 | [templates/agents/](agents/README.md) | task-start、run bundle、review、closeout の artifact template | AgentCanon source 内で agent team が render する |
 | [templates/documents/](documents/README.md) | README、design、experiment、host、remote execution、GitHub source | standalone AgentCanon target と source を同時に更新する |
 | [templates/code/](code/README.md) | parse-valid module/class/function と Docstring の materializable source | source-owned renderer が destination owner へ materialize する |
-| [templates/experiments/_template/](experiments/_template/README.md) | runnable experiment scaffold の frozen source | source-owned experiment command が新規 topic へ copy する |
+| [templates/experiments/_template/](experiments/_template/README.md) | 既存Python experiment scaffold の frozen source | selected Python topic が新規 topic へ copy する |
+| [templates/experiments/_cpp_template/](experiments/_cpp_template/README.md) | profile-selected C++-first experiment package | selected C++ topic がCMake profileに応じたfilesをcopyする |
 | `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
 
 ## Default Consumer Export Boundary
@@ -67,15 +69,20 @@ background task は再生成や上流探索を行いません。
 
 ## Experiment Copy Boundary
 
-`create_experiment_topic.py` は AgentCanon source 内で
-`templates/experiments/_template/` を唯一の copy source として読み、生成先だけを
-`experiments/<topic>/` に書き込みます。この source-owned operation は default consumer の
-bootstrap/runtime surface ではありません。
+`create_experiment_topic.py` は AgentCanon source内のcanonical packageを読み、生成先
+`experiments/<topic>/`と`experiments/registry.toml`だけを同じoperationで更新します。default Python profileは
+registryの`defaults.topic_template_dir`または`_template/`を使います。C++ profileは明示的な
+`--template-profile cpp`とconsumer-selected `--cmake-profile`を要求し、`_cpp_template/`から
+selected CMake surfaceをmaterializeします。bootstrap tool-containerのpublic
+`create-experiment-topic` routeはactive explicit targetだけへ書き込みます。通常のtemplate exportは
+fresh external directoryへのsource-free package exportを所有し、parent topic/registryを直接更新しません。
 
-managed runner の実行入口は常に生成後の `experiments/<topic>/run.py` です。`run.py` は
-orchestration、run schema、atomic publication を担当します。`cases.py` が case model・registry・
-worker・failure classification、`visualization.py` が topic renderer extension point を所有します。
-topic-produced outputs are divided between `result/<run-id>/raw/` and `result/<run-id>/summary/`.
+生成後のtopic filesはAgentCanon source/runtime/networkをimport・参照しません。consumer run ownerがraw
+directoryとbuilt executableを渡します。Python profileの`run.py`、`cases.py`、`visualization.py`は既存managed lifecycle contractを使います。C++
+profileのnative targetが数値処理を所有し、`run.py`はbounded launch、`visualization.py`はraw output
+rendererを所有します。固定一件caseは`cases.py`を作らず、explicit multi-case selectionだけが既存`CaseSpec`
+field shapeのoptional adapterをmaterializeします。run identity、process lifecycle、summary/failure
+publicationはshared experiment lifecycle ownerに残ります。
 
 ## Consumer Migration Packet
 
