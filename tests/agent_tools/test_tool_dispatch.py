@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests typed catalog loading, parity gating, and argv-safe dispatch.
+# responsibility Tests typed catalog loading and argv-safe dispatch.
 # upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py owns dispatcher behavior
 # upstream design ../../tools/catalog.yaml owns runtime schema and public inventory
 # downstream implementation ../../tools/bin/agent-canon owns the stable CLI namespace
@@ -49,11 +49,12 @@ class ToolDispatchTest(unittest.TestCase):
                 spec.side_effect_policy,
                 {"read-only", "external-artifact", "explicit-target-write"},
             )
-            self.assertTrue(spec.parity_fixture)
         self.assertEqual(specs["rust-docs"].argv[:2], ("tools/bin/agent-canon", "docs"))
         self.assertEqual(specs["rust-python-module-groups-check"].runtime, "rust")
         self.assertEqual(specs["quarto"].runtime, "native")
         self.assertEqual(specs["quarto"].argv, ("quarto",))
+        self.assertEqual(specs["vl-convert"].runtime, "native")
+        self.assertEqual(specs["vl-convert"].argv, ("vl-convert",))
         self.assertEqual(specs["vl-convert"].runtime, "native")
         self.assertEqual(specs["vl-convert"].argv, ("vl-convert",))
 
@@ -64,29 +65,6 @@ class ToolDispatchTest(unittest.TestCase):
         rows = payload["entries"]
         self.assertEqual(len(rows), len({row["id"] for row in rows}))
         self.assertEqual(rows, sorted(rows, key=lambda row: row["id"]))
-
-    def test_compatibility_adapters_remain_on_the_legacy_route(self) -> None:
-        """A Python entry documented as a Rust adapter is not auto-cut over."""
-        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        self.assertEqual(specs["graph-client"].parity, "legacy")
-
-    def test_catalog_does_not_default_to_verified(self) -> None:
-        """Listing a command cannot silently authorize a cutover."""
-        specs, schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        self.assertEqual(schema["default_parity"], "legacy")
-        self.assertEqual(
-            {spec.tool_id for spec in specs.values() if spec.parity == "verified"},
-            {
-                "generate-agent-improvement-guide",
-                "generate-agent-runtime-dashboard",
-                "issue-sync",
-                "quarto",
-                "route",
-                "skill-document-reader",
-                "template-bundle",
-                "vl-convert",
-            },
-        )
 
     def test_issue_sync_uses_resident_container_and_external_receipt_route(
         self,
@@ -102,7 +80,6 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(issue_sync.cwd_policy, "target-root")
         self.assertEqual(issue_sync.side_effect_policy, "external-artifact")
         self.assertEqual(issue_sync.output_root, "external-runtime")
-        self.assertEqual(issue_sync.parity, "verified")
 
     def test_issue_sync_rejects_online_issue_lookup_on_container_route(self) -> None:
         """Online GitHub reads cannot cross the body-free receipt boundary."""
@@ -129,7 +106,6 @@ class ToolDispatchTest(unittest.TestCase):
         self.assertEqual(dashboard.side_effect_policy, "external-artifact")
         self.assertEqual(dashboard.output_root, "external-runtime")
         self.assertEqual(dashboard.written_paths, ())
-        self.assertEqual(dashboard.parity, "verified")
 
     def test_dashboard_route_builds_typed_bootstrap_request(self) -> None:
         """Dashboard dispatch starts at bootstrap, never at a host Python path."""
@@ -151,7 +127,6 @@ class ToolDispatchTest(unittest.TestCase):
                 "side_effect": "external-artifact",
                 "output_root": "external-runtime",
                 "written_paths": [],
-                "parity": "verified",
             },
             tool_id="generate-agent-runtime-dashboard",
             path="eval/producers/generate_agent_runtime_dashboard.py",
@@ -171,15 +146,6 @@ class ToolDispatchTest(unittest.TestCase):
             previous_output_root,
         )
         os.environ["AGENT_CANON_OUTPUT_ROOT"] = str(output_root)
-        fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
-        parity = json.loads(fixture.read_text(encoding="utf-8"))
-        parity["entries"][0]["id"] = "generate-agent-runtime-dashboard"
-        parity["entries"][0]["observed"]["argv"] = [
-            "python3",
-            "eval/producers/generate_agent_runtime_dashboard.py",
-        ]
-        parity["entries"][0]["observed"]["cwd"] = "target-root"
-        fixture.write_text(json.dumps(parity), encoding="utf-8")
         with patch(
             "tools.runtime.dispatch.tool_dispatch.subprocess.run",
             return_value=subprocess.CompletedProcess([], 0),
@@ -224,19 +190,17 @@ class ToolDispatchTest(unittest.TestCase):
         )
 
     def test_dashboard_container_route_selects_container_executor(self) -> None:
-        """The verified dashboard route is delegated to the resident container."""
+        """The typed dashboard route is delegated to the resident container."""
         spec = tool_dispatch.load_specs(PROJECT_ROOT)[0][
             "generate-agent-runtime-dashboard"
         ]
         with patch.object(
             tool_dispatch, "_run_container_spec", return_value=0
         ) as container_run:
-            status = tool_dispatch._run_spec(
+            status = tool_dispatch.run_container_tool(
                 PROJECT_ROOT,
                 spec,
                 ("--help",),
-                require_parity=True,
-                container_exec=True,
             )
 
         self.assertEqual(status, 0)
@@ -248,12 +212,10 @@ class ToolDispatchTest(unittest.TestCase):
         with patch.object(
             tool_dispatch, "_run_container_spec", return_value=0
         ) as container_run:
-            status = tool_dispatch._run_spec(
+            status = tool_dispatch.run_container_tool(
                 PROJECT_ROOT,
                 spec,
                 ("pandoc", "--version"),
-                require_parity=False,
-                container_exec=True,
             )
 
         self.assertEqual(status, 0)
@@ -267,7 +229,6 @@ class ToolDispatchTest(unittest.TestCase):
             dispatch={
                 "runtime": "native",
                 "argv": ["quarto"],
-                "parity": "pending",
             },
             path="documents/native-command.md",
         )
@@ -285,7 +246,6 @@ class ToolDispatchTest(unittest.TestCase):
                 "argv": ["quarto"],
                 "output_root": "external-runtime",
                 "side_effect": "external-artifact",
-                "parity": "pending",
             },
             path="documents/native-command.md",
         )
@@ -359,7 +319,6 @@ class ToolDispatchTest(unittest.TestCase):
             dispatch={
                 "runtime": "python",
                 "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
             }
         )
         marker = root / "argument.json"
@@ -384,7 +343,6 @@ class ToolDispatchTest(unittest.TestCase):
             dispatch={
                 "runtime": "python",
                 "argv": "python3 tools/echo.py",
-                "parity": "verified",
             }
         )
         with self.assertRaisesRegex(
@@ -398,7 +356,6 @@ class ToolDispatchTest(unittest.TestCase):
             dispatch={
                 "runtime": "python",
                 "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
             }
         )
         catalog_path = root / "tools/catalog.yaml"
@@ -414,7 +371,6 @@ class ToolDispatchTest(unittest.TestCase):
             dispatch={
                 "runtime": "python",
                 "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
             }
         )
         catalog_path = root / "tools/catalog.yaml"
@@ -426,45 +382,12 @@ class ToolDispatchTest(unittest.TestCase):
         specs, _ = tool_dispatch.load_specs(root)
         self.assertEqual(specs["echo"].argv, ("python3", "tools/echo.py"))
 
-    def test_parity_fixture_requires_all_observed_fields(self) -> None:
-        """A fixture row without measured I/O/path fields cannot cut over."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
-            }
-        )
-        fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
-        payload = json.loads(fixture.read_text(encoding="utf-8"))
-        payload["entries"][0]["observed"].pop("written_paths")
-        fixture.write_text(json.dumps(payload), encoding="utf-8")
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "parity-incomplete"):
-            tool_dispatch.run_tool(root, tool_dispatch.load_specs(root)[0]["echo"], ())
-
-    def test_parity_fixture_mismatch_is_rejected(self) -> None:
-        """A stale observed route does not become an execution authority."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
-            }
-        )
-        fixture = root / "tests/fixtures/tool_dispatch/public-command-parity.json"
-        payload = json.loads(fixture.read_text(encoding="utf-8"))
-        payload["entries"][0]["observed"]["cwd"] = "task-root"
-        fixture.write_text(json.dumps(payload), encoding="utf-8")
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "parity-mismatch"):
-            tool_dispatch.run_tool(root, tool_dispatch.load_specs(root)[0]["echo"], ())
-
     def test_unknown_agent_canon_environment_is_not_forwarded(self) -> None:
         """The dispatcher uses exact names, never an AGENT_CANON_* wildcard."""
         root = self._minimal_root(
             dispatch={
                 "runtime": "python",
                 "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
             }
         )
         previous = os.environ.get("AGENT_CANON_SECRET")
@@ -583,25 +506,11 @@ class ToolDispatchTest(unittest.TestCase):
         finally:
             self._restore_environment(previous)
 
-    def test_pending_parity_keeps_legacy_route(self) -> None:
-        """An unverified entry is never cut over through the new route."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-                "parity": "pending",
-            }
-        )
-        specs = tool_dispatch.load_specs(root)[0]
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "legacy-route"):
-            tool_dispatch.run_tool(root, specs["echo"], ())
-
     def test_duplicate_ids_fail_closed(self) -> None:
         """Duplicate IDs cannot select an ambiguous execution target."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "tools").mkdir()
-            (root / "tests/fixtures/tool_dispatch").mkdir(parents=True)
             (root / "tools/echo.py").write_text("print('ok')\n", encoding="utf-8")
             catalog = self._catalog(
                 [
@@ -611,18 +520,6 @@ class ToolDispatchTest(unittest.TestCase):
             )
             (root / "tools/catalog.yaml").write_text(
                 yaml.safe_dump(catalog), encoding="utf-8"
-            )
-            (
-                root / "tests/fixtures/tool_dispatch/public-command-parity.json"
-            ).write_text(
-                json.dumps(
-                    {
-                        "schema": "agent-canon-tool-parity/v1",
-                        "version": 1,
-                        "entries": [{"id": "echo"}],
-                    }
-                ),
-                encoding="utf-8",
             )
             with self.assertRaisesRegex(tool_dispatch.DispatchError, "duplicate-id"):
                 tool_dispatch.load_specs(root)
@@ -647,7 +544,6 @@ class ToolDispatchTest(unittest.TestCase):
             or {
                 "runtime": "python",
                 "argv": ["python3", "tools/echo.py"],
-                "parity": "verified",
             },
         }
 
@@ -658,8 +554,6 @@ class ToolDispatchTest(unittest.TestCase):
             "catalog_kind": "agent_canon_tool_catalog",
             "runtime_schema": {
                 "version": 2,
-                "default_parity": "legacy",
-                "parity_fixture": "tests/fixtures/tool_dispatch/public-command-parity.json",
             },
             "entries": entries,
         }
@@ -676,7 +570,6 @@ class ToolDispatchTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         (root / "tools").mkdir()
-        (root / "tests/fixtures/tool_dispatch").mkdir(parents=True)
         tool_path = root / path
         tool_path.parent.mkdir(parents=True, exist_ok=True)
         tool_path.write_text("print('ok')\n", encoding="utf-8")
@@ -719,43 +612,6 @@ class ToolDispatchTest(unittest.TestCase):
             yaml.safe_dump(self._catalog([self._entry(tool_id, dispatch, path)])),
             encoding="utf-8",
         )
-        (root / "tests/fixtures/tool_dispatch/public-command-parity.json").write_text(
-            json.dumps(
-                {
-                    "schema": "agent-canon-tool-parity/v2",
-                    "version": 2,
-                    "entries": [
-                        {
-                            "id": "echo",
-                            "probe_args": [],
-                            "observed": {
-                                "argv": ["python3", "tools/echo.py"],
-                                "cwd": "source-root",
-                                "stdin": "inherited",
-                                "stdout": "inherited",
-                                "stderr": "inherited",
-                                "exit": "propagate",
-                                "signal": "propagate",
-                                "written_paths": [],
-                            },
-                            "legacy_result": {
-                                "exit_code": 0,
-                                "stdout_sha256": "0" * 64,
-                                "stderr_sha256": "0" * 64,
-                                "written_paths": [],
-                            },
-                            "container_result": {
-                                "exit_code": 0,
-                                "stdout_sha256": "0" * 64,
-                                "stderr_sha256": "0" * 64,
-                                "written_paths": [],
-                            },
-                        }
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
         return root
 
     def _container_root(self) -> tuple[Path, Path, Path, Path]:
@@ -766,7 +622,6 @@ class ToolDispatchTest(unittest.TestCase):
         image = base / "image"
         root = image / "runtime"
         (root / "tools").mkdir(parents=True)
-        (root / "tests/fixtures/tool_dispatch").mkdir(parents=True)
         (root / "tools/echo.py").write_text(
             "import sys; print(*sys.argv[1:])\n", encoding="utf-8"
         )
@@ -779,48 +634,10 @@ class ToolDispatchTest(unittest.TestCase):
                             {
                                 "runtime": "python",
                                 "argv": ["python3", "tools/echo.py"],
-                                "parity": "verified",
                             },
                         )
                     ]
                 )
-            ),
-            encoding="utf-8",
-        )
-        (root / "tests/fixtures/tool_dispatch/public-command-parity.json").write_text(
-            json.dumps(
-                {
-                    "schema": "agent-canon-tool-parity/v2",
-                    "version": 2,
-                    "entries": [
-                        {
-                            "id": "echo",
-                            "probe_args": [],
-                            "observed": {
-                                "argv": ["python3", "tools/echo.py"],
-                                "cwd": "source-root",
-                                "stdin": "inherited",
-                                "stdout": "inherited",
-                                "stderr": "inherited",
-                                "exit": "propagate",
-                                "signal": "propagate",
-                                "written_paths": [],
-                            },
-                            "legacy_result": {
-                                "exit_code": 0,
-                                "stdout_sha256": "0" * 64,
-                                "stderr_sha256": "0" * 64,
-                                "written_paths": [],
-                            },
-                            "container_result": {
-                                "exit_code": 0,
-                                "stdout_sha256": "0" * 64,
-                                "stderr_sha256": "0" * 64,
-                                "written_paths": [],
-                            },
-                        }
-                    ],
-                }
             ),
             encoding="utf-8",
         )
@@ -923,80 +740,6 @@ def _native_vl_convert_route(
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.delenv("AGENT_CANON_MOUNT_REGISTRY", raising=False)
     return target_root, runtime_root, output_root
-
-
-def test_vl_convert_native_argv_matches_direct_probe_and_parity_record(
-    tmp_path: Path,
-    monkeypatch,
-    capfd,
-) -> None:
-    """The generic native route preserves the official renderer CLI contract."""
-    target_root, runtime_root, output_root = _native_vl_convert_route(
-        tmp_path, monkeypatch
-    )
-    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["vl-convert"]
-    probe_args = ("--version",)
-    environment = tool_dispatch._environment(
-        PROJECT_ROOT, spec, runtime_root, output_root
-    )
-    direct = subprocess.run(
-        [*spec.argv, *probe_args],
-        cwd=target_root,
-        env=environment,
-        check=False,
-        capture_output=True,
-    )
-    routed_status = tool_dispatch._run_spec(
-        PROJECT_ROOT,
-        spec,
-        probe_args,
-        require_parity=False,
-        container_exec=True,
-    )
-    routed_output = capfd.readouterr()
-    direct_result = {
-        "exit_code": direct.returncode,
-        "stdout_sha256": hashlib.sha256(direct.stdout).hexdigest(),
-        "stderr_sha256": hashlib.sha256(direct.stderr).hexdigest(),
-        "written_paths": [],
-    }
-    routed_result = {
-        "exit_code": routed_status,
-        "stdout_sha256": hashlib.sha256(routed_output.out.encode("utf-8")).hexdigest(),
-        "stderr_sha256": hashlib.sha256(routed_output.err.encode("utf-8")).hexdigest(),
-        "written_paths": [],
-    }
-    assert routed_result == direct_result
-    parity_path = PROJECT_ROOT / spec.parity_fixture
-    fixture = json.loads(parity_path.read_text(encoding="utf-8"))
-    row = next(
-        (entry for entry in fixture["entries"] if entry.get("id") == spec.tool_id),
-        None,
-    )
-    if row is None:
-        raise AssertionError(
-            json.dumps(
-                {
-                    "id": spec.tool_id,
-                    "probe_args": list(probe_args),
-                    "observed": {
-                        "argv": list(spec.argv),
-                        "cwd": spec.cwd_policy,
-                        "stdin": spec.stdin_policy,
-                        "stdout": spec.stdout_policy,
-                        "stderr": spec.stderr_policy,
-                        "exit": spec.exit_policy,
-                        "signal": spec.signal_policy,
-                        "written_paths": list(spec.written_paths),
-                    },
-                    "legacy_result": direct_result,
-                    "container_result": routed_result,
-                },
-                sort_keys=True,
-            )
-        )
-    tool_dispatch._check_parity_fixture(PROJECT_ROOT, spec)
-    assert row["probe_args"] == list(probe_args)
 
 
 def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(

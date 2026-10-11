@@ -95,7 +95,6 @@
       "additionalProperties": false,
       "required": [
         "version",
-        "default_parity",
         "runtimes",
         "execution_planes",
         "cwd_policies",
@@ -104,12 +103,10 @@
         "exit_policies",
         "side_effect_policies",
         "output_roots",
-        "parity_fixture",
         "rust_public_commands"
       ],
       "properties": {
         "version": { "const": 2 },
-        "default_parity": { "enum": ["legacy", "verified"] },
         "runtimes": { "$ref": "#/$defs/nonEmptyStringList" },
         "execution_planes": { "$ref": "#/$defs/nonEmptyStringList" },
         "cwd_policies": { "$ref": "#/$defs/nonEmptyStringList" },
@@ -118,7 +115,6 @@
         "exit_policies": { "$ref": "#/$defs/nonEmptyStringList" },
         "side_effect_policies": { "$ref": "#/$defs/nonEmptyStringList" },
         "output_roots": { "$ref": "#/$defs/nonEmptyStringList" },
-        "parity_fixture": { "$ref": "#/$defs/path" },
         "rust_public_commands": {
           "type": "array",
           "items": { "$ref": "#/$defs/rustPublicCommand" },
@@ -152,8 +148,6 @@
           "items": { "$ref": "#/$defs/path" },
           "uniqueItems": true
         },
-        "parity": { "enum": ["legacy", "verified"] },
-        "parity_fixture": { "$ref": "#/$defs/path" },
         "arguments": {
           "type": "object",
           "additionalProperties": { "$ref": "#/$defs/argument" }

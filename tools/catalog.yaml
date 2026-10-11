@@ -14,15 +14,11 @@ catalog_kind: agent_canon_tool_catalog
 scope: shared_canon
 
 # The legacy catalog shape remains version 1 for the existing catalog checker.
-# Runtime dispatch is an additive, independently versioned contract.  Entries
+# Runtime dispatch is an additive, independently versioned contract. Entries
 # may provide a ``dispatch`` mapping; entries without one use these typed
-# defaults. The versioned parity fixture is still required before execution.
+# defaults.
 runtime_schema:
   version: 2
-  # A catalog entry is not cut over merely because it is listed.  Every
-  # verified entry must carry an explicit dispatch.parity value and an
-  # observed v2 fixture row; otherwise the legacy owner remains authoritative.
-  default_parity: legacy
   runtimes:
     - python
     - rust
@@ -51,7 +47,6 @@ runtime_schema:
     - none
     - external-runtime
     - explicit-target
-  parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
   # Commands exposed by tools/runtime/dispatch/agent-canon/src/main.rs that do not have a
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
@@ -341,8 +336,6 @@ entries:
       side_effect: read-only
       output_root: none
       written_paths: []
-      parity: legacy
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -822,8 +815,6 @@ entries:
       side_effect: explicit-target-write
       output_root: explicit-target
       written_paths: []
-      parity: legacy
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -856,8 +847,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -1138,8 +1127,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -1175,8 +1162,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -1232,7 +1217,6 @@ entries:
       side_effect: read-only
       output_root: none
       written_paths: []
-      parity: verified
     default_wiring:
       ci: false
       pr_check: false
@@ -1716,8 +1700,6 @@ entries:
       side_effect: read-only
       output_root: none
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -1750,8 +1732,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -2172,8 +2152,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
@@ -2207,8 +2185,6 @@ entries:
       side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
-      parity: verified
-      parity_fixture: tools/fixtures/tool_dispatch/public-command-parity.json
     default_wiring:
       ci: false
       pr_check: false
