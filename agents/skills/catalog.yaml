@@ -11,21 +11,6 @@ version: 1
 # downstream implementation ../../tests/agent_tools/test_route.py tests canonical visualization capability routing
 # @dependency-end
 
-# Runtime tool dispatch is deliberately a namespaced route. Skill entries may
-# continue to document their normal command, while the shared container uses
-# ``agent-canon tool run <catalog-id> -- <args...>`` when a v2 parity record is
-# available. This mapping is descriptive only; it does not create flat
-# executables or silently replace a legacy command.
-tool_runtime:
-  schema_version: 2
-  catalog: tools/catalog.yaml
-  command: agent-canon tool run <catalog-id> -- <args...>
-  execution: bootstrap exec typed request into the shared tool container
-  environment: exact allowlist only; AGENT_CANON_* wildcard inheritance is forbidden
-  parity_fields: [argv, cwd, stdin, stdout, stderr, exit, signal, written_paths]
-  parity_policy: verified-only
-  legacy_policy: retain-until-parity
-
 skill_families:
   # Public user-facing skill ids use plain hyphen-case. Runtime-internal skill
   # shims use .codex/personal/skills/_<name>/SKILL.md and stay owner-routed.
