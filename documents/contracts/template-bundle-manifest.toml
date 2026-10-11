@@ -12,7 +12,7 @@ roots = ["templates/documents"]
 roots = ["templates/code"]
 
 [profiles.experiment-scaffold]
-roots = ["templates/experiments/_template"]
+roots = ["templates/experiments"]
 
 [profiles.codex-user]
 # This is a bounded source-free Codex consumer package, not a source checkout.
