@@ -532,13 +532,11 @@ def default_monitoring_text(report_dir: Path) -> str:
 
 def resolve_report_dir(args: argparse.Namespace) -> Path:
     """Resolve the target run bundle directory."""
-    workspace_root = Path(str(args.workspace_root)).resolve()
     if args.report_dir:
         return _runtime_path(Path(str(args.report_dir)).resolve(), args.runtime_root)
     return (
         resolve_report_root(
             args.report_root,
-            workspace_root,
             runtime_root=args.runtime_root,
         )
         / str(args.run_id)

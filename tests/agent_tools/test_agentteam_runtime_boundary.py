@@ -36,7 +36,7 @@ class AgentTeamRuntimeBoundaryTest(unittest.TestCase):
             old = os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
             try:
                 with self.assertRaises(RuntimeRootRequired):
-                    resolve_report_root(None, source)
+                    resolve_report_root(None)
             finally:
                 if old is not None:
                     os.environ["AGENT_CANON_RUNTIME_ROOT"] = old
@@ -52,7 +52,7 @@ class AgentTeamRuntimeBoundaryTest(unittest.TestCase):
             before = source_file.read_bytes()
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
             try:
-                report_root = resolve_report_root(None, source)
+                report_root = resolve_report_root(None)
                 run_a = report_root / "run-a"
                 run_b = report_root / "run-b"
                 for run in (run_a, run_b):

@@ -1389,9 +1389,7 @@ def main() -> int:
     if args.report_dir:
         report_dir = Path(args.report_dir).resolve()
     else:
-        report_dir = resolve_report_root(args.report_root, workspace_root) / str(
-            args.run_id
-        )
+        report_dir = resolve_report_root(args.report_root) / str(args.run_id)
         report_dir = report_dir.resolve()
     output_path = Path(args.output)
     boundary = (
