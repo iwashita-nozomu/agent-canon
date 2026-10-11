@@ -158,7 +158,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Keep the shared AgentCanon tool container separate from the project Docker/test runner.",
         "classify_environment_profile",
         (
-            "./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+            "./bootstrap.sh --control-parent-root <parent> status",
             "docker build -f docker/Dockerfile -t <project-image> . && docker run --rm <project-image> test/testrunner.sh",
             "python3 -m pytest -q tests/tools/test_bootstrap_container_contract.py",
             "python3 -m pytest -q tests/bootstrap/test_bootstrap_runtime.py",
@@ -202,7 +202,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Route standalone AgentCanon source, bootstrap runtime, and source PR readback.",
         "route_agentcanon_update",
         (
-            "./bootstrap.sh --control-parent-root <parent> --runtime-root <runtime> status",
+            "./bootstrap.sh --control-parent-root <parent> status",
             "git status --short --branch",
             "gh pr view --repo iwashita-nozomu/agent-canon",
         ),

@@ -38,17 +38,21 @@ class CheckToolCatalogTest(unittest.TestCase):
             text=True,
         )
 
-    def test_workflow_command_rows_use_existing_catalog_schema(self) -> None:
-        """Workflow monitor and waterfall gate are ordinary catalog entries."""
+    def test_catalog_rows_allow_shared_native_dispatcher_path(self) -> None:
+        """Distinct native IDs may share the existing generic dispatcher."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
         )
         rows = {
             entry["id"]: entry
             for entry in catalog["entries"]
-            if entry["id"] in {"workflow-monitor", "waterfall-gate-check"}
+            if entry["id"]
+            in {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"}
         }
-        self.assertEqual(set(rows), {"workflow-monitor", "waterfall-gate-check"})
+        self.assertEqual(
+            set(rows),
+            {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"},
+        )
         self.assertEqual(
             rows["workflow-monitor"]["path"],
             "tools/runtime/lifecycle/workflow_monitor.py",
@@ -57,6 +61,10 @@ class CheckToolCatalogTest(unittest.TestCase):
             rows["waterfall-gate-check"]["path"],
             "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
         )
+        self.assertEqual(
+            rows["quarto"]["path"], "tools/runtime/dispatch/tool_dispatch.py"
+        )
+        self.assertEqual(rows["quarto"]["path"], rows["vl-convert"]["path"])
         self.assertTrue(rows["workflow-monitor"]["writes"])
         self.assertFalse(rows["waterfall-gate-check"]["writes"])
         result = self.run_checker(PROJECT_ROOT, "--format", "json")

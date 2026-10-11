@@ -628,6 +628,22 @@ provides = ["quarto"]
 failure_policy = "fail"
 
 [[records]]
+id = "vl-convert"
+package = "vl-convert"
+method = "release-asset"
+version = "1.9.0"
+source = "https://github.com/vega/vl-convert/releases/download/v1.9.0"
+assets = { aarch64 = "vl-convert_linux-aarch64.zip", x86_64 = "vl-convert_linux-64.zip" }
+checksums = { aarch64 = "99a5f96436efbb46fa469b88c28c9c9d864c02c283f18c38fd2b730eeb0ea320", x86_64 = "f557637a159c7510a1486e1e41a86c3919abd71c18abc0826b499c76c712aa53" }
+archive_format = "zip"
+extract = "vl-convert"
+destination = "/usr/local/bin/vl-convert"
+verification = { kind = "absolute-executable", path = "/usr/local/bin/vl-convert", args = ["--version"], output_contains = "1.9.0" }
+deps = []
+provides = ["vl-convert"]
+failure_policy = "fail"
+
+[[records]]
 id = "lychee"
 package = "lychee"
 method = "release-asset"

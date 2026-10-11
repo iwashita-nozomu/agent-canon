@@ -163,6 +163,31 @@ section per requested figure and its relevant calculation and geometry details.
 
 If a figure renderer consumes machine-readable input, include only the required machine-readable form in that renderer path and cite the file.
 
+## Native Vega-Lite Rendering
+
+When a requested figure has a selected Vega-Lite specification, pass that native
+JSON file directly to the registered `vl-convert` tool. The spec is the
+renderer input, not a second AgentCanon Figure Contract schema: keep population,
+formula, denominator, and interpretation in their existing project and Figure
+Contract owners. Claim-critical values should already be materialized by the
+project that owns them; the renderer does not calculate or infer them.
+
+Use an input path relative to the registered project, local or inline data, the
+Vega-Lite version pinned by the renderer route, and an unused output path under
+the shared runtime's external tool-output directory. The shared tool container
+has no network; remote data fetching is not part of this route. Preserve the
+native converter's stdout, stderr, and exit status. An invalid spec is a native
+conversion failure; do not add a second schema validator or output wrapper.
+
+```bash
+OUTPUT=/var/lib/agent-canon/runtime/tool-output/<figure-id>.svg
+"$BOOTSTRAP" "${COMMON[@]}" tool run --root "$PROJECT_ROOT" vl-convert -- \
+  vl2svg --input "$SPEC" --output "$OUTPUT" --vl-version 6.1
+```
+
+The existing `html-output` owner may consume the resulting static SVG as an
+image asset. It does not add a second chart grammar or browser renderer.
+
 ## Closeout
 
 When an inventory is created, give its path. Include a status summary only when

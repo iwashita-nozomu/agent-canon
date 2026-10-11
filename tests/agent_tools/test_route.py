@@ -1957,24 +1957,10 @@ class CapabilityRouteTest(unittest.TestCase):
         """Write a minimal capability catalog fixture."""
         path = root / "agents" / "skills" / "catalog.yaml"
         path.parent.mkdir(parents=True, exist_ok=True)
-        runtime = "\n".join(
-            [
-                "tool_runtime:",
-                "  schema_version: 2",
-                "  catalog: tools/catalog.yaml",
-                "  command: agent-canon tool run <catalog-id> -- <args...>",
-                "  execution: bootstrap exec typed request into the shared tool container",
-                "  environment: exact allowlist only",
-                "  parity_fields: [argv, cwd, stdin, stdout, stderr, exit, signal, written_paths]",
-                "  parity_policy: verified-only",
-                "  legacy_policy: retain-until-parity",
-            ]
-        )
         path.write_text(
             "\n".join(
                 [
                     "version: 1",
-                    runtime,
                     "skill_families:",
                     entries,
                 ]
