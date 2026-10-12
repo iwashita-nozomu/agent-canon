@@ -45,6 +45,16 @@ second omission/granularity policy.
 - 発表資料、token 効率、ローカル branch 統合の手順は、それぞれ [slides](slides.md)、
   [tokens](tokens.md)、[integration](integration.md) を正本とし、旧 workflow 文書へ戻しません。
 
+## Skill Authoring
+
+Skills are reusable methods for callers with different goals, inputs, paths,
+environments, and validation routes. State the useful method briefly and let
+the current request and its governing owner supply those concrete bindings.
+Make related Skills and native capabilities conditional on the question that
+needs them. Preserve an existing CLI/API's inputs and result semantics; do not
+make a context manifest or handoff packet a prerequisite unless an existing
+owner requires it.
+
 ## Skill Visibility Naming
 
 | 所有者・用途 | 正本と公開方法 |
@@ -105,81 +115,29 @@ OpenAI system skill の本文は host runtime が提供します。AgentCanon �
 
 ## Codex Defaults
 
-repo task の workflow / owner / validation route が未選択なら
-[agent-orchestration](agent-orchestration.md) から選びます。既知の owner と settled context は再利用し、
-下表は条件に合う既存 owner を選ぶ索引です。手順は選択した owner の正本に従います。
-編集を明示的に許可する場合だけ `--mode repo-changing` を渡し、prompt 語彙だけで mode を拡張しません。
-
-owner、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じる修正は通常の
-owner route で進めます。既存 tool は読了 gate なしに先に実行し、owner boundary・existing-tool route・targeted validation を
-記録します。typo / link / format-only、Routine docs、Focused code の label もこの条件を迂回しません。
-public surface の追加・縮小・削除・rename・restriction・deprecation・意味変更は `scoped_change` または broader route で
-`dependency/consumer/migration/docs closure` を形成し、file 数や owner の近さだけで route を固定しません。
-repository-changing execution では [codex-task-workflow](codex-task-workflow.md)、
-child delegation を実際に選択した場合だけ [subagent-bootstrap](subagent-bootstrap.md)
-を追加します。specialist の Codex 固有方針は
-[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md) を参照します。
-
-以下は既存の条件付き選択先です。列挙は起動許可や全件必読を意味しません。
-
-| 条件 | 選択する owner と境界 |
-| --- | --- |
-| template から新 repository を開始 | [start-repository](start-repository.md) |
-| 長い tool / skill 候補を短い command へ解決 | [task-routing](task-routing.md) |
-| dependency module の source clone / lifecycle / cleanup | 先に [dependency-module-change](dependency-module-change.md)。AgentCanon pin/update はこの一般規約を使う具体例。 |
-| 既存 Dev Container 内の一時的な `devcontainer exec --workspace-folder <root> ...` | [devcontainer-exec](devcontainer-exec.md)。Dockerfile・dependency・設定・build・起動は [environment-maintenance](environment-maintenance.md) / [dependency-design](dependency-design.md)、GPU admission は [gpu-execution](gpu-execution.md) が所有。 |
-| 文献調査が主 task | [literature-survey](literature-survey.md) |
-| 自然言語の数学 claim を形式証明へ移す | [formal-proof-workflow](formal-proof-workflow.md)。既存 proof / 文献探索は [literature-survey](literature-survey.md)。 |
-| production 実装前のアルゴリズム設計 | [lean-algorithm-design](lean-algorithm-design.md)。Lean 数学モデルと target theorem を先に検証する。 |
-| 収束・停止・certificate soundness・finite-precision floor・solver-chain handoff の方式探索 | [algorithm-proof-exploration](algorithm-proof-exploration.md)。最終 theorem / counterexample / unprovable-under-assumptions claim は [formal-proof-workflow](formal-proof-workflow.md)。 |
-| 一般説明 prose の README / workflow / guide / migration / specification | [long-form-writing](long-form-writing.md)。長さだけでは選択しない。 |
-| 論文、thesis chapter、scholarly note | [academic-writing](academic-writing.md)。paper section を含む draft は [paper-writing](paper-writing.md) を先に参照。 |
-| 研究 task / backlog 付きの tuning・探索・比較改善反復 | outer loop はそれぞれ [research-workflow](research-workflow.md) / [adaptive-improvement-loop](adaptive-improvement-loop.md)。 |
-| experiment topic、`run.py` 直実行、GPU/JAX 所有、artifact schema、`visualization.py` readiness の review | [experiment-review](experiment-review.md) |
-| 実験結果の保持・archive・externalization・削除を実行前に計画 | [retention](retention.md)。実験実行、artifact identity/checksum、archive serialization は各既存 owner。 |
-| semantic delta・obligation・一次検証 owner・hard-edge closure の実装前割当 | [semantic-responsibility-contract](../../documents/design/semantic-responsibility-contract.md) と `templates/documents/semantic-responsibility-contract.template.toml`。 |
-| owning mechanism の確立・修復後も既存 owner と targeted validation で閉じない test-owned runtime risk | [test-design](test-design.md)。contract-only wrapper は static contract validation と canonical command evidence を使う。 |
-| 文書の正本・generated evidence・closed Issue record・重複見出しの整理 | [document-canon-cleanup](document-canon-cleanup.md) |
-| dependency manifest、reverse edge、cycle、全 inventory、change-impact / repair-planning packet | [dependency-analysis](dependency-analysis.md) |
-| 大規模 refactor | [refactor-loop](refactor-loop.md)。semantic delta を別管理し、target 選定・handoff 前に上記 change-impact packet を入力にする。 |
-| directory / README / root view / path mapping / responsibility map の責務変更 | [structure-refactor](structure-refactor.md)。recursive directory responsibility graph を先に作る。 |
-| ユーザーが1件ずつの guided debugging を明示 | [user-guided-debugging](user-guided-debugging.md)。編集前に問題を示し、各修正後に次課題を提示。同じ作業の合意済み完了・検証を続け、明示 stop / wait 境界を尊重します。 |
-| C / C++ 差分 | [cpp-review](cpp-review.md) を既定候補にする。 |
-| OOP readability tool の実行・表出力・解釈 | [oop-readability-check](oop-readability-check.md)。`Mechanical Result` と `Agent Analysis` を分ける。 |
-| tool / hook / eval / skill / experiment 結果の書出し | [result-artifact-writeout](result-artifact-writeout.md)。raw / summary / manifest / unique path / overwrite policy を区別。 |
-| tool・checker・hook・static / structure analysis の report / repair packet | [tool-finding-report](tool-finding-report.md)。raw・structured full artifact、mechanical priority、任意 impact、prompt feedback decision を区別。finding の取捨選択は上位 workflow。 |
-| skill / tool / workflow / hook / eval 蓄積ログの分析 | [agent-log-analysis](agent-log-analysis.md)。既存 summary を再利用。不足は対象限定読取と制限の明示で扱い、archive 保守・dashboard 修理を前提にしない。 |
-| summary / prompt / run bundle / hook / routing / eval evidence から durable skill Issue を作る | [issue-finding-report](issue-finding-report.md)。観測と原因hypothesisを区別し、owner・mechanism・validationに応じてIssue境界を整理。 |
-| accumulated eval family の収集・修理を選択した | [agent-eval-accumulation](agent-eval-accumulation.md)。registered producer / compact checker / archive loop を使う。missing / stale / fail の観測・Issue 記録だけで再実行せず、eval report を手生成しない。 |
-| PR 処理・merge・conflict・ready 化・Issue triage・queue cleanup | [pr-processing](pr-processing.md)。単独候補はfast path、queue planningは実際のdependency/conflictがある場合に選ぶ。 |
-| AgentCanon source・共有 bootstrap・parent の development clone 運用の更新 | [agent-canon-update](agent-canon-update.md)。source PR と parent change を分離し、parent に pin / vendor checkout / root projection を追加しない。 |
-| agent-runtime branch や AgentCanon pin 更新の分離が必要 | [agent-update-branch](agent-update-branch.md) |
-| report・status・eval / audit summary・decision brief・presentation narrative・PPT storyboard | [report-writing](report-writing.md)。source packet、visual asset plan、Report Quality Checklist を固定。 |
-| 既存 prose の graph 分析を明示依頼、または具体的診断目的がある | [prose-reasoning-graph](prose-reasoning-graph.md)。段落接続、claim/evidence、experiment plan、split / merge / bridge / reorder、既存 skill handoff を扱う。 |
-| report / experiment / Eval / decision / presentation / HTML / document / paper / refactor の構造が非自明 | 本文・renderer・run・編集の前に [structure-planning](structure-planning.md)。primary artifact、source map、metric / delta contract、invalid interpretation を固定。未決の reader path・section order・claim/support も対象。 |
-| typo / link / format-only 文書変更 | [md-style-check](md-style-check.md) と `structure_contract=skipped` の理由を残す。 |
-| 文書の process・dependency・ownership・routing・state・review gate・handoff が非自明 | [structure-planning](structure-planning.md) の `visual_plan` で Mermaid を既定の primary visual 候補にする。 |
-| 明示的な HTML / browser view / dashboard / web page / 外部 browser 公開 | [html-output](html-output.md)。layout、ImageGen、server reuse / start command、local / external URL を固定。report の既定は Markdown。 |
-| 既存 experiment / Eval artifact の HTML 表示 | [html-output](html-output.md) を直接使う。新規・再実行だけ [experiment-lifecycle](experiment-lifecycle.md)、解釈・claim が必要な場合だけ [report-writing](report-writing.md) を追加。中間 wrapper skill を作らない。 |
-| stale worktree・古い `WORKTREE_SCOPE.md`・legacy action log | [worktree-health](worktree-health.md) で調査・cleanup 判断。 |
-| optimizer / solver / preconditioner / gradient / Jacobian / Hessian / KKT / 収束 / tolerance / 数値 benchmark | [computational-optimization](computational-optimization.md)。数学・検証契約を実装や実験の前に固定。 |
-| GPU / CUDA / JAX / XLA / IREE backend 実行、GPU 環境変数・nvidia-smi・JAX preallocation・GPU blocker | [gpu-execution](gpu-execution.md)。Python 実行は ExperimentRunner へ委譲。 |
-| JIT-canonical IR・Lean 実装定義・theorem graph overlay から反復法/証明状態の Mermaid block chart | [algorithm-flowchart](algorithm-flowchart.md)。proof navigation として使い、証明済み判定は formal proof checker へ戻す。 |
-| repo-wide の実装・文書・tooling・runtime 統合変更 | [comprehensive-development](comprehensive-development.md) |
-| repo-wide tool 導入や Docker / CI 更新案 | [environment-maintenance](environment-maintenance.md) と [environment_change_proposal](../../templates/agents/environment_change_proposal.md)。 |
-| private knowledge / feedback の検索・記録 | [agent-learning](agent-learning.md) と Rust `agent-canon k/f`。stable preference は対象 [AGENTS.md](../../AGENTS.md) への明示変更として昇格し、private log / source tree を第二正本にしない。 |
+When a repository task has no selected workflow or owner, start with
+[agent-orchestration](agent-orchestration.md) and the current task catalog.
+Reuse settled context and follow the selected owner's procedure. A related
+Skill is added only when its capability is needed for this request. Repository
+changes use [codex-task-workflow](codex-task-workflow.md); add
+[subagent-bootstrap](subagent-bootstrap.md) only when delegation is selected.
+For host-runtime policy, see [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md).
 
 ## Updating Skills
 
-この手順は AgentCanon source の登録・配布を変える場合だけに使います。分担を設計・変更するときは既存の [Skill Maintenance Delegation](../../documents/design/responsibility-cleanup.md#skill-maintenance-delegation) owner を参照し、解決済みの担当と判断を再利用します。
+Use this route when changing AgentCanon's skill source, registration, or
+distribution. Preserve the skill's reusable method; use the caller's current
+request and governing owner for concrete goals, inputs, paths, environment,
+validation, and output. Keep extra capabilities conditional, and retain native
+CLI/API behavior instead of introducing a wrapper or mandatory context packet.
+Prefer an existing capability identified in that context when it meets the
+requested guarantee; extend it only to close a concrete gap. Compare functional
+responsibility and contract, not names or paths alone.
 
-1. 依頼の成果・有効な利用経路・canonical owner から始め、[Library And Reuse Sweep](../canonical/CODEX_IMPLEMENTATION.md#library-and-reuse-sweep) の順で候補を調べます。
-   対応する history を照合し、その caller から既存 API / configuration を直接使う・組み合わせる方法で
-   必要な保証を満たすか確認します。同じ owner の branch / PR / prepared checkout があれば
-   [Branch Reuse Default](../canonical/CODEX_INTAKE.md#branch-reuse-default) に沿って継続し、残る gap が
-   確認できた場合だけ、その owner と影響する skill surface を更新します。
-2. material な設計 rationale は既存 design owner に残します。skill procedure の導出根拠は既存の [手順の設計根拠](../../documents/design/responsibility-rationale.md#skill-procedure-derivation) を参照します。bounded な文言変更に新しい design artifact は要りません。authority、safety、compatibility、completion の契約は既存 owner に保持します。
-3. public skill の canonical doc と catalog を整合させ、dependency、caller、配布面は影響する場合だけ更新します。既存 capability を包む skill を作りません。
-4. caller の選択を変えるときは、判断点に適用条件と canonical link を置き、条件成立時の到達と不成立時の非起動を確認します。[条件付き読込](task-routing.md#in-flight-skill-reads) に従います。
-5. canonical source の変更で adapter 更新が必要なら、保守者用 [materializer](../../README.md#source-and-artifact-boundary) を使って生成物を読み戻します。利用時には生成しません。変更した Markdown は [md-style-check](md-style-check.md)、他の検査は影響した surface の既存 owner に従います。
-6. 新しい behavior evidence がユーザー依頼または選択 workflow の要件なら [empirical-prompt-tuning](empirical-prompt-tuning.md#workflow) を使います。構造整合と実際の behavior は別の根拠であり、比較可能な測定なしに改善・benchmark を主張しません。
+Update the canonical document and only the catalog, dependency, caller, or
+adapter surfaces affected by the change. The catalog owns public identity and
+routing metadata; generated discovery views are updated by the maintainer's
+[materializer](../../README.md#source-and-artifact-boundary), never by skill
+use. Keep design rationale with its existing owner. Format changed Markdown
+with [md-style-check](md-style-check.md); select additional checks only when the
+changed surface requires them.
