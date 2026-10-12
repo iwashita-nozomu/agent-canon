@@ -167,7 +167,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
 ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
     "designer": {
         "agents/skills/codex-task-workflow.md": (
-            "Owner-First Readback",
+            "Execution route",
             "Stages",
         ),
         "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Context",),
@@ -175,7 +175,7 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
     },
     "implementer": {
         "agents/skills/codex-task-workflow.md": (
-            "Owner-First Readback",
+            "Execution route",
             "Stages",
         ),
         "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Context",),
