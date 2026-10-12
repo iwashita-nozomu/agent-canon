@@ -29,13 +29,15 @@ resumption. Repository-changing work alone does not select either.
 Resolve the task and role from the selected catalog route and
 [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). Use relative links from the
 selected workflow as conditional owner guidance, not as a blanket read list.
-Read the selected canonical Skill and applicable prerequisites through file
-EOF; related candidates remain unloaded unless their route activates. A child
-launch is not completion: use the actual host result to determine whether the
-handoff finished, and record actual results or failures through the selected
-workflow's existing route. Monitor rows alone do not establish completion.
-Existing Eval or owner review can assess whether the route missed necessary
-work; a different route alone is not failure.
+Read the selected canonical Skill's common constraints and the content needed
+for the current handoff, deferring inactive, later, or recovery branches until
+their conditions apply. Read applicable prerequisites under [In-flight skill
+reads](task-routing.md#in-flight-skill-reads); related candidates remain
+unloaded unless their route activates. A child launch is not completion: use the
+actual host result to determine whether the handoff finished, and record actual
+results or failures through the selected workflow's existing route. Monitor
+rows alone do not establish completion. Existing Eval or owner review can assess
+whether the route missed necessary work; a different route alone is not failure.
 
 [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) owns handoff and context
 fields. For a write-capable child, use its prepared writer target and allowed
