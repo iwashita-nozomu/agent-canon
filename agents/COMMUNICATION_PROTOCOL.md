@@ -422,12 +422,13 @@ branch, worktree, merge, cleanup, or publication policy.
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
-handoff carries the selected task and enough context to act within its role:
-the objective and owned request clauses, current stage and checkout identity,
-exact owner files or sections to read, role boundary, expected result, and return
-contract. Keep evidence artifacts local unless the child needs them for its next
-decision. The capsule and handoff fields are owned here; other sources should
-link to this section instead of restating the field list.
+handoff carries the selected task, objective and owned request clauses, current
+and retained requirements, relevant retirement reasons and unresolved points,
+current stage and checkout identity, exact owner files or sections to read, role
+boundary, expected result, and return contract. The latest explicit user
+instruction governs conflicts while compatible earlier requirements remain
+active. Keep evidence local unless needed for the next decision; link to this
+section instead of restating capsule fields.
 
 For write-capable work, carry the prepared `writer_target` and assigned
 `allowed_paths` under [Parallel Write Safety](canonical/CODEX_SUBAGENTS.md#parallel-write-safety).
