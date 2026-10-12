@@ -29,9 +29,9 @@ Reuse the route from the [task catalog](../task_catalog.yaml). A bounded task
 proceeds with its existing evidence and one execution owner. Coordination
 follows selected owner guidance; a run bundle or child is used only when the
 route needs durable evidence or delegation.
-Execute through the selected owner's configured route. On failure, inspect the
-immediately preceding change and target implementation, then fix the observed
-cause there; see the root [local repair rule](../../ROOT_AGENTS.md#always-on-boundary).
+Treat the current request and target contract—not an earlier implementation—as
+the correctness reference. For failure repair, follow the root [local repair
+rule](../../ROOT_AGENTS.md#always-on-boundary).
 
 ## Owner-First Readback
 

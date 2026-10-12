@@ -34,16 +34,20 @@ cannot resolve a concrete decision, state the missing fact and smallest referenc
 needed. For an explicitly cross-module change or API migration, use only its
 declared dependency scope.
 
-Carry authorized work through the requested outcome. Use the selected owner's
-configured route and preserve established behavior and external boundaries. If
-it fails, compare the target's expected and actual inputs and outputs, then check
-what it actually received or consumed (for example, program arguments or an
-agent's prompt, context, and selected Skill). Use the diff as one possible cause
-clue; inspect only the target's relevant boundary, fix the located input or
-implementation cause, and rerun the relevant route. Do not add speculative
-guards, fallback paths, retries, or gates without a concrete cause. Do not alter
-tests or switch routes merely to obtain a pass. Keep observations, causes, and
-unverified results distinct.
+Carry authorized work through the requested outcome. Base implementation on
+the current request and target's input/output contract while preserving external
+boundaries. Earlier implementations and diffs can explain behavior, but do not
+define correctness; restore prior behavior only when the current requirement
+calls for it. For consequential behavior changes, briefly record at the existing
+owner location why the change was needed, why the prior approach did not fit,
+and what behavior is intentionally retained or retired; use that rationale when
+reconsidering later changes or restoration. On failure, compare expected and
+actual inputs/outputs and check what the target received or consumed. Use
+history as cause evidence, inspect only the relevant target boundary, fix the
+located cause, and rerun the selected route. Do not add speculative guards,
+fallback paths, retries, or gates without a concrete cause. Do not alter tests
+or switch routes merely to obtain a pass.
+Keep observations, causes, and unverified results distinct.
 Use configured Git/GitHub transports. Do not discover, create, copy, link, or
 configure credentials or auth agents; return authentication failures to their
 transport owner.
