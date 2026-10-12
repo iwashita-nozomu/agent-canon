@@ -143,7 +143,7 @@ subjects = [
 id = "large-refactor"
 description = "Large behavior-preserving refactors should route to large delivery and refactor loop."
 expected_workflows = ["large-delivery"]
-expected_skills = ["refactor-loop", "subagent-bootstrap"]
+expected_skills = ["refactor-loop"]
 limit = 25
 prompt_templates = [
   "{subject} を既存挙動を維持する large refactor として進めて",

@@ -466,6 +466,7 @@ WORKFLOW_KEYWORDS: dict[str, tuple[str, ...]] = {
         "large refactor",
         "大規模",
         "複数 chunk",
+        "複数の関係ファイル",
         "milestone",
         "新機能",
         "structure drift",
