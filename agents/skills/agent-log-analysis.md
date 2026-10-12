@@ -15,83 +15,43 @@ downstream design agent-eval-accumulation.md repairs missing accumulated eval fa
 @dependency-end
 -->
 
-The consumed stable-branch and retention policy provenance is recorded in
-[agent-canon-log PR #4](https://github.com/iwashita-nozomu/agent-canon-log/pull/4).
-This external evidence link is intentionally prose metadata; dependency headers
-contain only repository-local owner paths.
-
 ## Reader Map
 
-- Purpose: interpret AgentCanon logs and related tool or child results to locate
-  a supported cause and its owner.
-- Use When: investigating skill, tool, workflow, hook, eval, or actual
-  subagent/tool-result behavior.
-- Flow: set scope, read available evidence, locate a selected owner, check the
-  changed guarantee, and report results and limits.
-- Boundary: analysis does not itself select collection, archive maintenance,
-  dashboard repair, eval reruns, or code changes.
-
-## Purpose
-
-Analyze accumulated logs and related execution evidence without making one
-dashboard, packet, or archive state a prerequisite. Existing records describe
-their recorded snapshot; they do not by themselves reproduce current runtime
-behavior.
-
-## Use When
-
-- Investigating missed or late skill/tool/workflow selection, routing gaps, or
-  repeated failures.
-- Interpreting available dashboard summaries, reports, issues, conversations,
-  native tool results, or child launch/completion/failure results.
-- Recording missing, stale, or failing eval-family evidence.
-- Preparing evidence for a selected repair or durable Issue.
+- Use When: an observed event, routing gap, unexpected result, or repeated
+  failure needs evidence-based interpretation.
+- Evidence: use available conversation, tool, child, report, issue, or archive
+  records; a dashboard or packet is not required. Records describe their own
+  snapshots and do not establish current runtime behavior by themselves.
+- Flow: compare expected and observed behavior, locate a supported cause and
+  owner, then report the conclusion and limits.
+- Boundary: analysis does not authorize collection, archive work, reruns,
+  dashboard changes, or repairs.
 
 ## Workflow
 
-1. Set the question and the relevant repository, artifact, snapshot or time
-   range, and coverage. Reuse available summaries when they answer the question;
-   a dashboard or structured summary is not required for analysis.
-2. If the summary is incomplete, read the known source with a bounded path,
-   time, or line range. Record why the drilldown was needed. Missing fields and
-   records remain unknown, never zero or successful; do not expand raw logs
-   broadly.
-3. Compare expected behavior with observed operations and results when relevant:
-   actual tool calls, child launch/completion/failure, prompt or tool selection,
-   checker execution, and owner follow-through. Plans, candidate lists, and
-   manifests alone do not prove an operation occurred. Separate observation,
-   interpretation, and tentative cause.
-4. Locate the canonical owner indicated by the evidence. Select further
-   collection, a change, or repair only when it is needed for the requested
-   claim or outcome. Use that owner's native command and authority; unavailable
-   new evidence limits the claim but does not erase readable evidence.
-5. For a selected change, check its changed guarantee through the owning route.
-   Report the actual result and unresolved limits; analysis or Issue recording
-   alone does not establish that a repair succeeded.
+1. Set the question and relevant source, revision, time range, or coverage;
+   reuse sufficient summaries.
+2. If needed, inspect a bounded source range. Missing records remain unknown,
+   not zero, successful, or absent.
+3. Compare expected behavior with observed operations and results. Plans,
+   candidates, and manifests alone do not prove execution; separate observation
+   from interpretation and cause.
+4. Follow evidence to its owner. Gather more or select a repair only when the
+   requested conclusion depends on it. For a selected repair, check the changed
+   guarantee through its owner and report remaining uncertainty.
 
 ## Claims And Owner Boundaries
 
-- Report the question, evidence sources and snapshot/coverage, observations,
-  interpretation, selected owner/action, checks actually performed, and limits.
-  Keep missing or stale evidence explicit.
-- Token-use claims require token coverage or moving-average evidence. Do not
-  estimate token use from event, file, line, or agent counts.
-- The dashboard owner owns aggregation. The runtime log archive owner owns
-  archive branches, delivery, retention, synchronization, and remote readback;
-  analysis does not sync or clean an archive. Distinguish a missing producer
-  record from failed delivery, and do not infer the cause from an old archive
-  head.
-- Stable archive branch identity follows the log repository policy and the
-  normalized Git remote; filesystem paths and session IDs are metadata only.
-- For selected dashboard refresh or source-bound collection, use the existing
-  owner command and output boundary. Runtime session collection uses the
-  container-local source root supplied by its owner, never host session paths.
-- Treat eval-family missing/stale/fail as observations. Do not automatically
-  rerun producers, migrate old logs, or repair the dashboard. Selected eval
-  repair follows [agent-eval-accumulation](agent-eval-accumulation.md); selected
-  archive work follows the [runtime log archive owner](../../documents/runtime/runtime-log-archive.md).
-- When durable Issue recording is requested, use
-  [issue-finding-report](issue-finding-report.md) with available evidence and
-  limitations. Publication is established by the publisher's actual receipt
-  and remote readback, not candidate counts or pending-state disappearance. For
-  a requested durable report, use `$result-artifact-writeout`.
+- Return the evidence and conclusion in the requested form, including limits
+  from missing or stale records.
+- Use evidence that actually covers a claim: event, file, line, or agent counts
+  do not establish token use.
+- If dashboard or archive records are involved, follow their owners for
+  aggregation, collection, delivery, retention, and readback. Analysis itself
+  does not sync or clean an archive.
+- Missing, stale, or failed eval evidence is an observation. If collection or
+  repair is selected, use [agent-eval-accumulation](agent-eval-accumulation.md).
+  For selected archive work, follow the
+  [runtime log archive owner](../../documents/runtime/runtime-log-archive.md).
+- For a requested durable Issue, use [issue-finding-report](issue-finding-report.md).
+  Claim publication only from the publisher's result and remote readback.
