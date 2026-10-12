@@ -20,6 +20,8 @@ provenance、failed/partial を含む terminal status をこの skill が記録�
 
 - experiment topic の初期化、case 実行、result/report 生成、review、rerun を行う
 - 一つの protocol と run の終端状態を再現可能に記録する
+- 完了済み experiment または閉じた verification/diagnosis の topic code を
+  retire する。active run を完了 archive へ強制しない
 
 ## Topic Preparation
 
@@ -93,6 +95,27 @@ topic に mini-runner、scheduler、独自 signal 回収、partial-resume protoc
   [Branch Scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)、raw log、annex payload retrieval、completed summary は
   [Result Log Retention And Visualization](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention)
   に従います。
+
+## Topic code closeout
+
+完了した experiment または閉じた verification/diagnosis の code を retire
+する場合だけ、次を行います。active run を archive closeout へ強制しません。
+topic branch には選択した topic の code/config だけを置き、`main` には共有
+model/helper、execution/regression infrastructure、completed `summary.md` を残します。
+
+1. Active raw log は ignored scratch に置く。archive 前に source/execution
+   commit、config/input identity、command/environment、解釈に必要な
+   log/result を保存する。
+2. 選択した evidence を既存 annex writer で圧縮し、archive reference を
+   `git annex add <archive-path>` で登録する。payload は configured annex
+   destination へ保存し、retrieval を確認する。Git push だけでは payload
+   保存を証明しない。
+3. `main` に retrieval method、execution commit、results、limits を記した
+   completed `summary.md` を保持する。cleanup 前に target repository の Issue
+   に `main` にない正確な `summary.md` paths を列挙し、その summaries を保持する。
+4. summary と retrievable payload を確認してから retired topic code/config
+   だけを除去する。shared models/helpers/execution/regression tests は保持し、
+   active experiment と closed verification/diagnosis の scope を混ぜない。
 
 `research-workflow` は複数 iteration の仮説と claim、`adaptive-improvement-loop` は backlog-driven sequence、
 `experiment-review` は topic contract の review を所有します。構造が本当に未決定な plan/report だけ `structure-planning` を追加します。
