@@ -27,6 +27,12 @@ Reuse unchanged context and evidence rather than restarting discovery.
 The latest explicit user agreement defines the requested outcome, acceptance, and
 authority. Confirm the checkout and relevant revision; preserve unknown Git state
 and user data. Task authority does not authorize unrelated changes or publication.
+Current explicit instructions in the conversation take precedence over repository
+and Skill guidance or past procedures, subject to higher-priority system and
+developer instructions. For code cleanup, reduce the relevant owning
+implementation; do not add features, wrappers, or safety code. Deleting unrelated
+documentation or artifacts does not offset source growth. Genuine functional
+expansion requires separate agreement from the current user.
 
 For a local repair, start from the target code, diff, and governing contract;
 do not make use-site or out-of-scope investigation a prerequisite. If those facts
