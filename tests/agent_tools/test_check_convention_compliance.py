@@ -809,22 +809,36 @@ class CheckConventionComplianceTest(unittest.TestCase):
         self.assertEqual(missing, [])
 
     def test_mathematical_necessity_gate_requires_markers(self) -> None:
-        """Mathematical judgment surfaces keep necessity-gate markers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.copy_minimal_repo(root)
-            proof_skill = root / "agents" / "skills" / "formal-proof-workflow.md"
-            proof_skill.write_text(
-                "program contract public entrypoint proof obligation\n",
-                encoding="utf-8",
-            )
+        """Both canonical policy owners keep necessity-gate markers."""
+        policy_markers = (
+            (
+                "documents/conventions/common/05_docs.md",
+                "necessary-and-sufficient condition",
+            ),
+            (
+                "documents/conventions/coding-conventions-testing.md",
+                "Numerical Trigger",
+            ),
+        )
+        for policy_path, marker in policy_markers:
+            with (
+                self.subTest(policy_path=policy_path, marker=marker),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
+                root = Path(tmp_dir)
+                self.copy_minimal_repo(root)
+                policy = root / policy_path
+                policy.write_text(
+                    policy.read_text(encoding="utf-8").replace(marker, ""),
+                    encoding="utf-8",
+                )
 
-            result = self.run_checker(root)
+                result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("mathematical_necessity_gate", result.stdout)
-            self.assertIn("missing-marker:mathematical necessity gate", result.stdout)
-            self.assertIn("missing-marker:theorem surface", result.stdout)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("mathematical_necessity_gate", result.stdout)
+                self.assertIn(policy_path, result.stdout)
+                self.assertIn(f"missing-marker:{marker}", result.stdout)
 
     def test_minimal_fixture_covers_mathematical_necessity_surfaces(self) -> None:
         """The minimal test fixture includes every math necessity surface."""
