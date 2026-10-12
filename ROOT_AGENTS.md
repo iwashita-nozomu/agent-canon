@@ -47,6 +47,13 @@ history as cause evidence, inspect only the relevant target boundary, fix the
 located cause, and rerun the selected route. Do not add speculative guards,
 fallback paths, retries, or gates without a concrete cause. Do not alter tests
 or switch routes merely to obtain a pass.
+When a separate responsibility fails, compare its actual and expected inputs
+and outputs with relevant completed behavior and its recorded purpose. Preserve
+shared purpose and invariants while distinguishing changed inputs; consider
+whether required valid cases fit the existing contract, type, interface, or
+abstraction, and extend it when needed. Change prior behavior when current
+requirements and this comparison identify a concrete cause; do not add layers
+for hypothetical inputs.
 Keep observations, causes, and unverified results distinct.
 Use configured Git/GitHub transports. Do not discover, create, copy, link, or
 configure credentials or auth agents; return authentication failures to their
