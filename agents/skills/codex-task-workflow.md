@@ -48,6 +48,10 @@ inactive. Resolve a material design question with
 [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md) before the affected
 edit. When multiple implementations or obsolete support must be retired, use
 the shared [owner and retirement rule](../../ROOT_AGENTS.md#always-on-boundary).
+When an operational procedure changes, update its applicable Skill's Use
+When/flow guidance in the same work unit and keep full procedure details in the
+canonical owner. Ordinary prose or README edits do not trigger a repository-wide
+Skill scan.
 
 ## Coordination handoff
 

@@ -19,12 +19,25 @@ It plans retention; it does not own experiment execution, artifact writing, arch
 
 各 source unit について、mutation または archive の前に順に決めます。
 
-1. source identity/content evidence と semantic classification。
+1. source identity/content evidence と semantic classification: active topic
+   code/config、completed topic/diagnostic code、shared infrastructure、result
+   evidence を区別する。
 2. `retain|archive|external|delete-after-use|defer` の retention decision。
 3. `compressed_archive|as_is|existing_external` の representation、destination、provenance。
 4. source-preservation condition、verification、resume identity。
 
 Semantic classification and physical representation are orthogonal. Do not infer that canonical data must be kept as-is or that noncanonical data must be compressed.
+
+## Topic code and result closeout
+
+For selected topic retirement, follow [Branch Scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)
+and [Result Log Retention And Visualization](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention).
+Keep each branch to its topic's code/config; retain shared models/helpers,
+execution/regression infrastructure, and completed summaries on `main`.
+Topic-code deletion planning requires a retrievable archive and retained
+summary; list exact missing `summary.md` paths in the target Issue. Active runs
+are not forced into archive closeout; closed verification/diagnosis is a
+separate source unit. This Skill remains read-only.
 
 ## Failure-closed rules
 
