@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests the standalone AgentCanon GitHub workflow convention checker.
 # upstream implementation ../../tools/validation/ci/checks/check_github_workflows.py convention checker
+# upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml dashboard event contract
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml standalone gate workflow
 # @dependency-end
 
@@ -16,8 +17,13 @@ from pathlib import Path
 
 import yaml
 
+from tools.validation.ci.checks.check_github_workflows import check_root_copy_headers
+
 ROOT = Path(__file__).resolve().parents[2]
 CHECKER = ROOT / "tools" / "validation" / "ci" / "checks" / "check_github_workflows.py"
+RUNTIME_DASHBOARD_WORKFLOW = (
+    ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+)
 
 
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
@@ -49,6 +55,14 @@ def write_workflow(root: Path, text: str) -> None:
     path = root / ".github" / "workflows" / "ci.yml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def write_dashboard_workflow(root: Path, text: str) -> Path:
+    """Write a dashboard workflow fixture for the focused header checker."""
+    path = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 VALID_WORKFLOW = """\
@@ -156,3 +170,60 @@ def test_workflows_do_not_restore_workspace_runtime_defaults() -> None:
     workflow_root = ROOT / ".github" / "workflows"
     for path in workflow_root.glob("*.y*ml"):
         assert "workspace/agent-canon-runtime" not in path.read_text(encoding="utf-8")
+
+
+def test_runtime_dashboard_preserves_pr_context_and_skips_diagnostics_for_prs() -> None:
+    """Keep the dashboard PR check while diagnostics run on manual/schedule events."""
+    workflow = yaml.load(
+        RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+
+    events = set(workflow["on"])
+    assert events == {"pull_request", "workflow_dispatch", "schedule"}
+    assert "dashboard" in workflow["jobs"]
+    dashboard_job = workflow["jobs"]["dashboard"]
+    assert dashboard_job["if"] == "github.event_name != 'pull_request'"
+
+
+def test_dashboard_header_checker_rejects_missing_pr_trigger_or_job_guard() -> None:
+    """Require both the PR context and the diagnostic exclusion at their owner."""
+    source = RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        write_dashboard_workflow(root, source)
+        assert check_root_copy_headers(root) == []
+
+        ordered_job = (
+            "  dashboard:\n"
+            "    if: github.event_name != 'pull_request'\n"
+            "    runs-on: ubuntu-latest\n"
+        )
+        reordered_job = (
+            "  dashboard:\n"
+            "    runs-on: ubuntu-latest\n"
+            "    if: github.event_name != 'pull_request'\n"
+        )
+        reordered = source.replace(ordered_job, reordered_job, 1)
+        assert reordered != source
+        write_dashboard_workflow(root, reordered)
+        assert check_root_copy_headers(root) == []
+
+        mutations = (
+            (
+                "missing_text:pull_request:",
+                "  pull_request:\n",
+                "",
+            ),
+            (
+                "missing_dashboard_pr_job_exclusion",
+                "jobs:\n  dashboard:\n    if: github.event_name != 'pull_request'\n",
+                "jobs:\n  dashboard:\n",
+            ),
+        )
+        for expected_message, removed_text, replacement in mutations:
+            mutated = source.replace(removed_text, replacement, 1)
+            assert mutated != source
+            write_dashboard_workflow(root, mutated)
+            findings = check_root_copy_headers(root)
+            assert any(finding.message == expected_message for finding in findings)
