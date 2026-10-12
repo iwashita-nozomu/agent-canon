@@ -43,17 +43,16 @@ JSONL and accumulated eval archive branch policy belong to
   and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
   [documents/runtime/runtime-log-archive.md](../runtime/runtime-log-archive.md).
-- `experiments/<topic>/result/<run-id>/raw/` stores raw experiment outputs, JSONL,
-  HLO dumps, and other producer-owned evidence.
+- `experiments/<topic>/result/<run-id>/raw/` is ignored scratch for active raw
+  experiment outputs, JSONL, HLO dumps, and other producer-owned evidence.
 - `experiments/<topic>/result/<run-id>/summary/` stores compact summaries,
   case records, manifests, snapshots, visualization status, and failure evidence.
 - `experiments/<topic>/result/<run-id>/logs/` stores per-run stdout/stderr,
   tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiments/<topic>/result/<run-id>.tar.gz` stores the
-  one-run compressed git-annex archive of formal experiment result/report
-  artifacts produced from the source checkout. The archive contains the result
-  tree, optional `experiments/<topic>/report/<run-id>.md`, and its
-  canonical retention manifest.
+- `experiments/<topic>/result/<run-id>.tar.gz` stores selected result/report
+  materials compressed as a one-run git-annex archive. Git tracks its annex
+  reference; the payload is transferred to and read back from the configured
+  annex destination.
 - `experiments/<topic>/visualization.py` is the sole topic visualization entry. Its renderer may
   produce deterministic HTML/SVG/PNG beside the summary artifacts; the default template has no notebook.
 - `experiments/<topic>/report/<run-id>.md` stores the human-readable experiment report.
@@ -108,7 +107,7 @@ Canonical helper commands:
 python3 tools/analysis/documents/formatting/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/artifacts/html_artifact_access.py <report.html>
-python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run-id> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
+git annex add <archive-path>
 python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
@@ -134,11 +133,30 @@ directly from inside a container and tunneling to the container IP.
   task, archive it mechanically with `runtime_log_archive_git.py
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
-- For formal experiments, run from the source checkout and retain the generated
-  `experiments/<topic>/result/<run-id>/` plus optional
-  `experiments/<topic>/report/<run-id>.md` with
-  `tools/experiments/artifacts/save_experiment_result_annex.py` in the configured annex
-  worktree. The archive operation is append-only and has no remote-push mode.
+- For experiment source placement, follow
+  [Branch Scope](../operations/BRANCH_SCOPE.md#experiment-topic-branch-scope).
+- Before removing topic code, use the target repository's Issue to list the
+  exact `summary.md` paths absent from `main` and retain those summaries. Do not
+  invent paths for the Issue.
+
+## Experiment Archive And Summary Retention
+
+Keep active raw logs in ignored scratch. Before cleanup, preserve the
+reproducibility record: source and execution commit, topic/config and input
+identity, command/environment, logs, and results needed to interpret the run.
+
+Compress the selected materials at the topic's archive path, then add the
+archive with `git annex add <archive-path>`. Git commits the annex reference and
+summary metadata, not a bulky raw payload. Transfer the payload through the
+configured annex destination and confirm that it is retrievable; a Git push
+alone does not establish payload transfer.
+
+Retain a completed `summary.md` in `main` with the archive retrieval method,
+execution commit, results, and limits before retiring the topic code. Remove
+retired topic-only or diagnostic code after that evidence is retained, while
+keeping shared models, helpers, execution infrastructure, and regression tests.
+Closed verification or diagnosis has its own scope and is distinct from an
+active experiment.
 
 ## Closeout Evidence
 

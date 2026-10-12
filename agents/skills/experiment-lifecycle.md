@@ -14,7 +14,7 @@ downstream implementation ../../tools/validation/semantic/tools/tool_rejection_p
 
 実験の準備、実行、終端状態、結果整理、rerun 判断を一続きで扱います。run identity、source/config/command/environment の
 provenance、failed/partial を含む terminal status をこの skill が記録し、実在 artifact は
-`result-artifact-writeout`、reader-facing claim は `report-writing`、annex retention は明示的な archive writer に委譲します。
+`result-artifact-writeout`、reader-facing claim は `report-writing`、source scope と archive retention はそれぞれの owner 文書に委譲します。
 
 ## Use When
 
@@ -89,8 +89,10 @@ topic に mini-runner、scheduler、独自 signal 回収、partial-resume protoc
 - checked-in config は `experiments/<topic>/config.yaml`、topic README は問い・比較対象・標準 command・config source・renderer・output schema・run name を説明する。
 - project registry がある場合は `python3 -m tools.validation.ci.checks.check_experiment_registry` を実行し、execution surface の変更は owner-selected test を使う。
 - result artifact の role/checksum/readback は `result-artifact-writeout`、reader-facing report は要求時だけ `report-writing`、HTML は要求時だけ `html-output` に委譲する。
-- annex retention は必要時だけ次を明示実行する。
-  `python3 -m tools.experiments.artifacts.save_experiment_result_annex --result-dir experiments/<topic>/result/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"`
+- Topic branch/source scope は
+  [Branch Scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)、raw log、annex payload retrieval、completed summary は
+  [Result Log Retention And Visualization](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention)
+  に従います。
 
 `research-workflow` は複数 iteration の仮説と claim、`adaptive-improvement-loop` は backlog-driven sequence、
 `experiment-review` は topic contract の review を所有します。構造が本当に未決定な plan/report だけ `structure-planning` を追加します。

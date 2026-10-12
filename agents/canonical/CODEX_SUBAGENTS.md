@@ -93,15 +93,13 @@ owner、scope、result と必要な cleanup を根拠に判断します。
 - 同じ checkout root の write-capable agent は同時起動しません。先行writerの
   lifecycle終了とowner release/readback後だけ同じcheckoutを直列再利用します。
   並列writerはcheckout ownerが選択したdistinct checkout rootを使います。
-- subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
+- handoff fields and the fresh-subagent capsule are owned by
+  [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md#fresh-subagent-context-capsule).
+  Use its selected-task context and role boundary; attach route-specific artifacts
+  and gate status only when that route requires them. Reuse an active agent only
+  when its owner, context, authority, and validation remain compatible.
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
-- fresh subagent は必要な launch ごとに [agents/COMMUNICATION_PROTOCOL.md](../COMMUNICATION_PROTOCOL.md)
-  の `Fresh Subagent Context Capsule` を受け取ります。active agent を再利用
-  できる場合は、同じ protocol-owned context を compatible な revised scope
-  として更新します。`context_artifacts`、`allowed_paths`、`do_not_read`、
-  `return_contract` などの capsule key は同文書を正本にし、schema の定義は
-  同文書だけに置きます。
-- theorem-driven、algorithm、implementation handoff では、protocol-owned capsule に `Target Binding Packet` が必須です。packet が complete になってから spawn し、unchecked output は verifier または owning reviewer が同じ public root に対して checker / validation を通した後だけ採用対象へ進みます。
+- theorem-driven、algorithm、implementation handoff では同 protocol の `Target Binding Packet` に従います。unchecked output は verifier または owning reviewer が同じ public root に対して checker / validation を通した後だけ採用対象へ進みます。
 - `計画レビュー`、`詳細設計レビュー`、`文書通読レビュー`、論文 draft の
   reviewer、学術文章の notation/logic reviewer は、owner-critical な
   validation または unresolved branch が選択した場合だけ起動する。必要な
@@ -565,18 +563,10 @@ launch work or require a particular sequence.
 
 ## Checkout Identity at Git Boundaries
 
-各 agent / work unit は、Git 状態に関係する作業単位の開始時に、既存の
-`checkout_identity` readback を一度 handoff context に含めます。cwd または
-checkout が変わった後、conflict 解消前、commit / push / PR 前、cleanup または
-destructive Git 前、subagent handoff と final handback でも同じ block を更新します。
-通常のコマンドごとには繰り返しません。
-
-readback は `python3 tools/runtime/authority/checkout_identity.py --format lines` で取得し、
-絶対 `cwd`、Git root、branch（detached を含む）、HEAD、normalized remote
-`owner/repository` を運びます。これは観測情報だけであり、branch / worktree authority、
-approval、merge、cleanup、Issue、publication の権限を追加しません。Git root または
-remote を解決できない場合は `unknown` をそのまま伝え、対象操作が identity を必要と
-するときだけ既存の owner route で停止します。
+`checkout_identity` fields and read-once lifecycle are owned by
+[COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md#checkout-identity-readback).
+Follow that section at its listed Git boundaries; ordinary commands do not
+require another read.
 
 ## Parallel Write Safety
 
