@@ -15,22 +15,24 @@ upstream design ../../documents/runtime/private-feedback-knowledge.md private ev
 Review the actual diff, resulting owning unit, and existing validation evidence.
 Use the host's ordinary review capability where available; this owner adds the
 AgentCanon-specific source, generated-surface, and retirement boundaries.
-Do not repeat generic review instructions or require a second review solely
-because this skill was selected.
+Repeat a completed review only after new diff, evidence, or a decision-relevant
+requirement; Skill selection alone does not require a second review.
 
 ## Procedure
 
-1. Inspect the current diff against the changed contract and the most recently
-   incorporated owner. Review the changed code and contract. Before accepting a
-   finding, identify why the current implementation exists and what evidence in
-   the target could refute it.
-2. For an overlap or missing-deletion finding, identify the retained owner and
-   obsolete contribution. RC-09 owns retirement; an alias or wrapper is not the
-   default repair.
-3. Derive findings from reachable effects and current guarantees, not symptoms or
-   reviewer wording. Treat a reviewer result as a hypothesis until source or a
-   direct static proof supports it. Unreachable branches and upstream-guaranteed
-   checks are deletion candidates, not speculative test triggers.
+1. Compare the actual diff and resulting behavior with changed and retained
+   requirements and the owning contract; the latest explicit user instruction
+   governs conflicts, while compatible earlier requirements remain active. Use
+   implementation rationale and target evidence to assess findings; history
+   explains changes but does not define correctness.
+2. For overlap or missed retirement, compare reachable behavior across names,
+   locations, wrappers, and branches; identify the retained owner and obsolete
+   contribution. A rename or move does not retire equivalent behavior. RC-09
+   owns retirement; an alias or wrapper is not the default repair.
+3. Derive findings from reachable effects and current guarantees, not symptoms
+   or reviewer wording; validate reviewer hypotheses against source or direct
+   static proof. Unreachable branches and upstream-guaranteed checks are deletion
+   candidates, not speculative test triggers.
 4. Check generated views against their source. Reuse applicable validation;
    select a language, numerical, or
    document specialist only for unresolved risk in that changed surface.
