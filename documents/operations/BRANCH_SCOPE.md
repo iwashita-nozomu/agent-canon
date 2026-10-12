@@ -34,7 +34,17 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - topic は独立した設計単位として扱い、branch と PR の scope もこの単位に揃えます。
 - branch の責務が広がったら、branch を分けるか `WORKTREE_SCOPE.md` を更新します。
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
-- `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。
+- `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。再利用する
+  model/helper、共有 execution・regression infrastructure、完了済み `summary.md` と
+  archive reference を保持し、topic-only / disposable diagnostic code は置きません。
+
+### Experiment topic branch scope
+
+実験 branch には、その topic の code/config だけを置き、完了済み別 topic の code を
+持ち込みません。閉じた verification / diagnosis は active experiment と別の scope
+として扱います。raw log、archive、summary の扱いは
+[Result Log Retention And Visualization](../experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention)
+に従います。
 
 ### Git 状態の保全と整合性
 

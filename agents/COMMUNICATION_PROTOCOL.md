@@ -23,7 +23,10 @@ downstream implementation ../tools/validation/semantic/tools/tool_rejection_pref
 
 - This document owns the artifact-level communication contracts for handoff, pre-edit investigation, fresh subagent capsules, review packets, write scope, and escalation.
 - The first sections define common rules and communication surfaces; the packet sections then specify exactly what must be handed between parent, subagents, reviewers, and implementers.
-- Use `## Pre-Edit Repository Investigation Packet` before selecting edit paths, and `## Fresh Subagent Context Capsule` before launching or reusing any run-local subagent.
+- For write work, use `## Pre-Edit Repository Investigation` to establish the
+  target, owner, scope, and authority; materialize route-specific artifacts
+  only when selected. Use `## Fresh Subagent Context Capsule` before launching
+  or reusing a run-local subagent.
 - For chunked reading, start from the packet type required by the current transition and read only the fields needed to make that transition auditable.
 - After context compaction, follow `## Post-Compaction Objective Re-Declaration Contract` before any resumed action.
 
@@ -315,9 +318,10 @@ for its source changes and findings.
 - `open_questions`
 - `status`
 
-`pre_handoff_gate_status` records gate evidence before a write-capable
-implementation handoff. Design-backed implementation handoffs require the
-current `design_brief.md` path or revision and the selected owner/design gate.
+`pre_handoff_gate_status` is conditional: include it only when the selected
+route has an active pre-handoff gate. Design-backed implementation handoffs
+require the current `design_brief.md` path or revision and the selected
+owner/design gate.
 `design_review.md` `Design Artifact Under Review`, normalized decision evidence
 from the [review dispatcher](../tools/agent/orchestration/review_dispatch.py),
 `waterfall-gate-check --gate design` evidence, and selected
@@ -369,12 +373,20 @@ the current run bundle; the contract checker validates the instance identity
 and references without turning the active packet into a second responsibility
 schema.
 
-## Pre-Edit Repository Investigation Packet
+## Pre-Edit Repository Investigation
 
-Before selecting edit paths, direct parent edits, or write-capable subagent
-handoff, the parent records a pre-edit investigation packet with explicit owner
-and scope. This is the required evidence that repo investigation happened
-before implementation.
+Before a write, establish the target repository and revision, requested behavior
+and governing contract, canonical owner, assigned write paths and authority,
+checkout identity, and selected validation route. Start from the target; inspect
+exact callers or history only when they resolve an open contract or a selected
+cross-surface change. Existing task and handoff context is sufficient for an
+ordinary bounded write; a separate investigation packet is not a dispatch
+prerequisite.
+
+Materialize structured investigation evidence or explicit request-clause mapping
+only when the selected coordination or design route needs it. Such route-owned
+artifacts, including `request_clause_ids` when applicable, travel through the
+existing handoff; they do not gate other routes.
 
 Asset reuse context is carried through the existing `reuse_survey` handoff field
 when the splitter has investigated candidate assets. The survey may record
@@ -383,39 +395,8 @@ current or historical assets. A known selected asset and its tests become
 starting context for every child; missing advisory reuse context does not block
 dispatch or writing.
 
-- `request_clause_ids`: user clauses covered by the edit
-- `workflow_and_skills`: selected workflow and the Markdown Skill links supplied
-  for the assigned work
-- `structure_intake`: `Structure Intake Packet` path, or reason it is not
-  applicable
-- `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
-  `FORBIDDEN_PATHS`, `REQUIRED_PRE_EDIT_CHECKS`, or a router-unavailable
-  blocker
-- `responsibility_search`: structured semantic-index / deterministic search / tool-catalog
-  result paths, not broad raw text-search dumps
-- `reuse_survey`: existing tools, skills, workflows, helpers, libraries, and,
-  when known, exact current+historical candidate paths, capability,
-  disposition (`reuse`/`extend`/`restore`/`consolidate`/`replace`/`delete`/
-  `reject`), reason, and test paths that inform the selected surface
-- `semantic_responsibility_contract`: run-local contract path, policy reference,
-  delta actions, obligation owners, and hard-edge closure readback
-- `stale_surface_scan`: obsolete mirror, generated artifact, legacy wrapper,
-  old convention, or source-canon drift checked before edits
-- `dependency_scope`: `dependency_edit_scope.txt`, `dependency_graph.tsv`, or
-  reason dependency expansion is not applicable
-- `validation_route`: targeted checks and closeout gates derived from the
-  packet
-- `llm_visible_context`: selected excerpts, structured summaries, or evidence
-  that must be in the prompt for the next decision
-- `local_tool_context`: artifact paths, command outputs, raw logs, dashboards,
-  or search results intentionally kept out of the prompt
-- `durable_knowledge_refs`: stable policy, issue, report, source packet, or private
-  knowledge references that survive chat compaction
-- `open_questions`: only items that cannot be resolved from repo evidence
-
-Raw search hits, chat memory, and a list of nearest files are not sufficient.
-If the packet is missing, implementation returns to investigation instead of
-guessing an edit path.
+Broad search output or remembered context does not replace the target, governing
+contract, assigned scope, or authority.
 
 ## Checkout Identity Readback
 
@@ -441,38 +422,20 @@ branch, worktree, merge, cleanup, or publication policy.
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
-handoff therefore includes a structured context capsule that is self-contained
-enough to execute the role and owned enough to avoid unrelated repo reading.
+handoff carries the selected task and enough context to act within its role:
+the objective and owned request clauses, current stage and checkout identity,
+exact owner files or sections to read, role boundary, expected result, and return
+contract. Keep evidence artifacts local unless the child needs them for its next
+decision. The capsule and handoff fields are owned here; other sources should
+link to this section instead of restating the field list.
 
-- `objective`: one sentence with active non-goals
-- `request_clause_ids`: clauses the subagent owns
-- `state_snapshot`: one `checkout_identity` block, relevant commit or run-id,
-  current stage, and integration executor owner
-- `read_before_work`: exact files or sections to read within role-owned
-  surfaces
-- `reuse_survey`: the parent-selected advisory asset context; when present, the
-  worker starts from selected assets and their tests before forming or editing a
-  slice
-- `context_artifacts`: router output, dashboard summary, checker finding
-  packet, dependency scope, design trace, or report summary paths
-- `subagent_startup_route`: private internal startup route path from
-  `team_manifest.yaml` `run.subagent_prompt_packet.subagent_startup_route`, or
-  `not_applicable` when the run manifest does not provide one
-- `pre_handoff_gate_status`: design review and gate-check status required
-  before write-capable implementation handoff
-- `allowed_paths` / `do_not_read`: role-specific path boundaries
-- `expected_output_schema`: artifact name, findings format, or patch summary
-- `validation_route`: commands or review gate the parent will use
-- `return_contract`: what changed, what evidence supports it, unresolved
-  blockers, and whether more context is needed
-- `checkout_identity`: repeat the same block in final handback, or provide the
-  new block after the checkout transition that changed it
-- `design_issue_policy`: if the role finds an API shape, responsibility
-  boundary, path layout, naming, algorithm, theorem target, test oracle,
-  dependency direction, runtime contract, or config-surface gap, it records
-  `design_issue_blocker` with evidence and returns to the design/review gate
-  instead of absorbing the issue with local fallback, wrapper, helper, branch,
-  compatibility route, test relaxation, or docs overwrite
+For write-capable work, carry the prepared `writer_target` and assigned
+`allowed_paths` under [Parallel Write Safety](canonical/CODEX_SUBAGENTS.md#parallel-write-safety).
+Carry the selected route's validation command or review gate when applicable;
+include route evidence only when the task needs it. Include a
+`pre_handoff_gate_status` only for a gate selected by the current route. Active
+gate evidence follows the rules in Handoff Packet; advisory data and unrelated
+route artifacts are not generic dispatch gates.
 
 The fresh capsule carries the same known selected asset context to every child.
 For a split, extraction, or missing suspected predecessor, the splitter must
@@ -480,6 +443,10 @@ investigate current and git-history assets before decomposition or prototyping;
 the resulting survey and tests are shared context. A reviewer may request
 missing reuse evidence, but absent advisory context does not hard-fail dispatch
 or writing.
+
+When a role discovers an unresolved API, responsibility, path, naming, oracle,
+dependency, runtime, or configuration boundary, return it with evidence to the
+owning design/review route instead of absorbing it with a local fallback.
 
 For theorem-driven, algorithm, or implementation handoffs, the capsule also
 includes a `Target Binding Packet`. This prevents a subagent from proving,

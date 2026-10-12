@@ -59,6 +59,16 @@ Use configured Git/GitHub transports. Do not discover, create, copy, link, or
 configure credentials or auth agents; return authentication failures to their
 transport owner.
 
+## Experiment Source Boundary
+
+Keep `main` to shared models/helpers, execution and regression infrastructure,
+completed `summary.md` files, and archive references; keep each experiment branch
+to that topic's code/config. Put active raw logs in ignored scratch, preserve
+reproducibility inputs and the execution commit, then archive selected evidence
+with a retrievable summary of its method, commit, results, and limits. Retire
+topic or disposable diagnostic code only after retaining the summary. Treat
+closed verification/diagnosis separately from active experiments.
+
 ## Runtime Owner Map
 
 | Responsibility | Consumer owner |

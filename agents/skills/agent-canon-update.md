@@ -214,14 +214,16 @@ qualified standalone source checkout; choose checkout mode from the repository
 relationship and use `$agent-update-branch` for lane selection. The parent does
 not become the AgentCanon source checkout.
 
-Read the canonical owner, the callers that can affect the selected mechanism,
-and the validation oracle for the requested change. For a source-free parent
-migration, freeze the exact management write set and immutable parent surfaces
-before any parent edit. The design record follows the open decision: when a
-cross-surface contract such as command shape, state roots, resource cap,
-rollback, archive route, cleanup, or validation remains unresolved, settle it
-in the existing design trace; for a bounded change with settled ownership,
-carry the decision in the existing task record.
+Start at the requested target and governing contract. Follow the
+[ROOT_AGENTS target-first boundary](../../ROOT_AGENTS.md#always-on-boundary);
+inspect callers only when the selected mechanism or an explicit cross-surface
+change depends on them. Do not make a broad use-site survey a prerequisite. For
+a source-free parent migration, freeze the exact management write set and
+immutable parent surfaces before any parent edit. The design record follows the
+open decision: when a cross-surface contract such as command shape, state roots,
+resource cap, rollback, archive route, cleanup, or validation remains
+unresolved, settle it in the existing design trace; for a bounded change with
+settled ownership, carry the decision in the existing task record.
 
 Implement in the owning AgentCanon clone, keeping affected docs, manifests,
 code, tests, and dependency headers aligned. Runtime, cache, eval, and test
