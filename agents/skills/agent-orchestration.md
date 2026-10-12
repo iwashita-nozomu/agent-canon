@@ -95,8 +95,10 @@ Eval or owner review to assess whether necessary work was missed or unnecessary
 work was done.
 
 Preserve the requested work and correctness before minimizing necessary total
-work. Time limits and prompt keywords do not cut scope. Read the selected Skill
-body through EOF and follow its applicable prerequisites.
+work. Time limits and prompt keywords do not cut scope. Read the selected Skill's
+common constraints and the content needed for the current decision, deferring
+inactive branches until their conditions apply. Read applicable prerequisites
+under [In-flight skill reads](task-routing.md#in-flight-skill-reads).
 
 Review a candidate once. Repair accepted in-scope findings and recheck only
 affected evidence; reopen review only when new contract, reachable-behavior, or
