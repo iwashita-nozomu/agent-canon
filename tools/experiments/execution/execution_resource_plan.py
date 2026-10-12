@@ -3481,9 +3481,7 @@ class GpuProcessOccupancyProbe:
                 occupied.update(children_by_parent.get(process.gpu_uuid, ()))
             else:
                 occupied.add(process.gpu_uuid)
-                parent_uuid = parent_by_child.get(process.gpu_uuid)
-                if parent_uuid is not None:
-                    occupied.add(parent_uuid)
+                occupied.add(parent_by_child[process.gpu_uuid])
         occupied_uuids = tuple(sorted(occupied))
         unit_states = _classify_gpu_unit_states(
             tuple(
