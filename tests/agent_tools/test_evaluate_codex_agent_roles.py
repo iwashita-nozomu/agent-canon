@@ -27,10 +27,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-)
 from tools.agent.orchestration.team_config import (
     load_task_catalog,
     load_team_config,
@@ -534,14 +530,11 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
             )
             self.assertNotIn("Traceback", result.stderr)
 
-    def test_materialization_uses_target_registry_without_current_checkout_fallback(
-        self,
-    ) -> None:
-        """Copied-root availability controls candidate materialization."""
+    def test_role_candidate_order_comes_from_target_team_config(self) -> None:
+        """Logical role candidates do not depend on a task-graph materializer."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             copy_eval_root(root)
-            (root / ".codex" / "agents" / "worker.toml").unlink()
             config = load_team_config(root / "agents" / "agents_config.json")
             catalog = load_task_catalog(config, root=root)
             roles = select_roles(
@@ -551,46 +544,8 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 catalog=catalog,
                 workflow_family_id="owner_bounded_change",
             )
-            initial_wave = recommended_initial_subagent_wave(
-                roles,
-                4,
-                catalog,
-                agent_root=root / ".codex" / "agents",
-            )
-            expansion_waves = recommended_dynamic_expansion_wave_slots(
-                roles,
-                4,
-                initial_wave,
-                catalog,
-                agent_root=root / ".codex" / "agents",
-            )
-
-            materialized = [
-                slot.agent_type for wave in expansion_waves for slot in wave
-            ]
-            self.assertIn("spark_worker", materialized)
-            self.assertNotIn("worker", materialized)
-
-    def test_dynamic_expansion_rejects_mismatched_initial_wave(self) -> None:
-        """Dynamic expansion must validate the caller's initial agent types."""
-        config = load_team_config()
-        catalog = load_task_catalog(config)
-        roles = select_roles(
-            config,
-            ["implementer"],
-            full_team=False,
-            catalog=catalog,
-            workflow_family_id="owner_bounded_change",
-        )
-
-        with self.assertRaisesRegex(RuntimeError, "initial_wave does not match"):
-            recommended_dynamic_expansion_wave_slots(
-                roles,
-                4,
-                ("worker",),
-                catalog,
-                agent_root=PROJECT_ROOT / ".codex" / "agents",
-            )
+            self.assertEqual(roles[0].id, "implementer")
+            self.assertEqual(roles[0].codex_agents, ("worker", "spark_worker"))
 
     def test_evaluator_grammar_is_packet_driven_and_parent_scored(self) -> None:
         """Evaluator execution is a closed view generated from canonical profile truth."""
@@ -866,129 +821,6 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_routing_reports_missing_stage_waves(self) -> None:
-        """The role evaluator should reject catalogs without topology stages."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            del catalog["role_topology_defaults"]["stage_waves"]
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=routing:role_topology_defaults:missing-stage-waves",
-                result.stdout,
-            )
-
-    def test_routing_reports_malformed_stage_waves_without_traceback(self) -> None:
-        """Malformed stage_waves entries should become findings instead of tracebacks."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            catalog["role_topology_defaults"]["stage_waves"][0] = "not-a-mapping"
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("malformed-stage-wave", result.stdout)
-            self.assertIn("materialization-failed", result.stdout)
-            self.assertNotIn("Traceback", result.stderr)
-
-    def test_routing_reports_duplicate_stage_role(self) -> None:
-        """One permanent role should not appear in multiple catalog stages."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            evaluation_stage = next(
-                stage
-                for stage in catalog["role_topology_defaults"]["stage_waves"]
-                if stage["id"] == "skill_evaluation"
-            )
-            evaluation_stage["role_ids"].append("manager")
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("duplicate-stage-role", result.stdout)
-
-    def test_routing_reports_reversed_producer_reviewer_order(self) -> None:
-        """Reviewer stages must come after their producer stages."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            stage_waves = catalog["role_topology_defaults"]["stage_waves"]
-            intake_index = next(
-                index
-                for index, wave in enumerate(stage_waves)
-                if wave["id"] == "intake"
-            )
-            review_index = next(
-                index
-                for index, wave in enumerate(stage_waves)
-                if wave["id"] == "intake_review"
-            )
-            stage_waves[intake_index], stage_waves[review_index] = (
-                stage_waves[review_index],
-                stage_waves[intake_index],
-            )
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("producer-reviewer-stage-order", result.stdout)
-
-    def test_routing_reports_missing_stage_role(self) -> None:
-        """Every permanent role should appear exactly once in stage_waves."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            final_stage = catalog["role_topology_defaults"]["stage_waves"][-1]
-            final_stage["role_ids"].remove("auditor")
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=routing:auditor:missing-stage-role",
-                result.stdout,
-            )
-
-    def test_routing_reports_missing_skill_evaluator_stage(self) -> None:
-        """The evaluator must not be exempt from executable stage topology."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            catalog_path = root / "agents" / "task_catalog.yaml"
-            catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-            for stage in catalog["role_topology_defaults"]["stage_waves"]:
-                if "skill_evaluator" in stage["role_ids"]:
-                    stage["role_ids"].remove("skill_evaluator")
-            catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-
-            result = run_eval("--root", str(root))
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn(
-                "CODEX_AGENT_ROLE_FINDING=routing:skill_evaluator:missing-stage-role",
-                result.stdout,
-            )
-
     def test_routing_reports_t14_normal_delivery_route(self) -> None:
         """T14 must not use the comprehensive worker/reviewer route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1094,52 +926,6 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 "skill-evaluator-candidate-reserved-for-skill-evaluator-role",
                 result.stdout,
             )
-
-    def test_materialization_rejects_skill_evaluator_fallback_for_ordinary_role(
-        self,
-    ) -> None:
-        """Unavailable ordinary candidates cannot fall through to the evaluator."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            copy_eval_root(root)
-            config_path = root / "agents" / "agents_config.json"
-            config_raw = json.loads(config_path.read_text(encoding="utf-8"))
-            experimenter_raw = next(
-                role
-                for role in config_raw["specialist_roles"]
-                if role["id"] == "experimenter"
-            )
-            experimenter_raw["codex_agents"].append("skill_evaluator")
-            config_path.write_text(json.dumps(config_raw), encoding="utf-8")
-            (root / ".codex" / "agents" / "experiment_runner.toml").unlink()
-            (root / ".codex" / "agents" / "worker.toml").unlink()
-            config = load_team_config(config_path)
-            catalog = load_task_catalog(config, root=root)
-            roles = select_roles(
-                config,
-                ["experimenter"],
-                full_team=False,
-                catalog=catalog,
-                workflow_family_id="research_driven_change",
-            )
-            initial_wave = recommended_initial_subagent_wave(
-                roles,
-                4,
-                catalog,
-                agent_root=root / ".codex" / "agents",
-            )
-
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "experimenter codex_agents must not include skill_evaluator",
-            ):
-                recommended_dynamic_expansion_wave_slots(
-                    roles,
-                    4,
-                    initial_wave,
-                    catalog,
-                    agent_root=root / ".codex" / "agents",
-                )
 
     def test_spark_profile_effort_must_match_the_role_binding(self) -> None:
         """Spark's low-effort profile must not replace a reviewer's binding."""

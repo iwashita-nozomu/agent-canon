@@ -20,17 +20,6 @@
 
 from __future__ import annotations
 
-if __package__:
-    from .implementation_dispatch import capacity_projection
-    from .implementation_dispatch import closeout_projection
-else:
-    from tools.agent.orchestration.implementation_dispatch import (
-        capacity_projection,
-    )
-    from tools.agent.orchestration.implementation_dispatch import (
-        closeout_projection,
-    )
-
 from tools.runtime.manifest.manifest_rendering import build_manifest as _build_manifest
 from tools.runtime.manifest.manifest_rendering import has_template as _has_template
 from tools.runtime.manifest.manifest_rendering import (
@@ -95,10 +84,8 @@ if __package__:
         TaskCatalog,
         TeamConfig,
         codex_agent_model_matrix_for_roles,
-        current_stage_skills,
         default_review_pack_ids_for_task,
         default_specialists_for_task,
-        deferred_stage_skills,
         enable_choices,
         expand_enabled_specialists,
         load_task_catalog,
@@ -118,10 +105,8 @@ else:
         TaskCatalog,
         TeamConfig,
         codex_agent_model_matrix_for_roles,
-        current_stage_skills,
         default_review_pack_ids_for_task,
         default_specialists_for_task,
-        deferred_stage_skills,
         enable_choices,
         expand_enabled_specialists,
         load_task_catalog,
@@ -143,7 +128,6 @@ from tools.repository.workspace.workspace_scope import (
     resolve_report_bundle_artifact_path,
     resolve_report_root,
     resolve_role_write_scope,
-    schedule_wave_row,
     validate_role_write_scope,
     write_directory_snapshot,
     write_workspace_change_snapshot,
@@ -180,57 +164,21 @@ else:
 
 if __package__:
     from .implementation_dispatch import (
-        ExecutionGraphTransition,
-        ToolExecutionResult,
-        advance_execution_graph,
-        agent_type_selection_map,
-        capacity_runtime_for_spec,
-        capacity_start_output_lines,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        declared_team_capacity_derivation,
         default_quality_check_agent_types,
         dispatch_fixed_implementation,
-        dispatch_subagent_wave,
         format_agent_type_selections,
         parse_agent_type_selections,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
-        recommended_initial_subagent_wave_slots,
-        parse_tool_execution_result,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
-        validate_writer_handoff_waves,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
     )
 else:
     from tools.agent.orchestration.implementation_dispatch import (
-        ExecutionGraphTransition,
-        ToolExecutionResult,
-        advance_execution_graph,
-        agent_type_selection_map,
-        capacity_runtime_for_spec,
-        capacity_start_output_lines,
-        codex_runtime_max_depth,
-        codex_runtime_max_threads,
-        declared_team_capacity_derivation,
         default_quality_check_agent_types,
         dispatch_fixed_implementation,
-        dispatch_subagent_wave,
         format_agent_type_selections,
         parse_agent_type_selections,
-        recommended_dynamic_expansion_wave_slots,
-        recommended_dynamic_expansion_waves,
-        recommended_initial_subagent_wave,
-        recommended_initial_subagent_wave_slots,
-        parse_tool_execution_result,
         unique_codex_agents_for_roles,
         validate_agent_type_selections,
-        validate_writer_handoff_waves,
-        workflow_spawn_budget,
-        workflow_topology_policy_violations,
     )
 
 from tools.runtime.manifest.manifest_rendering import (
@@ -238,9 +186,6 @@ from tools.runtime.manifest.manifest_rendering import (
     contract_complete_implementation_policy_output_lines,
     coordination_capability_policy_output_lines,
     default_quality_check_policy_output_lines,
-    format_subagent_role_instance_wave_chunks,
-    format_subagent_wave,
-    format_subagent_wave_chunks,
     language_review_candidates,
     pre_handoff_gate_status_output_lines,
     pre_handoff_scope_policy_output_lines,
@@ -372,7 +317,6 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
     source_root = _required_source_root(spec)
     report_root = _required_report_root(spec)
     _validate_report_destination(spec, report_root)
-    capacity_runtime = capacity_runtime_for_spec(spec)
     active_design_packet = run_active_design_packet(spec)
     missing_templates = required_output_templates_missing(
         spec.config,
@@ -404,21 +348,7 @@ def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
             rendered[artifact] = _render_template(
                 template_name, replacements, source_root=source_root
             )
-    rendered[spec.config.artifacts["team_manifest"]] = _build_manifest(
-        spec, capacity_runtime
-    )
-    rendered["closeout_packet.json"] = (
-        _json.dumps(
-            {
-                "capacity_request": capacity_projection(capacity_runtime, spec),
-                "closeout_packet": closeout_projection(capacity_runtime, spec),
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n"
-    )
-    created_files.append("closeout_packet.json")
+    rendered[spec.config.artifacts["team_manifest"]] = _build_manifest(spec)
     rendered[spec.config.artifacts["verification"]] = "\n".join(
         (
             f"run_id={spec.run_id}",
@@ -482,14 +412,8 @@ __all__ = (
     "enable_choices",
     "expand_enabled_specialists",
     "default_specialists_for_task",
-    "current_stage_skills",
-    "deferred_stage_skills",
-    "workflow_spawn_budget",
-    "workflow_topology_policy_violations",
     "writer_target_policy_output_lines",
     "required_output_templates_missing",
-    "codex_runtime_max_threads",
-    "codex_runtime_max_depth",
     "codex_agent_model_matrix_for_roles",
     "ActiveDesignPacketConfig",
     "normalize_active_design_packet_config",
@@ -499,27 +423,12 @@ __all__ = (
     "resolve_active_design_packet_config",
     "resolve_cross_cutting_document_packet",
     "resolve_role_document_packet",
-    "declared_team_capacity_derivation",
-    "capacity_runtime_for_spec",
     "dispatch_fixed_implementation",
-    "dispatch_subagent_wave",
-    "advance_execution_graph",
-    "ExecutionGraphTransition",
-    "ToolExecutionResult",
-    "parse_tool_execution_result",
-    "recommended_initial_subagent_wave",
-    "recommended_initial_subagent_wave_slots",
-    "recommended_dynamic_expansion_waves",
-    "recommended_dynamic_expansion_wave_slots",
-    "recommended_initial_subagent_wave_slots",
     "unique_codex_agents_for_roles",
     "default_quality_check_agent_types",
     "parse_agent_type_selections",
     "format_agent_type_selections",
     "validate_agent_type_selections",
-    "validate_writer_handoff_waves",
-    "agent_type_selection_map",
-    "capacity_start_output_lines",
     "materialize_close_agent_tool_call",
     "materialize_issue_worker_tool_call",
     "materialize_subagent_spawn_tool_call",
@@ -541,9 +450,6 @@ __all__ = (
     "resolve_math_intent_packet_for_spec",
     "run_active_design_packet",
     "run_workflow_family",
-    "format_subagent_wave",
-    "format_subagent_wave_chunks",
-    "format_subagent_role_instance_wave_chunks",
     "suggested_public_skills",
     "default_review_pack_ids_for_task",
     "default_quality_check_policy_output_lines",
@@ -563,6 +469,5 @@ __all__ = (
     "load_directory_snapshot",
     "write_directory_snapshot",
     "write_workspace_change_snapshot",
-    "schedule_wave_row",
     "make_run_id",
 )

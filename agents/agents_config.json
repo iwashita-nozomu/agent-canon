@@ -296,7 +296,7 @@
           "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, CompletionCoverage, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor unlocks completion only after coverage and topology gates pass, stable blocking findings and unresolved request clauses are empty, selected validation passes or is not applicable, focused recheck is complete when selected, the convergence projection rejects same-state/action repetition, required diff-check evidence is present when selected, and workflow monitoring plus agent evaluation feedback are resolved."
+        "notes": "Audit closeout records the requested outcome, actual validation and delivery results, workflow monitoring, agent evaluation, and retrospective evidence. The auditor confirms unresolved request clauses and blocking findings are accounted for, selected validation results are accurate, focused rechecks are complete when selected, required diff-check evidence is present when selected, and workflow-monitoring plus evaluation feedback are resolved."
       }
     }
   ],

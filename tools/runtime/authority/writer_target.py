@@ -366,34 +366,6 @@ def validate_spawn_handoff(
     return targets
 
 
-def validate_wave_writer_targets(
-    slots: Sequence[object],
-    writer_targets: Mapping[str, WriterTarget | Mapping[str, object] | None]
-    | None = None,
-) -> tuple[WriterTarget, ...]:
-    """Validate role-instance slots with targets supplied by the handoff."""
-    allocations: list[Mapping[str, object]] = []
-    targets = writer_targets or {}
-    for slot in slots:
-        role_id = str(getattr(slot, "role_id", ""))
-        identity = str(getattr(slot, "executable_identity", role_id))
-        target = targets.get(
-            identity,
-            targets.get(role_id, getattr(slot, "writer_target", None)),
-        )
-        write_capable = bool(
-            getattr(slot, "write_capable", False) or target is not None
-        )
-        allocations.append(
-            {
-                "owner": identity,
-                "write_capable": write_capable,
-                "writer_target": target,
-            }
-        )
-    return validate_writer_target_allocations(allocations)
-
-
 __all__ = (
     "WRITER_TARGET_SCHEMA",
     "WRITER_TARGET_PACKET_SCHEMA",
@@ -403,7 +375,6 @@ __all__ = (
     "parse_writer_target",
     "materialize_writer_target_packet",
     "read_writer_target_packet",
-    "validate_wave_writer_targets",
     "validate_writer_target_allocations",
     "validate_spawn_handoff",
     "validate_writer_target_identity",

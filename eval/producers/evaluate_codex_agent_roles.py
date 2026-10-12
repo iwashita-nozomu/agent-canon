@@ -5,9 +5,8 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../eval/definitions/README.md eval directory contract
 # upstream implementation ../../tools/agent/orchestration/team_config.py loads team and task routing metadata
-# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owns capacity and wave routing
+# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owns role type selection
 # upstream implementation ../../tools/agent/orchestration/model_profile_registry.py owns canonical model/profile expectations
-# upstream implementation ../../tools/agent/orchestration/capacity_handshake.py owns typed capacity provenance
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves accumulated eval archive paths
 # upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external role-eval artifact writes
 # downstream implementation ../../tests/agent_tools/test_evaluate_codex_agent_roles.py tests role eval behavior
@@ -53,15 +52,6 @@ from tools.agent.orchestration.team_config import (
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
-    select_roles,
-)
-
-from tools.agent.orchestration.implementation_dispatch import (
-    declared_team_capacity_derivation,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    workflow_spawn_budget,
-    workflow_topology_policy_violations,
 )
 
 COMPACT_FINDING_SAMPLE_LIMIT = 25
@@ -236,47 +226,6 @@ def role_by_id(roles: tuple[Role, ...]) -> dict[str, Role]:
     return {role.id: role for role in roles}
 
 
-def extract_stage_waves(
-    catalog_raw: dict[str, object],
-) -> tuple[tuple[dict[str, object], ...], list[Finding]]:
-    """Extract catalog stage_waves as typed mappings and report malformed topology."""
-    findings: list[Finding] = []
-    topology_raw = catalog_raw.get("role_topology_defaults")
-    if not isinstance(topology_raw, dict):
-        findings.append(
-            Finding("routing", "role_topology_defaults", "missing-stage-waves")
-        )
-        return (), findings
-    topology = cast(dict[str, object], topology_raw)
-    stage_waves_raw = topology.get("stage_waves")
-    if not isinstance(stage_waves_raw, list) or not stage_waves_raw:
-        findings.append(
-            Finding("routing", "role_topology_defaults", "missing-stage-waves")
-        )
-        return (), findings
-    stage_waves: list[dict[str, object]] = []
-    raw_stage_waves = cast(list[object], stage_waves_raw)
-    for index, raw_wave in enumerate(raw_stage_waves):
-        if not isinstance(raw_wave, dict):
-            findings.append(
-                Finding("routing", f"stage_waves[{index}]", "malformed-stage-wave")
-            )
-            continue
-        stage_waves.append(cast(dict[str, object], raw_wave))
-    same_role_raw = topology.get("same_role_parallel_instances")
-    if not isinstance(same_role_raw, dict):
-        findings.append(
-            Finding("routing", "role_topology_defaults", "legacy-identity-key")
-        )
-    else:
-        same_role = cast(dict[str, object], same_role_raw)
-        if same_role.get("identity_key") != "role_id+instance_id+agent_type":
-            findings.append(
-                Finding("routing", "role_topology_defaults", "legacy-identity-key")
-            )
-    return tuple(stage_waves), findings
-
-
 def evaluate_generated_role_projection(
     root: Path,
     configs: dict[str, dict[str, object]],
@@ -383,53 +332,6 @@ def evaluate_generated_role_projection(
             findings.append(
                 Finding("generated-view", agent_id, "missing-generated-header")
             )
-    try:
-        catalog = load_task_catalog(
-            load_team_config(root / "agents" / "agents_config.json"), root=root
-        )
-        derivation = declared_team_capacity_derivation(catalog)
-        peak = derivation.peak_family
-        if (
-            derivation.requested_max_threads() != 27
-            or peak.workflow_family_id != "research_driven_change"
-            or peak.direct_frontier_count != 21
-            or peak.nested_reservation_count != 6
-        ):
-            findings.append(
-                Finding(
-                    "capacity-attribution",
-                    "role_topology_defaults",
-                    "declared-21-plus-6-does-not-derive-27",
-                )
-            )
-        for family in catalog.workflow_families:
-            request = family.get("capacity_request")
-            if (
-                not isinstance(request, dict)
-                or request.get("topology_source") != "role_topology"
-                or request.get("write_scope_source") != "team_manifest.run.write_scopes"
-            ):
-                findings.append(
-                    Finding(
-                        "capacity-attribution",
-                        str(family.get("id")),
-                        "typed-capacity-request-mismatch",
-                    )
-                )
-            if "spawn_budget" in family:
-                findings.append(
-                    Finding(
-                        "capacity-attribution",
-                        str(family.get("id")),
-                        "numeric-spawn-budget-duplicate",
-                    )
-                )
-    except (OSError, KeyError, RuntimeError, TypeError, ValueError):
-        findings.append(
-            Finding(
-                "capacity-attribution", "task_catalog", "capacity-derivation-unreadable"
-            )
-        )
     return findings
 
 
@@ -535,7 +437,6 @@ def evaluate_routing(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     config = load_team_config(root / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, root=root)
-    agent_root = root / ".codex" / "agents"
     roles = role_by_id(config.always_on_roles + config.specialist_roles)
     evaluator = roles.get(EVALUATOR_AGENT_ID)
     if evaluator is None:
@@ -720,104 +621,6 @@ def evaluate_routing(root: Path) -> list[Finding]:
                 )
             )
 
-    stage_waves, topology_findings = extract_stage_waves(catalog.raw)
-    findings.extend(topology_findings)
-    role_stage: dict[str, tuple[int, str]] = {}
-    stage_ids: set[str] = set()
-    for stage_index, wave in enumerate(stage_waves):
-        stage_id = str(wave.get("id", ""))
-        if stage_id in stage_ids:
-            findings.append(Finding("routing", stage_id, "duplicate-stage-id"))
-        stage_ids.add(stage_id)
-        role_ids_raw = wave.get("role_ids")
-        if not isinstance(role_ids_raw, list):
-            findings.append(
-                Finding(
-                    "routing",
-                    stage_id or f"stage-{stage_index}",
-                    "malformed-stage-role-ids",
-                )
-            )
-            continue
-        role_ids = cast(list[object], role_ids_raw)
-        for raw_role_id in role_ids:
-            if not isinstance(raw_role_id, str):
-                findings.append(
-                    Finding(
-                        "routing",
-                        stage_id or f"stage-{stage_index}",
-                        "malformed-stage-role-id",
-                    )
-                )
-                continue
-            role_id = str(raw_role_id)
-            previous_stage = role_stage.get(role_id)
-            if previous_stage is not None:
-                findings.append(
-                    Finding(
-                        "routing",
-                        role_id,
-                        f"duplicate-stage-role-{previous_stage[1]}-{stage_id}",
-                    )
-                )
-            role_stage[role_id] = (stage_index, stage_id)
-    stage_required_roles = set(roles)
-    missing_stage_roles = sorted(stage_required_roles - set(role_stage))
-    for role_id in missing_stage_roles:
-        findings.append(Finding("routing", role_id, "missing-stage-role"))
-    implementer_stage = role_stage.get("implementer")
-    test_designer_stage = role_stage.get("test_designer")
-    change_reviewer_stage = role_stage.get("change_reviewer")
-    if (
-        implementer_stage is None
-        or test_designer_stage is None
-        or change_reviewer_stage is None
-        or not (
-            implementer_stage[0] < test_designer_stage[0] < change_reviewer_stage[0]
-        )
-    ):
-        findings.append(
-            Finding(
-                "routing", "test_designer", "test-design-must-follow-implementation"
-            )
-        )
-    if test_designer_stage is not None and test_designer_stage[1] != "test_design":
-        findings.append(
-            Finding("routing", "test_designer", "test-designer-stage-owner")
-        )
-    producer_reviewer_pairs = {
-        "manager": ("manager_reviewer",),
-        "researcher": ("research_reviewer",),
-        "scheduler": ("schedule_reviewer",),
-        "infra_steward": ("infra_reviewer",),
-        "designer": ("design_reviewer", "document_flow_reviewer"),
-        "experimenter": ("experiment_reviewer", "report_reviewer"),
-        "implementer": (
-            "test_designer",
-            "change_reviewer",
-            "python_reviewer",
-            "cpp_reviewer",
-        ),
-    }
-    for producer, reviewers in producer_reviewer_pairs.items():
-        for reviewer in reviewers:
-            producer_stage = role_stage.get(producer)
-            reviewer_stage = role_stage.get(reviewer)
-            if producer_stage is None or reviewer_stage is None:
-                continue
-            if producer_stage[0] == reviewer_stage[0]:
-                findings.append(
-                    Finding(
-                        "routing", reviewer, f"producer-reviewer-same-stage-{producer}"
-                    )
-                )
-            elif producer_stage[0] > reviewer_stage[0]:
-                findings.append(
-                    Finding(
-                        "routing", reviewer, f"producer-reviewer-stage-order-{producer}"
-                    )
-                )
-
     for task_id in ("T1", "T2"):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
         if task.get("family") != "owner_bounded_change":
@@ -848,20 +651,6 @@ def evaluate_routing(root: Path) -> list[Finding]:
         findings.append(
             Finding("routing", "T12", f"t12-overdefault-specialist-{t12_specialists}")
         )
-
-    try:
-        topology_violations = workflow_topology_policy_violations(catalog)
-    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-        findings.append(
-            Finding(
-                "routing",
-                "role_topology_defaults",
-                f"materialization-failed-{type(exc).__name__}",
-            )
-        )
-    else:
-        for family_id, code in topology_violations:
-            findings.append(Finding("routing", family_id, code))
 
     review_pack = next(
         pack
@@ -909,41 +698,6 @@ def evaluate_routing(root: Path) -> list[Finding]:
                     "evaluation-route-specialists-must-be-evaluator-only",
                 )
             )
-        try:
-            t14_default_specialists = default_specialists_for_task(
-                config, catalog, "T14"
-            )
-            t14_roles_active = select_roles(
-                config,
-                list(t14_default_specialists),
-                full_team=False,
-                catalog=catalog,
-                workflow_family_id="skill_evaluation",
-            )
-            t14_budget, _ = workflow_spawn_budget(catalog, "skill_evaluation")
-            t14_initial_wave = recommended_initial_subagent_wave(
-                t14_roles_active,
-                t14_budget,
-                catalog,
-                agent_root=agent_root,
-            )
-            t14_waves = recommended_dynamic_expansion_wave_slots(
-                t14_roles_active,
-                t14_budget,
-                t14_initial_wave,
-                catalog,
-                agent_root=agent_root,
-            )
-            if t14_initial_wave != (EVALUATOR_AGENT_ID,) or t14_waves:
-                findings.append(
-                    Finding(
-                        "routing", "T14", "evaluation-route-materialization-topology"
-                    )
-                )
-        except (KeyError, RuntimeError, TypeError, ValueError):
-            findings.append(
-                Finding("routing", "T14", "evaluation-route-materialization-failed")
-            )
     triage_pack = next(
         pack
         for pack in catalog.review_packs
@@ -960,44 +714,6 @@ def evaluate_routing(root: Path) -> list[Finding]:
                 "unexpected-triage-specialists",
             )
         )
-    for task in catalog.tasks:
-        task_id = str(task["id"])
-        try:
-            task_specialists = default_specialists_for_task(config, catalog, task_id)
-            task_roles = select_roles(
-                config,
-                list(task_specialists),
-                False,
-                catalog,
-                str(task["family"]),
-            )
-            active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
-            initial_wave = recommended_initial_subagent_wave(
-                task_roles,
-                active_budget,
-                catalog,
-                agent_root=agent_root,
-            )
-            wave_slots = recommended_dynamic_expansion_wave_slots(
-                task_roles,
-                active_budget,
-                initial_wave,
-                catalog,
-                agent_root=agent_root,
-            )
-        except (KeyError, RuntimeError, TypeError, ValueError) as exc:
-            findings.append(
-                Finding("routing", task_id, f"materialization-failed-{exc}")
-            )
-            continue
-        role_counts = Counter(slot.role_id for wave in wave_slots for slot in wave)
-        fanout_roles = sorted(
-            role_id for role_id, count in role_counts.items() if count > 1
-        )
-        if fanout_roles:
-            findings.append(
-                Finding("routing", task_id, f"role-candidate-fanout-{fanout_roles}")
-            )
     return findings
 
 

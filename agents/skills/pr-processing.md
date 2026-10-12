@@ -5,7 +5,6 @@
 contract skill
 responsibility Processes authorized Issue and PR operations, using queue planning only for interacting candidates.
 upstream design ../canonical/skills.md public Skill registry
-upstream design ./agent-orchestration.execution-contract.toml conditional coordination policy
 upstream design ../internal-routines/github-connected-work.md current-session GitHub transport and PR readback
 upstream design ../internal-routines/github-status-lifecycle.md conditional Issue status changes
 upstream design ../internal-routines/verification-result-structuring.md reader-reproducible publication

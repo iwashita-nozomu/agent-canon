@@ -23,7 +23,7 @@ downstream implementation ../../tools/validation/semantic/tools/tool_rejection_p
 
 ## Signals（signal）
 
-<!-- 実行中に観測した workflow signal を記録します。手編集より `python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --signal "..."` と tool-level `--report-dir` hook を優先します。selected skill、stage owner、write-capable child routing、wave_id、repo dependency intake、web-research decision、review status、validation status、drift risk を含めます。run-bundle producer は `workflow_monitor.py` を通じて canonical な `runtime_measurement_input=<JSON>` signal を出力するため、null と明示的 zero を区別し、その record を手書き・重複しません。 -->
+<!-- 実行中に観測した workflow signal を記録します。手編集より `python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <run> --signal "..."` と tool-level `--report-dir` hook を優先します。selected Skill、actual tool/agent route、repo dependency intake、web-research decision、review status、validation status、drift risk を含めます。run-bundle producer は `workflow_monitor.py` を通じて canonical な `runtime_measurement_input=<JSON>` signal を出力するため、null と明示的 zero を区別し、その record を手書き・重複しません。 -->
 
 - failure-cause classification:
 - conflict intent / preserved user or design clause:
@@ -32,13 +32,13 @@ downstream implementation ../../tools/validation/semantic/tools/tool_rejection_p
 
 ## Behavior Events（behavior event）
 
-<!-- 観測可能な agent behavior を retrospective prose ではなく structured event として記録します。`workflow_monitor.py --behavior-event "..."` を優先します。skill invocation、subagent lifecycle（サブエージェントのライフサイクル）、wave_id 付き stage/subagent routing、mid-task expansion、budget before/after、spawned/skipped role と理由、実装を gate する tool call、dependency/static-analysis、code checker、pre-edit rejection prediction、hook/tool feedback、protocol update、token efficiency、runtime feedback、subagent no-return investigation、static-analysis feedback、execution path、route efficiency、review decision、feedback action、subagent closeout、diff-check approval を必要 event family とします。実利用 feedback で skill/workflow/eval/memory を更新する場合は `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` を使います。runtime_feedback=observed かつ action が no_op でなければ、closeout 前に下の Improvement Decisions を少なくとも 1 つ applied または recorded にします。 -->
+<!-- 観測可能な agent behavior を retrospective prose ではなく structured event として記録します。`workflow_monitor.py --behavior-event "..."` を優先します。skill invocation、actual subagent launch/completion/failure、tool call、dependency/static-analysis、code checker、pre-edit rejection prediction、hook/tool feedback、protocol update、token efficiency、runtime feedback、subagent no-return investigation、static-analysis feedback、execution path、route efficiency、review decision、feedback action、subagent closeout、diff-check approval を必要に応じて記録します。実利用 feedback で skill/workflow/eval/memory を更新する場合は `workflow_monitor.py --runtime-feedback "source=user target=<skill-or-workflow> action=prompt_repair"` を使います。runtime_feedback=observed かつ action が no_op でなければ、closeout 前に下の Improvement Decisions を少なくとも 1 つ applied または recorded にします。 -->
 
 <!-- タスク中に契約、guardrail、warning、failure、rejection、conflict が実際に作動したら、手書きの要約ではなく `python3 tools/runtime/lifecycle/task_contract_observation.py --report-dir <run> --record "<key=value...>"` で `agent-canon.task-contract-observation.v1` event を追加します。contract_id、contract_source、phase、trigger、outcome、owner、evidence_ref、response を記録し、blocked/violated は同一 identity の次 sequence で satisfied または durable issue 付き deferred_with_issue へ閉じます。観測がなければ `contract_observation=none owner=manager reason=<slug>` を 1 行だけ記録します。closeout 前に同 tool を引数なしで実行し、`task_contract_observation_eval_status=pass`、`task_contract_observation_coverage=complete`、`task_contract_resolution=terminal`、`contract_archive_route=agent-canon-log:agent-reports` を生成させます。pass token を手書きして checker の代替にしません。raw prompt、hidden reasoning、secret、absolute local path は保存しません。 -->
 
-## Actual Wave Events（実際の wave event）
+## Actual Tool And Agent Results（実際の tool / agent 結果）
 
-<!-- bootstrap_agent_run.py の execution graph が実 ToolCall と完了結果から作った wave event を簡潔な `wave_event=...` token row として mirror します。各 row に wave_id、event_kind、spawn_authority、trigger、budget_before/after、runtime_max_threads/depth、spawned_roles、role_instances、skipped_roles、allowed_paths、do_not_read、write_scope、validation_route、review_gate、handoff_artifacts、status を記録します。同一 role を区別する deterministic readback は `role_id:instance_id:agent_type` を使います。この section は実行 readback であり、ready-set / completion authority ではありません。mid-task user input では既存 `workflow_monitor.py --mid-task-user-input` route を使います。 -->
+<!-- 選択した実行経路と、実際の tool call・subagent launch・completion・failure を、既存の behavior event と native result を根拠に記録します。期待経路は Markdown の owner / Skill link から読みます。run manifest や monitor row だけから実行・完了を推定しません。経路差だけを failure としません。 -->
 
 ## Tool Warnings（tool warning）
 

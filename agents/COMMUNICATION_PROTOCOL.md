@@ -278,42 +278,27 @@ path, for example
 
 ### Parent Orchestration-Only Contract
 
-For every repository-changing task, including a bounded owner/path/validation
-request, the parent is an orchestrator only. The parent may select and launch
-agents, relay packets without changing their claims, manage dependency and
-integration order, monitor status, and return final external readback. The
-parent must not investigate, design, implement, run tests, review diffs, draft
-or publish Issues/PRs, score evaluations, decide convergence, resolve merge
-conflicts, or interpret validation/finding results.
+For repository-changing work, the selected task route determines who owns
+investigation, implementation, validation, review, integration, and publication.
+The parent coordinates and returns external readback; it may also perform work
+when selected as that work's owner. It does not replace a distinct unit already
+assigned to a child.
 
-A write-capable child is mandatory for every repository edit. Missing spawn
-authorization, tool access, or another launch gate produces a typed
-`status=blocked` / retry / user-report packet; it never authorizes a parent
-write. Decision-owning reviewers or ship reviewers accept/reject findings and
-choose the next action. A verifier runs prescribed validation, an auditor
-creates the closeout artifact, an integration executor performs merge and
-conflict resolution, a publisher or PR-processing child performs Issue/PR
-writes, and an evaluation reviewer owns scoring and convergence.
+A child is used when the selected task route needs delegation; repository edits
+do not require a child by default. When a child is used, distinguish its actual
+launch result from its completion result and preserve failures honestly.
+Decision-owning reviewers or ship reviewers judge findings; verifiers,
+integration executors, publishers, and evaluation reviewers retain their
+selected responsibilities.
 
 Read-only conversational answers remain outside this repository-changing
 route and do not create a write handoff.
 
-Implementation handoffs project the canonical TargetStateContract and
-ImplementationExecutionContract: complete owner/type/API/config/schema/path/
-dependency/transition/deletion/validation structure, immutable packet identity,
-Decision Sufficiency record, and empty unresolved decisions. An identical
-owner/edit/validation action transitions directly to one complete materializer
-pass and one post-completion owning gate. `ImplementationFeedback` covers
-compile/static/deterministic failures; only an exact `StructuralDesignGap` is
-repaired once and resumed by the same Spark. Tool calls are registry-issued
-machine-readable `ToolCallToken` values.
-
-Capacity and lifecycle fields use the canonical requested/configured/
-platform-effective/workflow-demand/write-cap/nested-reserved/available terms;
-effective is the minimum of available constraints after reservations. Closeout
-must carry full descendant topology, durable handback, closure verification,
-reservation release, and the canonical `close_agent` ToolCall. Open terminal
-descendants, unknown descendants, missing handback, and reservation leaks fail.
+Implementation handoffs keep the selected owner's scope, mechanism, validation,
+and unresolved decisions clear. Use actual native tool results and errors as
+evidence; a launch or plan alone does not establish completion. The parent
+coordinates handoff and readback, while the selected owner remains responsible
+for its source changes and findings.
 
 - `from`
 - `to`
@@ -399,8 +384,8 @@ starting context for every child; missing advisory reuse context does not block
 dispatch or writing.
 
 - `request_clause_ids`: user clauses covered by the edit
-- `workflow_and_skills`: selected workflow, active skills, deferred dynamic
-  wave triggers
+- `workflow_and_skills`: selected workflow and the Markdown Skill links supplied
+  for the assigned work
 - `structure_intake`: `Structure Intake Packet` path, or reason it is not
   applicable
 - `implementation_surface_route`: `PRIMARY_SURFACE`, `PRIMARY_PATHS`,
@@ -525,9 +510,9 @@ refuting, naming, or implementing a nearby but different claim.
   passes
 
 Do not paste full run transcripts, full dashboards, raw accumulated logs, or
-entire repo docs into the prompt. If a subagent needs more context, it asks for
-an expanded packet path; parent updates the capsule and records the change in
-the Agent Wave Ledger.
+entire repo docs into the prompt. If a child needs more context, refer to the
+smallest relevant source or result and carry any scope change in the existing
+handoff.
 
 ### Optional Rejection Prediction
 
@@ -552,51 +537,6 @@ These are optional fields, not a second receipt. The diagnostic
 `responsibility_scope` gate records the `responsibility-scope.toml` scope,
 owner, class, and protecting tools for each planned path; it does not replace
 the owner's contract or prove that those checks ran.
-
-## CompletionCoverage v1 Schema Contract
-
-[COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md) owns the human-readable schema and evidence
-semantics for the deterministic completion read model. The canonical chain is
-the existing append-only logical run ledger, the generated
-`agent-canon.completion-coverage.v1` artifact, and its deterministic reader.
-No database, persistence service, second ledger, or closeout aggregation is
-introduced.
-
-The ledger accepts exactly these semantic kinds:
-`request_clause`, `responsibility_unit`, `decision`, `change`,
-`review_finding`, `validation`, `failure`, `publication_state`, and `deferral`.
-Every event is bound to `run_id`, `context_id`, an event identity or sequence,
-an `intent_id`, an owner, `state_owner`, `api_owner`, `dependency_owner`, an
-outcome, and source/artifact evidence references. Responsibility boundaries,
-decisions, failures, deferrals, and publication transitions cannot be grouped.
-
-The generated v1 artifact carries `source_binding`, deterministic projection
-metadata, semantic events, `coverage_map`, typed owner-boundary evidence, gate
-evidence, failure responses, and applicable W1 resource certificates. A
-coverage map has one direct or mechanically valid group mapping per active
-clause. Success requires `uncovered`, `multiply_mapped`, `orphan`, `redundant`,
-and `empty` to all be empty. Group mappings retain explicit member IDs and are
-allowed only for mechanically identical owner/unit/outcome facts.
-
-Typed OOP evidence consists only of owner overlap, state ownership, API
-boundary, and dependency-boundary facts. Line count, length, scalar score,
-`min_score`, and `final_score` are not schema fields or completion gates.
-Test-first, test-count/coverage, mutation, private-helper, and checker-retest
-rules are not evidence gates; each residual trust boundary has one canonical
-evidence owner.
-
-The single Markdown/math/Mermaid format/check route is
-`tools/bin/agent-canon docs check <changed-markdown-paths>`. The single
-PostToolUse/Stop hook contract is the existing dispatcher, with schema
-`agent-canon.posttooluse-stop.v1`; readers consume its evidence and do not add
-a second dispatcher or child-check path.
-
-Validation failures record `failing_contract`, `observation_level`,
-`cause_classification`, `intent_preservation`, `evidence`, the two taxonomy
-references (`documents/runtime/runtime-profiles-and-check-matrix.json` and its
-generated Markdown reader), same-intent repair or escalation, its owner and
-result, and result artifact references. The taxonomy text is not copied into
-this schema.
 
 ## Review Decision Boundary
 

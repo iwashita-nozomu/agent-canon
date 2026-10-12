@@ -43,7 +43,7 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Review Finding Incorporation Review（review finding 反映レビュー）
 
-<!-- selected owning review gate と明示的に有効化した specialist finding が implementation に反映されたか、または明示的に escalate されたか確認します。reviewer output は仮説入力であり、accepted finding には current snapshot、reachable path、contract、witness/static proof が必要です。rejected finding は reason_code/evidence_ref を持ち、repair wave を作りません。 -->
+<!-- selected owning review gate と明示的に有効化した specialist finding が implementation に反映されたか、または明示的に escalate されたか確認します。reviewer output は仮説入力であり、accepted finding には current snapshot、reachable path、contract、witness/static proof が必要です。rejected finding は reason_code/evidence_ref を持ちます。 -->
 
 ## Review Rejection Response Review（reject 応答レビュー）
 

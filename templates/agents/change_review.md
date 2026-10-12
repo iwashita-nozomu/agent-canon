@@ -24,10 +24,10 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Hypothesis Adjudication（仮説の判定）
 
-| Hypothesis | Snapshot Ref | Reachable Input / Control Path | Contract Ref | Witness / Static Proof | Adjudication | Reason Code | Evidence Ref | Opens Rework Wave |
+| Hypothesis | Snapshot Ref | Reachable Input / Control Path | Contract Ref | Witness / Static Proof | Adjudication | Reason Code | Evidence Ref | Follow-Up Action |
 | ---------- | ------------ | ----------------------------- | ------------ | ---------------------- | ------------ | ----------- | ------------ | ----------------- |
 
-<!-- reviewer output は仮説入力です。decision-owning reviewer は current snapshot、reachable path、contract、witness/static proof がそろい、behavior、owner/design boundary、correctness、validation、publication state のいずれかを変える仮説だけを受け付けます。却下行は reason_code と evidence_ref を使い、edit、revert、rollback、publication、新 wave を許可しません。 -->
+<!-- reviewer output は仮説入力です。decision-owning reviewer は current snapshot、reachable path、contract、witness/static proof がそろい、behavior、owner/design boundary、correctness、validation、publication state のいずれかを変える仮説だけを受け付けます。却下行は reason_code と evidence_ref を使い、edit、revert、rollback、publication を許可しません。 -->
 
 ## Reuse And Style Findings（reuse と style の指摘）
 
@@ -63,7 +63,7 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Revision Loop（改訂ループ）
 
-<!-- behavior、owner/design boundary、correctness、validation、publication state を変える accepted finding だけを記録します。rejected hypothesis は reason_code/evidence_ref を保持し、新しい review wave を作りません。 -->
+<!-- behavior、owner/design boundary、correctness、validation、publication state を変える accepted finding だけを記録します。rejected hypothesis は reason_code/evidence_ref を保持します。 -->
 
 ## Review Rejection Response Review（reject 応答レビュー）
 
@@ -71,7 +71,7 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Post-Review Fix Rerun Requirement（修正後 rerun 要件）
 
-<!-- decision-owning reviewer が behavior、owner/design boundary、correctness、validation、publication state を変える finding を accepted と判定した場合、updated diff に対する selected owning gate の rerun を記録します。duplicate、stylistic、already-covered、evidence-free、unreachable、stale、private/incidental、out-of-scope、unproven design-conflict hypothesis は reason_code と evidence_ref を持ち、wave や rollback を開始しません。 -->
+<!-- decision-owning reviewer が behavior、owner/design boundary、correctness、validation、publication state を変える finding を accepted と判定した場合、updated diff に対する selected owning gate の rerun を記録します。duplicate、stylistic、already-covered、evidence-free、unreachable、stale、private/incidental、out-of-scope、unproven design-conflict hypothesis は reason_code と evidence_ref を持ちます。 -->
 
 ## Follow-Up（後続対応）
 

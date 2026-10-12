@@ -24,7 +24,7 @@ contain only repository-local owner paths.
 
 - Purpose: interpret accumulated AgentCanon logs using existing structured
   evidence by default, with bounded drilldown when it cannot answer the question.
-- Use When: analyzing skill, tool, workflow, hook, eval, wave, or subagent logs
+- Use When: analyzing skill, tool, workflow, hook, eval, or actual subagent/tool-result logs
   for repeated misses or selection gaps.
 - Section path: Required Flow owns read-only analysis; Selected Acquisition And
   Repair owns optional follow-up; Boundaries and Finding Route Packet separate
@@ -124,7 +124,7 @@ untouched by read-only analysis.
 
 - この skill は log archive API、structured summary、routing miss、selection gap、
   missed / late skill invocation、over-constrained related-skill coverage、
-  wave execution reconciliation の観測と解釈を所有します。
+  actual native tool and child-result observations の解釈を所有します。
 - log archive repo は append-only evidence、AgentCanon source dashboard は
   集計、移動平均、routing evidence cell を所有します。bounded drilldown を
   新しい集計正本や欠落データの推定値へ変えません。
@@ -159,35 +159,27 @@ producer record from failed delivery, and do not infer the cause from an old
 archive head. Recording or routing this finding does not select repair or make
 repair a prerequisite for this analysis.
 
-## Work Amplification And Wave Interpretation
+## Work Amplification And Actual Results
 
-Work amplification is an evidence relationship, not a raw file, line, spawn, or
-wave count. Compare tool selections, spawn records, planned and actual wave
-rows, packet materialization, checker execution, and the resulting owner action
-before proposing a repair. A large packet or manifest is evidence of work
-surface; it is not evidence that every planned action was launchable or needed.
+Work amplification is an evidence relationship, not a raw file, line, or spawn
+count. Compare actual native tool calls, child launch/completion/failure
+results, prompt/tool selections, checker execution, and the resulting owner
+action before proposing a repair. A plan, candidate list, or manifest is not
+evidence that an operation occurred or was required. Do not infer a missing
+execution from a difference between a linked expected route and the actual
+route; use the existing Eval owner to assess whether the observed path was
+valid. Route a logging repair only when independent evidence shows an actual
+operation/result was omitted from its existing record.
 
-Classify every missing actual wave before proposing reconciliation:
-
-- `overplanning`: the planned row has no launch evidence and its surrounding
-  evidence is conditional, authority-blocked, skipped, or otherwise not
-  launchable;
-- `logging_gap`: launch, completion, or delegated execution evidence exists but
-  the corresponding actual row is absent; only this class is eligible for a
-  logging repair;
-- `unresolved`: the structured evidence cannot distinguish planning from
-  logging and must remain an owner-held unknown.
-
-Do not backfill `overplanning` or `unresolved` rows as executions. Group related
-findings by the owning replaceable responsibility and compatible context, then
-create one route or handoff per responsibility. A finding count does not create
-one agent, packet, wave, or review instance per finding; split only when owner,
-write authority, context integrity, validation route, or review gate is
-independent.
+Group related findings by the owning replaceable responsibility and compatible
+context, then create one route or handoff per responsibility. A finding count
+does not create one agent, packet, or review instance per finding; split only
+when owner, write authority, context integrity, validation route, or review gate
+is independent.
 
 ## Finding Route Packet
 
-Log analysis から修復 wave へ進むときは、次の structured route packet を
+Log analysis から選択済み修復へ進むときは、次の structured route packet を
 handoff message、tool result、または coordination/resumption 用の durable
 file に残します。repo-changing work alone does not require a run bundle or a
 file-backed packet. The table's closeout gates apply only to selected repair
@@ -195,7 +187,7 @@ work, not to analysis or Issue recording. Missing evidence stays explicit;
 producing a packet does not authorize its repair action.
 
 ```text
-finding_class=<wave_execution|skill_selection|tool_selection|workflow_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
+finding_class=<skill_selection|tool_selection|workflow_selection|workflow_attribution|eval_gap|token_coverage|archive_hygiene|prompt_or_config_drift|structure_boundary>
 evidence_cells=<available summary/API fields or snapshot-bound excerpt locators and gaps>
 route_target=<skill-or-role>
 instance_partition=<repo_key|hook_family|skill_name|workflow_name|issue_id|path_scope>
@@ -205,7 +197,6 @@ closeout_gate=<selected repair command or evidence field>
 
 | finding_class | route_target | required_packet | closeout_gate |
 | --- | --- | --- | --- |
-| `wave_execution` | `subagent-bootstrap` + `prompt_config_reviewer` when role config is implicated | compact Wave And Subagent Execution drilldown, planned-vs-actual wave ids, and the overplanning/logging-gap classification | logging-gap rows reconciled or the unresolved owner finding is recorded |
 | `skill_selection` | affected skill + `prompt_config_reviewer` | Selection Evidence drilldown row, skill source path, reset basis | skill prompt eval or dashboard miss rate after reset window |
 | `tool_selection` | `tools/catalog.yaml`, owning tool docs, and invocation guidance | Selection Evidence drilldown row, tool catalog entry, owning tool doc path | tool catalog validation and dashboard miss rate after reset window |
 | `workflow_selection` | [agents/TASK_WORKFLOWS.md](../TASK_WORKFLOWS.md) and owning workflow guide | Selection Evidence drilldown row, workflow registry row, owning workflow doc path | workflow selection eval or dashboard miss rate after reset window |
@@ -243,9 +234,6 @@ The runtime discovery adapter delegates these operating clauses to this canonica
    Preserve collection source authority, read-only targets, external outputs,
    credentials, and archive/publication integrity. Do not claim an unavailable
    collection, failed write, or missing publication receipt succeeded.
-1. Classify missing actual wave rows as `overplanning`, `logging_gap`, or
-   `unresolved` before reconciliation. Only supported logging gaps are eligible
-   for repair; never backfill overplanning or unresolved rows as executions.
 1. Answer token-use questions from token coverage/moving-average evidence.
    Without it, say token claims are unsupported.
 1. For durable Issues, give `$issue-finding-report` the available evidence,

@@ -54,9 +54,10 @@ behavior/eval/path/token evidence とその command/schema は各 owner に委�
 - 単一 run の実行と rerun 分岐は `experiment-lifecycle` を使います。
 - repo-wide な feature delivery には使わず、`comprehensive-development` と
   `codex-task-workflow` の implementation route を使います。
-- role selection、required roles、topology、spawn budget は `$agent-orchestration` と
-  `agents/task_catalog.yaml` が所有します。この skill は選択済み role を利用し、role list や
-  重複判定を再定義しません。
+- role selection と applicable role guidance は `$agent-orchestration` と
+  `agents/task_catalog.yaml` が所有します。実際の concurrent runtime limits は
+  configured native runtime が所有し、この skill は workflow capacity budget を導出しません。
+  この skill は選択済み role を利用し、role list や重複判定を再定義しません。
 - behavior event / calibration は `$agent-learning`、登録済み eval と duplicate audit は
   `$agent-eval-accumulation`、token / path comparison は `$tokens`、runtime feedback の構造化は
   `workflow_monitor.py` に委譲します。この skill は返された evidence の iteration 解釈と

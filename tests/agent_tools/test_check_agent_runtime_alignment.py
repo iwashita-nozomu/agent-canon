@@ -24,15 +24,20 @@ from unittest.mock import patch
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "validation" / "semantic" / "runtime" / "check_agent_runtime_alignment.py"
+SCRIPT_PATH = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "runtime"
+    / "check_agent_runtime_alignment.py"
+)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import tools.validation.semantic.runtime.check_agent_runtime_alignment as runtime_alignment  # noqa: E402
-from tools.validation.semantic.runtime.check_agent_runtime_alignment import validate_permanent_team_mapping  # noqa: E402
-from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
-    codex_runtime_max_depth,
-    workflow_topology_policy_violations,
-)
+from tools.validation.semantic.runtime.check_agent_runtime_alignment import (
+    validate_permanent_team_mapping,
+)  # noqa: E402
 from tools.agent.orchestration.packets import (  # noqa: E402
     markdown_document_headings,
     markdown_heading_anchor,
@@ -41,8 +46,14 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     resolve_document_section_locators,
     resolve_role_document_packet,
 )
-from tools.agent.orchestration.team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
-from tools.repository.workspace.workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
+from tools.agent.orchestration.team_config import (
+    TaskCatalog,
+    load_team_config,
+    resolve_role,
+)  # noqa: E402
+from tools.repository.workspace.workspace_scope import (
+    resolve_report_bundle_artifact_path,
+)  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
     COMMON_PROMPT_MUST_INCLUDE,
     render_subagent_prompt_packet,
@@ -161,7 +172,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as runtime_root:
+        with tempfile.TemporaryDirectory(
+            prefix="agent-runtime-alignment-"
+        ) as runtime_root:
             environment = os.environ.copy()
             environment["AGENT_CANON_RUNTIME_ROOT"] = runtime_root
             result = subprocess.run(
@@ -212,7 +225,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         config = load_team_config()
         subagents_path = PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
         text = subagents_path.read_text(encoding="utf-8")
-        text_without_verifier = text.replace("| `verifier` | prescribed validation runner |\n", "")
+        text_without_verifier = text.replace(
+            "| `verifier` | prescribed validation runner |\n", ""
+        )
 
         with self.assertRaisesRegex(
             RuntimeError,
@@ -220,30 +235,22 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         ):
             validate_permanent_team_mapping(config, text_without_verifier)
 
-    def test_skill_evaluator_is_staged_only_for_the_evaluation_route(self) -> None:
-        """The evaluator is catalog-staged without becoming a default for other tasks."""
+    def test_skill_evaluator_is_selected_only_for_the_evaluation_route(self) -> None:
+        """The evaluator is explicitly selected for T14, not staged for other work."""
         config = load_team_config()
         evaluator = resolve_role(config, "skill_evaluator")
         self.assertIn(evaluator, config.specialist_roles)
         self.assertEqual(evaluator.activation, "explicit_empirical_skill_evaluation")
         catalog = loaded_task_catalog_raw()
-        topology = cast(dict[str, object], catalog["role_topology_defaults"])
-        stage_waves = cast(list[object], topology["stage_waves"])
-        staged_ids: set[str] = set()
-        intake_role_ids: list[str] = []
-        evaluation_role_ids: list[str] = []
-        for raw_wave in stage_waves:
-            wave = cast(dict[str, object], raw_wave)
-            wave_role_ids = cast(list[object], wave["role_ids"])
-            if wave["id"] == "intake":
-                intake_role_ids = [cast(str, role_id) for role_id in wave_role_ids]
-            if wave["id"] == "skill_evaluation":
-                evaluation_role_ids = [cast(str, role_id) for role_id in wave_role_ids]
-            for raw_role_id in wave_role_ids:
-                staged_ids.add(cast(str, raw_role_id))
-        self.assertIn("skill_evaluator", staged_ids)
-        self.assertEqual(intake_role_ids, ["manager"])
-        self.assertEqual(evaluation_role_ids, ["skill_evaluator"])
+        t14 = next(task for task in catalog["tasks"] if task["id"] == "T14")
+        self.assertIn("skill_evaluator", t14["specialists"])
+        self.assertFalse(
+            any(
+                "skill_evaluator" in task["specialists"]
+                for task in catalog["tasks"]
+                if task["id"] != "T14"
+            )
+        )
 
     def test_full_team_keeps_skill_evaluator_isolated(self) -> None:
         """Full-team routes must not leak the empirical evaluator across workflows."""
@@ -268,7 +275,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertNotIn("skill_evaluator", {role.id for role in comprehensive_roles})
         self.assertEqual([role.id for role in evaluation_roles], ["skill_evaluator"])
 
-    def test_team_config_rejects_skill_evaluator_candidate_on_ordinary_role(self) -> None:
+    def test_team_config_rejects_skill_evaluator_candidate_on_ordinary_role(
+        self,
+    ) -> None:
         """An ordinary role cannot retain the evaluator as a trailing fallback."""
         config = load_team_config()
         experimenter = resolve_role(config, "experimenter")
@@ -284,7 +293,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ),
         )
 
-        with patch.object(runtime_alignment, "load_team_config", return_value=mutated_config):
+        with patch.object(
+            runtime_alignment, "load_team_config", return_value=mutated_config
+        ):
             with self.assertRaisesRegex(
                 RuntimeError,
                 "experimenter codex_agents must not include skill_evaluator",
@@ -309,32 +320,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             },
         )
 
-        with patch.object(runtime_alignment, "load_team_config", return_value=mutated_config):
+        with patch.object(
+            runtime_alignment, "load_team_config", return_value=mutated_config
+        ):
             with self.assertRaisesRegex(
                 RuntimeError,
                 r"^artifacts\.active_design_packet:field_unknown:unexpected_contract$",
             ):
                 runtime_alignment.validate_team_config_references()
-
-    def test_workflow_topology_rejects_evaluator_in_non_evaluation_family(self) -> None:
-        """The shared topology policy must isolate the evaluator by family."""
-        raw = loaded_task_catalog_raw()
-        families = cast(list[dict[str, object]], raw["workflow_families"])
-        comprehensive = next(
-            family for family in families if family["id"] == "comprehensive_development"
-        )
-        roles = cast(dict[str, object], comprehensive["roles"])
-        specialists = cast(list[str], roles["specialists"])
-        specialists.append("skill_evaluator")
-        catalog = task_catalog_from_raw(raw)
-
-        self.assertIn(
-            (
-                "comprehensive_development",
-                "skill-evaluator-only-in-skill-evaluation",
-            ),
-            workflow_topology_policy_violations(catalog),
-        )
 
     def test_skill_evaluator_context_is_packet_only(self) -> None:
         """The evaluator receives only its scenario packet and listed files."""
@@ -361,11 +354,13 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             }.issubset(set(cast(list[str], policy["do_not_share"]))),
         )
 
-    def test_t14_materializes_only_skill_evaluator(self) -> None:
-        """T14 must not inherit worker or reviewer waves from comprehensive delivery."""
+    def test_t14_selects_only_skill_evaluator(self) -> None:
+        """T14 role selection remains independent of ordinary delivery routes."""
         config = load_team_config()
         catalog = runtime_alignment.load_task_catalog(config)
-        specialists = runtime_alignment.default_specialists_for_task(config, catalog, "T14")
+        specialists = runtime_alignment.default_specialists_for_task(
+            config, catalog, "T14"
+        )
         roles = runtime_alignment.select_roles(
             config,
             list(specialists),
@@ -373,23 +368,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             catalog=catalog,
             workflow_family_id="skill_evaluation",
         )
-        active_budget, _ = runtime_alignment.workflow_spawn_budget(catalog, "skill_evaluation")
-        initial_wave = runtime_alignment.recommended_initial_subagent_wave(
-            roles, active_budget, catalog
-        )
-        expansion_waves = runtime_alignment.recommended_dynamic_expansion_wave_slots(
-            roles, active_budget, initial_wave, catalog
-        )
-        materialized = list(initial_wave) + [
-            slot.agent_type for wave in expansion_waves for slot in wave
-        ]
-
         self.assertEqual([role.id for role in roles], ["skill_evaluator"])
-        self.assertEqual(initial_wave, ("skill_evaluator",))
-        self.assertEqual(expansion_waves, ())
-        self.assertEqual(materialized, ["skill_evaluator"])
-        self.assertNotIn("worker", materialized)
-        self.assertNotIn("spark_worker", materialized)
+        self.assertEqual(roles[0].codex_agents, ("skill_evaluator",))
 
     def test_task_catalog_rejects_t14_comprehensive_route(self) -> None:
         """Alignment must reject T14 when it regresses to the normal delivery family."""
@@ -400,7 +380,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         catalog = task_catalog_from_raw(raw)
 
         with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "skill_evaluation workflow family"):
+            with self.assertRaisesRegex(
+                RuntimeError, "skill_evaluation workflow family"
+            ):
                 runtime_alignment.validate_task_catalog_references()
 
     def test_task_catalog_rejects_stale_implementation_role_family(self) -> None:
@@ -415,45 +397,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "implementation role family"):
                 runtime_alignment.validate_task_catalog_references()
 
-    def test_task_catalog_activation_policy_owns_positive_route_selection(self) -> None:
-        """Family, stage, and child activation pointers remain catalog-owned."""
-        catalog = loaded_task_catalog_raw()
-        policy = cast(dict[str, object], catalog["workflow_activation_policy"])
-        self.assertEqual(policy["family_selector"], "tasks[].family")
-        self.assertEqual(policy["stage_owner"], "role_topology_defaults.stage_waves")
-        self.assertEqual(policy["required_role_owner"], "workflow_families[].roles")
-        child_handoff = cast(dict[str, object], policy["child_handoff"])
-        self.assertEqual(child_handoff["activation"], "selected_typed_route")
-        self.assertEqual(
-            child_handoff["required_role_owner"],
-            "workflow_families[].roles",
-        )
-        self.assertTrue(child_handoff["write_capable"])
-        full_staging = cast(dict[str, object], policy["full_staging"])
-        self.assertEqual(full_staging["activation"], "selected_coordination_route")
-        self.assertIn(
-            "comprehensive_development",
-            cast(list[str], full_staging["coordination_families"]),
-        )
-
-    def test_task_catalog_rejects_activation_owner_drift(self) -> None:
-        """A positive route owner cannot silently move to a prose projection."""
-        raw = loaded_task_catalog_raw()
-        policy = cast(dict[str, object], raw["workflow_activation_policy"])
-        policy["stage_owner"] = "agents/skills/agent-orchestration.md"
-        catalog = task_catalog_from_raw(raw)
-
-        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "stage owner must be"):
-                runtime_alignment.validate_task_catalog_references()
-
-    def test_checked_in_workflow_topologies_use_active_decision_roles(self) -> None:
-        """Repo-changing families keep reviewers deferred until their decision exists."""
-        catalog = task_catalog_from_raw(loaded_task_catalog_raw())
-
-        self.assertEqual(workflow_topology_policy_violations(catalog), ())
-
-    def test_splitter_writer_reuse_survey_context_projects_for_both_change_routes(self) -> None:
+    def test_splitter_writer_reuse_survey_context_projects_for_both_change_routes(
+        self,
+    ) -> None:
         """Both applicable workflow prompts carry the same optional reuse context."""
         catalog = loaded_task_catalog_raw()
         families = cast(list[dict[str, object]], catalog["workflow_families"])
@@ -491,29 +437,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 role_prompt_must_include(resolve_role(config, role_id)),
             )
 
-    def test_workflow_topology_policy_rejects_always_on_delivery_reviewer(self) -> None:
-        """A catalog-owned role move is not rejected by a duplicate role table."""
-        raw = loaded_task_catalog_raw()
-        families = cast(list[dict[str, object]], raw["workflow_families"])
-        scoped = next(family for family in families if family["id"] == "scoped_change")
-        roles = cast(dict[str, object], scoped["roles"])
-        always_on = cast(list[str], roles["always_on"])
-        specialists = cast(list[str], roles["specialists"])
-        always_on.append("manager_reviewer")
-        specialists.remove("manager_reviewer")
-        catalog = task_catalog_from_raw(raw)
-
-        self.assertNotIn(
-            ("scoped_change", "delivery-producer-core"),
-            workflow_topology_policy_violations(catalog),
-        )
-
     def test_alignment_rejects_worker_model_policy_drift(self) -> None:
         """Alignment enforces the exact worker model and effort."""
         configs = runtime_alignment.parse_codex_agents()
         configs["worker"] = {**configs["worker"], "model": "gpt-5.5"}
 
-        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
+        with patch.object(
+            runtime_alignment, "parse_codex_agents", return_value=configs
+        ):
             with self.assertRaisesRegex(
                 RuntimeError,
                 "worker model must project registry profile luna_implementation_xhigh",
@@ -536,7 +467,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(mini_roles, {"skill_evaluator"})
         self.assertEqual(configs["skill_evaluator"]["model_reasoning_effort"], "medium")
 
-    def test_decision_sufficiency_has_one_owner_and_pointer_only_consumers(self) -> None:
+    def test_decision_sufficiency_has_one_owner_and_pointer_only_consumers(
+        self,
+    ) -> None:
         """DSV semantics stay canonical while packets, Spark, closeout, and evals consume it."""
         owner_document_path = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
@@ -546,10 +479,18 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             PROJECT_ROOT / "tools" / "runtime" / "manifest" / "manifest_rendering.py"
         ).read_text(encoding="utf-8")
         lifecycle_contract = (
-            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "update_lifecycle_contract.py"
+            PROJECT_ROOT
+            / "tools"
+            / "runtime"
+            / "lifecycle"
+            / "update_lifecycle_contract.py"
         ).read_text(encoding="utf-8")
         implementation_route = (
-            PROJECT_ROOT / "tools" / "agent" / "orchestration" / "implementation_route.py"
+            PROJECT_ROOT
+            / "tools"
+            / "agent"
+            / "orchestration"
+            / "implementation_route.py"
         ).read_text(encoding="utf-8")
         pointer_docs = [
             PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
@@ -621,9 +562,12 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             with self.subTest(pointer_doc=path):
                 self.assertIn(owner_reference, path.read_text(encoding="utf-8"))
 
-        self.assertIn("selected owner gate", (
-            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
-        ).read_text(encoding="utf-8"))
+        self.assertIn(
+            "selected owner gate",
+            (PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
+                encoding="utf-8"
+            ),
+        )
         self.assertIn("decision_sufficiency_packet_ref", manifest_rendering)
 
     def test_generated_role_views_cannot_claim_model_authority(self) -> None:
@@ -655,7 +599,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                         runtime_alignment.generated_role_authority_contradictions(claim)
                     )
 
-    def test_registry_generated_readback_wording_is_not_an_authority_contradiction(self) -> None:
+    def test_registry_generated_readback_wording_is_not_an_authority_contradiction(
+        self,
+    ) -> None:
         """Canonical source and generated-readback wording remains valid."""
         valid_claim = (
             "agents/model_profiles.toml is the canonical typed profile authority. "
@@ -678,7 +624,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             "model_reasoning_effort": "medium",
         }
 
-        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
+        with patch.object(
+            runtime_alignment, "parse_codex_agents", return_value=configs
+        ):
             with self.assertRaisesRegex(
                 RuntimeError,
                 "explorer model must project registry profile luna_reasoning_high",
@@ -690,20 +638,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         configs = runtime_alignment.parse_codex_agents()
         configs["worker"] = {**configs["worker"], "service_tier": "unsupported"}
 
-        with patch.object(runtime_alignment, "parse_codex_agents", return_value=configs):
-            with self.assertRaisesRegex(RuntimeError, "unsupported profile keys: service_tier"):
+        with patch.object(
+            runtime_alignment, "parse_codex_agents", return_value=configs
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError, "unsupported profile keys: service_tier"
+            ):
                 runtime_alignment.validate_codex_agent_settings()
 
-    def test_capacity_request_is_derived_from_declared_topology(self) -> None:
-        """Workflow capacity is sourced from declared topology rather than numeric budgets."""
-        catalog = loaded_task_catalog_raw()
-        topology = cast(dict[str, object], catalog["role_topology_defaults"])
-        self.assertEqual(topology["capacity_derivation"], "declared_team_peak_plus_nested_reservations_v1")
-        for family in cast(list[dict[str, object]], catalog["workflow_families"]):
-            request = cast(dict[str, object], family["capacity_request"])
-            self.assertEqual(request["topology_source"], "role_topology")
-            self.assertEqual(request["write_scope_source"], "team_manifest.run.write_scopes")
-            self.assertNotIn("spawn_budget", family)
     def test_project_config_rejects_agent_policy_scalar_keys(self) -> None:
         """Task policy strings must stay out of Codex's [agents] runtime table."""
         config = runtime_alignment.load_project_config_toml()
@@ -739,56 +681,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         catalog = task_catalog_from_raw(raw)
 
         with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "role_id\\+instance_id\\+agent_type"):
-                runtime_alignment.validate_task_catalog_references()
-
-    def test_task_catalog_rejects_missing_stage_waves(self) -> None:
-        """The task catalog must own materialization stage order."""
-        raw = loaded_task_catalog_raw()
-        del raw["role_topology_defaults"]["stage_waves"]  # type: ignore[index]
-        catalog = task_catalog_from_raw(raw)
-
-        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "stage_waves"):
-                runtime_alignment.validate_task_catalog_references()
-
-    def test_task_catalog_rejects_reversed_producer_reviewer_order(self) -> None:
-        """Producer stage indexes must be lower than their reviewer stages."""
-        raw = loaded_task_catalog_raw()
-        topology = cast(dict[str, object], raw["role_topology_defaults"])
-        stage_waves = cast(list[dict[str, object]], topology["stage_waves"])
-        intake_index = next(
-            index for index, wave in enumerate(stage_waves) if wave["id"] == "intake"
-        )
-        review_index = next(
-            index
-            for index, wave in enumerate(stage_waves)
-            if wave["id"] == "intake_review"
-        )
-        stage_waves[intake_index], stage_waves[review_index] = (
-            stage_waves[review_index],
-            stage_waves[intake_index],
-        )
-        catalog = task_catalog_from_raw(raw)
-
-        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "must precede reviewer"):
-                runtime_alignment.validate_task_catalog_references()
-
-    def test_task_catalog_rejects_missing_staged_role(self) -> None:
-        """Every permanent role must be present in stage_waves exactly once."""
-        raw = loaded_task_catalog_raw()
-        topology = cast(dict[str, object], raw["role_topology_defaults"])
-        stage_waves = topology["stage_waves"]
-        self.assertIsInstance(stage_waves, list)
-        final_stage = cast(dict[str, object], cast(list[object], stage_waves)[-1])
-        role_ids = final_stage["role_ids"]
-        self.assertIsInstance(role_ids, list)
-        cast(list[object], role_ids).remove("auditor")
-        catalog = task_catalog_from_raw(raw)
-
-        with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
-            with self.assertRaisesRegex(RuntimeError, "missing permanent roles"):
+            with self.assertRaisesRegex(
+                RuntimeError, "role_id\\+instance_id\\+agent_type"
+            ):
                 runtime_alignment.validate_task_catalog_references()
 
     def test_task_catalog_rejects_t12_default_review_pack(self) -> None:
@@ -821,9 +716,15 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
-            (root / "agents" / "skills" / "extra.md").write_text("# Extra\n", encoding="utf-8")
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
+            (root / "agents" / "skills" / "extra.md").write_text(
+                "# Extra\n", encoding="utf-8"
+            )
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
@@ -831,16 +732,24 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             registrations = (("example", "agents/skills/example.md"),)
 
             with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
-                runtime_alignment.validate_public_skill_document_contract(registrations, root)
+                runtime_alignment.validate_public_skill_document_contract(
+                    registrations, root
+                )
 
-    def test_public_skill_document_contract_rejects_nested_extra_public_doc(self) -> None:
+    def test_public_skill_document_contract_rejects_nested_extra_public_doc(
+        self,
+    ) -> None:
         """Nested Markdown in agents/skills also belongs to the public contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "agents" / "skills" / "extra").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
             (root / "agents" / "skills" / "extra" / "note.md").write_text(
                 "# Extra\n",
                 encoding="utf-8",
@@ -852,16 +761,24 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             registrations = (("example", "agents/skills/example.md"),)
 
             with self.assertRaisesRegex(RuntimeError, "non-catalog public docs"):
-                runtime_alignment.validate_public_skill_document_contract(registrations, root)
+                runtime_alignment.validate_public_skill_document_contract(
+                    registrations, root
+                )
 
-    def test_public_skill_document_contract_accepts_catalog_docs_and_internal_routines(self) -> None:
+    def test_public_skill_document_contract_accepts_catalog_docs_and_internal_routines(
+        self,
+    ) -> None:
         """Internal routines live outside the public skill doc contract."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
@@ -872,8 +789,12 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             )
             registrations = (("example", "agents/skills/example.md"),)
 
-            runtime_alignment.validate_public_skill_document_contract(registrations, root)
-            self.assertTrue((root / "agents" / "internal-routines" / "review.md").is_file())
+            runtime_alignment.validate_public_skill_document_contract(
+                registrations, root
+            )
+            self.assertTrue(
+                (root / "agents" / "internal-routines" / "review.md").is_file()
+            )
 
     def test_public_skill_readme_rejects_duplicate_catalog_table(self) -> None:
         """The public skill list must stay in catalog.yaml, not README rows."""
@@ -893,15 +814,21 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
             )
             registrations = (("example", "agents/skills/example.md"),)
 
-            with self.assertRaisesRegex(RuntimeError, "must not duplicate public skill catalog rows"):
-                runtime_alignment.validate_public_skill_document_contract(registrations, root)
+            with self.assertRaisesRegex(
+                RuntimeError, "must not duplicate public skill catalog rows"
+            ):
+                runtime_alignment.validate_public_skill_document_contract(
+                    registrations, root
+                )
 
     def test_public_skill_shims_reject_extra_shim_without_catalog_entry(self) -> None:
         """Runtime discovery shims must match the public skill catalog."""
@@ -911,7 +838,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             (root / "agents" / "internal-routines").mkdir(parents=True)
             (root / ".codex" / "personal" / "skills" / "example").mkdir(parents=True)
             (root / ".codex" / "personal" / "skills" / "extra").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
                     [
@@ -925,13 +854,17 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
             self.write_minimal_dependency_map(root)
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").write_text(
+            (
+                root / ".codex" / "personal" / "skills" / "example" / "SKILL.md"
+            ).write_text(
                 "---\nname: example\n---\n# Example\n",
                 encoding="utf-8",
             )
@@ -942,7 +875,11 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "SKILL_SHIM_ROOT",
+                    root / ".codex" / "personal" / "skills",
+                ),
                 self.assertRaisesRegex(RuntimeError, "missing catalog entries: extra"),
             ):
                 runtime_alignment.validate_public_skill_shims()
@@ -954,8 +891,12 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
             (root / ".codex" / "personal" / "skills" / "example").mkdir(parents=True)
-            (root / ".codex" / "personal" / "skills" / "_internal-example").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / ".codex" / "personal" / "skills" / "_internal-example").mkdir(
+                parents=True
+            )
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
                     [
@@ -969,17 +910,28 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            (root / "agents" / "skills" / "example.md").write_text("# Example\n", encoding="utf-8")
+            (root / "agents" / "skills" / "example.md").write_text(
+                "# Example\n", encoding="utf-8"
+            )
             self.write_minimal_dependency_map(root)
             (root / "agents" / "internal-routines" / "README.md").write_text(
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".codex" / "personal" / "skills" / "example" / "SKILL.md").write_text(
+            (
+                root / ".codex" / "personal" / "skills" / "example" / "SKILL.md"
+            ).write_text(
                 "---\nname: example\ndescription: Public skill.\n---\n# Example\n",
                 encoding="utf-8",
             )
-            (root / ".codex" / "personal" / "skills" / "_internal-example" / "SKILL.md").write_text(
+            (
+                root
+                / ".codex"
+                / "personal"
+                / "skills"
+                / "_internal-example"
+                / "SKILL.md"
+            ).write_text(
                 "---\nname: _internal-example\ndescription: Private skill.\n---\n# Internal\n",
                 encoding="utf-8",
             )
@@ -987,10 +939,23 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "SKILL_SHIM_ROOT",
+                    root / ".codex" / "personal" / "skills",
+                ),
             ):
                 runtime_alignment.validate_public_skill_shims()
-            self.assertTrue((root / ".codex" / "personal" / "skills" / "_internal-example" / "SKILL.md").is_file())
+            self.assertTrue(
+                (
+                    root
+                    / ".codex"
+                    / "personal"
+                    / "skills"
+                    / "_internal-example"
+                    / "SKILL.md"
+                ).is_file()
+            )
 
     def test_public_skill_catalog_rejects_private_skill_id(self) -> None:
         """The public catalog is the user-facing skill surface."""
@@ -998,8 +963,12 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "agents" / "skills").mkdir(parents=True)
             (root / "agents" / "internal-routines").mkdir(parents=True)
-            (root / ".codex" / "personal" / "skills" / "_private-example").mkdir(parents=True)
-            (root / "agents" / "skills" / "README.md").write_text("# Skills\n", encoding="utf-8")
+            (root / ".codex" / "personal" / "skills" / "_private-example").mkdir(
+                parents=True
+            )
+            (root / "agents" / "skills" / "README.md").write_text(
+                "# Skills\n", encoding="utf-8"
+            )
             (root / "agents" / "skills" / "catalog.yaml").write_text(
                 "\n".join(
                     [
@@ -1021,14 +990,25 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 "# Internal\n",
                 encoding="utf-8",
             )
-            (root / ".codex" / "personal" / "skills" / "_private-example" / "SKILL.md").write_text(
+            (
+                root
+                / ".codex"
+                / "personal"
+                / "skills"
+                / "_private-example"
+                / "SKILL.md"
+            ).write_text(
                 "---\nname: _private-example\ndescription: Private skill.\n---\n# Private\n",
                 encoding="utf-8",
             )
 
             with (
                 patch.object(runtime_alignment, "ROOT", root),
-                patch.object(runtime_alignment, "SKILL_SHIM_ROOT", root / ".codex" / "personal" / "skills"),
+                patch.object(
+                    runtime_alignment,
+                    "SKILL_SHIM_ROOT",
+                    root / ".codex" / "personal" / "skills",
+                ),
                 self.assertRaisesRegex(RuntimeError, "blocked-by=catalog-gate"),
             ):
                 runtime_alignment.validate_public_skill_shims()
@@ -1061,8 +1041,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         index_path = root / runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
         index_path.parent.mkdir(parents=True, exist_ok=True)
         index_path.write_text(
-            "# Fixture\n\n"
-            f"{runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK}\n",
+            f"# Fixture\n\n{runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK}\n",
             encoding="utf-8",
         )
 
@@ -1084,13 +1063,17 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                 PROJECT_ROOT,
             )
 
-    def test_official_system_skill_delegation_owner_maps_routes_and_index_links(self) -> None:
+    def test_official_system_skill_delegation_owner_maps_routes_and_index_links(
+        self,
+    ) -> None:
         """One document owns system skill routes and the canonical index links to it."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_official_skill_delegation_docs(root, missing_skill="imagegen")
 
-            with self.assertRaisesRegex(RuntimeError, "missing official system skill route"):
+            with self.assertRaisesRegex(
+                RuntimeError, "missing official system skill route"
+            ):
                 runtime_alignment.validate_official_system_skill_delegation(
                     {"skill_families": []},
                     root,
@@ -1103,7 +1086,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             )
             index_path = root / runtime_alignment.OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
             index_path.write_text("# Fixture\n", encoding="utf-8")
-            with self.assertRaisesRegex(RuntimeError, "must link to the official system skill delegation owner"):
+            with self.assertRaisesRegex(
+                RuntimeError, "must link to the official system skill delegation owner"
+            ):
                 runtime_alignment.validate_official_system_skill_delegation(
                     {"skill_families": []},
                     root,
@@ -1116,7 +1101,9 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             self.write_official_skill_delegation_docs(root)
             shim = root / ".codex" / "personal" / "skills" / "openai-docs" / "SKILL.md"
             shim.parent.mkdir(parents=True)
-            shim.write_text("---\nname: openai-docs\n---\n# OpenAI Docs\n", encoding="utf-8")
+            shim.write_text(
+                "---\nname: openai-docs\n---\n# OpenAI Docs\n", encoding="utf-8"
+            )
 
             with self.assertRaisesRegex(RuntimeError, "local shim"):
                 runtime_alignment.validate_official_system_skill_delegation(
@@ -1124,9 +1111,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
                     root,
                 )
 
-    def test_runtime_max_depth_is_exposed_for_spawn_policy(self) -> None:
-        """The generator must expose max_depth for delegated spawn policies."""
-        self.assertEqual(codex_runtime_max_depth(), 2)
+    def test_runtime_depth_limit_remains_owned_by_codex_config(self) -> None:
+        """The native runtime config retains its own depth limit, outside task policy."""
+        config = runtime_alignment.load_project_config_toml()
+        self.assertEqual(config["agents"]["max_depth"], 2)
 
     def test_template_workspace_can_use_agent_canon_shared_docs(self) -> None:
         """Derived workspaces need not expose shared AgentCanon docs at root."""
@@ -1157,13 +1145,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,
-                report_dir=workspace_root / "runtime" / "reports" / "agents" / "_packet_probe",
+                report_dir=workspace_root
+                / "runtime"
+                / "reports"
+                / "agents"
+                / "_packet_probe",
                 workspace_root=workspace_root,
                 active_design_packet=active_design_packet,
                 agentcanon_source_root=PROJECT_ROOT,
             )
             non_artifact_paths = {
-                entry.path for entry in packet.read_before_work if not entry.rationale.startswith("run artifact:")
+                entry.path
+                for entry in packet.read_before_work
+                if not entry.rationale.startswith("run artifact:")
             }
 
             self.assertIn(review_process, non_artifact_paths)
@@ -1178,7 +1172,11 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,
-                report_dir=Path(tmp_dir) / "runtime" / "reports" / "agents" / "_packet_probe",
+                report_dir=Path(tmp_dir)
+                / "runtime"
+                / "reports"
+                / "agents"
+                / "_packet_probe",
                 workspace_root=PROJECT_ROOT,
                 active_design_packet=active_design_packet,
                 agentcanon_source_root=PROJECT_ROOT,
@@ -1190,7 +1188,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertTrue(sectioned_entries)
         self.assertTrue(all("#" not in str(entry.path) for entry in sectioned_entries))
         for filename, heading in (
-            ("CODEX_BOOTSTRAP.md", "4. Run Bootstrap"),
+            ("CODEX_BOOTSTRAP.md", "4. Run Context"),
             ("CODEX_IMPLEMENTATION.md", "5. Implementation"),
         ):
             entry = next(

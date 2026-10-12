@@ -12,14 +12,14 @@ upstream design ../../documents/design/entrypoint-owner-map.md document responsi
 ## Reader Map
 
 Read common implementation decisions, then the section for the active operation.
-Select any child section separately; later-stage and inactive coordination
-procedures remain unread. Return to [Codex Workflow](CODEX_WORKFLOW.md#reader-map)
-when the phase changes.
+Select only the sections applicable to the current responsibility. Do not read
+unselected coordination guidance by default. Return to
+[Codex Workflow](CODEX_WORKFLOW.md#reader-map) when the task context changes.
 
 | When | Read |
 | --- | --- |
 | Choosing or correcting the implementation contract | [Design Integrity Gate](#design-integrity-gate) |
-| Selected typed route requires full staging | [Coordination design packet](#coordination-design-packet) |
+| Selected design work needs a durable packet | [Coordination design packet](#coordination-design-packet) |
 | Editing a repository file | [Edit Execution Surface](#edit-execution-surface) |
 | Selecting an implementation or adding code/API | [Library And Reuse Sweep](#library-and-reuse-sweep) |
 | Explicitly analyzing or editing a dependency-graph annotation | [File Dependency Manifest](#file-dependency-manifest) |
@@ -31,9 +31,9 @@ when the phase changes.
 Keep request clauses, valid inputs, guarantees, acceptance evidence, and the
 complete affected responsibility unit through design, implementation, and review.
 Use [implementation decisions](ROOT_IMPLEMENTATION.md#simplest-complete-implementation)
-for the engineering basis. Routing, waves, bounded work packets, and validation
-profiles order work; they do not narrow the requested outcome. Update a route
-when newly established owner/contract facts require it.
+for the engineering basis. Markdown links and actual dependency/ownership facts
+guide work; they do not narrow the requested outcome. Update the selected owner
+when newly established contract facts require it.
 
 ## Design Integrity Gate
 
@@ -46,9 +46,11 @@ algorithm, dependency, configuration, naming, oracle, or responsibility decision
 returns to its design owner with `design_issue_blocker` evidence. A verified root correction preserves the agreed
 intent while changing defective contracts and their consumers as necessary.
 
-The selected `workflow_activation_policy` owns child activation and authority.
-A blocked selected child preserves that boundary; it does not create a parent
-write fallback. User-guided debugging uses the common ROOT exception.
+Markdown links identify the expected owner and Skill route; they do not create a
+dispatch frontier. When delegation is selected, use the configured native
+collaboration route and preserve actual launch, completion, and failure results.
+A blocked child does not create a parent write fallback. User-guided debugging
+uses the common ROOT exception.
 
 A bounded route's selected execution owner performs its edit and verification
 without a child handoff. When the selected route requires full staging, read
@@ -191,5 +193,5 @@ workflow or unresolved runtime risk selected its creation. Consume the same
 `run.subagent_prompt_packet` and role prompt contract with the fresh context capsule.
 Activated design review and gate evidence must match the current artifact.
 Preserve disjoint writer targets, integration order, and the selected review owner.
-After each slice, resume the remaining work under the existing route rather than
-restarting intake or expanding inactive stages.
+After each assigned unit, continue from its actual result rather than restarting
+intake or expanding unselected work.

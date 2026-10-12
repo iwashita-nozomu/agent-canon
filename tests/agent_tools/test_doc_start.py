@@ -88,10 +88,8 @@ class DocStartTest(unittest.TestCase):
             manifest = yaml.safe_load(manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("prompt_contract:", manifest_text)
-            self.assertIn(
-                "role_topology",
-                manifest["run"]["execution_graph"],
-            )
+            self.assertNotIn("execution_graph", manifest["run"])
+            self.assertIn("roles", manifest)
 
     def test_doc_start_paper(self) -> None:
         """Paper doc start should enable citation, notation, and logic reviewers."""
@@ -161,10 +159,8 @@ class DocStartTest(unittest.TestCase):
             manifest = yaml.safe_load(manifest_text)
             self.assertIn("subagent_prompt_packet:", manifest_text)
             self.assertIn("prompt_contract:", manifest_text)
-            self.assertIn(
-                "role_topology",
-                manifest["run"]["execution_graph"],
-            )
+            self.assertNotIn("execution_graph", manifest["run"])
+            self.assertIn("roles", manifest)
 
     def test_doc_start_explicit_terra_is_review_only(self) -> None:
         """Explicit Terra selection appears in review output without write authority."""

@@ -170,7 +170,7 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
             "Owner-First Readback",
             "Stages",
         ),
-        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Bootstrap",),
+        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Context",),
         "agents/canonical/CODEX_IMPLEMENTATION.md": ("5. Implementation",),
     },
     "implementer": {
@@ -178,7 +178,7 @@ ROLE_DOCUMENT_PACKET_SECTION_SPECS: dict[str, dict[str, tuple[str, ...]]] = {
             "Owner-First Readback",
             "Stages",
         ),
-        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Bootstrap",),
+        "agents/canonical/CODEX_BOOTSTRAP.md": ("4. Run Context",),
         "agents/canonical/CODEX_IMPLEMENTATION.md": ("5. Implementation",),
     },
 }

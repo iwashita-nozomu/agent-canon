@@ -135,7 +135,9 @@ def _resolve_rooted_path(root: Path, relative_path: str, root_key: str) -> Path:
     try:
         resolved.relative_to(resolved_root)
     except ValueError as exc:
-        raise RuntimeError(f"runtime_artifact_path_invalid:{root_key}:{declared}") from exc
+        raise RuntimeError(
+            f"runtime_artifact_path_invalid:{root_key}:{declared}"
+        ) from exc
     return resolved
 
 
@@ -299,32 +301,6 @@ class RoleWriteScope:
     notes: str
 
 
-def schedule_wave_row(row: dict[str, str]) -> str:
-    """Return a schedule.md Agent Wave Ledger row."""
-    cells = (
-        row["wave_id"],
-        row["parent_or_delegate"],
-        row["spawn_authority"],
-        row["trigger"],
-        row["budget_before"],
-        row["budget_after"],
-        row["runtime_max_threads"],
-        row["runtime_max_depth"],
-        row["spawned_roles"],
-        row["role_instances"],
-        row["skipped_roles"],
-        row["allowed_paths"],
-        row["do_not_read"],
-        row["write_scope"],
-        row["validation_route"],
-        row["review_gate"],
-        row["handoff_artifacts"],
-        row["delegated_policy_ref"],
-        row["status"],
-    )
-    return "| " + " | ".join(cells) + " |"
-
-
 def resolve_role_write_scope(
     config: TeamConfig,
     role: Role,
@@ -360,7 +336,11 @@ def role_allowed_artifact_files(
     active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[Path, ...]:
     """Resolve generated artifact files one role may write."""
-    from tools.agent.orchestration.packets import resolve_active_design_packet_config, selected_artifact_name
+    from tools.agent.orchestration.packets import (
+        resolve_active_design_packet_config,
+        selected_artifact_name,
+    )
+
     packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         sorted(
@@ -556,12 +536,22 @@ def write_directory_snapshot(root: Path, output_path: Path) -> None:
     """Write the current directory snapshot to json."""
     try:
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=root.resolve(), explicit_root=None, purpose="directory-snapshot")
+            ParentRootAttestationRequest(
+                cwd=root.resolve(), explicit_root=None, purpose="directory-snapshot"
+            )
         )
-        ensure_parent_owned_directory(attestation, output_path.parent, "directory-snapshot-parent")
-        receipt = resolve_parent_owned_path(attestation, output_path, "directory-snapshot")
+        ensure_parent_owned_directory(
+            attestation, output_path.parent, "directory-snapshot-parent"
+        )
+        receipt = resolve_parent_owned_path(
+            attestation, output_path, "directory-snapshot"
+        )
         ParentRootSideEffectBoundary().atomic_publish(
-            receipt, (json.dumps(capture_directory_snapshot(root), indent=2, sort_keys=True) + "\n").encode("utf-8")
+            receipt,
+            (
+                json.dumps(capture_directory_snapshot(root), indent=2, sort_keys=True)
+                + "\n"
+            ).encode("utf-8"),
         )
     except ParentRootSideEffectError as exc:
         raise ReportBundleArtifactPathError(str(output_path), exc.reject.value) from exc
@@ -596,19 +586,32 @@ def write_workspace_change_snapshot(
     """Write the current git-visible workspace change snapshot to json."""
     try:
         attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=workspace_root.resolve(), explicit_root=None, purpose="workspace-snapshot")
+            ParentRootAttestationRequest(
+                cwd=workspace_root.resolve(),
+                explicit_root=None,
+                purpose="workspace-snapshot",
+            )
         )
-        ensure_parent_owned_directory(attestation, output_path.parent, "workspace-snapshot-parent")
-        receipt = resolve_parent_owned_path(attestation, output_path, "workspace-snapshot")
+        ensure_parent_owned_directory(
+            attestation, output_path.parent, "workspace-snapshot-parent"
+        )
+        receipt = resolve_parent_owned_path(
+            attestation, output_path, "workspace-snapshot"
+        )
         ParentRootSideEffectBoundary().atomic_publish(
             receipt,
-            (json.dumps(
-                capture_workspace_change_snapshot(
-                    workspace_root,
-                    ignored_roots=ignored_roots,
-                    ignored_paths=ignored_paths,
-                ), indent=2, sort_keys=True
-            ) + "\n").encode("utf-8"),
+            (
+                json.dumps(
+                    capture_workspace_change_snapshot(
+                        workspace_root,
+                        ignored_roots=ignored_roots,
+                        ignored_paths=ignored_paths,
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            ).encode("utf-8"),
         )
     except ParentRootSideEffectError as exc:
         raise ReportBundleArtifactPathError(str(output_path), exc.reject.value) from exc

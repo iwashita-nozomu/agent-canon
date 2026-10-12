@@ -279,19 +279,6 @@ CONTRACTS = (
         ),
     ),
     ToolContract(
-        name="subagent_wave_routing",
-        tool="tools/validation/semantic/tools/tool_drift.py",
-        links=(
-            LinkCheck("agents/canonical/CODEX_SUBAGENTS.md"),
-            LinkCheck("agents/TASK_WORKFLOWS.md"),
-            LinkCheck("agents/skills/agent-orchestration.md"),
-            LinkCheck(
-                "tools/validation/semantic/convention/check_convention_compliance.py"
-            ),
-            LinkCheck("tests/agent_tools/test_tool_drift.py"),
-        ),
-    ),
-    ToolContract(
         name="repo_dependency_review",
         tool="tools/analysis/dependencies/run_repo_dependency_review.sh",
         links=(

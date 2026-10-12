@@ -40,27 +40,13 @@ from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
     materialize_generated_completeness_receipt,
 )
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
-    ToolExecutionResult,
-    advance_execution_graph,
-    codex_runtime_max_threads,
     default_quality_check_agent_types,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
     unique_codex_agents_for_roles,
     validate_agent_type_selections,
-    workflow_spawn_budget,
 )
 from tools.agent.orchestration.packets import (  # noqa: E402
     active_design_packet_mapping,
     resolve_active_design_packet_config,
-)
-from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
-    actual_wave_event_fields,
-    check_schedule_artifact,
-    check_completion_coverage,
-    evaluate_completion_boundary,
-    project_completion_coverage,
-    wave_reconciliation_blockers,
 )
 from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
@@ -71,7 +57,6 @@ from tools.runtime.lifecycle.task_close import (  # noqa: E402
 )
 from tools.agent.orchestration.team_config import (  # noqa: E402
     AgentTypeSelection,
-    SubagentWaveSlot,
     load_task_catalog,
     load_team_config,
     select_roles,
@@ -88,10 +73,7 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
 from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 from tools.runtime.lifecycle.bootstrap_agent_run import (  # noqa: E402
     main as bootstrap_agent_run,
-    read_selected_skill_documents,
-    serialized_skill_document_reads,
 )
-from tools.agent.skills.skill_route_catalog import SkillRoutingRule  # noqa: E402
 
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
@@ -132,12 +114,6 @@ def snapshot_external_source(source_root: Path) -> tuple[tuple[str, str, int], .
             )
         )
     return tuple(entries)
-
-
-def expected_workflow_spawn_budget(family_id: str) -> tuple[int, int]:
-    """Read one workflow budget from the task catalog owner."""
-    config = load_team_config()
-    return workflow_spawn_budget(load_task_catalog(config), family_id)
 
 
 def selected_active_design_packet(prefix: str) -> dict[str, object]:
@@ -471,24 +447,6 @@ def ready_closeout_evidence_lines(
         "- agent_canon_source_checkout: standalone",
         "- agent_canon_source_status: inspected",
         "",
-        "## Review Convergence Evidence",
-        "- convergence_schema: agent-canon.review-convergence.v1",
-        "- candidate_epoch: 1",
-        "- candidate_digest: sha256:" + "a" * 64,
-        "- initial_review_status: complete",
-        "- initial_blocking_finding_ids: none",
-        "- focused_recheck_finding_ids: none",
-        "- open_blocking_finding_ids: none",
-        "- advisory_finding_ids: none",
-        "- unresolved_request_clause_ids: none",
-        "- unresolved_validation_ids: none",
-        "- unresolved_measure_initial: 0",
-        "- unresolved_measure_final: 0",
-        "- selected_validation_status: pass",
-        "- same_state_action_repeated: no",
-        "- terminal_state: ship",
-        "- new_epoch_reason: none",
-        "",
         "## Tool Warning Evidence",
         "- tool_warning_monitoring_status: none",
         "- tool_warning_open_items: none",
@@ -519,18 +477,7 @@ def ready_closeout_evidence_lines(
         "- mapping_error_sets_empty: yes",
         "- canonical_dispatcher_schema_status: pass",
         "",
-        "## CompletionCoverage And Failure Response Evidence",
-        "- completion_coverage_artifact: completion_coverage.json",
-        "- completion_coverage_consumer: yes",
-        "- validation_failure_response_status: pass",
-        "",
         "## Subagent Lifecycle Evidence",
-        "- fresh_subagents_required: conditional",
-        "- reuse_for_new_task: allowed_when_owner_context_compatible",
-        "- previous_task_subagent_reuse: none",
-        "- agent_wave_ledger_status: complete",
-        "- planned_vs_actual_wave_status: reconciled",
-        "- dynamic_spawn_policy_status: applied",
         "- subagent_closeout_status: closed",
         "- open_subagent_instances: none",
         "- close_agent_evidence: orchestrator_no_open_subagents",
@@ -561,50 +508,8 @@ def ready_closeout_evidence_lines(
 
 
 def write_ready_schedule(report_dir: Path) -> None:
-    """Write a filled schedule artifact."""
-    (report_dir / "schedule.md").write_text(
-        "\n".join(
-            [
-                "# Schedule",
-                "",
-                "## Stage Plan",
-                "| Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |",
-                "| ----- | ----------- | ------------ | ------ | ------------- | ------ |",
-                "| requirements | manager | manager_reviewer | contract | fixed | done |",
-                "## Clause Coverage",
-                "| Clause ID | Covered By Stage | Review Gate | Status |",
-                "| --------- | ---------------- | ----------- | ------ |",
-                "| T1-C1 | requirements | requirements | done |",
-                "## Planned Work Units",
-                "| Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |",
-                "| ------- | ---------- | ----- | ------------------- | --------- | ------ |",
-                "| W1 | T1-C1 | codex | tests | final | done |",
-                "## Agent Wave Ledger",
-                (
-                    "| Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | "
-                    "Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | "
-                    "Role Instances | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | "
-                    "Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |"
-                ),
-                (
-                    "| ------- | ------------------ | --------------- | ------- | ------------- | "
-                    "------------ | ------------------- | ----------------- | ------------- | "
-                    "-------------- | ------------------------- | ------------- | ----------- | ----------- | "
-                    "---------------- | ----------- | ----------------- | -------------------- | ------ |"
-                ),
-                (
-                    "| WAVE-1 | parent | parent | initial_intake | 0/12 | 1/12 | 26 | 2 | "
-                    "requirements_organizer | "
-                    "manager:manager_requirements_organizer:requirements_organizer:"
-                    "team_manifest.yaml | none | reports/agents/run | "
-                    "unrelated | read-only | pytest | schedule_review | team_manifest.yaml | "
-                    "team_manifest.yaml#run.delegated_spawn_policy | done |"
-                ),
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    """Write optional schedule prose without a machine task-stage ledger."""
+    (report_dir / "schedule.md").write_text("# Schedule\n", encoding="utf-8")
 
 
 def _log_ready_work(report_dir: Path) -> None:
@@ -640,123 +545,15 @@ def write_ready_workflow_monitoring(report_dir: Path) -> None:
             [
                 "# Workflow Monitoring",
                 "",
-                "## Actual Wave Events",
+                "## Behavior Events",
                 "",
-                (
-                    "- wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
-                    "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                    "budget_after=1/12 runtime_max_threads=26 runtime_max_depth=2 "
-                    "spawned_roles=requirements_organizer "
-                    "role_instances=manager:manager_requirements_organizer:"
-                    "requirements_organizer:team_manifest.yaml "
-                    "skipped_roles=none allowed_paths=reports/agents/run "
-                    "do_not_read=unrelated write_scope=read-only validation_route=pytest "
-                    "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done"
-                ),
+                "- tool_call=observed result=completed",
                 "",
                 "## Tool Warnings",
                 "",
                 "- tool_warnings_status: none",
                 "",
             ]
-        ),
-        encoding="utf-8",
-    )
-
-
-def append_mid_task_wave_checkpoint(
-    report_dir: Path,
-    *,
-    updated_packet: str = "reports/agents/run/user_delta_001.md",
-    input_classification: str = "same_active_task_delta",
-    scope_status: str | None = None,
-    redispatch_action: str | None = None,
-    spawn_authority: str | None = None,
-    target_agents: str | None = None,
-    spawned_roles: str | None = None,
-    role_instances: str | None = None,
-    skipped_roles: str | None = None,
-    allowed_paths: str = "reports/agents/run",
-    do_not_read: str = "unrelated",
-    write_scope: str = "read-only",
-    validation_route: str = "pytest",
-    review_gate: str = "parent_review",
-    handoff_artifacts: str = "reports/agents/run/user_delta_001.md",
-    status: str = "checkpointed",
-    fresh_wave_evidence: str | None = None,
-    fresh_run_bundle: str | None = None,
-) -> None:
-    """Append a matching mid-task user input wave checkpoint fixture."""
-    if input_classification == "same_active_task_delta":
-        scope_status = scope_status or "unchanged"
-        redispatch_action = redispatch_action or "send_input"
-        spawn_authority = spawn_authority or "parent_checkpoint_then_send_input"
-        target_agents = target_agents or "explorer"
-        spawned_roles = spawned_roles or "none"
-        role_instances = role_instances or "none"
-        skipped_roles = skipped_roles or f"{target_agents}:reused_run_local_send_input"
-    elif input_classification == "scope_or_contract_change":
-        scope_status = scope_status or "changed"
-        redispatch_action = redispatch_action or "fresh_followup_wave"
-        spawn_authority = spawn_authority or "parent_checkpoint_then_spawn_fresh_wave"
-        target_agents = target_agents or "worker"
-        spawned_roles = spawned_roles or target_agents
-        role_instances = (
-            role_instances
-            or f"{spawned_roles}:followup:{spawned_roles}:{updated_packet}"
-        )
-        skipped_roles = skipped_roles or "none"
-    elif input_classification == "new_task":
-        scope_status = scope_status or "new_task"
-        redispatch_action = redispatch_action or "fresh_run"
-        spawn_authority = spawn_authority or "fresh_run_required"
-        target_agents = target_agents or "none"
-        spawned_roles = spawned_roles or "none"
-        role_instances = role_instances or "none"
-        skipped_roles = skipped_roles or "none"
-    else:
-        raise ValueError(f"unsupported test classification: {input_classification}")
-    extra_fields = ""
-    if fresh_wave_evidence is not None:
-        extra_fields += f" fresh_wave_evidence={fresh_wave_evidence}"
-    if fresh_run_bundle is not None:
-        extra_fields += f" fresh_run_bundle={fresh_run_bundle}"
-    schedule_path = report_dir / "schedule.md"
-    schedule_text = schedule_path.read_text(encoding="utf-8")
-    schedule_path.write_text(
-        schedule_text.rstrip()
-        + "\n"
-        + (
-            f"| WAVE-2 | parent | {spawn_authority} | mid_task_user_input | "
-            f"3/12 | 3/12 | 26 | 2 | {spawned_roles} | {role_instances} | {skipped_roles} | "
-            f"{allowed_paths} | {do_not_read} | {write_scope} | "
-            f"{validation_route} | {review_gate} | {handoff_artifacts} | "
-            f"team_manifest.yaml#run.subagent_lifecycle_policy | {status} |"
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    monitoring_path = report_dir / "workflow_monitoring.md"
-    monitoring_text = monitoring_path.read_text(encoding="utf-8")
-    actual_event = (
-        "- wave_event=recorded wave_id=WAVE-2 event_kind=mid_task_user_input "
-        f"spawn_authority={spawn_authority} trigger=mid_task_user_input "
-        "budget_before=3/12 budget_after=3/12 runtime_max_threads=26 "
-        f"runtime_max_depth=2 spawned_roles={spawned_roles} "
-        f"role_instances={role_instances} "
-        f"skipped_roles={skipped_roles} allowed_paths={allowed_paths} "
-        f"do_not_read={do_not_read} write_scope={write_scope} "
-        f"validation_route={validation_route} review_gate={review_gate} "
-        f"handoff_artifacts={handoff_artifacts} status={status} "
-        f"input_classification={input_classification} "
-        f"updated_packet={updated_packet} redispatch_action={redispatch_action} "
-        f"target_agents={target_agents} scope_status={scope_status} "
-        "lifecycle_policy_ref=team_manifest.yaml#run.subagent_lifecycle_policy"
-        f"{extra_fields}"
-    )
-    monitoring_path.write_text(
-        monitoring_text.replace(
-            "\n## Tool Warnings", f"\n{actual_event}\n\n## Tool Warnings"
         ),
         encoding="utf-8",
     )
@@ -828,143 +625,6 @@ def write_ready_final_review(report_dir: Path) -> None:
                 "",
             ]
         ),
-        encoding="utf-8",
-    )
-
-
-def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
-    """Write the completion-coverage evidence consumed by task_close."""
-    source_binding = {
-        "run_id": run_id,
-        "context_id": "fixture-context",
-        "organizer_context_id": "fixture-organizer",
-        "parent": "codex",
-        "component_manager": "codex",
-        "assigned_unit": "fixture-unit",
-        "source_binding": {"run_id": run_id, "context_id": "fixture-context"},
-        "source_refs": ["tests/agent_tools/test_bootstrap_and_close.py"],
-    }
-    append_ledger_event(
-        report_dir,
-        {
-            "run_id": run_id,
-            "context_id": "fixture-context",
-            "event_id": "fixture-event-1",
-            "semantic_kind": "request_clause",
-            "owner": "codex",
-            "state_owner": "codex",
-            "api_owner": "codex",
-            "dependency_owner": "codex",
-            "responsibility_unit": "fixture-unit",
-            "intent_id": "fixture-intent",
-            "outcome": "complete",
-            "clause_id": "T1-C1",
-            "evidence_refs": ["fixture-evidence"],
-            "artifact_refs": ["fixture-artifact"],
-            "source_binding": source_binding["source_binding"],
-            "gate_evidence": [
-                {
-                    "gate_id": "oop_readability_guard",
-                    "stage": "review",
-                    "owner": "codex",
-                    "outcome": "pass",
-                    "artifact_refs": ["fixture-oop"],
-                    "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/runtime/lifecycle/task_close.py"],
-                    "signal_counts": {"review_signal_findings": 0},
-                    "typed_boundary_counts": {"api_boundary": 0},
-                    "solid_counts": {"single responsibility": 0},
-                    "typed_evidence_owner": "oop-readability-checker",
-                },
-                {
-                    "gate_id": "solid_evidence_gate",
-                    "stage": "review",
-                    "owner": "codex",
-                    "outcome": "pass",
-                    "artifact_refs": ["fixture-solid"],
-                    "source_event_refs": ["fixture-event-1"],
-                    "scanned_paths": ["tools/runtime/lifecycle/task_close.py"],
-                    "covered_paths": ["tools/runtime/lifecycle/task_close.py"],
-                    "solid_counts": {"single responsibility": 0},
-                },
-                {
-                    "gate_id": "canonical_formatter_static",
-                    "stage": "validation",
-                    "owner": "codex",
-                    "outcome": "pass",
-                    "artifact_refs": ["fixture-format"],
-                    "source_event_refs": ["fixture-event-1"],
-                },
-            ],
-        },
-    )
-    coverage = project_completion_coverage(
-        read_ledger_snapshot(report_dir, "fixture-snapshot"),
-        source_binding,
-    )
-    coverage_check = check_completion_coverage(
-        coverage,
-        ["T1-C1"],
-        {
-            "owner": "codex",
-            "state_owner": "codex",
-            "api_owner": "codex",
-            "dependency_owner": "codex",
-        },
-    )
-    completion_boundary = evaluate_completion_boundary(
-        coverage_check,
-        {
-            "w2_implementation_complete": True,
-            "w2_review_complete": True,
-            "source_freeze_review_complete": True,
-            "formatter_and_static_checks_pass": True,
-        },
-        {"planned_work_complete": True},
-        {"open_repairs": []},
-        {"open_crossing_edges": []},
-        {
-            "run_id": run_id,
-            "context_id": "fixture-context",
-            "observation_ref": "fixture-topology",
-            "global_publication_state": "publication_ready",
-            "routing_gate": "verified",
-            "writer_release_order_complete": True,
-            "final_review_approved": True,
-            "closeout_unlocked": True,
-            "branch_creation_reason": (
-                "convergence_w2_writer_owned_after_git_index_blocker"
-            ),
-            "source_freeze_before_review": True,
-            "formatter_static_events": ["formatter", "static"],
-            "writer_cardinality": 1,
-            "writer_collision_state": "collision_preserved",
-            "descendant_disposition": {"status": "none"},
-            "topology_schema": "agent-canon.control-topology.v1",
-            "topology_order": [
-                "design_approved",
-                "writer_released",
-                "source_frozen",
-                "change_review_approved",
-            ],
-        },
-    )
-    gate_results = coverage_check.get("gate_results")
-    if isinstance(gate_results, dict):
-        gate_results["G5_DELIVERY_BOUNDARY"] = bool(
-            completion_boundary.get("overall_delivery_complete")
-        )
-        error_sets = cast(dict[str, object], coverage_check.get("error_sets", {}))
-        coverage_check["ok"] = not any(error_sets.values()) and all(
-            bool(value) for value in gate_results.values()
-        )
-    artifact = {
-        **coverage,
-        "coverage_check": coverage_check,
-        "completion_boundary": completion_boundary,
-    }
-    (report_dir / "completion_coverage.json").write_text(
-        json.dumps(artifact, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -1077,9 +737,7 @@ def write_ready_closeout_bundle(
                 "- required_reviews_complete: yes",
                 "- validation_complete: yes",
                 "- request_contract_complete: yes",
-                "- all_planned_chunks_complete: yes",
                 "- overall_delivery_complete: yes",
-                "- unfinished_tasks_absent: yes",
                 "- dependency_headers_complete: yes",
                 "- repo_wide_dependency_tools_complete: yes",
                 "- repo_wide_static_analysis_complete: yes",
@@ -1087,7 +745,6 @@ def write_ready_closeout_bundle(
                 "- review_findings_integrated: yes",
                 "- focused_recheck_complete: yes",
                 "- tool_warnings_resolved: yes",
-                "- review_convergence_complete: yes",
                 "- subagents_closed: yes",
                 "- diff_check_agent_complete: yes",
                 "- canonical_tree_head_complete: yes",
@@ -1106,7 +763,6 @@ def write_ready_closeout_bundle(
     )
     write_ready_schedule(report_dir)
     _log_ready_work(report_dir)
-    write_ready_completion_coverage(report_dir, run_id)
     write_ready_workflow_monitoring(report_dir)
     write_ready_agent_evaluation(report_dir)
     write_ready_final_review(report_dir)
@@ -1138,681 +794,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
         )
         parent_env.start()
         self.addCleanup(parent_env.stop)
-
-    def test_skill_graph_reads_only_selected_hard_prerequisites_to_file_eof(
-        self,
-    ) -> None:
-        """A shared prerequisite is read once; related branches remain unloaded."""
-        documents = read_selected_skill_documents(
-            ("$subagent-bootstrap", "$direct-luna-communication"),
-            PROJECT_ROOT,
-        )
-        skill_ids = [skill for skill, _, _ in documents]
-
-        self.assertEqual(len(skill_ids), len(set(skill_ids)))
-        self.assertEqual(
-            set(skill_ids),
-            {
-                "agent-orchestration",
-                "codex-task-workflow",
-                "subagent-bootstrap",
-                "direct-luna-communication",
-            },
-        )
-        self.assertNotIn("result-artifact-writeout", skill_ids)
-        for _, canonical_path, content in documents:
-            self.assertTrue(canonical_path.startswith("agents/skills/"))
-            self.assertEqual(
-                content.encode("utf-8"),
-                (PROJECT_ROOT / canonical_path).read_bytes(),
-            )
-
-    def test_skill_graph_reuses_unchanged_body_and_rereads_changed_body(self) -> None:
-        """The graph reuses unchanged EOF text and refreshes only changed source."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
-            source_root = Path(temporary)
-            skill_path = source_root / "agents/skills/selected.md"
-            skill_path.parent.mkdir(parents=True)
-            skill_path.write_text("# Selected\n\nfirst body\n", encoding="utf-8")
-            rule = SkillRoutingRule(
-                skill="selected",
-                canonical_doc="agents/skills/selected.md",
-                reason="selected test skill",
-                stage_policy="all",
-                triggers=(),
-                capabilities=(),
-                related_skills=(),
-            )
-            with (
-                patch(
-                    "tools.runtime.lifecycle.bootstrap_agent_run.load_skill_route_rules",
-                    return_value=(rule,),
-                ),
-                patch(
-                    "tools.runtime.lifecycle.bootstrap_agent_run.derive_skill_invocation_order",
-                    return_value=("selected",),
-                ),
-            ):
-                initial = read_selected_skill_documents(("$selected",), source_root)
-                initial_digest = hashlib.sha256(
-                    initial[0][2].encode("utf-8")
-                ).hexdigest()
-                read_state = serialized_skill_document_reads(initial)
-                prior_graph = {"skill_document_reads": read_state}
-                with patch(
-                    "tools.runtime.lifecycle.bootstrap_agent_run.SkillDocumentReader.read_document",
-                    side_effect=AssertionError("unchanged skill body should be reused"),
-                ):
-                    unchanged = read_selected_skill_documents(
-                        ("$selected",),
-                        source_root,
-                        existing_graph=prior_graph,
-                    )
-                self.assertEqual(unchanged, initial)
-
-                skill_path.write_text("# Selected\n\nchanged body\n", encoding="utf-8")
-                refreshed = read_selected_skill_documents(
-                    ("$selected",),
-                    source_root,
-                    existing_graph=prior_graph,
-                )
-            self.assertEqual(refreshed[0][2], "# Selected\n\nchanged body\n")
-            self.assertNotEqual(
-                initial_digest,
-                hashlib.sha256(refreshed[0][2].encode("utf-8")).hexdigest(),
-            )
-
-    def test_bootstrap_blocks_dispatch_when_skill_read_fails(self) -> None:
-        """An incomplete selected Skill read leaves the execution graph unstarted."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
-            workspace_root = Path(temporary) / "workspace"
-            report_root = Path(temporary) / "reports"
-            workspace_root.mkdir()
-            report_root.mkdir()
-            seed_workspace_config(workspace_root)
-            calls: list[tuple[str, str]] = []
-            output = io.StringIO()
-            with (
-                patch(
-                    "tools.runtime.lifecycle.bootstrap_agent_run.read_selected_skill_documents",
-                    side_effect=RuntimeError("skill_readback:incomplete"),
-                ),
-                redirect_stdout(output),
-            ):
-                code = bootstrap_agent_run(
-                    [
-                        "--task",
-                        "academic draft",
-                        "--task-id",
-                        "T10",
-                        "--owner",
-                        "codex",
-                        "--run-id",
-                        "skill-read-blocks-execution",
-                        "--workspace-root",
-                        str(workspace_root),
-                        "--report-root",
-                        str(report_root),
-                    ],
-                    spawn=lambda agent_type, prompt: (
-                        calls.append((agent_type, prompt)) or "unexpected-agent"
-                    ),
-                )
-            self.assertEqual(code, 1)
-            self.assertIn("skill_execution_graph_read_failed", output.getvalue())
-            self.assertEqual(calls, [])
-            self.assertFalse((report_root / "skill-read-blocks-execution").exists())
-
-    def test_execution_graph_waits_for_actual_completion_before_dependent_dispatch(
-        self,
-    ) -> None:
-        """A successful launch is pending; only its child result unlocks a wave."""
-        intake = (
-            SubagentWaveSlot("explorer", "explorer_worker", "worker"),
-            SubagentWaveSlot("planner", "planner_worker", "execution_planner"),
-        )
-        implementation = (SubagentWaveSlot("implementer", "worker", "worker"),)
-        waves = (intake, implementation)
-        no_result: dict[str, dict[str, ToolExecutionResult]] = {}
-
-        first = advance_execution_graph(waves, no_result)
-
-        self.assertEqual(first.status, "ready")
-        self.assertEqual(first.ready_slots, intake)
-
-        launch_results = {
-            slot.executable_identity: {
-                "spawn_result": ToolExecutionResult(False, f"agent-{index}")
-            }
-            for index, slot in enumerate(intake, start=1)
-        }
-        launched = advance_execution_graph(waves, launch_results)
-        self.assertEqual(launched.status, "waiting")
-        self.assertEqual(
-            launched.waiting_identities, tuple(s.executable_identity for s in intake)
-        )
-
-        first_identity = intake[0].executable_identity
-        second_identity = intake[1].executable_identity
-        completed_first = {
-            first_identity: {
-                **launch_results[first_identity],
-                "completion_result": ToolExecutionResult(False, "exploration result"),
-            },
-            second_identity: {
-                **launch_results[second_identity],
-                "completion_result": ToolExecutionResult(False, "plan result"),
-            },
-        }
-        second = advance_execution_graph(waves, completed_first)
-
-        self.assertEqual(second.status, "ready")
-        self.assertEqual(second.ready_slots, implementation)
-        self.assertEqual(
-            {identity for identity, _ in second.completed_results},
-            {first_identity, second_identity},
-        )
-
-        failed = dict(completed_first)
-        failed[first_identity] = {
-            **launch_results[first_identity],
-            "completion_result": ToolExecutionResult(True, "agent failed"),
-        }
-        stopped = advance_execution_graph(waves, failed)
-        self.assertEqual(stopped.status, "failed")
-        self.assertEqual(stopped.failed_identities, (first_identity,))
-        self.assertEqual(stopped.ready_slots, ())
-        with self.assertRaisesRegex(RuntimeError, "dependent_node_before_ready"):
-            advance_execution_graph(
-                waves,
-                {
-                    implementation[0].executable_identity: {
-                        "spawn_result": ToolExecutionResult(False, "agent-3")
-                    }
-                },
-            )
-        with self.assertRaisesRegex(RuntimeError, "duplicate_role_instance"):
-            advance_execution_graph(((intake[0], intake[0]),), no_result)
-
-    def test_bootstrap_reenters_same_run_from_callback_and_child_results(self) -> None:
-        """The callback launches one ready wave; returned work unlocks the next."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as temporary:
-            workspace_root = Path(temporary) / "workspace"
-            report_root = Path(temporary) / "reports"
-            workspace_root.mkdir()
-            report_root.mkdir()
-            seed_workspace_config(workspace_root)
-            subprocess.run(
-                ["git", "init", "--quiet", "--initial-branch=test/execution-graph"],
-                cwd=workspace_root,
-                check=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Execution Graph Test"],
-                cwd=workspace_root,
-                check=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.email", "execution-graph@example.invalid"],
-                cwd=workspace_root,
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "remote",
-                    "add",
-                    "origin",
-                    "https://github.com/iwashita-nozomu/agent-canon.git",
-                ],
-                cwd=workspace_root,
-                check=True,
-            )
-            subprocess.run(["git", "add", "-A"], cwd=workspace_root, check=True)
-            subprocess.run(
-                ["git", "commit", "--quiet", "-m", "test: seed graph writer target"],
-                cwd=workspace_root,
-                check=True,
-            )
-            checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
-            host_checkout = "/host-visible/checkout"
-            writer_targets = json.dumps(
-                {
-                    "implementer": {
-                        "checkout_root": host_checkout,
-                        "branch": checkout_identity["branch"],
-                        "remote": checkout_identity["remote"],
-                        "allowed_paths": ["paper/draft.md"],
-                    }
-                }
-            )
-            run_id = "execution-graph-callback-result"
-            args = [
-                "--task",
-                "academic draft",
-                "--task-id",
-                "T10",
-                "--owner",
-                "codex",
-                "--workspace-root",
-                str(workspace_root),
-                "--report-root",
-                str(report_root),
-                "--run-id",
-                run_id,
-            ]
-            # The initial wave contains no writer; pass its topic target only when
-            # re-entering after the first successful results unlock later waves.
-            resume_args = [*args, "--writer-targets", writer_targets]
-            spawned: list[tuple[str, str]] = []
-
-            def spawn(agent_type: str, prompt: str) -> str:
-                agent_id = f"agent-{len(spawned) + 1}"
-                spawned.append((agent_type, prompt))
-                return agent_id
-
-            first_output = io.StringIO()
-            target_environment = {
-                "AGENT_CANON_PARENT_ROOT": str(parent_root),
-                "AGENT_CANON_TARGET_ROOT": str(workspace_root),
-                "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
-            }
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(first_output),
-            ):
-                first_code = bootstrap_agent_run(args, spawn=spawn)
-
-            self.assertEqual(first_code, 0)
-            self.assertTrue(spawned)
-            self.assertIn("EXECUTION_GRAPH_STATUS=waiting", first_output.getvalue())
-            self.assertIn("ACTIVE_SKILL_DOCUMENTS_JSON=", first_output.getvalue())
-            self.assertIn(
-                (PROJECT_ROOT / "agents/skills/agent-orchestration.md").read_text(
-                    encoding="utf-8"
-                ),
-                spawned[0][1],
-            )
-            spawn_line = next(
-                line
-                for line in first_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
-            )
-            spawn_results = json.loads(spawn_line.split("=", 1)[1])
-            results = {
-                identity: {
-                    **result,
-                    "completion_result": {
-                        "isError": False,
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"completed {identity}",
-                            }
-                        ],
-                    },
-                }
-                for identity, result in spawn_results.items()
-            }
-            second_output = io.StringIO()
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(second_output),
-            ):
-                second_code = bootstrap_agent_run(
-                    [*resume_args, "--execution-results", json.dumps(results)]
-                )
-
-            self.assertEqual(second_code, 0)
-            self.assertIn("EXECUTION_GRAPH_STATUS=ready", second_output.getvalue())
-            ready_line = next(
-                line
-                for line in second_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-            )
-            ready_calls = json.loads(ready_line.split("=", 1)[1])
-            self.assertEqual(len(ready_calls), 1)
-            self.assertIn(
-                "native collaboration.spawn_agent operation",
-                ready_calls[0]["intent"],
-            )
-            self.assertNotIn(
-                "raw spawn_agent is not an admission path",
-                ready_calls[0]["intent"],
-            )
-            self.assertIn(
-                "parent owns execution-graph progression",
-                ready_calls[0]["arguments"]["input"],
-            )
-            self.assertIn(
-                "return its actual result inline",
-                ready_calls[0]["arguments"]["input"],
-            )
-            self.assertNotIn(
-                "raw spawn_agent is not an admission path",
-                ready_calls[0]["arguments"]["input"],
-            )
-            ready_identity = ready_calls[0]["arguments"]["checkout_identity"]
-            self.assertEqual(ready_identity["cwd"], host_checkout)
-            self.assertEqual(ready_identity["git_root"], host_checkout)
-            self.assertEqual(ready_identity["branch"], checkout_identity["branch"])
-            self.assertEqual(ready_identity["head"], checkout_identity["head"])
-            self.assertEqual(ready_identity["remote"], checkout_identity["remote"])
-            self.assertIn(
-                "completed " + next(iter(spawn_results)),
-                ready_calls[0]["arguments"]["input"],
-            )
-            run_dirs = [path for path in report_root.iterdir() if path.is_dir()]
-            self.assertEqual([path.name for path in run_dirs], [run_id])
-            report_dir = report_root / run_id
-            manifest_path = report_dir / "team_manifest.yaml"
-            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            graph = manifest["run"]["execution_graph"]
-            wave_identities = {"WAVE-1": graph["initial_wave_role_instances"]}
-            for wave in graph["later_stage_waves"]:
-                if wave["wave_id"] != "none":
-                    wave_identities[wave["wave_id"]] = [
-                        item.split(":team_manifest.yaml#roles.", 1)[0]
-                        for item in wave["role_instances"]
-                    ]
-            current_output = second_output.getvalue()
-            writer_target_dispatched = False
-            writer_target_owner: str | None = None
-            writer_wave_id: str | None = None
-            while "EXECUTION_GRAPH_STATUS=ready" in current_output:
-                wave_index = int(
-                    next(
-                        line.split("=", 1)[1]
-                        for line in current_output.splitlines()
-                        if line.startswith("EXECUTION_GRAPH_WAVE_INDEX=")
-                    )
-                )
-                identities = wave_identities[f"WAVE-{wave_index}"]
-                self.assertTrue(identities)
-                ready_tool_call_line = next(
-                    line
-                    for line in current_output.splitlines()
-                    if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-                )
-                ready_tool_calls = json.loads(ready_tool_call_line.split("=", 1)[1])
-                writer_tool_call = next(
-                    (
-                        call
-                        for call in ready_tool_calls
-                        if call["arguments"]["role"] == "implementer"
-                    ),
-                    None,
-                )
-                if writer_tool_call is not None:
-                    target = writer_tool_call["arguments"]["writer_target"]
-                    writer_target_owner = next(
-                        identity
-                        for identity in identities
-                        if identity.startswith("implementer:")
-                    )
-                    writer_wave_id = f"WAVE-{wave_index}"
-                    self.assertEqual(target["checkout_root"], host_checkout)
-                    self.assertEqual(target["branch"], checkout_identity["branch"])
-                    self.assertEqual(target["remote"], checkout_identity["remote"])
-                    self.assertEqual(target["allowed_paths"], ["paper/draft.md"])
-                    self.assertIn(
-                        "completed " + next(iter(spawn_results)),
-                        writer_tool_call["arguments"]["input"],
-                    )
-                    writer_target_dispatched = True
-                wave_results = {
-                    identity: {
-                        "spawn_result": {
-                            "isError": False,
-                            "content": [{"type": "text", "text": f"agent-{identity}"}],
-                        },
-                        "completion_result": {
-                            "isError": False,
-                            "content": [
-                                {"type": "text", "text": f"completed {identity}"}
-                            ],
-                        },
-                    }
-                    for identity in identities
-                }
-                current_output = io.StringIO()
-                with (
-                    patch.dict(os.environ, target_environment),
-                    redirect_stdout(current_output),
-                ):
-                    completion_args = (
-                        args if writer_tool_call is not None else resume_args
-                    )
-                    current_code = bootstrap_agent_run(
-                        [
-                            *completion_args,
-                            "--execution-results",
-                            json.dumps(wave_results),
-                        ]
-                    )
-                self.assertEqual(current_code, 0, current_output.getvalue())
-                current_output = current_output.getvalue()
-            self.assertTrue(writer_target_dispatched)
-            self.assertIn("EXECUTION_GRAPH_STATUS=awaiting_closeout", current_output)
-
-            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            graph = manifest["run"]["execution_graph"]
-            state = graph["result_readback"]
-            expected_wave_ids = sorted(
-                (
-                    wave_id
-                    for wave_id, identities in wave_identities.items()
-                    if identities
-                ),
-                key=lambda wave_id: int(wave_id.removeprefix("WAVE-")),
-            )
-            self.assertEqual(state["completed_wave_ids"], expected_wave_ids)
-            self.assertEqual(state["status"], "awaiting_closeout")
-            self.assertTrue(writer_target_dispatched)
-            self.assertIsNotNone(writer_target_owner)
-            self.assertIsNotNone(writer_wave_id)
-            saved_writer_target = next(
-                entry
-                for entry in graph["writer_targets"]
-                if entry["owner"] == writer_target_owner
-            )
-            self.assertEqual(
-                saved_writer_target["target"]["allowed_paths"], ["paper/draft.md"]
-            )
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
-            wave_events = actual_wave_event_fields(monitoring)
-            recorded_wave_ids = [row["wave_id"] for row in wave_events]
-            self.assertEqual(recorded_wave_ids, expected_wave_ids)
-            writer_wave_event = next(
-                row for row in wave_events if row["wave_id"] == writer_wave_id
-            )
-            self.assertEqual(writer_wave_event["allowed_paths"], "paper/draft.md")
-            self.assertEqual(
-                wave_reconciliation_blockers(
-                    monitoring,
-                    {"agent_wave_ledger_status": "applicable"},
-                    report_dir,
-                    workspace_root,
-                ),
-                [],
-            )
-            schedule = (report_dir / "schedule.md").read_text(encoding="utf-8")
-            self.assertNotIn(
-                "schedule.md:agent_wave_ledger_empty",
-                check_schedule_artifact(schedule),
-            )
-
-            prior_readback = deepcopy(state)
-            monitoring_path = report_dir / "workflow_monitoring.md"
-            schedule_path = report_dir / "schedule.md"
-            monitoring_before = monitoring_path.read_bytes()
-            schedule_before = schedule_path.read_bytes()
-            empty_output = io.StringIO()
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(empty_output),
-            ):
-                empty_code = bootstrap_agent_run([*args, "--execution-results", "{}"])
-            self.assertEqual(empty_code, 0, empty_output.getvalue())
-            self.assertIn(
-                "EXECUTION_GRAPH_STATUS=awaiting_closeout", empty_output.getvalue()
-            )
-            empty_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            empty_readback = empty_manifest["run"]["execution_graph"]["result_readback"]
-            self.assertEqual(empty_readback, prior_readback)
-            self.assertEqual(monitoring_path.read_bytes(), monitoring_before)
-            self.assertEqual(schedule_path.read_bytes(), schedule_before)
-
-            graph["result_readback"]["status"] = "ready"
-            manifest_path.write_text(
-                yaml.safe_dump(manifest, sort_keys=False),
-                encoding="utf-8",
-            )
-            closeout_blockers = wave_reconciliation_blockers(
-                monitoring,
-                {"agent_wave_ledger_status": "applicable"},
-                report_dir,
-                workspace_root,
-            )
-            self.assertIn(
-                "team_manifest.yaml:execution_graph_results_incomplete:ready",
-                closeout_blockers,
-            )
-
-            local_args = [*args]
-            local_args[local_args.index("--run-id") + 1] = (
-                "execution-graph-local-target"
-            )
-            local_output = io.StringIO()
-            with patch.dict(
-                os.environ, {"AGENT_CANON_TARGET_ROOT": str(workspace_root)}
-            ):
-                os.environ.pop("AGENT_CANON_TARGET_HOST_ROOT", None)
-                with redirect_stdout(local_output):
-                    local_code = bootstrap_agent_run(local_args)
-            self.assertEqual(local_code, 0, local_output.getvalue())
-            local_ready_line = next(
-                line
-                for line in local_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-            )
-            local_ready_calls = json.loads(local_ready_line.split("=", 1)[1])
-            local_identity = local_ready_calls[0]["arguments"]["checkout_identity"]
-            self.assertEqual(local_identity["cwd"], str(workspace_root))
-            self.assertEqual(local_identity["git_root"], str(workspace_root))
-
-            empty_run_id = "execution-graph-empty-result-refresh"
-            empty_args = [
-                "--task",
-                (
-                    "Build the AgentCanon Skill traversal for the current Goal: "
-                    "read selected Skills and hard prerequisites fully, use the "
-                    "existing run graph after designated work to select the next "
-                    "instruction, and keep /root as orchestrator without broad "
-                    "implementation."
-                ),
-                "--task-id",
-                "T12",
-                "--owner",
-                "/root",
-                "--workspace-root",
-                str(workspace_root),
-                "--report-root",
-                str(report_root),
-                "--run-id",
-                empty_run_id,
-            ]
-            initial_output = io.StringIO()
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(initial_output),
-            ):
-                initial_code = bootstrap_agent_run(empty_args)
-            self.assertEqual(initial_code, 0, initial_output.getvalue())
-            self.assertIn("EXECUTION_GRAPH_STATUS=ready", initial_output.getvalue())
-            initial_ready_line = next(
-                line
-                for line in initial_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-            )
-            initial_calls = json.loads(initial_ready_line.split("=", 1)[1])
-            self.assertEqual(len(initial_calls), 1)
-            run_dir = report_root / empty_run_id
-            initial_input = initial_calls[0]["arguments"]["input"]
-            self.assertIn("Role document packet: manager", initial_input)
-            self.assertIn(host_checkout, initial_input)
-            self.assertNotIn(str(workspace_root), initial_input)
-            self.assertNotIn(str(report_root), initial_input)
-            initial_identity = initial_calls[0]["arguments"]["checkout_identity"]
-            self.assertIn(
-                json.dumps(initial_identity, ensure_ascii=False, sort_keys=True),
-                initial_input,
-            )
-            for artifact_name in (
-                "intent_brief.md",
-                "user_request_contract.md",
-                "schedule.md",
-            ):
-                artifact_content = (run_dir / artifact_name).read_text(encoding="utf-8")
-                self.assertTrue(artifact_content.strip(), artifact_name)
-                self.assertIn(f"Role document: manager/{artifact_name}", initial_input)
-                self.assertIn(artifact_content, initial_input)
-            manifest_path = run_dir / "team_manifest.yaml"
-            initial_manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            initial_readback = initial_manifest["run"]["execution_graph"][
-                "result_readback"
-            ]
-            self.assertEqual(initial_readback["status"], "ready")
-            self.assertEqual(initial_readback["role_results"], {})
-            monitoring_path = run_dir / "workflow_monitoring.md"
-            schedule_path = run_dir / "schedule.md"
-            monitoring_before = monitoring_path.read_bytes()
-            schedule_before = schedule_path.read_bytes()
-
-            refreshed_output = io.StringIO()
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(refreshed_output),
-            ):
-                refreshed_code = bootstrap_agent_run(
-                    [*empty_args, "--execution-results", "{}"]
-                )
-            self.assertEqual(refreshed_code, 0, refreshed_output.getvalue())
-            self.assertIn("EXECUTION_GRAPH_STATUS=ready", refreshed_output.getvalue())
-            refreshed_ready_line = next(
-                line
-                for line in refreshed_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-            )
-            refreshed_calls = json.loads(refreshed_ready_line.split("=", 1)[1])
-            self.assertEqual(len(refreshed_calls), 1)
-            self.assertEqual(
-                refreshed_calls[0]["token_id"], initial_calls[0]["token_id"]
-            )
-            refreshed_identity = refreshed_calls[0]["arguments"]["checkout_identity"]
-            self.assertEqual(refreshed_identity["cwd"], host_checkout)
-            self.assertEqual(refreshed_identity["git_root"], host_checkout)
-            self.assertEqual(
-                json.loads(
-                    next(
-                        line
-                        for line in refreshed_output.getvalue().splitlines()
-                        if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
-                    ).split("=", 1)[1]
-                ),
-                {},
-            )
-            refreshed_manifest = yaml.safe_load(
-                manifest_path.read_text(encoding="utf-8")
-            )
-            refreshed_readback = refreshed_manifest["run"]["execution_graph"][
-                "result_readback"
-            ]
-            self.assertEqual(refreshed_readback, initial_readback)
-            self.assertEqual(monitoring_path.read_bytes(), monitoring_before)
-            self.assertEqual(schedule_path.read_bytes(), schedule_before)
 
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """Retired repository synchronization wrappers are absent."""
@@ -1900,73 +881,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
         self.assertEqual(
             decision["reason"], "close_agent:all_six_gate_evidence_required"
-        )
-
-    def assert_current_checkout_write_policy(
-        self,
-        write_scope_policy: dict[str, object],
-        max_write_subagents: int,
-    ) -> None:
-        """Assert the current-checkout writer serialization contract."""
-        self.assertEqual(write_scope_policy["max_write_subagents"], max_write_subagents)
-        self.assertEqual(
-            write_scope_policy["overlapping_write_scopes"],
-            "reject_same_checkout_root_before_spawn",
-        )
-        self.assertNotIn("active_subagents", write_scope_policy)
-
-    def assert_same_role_runtime_policy(
-        self,
-        delegated_spawn_policy: dict[str, object],
-    ) -> None:
-        """Assert delegated spawn policy preserves same-role instance identity."""
-        raw_handoff_fields = cast(
-            "list[object]",
-            delegated_spawn_policy["handoff_required_fields"],
-        )
-        handoff_required_fields = {str(field) for field in raw_handoff_fields}
-        self.assertLessEqual(
-            {
-                "owner",
-                "child_role",
-                "child_instance_id",
-                "input_packet",
-                "allowed_paths",
-                "do_not_read",
-                "expected_output",
-                "write_scope",
-                "validation_route",
-                "review_gate",
-                "remaining_spawn_budget",
-            },
-            handoff_required_fields,
-        )
-        same_role_policy = cast(
-            "dict[str, object]",
-            delegated_spawn_policy["same_role_instances"],
-        )
-        self.assertEqual(
-            same_role_policy["status"],
-            "allowed_with_distinct_packets",
-        )
-        self.assertEqual(
-            same_role_policy["identity_key"],
-            "role_id+instance_id+agent_type",
-        )
-        raw_same_role_fields = cast(
-            "list[object]",
-            same_role_policy["required_fields"],
-        )
-        self.assertLessEqual(
-            {
-                "role_id",
-                "instance_id",
-                "agent_type",
-                "input_packet",
-                "allowed_paths",
-                "do_not_read",
-            },
-            {str(field) for field in raw_same_role_fields},
         )
 
     def assert_role_prompt_includes(
@@ -2685,20 +1599,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            expected_active, expected_write = expected_workflow_spawn_budget(
-                "comprehensive_development"
-            )
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
-            self.assertIn(
-                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
-            )
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
-            self.assertIn(
-                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
-            )
-            self.assertIn(
-                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
-            )
             self.assertIn("ADVERSARIAL_REQUIRED=yes", result.stdout)
             self.assertIn("terra:terra_terra:terra", result.stdout)
             self.assertIn(
@@ -2720,8 +1622,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("comprehensive_development", manifest_text)
-            self.assertIn(f"active_subagents: {expected_active}", manifest_text)
-            self.assertIn(f"max_write_subagents: {expected_write}", manifest_text)
+            self.assertNotIn("execution_graph:", manifest_text)
+            self.assertNotIn("capacity_request:", manifest_text)
             terra_start = manifest_text.index("  - id: terra")
             terra_end = manifest_text.find("\n  - id: ", terra_start + 1)
             terra_block = manifest_text[terra_start:terra_end]
@@ -2784,32 +1686,14 @@ class BootstrapAndCloseTest(unittest.TestCase):
             catalog=catalog,
             workflow_family_id="comprehensive_development",
         )
-        active_subagents, _max_write_subagents = workflow_spawn_budget(
-            catalog,
-            "comprehensive_development",
-        )
-
         self.assertIn("worker", unique_codex_agents_for_roles(roles))
 
         with patch(
             "tools.agent.orchestration.implementation_dispatch.registered_codex_agent_types",
             return_value=set(),
         ):
-            initial_wave = recommended_initial_subagent_wave(
-                roles,
-                active_subagents,
-                catalog,
-            )
-            dynamic_waves = recommended_dynamic_expansion_wave_slots(
-                roles,
-                active_subagents,
-                initial_wave,
-                catalog,
-            )
             quality_agent_types = default_quality_check_agent_types(roles)
 
-        self.assertEqual(initial_wave, ())
-        self.assertEqual(dynamic_waves, ())
         self.assertEqual(quality_agent_types, ())
 
     def test_bootstrap_uses_default_worker_candidate(self) -> None:
@@ -2929,16 +1813,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     encoding="utf-8"
                 )
             )
-            self.assertEqual(
-                manifest["run"]["execution_graph"]["agent_type_selections"],
-                [
-                    {
-                        "role_id": "implementer",
-                        "agent_type": "spark_worker",
-                        "evidence": "approved-bounded-slice",
-                    }
-                ],
-            )
+            self.assertNotIn("execution_graph", manifest["run"])
+            self.assertIn("implementer", {role["id"] for role in manifest["roles"]})
 
     def test_bootstrap_rejects_invalid_agent_type_selection(self) -> None:
         """Invalid role-to-agent parent-packet selections should fail closed."""
@@ -2980,166 +1856,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             self.assertFalse((report_root / "test-invalid-selection").exists())
 
-    def test_bootstrap_activation_policy_cases(self) -> None:
-        """Bootstrap preserves route activation boundaries across equivalent prompt cases."""
-        cases = (
-            (
-                "plain-fix",
-                "Fix the failing tests in the repository.",
-                "test-plain-fix-route-parity",
-                (
-                    "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow",
-                    "ACTIVE_SKILLS=$agent-orchestration",
-                    "DEFERRED_SKILLS=$codex-task-workflow",
-                ),
-                (),
-                False,
-            ),
-            (
-                "plain-refactor",
-                "Refactor the repository routing helpers.",
-                "test-plain-refactor-route-parity",
-                (
-                    "SUGGESTED_SKILLS=",
-                    "ACTIVE_SKILLS=",
-                    "$agent-orchestration",
-                    "$task-routing",
-                    "$refactor-loop",
-                    "$structure-refactor",
-                    "DEFERRED_SKILLS=$codex-task-workflow",
-                ),
-                (),
-                False,
-            ),
-            (
-                "review-only",
-                "Use subagents for review only; do not edit files.",
-                "test-review-only-no-edit",
-                (
-                    "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap",
-                    "ACTIVE_SKILLS=$agent-orchestration",
-                    "DEFERRED_SKILLS=$codex-task-workflow,$subagent-bootstrap",
-                ),
-                (
-                    "PARENT_REPO_EDITS_ALLOWED=no",
-                    "IMPLEMENTATION_HANDOFF_REQUIRED=yes",
-                ),
-                True,
-            ),
-        )
-        for name, task, run_id, expected, forbidden, check_review_policy in cases:
-            with (
-                self.subTest(case=name),
-                tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir,
-            ):
-                workspace_root = Path(tmp_dir) / "workspace"
-                report_root = Path(tmp_dir) / "reports"
-                workspace_root.mkdir(parents=True, exist_ok=True)
-                seed_workspace_config(workspace_root)
-                report_root.mkdir(parents=True, exist_ok=True)
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(BOOTSTRAP_SCRIPT),
-                        "--task",
-                        task,
-                        "--owner",
-                        "codex",
-                        "--run-id",
-                        run_id,
-                        "--workspace-root",
-                        str(workspace_root),
-                        "--report-root",
-                        str(report_root),
-                    ],
-                    cwd=PROJECT_ROOT,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-
-                self.assertEqual(result.returncode, 0, result.stderr)
-                for marker in expected:
-                    self.assertIn(marker, result.stdout)
-                for marker in forbidden:
-                    self.assertNotIn(marker, result.stdout)
-                self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-                if not check_review_policy:
-                    continue
-                manifest = yaml.safe_load(
-                    (report_root / run_id / "team_manifest.yaml").read_text(
-                        encoding="utf-8"
-                    )
-                )
-                contract_policy = manifest["run"][
-                    "contract_complete_implementation_policy"
-                ]
-                for key in (
-                    "implementation_handoff_required",
-                    "parent_repo_edits_allowed",
-                    "parent_orchestration_only",
-                ):
-                    self.assertNotIn(key, contract_policy)
-
-    def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
-        """Academic routing follows the current bounded designer/worker sequence."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "academic draft",
-                    "--task-id",
-                    "T10",
-                    "--owner",
-                    "codex",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--run-id",
-                    "test-academic-wave-order",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("EXECUTION_GRAPH_STATUS=ready", result.stdout)
-            self.assertIn("EXECUTION_GRAPH_WAVE_INDEX=1", result.stdout)
-            ready_calls_line = next(
-                line
-                for line in result.stdout.splitlines()
-                if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-            )
-            ready_calls = json.loads(ready_calls_line.split("=", 1)[1])
-            self.assertEqual(len(ready_calls), 1)
-            self.assertEqual(ready_calls[0]["arguments"]["role"], "manager")
-            self.assertEqual(
-                ready_calls[0]["arguments"]["agent_type"], "requirements_organizer"
-            )
-            manifest_text = (
-                report_root / "test-academic-wave-order" / "team_manifest.yaml"
-            ).read_text(encoding="utf-8")
-            manifest = yaml.safe_load(manifest_text)
-            wave_ids = [
-                wave["wave_id"]
-                for wave in manifest["run"]["execution_graph"]["later_stage_waves"]
-                if any(
-                    "citation_evidence_reviewer" in item
-                    for item in wave["role_instances"]
-                )
-            ]
-            self.assertEqual(wave_ids, [])
-
     def test_large_refactor_bootstrap_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
@@ -3174,55 +1890,17 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            expected_active, expected_write = expected_workflow_spawn_budget(
-                "large_delivery"
-            )
-            self.assertIn(
-                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
-            )
-            self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
-            self.assertIn(
-                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
-                result.stdout,
-            )
-            self.assertIn(
-                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
-            )
-            self.assertIn(
-                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
-            )
+            self.assertIn("$refactor-loop", result.stdout)
+            self.assertNotIn("ACTIVE_SKILLS=", result.stdout)
+            self.assertNotIn("DEFERRED_SKILLS=", result.stdout)
             manifest_text = (
                 report_root / "test-large-refactor" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
-            spawn_budget = manifest["run"]["spawn_budget"]
-            write_scope_policy = manifest["run"]["write_scope_policy"]
-            self.assertEqual(spawn_budget["active_subagents"], expected_active)
-            self.assertEqual(spawn_budget["max_write_subagents"], expected_write)
+            self.assertNotIn("spawn_budget", manifest["run"])
             self.assertEqual(
-                spawn_budget["runtime_max_threads"], codex_runtime_max_threads()
-            )
-            self.assert_current_checkout_write_policy(
-                write_scope_policy, expected_write
-            )
-            self.assertIn("spawn_budget:", manifest_text)
-            self.assertIn(f"active_subagents: {expected_active}", manifest_text)
-            self.assertIn(f"max_write_subagents: {expected_write}", manifest_text)
-            self.assertIn(
-                "max_write_subagents_scope: 'write-capable subagents only'",
-                manifest_text,
-            )
-            self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop",
-                result.stdout,
-            )
-            self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$refactor-loop",
-                result.stdout,
-            )
-            self.assertIn(
-                "DEFERRED_SKILLS=$codex-task-workflow",
-                result.stdout,
+                manifest["run"]["writer_target_policy"]["required_for"],
+                "write_capable_handoffs",
             )
 
     def test_bootstrap_defaults_report_root_to_external_runtime(self) -> None:
@@ -3252,9 +1930,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
-            )
             report_dir = TEST_TEMP_ROOT / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertIn(
@@ -3467,93 +2142,29 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(events[0]["workflow_attribution_kind"], "context")
             self.assertEqual(events[0]["workflow_monitor_report_dir"], str(report_dir))
 
-    def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
-        """Bootstrap projects the task catalog budget into output and manifest."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "mechanical spawn budget",
-                    "--task-id",
-                    "T8",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "test-bootstrap-spawn-budget",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            expected_active, expected_write = expected_workflow_spawn_budget(
-                "platform_and_environment"
-            )
-            self.assertIn("WORKFLOW_FAMILY=platform_and_environment", result.stdout)
-            self.assertIn(
-                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
-            )
-            self.assertIn(
-                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
-            )
-            self.assertIn("EXECUTION_GRAPH_STATUS=ready", result.stdout)
-            self.assertIn("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=", result.stdout)
-            self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
-
-            manifest = yaml.safe_load(
-                (
-                    report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
-                ).read_text(encoding="utf-8")
-            )
-            spawn_budget = manifest["run"]["spawn_budget"]
-            self.assertEqual(spawn_budget["active_subagents"], expected_active)
-            self.assertEqual(spawn_budget["max_write_subagents"], expected_write)
-            self.assertEqual(
-                spawn_budget["runtime_max_threads"], codex_runtime_max_threads()
-            )
-            self.assert_current_checkout_write_policy(
-                manifest["run"]["write_scope_policy"], expected_write
-            )
-
-    def test_task_catalog_workflow_families_define_role_topology(self) -> None:
-        """Every workflow family should define role topology separately from thread budget."""
+    def test_task_catalog_workflow_families_define_role_sets(self) -> None:
+        """Family role choices and same-role writer semantics remain declared."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
         )
 
+        role_topology = catalog["role_topology_defaults"]
+        same_role_instances = role_topology["same_role_parallel_instances"]
+        self.assertIn("implementation", role_topology["role_families"])
+        self.assertIn("review", role_topology["role_families"])
+        self.assertEqual(same_role_instances["status"], "allowed_with_distinct_packets")
+        self.assertEqual(
+            same_role_instances["identity_key"], "role_id+instance_id+agent_type"
+        )
+        self.assertFalse(same_role_instances["runtime_threads_are_cardinality_source"])
         for workflow_family in catalog["workflow_families"]:
             with self.subTest(workflow_family=workflow_family["id"]):
-                role_topology = workflow_family["role_topology"]
-                same_role_instances = role_topology["same_role_parallel_instances"]
-                self.assertIn("role_families", role_topology)
-                self.assertIn("implementation", role_topology["role_families"])
-                self.assertIn("review", role_topology["role_families"])
-                self.assertEqual(
-                    same_role_instances["status"],
-                    "allowed_with_distinct_packets",
-                )
-                self.assertEqual(
-                    same_role_instances["identity_key"],
-                    "role_id+instance_id+agent_type",
-                )
-                self.assertFalse(
-                    same_role_instances["runtime_threads_are_cardinality_source"]
-                )
+                roles = workflow_family["roles"]
+                self.assertIsInstance(roles.get("always_on"), list)
+                self.assertIsInstance(roles.get("specialists"), list)
 
-    def test_bootstrap_warns_when_multi_agent_task_lacks_task_id(self) -> None:
-        """A repo-wide bootstrap without --task-id should not silently lose fan-out evidence."""
+    def test_bootstrap_without_task_id_is_not_blocked_by_task_graph(self) -> None:
+        """Optional task-catalog selection does not gate ordinary run-bundle creation."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
@@ -3581,14 +2192,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("START_DECLARATION=workflow=Unspecified", result.stdout)
             self.assertIn("TASK_ID_ROUTE_STATUS=missing", result.stdout)
-            self.assertIn("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT=yes", result.stdout)
-            self.assertIn(
-                "SUBAGENT_FANOUT_STATUS=not_selected_without_task_id",
-                result.stdout,
-            )
+            self.assertNotIn("TASK_ID_ROUTE_REQUIRED_FOR_MULTI_AGENT", result.stdout)
+            self.assertNotIn("EXECUTION_GRAPH", result.stdout)
             manifest_text = (
                 report_root / "test-bootstrap-missing-task-id" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
@@ -3674,10 +2282,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 )
 
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn(
-                    "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
-                    result.stdout,
-                )
                 manifest_text = (report_root / run_id / "team_manifest.yaml").read_text(
                     encoding="utf-8",
                 )
@@ -3686,8 +2290,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 self.assertIn("workflow_focus:", manifest_text)
                 self.assertIn("reviewer_prompt:", manifest_text)
                 self.assertIn("subagent_lifecycle_policy:", manifest_text)
-                self.assertIn("mid_task_user_input_policy:", manifest_text)
-                self.assertIn("closeout_gate_key: subagents_closed", manifest_text)
                 self.assertIn("prompt_contract:", manifest_text)
                 manifest = yaml.safe_load(manifest_text)
                 subagent_prompt_packet = manifest["run"]["subagent_prompt_packet"]
@@ -3706,8 +2308,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 self.assertNotIn("tool_command_packet_command", subagent_prompt_packet)
                 self.assertNotIn("tool_commands", subagent_prompt_packet)
                 # The configured physical requirements_organizer is read-only;
-                # its prompt returns requirements inline while graph progression
-                # and write authority stay with the parent.
+                # it returns its assigned result inline without parent operations.
                 roles_by_id = {role["id"]: role for role in manifest["roles"]}
                 manager_prompt = roles_by_id["manager"]["prompt_contract"][
                     "assignment_prompt"
@@ -3715,7 +2316,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 self.assertIn("inline handoff", manager_prompt)
                 self.assertIn("non-goals", manager_prompt)
                 self.assertIn("completion conditions", manager_prompt)
-                self.assertIn("parent owns execution-graph progression", manager_prompt)
+                self.assertIn(
+                    "The parent owns choosing the next instruction from linked task guidance",
+                    manager_prompt,
+                )
+                self.assertIn("return its actual result inline", manager_prompt)
                 self.assertIn("when present", manager_prompt)
                 self.assertIn("respect supplied path boundaries", manager_prompt)
                 self.assertIn(
@@ -3884,142 +2489,17 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "--report-root",
                 str(report_root),
             ]
-            checkout_identity = resolve_checkout_identity(workspace_root).as_dict()
-            host_checkout = str(workspace_root)
-            target_environment = {
-                "AGENT_CANON_TARGET_ROOT": str(workspace_root),
-                "AGENT_CANON_TARGET_HOST_ROOT": host_checkout,
-            }
-            writer_targets = json.dumps(
-                {
-                    "implementer": {
-                        "schema": "agent-canon.writer-target.v1",
-                        "checkout_root": host_checkout,
-                        "branch": checkout_identity["branch"],
-                        "remote": checkout_identity["remote"],
-                        "allowed_paths": ["src/closeout-fixture.md"],
-                    }
-                }
-            )
-            spawned: list[str] = []
-
-            def spawn(_agent_type: str, _prompt: str) -> str:
-                agent_id = f"closeout-agent-{len(spawned) + 1}"
-                spawned.append(agent_id)
-                return agent_id
-
-            first_output = io.StringIO()
+            bootstrap_output = io.StringIO()
             with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(first_output),
+                patch.dict(os.environ, environment),
+                redirect_stdout(bootstrap_output),
             ):
-                first_code = bootstrap_agent_run(args, spawn=spawn)
-            self.assertEqual(first_code, 0, first_output.getvalue())
-            self.assertTrue(spawned)
-            first_spawn_line = next(
-                line
-                for line in first_output.getvalue().splitlines()
-                if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
-            )
-            first_spawn_results = json.loads(first_spawn_line.split("=", 1)[1])
-            first_results = {
-                identity: {
-                    **result,
-                    "completion_result": {
-                        "isError": False,
-                        "content": [{"type": "text", "text": f"completed {identity}"}],
-                    },
-                }
-                for identity, result in first_spawn_results.items()
-            }
-            # Keep this closeout fixture on the canonical T12 graph route; child
-            # outcomes here are synthetic test results, not production execution.
-            resumed_args = [*args, "--writer-targets", writer_targets]
-            current_output = io.StringIO()
-            with (
-                patch.dict(os.environ, target_environment),
-                redirect_stdout(current_output),
-            ):
-                current_code = bootstrap_agent_run(
-                    [*resumed_args, "--execution-results", json.dumps(first_results)]
-                )
-            self.assertEqual(current_code, 0, current_output.getvalue())
-            current_text = current_output.getvalue()
+                bootstrap_code = bootstrap_agent_run(args)
+            self.assertEqual(bootstrap_code, 0, bootstrap_output.getvalue())
             manifest_path = report_dir / "team_manifest.yaml"
+            self.assertTrue(manifest_path.is_file())
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            graph = manifest["run"]["execution_graph"]
-            wave_identities = {"WAVE-1": graph["initial_wave_role_instances"]}
-            for wave in graph["later_stage_waves"]:
-                if wave["wave_id"] != "none":
-                    wave_identities[wave["wave_id"]] = [
-                        item.split(":team_manifest.yaml#roles.", 1)[0]
-                        for item in wave["role_instances"]
-                    ]
-            while "EXECUTION_GRAPH_STATUS=ready" in current_text:
-                wave_index = int(
-                    next(
-                        line.split("=", 1)[1]
-                        for line in current_text.splitlines()
-                        if line.startswith("EXECUTION_GRAPH_WAVE_INDEX=")
-                    )
-                )
-                identities = wave_identities[f"WAVE-{wave_index}"]
-                self.assertTrue(identities)
-                ready_calls = json.loads(
-                    next(
-                        line.split("=", 1)[1]
-                        for line in current_text.splitlines()
-                        if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-                    )
-                )
-                writer_call = next(
-                    (
-                        call
-                        for call in ready_calls
-                        if call["arguments"]["role"] == "implementer"
-                    ),
-                    None,
-                )
-                if writer_call is not None:
-                    target = writer_call["arguments"]["writer_target"]
-                    self.assertEqual(target["checkout_root"], host_checkout)
-                    self.assertEqual(target["branch"], checkout_identity["branch"])
-                    self.assertEqual(target["remote"], checkout_identity["remote"])
-                    self.assertEqual(
-                        target["allowed_paths"], ["src/closeout-fixture.md"]
-                    )
-                wave_results = {
-                    identity: {
-                        "spawn_result": {
-                            "isError": False,
-                            "content": [{"type": "text", "text": f"agent-{identity}"}],
-                        },
-                        "completion_result": {
-                            "isError": False,
-                            "content": [
-                                {"type": "text", "text": f"completed {identity}"}
-                            ],
-                        },
-                    }
-                    for identity in identities
-                }
-                next_output = io.StringIO()
-                with (
-                    patch.dict(os.environ, target_environment),
-                    redirect_stdout(next_output),
-                ):
-                    current_code = bootstrap_agent_run(
-                        [
-                            *resumed_args,
-                            "--execution-results",
-                            json.dumps(wave_results),
-                        ]
-                    )
-                self.assertEqual(current_code, 0, next_output.getvalue())
-                current_text = next_output.getvalue()
-            self.assertIn("EXECUTION_GRAPH_STATUS=awaiting_closeout", current_text)
-            graph_schedule = (report_dir / "schedule.md").read_bytes()
-            graph_monitoring = (report_dir / "workflow_monitoring.md").read_bytes()
+            self.assertNotIn("execution_graph", manifest["run"])
             verification_path = report_dir / "verification.txt"
             verification_path.write_text(
                 "\n".join(
@@ -4061,9 +2541,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
@@ -4071,7 +2549,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -4093,63 +2570,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
-            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
             write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            # The fixture owns plan and warning-free sections; bootstrap owns
-            # the wave ledger and actual-wave rows.
-            schedule_path = report_dir / "schedule.md"
-            schedule_text = schedule_path.read_text(encoding="utf-8")
-            graph_schedule_text = graph_schedule.decode("utf-8")
-            schedule_heading = "## Agent Wave Ledger"
-            schedule_prefix, _, _ = schedule_text.partition(schedule_heading)
-            _, graph_ledger_heading, graph_ledger = graph_schedule_text.partition(
-                schedule_heading
-            )
-            schedule_path.write_text(
-                schedule_prefix + graph_ledger_heading + graph_ledger,
-                encoding="utf-8",
-            )
-            monitoring_path = report_dir / "workflow_monitoring.md"
-            warning_heading = "## Tool Warnings"
-            monitoring_lines = graph_monitoring.decode("utf-8").splitlines()
-            ready_monitoring_lines = monitoring_path.read_text(
-                encoding="utf-8"
-            ).splitlines()
-            ready_warning_start = next(
-                index
-                for index, line in enumerate(ready_monitoring_lines)
-                if line.strip() == warning_heading
-            )
-            ready_warning_section = ready_monitoring_lines[ready_warning_start:]
-            warning_start = next(
-                (
-                    index
-                    for index, line in enumerate(monitoring_lines)
-                    if line.strip() == warning_heading
-                ),
-                None,
-            )
-            if warning_start is None:
-                monitoring_lines.extend(["", *ready_warning_section])
-            else:
-                warning_end = next(
-                    (
-                        index
-                        for index in range(warning_start + 1, len(monitoring_lines))
-                        if monitoring_lines[index].strip().startswith("## ")
-                    ),
-                    len(monitoring_lines),
-                )
-                monitoring_lines = (
-                    monitoring_lines[:warning_start]
-                    + ready_warning_section
-                    + monitoring_lines[warning_end:]
-                )
-            monitoring_path.write_text(
-                "\n".join(monitoring_lines).rstrip() + "\n",
-                encoding="utf-8",
-            )
             verification_lines = [
                 line
                 for line in verification_path.read_text(encoding="utf-8").splitlines()
@@ -4461,9 +2883,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
@@ -4471,7 +2891,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -4493,7 +2912,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             write_ready_workflow_monitoring(report_dir)
             write_ready_agent_evaluation(report_dir)
             write_ready_final_review(report_dir)
-            write_ready_completion_coverage(report_dir, run_id)
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
             write_ready_closeout_bundle(
                 report_dir,
@@ -4655,11 +3073,11 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ACTIVE_RUN_MATCH=no", result.stdout)
             self.assertIn("report_active_run_match", result.stdout)
 
-    def test_task_close_rejects_missing_review_convergence_or_diff_check(self) -> None:
-        """task_close should fail when parent-only closeout skips the final diff loop."""
+    def test_task_close_requires_actual_child_close_and_diff_check(self) -> None:
+        """Closeout checks actual child lifecycle and selected diff review, not graph convergence."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-missing-diff-loop"
+            run_id = "test-task-close-missing-child-close-and-diff-check"
             report_dir = report_root / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id)
@@ -4667,12 +3085,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             closeout_text = closeout_path.read_text(encoding="utf-8")
             closeout_path.write_text(
                 closeout_text.replace(
-                    "- review_convergence_complete: yes\n"
-                    "- subagents_closed: yes\n"
-                    "- diff_check_agent_complete: yes",
-                    "- review_convergence_complete: no\n"
-                    "- subagents_closed: no\n"
-                    "- diff_check_agent_complete: no",
+                    "- subagents_closed: yes\n- diff_check_agent_complete: yes",
+                    "- subagents_closed: no\n- diff_check_agent_complete: no",
                 ),
                 encoding="utf-8",
             )
@@ -4693,7 +3107,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("review_convergence_complete", result.stdout)
+            self.assertIn("subagents_closed", result.stdout)
             self.assertIn("diff_check_agent_complete", result.stdout)
 
     def test_task_close_rejects_missing_subagent_lifecycle_evidence(self) -> None:
@@ -4733,41 +3147,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("subagents_closed", result.stdout)
             self.assertIn("close_agent_evidence", result.stdout)
-
-    def test_task_close_rejects_policy_value_as_observed_subagent_reuse(self) -> None:
-        """task_close should require observed prior-task subagent reuse to be none."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-policy-value-is-not-observation"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            closeout_path = report_dir / "closeout_gate.md"
-            closeout_path.write_text(
-                closeout_path.read_text(encoding="utf-8").replace(
-                    "- previous_task_subagent_reuse: none",
-                    "- previous_task_subagent_reuse: forbidden",
-                ),
-                encoding="utf-8",
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("previous_task_subagent_reuse", result.stdout)
 
     def test_task_close_rejects_missing_diff_check_artifact(self) -> None:
         """task_close should fail when diff-check evidence points to a missing artifact."""
@@ -4967,8 +3346,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
             self.assertIn("diff_check_not_applicable_route", result.stdout)
 
-    def test_task_close_rejects_incomplete_review_convergence_evidence(self) -> None:
-        """task_close should fail when review convergence structured evidence is incomplete."""
+    def test_task_close_rejects_incomplete_selected_validation_evidence(self) -> None:
+        """task_close requires the selected validation evidence to be complete."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-incomplete-mechanical-loop"
@@ -5981,453 +4360,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
 
-    def test_task_close_accepts_mid_task_user_input_wave_checkpoint(self) -> None:
-        """A classified mid-task user input checkpoint should preserve closeout readiness."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-mid-task-user-input"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(report_dir)
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=\n", result.stdout)
-
-    def test_task_close_rejects_mid_task_user_input_without_packet(self) -> None:
-        """Mid-task user input rows should include a checkpoint packet path."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-mid-task-user-input-missing-packet"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(report_dir, updated_packet="none")
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_field_missing:"
-                "WAVE-2:updated_packet",
-                result.stdout,
-            )
-            self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
-
-    def test_task_close_rejects_scope_change_without_fresh_wave_evidence(self) -> None:
-        """Scope-changing additions should not close without fresh wave evidence."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-scope-change-missing-fresh-wave"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="scope_or_contract_change",
-                allowed_paths="tools/agent_tools",
-                do_not_read="reports/agents/other",
-                write_scope="tools/agent_tools",
-                validation_route="pytest",
-                review_gate="python_review",
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_field_missing:"
-                "WAVE-2:fresh_wave_evidence",
-                result.stdout,
-            )
-
-    def test_task_close_accepts_scope_change_with_fresh_wave_evidence(self) -> None:
-        """Scope-changing additions may close after fresh wave evidence exists."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-scope-change-fresh-wave"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            fresh_wave_evidence = report_dir / "fresh_wave_evidence.md"
-            fresh_wave_evidence.write_text(
-                "fresh follow-up wave completed\n", encoding="utf-8"
-            )
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="scope_or_contract_change",
-                allowed_paths="tools/agent_tools",
-                do_not_read="reports/agents/other",
-                write_scope="tools/agent_tools",
-                validation_route="pytest",
-                review_gate="python_review",
-                fresh_wave_evidence=str(fresh_wave_evidence),
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-
-    def test_task_close_rejects_scope_change_with_unrelated_wave_evidence(self) -> None:
-        """Fresh-wave evidence should be scoped to the current run bundle."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            unrelated_evidence = Path(tmp_dir) / "unrelated-wave.md"
-            unrelated_evidence.write_text(
-                "not a current-run wave artifact\n", encoding="utf-8"
-            )
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-scope-change-unrelated-fresh-wave"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="scope_or_contract_change",
-                allowed_paths="tools/agent_tools",
-                do_not_read="reports/agents/other",
-                write_scope="tools/agent_tools",
-                validation_route="pytest",
-                review_gate="python_review",
-                fresh_wave_evidence=str(unrelated_evidence),
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_evidence_outside_scope:"
-                f"WAVE-2:fresh_wave_evidence:{unrelated_evidence}",
-                result.stdout,
-            )
-
-    def test_task_close_rejects_new_task_without_fresh_run_bundle(self) -> None:
-        """New tasks should not be absorbed into the current run without a fresh run."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-new-task-missing-fresh-run"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="new_task",
-                allowed_paths="reports/agents/new-run",
-                do_not_read="reports/agents/run",
-                write_scope="none",
-                validation_route="bootstrap",
-                review_gate="manager_review",
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_field_missing:"
-                "WAVE-2:fresh_run_bundle",
-                result.stdout,
-            )
-
-    def test_task_close_rejects_new_task_with_missing_fresh_run_path(self) -> None:
-        """Fresh-run evidence should point at an existing run bundle directory."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-new-task-missing-fresh-run-path"
-            report_dir = report_root / run_id
-            missing_fresh_run = report_root / "missing-new-task-run"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="new_task",
-                allowed_paths="reports/agents/missing-new-task-run",
-                do_not_read="reports/agents/run",
-                write_scope="none",
-                validation_route="bootstrap",
-                review_gate="manager_review",
-                fresh_run_bundle=str(missing_fresh_run),
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_evidence_missing:"
-                f"WAVE-2:fresh_run_bundle:{missing_fresh_run}",
-                result.stdout,
-            )
-
-    def test_task_close_rejects_new_task_with_unrelated_fresh_run_dir(self) -> None:
-        """Fresh-run evidence should be a sibling reports/agents run directory."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            unrelated_run_dir = Path(tmp_dir) / "unrelated-run"
-            unrelated_run_dir.mkdir(parents=True, exist_ok=True)
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-new-task-unrelated-fresh-run"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="new_task",
-                allowed_paths="reports/agents/unrelated-run",
-                do_not_read="reports/agents/run",
-                write_scope="none",
-                validation_route="bootstrap",
-                review_gate="manager_review",
-                fresh_run_bundle=str(unrelated_run_dir),
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:mid_task_user_input_evidence_outside_scope:"
-                f"WAVE-2:fresh_run_bundle:{unrelated_run_dir}",
-                result.stdout,
-            )
-
-    def test_task_close_accepts_new_task_with_fresh_run_bundle(self) -> None:
-        """Current run closeout may pass after the new task has a fresh run bundle."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-new-task-fresh-run"
-            report_dir = report_root / run_id
-            fresh_run_bundle = report_root / "fresh-new-task-run"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            fresh_run_bundle.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            append_mid_task_wave_checkpoint(
-                report_dir,
-                input_classification="new_task",
-                allowed_paths="reports/agents/fresh-new-task-run",
-                do_not_read="reports/agents/run",
-                write_scope="none",
-                validation_route="bootstrap",
-                review_gate="manager_review",
-                fresh_run_bundle=str(fresh_run_bundle),
-            )
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-
-    def test_task_close_rejects_chunk_only_completion(self) -> None:
-        """task_close should fail when only a chunk is complete."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-chunk-only"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "verification.txt").write_text(
-                "\n".join(
-                    [
-                        f"run_id={run_id}",
-                        "task=chunk only closeout smoke",
-                        "owner=codex",
-                        "created_at_utc=2026-04-08T00:00:00Z",
-                        "status=pass",
-                        "user_completion_report=unlocked",
-                        "closeout_gate_status=resolved",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "user_request_contract.md").write_text(
-                "\n".join(
-                    [
-                        "# User Request Contract",
-                        "",
-                        "- all_clauses_resolved: yes",
-                        "- forbidden_drift_detected: no",
-                        "- deferred_clause_ids:",
-                        "- unresolved_clause_ids:",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "closeout_gate.md").write_text(
-                "\n".join(
-                    [
-                        "# Closeout Gate",
-                        "",
-                        "## Gate Status",
-                        "",
-                        "- verifier_status: pass",
-                        "- auditor_status: resolved",
-                        "- required_reviews_complete: yes",
-                        "- validation_complete: yes",
-                        "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: no",
-                        "- overall_delivery_complete: no",
-                        "- unfinished_tasks_absent: no",
-                        "- dependency_headers_complete: yes",
-                        "- repo_wide_dependency_tools_complete: yes",
-                        "- repo_wide_static_analysis_complete: yes",
-                        "- agent_canon_latest_complete: yes",
-                        "- review_findings_integrated: yes",
-                        "- focused_recheck_complete: yes",
-                        "- tool_warnings_resolved: yes",
-                        "- review_convergence_complete: no",
-                        "- diff_check_agent_complete: no",
-                        "- canonical_tree_head_complete: yes",
-                        "- agent_evaluation_complete: yes",
-                        "- runtime_log_archive_synced: yes",
-                        "- commit_created: yes",
-                        "- push_completed: yes",
-                        "- user_completion_report: unlocked",
-                        *ready_closeout_evidence_lines(),
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            write_ready_schedule(report_dir)
-            _log_ready_work(report_dir)
-            write_ready_workflow_monitoring(report_dir)
-            write_ready_agent_evaluation(report_dir)
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("all_planned_chunks_complete", result.stdout)
-            self.assertIn("overall_delivery_complete", result.stdout)
-            self.assertIn("unfinished_tasks_absent", result.stdout)
-
-    def test_task_close_rejects_partial_spec_or_ignored_review_findings(self) -> None:
-        """task_close should fail when spec coverage or review integration is incomplete."""
+    def test_task_close_rejects_unintegrated_review_findings(self) -> None:
+        """Actual review findings still need disposition and integration."""
         with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-partial-spec"
@@ -6474,16 +4408,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: no",
                         "- focused_recheck_complete: no",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -6518,7 +4449,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("completion_coverage_consumer", result.stdout)
             self.assertIn("review_findings_integrated", result.stdout)
 
     def test_task_close_rejects_missing_focused_recheck_completion(self) -> None:
@@ -6588,16 +4518,13 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
                         "- agent_canon_latest_complete: yes",
                         "- review_findings_integrated: yes",
                         "- focused_recheck_complete: no",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",
@@ -6682,9 +4609,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
@@ -6692,7 +4617,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: no",
@@ -6796,9 +4720,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- required_reviews_complete: yes",
                         "- validation_complete: yes",
                         "- request_contract_complete: yes",
-                        "- all_planned_chunks_complete: yes",
                         "- overall_delivery_complete: yes",
-                        "- unfinished_tasks_absent: yes",
                         "- dependency_headers_complete: yes",
                         "- repo_wide_dependency_tools_complete: yes",
                         "- repo_wide_static_analysis_complete: yes",
@@ -6806,7 +4728,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                         "- review_findings_integrated: yes",
                         "- focused_recheck_complete: yes",
                         "- tool_warnings_resolved: yes",
-                        "- review_convergence_complete: yes",
                         "- subagents_closed: yes",
                         "- diff_check_agent_complete: yes",
                         "- canonical_tree_head_complete: yes",

@@ -25,11 +25,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.repository.github import issue_worker_dispatch  # noqa: E402
 from tools.runtime.lifecycle.bootstrap_agent_run import main as bootstrap_main  # noqa: E402
 from tools.runtime.authority.checkout_identity import CheckoutIdentity  # noqa: E402
-from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    workflow_spawn_budget,
-)
 from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
@@ -148,19 +143,10 @@ def test_same_repository_candidate_materializes_publisher_tool_call(
         workflow_family_id="issue_worker_publication",
         issue_worker_candidate=_candidate(),
     )
-    active_subagents, _ = workflow_spawn_budget(catalog, "issue_worker_publication")
     assert tuple(role.id for role in roles) == ("publisher",)
-    assert recommended_initial_subagent_wave(
-        roles,
-        active_subagents,
-        catalog,
-        agent_root=PROJECT_ROOT / ".codex" / "agents",
-        workflow_family_id="issue_worker_publication",
-        issue_worker_candidate=_candidate(),
-    ) == ("worker",)
 
 
-def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
+def test_t15_without_explicit_candidate_selects_no_publisher() -> None:
     config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, PROJECT_ROOT)
     roles = select_roles(
@@ -170,23 +156,11 @@ def test_t15_without_explicit_candidate_has_no_initial_publisher() -> None:
         catalog=catalog,
         workflow_family_id="issue_worker_publication",
     )
-    active_subagents, _ = workflow_spawn_budget(catalog, "issue_worker_publication")
-
     assert roles == ()
-    assert (
-        recommended_initial_subagent_wave(
-            roles,
-            active_subagents,
-            catalog,
-            agent_root=PROJECT_ROOT / ".codex" / "agents",
-            workflow_family_id="issue_worker_publication",
-        )
-        == ()
-    )
 
 
-def test_adversarial_cross_owner_selection_materializes_terra_wave() -> None:
-    """An explicit Terra enablement reaches the conditional cross-owner stage."""
+def test_adversarial_cross_owner_selection_includes_terra_role() -> None:
+    """An explicit Terra enablement adds that selected role."""
     config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, PROJECT_ROOT)
     roles = select_roles(
@@ -196,27 +170,11 @@ def test_adversarial_cross_owner_selection_materializes_terra_wave() -> None:
         catalog=catalog,
         workflow_family_id="comprehensive_development",
     )
-    active_subagents, _ = workflow_spawn_budget(catalog, "comprehensive_development")
-    initial_wave = recommended_initial_subagent_wave(
-        roles,
-        active_subagents,
-        catalog,
-        agent_root=PROJECT_ROOT / ".codex" / "agents",
-    )
-    waves = recommended_dynamic_expansion_wave_slots(
-        roles,
-        active_subagents,
-        initial_wave,
-        catalog,
-        agent_root=PROJECT_ROOT / ".codex" / "agents",
-    )
-
     assert "terra" in {role.id for role in roles}
-    assert any(slot.role_id == "terra" for wave in waves for slot in wave)
 
 
-def test_bounded_routes_do_not_materialize_terra_without_explicit_enablement() -> None:
-    """Ordinary T1/T2/T3-shaped routes retain no cross-owner Terra wave."""
+def test_bounded_routes_keep_terra_opt_in() -> None:
+    """Ordinary bounded role selection keeps Terra opt-in."""
     config = load_team_config(PROJECT_ROOT / "agents" / "agents_config.json")
     catalog = load_task_catalog(config, PROJECT_ROOT)
     for family in ("owner_bounded_change", "scoped_change"):
@@ -227,22 +185,7 @@ def test_bounded_routes_do_not_materialize_terra_without_explicit_enablement() -
             catalog=catalog,
             workflow_family_id=family,
         )
-        active_subagents, _ = workflow_spawn_budget(catalog, family)
-        initial_wave = recommended_initial_subagent_wave(
-            roles,
-            active_subagents,
-            catalog,
-            agent_root=PROJECT_ROOT / ".codex" / "agents",
-        )
-        waves = recommended_dynamic_expansion_wave_slots(
-            roles,
-            active_subagents,
-            initial_wave,
-            catalog,
-            agent_root=PROJECT_ROOT / ".codex" / "agents",
-        )
         assert "terra" not in {role.id for role in roles}
-        assert all(slot.role_id != "terra" for wave in waves for slot in wave)
 
     full_roles = select_roles(
         config,
@@ -330,24 +273,12 @@ def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> Non
         workflow_family_id="comprehensive_development",
         issue_worker_candidate=_candidate(),
     )
-    active_subagents, _ = workflow_spawn_budget(catalog, "comprehensive_development")
-
     assert all(role.id != "publisher" for role in roles)
-    assert recommended_initial_subagent_wave(
-        roles,
-        active_subagents,
-        catalog,
-        agent_root=PROJECT_ROOT / ".codex" / "agents",
-        workflow_family_id="comprehensive_development",
-        issue_worker_candidate=_candidate(),
-    ) == ("requirements_organizer",)
 
 
-def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
+def test_bootstrap_t15_dispatches_candidate_once_and_persists_role_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Exercise this self-contained source checkout instead of the image's
-    # mounted install-root override.
     monkeypatch.delenv("AGENT_CANON_SOURCE_ROOT", raising=False)
     monkeypatch.delenv("AGENT_CANON_ROOT", raising=False)
     calls: list[tuple[str, str]] = []
@@ -387,138 +318,17 @@ def test_bootstrap_t15_dispatches_candidate_once_and_persists_tool_call(
             )
 
         assert return_code == 0
-        manifest_path = report_root / run_id / "team_manifest.yaml"
-        manifest_payload = (
-            yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-            if manifest_path.is_file()
-            else None
-        )
-        run_payload = (
-            manifest_payload.get("run") if isinstance(manifest_payload, dict) else None
-        )
-        dispatch_payload = (
-            run_payload.get("issue_worker_dispatch")
-            if isinstance(run_payload, dict)
-            else None
-        )
-        dispatch_status = (
-            dispatch_payload.get("status")
-            if isinstance(dispatch_payload, dict)
-            else None
-        )
-        handoff_payload = (
-            dispatch_payload.get("handoff")
-            if isinstance(dispatch_payload, dict)
-            else None
-        )
-        handoff_reason = (
-            handoff_payload.get("reason") if isinstance(handoff_payload, dict) else None
-        )
-        assert len(calls) == 1, (
-            "expected one publisher spawn; "
-            f"bootstrap_output={output.getvalue()!r}; "
-            f"dispatch_status={dispatch_status!r}; "
-            f"handoff_reason={handoff_reason!r}"
-        )
+        assert len(calls) == 1
         assert calls[0][0] == "publisher"
-        assert "ISSUE_WORKER_TOOL_CALL=" not in output.getvalue()
-        assert "EXECUTION_GRAPH_STATUS=waiting" in output.getvalue()
-        spawn_line = next(
-            line
-            for line in output.getvalue().splitlines()
-            if line.startswith("EXECUTION_GRAPH_SPAWN_RESULTS_JSON=")
-        )
-        spawn_results = json.loads(spawn_line.split("=", 1)[1])
-        role_identity = next(iter(spawn_results))
-        assert spawn_results[role_identity]["spawn_result"]["content"][0]["text"] == (
-            "publisher-bootstrap-1"
-        )
+        assert "ISSUE_WORKER_DISPATCH_STATUS=spawned" in output.getvalue()
+        assert "EXECUTION_GRAPH" not in output.getvalue()
+        manifest_path = report_root / run_id / "team_manifest.yaml"
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         run = manifest["run"]
-        assert run["execution_graph"]["initial_wave_agent_types"] == ["worker"]
+        assert "execution_graph" not in run
         dispatch = run["issue_worker_dispatch"]
         assert dispatch["status"] == "spawned"
         assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
-        completion = {
-            role_identity: {
-                **spawn_results[role_identity],
-                "completion_result": {
-                    "isError": False,
-                    "content": [{"type": "text", "text": "publisher completed"}],
-                },
-            }
-        }
-        next_output = io.StringIO()
-        with redirect_stdout(next_output):
-            next_code = bootstrap_main(
-                [
-                    "--task",
-                    "publish explicit feedback",
-                    "--task-id",
-                    "T15",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(PROJECT_ROOT),
-                    "--report-root",
-                    str(report_root),
-                    "--runtime-root",
-                    str(runtime_root),
-                    "--issue-worker-candidate",
-                    json.dumps(candidate),
-                    "--execution-results",
-                    json.dumps(completion),
-                ]
-            )
-        assert next_code == 0
-        assert "EXECUTION_GRAPH_STATUS=ready" in next_output.getvalue()
-        issue_call_line = next(
-            line
-            for line in next_output.getvalue().splitlines()
-            if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
-        )
-        issue_calls = json.loads(issue_call_line.split("=", 1)[1])
-        assert issue_calls[0]["tool_id"] == "issue-worker"
-        assert issue_calls[0]["arguments"]["publisher_agent_id"] == (
-            "publisher-bootstrap-1"
-        )
-        completed = {
-            role_identity: {
-                **completion[role_identity],
-                "publication_result": {
-                    "isError": False,
-                    "content": [{"type": "text", "text": "issue sync result"}],
-                },
-            }
-        }
-        final_output = io.StringIO()
-        with redirect_stdout(final_output):
-            final_code = bootstrap_main(
-                [
-                    "--task",
-                    "publish explicit feedback",
-                    "--task-id",
-                    "T15",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(PROJECT_ROOT),
-                    "--report-root",
-                    str(report_root),
-                    "--runtime-root",
-                    str(runtime_root),
-                    "--issue-worker-candidate",
-                    json.dumps(candidate),
-                    "--execution-results",
-                    json.dumps(completed),
-                ]
-            )
-        assert final_code == 0
-        assert "EXECUTION_GRAPH_STATUS=awaiting_closeout" in final_output.getvalue()
 
 
 def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
@@ -557,12 +367,12 @@ def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
 
         assert return_code == 0
         assert calls == []
-        assert "EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=[]" in output.getvalue()
+        assert "EXECUTION_GRAPH" not in output.getvalue()
         manifest = yaml.safe_load(
             (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
         )
         run = manifest["run"]
-        assert run["execution_graph"]["initial_wave_role_ids"] == []
+        assert "execution_graph" not in run
         assert "issue_worker_dispatch" not in run
 
 
@@ -657,15 +467,13 @@ def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() ->
 
         assert result.returncode == 0, result.stderr
         assert "ISSUE_WORKER_DISPATCH_STATUS=pending" in result.stdout
-        assert "EXECUTION_GRAPH_STATUS=ready" in result.stdout
-        ready_line = next(
+        assert "EXECUTION_GRAPH" not in result.stdout
+        spawn_line = next(
             line
             for line in result.stdout.splitlines()
-            if line.startswith("EXECUTION_GRAPH_READY_TOOL_CALLS_JSON=")
+            if line.startswith("ISSUE_WORKER_SPAWN_TOOL_CALL_JSON=")
         )
-        ready_calls = json.loads(ready_line.split("=", 1)[1])
-        assert len(ready_calls) == 1
-        spawn_tool_call = ready_calls[0]
+        spawn_tool_call = json.loads(spawn_line.split("=", 1)[1])
         assert spawn_tool_call["tool_id"] == "spawn_agent"
         assert spawn_tool_call["arguments"]["role"] == "publisher"
         assert spawn_tool_call["arguments"]["agent_type"] == "worker"

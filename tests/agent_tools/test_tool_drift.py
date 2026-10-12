@@ -525,38 +525,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_subagent_wave_routing_requires_owner_link(self) -> None:
-        """Subagent routing keeps its direct canonical-owner dependency."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_subagent_wave_routing_contract(root)
-            checker = (
-                root
-                / "tools"
-                / "validation"
-                / "semantic"
-                / "tools"
-                / "tool_drift.py"
-            )
-            checker.write_text(
-                checker.read_text(encoding="utf-8").replace(
-                    "# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagents\n",
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "subagent_wave_routing")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-manifest-link:subagent_wave_routing:"
-                "tools/validation/semantic/tools/tool_drift.py:"
-                "agents/canonical/CODEX_SUBAGENTS.md",
-                result.stdout,
-            )
-
-
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""
         path = root / relative
@@ -621,53 +589,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tests/agent_tools/test_check_convention_compliance.py",
         ]:
             self.write_plain_manifest(root, relative)
-
-    def write_subagent_wave_routing_contract(self, root: Path) -> None:
-        """Write fixtures for the subagent wave routing contract."""
-        self.write_file(root, "README.md", "# Fixture\n")
-        self.write_file(
-            root,
-            "tools/validation/semantic/tools/tool_drift.py",
-            "\n".join(
-                [
-                    "# @dependency-start",
-                    "# responsibility Detects fixture tool drift.",
-                    "# upstream design ../../../../agents/canonical/CODEX_SUBAGENTS.md subagents",
-                    "# upstream design ../../../../agents/TASK_WORKFLOWS.md workflows",
-                    "# upstream design ../../../../agents/skills/agent-orchestration.md orchestration",
-                    "# upstream implementation ../convention/check_convention_compliance.py convention gate",
-                    "# downstream implementation ../../../../tests/agent_tools/test_tool_drift.py tests",
-                    "# @dependency-end",
-                    "",
-                ]
-            ),
-        )
-        for relative in [
-            "agents/canonical/CODEX_SUBAGENTS.md",
-            "agents/TASK_WORKFLOWS.md",
-            "agents/skills/agent-orchestration.md",
-            "tools/validation/semantic/convention/check_convention_compliance.py",
-        ]:
-            self.write_file(
-                root,
-                relative,
-                "\n".join(
-                    [
-                        "<!--",
-                        "@dependency-start",
-                        "responsibility Provides subagent wave routing fixture.",
-                        "upstream design README.md fixture anchor",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                    ]
-                ),
-            )
-        self.write_file(
-            root,
-            "tests/agent_tools/test_tool_drift.py",
-            "# fixture test\n",
-        )
 
     def write_tool_rejection_preflight_contract(self, root: Path) -> None:
         """Write fixtures for the tool rejection preflight contract."""

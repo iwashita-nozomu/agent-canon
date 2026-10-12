@@ -21,13 +21,10 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
-from typing import cast
 from unittest.mock import patch
 
 import yaml
 
-from tools.agent.orchestration import capacity_handshake
 from tools.agent.orchestration.agent_team import (
     RunBundleSpec,
     create_run_bundle,
@@ -43,7 +40,6 @@ from tools.agent.orchestration.packets import (
     resolve_role_document_packet,
 )
 from tools.agent.orchestration.team_config import (
-    current_stage_skills,
     load_task_catalog,
     load_team_config,
     resolve_role,
@@ -52,7 +48,7 @@ from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactBoundary
 from tools.runtime.authority.checkout_identity import CheckoutIdentity
 from tools.runtime.authority.task_authority import hash_baseline_bytes
 from tools.runtime.authority.writer_target import WriterTarget
-from tools.runtime.lifecycle import task_close, update_lifecycle_contract
+from tools.runtime.lifecycle import update_lifecycle_contract
 from tools.runtime.manifest.manifest_rendering import (
     COMMON_PROMPT_MUST_INCLUDE,
     language_review_candidates,
@@ -426,9 +422,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             experiment_dir = consumer_root / "experiments" / "status_experiment"
             experiment_dir.mkdir(parents=True)
             self.assertFalse((consumer_root / "tests" / "cpp").exists())
-            (experiment_dir / "main.cpp").write_text(
-                consumer_main, encoding="utf-8"
-            )
+            (experiment_dir / "main.cpp").write_text(consumer_main, encoding="utf-8")
             (experiment_dir / "CMakeLists.txt").write_text(
                 "cmake_minimum_required(VERSION 3.16)\n"
                 "project(status_experiment LANGUAGES CXX)\n"
@@ -457,9 +451,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 0,
                 configure_experiment.stdout + configure_experiment.stderr,
             )
-            self.assertFalse(
-                (experiment_build_dir / "CTestTestfile.cmake").exists()
-            )
+            self.assertFalse((experiment_build_dir / "CTestTestfile.cmake").exists())
             build_experiment = subprocess.run(
                 ["cmake", "--build", str(experiment_build_dir), "--parallel", "1"],
                 check=False,
@@ -612,18 +604,6 @@ class AgentTeamTemplateTest(unittest.TestCase):
 
         self.assertNotIn("$task-routing", skills)
 
-    def test_stage_handoff_mode_comes_from_typed_route_fact(self) -> None:
-        """Only a typed write-capable route enables the bootstrap stage."""
-        selected = ("$agent-orchestration", "$subagent-bootstrap")
-        self.assertNotIn(
-            "$subagent-bootstrap",
-            current_stage_skills(selected, "implement", typed_route_required=False),
-        )
-        self.assertIn(
-            "$subagent-bootstrap",
-            current_stage_skills(selected, "implement", typed_route_required=True),
-        )
-
     def test_optional_review_templates_are_materialized_only_when_selected(
         self,
     ) -> None:
@@ -774,14 +754,11 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "public_shape_fixed": True,
             "dependency_change_required": False,
             "context_continuity_decision_ref": "continuity://P3",
-            "capacity_snapshot_ref": "capacity://current",
-            "capacity_reservation_ref": "reservation://on-success",
             "owner_gate_id": "implementation_route_gate",
             "parent_lineage_id": "parent/P3",
             "resume_worker_agent_id": None,
             "dependency_import_direction": [
                 "implementation_route->model_profile_registry",
-                "implementation_route->capacity_handshake",
                 "implementation_route->update_lifecycle_contract",
                 "implementation_route-X->route",
                 "implementation_route-X->capability_route",
@@ -801,29 +778,11 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "decision_sufficiency_ref": decision_ref,
             "decision_sufficiency_sha256": decision_sha,
             "context_continuity_decision_ref": "continuity://P3",
-            "capacity_snapshot_ref": "capacity://current",
             "parent_lineage_id": "parent/P3",
             "resume_worker_agent_id": None,
             "structural_design_gap_ref": None,
             "fixed_implementation_packet": packet,
             "fixed_decision_sufficiency": decision,
-            "capacity_snapshot": {
-                "shape_id": "capacity_snapshot_projection_v1",
-                "requested_total_capacity": 26,
-                "effective_total_capacity": 26,
-                "available_total_capacity": 2,
-                "requested_write_capacity": 1,
-                "effective_write_capacity": 1,
-                "available_write_capacity": 1,
-                "input_provenance": [
-                    "capacity://configured",
-                    "capacity://platform",
-                    "capacity://current",
-                    "capacity://dag",
-                    "capacity://write",
-                    "capacity://nested",
-                ],
-            },
             "continuity_decision": {
                 "decision_sufficiency": decision,
                 "continue_existing": False,
@@ -928,59 +887,6 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
         self.assertEqual(blocked.status, "blocked")
         self.assertEqual(blocked.owner_gate_id, "WRITE_SUBAGENT_AUTHORIZATION=required")
-
-    def test_closeout_provider_orders_child_before_parent(self) -> None:
-        """The public closeout validator enforces provider child-before-parent order."""
-        ledger = capacity_handshake.CapacityLedger(
-            topology=capacity_handshake.DescendantTopologyReadback("run", ())
-        )
-        snapshot = cast(
-            capacity_handshake.CapacitySnapshot,
-            SimpleNamespace(remaining_total_slots=2, remaining_write_slots=0),
-        )
-
-        def successful_terminal(work_id: str, parent_work_id: str) -> None:
-            reservation = capacity_handshake.record_successful_spawn(
-                snapshot,
-                ledger,
-                capacity_handshake.ReadyWorkItem(
-                    work_id=work_id,
-                    packet_sha256=f"packet://{work_id}",
-                    profile_id="spark_implementation_low",
-                ),
-                spawn_succeeded=True,
-                parent_work_id=parent_work_id,
-            )
-            self.assertEqual(reservation.status, "granted")
-            record = ledger.open_records[work_id]
-            record.status = capacity_handshake.LifecycleStatus.READBACK_VERIFIED
-            record.durable_result_evidence_ref = f"result://{work_id}"
-            record.durable_handback = True
-            record.descendants_closed = True
-            record.close_readback = True
-
-        successful_terminal("parent", "run")
-        successful_terminal("child", "parent")
-        calls = [
-            {
-                "agent_id": "child",
-                "tool_call_token": {
-                    "tool_id": "close_agent",
-                    "arguments": {"terminal_agent_id": "child"},
-                },
-            },
-            {
-                "agent_id": "parent",
-                "tool_call_token": {
-                    "tool_id": "close_agent",
-                    "arguments": {"terminal_agent_id": "parent"},
-                },
-            },
-        ]
-        self.assertEqual(
-            task_close.validate_capacity_lifecycle_closeout(ledger, calls),
-            (True, ()),
-        )
 
 
 if __name__ == "__main__":

@@ -26,9 +26,12 @@ and read-only inspection keep their existing scope.
 ## Execution route
 
 Reuse the route from the [task catalog](../task_catalog.yaml). A bounded task
-proceeds with its existing evidence and one execution owner. Coordination uses
-its selected run bundle and closeout owner. Do not create a bundle or child
-handoff unless the route requires one.
+proceeds with its existing evidence and one execution owner. Coordination
+follows selected owner guidance; a run bundle or child is used only when the
+route needs durable evidence or delegation.
+Execute through the selected owner's configured route. On failure, inspect the
+immediately preceding change and target implementation, then fix the observed
+cause there; see the root [local repair rule](../../ROOT_AGENTS.md#always-on-boundary).
 
 ## Owner-First Readback
 
