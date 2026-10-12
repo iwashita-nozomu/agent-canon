@@ -3,7 +3,6 @@
 # responsibility Provides structural refiners for decoded runtime values.
 # downstream implementation ./container/devcontainer_dependencies.py narrows dependency manifest and receipt values
 # downstream implementation ../agent/orchestration/model_profile_registry.py narrows registry values
-# downstream implementation ../agent/orchestration/capacity_handshake.py narrows lifecycle projection values
 # downstream implementation ../agent/orchestration/team_config.py narrows config values
 # downstream implementation ../agent/orchestration/implementation_dispatch.py narrows packet values
 # downstream implementation ../agent/orchestration/packets.py narrows packet values

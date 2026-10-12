@@ -270,7 +270,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
             "## Runtime Owner Map",
             (
                 (
-                    "workflow family, spawn budget, role topology",
+                    "workflow family and role candidates",
                     "agents/task_catalog.yaml",
                     "check_agent_runtime_alignment.py",
                 ),
@@ -280,7 +280,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "bootstrap_agent_run.py",
                 ),
                 (
-                    "subagent lifecycle, same-role instances, wave ledger",
+                    "actual subagent lifecycle and same-role identity",
                     "agents/canonical/CODEX_SUBAGENTS.md",
                     "workflow_monitor.py",
                 ),
@@ -347,7 +347,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "bash bootstrap.sh --help",
                 ),
                 (
-                    "workflow family, spawn budget, role topology",
+                    "workflow family and role candidates",
                     "agents/task_catalog.yaml",
                     "check_agent_runtime_alignment.py",
                 ),
@@ -369,7 +369,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
             "## Workflow Contract Owners",
             (
                 (
-                    "workflow family and spawn budget",
+                    "workflow family and roles",
                     "agents/task_catalog.yaml",
                 ),
                 (
@@ -382,7 +382,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "agents/agents_config.json",
                 ),
                 (
-                    "run bundle, declared workflow / skills / review, and dynamic wave ledger",
+                    "optional run bundle and actual route evidence",
                     "bootstrap_agent_run.py",
                     "workflow_monitor.py",
                 ),
@@ -392,7 +392,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "python3 tools/agent/orchestration/route.py --prompt",
                 ),
                 (
-                    "implementation stage gate",
+                    "implementation guidance and closeout",
                     "agents/skills/codex-task-workflow.md",
                 ),
                 (

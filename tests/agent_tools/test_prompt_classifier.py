@@ -4,6 +4,7 @@
 # upstream implementation ../../tools/agent/orchestration/prompt_classifier.py owns prompt classification.
 # @dependency-end
 """Focused tests for injected prompt classification."""
+
 from __future__ import annotations
 
 import sys
@@ -11,22 +12,40 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "agent_tools"))
-from tools.agent.orchestration.prompt_classifier import PromptClassifierInputs, prompt_intake_signals  # noqa: E402
+from tools.agent.orchestration.prompt_classifier import (
+    PromptClassifierInputs,
+    prompt_intake_signals,
+)  # noqa: E402
 
 
 class PromptClassifierTest(unittest.TestCase):
     def test_declared_skill_is_selected_without_io(self) -> None:
-        signals = prompt_intake_signals(PromptClassifierInputs("use $task-routing", Path("."), {}, {}))
+        signals = prompt_intake_signals(
+            PromptClassifierInputs("use $task-routing", Path("."), {}, {})
+        )
         self.assertEqual(signals.skills, ("task-routing",))
 
-    def test_repository_topic_checkout_modes_keep_agentcanon_route_metadata(self) -> None:
+    def test_repository_topic_checkout_modes_keep_agentcanon_route_metadata(
+        self,
+    ) -> None:
         for prompt in (
             "Use the parent/same-repository branch with linked-worktree for the AgentCanon update.",
             "Use the dependency repository's independent-clone for the AgentCanon update.",
         ):
-            signals = prompt_intake_signals(PromptClassifierInputs(prompt, Path("."), {}, {}))
+            signals = prompt_intake_signals(
+                PromptClassifierInputs(prompt, Path("."), {}, {})
+            )
             self.assertIn("agent-canon-update", signals.candidate_workflows)
             self.assertIn("agent-canon-update-route", signals.candidate_workflows)
+
+    def test_multi_file_refactor_suggests_large_delivery(self) -> None:
+        prompt = "複数の関係ファイルに及ぶ routing evaluator refactor を既存 oracle と一致させて"
+        signals = prompt_intake_signals(
+            PromptClassifierInputs(prompt, Path("."), {}, {})
+        )
+
+        self.assertIn("large-delivery", signals.candidate_workflows)
+        self.assertIn("refactor-loop", signals.candidate_skills)
 
 
 if __name__ == "__main__":

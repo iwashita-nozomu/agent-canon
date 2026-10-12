@@ -56,7 +56,7 @@ The reader map is neither a startup packet nor an execution checklist.
 | Responsibility | Canonical owner | Validation / reader route |
 | --- | --- | --- |
 | root runtime entrypoint | `bootstrap.sh` | `bash bootstrap.sh --help` |
-| workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
+| workflow family and role candidates | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml` | `check_agent_runtime_alignment.py` |
 | AgentCanon source publication | [agents/skills/agent-canon-update.md](../skills/agent-canon-update.md) | repository-topic-clone and PR checks |
 | entrypoint responsibility grammar | [documents/design/entrypoint-owner-map.md](../../documents/design/entrypoint-owner-map.md) | `check_entrypoint_owner_map.py` |

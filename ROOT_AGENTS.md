@@ -35,11 +35,15 @@ needed. For an explicitly cross-module change or API migration, use only its
 declared dependency scope.
 
 Carry authorized work through the requested outcome. Use the selected owner's
-existing mechanism and configured route, preserve established behavior and
-external boundaries, and reuse unchanged evidence. A failed result does not by
-itself identify a cause: distinguish source, contract/oracle, fixture, and
-transport/environment. Do not alter tests or switch routes merely to obtain a
-pass. Keep observations, causes, and unverified results distinct.
+configured route and preserve established behavior and external boundaries. If
+it fails, compare the target's expected and actual inputs and outputs, then check
+what it actually received or consumed (for example, program arguments or an
+agent's prompt, context, and selected Skill). Use the diff as one possible cause
+clue; inspect only the target's relevant boundary, fix the located input or
+implementation cause, and rerun the relevant route. Do not add speculative
+guards, fallback paths, retries, or gates without a concrete cause. Do not alter
+tests or switch routes merely to obtain a pass. Keep observations, causes, and
+unverified results distinct.
 Use configured Git/GitHub transports. Do not discover, create, copy, link, or
 configure credentials or auth agents; return authentication failures to their
 transport owner.

@@ -36,21 +36,14 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 - required_reviews_complete: not_applicable
 - validation_complete: no
 - request_contract_complete: no
-- all_planned_chunks_complete: no
 - overall_delivery_complete: no
-- completion_coverage_consumer: no
-- mapping_error_sets_empty: no
-- typed_owner_boundary_status: pending
 - canonical_format_check_status: pending
 - canonical_dispatcher_schema_status: pending
-- validation_failure_response_status: pending
-- unfinished_tasks_absent: no
 - repo_wide_static_analysis_complete: no
 - agent_canon_latest_complete: no
 - review_findings_integrated: no
 - focused_recheck_complete: not_applicable
 - tool_warnings_resolved: no
-- review_convergence_complete: no
 - subagents_closed: no
 - diff_check_agent_complete: not_applicable
 - canonical_tree_head_complete: no
@@ -76,21 +69,14 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 <!-- selected owning gate の判定が完了したら required_reviews_complete を yes にし、review が無効なら not_applicable にします。 -->
 - validation_complete: yes
 - request_contract_complete: yes
-- all_planned_chunks_complete: yes
 - overall_delivery_complete: yes
-- unfinished_tasks_absent: yes
 - `repo_wide_static_analysis_complete`: `yes` for full static analysis, or `profile_selected` when the runtime profile selected targeted validation
 - agent_canon_latest_complete: yes
-- completion_coverage_consumer: yes
-- mapping_error_sets_empty: yes
-- typed_owner_boundary_status: pass
 - canonical_format_check_status: pass
 - canonical_dispatcher_schema_status: pass
-- validation_failure_response_status: pass
 - review_findings_integrated: yes
 <!-- repair 後の focused recheck が完了したら focused_recheck_complete を yes にし、initial review で blocker が無ければ not_applicable にします。 -->
 - tool_warnings_resolved: yes
-- review_convergence_complete: yes
 - subagents_closed: yes
 <!-- diff-check gate が有効で完了したら diff_check_agent_complete を yes にし、それ以外は not_applicable にします。 -->
 - canonical_tree_head_complete: yes
@@ -106,20 +92,6 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 - clone_materialization_readback: pass / not_applicable
 - unexpected_action_report: none / resolved / handed_to_parent
 
-## Completion Boundary Evidence（完了境界 evidence）
-
-<!-- これが chunk、slice、checkpoint、subpass ではなく user request 全体の完了である理由を記録します。planned work unit と active clause をすべて complete とし、schedule.md が TODO の source of truth であること、unfinished task/follow-up/validation/commit/push/canon-sync item が scope に残らないことを確認します。work_log.md または TODO coverage が不完全なら closeout を lock する理由を記録します。 -->
-
-- completion_coverage_artifact: completion_coverage.json
-- completion_coverage_schema: agent-canon.completion-coverage.v1
-- completion_coverage_consumer: no
-- control_topology_observation_ref:
-- all_planned_chunks_complete_source: completion-boundary projection
-- overall_delivery_complete_source: completion-boundary projection
-- open_repairs:
-- open_crossing_edges:
-- canonical_gate_basis: G1_CLAUSE_COVERAGE,G2_OWNER_BOUNDARY,G3_STAGE_EVIDENCE,G4_VALIDATION_RESPONSE,G5_DELIVERY_BOUNDARY
-
 ## Canonical Formatter And Static Evidence（canonical formatter/static evidence）
 
 <!-- canonical な Markdown/math/Mermaid formatter/check route 1 つと selected non-Python static evidence を記録します。重複する CI、formatter、checker、coverage、mutation、private-helper、checker-retest route は追加の W2 gate ではありません。 -->
@@ -132,16 +104,6 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 - Markdown/math/Mermaid source paths:
 - formatter/fixer command and post-format readback:
 - targeted-only reason or selected full-suite owner:
-
-## CompletionCoverage And Failure Response Evidence（completion coverage と failure response）
-
-<!-- generated v1 projection、5 つの明示的 mapping error set、pointer-only validation-failure response を記録します。taxonomy text の owner は JSON source と generated Markdown reader のままです。 -->
-
-- completion_coverage_artifact:
-- completion_coverage_consumer:
-- validation_failure_response_status:
-- validation_failure_taxonomy_owner: documents/runtime/runtime-profiles-and-check-matrix.json
-- validation_failure_taxonomy_reader: documents/runtime/runtime-profiles-and-check-matrix.md
 
 ## AgentCanon Latest Evidence（AgentCanon latest evidence）
 
@@ -163,10 +125,8 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Focused Recheck Evidence（focused recheck evidence）
 
-<!-- initial owning review が stable blocking finding ID を返し、その repair が入った場合だけ記録します。candidate epoch/digest、repaired finding IDs、repair が invalidated した evidence IDs、focused recheck verdict を固定し、full review を再開しません。 -->
+<!-- focused recheck が必要な場合だけ、修復した finding と影響を受けた evidence、および実際の再確認結果を記録します。 -->
 
-- focused_recheck_candidate_epoch:
-- focused_recheck_candidate_digest:
 - focused_recheck_finding_ids:
 - focused_recheck_invalidated_evidence_ids:
 - focused_recheck_status:
@@ -209,50 +169,17 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 - cleanup failure cause and typed hold:
 - parent handoff for any unexpected action:
 
-## Review Convergence Evidence（review convergence evidence）
-
-<!-- `agent-canon.review-convergence.v1` の terminal projection を記録します。one initial owning review、stable blocker IDs、focused recheck、unresolved measure、selected validation、same-state/action cycle の不在を一度だけ判定します。zero blocker + zero unresolved request clause + selected validation pass/not_applicable で ship/handoff し、advisory improvement は現 task を再開しません。 -->
-
-- convergence_schema: agent-canon.review-convergence.v1
-- candidate_epoch:
-- candidate_digest:
-- initial_review_status:
-- initial_blocking_finding_ids:
-- focused_recheck_finding_ids:
-- open_blocking_finding_ids:
-- advisory_finding_ids:
-- unresolved_request_clause_ids:
-- unresolved_validation_ids:
-- unresolved_measure_initial:
-- unresolved_measure_final:
-- selected_validation_status:
-- same_state_action_repeated:
-- terminal_state:
-- new_epoch_reason:
-
 ## Subagent Lifecycle Evidence（subagent lifecycle evidence）
 
-<!-- subagent または durable lifecycle route を選択した場合、user-facing completion 前に run-local subagent lifecycle evidence を記録します。各 user input を same_active_task_delta、scope_or_contract_change、new_task に分類し、owner、responsibility、context、write authority、validation route が compatible なら revised scope を含めて active agent を reuse します。fresh agent は independent review、disjoint write authority、incompatible owner/context、context integrity failure 用です。durable checkpoint と updated packet path は coordination/resumption に必要な場合だけ作り、terminal stage-wave agent は cleanup として close します。timeout、empty status、absent final response は指定された termination_action/write_scope/overlap/lifecycle gate に記録します。dynamic fanout では team_manifest.yaml run.execution_graph.result_readback の実際の child result を terminal predicate に使い、workflow_monitoring.md Actual Wave Events は同じ実行の readback として照合します。schedule.md Agent Wave Ledger は表示 projection のみで、status 自体から readiness/completion を判断しません。wait_agent の timeout/empty status/response 欠落があれば no-return investigation field を記録し、新しい state evidence または明示的 cancellation まで lifecycle gate を incomplete にします。 -->
+<!-- child work が選択された場合だけ、実際の起動結果、完了または失敗結果、handoff を既存 owner receipt で確認します。起動や monitor status だけでは完了になりません。 -->
 
-- fresh_subagents_required:
-- reuse_for_new_task:
-- previous_task_subagent_reuse:
-- mid_task_user_input_status:
-- same_task_delta_packet_evidence:
-- agent_wave_ledger_status:
-- planned_vs_actual_wave_status:
-- dynamic_spawn_policy_status:
-- no_return_investigation_status:
-- no_return_agent_ids:
-- no_return_cause_evidence:
-- no_return_resolution_decision:
 - subagent_closeout_status:
 - open_subagent_instances:
 - close_agent_evidence:
 
 ## Diff-Check Agent Evidence（diff-check agent evidence）
 
-<!-- selected owning review gate（有効時だけ read-only diff-check instance）、input packet path、latest diff range/commit、decision、finding disposition、accepted same-owner fix 後の rerun evidence を記録します。reviewer output は仮説入力で decision-owning reviewer が判定します。accepted finding は current snapshot、reachable path、contract、witness/static proof を引用し、rejected finding は reason_code/evidence_ref を持ち wave や rollback を起こしません。 -->
+<!-- selected owning review gate（有効時だけ read-only diff-check instance）、input packet path、latest diff range/commit、decision、finding disposition、accepted same-owner fix 後の rerun evidence を記録します。reviewer output は仮説入力で decision-owning reviewer が判定します。accepted finding は current snapshot、reachable path、contract、witness/static proof を引用し、rejected finding は reason_code/evidence_ref を持ちます。 -->
 
 - diff_check_agent_role:
 - diff_check_agent_decision:

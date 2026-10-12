@@ -50,7 +50,9 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
     def test_current_manifest_expands_required_task_groups(self) -> None:
         """The canonical manifest should expand to 21 stable 25-case groups."""
-        manifest = load_manifest(PROJECT_ROOT / "eval" / "definitions" / "workflow_selection_eval.toml")
+        manifest = load_manifest(
+            PROJECT_ROOT / "eval" / "definitions" / "workflow_selection_eval.toml"
+        )
         expected_groups = {
             "routing-advisory",
             "scoped-lite-code",
@@ -87,8 +89,12 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
                 25,
                 group_id,
             )
-        docs_cases = [case for case in manifest.cases if case.group_id == "docs-structure"]
-        large_cases = [case for case in manifest.cases if case.group_id == "large-refactor"]
+        docs_cases = [
+            case for case in manifest.cases if case.group_id == "docs-structure"
+        ]
+        large_cases = [
+            case for case in manifest.cases if case.group_id == "large-refactor"
+        ]
         validation_cases = [
             case
             for case in manifest.cases
@@ -96,13 +102,20 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
         ]
         self.assertTrue(
             all(
-                {"structure-planning", "prose-reasoning-graph"}.issubset(case.expected_skills)
+                {"structure-planning", "prose-reasoning-graph"}.issubset(
+                    case.expected_skills
+                )
                 for case in docs_cases
             )
         )
-        self.assertTrue(all("subagent-bootstrap" in case.expected_skills for case in large_cases))
         self.assertTrue(
-            all("codex-task-workflow" in case.expected_skills for case in validation_cases)
+            all(case.expected_skills == ("refactor-loop",) for case in large_cases)
+        )
+        self.assertTrue(
+            all(
+                "codex-task-workflow" in case.expected_skills
+                for case in validation_cases
+            )
         )
         self.assertTrue(
             all("test-design" not in case.expected_skills for case in validation_cases)
@@ -145,12 +158,18 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("WORKFLOW_SELECTION_EVAL_REPORT=", result.stdout)
-        self.assertIn(f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", result.stdout)
+        self.assertIn(
+            f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", result.stdout
+        )
         self.assertEqual(len(reports), 1)
         self.assertIn("WORKFLOW_SELECTION_EVAL_RUN_ID=", report_text)
-        self.assertIn(f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", report_text)
+        self.assertIn(
+            f"WORKFLOW_SELECTION_EVAL_SOURCE_RUN_ID={source_run_id}", report_text
+        )
         self.assertIn("WORKFLOW_SELECTION_EVAL_EXPECTED_CASES=525", report_text)
-        self.assertIn("WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES=525", report_text)
+        self.assertIn(
+            "WORKFLOW_SELECTION_EVAL_EXPECTED_GENERATED_CASES=525", report_text
+        )
         self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=none", report_text)
         self.assertIn("routing-advisory-001", report_text)
         self.assertIn("selected skills", report_text)
@@ -277,7 +296,10 @@ class EvaluateWorkflowSelectionTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("WORKFLOW_SELECTION_EVAL_FAILED=0", result.stdout)
-        self.assertIn("WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=expected_case_count=500 observed=1", result.stdout)
+        self.assertIn(
+            "WORKFLOW_SELECTION_EVAL_COUNT_FAILURES=expected_case_count=500 observed=1",
+            result.stdout,
+        )
         self.assertIn("WORKFLOW_SELECTION_EVAL_STATUS=fail", result.stdout)
 
     def copy_runtime_fixture(self, root: Path) -> None:

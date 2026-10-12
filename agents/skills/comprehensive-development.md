@@ -4,7 +4,7 @@
 contract skill
 responsibility Documents comprehensive-development for this repository.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../task_catalog.yaml workflow family spawn budget and role topology owner
+upstream design ../task_catalog.yaml workflow family and role candidate owner
 upstream design ../agents_config.json permanent team role ownership and write policy owner
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
 upstream design ../internal-routines/design-implementation-correspondence.md cross-surface design-to-implementation correspondence route
@@ -20,11 +20,11 @@ upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint r
 複数 surface を束ねるときは、各 bounded slice の design locator、clause
 fingerprint、implementation target、review evidence を
 [../internal-routines/design-implementation-correspondence.md](../internal-routines/design-implementation-correspondence.md) に接続します。
-この skill は umbrella integration stage の owner であり、共通 policy の別実装
+この skill は選択された場合の cross-surface integration guidance であり、共通 policy の別実装
 を作りません。
 
-code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更を、1 本の umbrella workflow と explicit subagent routing で進めます。
-この skill は route packet と reader contract に限定し、spawn budget、role topology、role ownership、write policy は正本 surface へ委譲します。
+code、docs、tests、workflow、tools、runtime をまたぐ repo-wide な変更に、owner、依存、衝突を確認する reader guidance を提供します。
+この skill は route packet と reader contract に限定し、role candidates、role ownership、write policy は正本 surface へ委譲します。
 
 ## Cross-surface work
 

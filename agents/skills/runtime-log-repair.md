@@ -18,8 +18,8 @@ downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.
 
 - Purpose: turns structured AgentCanon runtime dashboard findings into an
   owner-routed Runtime Log Repair Packet and verifies the repair closeout.
-- Use When: dashboard next actions, hook failure evidence, missing actual wave
-  rows, workflow attribution gaps, missing consulted source URLs, or recurring
+- Use When: dashboard next actions, hook failure evidence, workflow attribution
+  gaps, missing consulted source URLs, or recurring
   runtime-log repair work need routed action rather than more analysis.
 - Section path: Purpose and Use When define the trigger; Required Flow connects
   selected findings to owner decisions and closeout; Boundaries keep raw analysis, durable issues,
@@ -33,17 +33,16 @@ downstream implementation ../../.codex/personal/skills/runtime-log-repair/SKILL.
 
 `agent-log-analysis` が選んだ compact dashboard / API evidence から、修復が
 選択された項目を owner surface につなぐ skill です。観測だけでは patch や
-repair wave を起動しません。修復を行う場合は既存の Runtime Log Repair Packet
+repair を起動しません。修復を行う場合は既存の Runtime Log Repair Packet
 で根拠、担当、入力、適用する closeout を伝えます。
 
 ## Use When
 
 - runtime dashboard の next actions を処理する
 - hook entries `status=fail`、`AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING`、
-  `AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL`、または
   `AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS` を修復へ回す
-- missing actual wave rows、workflow attribution gaps、consulted source URLs
-  missing、reference missing URLs を owner-routed repair にする
+- workflow attribution gaps、consulted source URLs missing、reference missing URLs
+  を owner-routed repair にする
 - dashboard evidence が raw analysis ではなく実装・設定・記録の修復を要求している
 - 頻発する runtime-log repair work を skill / tool / workflow owner に分解する
 
@@ -58,12 +57,12 @@ finding; do not expand raw JSONL broadly.
 For a repair that is actually selected, identify its owner from the observed
 failure and affected surface. Use the existing classes below only where they fit;
 an item that crosses owners may need more than one responsibility, and an
-uncertain cause stays uncertain. Before editing or launching a repair wave,
+uncertain cause stays uncertain. Before editing or launching a repair,
 carry the evidence and selected operation in the existing Runtime Log Repair
 Packet:
 
 ```text
-repair_class=<hook_failure|wave_execution|workflow_attribution|reference_capture|skill_selection|tool_selection|eval_gap|archive_hygiene|prompt_or_config_drift>
+repair_class=<hook_failure|workflow_attribution|reference_capture|skill_selection|tool_selection|eval_gap|archive_hygiene|prompt_or_config_drift>
 dashboard_evidence=<compact section, API field, or snapshot-qualified excerpt and evidence gaps>
 owner_surface=<canonical skill/tool/workflow/hook/document path>
 repair_route=<skill-or-role>
@@ -74,8 +73,8 @@ closeout_gate=<command or dashboard field that proves routed repair completion>
 
 Route the operation to its existing owner: selection repairs use `$task-routing`
 and the affected owner; eval repair uses `$agent-eval-accumulation`; delivery or
-archive maintenance uses the linked runtime delivery owner; artifacts,
-Issues, wave mechanics, and recurrence learning use their existing owners.
+archive maintenance uses the linked runtime delivery owner; artifacts, Issues,
+and recurrence learning use their existing owners.
 Before changing hook, monitoring, schedule, reference, or closeout tooling, cite
 the evidence locator and verify that owner path. A missing summary is not
 evidence for an invented cause.
@@ -105,8 +104,8 @@ evidence and does not duplicate those policy definitions.
 - Artifact placement and durable raw/summary writeout belong to
   `$result-artifact-writeout`.
 - Durable issue creation belongs to `$issue-finding-report`.
-- Subagent launch mechanics and wave lifecycle records belong to
-  `$subagent-bootstrap`.
+- Actual subagent launch/completion/failure evidence belongs to the configured
+  native collaboration route and its existing result records.
 - Prompt/config review belongs to `$task-routing`, affected skill owners, and
   the prompt/config reviewer role.
 - Hook implementation details, workflow monitoring internals, and reference extraction internals stay with their owner surfaces.

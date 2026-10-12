@@ -23,16 +23,16 @@ limit context, work scope, team mode, or task size, and selecting it needs no
 fresh environment preflight. Record the selection and evidence in the existing
 task result; inactive profiles need no inventory.
 
-Child handoff follows `agents/task_catalog.yaml#workflow_activation_policy`
-and the selected typed route. Candidate roles do not activate themselves. When
-an activated child is blocked, preserve its typed failure and the existing
-authority boundary; use the selected execution owner rather than a parent
-fallback. User-guided debugging retains the common ROOT boundary.
+Markdown links identify the expected role and Skill route. When delegation is
+selected, use the configured native collaboration route; candidate role
+metadata alone does not launch a child. Preserve actual launch, completion,
+and failure results. A blocked child does not create a parent fallback.
+User-guided debugging retains the common ROOT boundary.
 
 ## Task Classification
 
 Select the primary family from [the task catalog](../task_catalog.yaml), using
-`tasks[].family` and `workflow_activation_policy`. The
+`tasks[].family`. The
 [family reader paths](../TASK_WORKFLOWS.md#workflow-family-reader-paths) explain
 those records, including Owner-Bounded Change and IssueWorker Publication.
 Keep one selected primary family when work spans domains. This document does
@@ -47,8 +47,8 @@ keeps product validation separate from AgentCanon runtime validation.
 Use `execution_route_policy` to distinguish `bounded_fast_path` and
 `coordination`. Bounded work has one execution owner and uses existing task
 evidence without requiring a child or run bundle; its internal work follows the
-selected owner and actual dependencies. Coordination assigns its units and uses
-its declared run bundle.
+selected owner and actual dependencies. Coordination assigns its units and may
+use the optional run-bundle metadata.
 
 ## Contract-Required Skill Set
 
@@ -87,7 +87,7 @@ are explicit changes to their canonical owner.
 ## 2. Workflow Selection
 
 Use the selected family record and [workflow reader paths](../TASK_WORKFLOWS.md#workflow-family-reader-paths).
-Select only stages and review claims required by that route. Existing resolved
+Select only responsibilities and review claims required by that route. Existing resolved
 owner and validation facts remain valid across the transition.
 
 ## 3. Placement

@@ -456,7 +456,7 @@ skill_families:
     shim: .codex/personal/skills/runtime-log-repair/SKILL.md
     discovery:
       name: runtime-log-repair
-      description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, missing actual wave rows, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
+      description: "Use when AgentCanon runtime dashboard evidence should be turned into owner-routed repair work, including dashboard next actions, repair failing hook evidence, hook entries status=fail, workflow attribution gaps, consulted source URLs, reference missing URLs, AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING, or AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS."
     routing:
       stage_policy: active
       reason: structured runtime dashboard evidence needs owner-routed repair work
@@ -468,7 +468,6 @@ skill_families:
         - ["dashboard", "repair", "failing", "hook", "evidence"]
         - ["runtime", "log", "repair", "failing", "hook"]
         - ["runtime", "dashboard", "hook", "entries", "status=fail"]
-        - ["runtime", "dashboard", "missing", "actual", "wave"]
         - ["runtime", "dashboard", "workflow", "attribution"]
         - ["runtime", "dashboard", "consulted", "source", "urls"]
         - ["runtime", "dashboard", "reference", "missing", "urls"]
@@ -479,7 +478,6 @@ skill_families:
         - ["skill", "miss", "repair"]
         - ["skill", "misses", "repair"]
         - ["selection", "miss", "repair"]
-        - ["AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"]
         - ["AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING"]
         - ["AGENT_RUNTIME_DASHBOARD_REFERENCE_MISSING_URLS"]
   - id: agent-eval-accumulation

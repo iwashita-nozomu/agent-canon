@@ -8,9 +8,9 @@ upstream implementation task_catalog.yaml workflow family defaults.
 upstream implementation agents_config.json permanent team and role mapping.
 upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
 downstream design skills/codex-task-workflow.md implementation stage and closeout flow.
-downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py emits workflow packets and creates workflow run bundles.
-downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records dynamic wave events.
-downstream implementation ../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates the canonical packet owner marker.
+downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py creates optional run-bundle metadata.
+downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records actual behavior events.
+downstream implementation ../eval/checkers/compare_agent_run_paths.py compares expected and actual routes.
 @dependency-end
 -->
 
@@ -18,8 +18,8 @@ downstream implementation ../tools/validation/semantic/runtime/check_agent_runti
 
 ## Reader Map
 
-This file is a workflow reader map. It points to the owner surfaces that select
-workflow family, roles, skills, stage gates, wave budgets, and closeout checks.
+This file is a workflow reader map. It points to the owner surfaces that describe
+workflow families, roles, Skills, and closeout checks.
 Use `Workflow Contract Owners` to find the canonical owner, `Common Evidence
 Packet` to understand task/run handoff data, `Design Artifact Shape` for
 implementation design anchors, and `Workflow Family Reader Paths` to route by
@@ -30,13 +30,12 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 
 | Contract | Owner Surface |
 | -------- | ------------- |
-| workflow family, activation, and full-staging route | `agents/task_catalog.yaml` `workflow_activation_policy`; `workflow_families[].id` |
-| stage topology and required roles | `agents/task_catalog.yaml` `role_topology_defaults.stage_waves`; `workflow_families[].roles` |
+| workflow family and role guidance | `agents/task_catalog.yaml` `workflow_families[].id`, `workflow_families[].roles` |
 | default specialists and review packs | `agents/task_catalog.yaml`; `agents/agents_config.json` |
-| role behavior, stage conditions, and review separation | `.codex/agents/*.toml` |
-| selected Skills, execution readiness, and same-run result transitions | `bootstrap_agent_run.py`; `skill_document_reader.py`; `workflow_monitor.py` |
+| role behavior and write authority | `.codex/agents/*.toml` |
+| Skill selection and canonical Skill text | `agents/skills/catalog.yaml`; selected Skill links |
 | skill selection | `agents/skills/catalog.yaml`; `.codex/personal/skills/*/SKILL.md`; `python3 tools/agent/orchestration/route.py --prompt` |
-| implementation stage and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
+| implementation guidance and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
 | active design packet schema | [agents/COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md); `agents/agents_config.json#artifacts.active_design_packet` |
 | semantic responsibility allocation | [documents/design/semantic-responsibility-contract.md](../documents/design/semantic-responsibility-contract.md); run-local instance via active-packet `source_refs` |
 | closeout authority | `task_close.py`; `report_artifact_checks.py` |
@@ -46,46 +45,33 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 Contract edits start in the owner surface. This reader map changes when the
 reader path changes.
 
-## Common Evidence Packet
+## Optional Run Bundle
 
-`bootstrap_agent_run.py` emits:
+When explicitly selected, `bootstrap_agent_run.py` can create an optional run
+bundle and print workflow family, suggested Skill links, selected roles,
+document packets, and a validation route. Ordinary task start does not require
+a run bundle, task-catalog CLI, manifest, or readiness state.
 
-- workflow family
-- active and deferred skills
-- selected skill tool route sequence
-- dynamic skill routing candidates
-- tool catalog match surface
-- review roles
-- document packets
-- selected canonical Skill bodies read through file EOF
-- current execution-graph status and ready ToolCalls
-- same-run result input route for actual host/child results
-- validation route
+Read the applicable `ROOT_AGENTS.md` and selected Skill directly. Markdown links
+describe the expected route; native ToolCalls and their actual results and
+failures describe what occurred. A launch is not a completion.
+`workflow_monitor.py` records actual behavior events but does not authorize or
+sequence work. Existing Eval owners compare expected and actual routes and
+evaluate their validity; a route difference alone is not a failure.
 
-Subagent handoffs carry that machine-readable packet and the run bundle paths.
-The runtime dispatches only the ready graph frontier. A launch result is not a
-completion result; subsequent stages wait for actual child results passed with
-the same run ID. `workflow_monitor.py` projects those results into the existing
-wave event readback; it does not decide readiness. The run manifest's
-`execution_graph.result_readback` retains the actual results used to unlock
-each node and is the closeout input; a monitoring or schedule status alone
-cannot establish graph completion.
-Tool routing is carried through `team_manifest.yaml` under
-`run.repo_tool_routing_policy`. Selected tools are invoked through their existing
-CLI, API, script, or Make entrypoint with native argv and retain the configured
-execution, permission, environment, and validation guarantees. A related skill
-becoming active in a later wave selects that owner directly; no private command
-packet or regenerated binding projection is required before handoff.
+Tool routing remains with each selected tool's existing CLI, API, script, or
+Make entrypoint. Preserve native argv and its configured execution, permission,
+environment, and validation guarantees.
 
 ## Design Artifact Shape
 
 Implementation design is owned by the neutral closed active design packet
 `waterfall.design_packet.v1`, persisted at
 `team_manifest.yaml#run.active_design_packet`. The selected artifact paths,
-review paths, and `document_flow_required` flag remain the main runtime fields;
-the closed graph contract adds one clause registry and four typed entries. The
-persisted `active_design_packet_reference_projection` binds those entries to
-source bytes, dependency endpoints, selected outputs, and review identities.
+review paths, and `document_flow_required` flag remain available to workflows
+that choose to use the packet. Its persisted
+`active_design_packet_reference_projection` binds packet entries to source
+bytes, dependency endpoints, selected outputs, and review identities.
 Chat, schedule prose, history, and inferred headings are not packet authority.
 
 - `Abstract Design Frame`
@@ -95,27 +81,15 @@ Chat, schedule prose, history, and inferred headings are not packet authority.
 
 Each entry declares its exact clause, owner, source, dependency, output, and
 reviewer references. Chat, schedule prose, history, and inferred headings are
-not packet authority. `agent_team.py::create_run_bundle` is the sole public
-delegator: it resolves the packet, validates all references, renders every
-projection, and atomically publishes the complete bundle for task-start,
-bootstrap, and document-start producers. One responsibility unit remains one
-implementation handoff even when its internal work is dependency ordered.
+not packet authority. `agent_team.py::create_run_bundle` remains an optional
+bundle publisher that resolves and validates the packet when a chosen workflow
+needs those artifacts.
 
 When a design contains semantic deltas, the implementation source packet also
 references `artifact:semantic_responsibility_contract.toml`. The populated
 instance is created from the reusable template in the current run bundle,
 allocates obligations before implementation, and is not copied into the
 repository-wide template or policy.
-
-## Implementation Flow Graph
-
-The selected task family and Skill packets define the production stage graph;
-the active packet's typed entries provide its selected graph anchors and
-materialization reader path. `bootstrap_agent_run.py` is the sole dispatcher:
-it loads selected canonical Skill documents and required prerequisites through
-EOF, dispatches non-conflicting ready nodes via existing ToolCalls, and advances
-only from actual host results. Hooks remain partial observations and do not
-control scheduling. `task_close.py` remains the sole terminal predicate.
 
 ## Workflow Family Reader Paths
 
@@ -130,26 +104,22 @@ control scheduling. `task_close.py` remains the sole terminal predicate.
 | Adaptive Improvement Loop | `agents/task_catalog.yaml` `workflow_families[].id=adaptive_improvement_loop` |
 | IssueWorker Publication | `agents/task_catalog.yaml` `workflow_families[].id=issue_worker_publication`; logical route executes the `publisher` role for explicit candidates |
 
-`workflow_activation_policy` selects the positive family/stage/child route. Safety,
+Family rows provide routing context rather than a dispatch schedule. Safety,
 authority, and validation prohibitions stay with their canonical owners;
 [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) selects the active
 validation matrix for the changed path and risk class.
 
-## Execution Result Readback
+## Actual Route Evidence
 
-The runtime uses actual results for graph readiness. Run-local execution
-results and readback stay in existing artifacts:
+Expected paths are read from linked workflow and Skill instructions. Actual
+route events and outcomes use the existing evidence surfaces:
 
-- `team_manifest.yaml` `run.execution_graph.result_readback` is read by task
-  closeout as the execution-result owner
-- `workflow_monitoring.md` `Actual Wave Events` is the matching event readback
-- `schedule.md` `Agent Wave Ledger` is a display projection only
-- `team_manifest.yaml` `run.delegated_spawn_policy`
-- `team_manifest.yaml` `run.subagent_lifecycle_policy`
+- `workflow_monitoring.md` behavior and semantic events record observations
+- native ToolCall results distinguish spawn, completion, and failure
+- existing Eval owners compare expected and actual routes and evaluate validity
 
-The runtime cap is in `.codex/config.toml`; family budgets are in
-`agents/task_catalog.yaml`. Do not add a parallel wave planner or use these
-readback rows as completion authority.
+Do not infer a required route or successful completion from a manifest or
+monitor row alone. A route difference alone is not an Eval failure.
 
 ## Validation
 

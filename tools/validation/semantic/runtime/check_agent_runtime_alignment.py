@@ -9,7 +9,6 @@
 # upstream design ../../../../agents/skills/catalog.yaml public skill routing and related-skill catalog
 # upstream implementation ../../../agent/skills/skill_route_catalog.py canonical skill-route rules and capability metadata
 # upstream implementation ../../../agent/orchestration/model_profile_registry.py owns canonical model/profile projections
-# upstream implementation ../../../agent/orchestration/capacity_handshake.py owns typed capacity readback
 # upstream implementation ../../../agent/orchestration/packets.py owns active design packet normalization and materialization
 # upstream implementation ../../../agent/orchestration/team_config.py owns team and role configuration resolution
 # upstream implementation ../../../repository/workspace/workspace_scope.py owns typed workspace/source/report roots
@@ -55,18 +54,9 @@ from tools.agent.orchestration.team_config import (
     load_task_catalog,
     load_team_config,
     resolve_role,
+    resolve_workflow_family,
     select_roles,
     task_ids,
-)
-
-from tools.agent.orchestration.implementation_dispatch import (
-    codex_runtime_max_depth,
-    codex_runtime_max_threads,
-    declared_team_capacity_derivation,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave,
-    workflow_spawn_budget,
-    workflow_topology_policy_violations,
 )
 
 from tools.agent.orchestration.agent_team import create_run_bundle
@@ -103,7 +93,6 @@ EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
 EXPECTED_MAX_THREADS = 27
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
-MIN_DYNAMIC_SPAWN_BUDGET = 4
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
@@ -135,9 +124,7 @@ OFFICIAL_SYSTEM_SKILLS = (
 )
 OFFICIAL_SYSTEM_SKILL_DELEGATION_OWNER = Path("agents/skills/README.md")
 OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX = Path("agents/canonical/skills.md")
-OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK = (
-    "[Official System Skill Delegation](../skills/README.md#official-system-skill-delegation)"
-)
+OFFICIAL_SYSTEM_SKILL_DELEGATION_LINK = "[Official System Skill Delegation](../skills/README.md#official-system-skill-delegation)"
 SUBAGENT_PROTOCOL_DOCS = (
     ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
     ROOT / "agents" / "TASK_WORKFLOWS.md",
@@ -149,25 +136,6 @@ TOOL_RESULT_ROUTE_MARKERS = (
     "repo-wide drift and integration risk -> project_reviewer",
 )
 PERMANENT_TEAM_MAPPING_HEADING = "## Permanent Team To Codex Mapping"
-NON_SPAWN_WAVE_ROLE_IDS = {"manager", "verifier", "auditor"}
-PRE_FINAL_REVIEW_ROLE_IDS = {
-    "change_reviewer",
-    "research_reviewer",
-    "experiment_reviewer",
-    "report_reviewer",
-    "reproducibility_reviewer",
-    "artifact_reviewer",
-    "scientific_computing_reviewer",
-    "benchmark_reviewer",
-    "fair_data_reviewer",
-    "ml_science_reviewer",
-    "citation_evidence_reviewer",
-    "notation_definition_reviewer",
-    "logic_gap_reviewer",
-    "infra_reviewer",
-    "python_reviewer",
-    "cpp_reviewer",
-}
 
 
 @dataclass(frozen=True)
@@ -1046,52 +1014,12 @@ def validate_team_config_references() -> None:
 
 
 def validate_task_catalog_references() -> None:
-    """Check task catalog roles and task-family relationships."""
+    """Check task-family, role, and review-pack records without a dispatch graph."""
     config = load_team_config()
     catalog = load_task_catalog(config)
     ensure(
         not (SCOPED_MODEL_POLICY_KEYS & set(catalog.raw)),
         "task_catalog.yaml must not own model, effort, review model, or tier policy",
-    )
-    activation_policy = require_mapping(
-        catalog.raw.get("workflow_activation_policy"),
-        "workflow_activation_policy must be a mapping",
-    )
-    ensure(
-        activation_policy.get("family_selector") == "tasks[].family",
-        "workflow_activation_policy family selector must be tasks[].family",
-    )
-    ensure(
-        activation_policy.get("stage_owner") == "role_topology_defaults.stage_waves",
-        "workflow_activation_policy stage owner must be role_topology_defaults.stage_waves",
-    )
-    ensure(
-        activation_policy.get("required_role_owner") == "workflow_families[].roles",
-        "workflow_activation_policy required-role owner must be workflow_families[].roles",
-    )
-    child_handoff = require_mapping(
-        activation_policy.get("child_handoff"),
-        "workflow_activation_policy child_handoff must be a mapping",
-    )
-    ensure(
-        child_handoff.get("activation") == "selected_typed_route",
-        "workflow_activation_policy child handoff must be selected-route-only",
-    )
-    ensure(
-        child_handoff.get("required_role_owner") == "workflow_families[].roles",
-        "workflow_activation_policy child role owner must be family roles",
-    )
-    ensure(
-        child_handoff.get("write_capable") is True,
-        "workflow_activation_policy child handoff must be write-capable",
-    )
-    full_staging = require_mapping(
-        activation_policy.get("full_staging"),
-        "workflow_activation_policy full_staging must be a mapping",
-    )
-    ensure(
-        full_staging.get("activation") == "selected_coordination_route",
-        "workflow_activation_policy full staging must be selected-route-only",
     )
     review_policy = require_mapping(
         catalog.raw.get("review_activation_policy"),
@@ -1111,40 +1039,36 @@ def validate_task_catalog_references() -> None:
         == "distinct_unresolved_claim_or_risk_only",
         "review_activation_policy specialist activation must be conditional",
     )
+
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
         "role_topology_defaults must be a mapping",
     )
-    ensure(
-        topology.get("capacity_derivation")
-        == "declared_team_peak_plus_nested_reservations_v1",
-        "role_topology_defaults must declare the approved capacity derivation",
-    )
-    topology_role_families = require_mapping(
+    role_families = require_mapping(
         topology.get("role_families"),
         "role_topology_defaults.role_families must be a mapping",
     )
     ensure(
         require_string_list(
-            topology_role_families.get("implementation"),
+            role_families.get("implementation"),
             "role_topology_defaults.role_families.implementation must be a list",
         )
         == ["worker", "spark_worker"],
-        "role_topology_defaults implementation role family must be worker,spark_worker",
+        "implementation role family must preserve worker candidate order",
     )
     ensure(
         require_string_list(
-            topology_role_families.get("test_design"),
+            role_families.get("test_design"),
             "role_topology_defaults.role_families.test_design must be a list",
         )
         == ["test_designer"],
-        "role_topology_defaults test_design role family must contain test_designer",
+        "test_design role family must contain test_designer",
     )
     ensure(
         "test_designer"
         not in require_string_list(
-            topology_role_families.get("design"),
+            role_families.get("design"),
             "role_topology_defaults.role_families.design must be a list",
         ),
         "test_designer must not be in the design role family",
@@ -1155,218 +1079,38 @@ def validate_task_catalog_references() -> None:
     )
     ensure(
         same_role_instances.get("identity_key") == "role_id+instance_id+agent_type",
-        "role_topology_defaults same-role identity key must be role_id+instance_id+agent_type",
+        "same-role identity must be role_id+instance_id+agent_type",
     )
-    stage_waves = require_list(
-        topology.get("stage_waves"),
-        "role_topology_defaults.stage_waves must be a non-empty list",
-    )
-    ensure(bool(stage_waves), "role_topology_defaults.stage_waves must be non-empty")
-    staged_roles: dict[str, tuple[int, str]] = {}
-    stage_ids: set[str] = set()
-    for stage_index, raw_wave in enumerate(stage_waves):
-        wave = require_mapping(raw_wave, "stage_waves entries must be mappings")
-        stage_id = require_string(wave.get("id"), "stage_waves[].id must be a string")
-        ensure(
-            stage_id not in stage_ids,
-            f"stage_waves id must be unique: {stage_id}",
-        )
-        stage_ids.add(stage_id)
-        stage_class = require_string(
-            wave.get("stage_class"),
-            "stage_waves[].stage_class must be a string",
-        )
-        ensure(
-            stage_class in {"producer", "reviewer", "final"},
-            f"stage {stage_id} stage_class invalid: {stage_class}",
-        )
-        for role_id in require_string_list(
-            wave.get("role_ids"),
-            f"stage {stage_id} role_ids must be a list",
-        ):
-            ensure(
-                role_id in role_ids,
-                f"stage {stage_id} references unknown role {role_id}",
-            )
-            ensure(
-                role_id not in staged_roles,
-                f"role {role_id} appears in duplicate stage_waves: {staged_roles.get(role_id, ('', ''))[1]} and {stage_id}",
-            )
-            staged_roles[role_id] = (stage_index, stage_id)
-    missing_stage_roles = sorted(role_ids - set(staged_roles))
-    ensure(
-        not missing_stage_roles,
-        f"stage_waves missing permanent roles: {missing_stage_roles}",
-    )
-    ensure(
-        staged_roles.get("implementer", (0, ""))[0]
-        < staged_roles.get("test_designer", (0, ""))[0]
-        < staged_roles.get("change_reviewer", (0, ""))[0],
-        "test_designer must be post-implementation and pre-implementation-review",
-    )
-    ensure(
-        staged_roles.get("test_designer", (0, ""))[1] == "test_design",
-        "test_designer must be owned by the test_design stage",
-    )
-    producer_reviewer_pairs = {
-        "manager": ("manager_reviewer",),
-        "researcher": ("research_reviewer",),
-        "scheduler": ("schedule_reviewer",),
-        "infra_steward": ("infra_reviewer",),
-        "designer": ("design_reviewer", "document_flow_reviewer"),
-        "experimenter": ("experiment_reviewer", "report_reviewer"),
-        "implementer": (
-            "test_designer",
-            "change_reviewer",
-            "python_reviewer",
-            "cpp_reviewer",
-        ),
-    }
-    for producer, reviewers in producer_reviewer_pairs.items():
-        for reviewer in reviewers:
-            producer_stage = staged_roles.get(producer)
-            reviewer_stage = staged_roles.get(reviewer)
-            if producer_stage is None or reviewer_stage is None:
-                continue
-            ensure(
-                producer_stage[0] != reviewer_stage[0],
-                f"producer {producer} and reviewer {reviewer} must not share a stage_wave",
-            )
-            ensure(
-                producer_stage[0] < reviewer_stage[0],
-                f"producer {producer} must precede reviewer {reviewer} in stage_waves",
-            )
+
     family_ids = {
         require_string(family.get("id"), "workflow family id must be a string")
         for family in catalog.workflow_families
     }
-    coordination_families = require_string_list(
-        full_staging.get("coordination_families"),
-        "workflow_activation_policy coordination_families must be a list",
-    )
-    ensure(
-        set(coordination_families).issubset(family_ids),
-        "workflow_activation_policy coordination family is unknown",
-    )
-    ensure(
-        "comprehensive_development" in coordination_families,
-        "workflow_activation_policy must retain comprehensive_development full staging",
-    )
-
-    task_by_id_map = {
-        require_string(task.get("id"), "task id must be a string"): task
-        for task in catalog.tasks
-    }
-    for task_id, task in task_by_id_map.items():
-        ensure(
-            "test_designer"
-            not in require_string_list(
-                task.get("specialists"),
-                f"task {task_id} specialists must be a list",
-            ),
-            f"task {task_id} must not default-enable test_designer",
-        )
-    ensure(
-        "T14" in task_by_id_map,
-        "task catalog must register explicit skill evaluation task T14",
-    )
-    t14 = task_by_id_map["T14"]
-    ensure(
-        EVALUATOR_AGENT_ID
-        in require_string_list(
-            t14.get("specialists"), "T14 specialists must be a list"
-        ),
-        "T14 must activate skill_evaluator explicitly",
-    )
-    ensure(
-        t14.get("family") == "skill_evaluation",
-        "T14 must use the skill_evaluation workflow family",
-    )
-    t14_family = next(
-        family
-        for family in catalog.workflow_families
-        if family.get("id") == "skill_evaluation"
-    )
-    t14_roles = require_mapping(
-        t14_family.get("roles"), "T14 family roles must be a mapping"
-    )
-    ensure(
-        require_string_list(
-            t14_roles.get("always_on"), "T14 family always_on must be a list"
-        )
-        == [],
-        "T14 skill_evaluation family must not have default always-on roles",
-    )
-    ensure(
-        require_string_list(
-            t14_roles.get("specialists"),
-            "T14 family specialists must be a list",
-        )
-        == [EVALUATOR_AGENT_ID],
-        "T14 skill_evaluation family must activate only skill_evaluator by default",
-    )
-    t14_default_specialists = default_specialists_for_task(config, catalog, "T14")
-    t14_active_roles = select_roles(
-        config,
-        list(t14_default_specialists),
-        full_team=False,
-        catalog=catalog,
-        workflow_family_id="skill_evaluation",
-    )
-    ensure(
-        tuple(role.id for role in t14_active_roles) == (EVALUATOR_AGENT_ID,),
-        "T14 default active roles must contain only skill_evaluator",
-    )
-    t14_active_budget, _ = workflow_spawn_budget(catalog, "skill_evaluation")
-    t14_initial_wave = recommended_initial_subagent_wave(
-        t14_active_roles,
-        t14_active_budget,
-        catalog,
-    )
-    t14_expansion_waves = recommended_dynamic_expansion_wave_slots(
-        t14_active_roles,
-        t14_active_budget,
-        t14_initial_wave,
-        catalog,
-    )
-    ensure(
-        t14_initial_wave == (EVALUATOR_AGENT_ID,),
-        "T14 initial topology must materialize only skill_evaluator",
-    )
-    ensure(
-        not t14_expansion_waves,
-        "T14 topology must not materialize worker, reviewer, or duplicate evaluator waves",
-    )
-    ensure(
-        all(
-            EVALUATOR_AGENT_ID
-            not in require_string_list(
-                task.get("specialists"), "task specialists must be a list"
-            )
-            for task_id, task in task_by_id_map.items()
-            if task_id != "T14"
-        ),
-        "skill_evaluator must not be a default specialist for another task",
-    )
-
     for family in catalog.workflow_families:
-        family_id = require_string(
-            family.get("id"), "workflow family id must be a string"
-        )
+        family_id = require_string(family.get("id"), "workflow family id")
         roles = require_mapping(
-            family.get("roles", {}), f"family {family_id} roles must be a mapping"
+            family.get("roles", {}),
+            f"family {family_id} roles must be a mapping",
         )
-        prompt = family.get("subagent_prompt")
+        for role_group in ("always_on", "specialists"):
+            for role_id in require_string_list(
+                roles.get(role_group, []),
+                f"family {family_id} {role_group} must be a list",
+            ):
+                ensure(
+                    role_id in role_ids,
+                    f"family {family_id} references unknown role {role_id}",
+                )
         prompt = require_mapping(
-            prompt, f"family {family_id} subagent_prompt must be a mapping"
+            family.get("subagent_prompt"),
+            f"family {family_id} subagent_prompt must be a mapping",
         )
         for key in ("purpose", "prompt_preamble", "workflow_focus", "reviewer_prompt"):
             ensure(key in prompt, f"family {family_id} subagent_prompt missing {key}")
-        purpose = require_string(
-            prompt.get("purpose"), f"family {family_id} subagent_prompt purpose empty"
-        )
         ensure(
-            bool(purpose.strip()),
+            bool(
+                require_string(prompt.get("purpose"), "subagent_prompt purpose").strip()
+            ),
             f"family {family_id} subagent_prompt purpose empty",
         )
         for key in ("prompt_preamble", "workflow_focus", "reviewer_prompt"):
@@ -1378,61 +1122,68 @@ def validate_task_catalog_references() -> None:
                 bool(values) and all(value.strip() for value in values),
                 f"family {family_id} subagent_prompt {key} must be a non-empty list",
             )
-        for bucket in ("always_on", "specialists"):
-            members = require_string_list(
-                roles.get(bucket, []), f"family {family_id} {bucket} must be a list"
-            )
-            for role_id in members:
-                ensure(
-                    role_id in role_ids,
-                    f"family {family_id} references unknown role {role_id}",
-                )
-        ensure(
-            "spawn_budget" not in family,
-            f"family {family_id} must not declare numeric spawn_budget",
-        )
-        capacity_request = require_mapping(
-            family.get("capacity_request"),
-            f"family {family_id} capacity_request must be a mapping",
-        )
-        ensure(
-            capacity_request.get("schema_id") == "task_catalog_capacity_request_v1",
-            f"family {family_id} capacity_request schema mismatch",
-        )
-        ensure(
-            capacity_request.get("policy_id") == "topology_derived_v1",
-            f"family {family_id} capacity policy mismatch",
-        )
-        ensure(
-            capacity_request.get("topology_source") == "role_topology",
-            f"family {family_id} capacity topology source mismatch",
-        )
-        ensure(
-            capacity_request.get("write_scope_source")
-            == "team_manifest.run.write_scopes",
-            f"family {family_id} write scope source mismatch",
-        )
 
     for task_id in task_ids(catalog):
         task = next(task for task in catalog.tasks if task["id"] == task_id)
         ensure(
-            task["family"] in family_ids,
-            f"task {task_id} references unknown family {task['family']}",
+            task.get("family") in family_ids,
+            f"task {task_id} references unknown workflow family",
         )
-        _ = default_specialists_for_task(
+        ensure(
+            "test_designer"
+            not in require_string_list(
+                task.get("specialists"),
+                f"task {task_id} specialists must be a list",
+            ),
+            f"task {task_id} must not default-enable test_designer",
+        )
+        default_specialists_for_task(
             config=config,
             catalog=catalog,
             task_id=task_id,
             include_default_review_packs=True,
         )
-    t12_specialists = default_specialists_for_task(
-        config=config,
-        catalog=catalog,
-        task_id="T12",
-        include_default_review_packs=True,
+
+    t14 = next(task for task in catalog.tasks if task.get("id") == "T14")
+    ensure(
+        t14.get("family") == "skill_evaluation",
+        "T14 must use the skill_evaluation workflow family",
     )
     ensure(
-        t12_specialists
+        EVALUATOR_AGENT_ID
+        in require_string_list(
+            t14.get("specialists"), "T14 specialists must be a list"
+        ),
+        "T14 must activate skill_evaluator explicitly",
+    )
+    t14_family = resolve_workflow_family(catalog, "skill_evaluation")
+    t14_roles = require_mapping(
+        t14_family.get("roles"), "T14 family roles must be a mapping"
+    )
+    ensure(
+        require_string_list(t14_roles.get("always_on"), "T14 always_on must be a list")
+        == [],
+        "T14 skill_evaluation family must not have default always-on roles",
+    )
+    ensure(
+        require_string_list(
+            t14_roles.get("specialists"), "T14 specialists must be a list"
+        )
+        == [EVALUATOR_AGENT_ID],
+        "T14 skill_evaluation family must activate only skill_evaluator by default",
+    )
+    ensure(
+        all(
+            EVALUATOR_AGENT_ID
+            not in require_string_list(task.get("specialists"), "task specialists")
+            for task_id, task in ((str(t["id"]), t) for t in catalog.tasks)
+            if task_id != "T14"
+        ),
+        "skill_evaluator must not be a default specialist for another task",
+    )
+
+    ensure(
+        default_specialists_for_task(config, catalog, "T12")
         == (
             "scheduler",
             "schedule_reviewer",
@@ -1440,29 +1191,10 @@ def validate_task_catalog_references() -> None:
             "docs_workflow_steward",
             "prompt_config_reviewer",
         ),
-        f"T12 candidate specialists must remain the five catalog candidates, got {t12_specialists}",
+        "T12 candidate specialists must remain the five catalog candidates",
     )
-    derivation = declared_team_capacity_derivation(catalog)
-    ensure(
-        derivation.requested_max_threads() == 27,
-        "declared topology must derive max_threads=27",
-    )
-    peak = derivation.peak_family
-    ensure(
-        peak.workflow_family_id == "research_driven_change",
-        "research_driven_change must be the peak family",
-    )
-    ensure(peak.direct_frontier_count == 21, "declared direct frontier must be 21")
-    ensure(peak.nested_reservation_count == 6, "declared nested reservations must be 6")
-    topology_violations = workflow_topology_policy_violations(catalog)
-    ensure(
-        not topology_violations,
-        "workflow topology policy violations: "
-        + ", ".join(f"{family_id}:{code}" for family_id, code in topology_violations),
-    )
-
     for pack in catalog.review_packs:
-        pack_id = require_string(pack.get("id"), "review pack id must be a string")
+        pack_id = require_string(pack.get("id"), "review pack id")
         for role_id in require_string_list(
             pack.get("specialists", []),
             f"review pack {pack_id} specialists must be a list",
@@ -1490,73 +1222,6 @@ def validate_task_catalog_references() -> None:
             ensure(
                 task_id in task_ids(catalog),
                 f"review pack {pack_id} optional task missing: {task_id}",
-            )
-
-
-def validate_dynamic_wave_policy() -> None:
-    """Check generated waves preserve role instances and pre-final reviewers."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
-    for task_id in task_ids(catalog):
-        task = task_by_id(catalog, task_id)
-        roles = roles_for_task(config, catalog, task_id)
-        active_budget, _ = workflow_spawn_budget(catalog, str(task["family"]))
-        initial_wave = recommended_initial_subagent_wave(
-            roles,
-            active_budget,
-            catalog,
-        )
-        wave_slots = recommended_dynamic_expansion_wave_slots(
-            roles,
-            active_budget,
-            initial_wave,
-            catalog,
-        )
-        flattened_slots = tuple(slot for wave in wave_slots for slot in wave)
-        slot_keys = {slot.role_id for slot in flattened_slots}
-        expected_slots = {
-            role.id
-            for role in roles
-            if role.id not in NON_SPAWN_WAVE_ROLE_IDS
-            and role.activation != EVALUATOR_ACTIVATION
-        }
-        missing_slots = sorted(expected_slots - slot_keys)
-        ensure(
-            not missing_slots,
-            f"task {task_id} dynamic waves collapsed role instances: {missing_slots}",
-        )
-        duplicate_slots = sorted(
-            role_id
-            for role_id in slot_keys
-            if sum(1 for slot in flattened_slots if slot.role_id == role_id) > 1
-        )
-        ensure(
-            not duplicate_slots,
-            f"task {task_id} dynamic waves materialized duplicate role slots: {duplicate_slots}",
-        )
-        if any(role.id == "final_reviewer" for role in roles):
-            final_wave_indexes = [
-                index
-                for index, wave in enumerate(wave_slots)
-                if any(slot.role_id == "final_reviewer" for slot in wave)
-            ]
-            ensure(
-                bool(final_wave_indexes),
-                f"task {task_id} dynamic waves missing final_reviewer",
-            )
-            final_wave_index = min(final_wave_indexes)
-            pre_final_role_ids = {
-                slot.role_id for wave in wave_slots[:final_wave_index] for slot in wave
-            }
-            late_reviewers = sorted(
-                role.id
-                for role in roles
-                if role.id in PRE_FINAL_REVIEW_ROLE_IDS
-                and role.id not in pre_final_role_ids
-            )
-            ensure(
-                not late_reviewers,
-                f"task {task_id} review roles scheduled after final review: {late_reviewers}",
             )
 
 
@@ -1729,8 +1394,7 @@ def validate_official_system_skill_delegation(
     index_path = root / OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX
     ensure(
         index_path.is_file(),
-        "canonical skill index missing: "
-        f"{OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX}",
+        f"canonical skill index missing: {OFFICIAL_SYSTEM_SKILL_DELEGATION_INDEX}",
     )
     index_text = index_path.read_text(encoding="utf-8")
     ensure(
@@ -1805,7 +1469,7 @@ def validate_registry_authority_docs() -> None:
 
 
 def validate_subagent_protocol_docs() -> None:
-    """Check subagent routing docs keep machine-enforceable boundaries."""
+    """Check subagent routing docs retain role ownership and actual-result guidance."""
     validate_registry_authority_docs()
     for path in SUBAGENT_PROTOCOL_DOCS:
         text = path.read_text(encoding="utf-8")
@@ -1818,27 +1482,15 @@ def validate_subagent_protocol_docs() -> None:
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
                 "python3 tools/agent/orchestration/route.py --prompt",
-                "Implementation Flow Graph",
+                "Markdown links",
+                "actual results",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:
-            ensure("Wave Plan Contract" in text, f"{path} missing wave plan contract")
             ensure(
-                "Agent Wave Ledger" in text,
-                f"{path} missing Agent Wave Ledger contract",
+                "起動結果" in text and "完了結果" in text,
+                f"{path} must distinguish actual child launch and completion results",
             )
-            ensure(
-                "max_depth = 2" in text and "delegated_spawn_policy" in text,
-                f"{path} must state bounded nested spawn and delegated_spawn_policy",
-            )
-        ensure(
-            "subagents do not spawn subagents" not in text,
-            f"{path} must not prohibit bounded nested subagent spawn",
-        )
-        ensure(
-            "depth は固定しません" not in text,
-            f"{path} must not allow unfixed depth wording",
-        )
     subagents_text = (ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md").read_text(
         encoding="utf-8"
     )
@@ -2011,7 +1663,7 @@ def ensure_required_outputs(
 
 
 def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> None:
-    """Ensure one generated task manifest preserves subagent handoff contracts."""
+    """Ensure an explicitly generated bundle preserves role and handoff contracts."""
     manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
         encoding="utf-8",
     )
@@ -2022,6 +1674,7 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     run = require_mapping(
         manifest.get("run"), f"task {task_id} manifest missing run mapping"
     )
+    manifest_roles = manifest.get("roles")
     implementation_policy = require_mapping(
         run.get("contract_complete_implementation_policy"),
         f"task {task_id} manifest missing contract-complete implementation policy",
@@ -2048,46 +1701,6 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
                 retired_field not in implementation_policy,
                 f"task {task_id} manifest retains retired field: {retired_field}",
             )
-    spawn_budget = require_mapping(
-        run.get("spawn_budget"),
-        f"task {task_id} manifest missing run.spawn_budget",
-    )
-    catalog = load_task_catalog(config)
-    task = task_by_id(catalog, task_id)
-    expected_active, expected_max_write = workflow_spawn_budget(
-        catalog,
-        str(task["family"]),
-    )
-    expected_runtime_max_threads = codex_runtime_max_threads()
-    expected_runtime_max_depth = codex_runtime_max_depth()
-    ensure(
-        spawn_budget.get("active_subagents") == expected_active,
-        f"task {task_id} manifest run.spawn_budget.active_subagents mismatch",
-    )
-    ensure(
-        spawn_budget.get("max_write_subagents") == expected_max_write,
-        f"task {task_id} manifest run.spawn_budget.max_write_subagents mismatch",
-    )
-    ensure(
-        spawn_budget.get("runtime_max_threads") == expected_runtime_max_threads,
-        f"task {task_id} manifest run.spawn_budget.runtime_max_threads mismatch",
-    )
-    ensure(
-        spawn_budget.get("runtime_max_depth") == expected_runtime_max_depth,
-        f"task {task_id} manifest run.spawn_budget.runtime_max_depth mismatch",
-    )
-    ensure(
-        spawn_budget.get("initial_three_agent_intake_is_total_cap") is False,
-        f"task {task_id} manifest must state intake responsibility wave is not a total cap",
-    )
-    ensure(
-        "workflow_families[].spawn_budget" in str(spawn_budget.get("source", "")),
-        f"task {task_id} manifest run.spawn_budget source missing catalog reference",
-    )
-    ensure(
-        spawn_budget.get("max_write_subagents_scope") == "write-capable subagents only",
-        f"task {task_id} manifest run.spawn_budget max_write scope unclear",
-    )
     capability = require_mapping(
         run.get("coordination_capability_handshake"),
         f"task {task_id} manifest missing run.coordination_capability_handshake",
@@ -2143,182 +1756,14 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
         receipt_policy.get("parent_relay_is_not_direct_peer") is True,
         f"task {task_id} parent relay must remain distinct from direct peer",
     )
-    delegated_spawn_policy = require_mapping(
-        run.get("delegated_spawn_policy"),
-        f"task {task_id} manifest missing run.delegated_spawn_policy",
-    )
-    ensure(
-        delegated_spawn_policy.get("dynamic_mid_task_spawn") == "allowed",
-        f"task {task_id} manifest must allow dynamic mid-task spawn",
-    )
-    ensure(
-        delegated_spawn_policy.get("delegated_child_spawn")
-        == "allowed_with_bounded_packet",
-        f"task {task_id} manifest delegated child spawn policy mismatch",
-    )
-    required_fields = require_string_list(
-        delegated_spawn_policy.get("handoff_required_fields"),
-        f"task {task_id} manifest delegated spawn handoff fields incomplete",
-    )
-    expected_handoff_fields = {
-        "owner",
-        "child_role",
-        "child_instance_id",
-        "input_packet",
-        "replaceable_unit",
-        "implementation_mechanism",
-        "allowed_paths",
-        "do_not_read",
-        "expected_output",
-        "write_scope",
-        "writer_target",
-        "validation_route",
-        "remaining_spawn_budget",
-    }
-    ensure(
-        expected_handoff_fields.issubset(set(required_fields)),
-        f"task {task_id} manifest delegated spawn handoff fields incomplete",
-    )
-    same_role_policy = require_mapping(
-        delegated_spawn_policy.get("same_role_instances"),
-        f"task {task_id} manifest missing delegated same-role instance policy",
-    )
-    ensure(
-        same_role_policy.get("status") == "allowed_with_distinct_packets",
-        f"task {task_id} manifest same-role instance policy status mismatch",
-    )
-    ensure(
-        same_role_policy.get("identity_key") == "role_id+instance_id+agent_type",
-        f"task {task_id} manifest same-role identity key mismatch",
-    )
-    same_role_required_fields = require_string_list(
-        same_role_policy.get("required_fields"),
-        f"task {task_id} manifest same-role required fields incomplete",
-    )
-    expected_same_role_fields = {
-        "role_id",
-        "instance_id",
-        "agent_type",
-        "input_packet",
-        "allowed_paths",
-        "do_not_read",
-        "expected_output",
-        "write_scope",
-        "writer_target",
-        "validation_route",
-        "review_gate",
-    }
-    ensure(
-        expected_same_role_fields.issubset(set(same_role_required_fields)),
-        f"task {task_id} manifest same-role required fields incomplete",
-    )
-    execution_graph = require_mapping(
-        run.get("execution_graph"),
-        f"task {task_id} manifest missing run.execution_graph",
-    )
-    initial_wave = require_string_list(
-        execution_graph.get("initial_wave_agent_types"),
-        f"task {task_id} execution graph must expose initial agent types",
-    )
-    later_stage_waves = execution_graph.get("later_stage_waves")
-    manifest_roles = manifest.get("roles")
-    total_agent_candidates: list[str] = []
-    if isinstance(manifest_roles, list):
-        for role in require_list(
-            cast(object, manifest_roles),
-            f"task {task_id} manifest roles must be a list",
-        ):
-            if not isinstance(role, dict):
-                continue
-            role = require_mapping(
-                cast(object, role), f"task {task_id} role must be a mapping"
-            )
-            codex_agents = role.get("codex_agents")
-            if not isinstance(codex_agents, list):
-                continue
-            for agent_type in require_string_list(
-                cast(object, codex_agents),
-                f"task {task_id} role codex_agents must be a list",
-            ):
-                if agent_type not in total_agent_candidates:
-                    total_agent_candidates.append(agent_type)
-    # T15 has no initial work until an explicit IssueWorker candidate is
-    # supplied.  The catalog smoke bundle intentionally carries no candidate,
-    # so its empty wave is the expected no-action projection.  Candidate-bound
-    # T15 runs are materialized through the publisher route and are validated
-    # by that route's focused tests.
-    if task_id != "T15":
-        ensure(
-            len(initial_wave) >= 1,
-            f"task {task_id} execution graph must expose initial agent types",
-        )
-    if expected_active > MIN_DYNAMIC_SPAWN_BUDGET and len(total_agent_candidates) > len(
-        initial_wave
-    ):
-        dynamic_agent_candidates: list[str] = []
-        if isinstance(later_stage_waves, list):
-            for wave in require_list(
-                cast(object, later_stage_waves),
-                f"task {task_id} execution graph later_stage_waves must be a list",
-            ):
-                if not isinstance(wave, dict):
-                    continue
-                wave = require_mapping(
-                    cast(object, wave),
-                    f"task {task_id} later-stage wave must be a mapping",
-                )
-                agent_types = wave.get("agent_types")
-                role_instances = wave.get("role_instances")
-                if isinstance(role_instances, list):
-                    for raw_identity in require_string_list(
-                        cast(object, role_instances),
-                        f"task {task_id} later-stage role_instances must be a list",
-                    ):
-                        identity = raw_identity.split(":", 3)
-                        ensure(
-                            len(identity) == 4,
-                            f"task {task_id} role_instance must carry role_id:instance_id:agent_type:input_packet",
-                        )
-                if not isinstance(agent_types, list):
-                    continue
-                for agent_type in require_string_list(
-                    cast(object, agent_types),
-                    f"task {task_id} dynamic expansion agent_types must be a list",
-                ):
-                    if agent_type not in dynamic_agent_candidates:
-                        dynamic_agent_candidates.append(agent_type)
-        ensure(
-            len(dynamic_agent_candidates) >= 1,
-            f"task {task_id} execution graph must expose later-stage waves",
-        )
-        ensure(
-            initial_wave == ["requirements_organizer"],
-            f"task {task_id} execution graph must use the active intake responsibility wave",
-        )
-        ensure(
-            len(set(initial_wave + dynamic_agent_candidates)) > len(initial_wave),
-            f"task {task_id} execution graph must not collapse multi-agent work to intake responsibility",
-        )
-    ensure(
-        len(initial_wave) <= expected_active,
-        f"task {task_id} execution graph initial wave exceeds active spawn budget",
-    )
     write_scope_policy = require_mapping(
         run.get("write_scope_policy"),
         f"task {task_id} manifest missing run.write_scope_policy",
     )
     ensure(
-        write_scope_policy.get("max_write_subagents") == expected_max_write,
-        f"task {task_id} manifest run.write_scope_policy.max_write_subagents mismatch",
-    )
-    ensure(
         write_scope_policy.get("overlapping_write_scopes")
         == "reject_same_checkout_root_before_spawn",
-        f"task {task_id} manifest overlapping write scope policy must serialize current checkout waves",
-    )
-    ensure(
-        "active_subagents" not in write_scope_policy,
-        f"task {task_id} manifest write_scope_policy must not carry active_subagents",
+        f"task {task_id} manifest must reject overlapping writes to one checkout",
     )
     ensure(
         "subagent_prompt_packet:" in manifest_text,
@@ -2366,11 +1811,6 @@ def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> 
     lifecycle_policy = require_mapping(
         run.get("subagent_lifecycle_policy"),
         f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
-    )
-    ensure(
-        lifecycle_policy.get("mid_task_user_input_policy")
-        == "classify_then_reuse_or_route_fresh",
-        f"task {task_id} manifest missing semantic mid-task input policy",
     )
     ensure(
         lifecycle_policy.get("same_task_delta_reuse")
@@ -2679,7 +2119,6 @@ def main() -> int:
     validate_codex_agent_settings()
     validate_team_config_references()
     validate_task_catalog_references()
-    validate_dynamic_wave_policy()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
     validate_bundle_outputs()

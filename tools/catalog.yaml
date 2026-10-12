@@ -938,7 +938,7 @@ entries:
       - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: workflow-monitor
-    summary: Appends typed workflow behavior and wave evidence to an agent run bundle.
+    summary: Appends observed workflow behavior and actual native-result evidence to an agent run bundle.
     path: tools/runtime/lifecycle/workflow_monitor.py
     family: agent_tools
     role: workflow
@@ -1693,25 +1693,6 @@ entries:
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
       - tests/agent_tools/test_check_agent_runtime_alignment.py
-
-  - id: check-execution-time-aware-orchestration
-    summary: Enforces the canonical execution-time-aware orchestration owner contract and consumer projections.
-    path: tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py --root .
-    dispatch: {argv: ["python3", "tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py", "--root", "."]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/skills/agent-orchestration.md
-    tests:
-      - tests/agent_tools/test_execution_time_aware_orchestration_contract.py
 
   - id: check-skill-frontmatter
     summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.

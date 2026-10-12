@@ -22,7 +22,6 @@ artifacts and state below apply only to `coordination`, not `bounded_fast_path`.
 | Performing selected validation | [6. Validation](#6-validation) |
 | Closing a bounded route | [Bounded delivery](#bounded-delivery) |
 | Closing a coordination run | [Mechanical Completion Loop](#mechanical-completion-loop) and [Coordination closeout](#coordination-closeout) |
-| Consuming a coordination CompletionCoverage projection | [CompletionCoverage applicability](#completioncoverage-applicability-and-state-contract) |
 | Reporting or handing off the result | [Completion Readiness](#completion-readiness) |
 
 ## Completion Bar
@@ -59,15 +58,15 @@ the selected operations. Decide commit and push under
 [delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions).
 
 The selected results are the evidence. This route creates no coordination run
-bundle, `user_request_contract.md`, `schedule.md`, `closeout_gate.md`, or
-CompletionCoverage ledger, and does not call `task_close.py`. A concrete new
+bundle, `user_request_contract.md`, `schedule.md`, or `closeout_gate.md`, and does
+not call `task_close.py`. A concrete new
 coordination need returns only that changed decision to the route owner; labels,
 links, and report length do not initiate a route change.
 
 ## Mechanical Completion Loop
 
-For a selected coordination run, use the existing run bundle and `closeout_gate.md`.
-Read current active clauses, planned units, accepted findings, validation gaps, and
+For an explicitly selected coordination closeout, use its existing run bundle and
+`closeout_gate.md`. Read current request clauses, accepted findings, validation gaps, and
 selected commit/push, synchronization, and follow-up outcomes. Inspect the final
 tracked/untracked diff and directly affected dependencies/consumers. Run selected
 static and targeted checks; select broad execution only when the affected contract
@@ -80,46 +79,11 @@ in-scope repair. Preserve the intent through repair, redesign, or authorized
 escalation. Use [review activation and adjudication](../skills/agent-orchestration.md#review-activation-and-adjudication)
 for those decisions.
 
-`task_close.py` consumes the selected stage evidence and closeout inputs as the
-coordination run's sole terminal readiness predicate. Record `not_applicable`
-only where the selected run schema requires an inactive gate's disposition;
-this does not activate the gate or a second evidence ledger.
-
-## CompletionCoverage Applicability And State Contract
-
-This section applies to coordination runs using CompletionCoverage. Existing
-ledger owners append facts; the W2 projection/check boundary derives the read
-model; `task_close` and `report_artifact_checks` consume it. Readers do not write
-back to the schema owner or define a second state machine.
-
-The state comprises `context_binding`, `coverage_map`, `gate_evidence`,
-`failure_response`, `completion_boundary`, and `projection_metadata`. Preserve
-transitions `context_bound` → `design_pending` → `design_approved` →
-`writer_release_pending` → `writer_released` → `source_freeze_pending` →
-`source_frozen` → `change_review_pending` → `change_review_approved` →
-`integration_pending` → `publication_ready` → `delivered`. Validation failure
-enters `repair_pending`; same-intent repair returns to its owner and unresolved
-or intent-changing work enters `escalation_pending`.
-
-`evaluate_completion_boundary` consumes one `control_topology_ledger.json`
-snapshot for routing/publication, with schedule, open-work, repair, and crossing-edge
-inputs. Parent-route and global-publication facts are not separate duplicate
-inputs. Keep `all_planned_chunks_complete` and `overall_delivery_complete`
-independent; a chunk or checkpoint is an internal progress observation.
-
-W2-20 orders W2 design `APPROVE`, one isolated-branch writer release with collision
-preservation and `branch_creation_reason=convergence_w2_gate_completion_authority`,
-source freeze/review, then W3/integration-executor integration. Later
-`routing_gate=verified` evidence is not a prerequisite for the writer action
-that produces integration evidence.
-
-W1 produces `ExecutionResourcePlan`. W2 consumes its W2-12 plan/actual/readback/
-failure certificate mapping and W2-19 ordered GPU consumer mapping: candidate UUIDs,
-process-held PID/start identities, active reservations, selected UUIDs, atomic
-lock/lease and post-lock readback, effective environment, terminal GPU identities,
-release/descendant retention, and typed insufficient-eligible or mismatch failure.
-W2 does not select/reserve resources, parse NVML, construct environments, or
-reimplement their tests and gates.
+For an explicitly selected coordination closeout, `task_close.py` checks the
+requested outcome, actual validation and delivery evidence, and applicable
+closeout records. It does not require a task graph, stage plan, or planned-work
+ledger. Record `not_applicable` only where the selected closeout artifact defines
+an inactive field.
 
 ## 6. Validation
 
@@ -228,7 +192,7 @@ closeout, preserving unrelated/user-owned resources.
 findings and authorized withdrawal/replacement/escalation for any discarded slice.
 Keep selected review post-fix evidence and required inactive dispositions in the
 same run record. The terminal owner consumes canonical tree-head, subagent, log,
-evaluation, and coverage evidence under their actual activation conditions.
+and evaluation evidence under their actual activation conditions.
 
 When behavior feedback/evaluation is selected, update the existing
 `workflow_monitoring.md` signals, interventions, decisions, and protocol feedback
@@ -240,7 +204,7 @@ Reuse [agent-learning](../skills/agent-learning.md#reader-map) for private knowl
 or behavior-learning decisions. Public failed verification stays in the saved topic
 record. A standalone memo save does not activate behavior evaluation.
 
-Keep the selected run's schedule and execution trail current, settle applicable
+Keep any selected run's execution trail current, settle applicable
 log-derived avoidances at their owner, and retain required experiment/performance
 comparisons and scope-limited claims. Publish actual results through the existing
 reporting owner rather than a second closeout checklist or approval gate.

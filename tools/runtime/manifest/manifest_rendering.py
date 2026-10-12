@@ -5,7 +5,6 @@
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns coordination capability and receipt semantics.
 # upstream implementation ../../agent/orchestration/team_config.py provides rendering configuration inputs.
 # upstream implementation ../../agent/orchestration/packets.py provides rendering packet inputs.
-# upstream implementation ../../agent/orchestration/implementation_dispatch.py owns capacity and closeout projections.
 # upstream implementation ../values.py refines decoded rendering containers.
 # upstream implementation ../../repository/workspace/workspace_scope.py provides rendering paths.
 # downstream implementation ../../agent/orchestration/agent_team.py facade consumes rendering APIs.
@@ -55,15 +54,11 @@ from tools.agent.orchestration.packets import (
 from tools.repository.workspace.workspace_scope import resolve_role_write_scope
 
 from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
-from tools.runtime.authority.writer_target import parse_writer_target
-
 from tools.agent.orchestration.team_config import (
     ROOT,
     Role,
     RunBundleSpec,
-    SubagentWaveSlot,
     TeamConfig,
-    as_mapping_tuple,
     as_optional_string,
     as_required_string,
     as_string_tuple,
@@ -71,26 +66,15 @@ from tools.agent.orchestration.team_config import (
     load_task_catalog,
     load_team_config,
     resolve_workflow_family,
-    workflow_child_handoff_required,
 )
 
 from tools.agent.orchestration.tool_calls import (
     TOOL_CALL_SCHEMA,
-    materialize_dynamic_route_tool_call_token,
 )
 
 from tools.agent.orchestration.implementation_dispatch import (
-    CapacityRuntime,
-    capacity_projection,
-    closeout_projection,
-    capacity_runtime_for_spec,
-    codex_runtime_max_depth,
-    codex_runtime_max_threads,
     default_quality_check_agent_types,
     default_quality_check_role_ids,
-    recommended_dynamic_expansion_wave_slots,
-    recommended_initial_subagent_wave_slots,
-    workflow_spawn_budget,
 )
 
 
@@ -273,22 +257,12 @@ CONTRACT_COMPLETE_IMPLEMENTATION_RULE = (
     "実装 behavior は request clauses、acceptance contract、"
     "Implementation Source Packet、Design-To-Implementation Trace、"
     "dependency-expanded scope、validation route、review gate から導く。"
-    "見た目の広さ、Owner-Bounded Change、MVP、thin slice は暫定的な routing、"
-    "wave、validation profile の選択 signal に留め、owner boundary や "
+    "見た目の広さ、Owner-Bounded Change、MVP、thin slice は暫定的な routing "
+    "signal に留め、owner boundary や "
     "impact surface が違うと分かった時点で route を更新する。contract gap、"
     "責務境界、API shape、依存方向、runtime contract の不足は "
     "design_issue_blocker として Gate 5-6 へ戻す。"
 )
-
-IMPLEMENTATION_HANDOFF_REQUIRED = "yes"
-
-PARENT_REPO_EDITS_ALLOWED = "no"
-
-PARENT_ORCHESTRATION_ONLY = "yes"
-
-WRITE_CAPABLE_CHILD_REQUIRED = "yes"
-
-PARENT_BLOCKED_ROUTE = "typed_blocked_retry_or_user_report"
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
@@ -298,7 +272,7 @@ REPO_TOOL_ROUTING_STATUS = "selected_native_argv"
 
 REPO_TOOL_ROUTING_ROUTE_BASIS = "selected_public_skills"
 
-REPO_TOOL_ROUTING_EXECUTION_MODE = "sequential_by_skill_and_stage"
+REPO_TOOL_ROUTING_EXECUTION_MODE = "selected_skill_then_native_command"
 
 REPO_TOOL_ROUTING_SEQUENCE = (
     "select_existing_entrypoint",
@@ -306,7 +280,7 @@ REPO_TOOL_ROUTING_SEQUENCE = (
     "record_process_result",
 )
 
-REPO_TOOL_ROUTING_STAGE_FIELDS = (
+REPO_TOOL_ROUTING_RESULT_FIELDS = (
     "tool_route",
     "argv",
     "cwd",
@@ -315,10 +289,6 @@ REPO_TOOL_ROUTING_STAGE_FIELDS = (
     "stdout",
     "stderr",
 )
-
-REPO_DYNAMIC_SKILL_ROUTING_STATUS = "related_skill_candidates"
-
-REPO_DYNAMIC_SKILL_ROUTING_NEXT = "add_skill_then_select_existing_entrypoint"
 
 # DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
 DECISION_SUFFICIENCY_OWNER = (
@@ -387,13 +357,9 @@ class ValidationFailureResponsePolicy(TypedDict):
 
 _validation_failure_response_policy_cache: ValidationFailureResponsePolicy | None = None
 
-CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX = 6
-
 DEFAULT_QUALITY_CHECK_POLICY_SOURCE = (
     "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default"
 )
-
-DEFAULT_QUALITY_CHECK_STAGES = ("selected_stages_only",)
 
 DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
     ("tools/bin/agent-canon", "docs", "check", "<changed-markdown-paths>"),
@@ -515,7 +481,6 @@ COMMON_PROMPT_MUST_INCLUDE = (
     "team_manifest_path",
     "user_facing_language_policy",
     "contract_complete_implementation_policy",
-    "execution_graph",
     "pre_handoff_scope_policy",
     "reuse_survey",
     "pre_handoff_gate_status",
@@ -638,22 +603,10 @@ def user_facing_language_policy_output_lines() -> tuple[str, ...]:
 
 def contract_complete_implementation_policy_output_lines(
     task_text: str = "",
-    *,
-    child_handoff_required: bool = False,
 ) -> tuple[str, ...]:
     """Return stdout lines for contract-complete implementation policy."""
     del task_text
-    handoff_lines: tuple[str, ...] = ()
-    if child_handoff_required:
-        handoff_lines = (
-            f"IMPLEMENTATION_HANDOFF_REQUIRED={IMPLEMENTATION_HANDOFF_REQUIRED}",
-            f"PARENT_REPO_EDITS_ALLOWED={PARENT_REPO_EDITS_ALLOWED}",
-            f"PARENT_ORCHESTRATION_ONLY={PARENT_ORCHESTRATION_ONLY}",
-            f"WRITE_CAPABLE_CHILD_REQUIRED={WRITE_CAPABLE_CHILD_REQUIRED}",
-            f"PARENT_BLOCKED_ROUTE={PARENT_BLOCKED_ROUTE}",
-        )
     return (
-        *handoff_lines,
         "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
         "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS="
         f"{CONTRACT_COMPLETE_IMPLEMENTATION_SCOPE_BASIS}",
@@ -679,27 +632,6 @@ def selected_skill_names(selected_skills: tuple[str, ...]) -> tuple[str, ...]:
     )
 
 
-def dynamic_skill_candidate_names(
-    selected_skills: tuple[str, ...],
-    source_root: Path | None = None,
-) -> tuple[str, ...]:
-    """Return related public skills that can activate in later waves."""
-    selected = set(selected_skill_names(selected_skills))
-    candidates: list[str] = []
-    rules = {rule.skill: rule for rule in load_skill_route_rules(source_root or ROOT)}
-    for skill in selected_skill_names(selected_skills):
-        for candidate in rules[skill].related_skills:
-            if candidate in selected or candidate in candidates:
-                continue
-            candidates.append(candidate)
-    return tuple(candidates)
-
-
-def format_public_skill_list(skills: tuple[str, ...]) -> str:
-    """Return a machine-readable public skill list."""
-    return ",".join(f"${skill}" for skill in skills) or "-"
-
-
 def repo_tool_routing_policy_output_lines(
     selected_skills: tuple[str, ...],
     *,
@@ -709,29 +641,17 @@ def repo_tool_routing_policy_output_lines(
     if source_root is None:
         raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     skill_names = selected_skill_names(selected_skills)
-    skill_list = format_public_skill_list(skill_names)
-    dynamic_candidates = dynamic_skill_candidate_names(selected_skills, source_root)
+    skill_list = ",".join(f"${skill}" for skill in skill_names) or "-"
     return (
         "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
         "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
         f"REPO_TOOL_SELECTED_SKILLS={skill_list}",
-        f"REPO_TOOL_DYNAMIC_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
         f"REPO_TOOL_ROUTING_SOURCE={REPO_TOOL_ROUTING_POLICY_SOURCE}",
         f"REPO_TOOL_ROUTING_OWNER={REPO_TOOL_ROUTING_OWNER}",
         f"REPO_TOOL_ROUTING_ROUTE_BASIS={REPO_TOOL_ROUTING_ROUTE_BASIS}",
         f"REPO_TOOL_ROUTING_EXECUTION_MODE={REPO_TOOL_ROUTING_EXECUTION_MODE}",
         f"REPO_TOOL_ROUTING_SEQUENCE={','.join(REPO_TOOL_ROUTING_SEQUENCE)}",
-        f"REPO_TOOL_ROUTING_STAGE_FIELDS={','.join(REPO_TOOL_ROUTING_STAGE_FIELDS)}",
-        f"REPO_DYNAMIC_SKILL_ROUTING_POLICY={REPO_DYNAMIC_SKILL_ROUTING_STATUS}",
-        "REPO_DYNAMIC_SKILL_ROUTING_TOOL_CALL="
-        + json.dumps(
-            materialize_dynamic_route_tool_call_token(),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ),
-        f"REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES={format_public_skill_list(dynamic_candidates)}",
-        f"REPO_DYNAMIC_SKILL_ROUTING_NEXT={REPO_DYNAMIC_SKILL_ROUTING_NEXT}",
+        f"REPO_TOOL_ROUTING_RESULT_FIELDS={','.join(REPO_TOOL_ROUTING_RESULT_FIELDS)}",
     )
 
 
@@ -754,7 +674,6 @@ def default_quality_check_policy_output_lines(
         f"{','.join(default_quality_check_role_ids(roles)) or '-'}",
         "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES="
         f"{','.join(default_quality_check_agent_types(roles)) or '-'}",
-        f"DEFAULT_QUALITY_CHECK_STAGES={','.join(DEFAULT_QUALITY_CHECK_STAGES)}",
         f"DEFAULT_QUALITY_CHECK_EVIDENCE={','.join(OOP_EVIDENCE_DIMENSIONS)}",
         "DEFAULT_FORMAT_CHECK_ROUTE="
         + public_command_for_layout(CANONICAL_FORMAT_CHECK_ROUTE, layout),
@@ -780,17 +699,9 @@ def suggested_public_skills(
     source_root: Path | None = None,
     issue_worker_candidate: Mapping[str, object] | None = None,
 ) -> tuple[str, ...]:
-    """Return the public skill set required by the selected route."""
+    """Return task-specific Skill links as guidance, never as a start gate."""
     selected = ["$agent-orchestration", "$codex-task-workflow"]
-    config = load_team_config()
-    catalog = load_task_catalog(config, source_root or ROOT)
-    if workflow_child_handoff_required(
-        config,
-        catalog,
-        workflow_family_id,
-        issue_worker_candidate,
-    ):
-        selected.append("$subagent-bootstrap")
+    del issue_worker_candidate
     if workflow_family_id == "research_driven_change":
         selected.append("$literature-survey")
         selected.append("$research-workflow")
@@ -880,29 +791,6 @@ def language_review_candidates(
             ("docs_workflow_steward", has_docs_or_runtime),
         )
         if enabled
-    )
-
-
-def format_subagent_wave(agent_types: tuple[str, ...]) -> str:
-    """Render one wave as a comma-separated agent_type list."""
-    return ",".join(agent_types)
-
-
-def format_subagent_wave_chunks(waves: tuple[tuple[str, ...], ...]) -> str:
-    """Render follow-up waves in a machine-readable summary form."""
-    return ";".join(
-        f"WAVE-{index + 2}={format_subagent_wave(wave)}"
-        for index, wave in enumerate(waves)
-    )
-
-
-def format_subagent_role_instance_wave_chunks(
-    waves: tuple[tuple[SubagentWaveSlot, ...], ...],
-) -> str:
-    """Render follow-up role-instance waves in a machine-readable summary form."""
-    return ";".join(
-        f"WAVE-{index + 2}=" + ",".join(slot.executable_identity for slot in wave)
-        for index, wave in enumerate(waves)
     )
 
 
@@ -1013,10 +901,7 @@ def required_output_templates_missing(
     )
 
 
-def build_manifest(
-    spec: RunBundleSpec,
-    capacity_runtime: CapacityRuntime | None = None,
-) -> str:
+def build_manifest(spec: RunBundleSpec) -> str:
     """Build the team manifest yaml."""
     workflow_family = None
     if spec.workflow_family_id:
@@ -1034,7 +919,7 @@ def build_manifest(
             workflow_family=workflow_family,
         )
     )
-    lines = manifest_run_lines(spec, workflow_family, capacity_runtime)
+    lines = manifest_run_lines(spec, workflow_family)
     lines.extend(manifest_role_lines(spec, workflow_family, active_design_packet))
     lines.extend(manifest_context_policy_lines(spec.config, active_design_packet))
     lines.extend(manifest_quality_gate_lines(spec.config))
@@ -1045,12 +930,8 @@ def build_manifest(
 def manifest_run_lines(
     spec: RunBundleSpec,
     workflow_family: dict[str, object] | None,
-    capacity_runtime: CapacityRuntime | None = None,
 ) -> list[str]:
     """Render run-level manifest fields."""
-    capacity_runtime = capacity_runtime or capacity_runtime_for_spec(spec)
-    capacity_payload = capacity_projection(capacity_runtime, spec)
-    closeout_payload = closeout_projection(capacity_runtime, spec)
     active_design_packet = (
         spec.active_design_packet
         or resolve_active_design_packet_config(
@@ -1127,49 +1008,14 @@ def manifest_run_lines(
     lines.extend(f"    {line}" for line in projection_yaml)
     lines.extend(
         [
-            "  parent_lineage_id: " + repr(capacity_runtime.parent_lineage_id),
-            "  implementation_execution:",
-            "    schema_id: 'implementation_execution_contract_v1'",
-            "    route_owner: 'implementation_route'",
-            "    route_import: 'tools.agent.orchestration.implementation_route'",
-            "    profile_registry_import: 'tools.agent.orchestration.model_profile_registry'",
-            "    dispatch: 'immediate_one_pass'",
-            "    same_spark_gap_continuation: 'resume_same_spark_after_gap'",
-            f"    deterministic_search_route: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'semantic', '--format', 'json'))!r}",
-            "  capacity_request:",
-        ]
-    )
-    capacity_yaml = yaml.safe_dump(
-        capacity_payload,
-        sort_keys=False,
-        default_flow_style=False,
-    ).splitlines()
-    for line in capacity_yaml:
-        lines.append(f"    {line}")
-    lines.extend(
-        [
-            "  closeout_packet:",
-        ]
-    )
-    closeout_yaml = yaml.safe_dump(
-        closeout_payload,
-        sort_keys=False,
-        default_flow_style=False,
-    ).splitlines()
-    for line in closeout_yaml:
-        lines.append(f"    {line}")
-    lines.extend(
-        [
             "  subagent_lifecycle_policy:",
             "    fresh_subagents_required: conditional",
             "    reuse_for_new_task: allowed_when_owner_context_compatible",
             "    previous_task_subagent_reuse: allowed_when_owner_context_compatible",
-            "    mid_task_user_input_policy: classify_then_reuse_or_route_fresh",
             "    same_task_delta_reuse: allowed_when_owner_context_compatible",
             "    scope_change_reuse: evaluate_owner_context_compatibility",
             "    new_task_reuse: evaluate_owner_context_compatibility",
             "    close_before_user_completion: true",
-            "    closeout_gate_key: subagents_closed",
             "    closeout_evidence_section: 'Subagent Lifecycle Evidence'",
             "    handoff_rule: 'Reuse an active agent when owner, responsibility, context, write "
             "authority, and validation route remain compatible, including revised scope. Use a "
@@ -1188,12 +1034,6 @@ def manifest_run_lines(
             *manifest_user_facing_language_policy_lines(),
             *manifest_contract_complete_implementation_policy_lines(
                 spec.task,
-                child_handoff_required=workflow_child_handoff_required(
-                    spec.config,
-                    spec.task_catalog,
-                    spec.workflow_family_id or None,
-                    spec.issue_worker_candidate,
-                ),
             ),
             *manifest_pre_handoff_scope_policy_lines(),
             *manifest_pre_handoff_gate_status_lines(
@@ -1254,287 +1094,60 @@ def manifest_run_lines(
             f"  communication_protocol: {str(source_root / str(communication_protocol))!r}"
         )
     if workflow_family is not None:
-        if spec.task_catalog is None:
-            raise RuntimeError("task catalog is required for spawn wave recommendation")
-        active_subagents, max_write_subagents = workflow_spawn_budget(
-            spec.task_catalog,
-            spec.workflow_family_id,
-            include_math_intent=math_intent_route_id is not None,
-        )
-        lines.append("  spawn_budget:")
-        lines.append(
-            "    source: 'agents/task_catalog.yaml workflow_families[].spawn_budget'"
-        )
-        lines.append(f"    active_subagents: {active_subagents}")
-        lines.append(f"    max_write_subagents: {max_write_subagents}")
-        lines.append(
-            f"    runtime_max_threads: {codex_runtime_max_threads(spec.workspace_root)}"
-        )
-        lines.append(
-            f"    runtime_max_depth: {codex_runtime_max_depth(spec.workspace_root)}"
-        )
-        lines.append("    initial_three_agent_intake_is_total_cap: false")
-        lines.append("    max_write_subagents_scope: 'write-capable subagents only'")
-        writer_targets = spec.writer_targets
-        graph_issue_worker_candidate = spec.issue_worker_candidate
-        if (
-            spec.workflow_family_id == "issue_worker_publication"
-            and spec.issue_worker_dispatch is not None
-            and spec.issue_worker_dispatch.get("status") not in {"pending", "spawned"}
-        ):
-            graph_issue_worker_candidate = None
-        initial_slots = recommended_initial_subagent_wave_slots(
-            spec.roles,
-            active_subagents,
-            spec.task_catalog,
-            spec.agent_type_selections,
-            _required_spec_source_root(spec) / ".codex" / "agents",
-            workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=graph_issue_worker_candidate,
-            writer_targets=writer_targets,
-            math_intent_route_id=math_intent_route_id,
-        )
-        initial_wave_slots = initial_slots
-        initial_wave = tuple(slot.agent_type for slot in initial_slots)
-        expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
-            spec.roles,
-            active_subagents,
-            initial_wave,
-            spec.task_catalog,
-            spec.agent_type_selections,
-            _required_spec_source_root(spec) / ".codex" / "agents",
-            workflow_family_id=spec.workflow_family_id,
-            issue_worker_candidate=graph_issue_worker_candidate,
-            writer_targets=writer_targets,
-            math_intent_route_id=math_intent_route_id,
-        )
-        lines.append("  execution_graph:")
-        lines.append("    controller: 'tools/runtime/lifecycle/bootstrap_agent_run.py'")
-        lines.append(
-            "    node_source: 'agents/task_catalog.yaml role_topology_defaults.stage_waves'"
-        )
-        lines.append("    readiness_source: actual_host_tool_results")
-        lines.append("    skill_read_source: canonical_doc")
-        lines.append(f"    task_id: {spec.task_id or 'none'}")
-        lines.append(f"    math_intent_route_id: {math_intent_route_id or 'none'}")
-        lines.append("    selected_role_ids:")
-        if spec.roles:
-            for role in spec.roles:
-                lines.append(f"      - {role.id}")
-        else:
-            lines[-1] = "    selected_role_ids: []"
-        lines.append("    initial_wave_id: WAVE-1")
-        lines.append("    initial_wave_role_ids:")
-        if initial_wave_slots:
-            for slot in initial_wave_slots:
-                lines.append(f"      - {slot.role_id}")
-        else:
-            lines[-1] = "    initial_wave_role_ids: []"
-        lines.append("    initial_wave_role_instances:")
-        if initial_wave_slots:
-            for slot in initial_wave_slots:
-                lines.append(f"      - {slot.executable_identity}")
-        else:
-            lines[-1] = "    initial_wave_role_instances: []"
-        lines.append("    initial_wave_agent_types:")
-        if initial_wave:
-            for agent_type in initial_wave:
-                lines.append(f"      - {agent_type}")
-        else:
-            lines[-1] = "    initial_wave_agent_types: []"
-        if spec.agent_type_selections:
-            lines.append("    agent_type_selections:")
-            for selection in spec.agent_type_selections:
-                lines.append(f"      - role_id: {selection.role_id}")
-                lines.append(f"        agent_type: {selection.agent_type}")
-                lines.append(f"        evidence: {selection.evidence!r}")
-        else:
-            lines.append("    agent_type_selections: []")
-        lines.append("    later_stage_waves:")
-        if expansion_wave_slots:
-            for index, wave in enumerate(expansion_wave_slots, start=2):
-                lines.append(f"      - wave_id: WAVE-{index}")
-                lines.append(f"        depends_on: WAVE-{index - 1}")
-                lines.append("        agent_types:")
-                for slot in wave:
-                    lines.append(f"          - {slot.agent_type}")
-                lines.append("        role_instances:")
-                for slot in wave:
-                    lines.append(
-                        "          - "
-                        f"{slot.executable_identity}:team_manifest.yaml#roles.{slot.role_id}"
-                    )
-        else:
-            lines.append("      - wave_id: none")
-            lines.append("        depends_on: []")
-            lines.append("        agent_types: []")
-            lines.append("        role_instances: []")
-        lines.append("    result_readback:")
-        lines.append("      status: pending")
-        lines.append("      completed_wave_ids: []")
-        lines.append("      role_results: {}")
-        lines.append("    skill_document_reads: {}")
-        lines.append("    writer_targets:")
-        if writer_targets:
-            for owner, raw_target in sorted(writer_targets.items()):
-                target = parse_writer_target(raw_target)  # type: ignore[arg-type]
-                lines.append(f"      - owner: {str(owner)!r}")
-                lines.append("        target:")
-                for field, value in target.as_dict().items():
-                    lines.append(f"          {field}: {value!r}")
-        else:
-            lines.append("      []")
-        lines.extend(render_role_topology(workflow_family, indent="    "))
-        lines.append("  delegated_spawn_policy:")
-        lines.append("    dynamic_mid_task_spawn: allowed")
-        lines.append("    delegated_child_spawn: allowed_with_bounded_packet")
-        lines.append("    owner: parent_or_delegated_stage_owner")
-        lines.append(
-            "    child_role_budget_inheritance: active_budget_remaining_after_parent_wave"
-        )
-        lines.append("    active_budget_source: 'run.spawn_budget.active_subagents'")
-        lines.append(
-            "    runtime_thread_ceiling_source: 'run.spawn_budget.runtime_max_threads'"
-        )
-        lines.append(
-            "    runtime_depth_ceiling_source: 'run.spawn_budget.runtime_max_depth'"
-        )
-        lines.append("    validation_failure_triage_policy:")
-        lines.append(f"      trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
-        lines.append("      triage_write_scope: read_only_until_cause_identified")
-        validation_policy = validation_failure_response_policy(
-            spec.agentcanon_source_root
-        )
-        lines.append(f"      taxonomy_source: {validation_policy['taxonomy_source']}")
-        lines.append("      repair_required_fields:")
-        for field in validation_policy["required_fields"]:
-            lines.append(f"        - {field}")
-        lines.append("      intent_preservation_values:")
-        for value in validation_policy["intent_preservation"]:
-            lines.append(f"        - {value}")
-        lines.append("    same_role_instances:")
-        lines.append(f"      status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
-        lines.append(
-            f"      identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}"
-        )
-        lines.append(
-            "      parallel_read_only: "
-            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_read_only']}"
-        )
-        lines.append(
-            "      parallel_write: "
-            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_write']}"
-        )
-        lines.append(
-            "      collision_policy: "
-            f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['collision_policy']}"
-        )
-        lines.append("      required_fields:")
-        for field in SAME_ROLE_SUBAGENT_REQUIRED_FIELDS:
-            lines.append(f"        - {field}")
-        lines.append("    handoff_required_fields:")
-        lines.append("      - owner")
-        lines.append("      - child_role")
-        lines.append("      - child_instance_id")
-        lines.append("      - input_packet")
-        lines.append("      - replaceable_unit")
-        lines.append("      - implementation_mechanism")
-        lines.append("      - validation_route")
-        lines.append("      - tool_route")
-        lines.append("      - tool_call_token")
-        lines.append("      - tool_evidence")
-        lines.append("      - allowed_paths")
-        lines.append("      - do_not_read")
-        lines.append("      - expected_output")
-        lines.append("      - write_scope")
-        lines.append("      - remaining_spawn_budget")
-        lines.append("      - checkout_identity")
-        lines.append("      - writer_target")
-        if math_intent_route_id_for_spec(spec) is not None:
-            lines.append("      - mathematical_intent_packet")
-            lines.append("      - math_intent_write_scope")
-        lines.append("    handoff_optional_fields:")
-        lines.append("      - decision_sufficiency_packet_ref")
-        lines.append("      - unresolved_branch")
-        lines.append("      - review_gate")
-        lines.append("      - plan_artifact")
-        lines.append("      - edit_handoff")
-        lines.append("      - pre_handoff_gate_status")
-        lines.append("    required_before_spawn:")
-        lines.append(
-            "      - owner, replaceable unit, implementation mechanism, validation "
-            "route, and any unresolved branch that can change them"
-        )
-        lines.append(
-            "      - include run.default_quality_check_policy only when a selected "
-            "review or edit route consumes it"
-        )
-        lines.append(
-            "      - include run.pre_handoff_scope_policy and dependency-expanded "
-            "handoff scope evidence"
-        )
-        lines.append(
-            "      - include run.pre_handoff_gate_status only before the selected "
-            "implementation or write-capable handoff when design_brief.md exists"
-        )
-        lines.append(
-            "      - validation_failure_requires_parallel_triage waves stay read-only "
-            "until failing_contract, observation_level, cause_classification, "
-            "intent_preservation, and evidence are recorded for same-intent repair "
-            "or escalation"
-        )
-        lines.append(
-            "      - re-enter bootstrap_agent_run with the same run id and actual "
-            "spawn/completion ToolCall results before a dependent node is ready"
-        )
-        lines.append(
-            "      - runtime graph projects completed wave results to schedule.md and "
-            "workflow_monitoring.md; those rows are readback, not readiness authority"
-        )
-        lines.append(
-            "      - workflow_monitoring.md intervention or behavior-event for spawned/skipped roles"
-        )
-        lines.append(
-            "      - structured handoff with allowed_paths, do_not_read, expected_output, "
-            "and write_policy; durable packet transport is conditional"
-        )
-        lines.append(
-            "      - one checkout_identity readback at start, checkout transitions, "
-            "Git mutation boundaries, handoff, and final handback"
-        )
-        lines.append("    closeout_required_evidence:")
-        lines.append(
-            "      - closeout_gate.md Subagent Lifecycle Evidence planned-vs-actual wave status"
-        )
-        lines.append(
-            "      - closed selected run-local agent ids and auditor closeout artifact"
-        )
-        lines.append("  write_scope_policy:")
-        lines.append("    parent_managed: true")
-        lines.append("    scope_source_ref: run.pre_handoff_scope_policy")
-        lines.append("    handoff_scope_status: seed_then_expand_before_handoff")
-        lines.append("    disjoint_write_scopes_required: true")
-        lines.append(
-            "    overlapping_write_scopes: reject_same_checkout_root_before_spawn"
-        )
-        lines.append(f"    max_write_subagents: {max_write_subagents}")
-        lines.append("  writer_target_policy:")
-        lines.append("    required_for: write_capable_handoffs")
-        lines.append("    prepared_by: repository-topic-clone.prepare")
-        lines.append("    collision: reject_same_checkout_root_before_spawn")
-        lines.append(
-            "    pretooluse_environment: "
-            "AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)"
-        )
-        lines.append("    fields:")
-        for field in WRITER_TARGET_REQUIRED_FIELDS:
-            lines.append(f"      - {field}")
-        lines.append("    readers: target_omitted_and_shareable")
-        lines.append("    registry: none")
         lines.append("  workflow_family:")
         lines.append(f"    id: {spec.workflow_family_id}")
         lines.append(f"    name: {str(workflow_family['name'])!r}")
+        lines.extend(render_role_topology(workflow_family, indent="    "))
         lines.extend(render_subagent_prompt_packet(workflow_family, indent="  "))
+    lines.append("  write_scope_policy:")
+    lines.append("    parent_managed: true")
+    lines.append("    scope_source_ref: run.pre_handoff_scope_policy")
+    lines.append("    handoff_scope_status: seed_then_expand_before_handoff")
+    lines.append("    disjoint_write_scopes_required: true")
+    lines.append("    overlapping_write_scopes: reject_same_checkout_root_before_spawn")
+    lines.append("  writer_target_policy:")
+    lines.append("    required_for: write_capable_handoffs")
+    lines.append("    prepared_by: repository-topic-clone.prepare")
+    lines.append("    collision: reject_same_checkout_root_before_spawn")
+    lines.append(
+        "    pretooluse_environment: "
+        "AGENT_CANON_CHECKOUT_ROOT,AGENT_CANON_CHECKOUT_BRANCH,AGENT_CANON_WRITER_ALLOWED_PATHS(JSON)"
+    )
+    lines.append("    fields:")
+    for field in WRITER_TARGET_REQUIRED_FIELDS:
+        lines.append(f"      - {field}")
+    lines.append("    readers: target_omitted_and_shareable")
+    lines.append("    registry: none")
+    lines.append("  same_role_instances:")
+    lines.append(f"    status: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['status']}")
+    lines.append(
+        f"    identity_key: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['identity_key']!r}"
+    )
+    lines.append(
+        "    parallel_read_only: "
+        f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_read_only']}"
+    )
+    lines.append(
+        f"    parallel_write: {SAME_ROLE_SUBAGENT_INSTANCE_POLICY['parallel_write']}"
+    )
+    lines.append(
+        "    collision_policy: "
+        f"{SAME_ROLE_SUBAGENT_INSTANCE_POLICY['collision_policy']}"
+    )
+    lines.append("    required_fields:")
+    for field in SAME_ROLE_SUBAGENT_REQUIRED_FIELDS:
+        lines.append(f"      - {field}")
+    lines.append("  validation_failure_response_policy:")
+    lines.append(f"    trigger: {VALIDATION_FAILURE_TRIAGE_TRIGGER}")
+    lines.append("    triage_write_scope: read_only_until_cause_identified")
+    validation_policy = validation_failure_response_policy(spec.agentcanon_source_root)
+    lines.append(f"    taxonomy_source: {validation_policy['taxonomy_source']}")
+    lines.append("    repair_required_fields:")
+    for field in validation_policy["required_fields"]:
+        lines.append(f"      - {field}")
+    lines.append("    intent_preservation_values:")
+    for value in validation_policy["intent_preservation"]:
+        lines.append(f"      - {value}")
     lines.append("  cross_cutting_document_packet:")
     cross_cutting_packet = resolve_cross_cutting_document_packet(
         spec.workspace_root,
@@ -1548,8 +1161,6 @@ def manifest_run_lines(
 
 def manifest_contract_complete_implementation_policy_lines(
     task_text: str = "",
-    *,
-    child_handoff_required: bool = False,
 ) -> list[str]:
     """Render contract-complete implementation policy lines."""
     lines = [
@@ -1561,16 +1172,6 @@ def manifest_contract_complete_implementation_policy_lines(
         f"    rule: {CONTRACT_COMPLETE_IMPLEMENTATION_RULE!r}",
         "    required_inputs:",
     ]
-    if child_handoff_required:
-        lines[
-            CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX:CONTRACT_COMPLETE_IMPLEMENTATION_HANDOFF_INSERT_INDEX
-        ] = [
-            f"    implementation_handoff_required: {IMPLEMENTATION_HANDOFF_REQUIRED!r}",
-            f"    parent_repo_edits_allowed: {PARENT_REPO_EDITS_ALLOWED!r}",
-            f"    parent_orchestration_only: {PARENT_ORCHESTRATION_ONLY!r}",
-            f"    write_capable_child_required: {WRITE_CAPABLE_CHILD_REQUIRED!r}",
-            f"    parent_blocked_route: {PARENT_BLOCKED_ROUTE!r}",
-        ]
     for field in CONTRACT_COMPLETE_IMPLEMENTATION_REQUIRED_INPUTS:
         lines.append(f"      - {field}")
     lines.append("    route_signals:")
@@ -1673,8 +1274,6 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
         issue_worker_candidate=spec.issue_worker_candidate,
     )
     skill_names = selected_skill_names(selected_skills)
-    source_root = _required_spec_source_root(spec)
-    dynamic_candidates = dynamic_skill_candidate_names(selected_skills, source_root)
     lines = [
         "  repo_tool_routing_policy:",
         "    enabled: true",
@@ -1687,25 +1286,12 @@ def manifest_repo_tool_routing_policy_lines(spec: RunBundleSpec) -> list[str]:
     ]
     for stage in REPO_TOOL_ROUTING_SEQUENCE:
         lines.append(f"      - {stage}")
-    lines.append("    stage_fields:")
-    for field in REPO_TOOL_ROUTING_STAGE_FIELDS:
+    lines.append("    result_fields:")
+    for field in REPO_TOOL_ROUTING_RESULT_FIELDS:
         lines.append(f"      - {field}")
     lines.append("    selected_skills:")
     for skill in skill_names:
         lines.append(f"      - ${skill}")
-    lines.append("    dynamic_skill_routing:")
-    lines.append(f"      status: {REPO_DYNAMIC_SKILL_ROUTING_STATUS!r}")
-    lines.append("      tool_call_token:")
-    lines.extend(
-        _yaml_mapping_lines(materialize_dynamic_route_tool_call_token(), indent=8)
-    )
-    lines.append(f"      next: {REPO_DYNAMIC_SKILL_ROUTING_NEXT!r}")
-    lines.append("      candidates:")
-    if dynamic_candidates:
-        for candidate in dynamic_candidates:
-            lines.append(f"        - ${candidate}")
-    else:
-        lines.append("        - none")
     return lines
 
 
@@ -1784,10 +1370,7 @@ def manifest_default_quality_check_policy_lines(spec: RunBundleSpec) -> list[str
         f"    source: {DEFAULT_QUALITY_CHECK_POLICY_SOURCE!r}",
         "    activation: owner_critical_or_distinct_unresolved_claim_or_risk",
         "    role_topology_ref: 'agents/task_catalog.yaml#role_topology_defaults.role_families.review'",
-        "    stages:",
     ]
-    for stage in DEFAULT_QUALITY_CHECK_STAGES:
-        lines.append(f"      - {stage}")
     if role_ids:
         lines.append("    candidate_roles:")
         for role_id in role_ids:
@@ -2119,25 +1702,6 @@ def render_role_topology(
         raise RuntimeError(
             "role_topology.same_role_parallel_instances must be a mapping"
         )
-    stage_waves = topology.get("stage_waves")
-    if is_object_list(stage_waves):
-        lines.append(f"{indent}  stage_waves:")
-        for wave in as_mapping_tuple(
-            stage_waves,
-            "role_topology.stage_waves",
-        ):
-            lines.append(
-                f"{indent}    - id: {as_required_string(wave.get('id'), 'stage_waves[].id')}"
-            )
-            lines.append(
-                f"{indent}      stage_class: "
-                f"{as_required_string(wave.get('stage_class'), 'stage_waves[].stage_class')}"
-            )
-            lines.append(f"{indent}      role_ids:")
-            for role_id in as_string_tuple(
-                wave.get("role_ids"), "stage_waves[].role_ids"
-            ):
-                lines.append(f"{indent}        - {role_id}")
     return lines
 
 
@@ -2162,12 +1726,9 @@ def render_subagent_prompt_packet(
         f"{indent}  decision_sufficiency_packet_ref: "
         "'run.decision_sufficiency.packet_ref'"
     )
-    lines.append(f"{indent}  execution_graph_ref: 'run.execution_graph'")
     lines.append(f"{indent}  tool_route: 'run.repo_tool_routing_policy'")
     lines.append(f"{indent}  native_argv: 'run.repo_tool_routing_policy'")
-    lines.append(
-        f"{indent}  tool_evidence: 'run.repo_tool_routing_policy.dynamic_skill_routing'"
-    )
+    lines.append(f"{indent}  tool_evidence: 'run.repo_tool_routing_policy'")
     lines.append(f"{indent}  tool_catalog_matches: 'tools/catalog.yaml'")
     for key in ("dispatch_route", "execution_role", "tool_call_route"):
         value = as_optional_string(
@@ -2236,9 +1797,9 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "When run.subagent_prompt_packet.subagent_startup_route is present, carry that "
         "structural route field into the next handoff or review result without turning it "
         "into prompt keyword skill activation. "
-        "The parent owns execution-graph progression and dispatch. Complete the assigned "
-        "role task and return its actual result inline; do not operate the parent's graph "
-        "or treat a spawn id or monitor row as completion. For requirements and intake "
+        "The parent owns choosing the next instruction from linked task guidance and "
+        "actual run evidence. Complete the assigned role task and return its actual "
+        "result inline; a launch or monitor row alone is not completion. For requirements and intake "
         "assignments, include the objective, non-goals, constraints, and completion "
         "conditions in that handoff. "
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
@@ -2247,8 +1808,8 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
         "and normalized remote owner/repository at the bounded transition points; do not "
         "repeat it for ordinary commands. Do not delegate unless the handoff explicitly "
-        "supplies delegated_spawn_policy and a graph-ready ToolCall; do not require another "
-        "dispatcher or launch an unselected child. Return findings or outputs tied to "
+        "explicitly authorizes a native child call; do not launch an unselected child. "
+        "Return findings or outputs tied to "
         "request_clause_ids, include artifact paths and dependency-file headers when files "
         "are created, and report remaining planned work or a next gate only when assigned."
     )
@@ -2287,7 +1848,8 @@ def compact_role_prompt_contract(
         f"{role.id} for {family_name}; {write_scope}; use supplied handoff context and "
         "named accessible packets, respect supplied path boundaries, and use the "
         "subagent startup route and repo tool route fields when present. The parent "
-        "owns execution-graph progression; return the assigned result inline. For "
+        "chooses the next step from linked guidance and actual outcomes; return the "
+        "assigned result inline. For "
         "requirements and intake assignments, include the objective, non-goals, "
         "constraints, and completion conditions in that handoff."
         f" Include checkout_identity in every handoff where Git state matters;{writer_target}."

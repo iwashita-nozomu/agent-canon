@@ -7,27 +7,12 @@
 # downstream design ../templates/agents/schedule.md execution-time-aware schedule projection
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # downstream implementation ../tools/agent/orchestration/route.py consumes exclusive execution routes
-# downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py evaluates selected role waves and actual results
+# downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py creates optional run-bundle metadata
 # @dependency-end
 version: 2
 
-# Positive workflow activation is resolved from the typed family and topology
-# records below.  Consumers must not infer a family, stage, or child from
-# prompt prose; authority and safety prohibitions remain with their canonical
-# workflow/authority owners.
-workflow_activation_policy:
-  family_selector: tasks[].family
-  stage_owner: role_topology_defaults.stage_waves
-  required_role_owner: workflow_families[].roles
-  child_handoff:
-    activation: selected_typed_route
-    required_role_owner: workflow_families[].roles
-    write_capable: true
-  full_staging:
-    activation: selected_coordination_route
-    coordination_families:
-      - comprehensive_development
-
+# Workflow and role selections are guidance for the chosen route. Authority
+# and safety prohibitions remain with their canonical workflow/authority owners.
 review_activation_policy:
   mode: candidate_only
   owner_gate_cardinality: one_gate_per_replaceable_responsibility
@@ -45,12 +30,6 @@ review_activation_policy:
     existing_tests: evidence_not_first_edit_surface
     checker_owned_properties: route_to_static_or_deterministic_checker
     private_helpers_and_incidental_apis: do_not_freeze
-  review_finding_rework:
-    initial_review: one_per_candidate_epoch_with_stable_blocking_finding_ids
-    focused_recheck: addressed_blockers_and_invalidated_evidence_only
-    rework_when: stable_blocker_closure_or_typed_new_epoch_evidence
-    record_without_new_wave: advisory_duplicate_stylistic_already_covered_or_evidence_free
-    same_state_action: non_convergent_cycle
   validation:
     owner_ref: "agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary"
     route_source: parent_packet.validation_route
@@ -72,29 +51,7 @@ execution_route_policy:
       next_action: run_existing_coordinated_closeout
       commands: ["python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"]
 
-execution_time_policy:
-  owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
-  applies_to: coordination
-  projection: templates/agents/schedule.md#Execution-Time-Aware Plan
-  graph_activation: only_when_selected_ordering_or_collision_edges_exist
-  graph_scope: selected_dependency_and_collision_edges_only
-  executable_fields:
-    - dependency_dag
-    - responsibility_completeness
-    - correctness
-    - decision_relevant_total_work
-    - makespan_objective
-    - critical_path
-    - ready_set
-    - context_reuse
-    - affected_evidence_invalidation
-    - candidate_epoch
-    - blocking_finding_ids
-    - focused_recheck
-    - terminal_state
-
-role_topology_defaults: &standard_role_topology
-  capacity_derivation: declared_team_peak_plus_nested_reservations_v1
+role_topology_defaults:
   role_families:
     intake:
       - requirements_organizer
@@ -143,123 +100,6 @@ role_topology_defaults: &standard_role_topology
     collision_policy: reject_same_checkout_root_before_spawn
     parallel_writer_checkout_policy: lifecycle_selected_distinct_checkout_root
     runtime_threads_are_cardinality_source: false
-  stage_waves:
-    - id: intake
-      stage_class: producer
-      role_ids:
-        - manager
-    - id: skill_evaluation
-      stage_class: producer
-      role_ids:
-        - skill_evaluator
-    - id: intake_review
-      stage_class: reviewer
-      role_ids:
-        - manager_reviewer
-    - id: mathematical_intent_review
-      stage_class: reviewer
-      activation: conditional_math_intent_packet
-      role_ids:
-        - mathematical_correctness_reviewer
-    - id: research
-      stage_class: producer
-      role_ids:
-        - researcher
-    - id: research_review
-      stage_class: reviewer
-      role_ids:
-        - research_reviewer
-        - reproducibility_reviewer
-        - scientific_computing_reviewer
-        - benchmark_reviewer
-        - artifact_reviewer
-        - fair_data_reviewer
-        - ml_science_reviewer
-    - id: scheduling
-      stage_class: producer
-      role_ids:
-        - scheduler
-    - id: schedule_review
-      stage_class: reviewer
-      role_ids:
-        - schedule_reviewer
-    - id: platform_planning
-      stage_class: producer
-      role_ids:
-        - infra_steward
-    - id: platform_review
-      stage_class: reviewer
-      role_ids:
-        - infra_reviewer
-    - id: integration_assessment
-      stage_class: reviewer
-      role_ids:
-        - project_reviewer
-        - docs_workflow_steward
-        - prompt_config_reviewer
-    - id: cross_owner_integration
-      stage_class: reviewer
-      activation: explicit_enable_or_full_team_or_comprehensive_family
-      role_ids:
-        - terra
-    - id: design
-      stage_class: producer
-      role_ids:
-        - designer
-    - id: design_review
-      stage_class: reviewer
-      role_ids:
-        - design_reviewer
-    - id: document_flow_review
-      stage_class: reviewer
-      role_ids:
-        - document_flow_reviewer
-        - citation_evidence_reviewer
-        - notation_definition_reviewer
-        - logic_gap_reviewer
-    - id: experiment
-      stage_class: producer
-      role_ids:
-        - experimenter
-    - id: experiment_review
-      stage_class: reviewer
-      role_ids:
-        - experiment_reviewer
-        - report_reviewer
-    - id: implementation
-      stage_class: producer
-      role_ids:
-        - implementer
-    - id: integration
-      stage_class: producer
-      role_ids:
-        - integration_executor
-    - id: publication
-      stage_class: final
-      role_ids:
-        - publisher
-    - id: test_design
-      stage_class: reviewer
-      role_ids:
-        - test_designer
-    - id: implementation_review
-      stage_class: reviewer
-      role_ids:
-        - change_reviewer
-        - python_reviewer
-        - cpp_reviewer
-      owner_gate: change_reviewer
-      domain_validators_are_bounded: true
-    - id: final_review
-      stage_class: final
-      role_ids:
-        - final_reviewer
-    - id: verification_closeout
-      stage_class: final
-      role_ids:
-        - verifier
-        - auditor
-
 math_intent_routes:
   mathematical_correction:
     id: mathematical_correction
@@ -268,7 +108,6 @@ math_intent_routes:
     owner_skill: computational-optimization
     reviewer: mathematical_correctness_reviewer
     required_packet: mathematical_intent_packet
-    precedes: [design, benchmark_reviewer]
 
 workflow_families:
   - id: owner_bounded_change
@@ -283,20 +122,12 @@ workflow_families:
       workflow_focus:
         - Treat catalog intake roles, `explorer`, language-specific reviewers, and review packs as candidates. For semantic deltas, reference the run-local semantic_responsibility_contract.toml from the active design packet and allocate one action plus obligation owners before implementation. Activate only the owner-critical implementation route or a distinct unresolved claim/risk. Add `test_designer` only after the owning mechanism is established or repaired and an unresolved oracle/specification/regression/failure-mode risk remains outside static analysis, checkers, and targeted validation; consume the implementer role/profile selected by the typed route and its existing readback.
         - Keep this route only when the run's abstract responsibility frame derives a bounded implementation slice with public interface unchanged, meaning `external public API/behavior/schema unchanged`, no dependency change, no specification interpretation, and local validation. File count and nearby ownership are not enough to select or keep this route.
-        - Activate design, document-flow, and broad review only when an unresolved owner/design/reader-facing claim requires it. A produced design artifact does not by itself create a separate review wave; one owning review gate may cover the responsibility.
+        - Activate design, document-flow, and broad review only when an unresolved owner/design/reader-facing claim requires it. One owning review gate may cover the responsibility.
         - Escalate to `scoped_change` when any external public API, behavior, or schema delta exists, the owner boundary is non-obvious, validation is cross-module, or the diff-triage reviewer returns escalate; public deltas carry `dependency/consumer/migration/docs closure` into scope.
         - Begin applicable writer prompts from known selected assets and tests, propagate the same context to every child, and consolidate overlapping responsibility/asset slices before child prompts.
       reviewer_prompt:
         - Prefer language-specific and diff-triage findings before broad review.
         - Block completion if public-surface invariance is missing, validation is missing, request clauses are not mapped, or write scope expanded beyond the owner-bounded route.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -333,15 +164,7 @@ workflow_families:
         - Treat one fix, chunk, or checkpoint as internal progress until every active clause and planned work unit is complete.
       reviewer_prompt:
         - Verify behavior, tests, docs, and request-clause coverage rather than only checking style.
-        - Rework only findings that change requested behavior, owner/design boundary, correctness, validation, or publication state. Record duplicate, stylistic, already-covered, or evidence-free findings without opening a new wave; block completion only when an active claim remains unvalidated or unresolved.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
+        - Rework findings that change requested behavior, owner/design boundary, correctness, validation, or publication state. Record duplicate, stylistic, already-covered, or evidence-free findings separately; block completion only when an active claim remains unvalidated or unresolved.
     roles:
       always_on:
         - manager
@@ -386,14 +209,6 @@ workflow_families:
       reviewer_prompt:
         - Block overclaims, spot/debug/partial evidence used as formal evidence, missing baselines, and missing reproducibility artifacts.
         - For paper-like work, split citation/evidence, notation, logic, and document-flow review only when each is a distinct unresolved claim; otherwise one owning review gate may cover the responsibility.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -453,14 +268,6 @@ workflow_families:
         - Block hidden semantic changes, incomplete path mapping, stale docs, and parallel durable truth surfaces.
         - For cleanup reviews, follow code-cleanup's streaming route; do not demand speculative safety reimplementation or per-line validation.
         - Verify every chunk maps back to the umbrella completion boundary.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -503,14 +310,6 @@ workflow_families:
       reviewer_prompt:
         - Block environment changes without a code requirement, rollback path, or validation evidence.
         - Verify docs, CI, Docker packs, and local developer commands remain aligned.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -553,18 +352,10 @@ workflow_families:
         - Before decomposition, prototyping, or worker handoff, determine the involved Git-root/module count and whether a dependency-repository consumer exists. After that observation satisfies the cross-module condition, promote/activate deferred or candidate `dependency-analysis` to ACTIVE and run it before decomposition, prototyping, or worker handoff; populate the existing dependency DAG, dependency scope / reuse facts, repair batches, involved-root identities, edge kinds, topological order, and common validation obligations, then relay that same shared context to every child. Derive each child role / module's `allowed_paths`, `do_not_read`, write scope, and exact validation commands from the shared context; do not copy one child's authority to another. A standalone single-module task keeps the existing fast path; this is not a machine gate.
         - Update docs, tests, runtime helpers, skill shims, mirrors, and validation tools together when the behavior crosses those surfaces.
         - Use `prompt_config_reviewer` before editing prompt, routing, or subagent-config policy surfaces.
-        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths and prepared writer targets. Colliding writers must be serialized into later waves. Independent streams use the repository-topic lifecycle's `linked-worktree` for a parent/same-repository branch or `independent-clone` for a dependency repository, with the shared workspace/topic/repo placement.
+        - Preserve parent-managed write-scope discipline; concurrent write-capable agents require disjoint paths and prepared writer targets. Serialize colliding writers. Independent streams use the repository-topic lifecycle's `linked-worktree` for a parent/same-repository branch or `independent-clone` for a dependency repository, with the shared workspace/topic/repo placement.
       reviewer_prompt:
         - Block changes that work only for the touched diff but leave task catalog, starter tools, mirrors, docs, tests, or runtime validation stale.
         - Verify all workflow families and task ids still bootstrap with usable prompt, packet, role, and validation metadata.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -613,14 +404,6 @@ workflow_families:
       reviewer_prompt:
         - Block progress claims from spot runs, partial runs, raw failure counts, or unreviewed protocol changes.
         - Verify the backlog, decision state, reproducibility evidence, and carry-over notes are current.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on:
         - manager
@@ -664,20 +447,12 @@ workflow_families:
         - The evaluator starts only from the frozen Scenario Packet and its explicit read allowlist.
         - Do not materialize implementation or reviewer roles unless the parent packet separately enables them.
       workflow_focus:
-        - Materialize the catalog-owned initial skill_evaluation stage with skill_evaluator only.
+        - Use the skill_evaluator role only for an explicitly selected skill-evaluation task.
         - Keep skill_evaluator fresh, read-only, artifact-only, and scoped to the packet-listed scenario.
         - The parent owns the standard run-coordination and closeout artifacts, scoring, iteration, convergence, and any implementation follow-up; those artifacts remain outside evaluator context.
       reviewer_prompt:
-        - Verify that the evaluation route has no default worker, spark_worker, or reviewer wave.
+        - Verify that the evaluation route is not mixed with implementation or review roles.
         - Verify that the evaluator model and read-only/fresh policy remain unchanged.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on: []
       specialists:
@@ -703,14 +478,6 @@ workflow_families:
         - Read back every affected Issue URL, number, body, and state. Do not request an extra approval gate or create a local Issue database.
       reviewer_prompt:
         - Verify the candidate boundary, repository routing, no-mutation foreign-repository handoff, and idempotent update/no-op behavior.
-    capacity_request:
-      schema_id: task_catalog_capacity_request_v1
-      policy_id: topology_derived_v1
-      topology_source: role_topology
-      write_scope_source: team_manifest.run.write_scopes
-      capacity_policy_ref: agents/capacity_policy.toml
-      target_state_gate_ref: implementation_execution_contract_v1
-    role_topology: *standard_role_topology
     roles:
       always_on: []
       specialists:

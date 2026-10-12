@@ -40,9 +40,6 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
-from tools.agent.orchestration.implementation_dispatch import (
-    declared_team_capacity_derivation,
-)  # noqa: E402
 from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
@@ -417,7 +414,6 @@ class RouteToolTest(unittest.TestCase):
                         "owner_skill": "computational-optimization",
                         "reviewer": "mathematical_correctness_reviewer",
                         "required_packet": "mathematical_intent_packet",
-                        "precedes": ["design", "benchmark_reviewer"],
                     },
                 )
                 self.assertIn(
@@ -432,12 +428,6 @@ class RouteToolTest(unittest.TestCase):
                     "mathematical_correctness_reviewer",
                     default_specialists_for_task(config, catalog, task_id),
                 )
-        waves = {
-            wave["id"]: wave["role_ids"]
-            for wave in catalog.raw["role_topology_defaults"]["stage_waves"]
-        }
-        self.assertIn("benchmark_reviewer", waves["research_review"])
-        self.assertNotIn("benchmark_reviewer", waves["final_review"])
 
     def test_math_scope_contract_is_owned_and_routed(self) -> None:
         """The math owner defines packet fields and orchestration routes to it."""
@@ -517,15 +507,6 @@ class RouteToolTest(unittest.TestCase):
         )
         self.assertEqual(reviewer_view["model"], "gpt-6-luna")
         self.assertEqual(reviewer_view["model_reasoning_effort"], "high")
-
-    def test_conditional_math_reviewer_enters_capacity_only_when_active(self) -> None:
-        """The dormant conditional stage stays out of baseline capacity."""
-        catalog = load_task_catalog(load_team_config())
-        baseline = declared_team_capacity_derivation(catalog)
-        active = declared_team_capacity_derivation(catalog, include_math_intent=True)
-        self.assertEqual(baseline.requested_max_threads(), 27)
-        self.assertEqual(active.requested_max_threads(), 28)
-        self.assertEqual(active.peak_family.direct_frontier_count, 22)
 
     def test_prompt_routes_direct_review_to_change_review_without_bootstrap(
         self,
@@ -1124,7 +1105,7 @@ class RouteToolTest(unittest.TestCase):
             "--prompt",
             (
                 "$runtime-log-repair runtime dashboard next actions: repair failing hook evidence and "
-                "AGENT_RUNTIME_DASHBOARD_WAVE_MISSING_ACTUAL"
+                "AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING"
             ),
             "--format",
             "json",

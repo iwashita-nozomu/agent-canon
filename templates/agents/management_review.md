@@ -37,7 +37,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Routing Review（routing レビュー）
 
-<!-- workflow=<family>、skills=<...>、review=<...> が宣言され、適切な specialist role と明示的な stage subagent が有効か確認します。fanout ledger が Intake Responsibility Wave を total cap ではなく intake slice と証明しない場合、または dynamic expansion wave に budget/scope evidence がなければ revise とします。 -->
+<!-- Markdown の workflow / Skill links が示す想定経路と、実際に選択された role・tool 結果を分けて読みます。specialist role の選択や実行の妥当性は担当する既存 Eval で判断し、経路差だけでは revise にしません。 -->
 
 ## Finding Status And Outcome（finding status と判定）
 

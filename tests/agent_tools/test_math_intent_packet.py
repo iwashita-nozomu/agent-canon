@@ -31,8 +31,6 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     validate_mathematical_intent_route,
 )
 from tools.agent.orchestration.tool_calls import materialize_subagent_spawn_tool_call  # noqa: E402
-from tools.agent.orchestration.implementation_dispatch import dispatch_subagent_wave  # noqa: E402
-from tools.agent.orchestration.team_config import SubagentWaveSlot  # noqa: E402
 from tools.runtime.authority.writer_target import WriterTarget  # noqa: E402
 
 
@@ -119,7 +117,10 @@ def target(root: Path, paths: tuple[str, ...] = ("src/solver.py",)) -> WriterTar
 def test_packet_normalization_is_closed_and_serializable() -> None:
     """A complete packet round-trips without adding an identity registry."""
     normalized = normalize_mathematical_intent_packet(packet())
-    assert mathematical_intent_packet_mapping(normalized)["schema"] == MATHEMATICAL_INTENT_PACKET_SCHEMA
+    assert (
+        mathematical_intent_packet_mapping(normalized)["schema"]
+        == MATHEMATICAL_INTENT_PACKET_SCHEMA
+    )
     assert normalized.allowed_write_paths == (
         "src/solver.py",
         "tests/math_oracle.py",
@@ -133,7 +134,9 @@ def test_math_route_accepts_only_canonical_route_id() -> None:
     with pytest.raises(RuntimeError, match="unknown_id"):
         validate_mathematical_intent_route("caller_supplied_route")
     with pytest.raises(RuntimeError, match="unknown_id"):
-        validate_mathematical_intent_route({"owner_skill": "computational-optimization"})  # type: ignore[arg-type]
+        validate_mathematical_intent_route(
+            {"owner_skill": "computational-optimization"}
+        )  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -198,7 +201,9 @@ def test_packet_rejects_extra_or_missing_allowed_write_path() -> None:
 
     missing = packet()
     missing["allowed_write_paths"] = ["src/solver.py", "documents/math.md"]
-    with pytest.raises(RuntimeError, match="union_mismatch:missing=tests/math_oracle.py"):
+    with pytest.raises(
+        RuntimeError, match="union_mismatch:missing=tests/math_oracle.py"
+    ):
         normalize_mathematical_intent_packet(missing)
 
 
@@ -277,78 +282,11 @@ def test_spawn_carries_valid_packet_and_narrowed_target() -> None:
             math_intent_route=MATH_ROUTE,
             math_intent_packet=packet(),
         )
-        assert call["arguments"]["mathematical_intent_packet"]["schema"] == MATHEMATICAL_INTENT_PACKET_SCHEMA
+        assert (
+            call["arguments"]["mathematical_intent_packet"]["schema"]
+            == MATHEMATICAL_INTENT_PACKET_SCHEMA
+        )
         assert call["arguments"]["writer_target"]["allowed_paths"] == ["src/solver.py"]
-
-
-def test_wave_blocks_before_callback_without_math_packet() -> None:
-    """The normal AgentTeam wave cannot spawn a math writer without its packet."""
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        slot = SubagentWaveSlot(
-            role_id="implementer",
-            instance_id="math-worker",
-            agent_type="worker",
-            write_capable=True,
-            writer_target=target(root),
-            math_intent_route_id=MATH_ROUTE,
-        )
-        spawned: list[str] = []
-        with pytest.raises(RuntimeError, match="math_packet_missing"):
-            dispatch_subagent_wave(
-                (slot,),
-                {slot.executable_identity: "math task"},
-                lambda _agent, _prompt: spawned.append("unexpected") or "agent",
-                {slot.executable_identity: target(root)},
-            )
-        assert spawned == []
-
-
-def test_math_wave_emits_separate_nonmath_handoff_without_arch_writer() -> None:
-    """A JIT-looking symptom stays a deferred handoff beside math-only writers."""
-    with tempfile.TemporaryDirectory() as directory:
-        root = Path(directory)
-        worker = SubagentWaveSlot(
-            role_id="implementer",
-            instance_id="math-worker",
-            agent_type="worker",
-            write_capable=True,
-            writer_target=target(root),
-            math_intent_route_id=MATH_ROUTE,
-        )
-        reviewer = SubagentWaveSlot(
-            role_id="mathematical_correctness_reviewer",
-            instance_id="math-reviewer",
-            agent_type="reviewer",
-            write_capable=False,
-        )
-        prompts = {
-            worker.executable_identity: "convergence math worker",
-            reviewer.executable_identity: "convergence math review",
-        }
-        spawned: list[str] = []
-        handoffs: list[Mapping[str, object]] = []
-        result = dispatch_subagent_wave(
-            (worker, reviewer),
-            prompts,
-            lambda agent, _prompt: spawned.append(agent) or agent,
-            {worker.executable_identity: target(root)},
-            math_intent_packet=packet(
-                separate_handoff_targets=["architecture/JIT performance owner"]
-            ),
-            nonmath_handoff=handoffs.append,
-        )
-        assert result == ("worker", "reviewer")
-        assert spawned == ["worker", "reviewer"]
-        assert handoffs == [
-            {
-                "target": "architecture/JIT performance owner",
-                "owner": "parent",
-                "status": "deferred",
-                "writer_tool_call": "none",
-                "math_writer_paths": [],
-            }
-        ]
 
 
 @contextmanager
@@ -423,6 +361,7 @@ def run_bootstrap(
 
 def test_temporary_runtime_cleanup_failure_preserves_primary_exception() -> None:
     """Cleanup diagnostics must not replace an exception from the test body."""
+
     def fail_after_cleanup(cleanup: Callable[[], None]) -> None:
         cleanup()
         raise RuntimeError("cleanup failed")
@@ -436,6 +375,7 @@ def test_temporary_runtime_cleanup_failure_preserves_primary_exception() -> None
 
 def test_temporary_runtime_cleanup_only_failure_is_raised() -> None:
     """Cleanup failure is raised when the managed body completed normally."""
+
     def fail_after_cleanup(cleanup: Callable[[], None]) -> None:
         cleanup()
         raise RuntimeError("cleanup failed")
@@ -512,9 +452,7 @@ def test_normal_math_bootstrap_materializes_packet_and_reviewer() -> None:
         "--task-id",
         "T4",
         "--math-intent-packet",
-        json.dumps(
-            packet(separate_handoff_targets=["architecture/JIT owner"])
-        ),
+        json.dumps(packet(separate_handoff_targets=["architecture/JIT owner"])),
     ) as (result, report_dir):
         assert result.returncode == 0, result.stdout + result.stderr
         assert "MATH_INTENT_ROUTE_STATUS=active" in result.stdout

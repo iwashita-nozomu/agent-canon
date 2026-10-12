@@ -38,7 +38,6 @@ from tools.runtime.lifecycle.update_lifecycle_contract import (
 
 TOOL_CALL_SCHEMA = "agent-canon.tool-call.v1"
 
-ROUTE_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.route.args.v1"
 SUBAGENT_SPAWN_TOOL_CALL_ARGUMENT_SCHEMA = "agent-canon.spawn-agent.args.v1"
 
 
@@ -194,32 +193,6 @@ def materialize_tool_call_token(
         "sha256:" + hashlib.sha256(canonical_json_bytes(record)).hexdigest()
     )
     return record
-
-
-def materialize_dynamic_route_tool_call_token() -> dict[str, object]:
-    """Return a canonical route call bound to the run's request artifact."""
-    return materialize_tool_call_token(
-        tool_id="route",
-        argument_schema_id=ROUTE_TOOL_CALL_ARGUMENT_SCHEMA,
-        argument_properties={
-            "prompt_ref": {"type": "string", "minLength": 1},
-            "format": {"type": "string", "enum": ["json"]},
-        },
-        arguments={"prompt_ref": "run.user_request_contract", "format": "json"},
-        intent="Resolve a changed request into the canonical public-skill route.",
-        typed_failure_semantics=(
-            {
-                "code": "route:request_artifact_missing",
-                "retryable": False,
-                "next": "reject_route_packet",
-            },
-            {
-                "code": "route:no_matching_skill",
-                "retryable": False,
-                "next": "return_typed_no_match",
-            },
-        ),
-    )
 
 
 def materialize_issue_worker_tool_call(
@@ -458,10 +431,11 @@ def materialize_subagent_spawn_tool_call(
         argument_properties=argument_properties,
         arguments=arguments,
         intent=(
-            "Dispatch only this graph-ready spawn_agent ToolCall through the host's "
-            "native collaboration.spawn_agent operation with its exact arguments; "
-            "the selected ToolCall is the admission. Do not require a second "
-            "AgentTeam/MCP dispatcher or launch an unselected child."
+            "Execute the selected spawn_agent ToolCall through the host's native "
+            "collaboration.spawn_agent operation with its exact arguments. A "
+            "successful spawn records launch only; it is not the child's completion "
+            "result. Do not require a second AgentTeam/MCP dispatcher or launch an "
+            "unselected child."
         ),
         typed_failure_semantics=(
             {

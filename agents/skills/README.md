@@ -115,8 +115,10 @@ owner route で進めます。既存 tool は読了 gate なしに先に実行�
 記録します。typo / link / format-only、Routine docs、Focused code の label もこの条件を迂回しません。
 public surface の追加・縮小・削除・rename・restriction・deprecation・意味変更は `scoped_change` または broader route で
 `dependency/consumer/migration/docs closure` を形成し、file 数や owner の近さだけで route を固定しません。
-execution stage で [codex-task-workflow](codex-task-workflow.md)、handoff / wave が ready になった stage で
-[subagent-bootstrap](subagent-bootstrap.md) を追加します。specialist の Codex 固有方針は [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md) を参照します。
+repository-changing execution では [codex-task-workflow](codex-task-workflow.md)、
+child delegation を実際に選択した場合だけ [subagent-bootstrap](subagent-bootstrap.md)
+を追加します。specialist の Codex 固有方針は
+[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md) を参照します。
 
 以下は既存の条件付き選択先です。列挙は起動許可や全件必読を意味しません。
 

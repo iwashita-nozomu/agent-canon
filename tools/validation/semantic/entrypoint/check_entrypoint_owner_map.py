@@ -65,7 +65,7 @@ CONTRACTS = (
         owner_rows=(
             ("root runtime entrypoint", "bootstrap.sh", "bash bootstrap.sh --help"),
             (
-                "workflow family, spawn budget, role topology",
+                "workflow family and role candidates",
                 "agents/task_catalog.yaml",
                 "check_agent_runtime_alignment.py",
             ),
@@ -98,11 +98,17 @@ CONTRACTS = (
             "## Validation Routing",
         ),
         owner_rows=(
-            ("product implementation and behavior", "consumer source and design owners"),
+            (
+                "product implementation and behavior",
+                "consumer source and design owners",
+            ),
             ("build, tests, and runtime environment", "consumer build and test owners"),
             ("repository structure and file placement", "consumer structure owner"),
             ("root instruction extension", "consumer-specific section in this file"),
-            ("AgentCanon source maintenance", "selected AgentCanon development checkout"),
+            (
+                "AgentCanon source maintenance",
+                "selected AgentCanon development checkout",
+            ),
         ),
     ),
 )
@@ -152,7 +158,9 @@ class Finding:
 def _section_lines(lines: Sequence[str], heading: str) -> list[str] | None:
     """Return one level-2 section body."""
     try:
-        start = next(index for index, line in enumerate(lines) if line.strip() == heading)
+        start = next(
+            index for index, line in enumerate(lines) if line.strip() == heading
+        )
     except StopIteration:
         return None
     section: list[str] = []
@@ -178,7 +186,10 @@ def _table_rows(lines: Sequence[str]) -> tuple[str, ...]:
 
 
 def _check_owner_links(
-    root: Path, contract: EntrypointContract, rows: Sequence[str], markers: Sequence[str]
+    root: Path,
+    contract: EntrypointContract,
+    rows: Sequence[str],
+    markers: Sequence[str],
 ) -> list[Finding]:
     """Verify required document destinations, not just their displayed names."""
     destinations = {
@@ -215,7 +226,11 @@ def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
             Finding(contract.path, "common-base", "expected-leading=@ROOT_AGENTS.md", 1)
         )
 
-    h1 = [(index + 1, line.strip()) for index, line in enumerate(lines) if H1_RE.match(line)]
+    h1 = [
+        (index + 1, line.strip())
+        for index, line in enumerate(lines)
+        if H1_RE.match(line)
+    ]
     if len(h1) != 1:
         findings.append(Finding(contract.path, "title", f"h1-count={len(h1)}"))
     elif h1[0][1] != contract.title:

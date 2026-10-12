@@ -8,13 +8,11 @@ upstream design ../canonical/CODEX_ROUTING.md task and workflow selection
 upstream design ../task_catalog.yaml typed workflow and execution route
 upstream design ./catalog.yaml public Skill identity and discovery
 upstream design ./skill-dependencies.yaml Skill prerequisites and ordering
-upstream design ./agent-orchestration.execution-contract.toml coordination scheduling and convergence
 upstream design ../COMMUNICATION_PROTOCOL.md collaboration capability and handoff boundary
 downstream design ../canonical/CODEX_INTAKE.md owner-first read route
 downstream design ../canonical/CODEX_COMPLETION.md validation and closeout
 downstream design ./codex-task-workflow.md repository execution
 downstream design ./pr-processing.md dependent PR queues
-downstream implementation ../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py typed contract validation
 @dependency-end
 -->
 
@@ -88,33 +86,26 @@ or resumption.
 
 ## Execution-Time-Aware Work-Conservation Contract
 
-This contract applies when coordination is selected. Its machine-readable details
-and validation live in the
-[execution contract](agent-orchestration.execution-contract.toml) and its
-[checker](../../tools/validation/semantic/orchestration/check_execution_time_aware_orchestration.py).
+This guidance applies when coordination is selected. Use relative links from the
+selected workflow to find relevant owner instructions; a link is conditional
+guidance, not a requirement to read every linked document. Record actual native
+tool and child results using the selected workflow's existing record. A launch
+is not completion, and a route difference alone is not a failure; use existing
+Eval or owner review to assess whether necessary work was missed or unnecessary
+work was done.
 
 Preserve the requested work and correctness before minimizing necessary total
-work, then makespan. Model only real dependency or collision edges, dispatch
-ready non-conflicting work, and wait only when no useful work is ready. Time
-limits and prompt keywords do not cut scope.
-
-When AgentCanon's run graph is active, `bootstrap_agent_run.py` is the single
-transition owner. It reads only selected canonical Skills and hard prerequisites
-through file EOF before making dependent dispatch ready. Execute only its ready
-ToolCalls; a spawn result means launched, while the child's actual completion
-result is required before dependents become ready. Re-enter the same run with
-those results. Wave-monitor rows are readback, not readiness authority; `task_close.py`
-remains the terminal predicate.
+work. Time limits and prompt keywords do not cut scope. Read the selected Skill
+body through EOF and follow its applicable prerequisites.
 
 Review a candidate once. Repair accepted in-scope findings and recheck only
 affected evidence; reopen review only when new contract, reachable-behavior, or
 structural-contradiction evidence changes the candidate. Repeating the same
 state and action without new evidence is a cycle, not progress.
 
-Completion requires no unresolved request clauses, blockers, or required
-validations, and selected validation must pass or be not applicable. PR queues use
-this contract only when candidates have actual ordering or collision
-dependencies.
+Completion requires no unresolved request clauses or blockers, and required
+validation must pass or be not applicable. PR queues use this guidance when
+candidates have actual ordering or collision dependencies.
 
 ## Review Activation And Adjudication
 

@@ -86,18 +86,18 @@ AgentCanon の更新・再構築を要求しません。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
 - AgentCanon source 変更は standalone source checkout を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout を再利用します。親の pin や root projection は作成しません。
-- standalone source の変更は非並列 single-stream の既定です。選択した coordination route の
-  writer placement は [Parallel Write Safety](CODEX_SUBAGENTS.md#parallel-write-safety)
-  に従い、同じ checkout root を同時利用しません。bounded route はこの handoff wave
-  を作りません。
+- standalone source の writer placement は [Parallel Write Safety](CODEX_SUBAGENTS.md#parallel-write-safety)
+  に従い、同じ checkout root の競合する writes を直列化します。独立した責務は実際の
+  dependency と checkout ownership に基づいて並行できます。bounded route は child
+  handoff を必須にしません。
 - repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 checkout と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent または同一 repository の branch は `linked-worktree`、dependency repository は `independent-clone` を選び、どちらも同じ `<anchor>/workspace/<topic>/<repo>` placement にします。各 source branch は candidate review / PR 前に integration executor が最新 `origin/main` を通常 merge し、conflict はその owner が native Git index に残った実際の競合を source owner とレビューして解消します。解消後は canonical finalizer が `MERGE_HEAD` と resolved index tree に基づく commit parents/tree を確認します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。writer target は短命な handoff 値であり、claim、PID、expiry、daemon、writer registry は作成しません。
 
 ## Context Sweep
 
 実装、設計変更、文書改訂、実験計画の前に、repo evidence を根拠にします。
 まず現在の cause、適用される constraints、変更後に必要な guarantee を特定し、
-その判断を変える範囲だけを読みます。過去 task の context sweep、handoff、stage
-sequence は既定の着手条件にせず、現在の cause/guarantee が同じ根拠を要求するとき
+その判断を変える範囲だけを読みます。過去 task の context sweep や handoff は
+既定の着手条件にせず、現在の cause/guarantee が同じ根拠を要求するとき
 だけ再利用します。user request から要求された file、workflow、check、doc、PR
 state と acceptance criteria は `requested_scope` として保存し、選択された owner
 と validation で必要な `work_scope` だけを具体化します。

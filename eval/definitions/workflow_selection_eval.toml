@@ -143,14 +143,14 @@ subjects = [
 id = "large-refactor"
 description = "Large behavior-preserving refactors should route to large delivery and refactor loop."
 expected_workflows = ["large-delivery"]
-expected_skills = ["refactor-loop", "subagent-bootstrap"]
+expected_skills = ["refactor-loop"]
 limit = 25
 prompt_templates = [
-  "too few subagents を避け、subagent fan-out と spawn budget を決めて {subject} を large refactor として behavior-preserving に分割して進めて",
-  "subagent under-provisioning を避け、subagent fan-out と spawn budget 付きで {subject} の大規模な構造変更に dependency graph と review gate を立てて",
-  "too few subagents にならないよう subagent fan-out と spawn budget を決め、複数 chunk の {subject} refactor を milestone ごとに進めて",
-  "subagent under-provisioning を避けるため subagent fan-out と spawn budget を明示し、{subject} の large refactor で既存挙動を変えずに移行して",
-  "too few subagents を避ける subagent fan-out と spawn budget で、新機能ではなく {subject} の大規模リファクタを staged plan で実施して",
+  "{subject} を既存挙動を維持する large refactor として進めて",
+  "{subject} の大規模な構造変更で依存と validation を確認して",
+  "複数の関係ファイルに及ぶ {subject} refactor を既存 oracle と一致させて",
+  "{subject} の large refactor で既存挙動を変えずに移行して",
+  "新機能ではなく {subject} の大規模リファクタを実行して",
 ]
 subjects = [
   "routing evaluator",

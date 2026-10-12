@@ -57,17 +57,20 @@ class AgentTeamRuntimeBoundaryTest(unittest.TestCase):
                 run_b = report_root / "run-b"
                 for run in (run_a, run_b):
                     run.mkdir(parents=True)
-                    (run / "schedule.md").write_text(
-                        "# Schedule\n\n## Agent Wave Ledger\n\n",
-                        encoding="utf-8",
-                    )
+                    (run / "schedule.md").write_text("# Schedule\n", encoding="utf-8")
                     append_monitoring(
                         run,
                         MonitoringEntries(signals=(f"run={run.name}",)),
                     )
-                self.assertIn("run=run-a", (run_a / "workflow_monitoring.md").read_text())
-                self.assertNotIn("run=run-b", (run_a / "workflow_monitoring.md").read_text())
-                self.assertIn("run=run-b", (run_b / "workflow_monitoring.md").read_text())
+                self.assertIn(
+                    "run=run-a", (run_a / "workflow_monitoring.md").read_text()
+                )
+                self.assertNotIn(
+                    "run=run-b", (run_a / "workflow_monitoring.md").read_text()
+                )
+                self.assertIn(
+                    "run=run-b", (run_b / "workflow_monitoring.md").read_text()
+                )
                 self.assertEqual(source_file.read_bytes(), before)
                 self.assertFalse((source / "reports").exists())
             finally:
@@ -88,7 +91,9 @@ class AgentTeamRuntimeBoundaryTest(unittest.TestCase):
             old = os.environ.get("AGENT_CANON_RUNTIME_ROOT")
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
             try:
-                self.assertEqual(find_authority_path(root / "project"), run / AUTHORITY_FILE_NAME)
+                self.assertEqual(
+                    find_authority_path(root / "project"), run / AUTHORITY_FILE_NAME
+                )
             finally:
                 if old is None:
                     os.environ.pop("AGENT_CANON_RUNTIME_ROOT", None)
