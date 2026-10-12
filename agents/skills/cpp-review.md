@@ -14,311 +14,89 @@ upstream design ../../documents/design/cpp-debugging.md native debugging selecti
 
 ## Reader Map
 
-Select the changed contract before reading checks. A language-review candidate is
-not a reviewer activation; the selected owner must need a concrete C/C++ claim or
-risk resolved. Reuse an active reviewer when it already owns that claim.
+Use this Skill when the review needs a concrete C/C++ contract or risk resolved.
+A C/C++ path or reviewer candidate alone does not select every route.
 
-| Current change or decision | Read next |
+| Review question | Read next |
 | --- | --- |
-| Native source, public header, ABI, or build configuration | [Required Checks](#required-checks) and the relevant interface/ownership evidence |
-| Docstring or convention prose only | [Docstring projection route](#docstring-projection-route); no native build is added |
-| CMake clangd/LSP analysis setup | [CMake analysis environment](#cmake-analysis-environment) |
-| Crash, hang, lifetime, initialization, or race diagnosis | [Runtime debugging](#runtime-debugging) |
-| Performance claim or changed workload cost | [Performance review activation boundary](#performance-review-activation-boundary), then its selected performance section |
-| Execute any selected program/check | [Project-owned execution](#project-owned-execution) |
-
-Read later debugging, benchmark, and recovery details when their condition is true.
-A documentation-only task with no performance claim uses documentation evidence;
-seeing this Skill or a C++ path does not activate every row.
+| Native source, header, ABI, or build behavior | [Core review](#core-review) |
+| Docstring or convention prose only | [Documentation review](#documentation-review) |
+| Crash, hang, lifetime, initialization, or race | [Runtime debugging](#runtime-debugging) |
+| Performance claim or changed workload cost | [Performance review](#performance-review) |
 
 ## Purpose
 
-Review C/C++ changes for build/header boundaries, ABI, ownership, lifetime,
-exceptions/error paths, and required test/documentation follow-through. For a selected
-performance change, establish the workload, metric, and supported bottleneck
-hypothesis. Use the relevant performance dimensions below in the order needed to
-test that hypothesis; skip dimensions that cannot affect the changed path.
-Complex low-level code or a compiler flag alone is not performance evidence.
+Review the changed C/C++ contract, reachable behavior, ownership, and relevant
+validation. For performance claims, examine the actual workload and cost
+evidence. Select only the parts that can affect the requested claim.
 
 ## Use When
 
-Use when an active review requires native C/C++ evidence, including changes to the
-selected profile's production source/header paths, CMake manifests, native build
-settings, public headers, ABI/FFI/CLI behavior, or C++ Docstring projection. CMake analysis
-setup and explicit native performance/debugging requests use their matching rows.
-A `cpp_reviewer` candidate from changed-path routing is considered under the same
-claim/risk condition rather than automatically launched.
+Use when the selected task needs evidence about native C/C++ source, public
+headers, ABI/FFI behavior, build settings, or C++ semantic documentation.
+Debugging and performance details below apply only when those concerns are part
+of the request or changed guarantee.
 
-## Project-owned execution
+## Core review
 
-通常の configure / build / test / static analysis は、selected profile の
-project-owned 規定経路を既定設定のまま実行します。project owner が Make target などの
-入口を示す場合は、その既存 command を先に実行し、失敗した場合だけ必要な経路診断を行います。Docker context / image、cgroup
-version / driver、有限の memory / CPU / PIDs 上限の事前確認は行わず、未設定・
-未確認や cgroup v1 を理由に開始を止めません。
+Start with the changed interface or behavior and its governing contract. Trace
+only the callers and failure paths needed to understand the effect. Check
+header/implementation correspondence, linkage and ABI, type invariants,
+ownership and lifetime, moves/copies and resource release, bounds/null handling,
+and exception or error behavior where they affect the change. Preserve required
+inputs, memory and numerical semantics, and existing regression contracts.
 
-資源上限が必要なら、consumer の Compose 等の既存実行設定へ宣言し、並列度も既存の
-build 設定に置きます。設定と適用はその owner の責務であり、AgentCanon の request
-JSON、host lease、別ランナーで重ねません。上限設定の追加を通常実行の前提にしません。
+Use the project's selected build, test, or static-analysis route that covers the
+changed guarantee. For CMake path/build changes, consult the relevant
+[build-layout owner](../../documents/design/cpp-build-layout.md) and the
+consumer's CMake configuration for production paths, targets, and tests. Use
+existing compiler settings and analysis configuration rather than creating a
+second set of flags or include paths.
 
-規定経路の権限・終了コードと明示された再実行禁止を維持し、別 daemon や host 直実行へ
-迂回しません。再実行禁止は縮小 build・別 target・小規模 GPU にも適用し、既存 evidence と
-fixture-only 検証へ限定します。禁止を解く根拠に過去の別許可を使いません。
-Failed verification follows [the topic-record owner](../../documents/operations/notes-lifecycle.md#failed-verification-record)
-with the actual command, observed result, affected property, and next owner/action.
+Run through the project's selected environment with its permissions and
+resource/retry limits. Keep diagnostic success separate from program success,
+and report failed, partial, skipped, and unrun checks accurately.
 
-## CMake analysis environment
+## Documentation review
 
-CMake project の clangd / LSP 解析を準備するときは、既存の project-owned configure
-argv に `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` を加え、build directory に
-`compile_commands.json` を生成します。既存 configure preset の同等の cache 設定も
-使えます。source / build directory、toolchain、backend、依存解決は実ビルドと揃え、
-同じ構成の最新 DB が既にあれば再生成しません。compiler を起動する configure も
-project-owned の規定経路で行います。この生成機能は Ninja / Makefile 系が対象で、
-非対応 generator を勝手に切り替えず、生成できない範囲を未検証として残します。
-
-clangd は依存を持つ既存の開発コンテナなど、実ビルドの環境で動かし、対象 module の
-build directory を `--compile-commands-dir=<build-dir>` で指定します。DB は compiler
-argv の記録であり、依存を取得・同梱しません。参照する source、依存ヘッダー、標準
-ライブラリ、toolchain がその環境から読める必要があります。生成ヘッダーが必要なら
-既存の生成 target までを準備し、解析準備だけを理由に full build / test を要求しません。
-include path、define、言語規格を Neovim 側で手書きして第二の設定にしません。
-
-開いている workspace 内で依存を実際に include する translation unit を選び、現在の
-project build directory を指定して直接 `clangd` を実行します。
-`clangd --check=<source> --compile-commands-dir=<build-directory>` で DB と compile
-command の読込み・依存解決・診断を確認します。DB 生成成功と依存込み解析成功を分け、
-結果と未検証範囲を Issue / PR に残します。
-ホストの Neovim とコンテナの workspace path 対応は必要ですが、コンテナ専用の外部
-ヘッダー自体をホストで開くための複製・転送は、この workspace 内解析の終了条件にしません。
-通常の docs-only 編集へ configure / build / LSP 実行を一律に追加しません。
-
-根拠は [CMake compilation database](https://cmake.org/cmake/help/latest/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html)
-と [clangd compile commands](https://clangd.llvm.org/design/compile-commands) です。
-
-## Required Checks
-
-This section applies to changed native source/header/ABI/build contracts. A Docstring
-or convention-only change goes directly to its projection section. Select the
-project-native configure/build/test evidence that covers the changed contract;
-consume combined runner results without duplicating each underlying command.
-Use configured `ctest` and installation evidence when those contracts are affected.
-
-When static analysis is relevant and a CMake-generated database exists, use the
-project's selected preset or binary directory directly:
-`clangd --check=<source> --compile-commands-dir=<build-directory>` for one translation
-unit, and `run-clang-tidy.py -p <build-directory> <sources...>` for the selected native
-checks. The build-directory argument locates the project's compile database; it does
-not select a runtime backend. Preserve the native tools' output and exit status; do not
-materialize an active compile-database symlink or enumerate extra include paths,
-compiler flags, or provider-specific diagnostics. Keep the project's native `.clang-tidy`
-discovery; pass `-config-file=<path>` directly only when the project owns a nonstandard
-configuration file.
-
-Trace public header/implementation and call-site correspondence, linkage/ABI,
-lifetime, ownership, move/copy, resource release, bounds, null, exception/error
-behavior, and affected tests/docs. Inspect the changed mechanism and reachable
-failure paths rather than freezing private helper layout. Preserve required inputs,
-safety, numerical semantics, and existing regression contracts.
-
-Only a performance-activated change requires its comparable benchmark/profiler
-results. Do not require a universal profiler, hardware counter, compiler, benchmark
-framework, or new threshold owner.
+For a C/C++ semantic-documentation change, use the
+[Docstring contract](../../documents/conventions/DOCSTRING_GUIDE.md). Check
+syntax and that the prose matches the relevant interface and changed behavior.
+Do not copy declarations into comments or require a fixed set of tags. A
+documentation-only change does not add a native build unless its changed claim
+requires one.
 
 ## Runtime debugging
 
-For crash, hang, lifetime violation, uninitialized values, data races, or an explicit
-debugging request, read [C++ debugging](../../documents/design/cpp-debugging.md) and
-select needed GDB, Valgrind Memcheck, or existing compiler sanitizer evidence.
-Keep the project-owned runner, permissions, resource and rerun limits. Diagnostic
-command success and program success are separate observations; preserve stacks,
-diagnostics, and the unverified scope in the existing Issue/PR.
+For an active crash, hang, lifetime, initialization, or race question, use
+[C++ debugging](../../documents/design/cpp-debugging.md) to choose relevant
+diagnostic evidence. Preserve the project's runner and execution limits. A
+diagnostic command completing does not by itself show that the program behavior
+is correct.
 
-## Core References
+## Performance review
+
+Activate this route for a performance claim, a changed known hot path or cost
+model, or an existing performance regression contract. Establish the workload,
+metric, comparison conditions, and supported bottleneck hypothesis. Use the
+project's existing benchmark or profiler where needed; compare equivalent work
+and report variability and untested conditions. Keep analytical cost reasoning
+separate from measured results, and preserve ABI, lifetime, concurrency, and
+numerical semantics. Do not infer end-to-end gains from an isolated timing or
+introduce a universal threshold. For numerical solvers, use
+[computational-optimization](computational-optimization.md) when convergence or
+solver behavior is part of the claim.
+
+## Expected outcome
+
+Report the relevant interface, ownership, error-path, correctness, build, and
+documentation findings with the validation actually performed. For an active
+performance claim, include the comparison and its limits. Identify unresolved
+risks without treating missing evidence as a pass.
+
+## Core references
 
 - [C++ conventions](../../documents/conventions/coding-conventions-cpp.md)
-- [Docstring contract](../../documents/conventions/DOCSTRING_GUIDE.md)
 - [Testing conventions](../../documents/conventions/coding-conventions-testing.md)
 - [Review process](../../documents/conventions/REVIEW_PROCESS.md)
-
-Performance references support the selected engineering judgment; they are not
-additional policy owners or a startup reading list:
-
 - [C++ Core Guidelines](https://isocpp.org/guidelines)
-- [Google Benchmark](https://google.github.io/benchmark/user_guide.html)
-- [LLVM vectorization diagnostics](https://llvm.org/docs/Vectorizers.html)
-- [GCC optimization options](https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html)
-- [CMake IPO support](https://cmake.org/cmake/help/latest/module/CheckIPOSupported.html)
-
-## Target graph readback
-
-For C++ path/build changes, read the selected profile from
-`documents/design/cpp-build-layout.md` and the consumer's existing CMake owner. Check
-its actual production source/header paths, configure entrypoint, target dependencies,
-binary directory, and test registration. `root-aggregate` and `consumer-local` are
-separate graph shapes; neither is a fallback for the other. Target names and output
-paths are project-owned. Run/result publication stays with experiment lifecycle.
-
-## Docstring projection route
-
-For a selected C/C++ semantic-documentation review, use
-[DOCSTRING_GUIDE](../../documents/conventions/DOCSTRING_GUIDE.md) as clause owner.
-A native suffix or `cpp_reviewer` candidate alone does not require a new reviewer;
-activate only a needed native claim/risk. Convention/template prose belongs to the
-selected documentation owner. OOP/type-design capability selection stays separate.
-
-Review Doxygen syntax/format, header/source anchors, native ownership evidence, and
-correspondence to the selected semantic delta. Do not copy signatures, namespace,
-fields, or type facts into comments or require every `@param`/`@return`/`@throws` tag.
-Docstring or convention-only changes close with design/header/static evidence.
-Changed source/header/ABI/build behavior uses the Required Checks route above.
-
-## Performance review activation boundary
-
-Activate performance review when the change claims improved or preserved performance;
-changes a known critical path, hot loop, allocation/layout, I/O/transfer,
-threading/synchronization or compiler optimization; changes the workload cost model
-(complexity, working set, copies, transfers, synchronization); or falls under an
-existing performance regression contract.
-
-A performance-neutral rename, non-executable metadata, or ordinary comment/docs
-change without a performance claim does not require benchmarking. When active,
-use the repository-owned workload, profiler and benchmark. Keep correctness and
-analytical cost evidence distinct from empirical performance. If the required
-runtime is unavailable, report exact hardware/workload/compiler/thread/device gaps;
-do not mark an unmeasured improvement verified.
-
-## Performance review order
-
-Select the relevant subsections only after the activation decision above. Start
-from the measured or otherwise supported bottleneck and follow its causal
-dependencies; these dimensions are not a fixed checklist or execution sequence.
-Retain the numerical solver handoff when the changed claim crosses that owner.
-
-### Numerical solver handoff boundary
-
-For C/C++ numerical solvers or iterative algorithms, first read
-[computational-optimization](computational-optimization.md) for convergence-first
-numerical performance diagnosis. Its post-run classification uses
-`tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json>
---format json` through the existing route. The dependency dictionary exposes a
-conditional candidate, not a mandatory prerequisite for all C++ reviews.
-
-Changed iterations, residual/objective/KKT trajectory, finite state, accepted steps,
-termination, conditioning, inner-solver work, or objective/gradient/evaluation/
-linear-solve/matvec counts return to the mathematical/algorithm owner. Systems/JIT
-handoff requires unchanged numerical trajectory, work counters, problem, initial
-state, stopping policy, dtype, workload, run mode, cache, backend, device and compiler,
-with a positive regression in the relevant compile/JIT, iteration, evaluation,
-linear-solve, transfer/synchronization or total component.
-
-Different comparison context or missing finite/non-finite events is
-`evidence_missing`, not systems attribution. Total-only or unattributed total growth
-is `evidence_missing` / `unattributed_total`; obtain relevant component evidence
-before proposing a JIT-boundary change. Non-solver performance uses the native
-workload/data-movement route without a convergence-record requirement.
-
-### Contract、workload、metric
-
-Fix latency, throughput, memory, allocation, startup, binary size or scaling metrics
-and representative input size/distribution/state, concurrency/device counts,
-warm/cold conditions, and setup/I/O/transfer/synchronization measurement boundaries.
-Support a critical-path hypothesis with profile, trace, call frequency, complexity,
-working-set estimate or existing regression evidence. Preserve semantic/ABI/numeric
-and resource guarantees instead of changing them after seeing results.
-
-### Algorithm と不要処理
-
-Start with total asymptotic work/space, iterations/passes, search, data structures,
-batching and I/O/syscall/transfer/synchronization counts. Check redundant conversions,
-lookups, format/parse, recalculation and materialization against loop invariants.
-Early exit, caching, precomputation, fusion and parallelization must preserve input,
-memory, invalidation, order and failure contracts. Explain the hotspot's contribution
-to the end-to-end metric. Branchless tricks, unrolling, allocators, intrinsics and
-assembly require compiler/profile/benchmark evidence and justified maintenance and
-portability cost, not speculative speed claims.
-
-### Data movement、layout、allocation
-
-Relate access patterns, contiguous traversal, working sets, cache reuse, pointer
-chasing, strides and randomness to actual fields and architecture. Check AoS/SoA,
-indices/pointers, compact representation, padding/alignment, allocation/growth,
-temporaries, deep copies, refcounts, serialization and host-device byte/count changes.
-`reserve`, buffer reuse, moves, views and arenas must preserve lifetime, invalidation,
-peak memory, exceptions and ownership. Evaluate ABI/cache/vectorization/false-sharing
-impacts. Neither moves nor references nor heap allocation is a universal improvement;
-use value category, alias/escape, frequency, lifetime and size evidence.
-
-### Branch、alias、vectorization、generated code
-
-Check branch prediction, dependency chains, aliases, alignment, trip counts,
-reductions and call boundaries. Support vectorization/inlining/unrolling claims with
-compiler remarks, assembly, profiles or relevant counters. Expose clear data and type
-dependencies rather than copying compiler transformations. Include code size,
-instruction cache, compile time and register-pressure costs.
-
-### Concurrency と heterogeneous runtime
-
-When parallel execution is involved, inspect contention, atomics/cache-line traffic,
-false sharing, barriers, queueing, task size, load balance and oversubscription.
-Relate affinity/NUMA/process/device topology to workload, and trace materialization,
-transfers, launches, implicit synchronization and asynchronous lifetime. Compare
-total work, memory, tail latency, determinism and failure propagation as well as
-speedup. Preserve memory order, locking, lifetimes, stream/event dependencies and
-race freedom even when a weaker implementation benchmarks faster.
-
-### Toolchain optimization と numerical semantics
-
-Compare optimized builds with matched compiler/version, architecture, standard
-library, flags and link mode. LTO/IPO needs compile/link support and evidence about
-size, link time, debugging, sanitizers and packaging. PGO needs representative training
-workload, profile identity and generation/merge/use/staleness semantics. Flags such as
-`-O3`, `-march=native`, fast-math, prefetch and SIMD need portability and measured
-benefit. Preserve floating-point reassociation, NaN/Inf, signed zero, rounding,
-overflow, alias/alignment, lifetime and defined-behavior assumptions. Numerical
-accuracy/reproducibility/exception changes require their own explicit contract/tests.
-
-## Benchmark evidence contract
-
-For empirical performance claims, retain what (metric/workload/input/path), where
-(hardware/OS/compiler/library/flags/topology), how (timing/clock/counter/warm-up/
-repetitions/setup/synchronization/noise), validity (observable output, no dead-code
-or constant-folded result, same semantic result), result (before/after raw or owned
-summary, sample count, selected statistics, dispersion, meaningful effect and
-regression-threshold rationale), and scope (regressions, untested conditions,
-memory/tail-latency trade-offs).
-
-Timing boundaries follow the metric. Do not extrapolate a microbenchmark to
-end-to-end behavior, use a single best timing as proof, or call a below-noise effect
-an improvement. Use existing regression ownership and observed variation rather
-than adding a universal improvement percentage or statistical method.
-
-## Expected Outcome
-
-Report selected interface/ownership/error/correctness/build/docs findings and actual
-validation with its unrun scope. Performance findings retain the cost hypothesis,
-comparison conditions, variability, semantic risks and unverified conditions. Choose
-the smallest contract-complete correction supported by the observed dominant cause.
-
-## Mandatory Checklist
-
-Apply the current Reader Map row and shared safety/semantic constraints. Native
-review uses Required Checks, documentation review its projection, and performance
-review its activation and selected evidence sections. This heading does not create
-a second unconditional build or benchmark checklist.
-
-## Default Sequence
-
-Select the changed contract and required risk, read its current section, obtain
-owner-defined evidence, and report findings with limits. Resolve additional runtime,
-performance or numerical questions at the conditional routes above, then return to
-the same review. Reuse valid existing results rather than rerunning a whole sequence.
-
-## Common Failure Modes
-
-Watch for unmigrated callers/docs after a header change, implicit lifetime/ownership
-assumptions, build changes without selected build evidence, and untested reachable
-error paths. Under performance activation, reject unmatched build/hardware/input
-comparisons, missing warm-up/repetition/noise or dead-code controls, low-level tricks
-before algorithm/data-movement analysis, unexplained concurrency/layout changes,
-weakened numerical or memory semantics, and duplicate benchmark/profiler frameworks.

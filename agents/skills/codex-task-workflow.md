@@ -25,48 +25,40 @@ and read-only inspection keep their existing scope.
 
 ## Execution route
 
-Reuse the route from the [task catalog](../task_catalog.yaml). A bounded task
-proceeds with its existing evidence and one execution owner. Coordination
-follows selected owner guidance; a run bundle or child is used only when the
-route needs durable evidence or delegation.
-Treat the current request and target contract—not an earlier implementation—as
-the correctness reference. For failure repair, follow the root [local repair
-rule](../../ROOT_AGENTS.md#always-on-boundary).
-
-## Owner-First Readback
-
-Use the applicable root instructions and selected Skill. Preserve settled
-context across phases. For a local change, use the target, current diff, and
-governing contract to select the next action.
+Reuse the applicable route from the [task catalog](../task_catalog.yaml), the
+current target, and settled context. Begin with the requested outcome, authority,
+input/output contract, and governing owner. For a failure repair, identify the
+cause from the target and relevant evidence, then use the root [local repair
+rule](../../ROOT_AGENTS.md#always-on-boundary). Do not restart discovery or add
+phases that do not affect this task.
 
 ## Stages
 
-Use the current phase row in [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md)
-to find the owner for the next action. Follow actual dependencies rather than a
-fixed stage sequence; inactive phases, reviewers, and specialists remain
-inactive. Resolve a material design question with
-[CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md) before the affected
-edit. When multiple implementations or obsolete support must be retired, use
-the shared [owner and retirement rule](../../ROOT_AGENTS.md#always-on-boundary).
-When an operational procedure changes, update its applicable Skill's Use
-When/flow guidance in the same work unit and keep full procedure details in the
-canonical owner. Ordinary prose or README edits do not trigger a repository-wide
-Skill scan.
+Use [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md) to select an owner for the
+next needed action. Follow actual dependencies, not a fixed stage order. Resolve
+a material design question with [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md)
+when it changes the implementation. Keep obsolete-support retirement with the
+existing owner. A newly selected capability uses its existing CLI/API/script
+with its native arguments and process-result semantics. Before adding an
+implementation, compare the requested guarantee with capabilities already
+identified in the caller's context. Reuse or compose one that satisfies it;
+extend only to close a concrete gap. Judge overlap by responsibility and
+contract, not by names or paths alone.
 
 ## Coordination handoff
 
-Use [subagent-bootstrap](subagent-bootstrap.md) only after the typed route
-selects a child or durable coordination. [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md)
-owns roles and lifecycle; [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md)
-owns handoff content. For a writing child, use
-[repository-topic-clone](repository-topic-clone.md) for the prepared checkout
-and target. Parent and child retain their assigned authorities.
-A newly selected related Skill is read from its current owner and executed through the existing native CLI/API/script entrypoint with argv and process-result semantics preserved.
+Delegate or create durable coordination only when the selected route needs it.
+Then follow [subagent-bootstrap](subagent-bootstrap.md),
+[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md), and
+[COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) for the applicable role,
+checkout, authority, and handoff. Parent and child retain their assigned scopes.
 
 ## Validation and delivery
 
-Use [CODEX_COMPLETION](../canonical/CODEX_COMPLETION.md) for required checks and
-closeout. Report what was actually established; unavailable required
-verification remains unverified. Use the selected integration or PR owner for
-authorized base integration and publication, and read back remote state after a
-write.
+Run the validation selected by the changed guarantee and its owner. Report what
+the result establishes; keep failed, skipped, and unrun checks distinct. Use
+[CODEX_COMPLETION](../canonical/CODEX_COMPLETION.md) for closeout when needed.
+Integration or publication follows its selected owner and authorization, with
+remote readback after an external write. When the task changes an operational
+procedure, update the affected Skill's Use When/flow in the same work unit;
+ordinary prose edits do not trigger a repository-wide Skill scan.

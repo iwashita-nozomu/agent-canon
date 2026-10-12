@@ -12,110 +12,75 @@ downstream implementation ../../tools/validation/semantic/tools/tool_rejection_p
 
 ## Purpose
 
-実験の準備、実行、終端状態、結果整理、rerun 判断を一続きで扱います。run identity、source/config/command/environment の
-provenance、failed/partial を含む terminal status をこの skill が記録し、実在 artifact は
-`result-artifact-writeout`、reader-facing claim は `report-writing`、source scope と archive retention はそれぞれの owner 文書に委譲します。
+Carry an experiment from its question through execution and interpretation. Use
+the caller's runner, project environment, inputs, and comparison; record enough
+source/config/command identity and terminal status to explain the observed
+result. Artifact writing, report prose, and retention decisions stay with their
+selected owners.
 
 ## Use When
 
-- experiment topic の初期化、case 実行、result/report 生成、review、rerun を行う
-- 一つの protocol と run の終端状態を再現可能に記録する
-- 完了済み experiment または閉じた verification/diagnosis の topic code を
-  retire する。active run を完了 archive へ強制しない
+Use when the request includes planning, running, interpreting, or rerunning an
+experiment. Topic creation, GPU diagnosis, report generation, and code/archive
+closeout are separate conditional tasks.
+
+## Method
+
+1. State the question or claim, the inputs and comparison that can answer it,
+   and the stopping condition needed for this request.
+2. Run through the project's existing runner and environment. Preserve their
+   configured defaults and execution semantics; use a specialized profile or
+   variant only when the requested evidence needs it.
+3. Observe the actual terminal result. Distinguish completed, failed, and
+   partial work, and keep source/config/command details needed to reproduce or
+   interpret that result. A partial or failed run does not establish a completed
+   comparison.
+4. Rerun only when the question or supported cause requires another run. Keep
+   changed inputs or execution conditions identifiable; report what changed and
+   what the comparison can establish.
+5. Use an existing artifact or report owner when the requested outcome needs
+   durable raw results, archive handling, or reader-facing claims. Do not turn
+   an ordinary run into an archive or report workflow.
 
 ## Topic Preparation
 
-topic 名と registry identity を決め、次の唯一の existing creator route を使います。
-
-```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
-```
-
-C++ を主実装とする場合も同じ creator を使い、consumer CMake owner が選んだ profile を明示します。
-
-```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic> \
-  --template-profile cpp --cmake-profile <root-aggregate|consumer-local>
-```
-
-multi-case adapterが必要なtopicだけは、同じcommandに`--multi-case`を付けます。case inputは生成後に
-実データで設定し、未設定のempty/example registryは作りません。
-
-bootstrap の tool-container から親へ生成する場合は、親が既に明示的な target-write capability
-へ登録されていることを確認し、同じ creator の catalog route を使います。
-
-```bash
-bootstrap.sh --control-parent-root <control-root> tool run --root <parent-root> \
-  create-experiment-topic -- <topic> --template-profile cpp \
-  --cmake-profile <root-aggregate|consumer-local>
-```
-
-通常のsource-free `template export`はpackage filesのexport ownerのままです。
-
-作成後は、今回の変更・実行に関係する `run.py`、`cases.py`、`config.yaml`、
-`visualization.py`、`README.md` の責務と接続を確認します。順序は調べる依存に合わせます。
-template の直接コピーや別 scaffold fallback は使いません。
-
-## Run procedure
-
-1. 再現・解釈に必要な範囲で、question、comparison target、stop condition、fairness、
-   artifact、registry/config snapshot、execution plan を記録する。空の欄や独立した段階を
-   checklist のためだけに作らない。
-2. 求める証拠に合う既存 variant を選ぶ: `debug`/`smoke` は局所確認、`verified` は
-   bounded run、`formal` は case set、timeout、dtype、backend、worker、output を固定した
-   比較 run に使う。
-3. formal/verified の入口は次を使う。
-   `python3 -m tools.experiments.execution.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py`
-4. source、effective config、command、environment、run identity、terminal status を記録し、producer が選んだものだけを
-   `result/<run-id>/raw/` と `result/<run-id>/summary/` に渡す。`visualization.py` は artifact reader/renderer で、launcher や config 正本ではない。
-5. spot、都合のよい subset、途中停止や partial run は formal evidence にしない。停止は `Stop Reason:` と `Restart Decision:` を残し、rerun は新しい run identity で最初から行う。
-
-## Failed-run evidence and retention
-
-失敗の確定は terminal status を定めるもので、既存 artifact の削除を指示しません。失敗だけを理由に run artifact を削除せず、既存の明示的な処分判断と readback 条件は [retention](retention.md) に従います。原因が未確定なら、その不確実性だけで evidence を破棄せず、既存の retention 判断に委ねます。
-
-## Long GPU or crash branch
-
-長時間 GPU run の開始/延長や crash 後の rerun では、既存ログ・最後の進捗・run identity
-を確認し、今回の失敗原因を調べるのに必要な bounded 診断を選びます。compile と run を
-分ける設計ならそれぞれの resource、期限、停止条件、永続保存先を確認してから実行します。
-クラッシュ報告後、原因と安全性を裏付ける根拠が未確定な間は同じ高負荷設定を再実行せず、
-次の判断は既存ログと bounded 診断の結果に基づけます。
-小さな確認の成功だけで長時間 rerun を自動起動しません。
-topic に mini-runner、scheduler、独自 signal 回収、partial-resume protocol を追加せず、managed runner/scheduler owner に handoff します。
+When topic setup is part of the request, use the caller's existing creator or
+scaffold. For an AgentCanon experiment topic, its native creator is
+`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>`; select
+supported options only when the topic's actual needs call for them.
 
 ## Topic boundary
 
-- `run.py` は orchestration、`cases.py` は case/difficulty/resource estimate、`task(case, context)` は一 case の研究 logic を持つ。
-- process lifecycle、timeout、child cleanup、worker completion、GPU/CPU slot、child environment propagation は managed runner が持つ。
-- checked-in config は `experiments/<topic>/config.yaml`、topic README は問い・比較対象・標準 command・config source・renderer・output schema・run name を説明する。
-- project registry がある場合は `python3 -m tools.validation.ci.checks.check_experiment_registry` を実行し、execution surface の変更は owner-selected test を使う。
-- result artifact の role/checksum/readback は `result-artifact-writeout`、reader-facing report は要求時だけ `report-writing`、HTML は要求時だけ `html-output` に委譲する。
-- Topic branch/source scope は
-  [Branch Scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)、raw log、annex payload retrieval、completed summary は
-  [Result Log Retention And Visualization](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention)
-  に従います。
+Follow the project's existing separation between experiment orchestration,
+per-case logic, runtime lifecycle, and artifact/report handling. Let the topic
+owner define its file layout and run contract; do not impose AgentCanon
+filenames or a wrapper on another project.
 
-## Topic code closeout
+For execution, prefer the caller's established runner. When AgentCanon's
+managed formal or verified route is selected, its existing invocation is:
 
-完了した experiment または閉じた verification/diagnosis の code を retire
-する場合だけ、次を行います。active run を archive closeout へ強制しません。
-topic branch には選択した topic の code/config だけを置き、`main` には共有
-model/helper、execution/regression infrastructure、completed `summary.md` を残します。
+```bash
+python3 -m tools.experiments.execution.run_managed_experiment \
+  --topic <topic> --variant <variant> -- <project run command>
+```
 
-1. Active raw log は ignored scratch に置く。archive 前に source/execution
-   commit、config/input identity、command/environment、解釈に必要な
-   log/result を保存する。
-2. 選択した evidence を既存 annex writer で圧縮し、archive reference を
-   `git annex add <archive-path>` で登録する。payload は configured annex
-   destination へ保存し、retrieval を確認する。Git push だけでは payload
-   保存を証明しない。
-3. `main` に retrieval method、execution commit、results、limits を記した
-   completed `summary.md` を保持する。cleanup 前に target repository の Issue
-   に `main` にない正確な `summary.md` paths を列挙し、その summaries を保持する。
-4. summary と retrievable payload を確認してから retired topic code/config
-   だけを除去する。shared models/helpers/execution/regression tests は保持し、
-   active experiment と closed verification/diagnosis の scope を混ぜない。
+## Conditional owner routes
 
-`research-workflow` は複数 iteration の仮説と claim、`adaptive-improvement-loop` は backlog-driven sequence、
-`experiment-review` は topic contract の review を所有します。構造が本当に未決定な plan/report だけ `structure-planning` を追加します。
+- GPU execution or crash diagnosis: use [gpu-execution](gpu-execution.md) and
+  the project-selected runner when those concerns affect the requested run.
+- Result identity, checksum, or durable writeout: use
+  [result-artifact-writeout](result-artifact-writeout.md) when the result must
+  be retained or shared. Use [report-writing](report-writing.md) only when a
+  reader-facing report is requested.
+- Multiple research iterations, backlog tracking, or a separate topic review:
+  use [research-workflow](research-workflow.md),
+  [adaptive-improvement-loop](adaptive-improvement-loop.md), or
+  [experiment-review](experiment-review.md) only when that work is selected.
+- Retiring AgentCanon topic code: apply the existing
+  [topic branch scope](../../documents/operations/BRANCH_SCOPE.md#experiment-topic-branch-scope)
+  and [archive and summary policy](../../documents/experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention).
+  That policy requires retrievable retained evidence before retirement and
+  preserves shared models/helpers, execution/regression infrastructure, and
+  completed summaries on `main`; list exact summaries missing from `main` in
+  the target Issue. This closeout route does not apply to every run or retention
+  plan.

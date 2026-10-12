@@ -16,165 +16,69 @@ downstream implementation ../../tests/agent_tools/test_gpu_execution_docker_all_
 
 ## Reader Map
 
-- Purpose: Docker、CI、dependency、Dev Container の変更を、同じ canonical image
-  から実行と検証が完結する構造へそろえます。
-- Use When: runtime image、dependency、CI、Dev Container、Compose、container profile、
-  environment compatibility guidance を変更するときに使います。
-- Section path: Expected Structure defines the environment outcome. Select the
-  change fields, owner routes, and validation that match the affected image,
-  dependency, runtime wiring, or documentation surface.
-- Boundary: source、data、model、credential、GPU driver/device などの runtime input は
-  image 外に置けますが、標準環境の構築には使いません。
-
-通常実行は共通入口の境界に従い、既存entrypointを設定・既定値のまま先に実行し、
-失敗した場合だけ必要な経路を検証します。利用者への環境選択要求や、agentによる環境フラグ・
-環境変数・設定の手動上書きを行いません。
-新しいtask/session、CPU/GPUの利用、任意設定の未確認だけで環境判定や本Skillを
-起動しません。環境変更が依頼範囲にある場合だけ、Required Change Fields以降の
-構築・acceptanceを適用します。実失敗の限定調査から、setup・修復・未使用profileや
-設定項目の補完を自動的に追加せず、通常実行の前提にも戻しません。
-
-AgentCanon source is the exception to project-local Dev Container discovery:
-its Python/Rust/LSP dependencies belong to the shared image built by
-`bootstrap.sh` and `bootstrap/`. A parent project may keep its own
-`.devcontainer/`, but that directory is never an AgentCanon dependency or
-fallback.
-
-## Expected Structure
-
-環境設計は次の完成状態から逆算します。
-
-```text
-Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pass
-```
-
-- Dockerfile の canonical target が、repository の標準実行・開発・検証commandに
-  必要なOS package、language runtime、compiler、CLI、Python/Node等のdependency、
-  shell/runtime設定を所有します。
-- buildしたimageは、Feature、initialize、post-create、post-attach、host interpreter、
-  mounted installer、workspace venv、previous container stateに依存せず、
-  `docker run`からrepositoryの標準テスト一式を完了します。
-- Dev Container、Compose、runtime pack、GitHub Actionsは project-owned image/layer を
-  選択・build・runし、source/data mount、UID/GID、GPU/device、port、credential、secret、
-  environment variable の配線だけを担当します。これは AgentCanon の shared toolresident
-  とは別の execution plane です。project 側で image/layer を再利用しても container は
-  product と toolresident を兼用しません。
-- optional workflow capabilityが追加imageを必要とする場合も、そのworkflowが選ぶ
-  Dockerfile/OCI image targetとして完成させます。container起動後のinstallへ逃がしません。
-
-provider、manifest、Feature、lifecycle hook、Compose generatorなどの実装機構を選ぶ前に、
-この期待構造とcanonical full test commandを確定します。
+- Purpose: assess requested changes to environment construction, dependencies,
+  runtime wiring, and their consumers.
+- Use When: the task changes a runtime image, dependency, CI, Dev Container,
+  Compose setup, or environment compatibility rule.
+- Flow: identify the changed guarantee and its owner, trace affected consumers,
+  and select the acceptance evidence for that change.
+- Boundary: follow the caller's project environment and defaults. AgentCanon's
+  shared Python/Rust/LSP tool environment is separate from a consumer project's
+  product runtime.
 
 ## Purpose
 
-code requirementが必要とする環境capabilityをcanonical imageへ配置し、local、Dev Container、
-CIで同じimageとtest commandを再利用できる状態にします。
+Keep an environment change aligned with the repository's actual build and run
+route. Determine which capability changes, where it belongs, what selects it,
+and how the affected behavior is checked. This Skill does not prescribe one
+container layout for every caller.
 
 ## Use When
 
-- Dockerfileやcontainer image targetを更新する
-- dependency/runtime/toolchainを追加・更新・削除する
-- CI、Dev Container、Compose、runtime packを変更する
-- host/container/CIの責務分担を修正する
-- Dockerfile外のinstallerやmutable environmentを除去する
+- The requested change affects an environment definition or its consumers.
+- A dependency or runtime capability must be added, changed, or removed.
+- An environment requirement or setup instruction no longer matches its owner.
 
-## Core References
+Routine execution of an existing project command is not an environment change.
 
-- [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
-- [documents/contracts/github-first-module-and-devcontainer-policy.md](../../documents/contracts/github-first-module-and-devcontainer-policy.md)
-- [documents/conventions/coding-conventions-project.md](../../documents/conventions/coding-conventions-project.md)
-- project-owned `Dockerfile` / `docker/`
-- `bootstrap.sh` / `bootstrap/`
-- project-owned `.devcontainer/` when the parent explicitly provides one
-- `.github/workflows/`
-- `README.md`
-- [agents/skills/dependency-design.md](dependency-design.md)
-- [agents/skills/gpu-execution.md](gpu-execution.md)
+## Method
 
-## Required Change Fields
+1. Start from the requested guarantee, changed target, and its environment
+   owner. Reuse the project's documented build, run, and validation route.
+2. Inspect only the definitions and consumers that can be affected: for
+   example, a Dockerfile/image target, dependency manifest, runtime config,
+   CI job, or Dev Container. Distinguish installed dependencies from runtime
+   inputs such as data, credentials, or devices.
+3. Place the change where the owner expects it and update consumers whose
+   actual contract changes. Preserve existing defaults and supported execution
+   behavior; do not add a separate host or tool-container path as a substitute
+   for the project's selected environment.
+4. Select checks that establish the changed guarantee. Keep documentation,
+   dependency resolution, image construction, and runtime acceptance distinct;
+   report which were performed and which remain unverified.
 
-Record the fields that apply to this change: the affected image target/profile
-and command, dependencies versus runtime inputs, consumers that select the
-target, any installer or superseded environment being removed, and the
-validation/recovery route. Do not create placeholder values for unaffected
-profiles, consumers, or retired resources.
+## Conditional owner routes
 
-## Operating Rules
+- If dependency placement, provider, version, or lock semantics are in scope,
+  use [dependency-design](dependency-design.md).
+- For AgentCanon's shared tool image and lifecycle, follow
+  [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md). Consumer project
+  images and their tests remain project-owned.
+- If a project's established contract requires a canonical image and full test
+  command, validate that build-and-run route for changes that can affect it.
+  Do not impose it on unrelated documentation or routine command execution.
+- If the affected route needs GPU runtime evidence or optional admission, use
+  [gpu-execution](gpu-execution.md).
+- If the task replaces or removes an existing environment, use
+  [environment-cleanup](environment-cleanup.md) for that selected lifecycle.
+- A command inside an already running Dev Container belongs to
+  [devcontainer-exec](devcontainer-exec.md), not environment redesign.
 
-- 再構築・置換は[environment-cleanupの廃棄手順](environment-cleanup.md#rebuild-cleanup)を使い、
-  旧環境の削除まで同じ作業で閉じます。現行shared imageの再利用規則を旧環境の保持理由にしません。
-- dependencyの追加・移動・削除がある場合は、Expected Structureを固定したうえで
-  `dependency-design`へ渡し、各dependencyのimage target、provider、version/lock、
-  validation commandを決めます。
-- 標準commandに必要なdependencyはDockerfile build時に導入します。
-  typed manifestを使う場合もmanifestはbuild inputであり、runtime installerのownerにはしません。
-- Dev Container Feature、initialize/post-create/post-attach、Compose generator、
-  CI runner setup、shell startupからpackage manager、dependency resolver、venv生成、
-  editable install、global tool installを実行しません。
-- post-create等を残す場合は、image-owned stateとruntime wiringのread-only確認に限定し、
-  その処理がなくても`docker run`の標準テスト一式は成功しなければなりません。
-- local developer convenienceだけを理由にhost-global installやproject image外のbootstrapを
-  canonical routeへ昇格させません。
-- GPU imageはdeviceなしでbuild可能にします。GPUを必要とする標準テストは、
-  [gpu-execution](gpu-execution.md)に従い、既存のGPU・image設定を使う規定経路を
-  先に実行します。経路・空き確認は実失敗に関係する場合だけ行います。
-  通常実行に専用admissionやJAX/XLA設定を要求せず、排他予約が必要な場合だけ
-  同skillの任意経路を選びます。
-- When a changed target or command is referenced by the Dockerfile, Dev
-  Container, Compose, CI, or README, update the affected consumers to the same
-  contract. Do not edit unrelated references or consumers.
-- Project runners reuse the image tag selected by the current environment owner and
-  runtime pack across checkouts. They perform one native local-tag presence lookup;
-  a missing tag is built with the builder's normal cache, while an explicit
-  build/update request uses that same cache unless the caller selected `--no-cache`.
-  Ordinary runs do not create task-specific image tags, attach task lifecycle
-  labels to shared images, or remove/retag the selected image. The run container
-  is disposable (`docker run --rm` / equivalent); the selected image remains.
-- Image selection belongs to the existing project entrypoint and runtime-pack
-  configuration, not per-task manual overrides. Same Dockerfile text, source-tree
-  hashes, registry provenance, and daemon preflight/snapshot comparisons are not
-  substitutes for the configured runtime-pack image tag.
-- 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
-  previous mutable stateを排除したimage build/runがacceptance ownerです。
-- validation failureを解消するためにtest範囲やoracleを弱めません。Authorized CI/environment
-  repairでは、affected canonical validation path上のpre-existing failureもscopeに含め、
-  skipped/no-op validationをruntime behaviorの根拠にしません。imageに不足するcapabilityを
-  Dockerfileへ戻すか、canonical commandの実責務が誤っていることをowner evidenceで修正します。
+## Validation and closeout
 
-## Validation
-
-変更した環境のownerに沿って検証します。以下のbootstrap例とlifecycle readbackは
-AgentCanon tool runtimeのimage/lifecycle変更に限ります。project環境の変更は
-project-owned build/runと該当profileのcanonical full testで検証し、AgentCanon
-bootstrapを前提にしません。文書のみの変更は文書・参照整合の検証に限定し、
-image buildや実機acceptanceを実施したとは報告しません。
-
-```bash
-./bootstrap.sh --control-parent-root <root> install
-./bootstrap.sh --control-parent-root <root> start
-./bootstrap.sh --control-parent-root <root> status
-```
-
-- bootstrap container contract testと実lifecycle readbackをcompletion evidenceにします。
-- 変更の影響を受けるsupported profileを検証します。未使用profileの整備を開始条件にしません。
-- GPU deviceを必要とするtestはGPU runner上で実行し、対象commandが実際にGPU backendを
-  使用したことを確認します。JAXのbackend確認はJAXを使用する場合だけ行います。
-- When a code or policy change affects the environment construction rule, use
-  its focused policy test for Dockerfile-external dependency installation and
-  alternate environment construction.
-- 文書変更はrepositoryのcanonical docs checkで検証します。
-
-## Completion
-
-以下は環境実装を変更した場合の終了条件であり、通常実行や文書のみの変更には適用しません。
-
-- canonical Docker imageをbuildできる。
-- buildしたimageを`docker run`し、repositoryの標準テスト一式が追加setupなしで全て成功する。
-- Dev Container、Compose、CIは同じimageを使用し、起動後にenvironmentを構築しない。
-- 再構築・置換では、旧環境と専用資源の削除・不在確認まで完了している。
-
-## Boundary
-
-- 起動済みDev Container内のtargeted command実行は`devcontainer-exec`が所有します。
-- 実験loop自体の運用は`adaptive-improvement-loop`または`research-workflow`を使います。
-- 差分レビューは`change-review`を使います。
+Use the owning project's existing command and environment to check the changed
+behavior. A documentation-only change needs documentation checks; dependency,
+image, runtime, or CI changes need only the acceptance checks that cover their
+affected contract. Preserve the project's execution permissions and rerun
+limits. Keep failures separate from skipped or unavailable checks, and report
+the result with its remaining scope.
