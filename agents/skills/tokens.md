@@ -17,112 +17,67 @@ downstream design ./agent-eval-accumulation.md accumulated eval evidence route
 
 ## Reader Map
 
-- Purpose: diagnose overhead and measure token efficiency without weakening
-  the task contract or required validation.
-- Use When: requested token diagnosis/measurement or observed efficiency problems.
-- Boundary: task classification, role defaults, context construction, metrics,
-  artifact storage, and runtime publication remain with their existing owners.
+- Purpose: locate avoidable context or token work without changing the task
+  contract.
+- Use When: token/context diagnosis is requested or repeated inefficiency is
+  observed; task size alone is not a trigger.
+- Boundary: the caller supplies the task context; existing owners define metric,
+  collection, and runtime routes.
 
-## Purpose
+## Method
 
-An unnecessary operation and a measured token reduction are different claims.
-Logs and source can establish the former without a post-change session. A
-shorter prompt, smaller role list, or successful task alone proves no reduction.
+Start from the caller's goal and the context already available. Use known facts,
+the current revision, metrics, or target role only as relevant. On a resumed or
+compressed context, retain why completed fixes were accepted and what unit
+remains. Continue that unit without reopening finished work or restoring a
+rejected approach. Re-read only a truncated relevant part or check a specific
+missing fact when it could change the action; do not reopen the full history.
+Do not re-compress context just to make it shorter when no task-relevant
+information or handoff needs it.
 
-## Activation
+Identify a concrete repeated read, decision, unused output, retry, or other
+source-supported waste; follow it to its owner and repair it with the owner's
+normal validation. A supported waste repair does not need comparison sessions.
+Shorter text, fewer roles, or a successful task alone does not prove token
+savings. Keep the task's required behavior and checks intact.
 
-Activate for explicit token diagnosis/measurement or observed duplicate reads,
-repeated decisions, unused output, oversized tool output, or retries; not for a
-normal task budget, task size, or adaptive execution decision alone.
+Missing counters or incomplete coverage remain unknown or `unmeasured`, not
+zero. Do not automatically collect logs, sync archives, repair dashboards,
+rerun producers, or launch comparison sessions. Change a model, window, runtime,
+or profile only when observed evidence identifies that setting as the cause.
 
-Start with existing summaries/API and a named snapshot. Reuse applicable results
-and use bounded drilldown through `$agent-log-analysis` for unresolved questions.
-Missing counters limit quantitative claims, not other supported observations.
-Do not automatically collect logs, sync archives, repair dashboards, rerun evals,
-or launch comparison sessions to fill gaps. Select further collection only when
-the requested decision needs it and it is authorized. Unknown is not zero use.
+## Quantitative claims
 
-## Budget and Measured Footprint
+A reduction claim needs actual before-and-after sessions with equivalent task
+intent, validation obligations, role responsibilities, and usable output. Use
+actual counters from the existing footprint route; do not estimate savings from
+shorter instructions or task success. If sessions or required measurements are
+missing, report `unmeasured`, not zero or a reduction. Reuse existing results;
+do not create an unrelated baseline or a new metric/threshold.
 
-Read `.codex/config.toml` and the selected `agents/task_catalog.yaml` family only
-for budget/runtime decisions, not as a prerequisite for describing existing logs.
-For relevant role attribution, record roles that actually ran, distinct decisions,
-packet reuse, and output use; registration or task size is not execution evidence.
-`worker` / `spark_worker` selection, roles, teams, and context packets remain with
-`$agent-orchestration` and `$subagent-bootstrap`; reuse their evidence instead of
-launching a role merely for this report.
+## Conditional owner routes
 
-## Baseline and Efficiency Decision
-
-A quantitative reduction claim requires both source sessions and equivalent
-behavior envelopes: the same task intent, validation obligations, role
-responsibilities, and usable output. Reuse applicable token-footprint checker
-results, or call the checker when that comparison is selected. Use the role
-evaluator only for unresolved role attribution, not for every diagnosis. Preserve
-selected artifacts through the normal result-artifact route; add no metric or
-acceptance threshold. Missing sessions or required measurements mean `unmeasured`,
-not a reduction claim. Do not manufacture baselines by running unrelated tasks.
-
-A source-supported unnecessary operation may be repaired by its existing owner
-with normal validation while its token effect remains `unmeasured`. Change model
-effort, profile, team, or output limits only when observed runtime evidence
-identifies that surface as the cause. Delegate to `$agent-orchestration` or
-`$subagent-bootstrap`; apply profile changes in a fresh session and do not encode
-machine-local values in repository docs.
-
-## Evidence Owners
-
-- `eval/checkers/compare_codex_token_footprints.py`: equivalent session comparison.
-- `eval/producers/evaluate_codex_agent_roles.py`: per-role calls, tokens, latency,
-  retries, parent interventions, format compliance, and output use.
-- `eval/producers/generate_agent_runtime_dashboard.py`: accumulated trends.
-- `$agent-log-analysis`: structured interpretation and `token_coverage` findings.
-- `$agent-eval-accumulation`: selected producer execution and accumulation;
-  `$result-artifact-writeout`: durable artifact placement.
-
-These references are not a mandatory execution sequence. Do not hand-write
-numeric token reports or per-wave schemas. Diagnostic observations are not metrics.
-
-## Adaptive Triggers and Route
-
-Classify duplicate decisions/reads, unused reviews, oversized output,
-malformed-handoff retries, or model/effort mismatch before choosing a repair.
-Rejection or validation failure does not automatically expand the team or change
-the profile. Carry the snapshot, observation, cause hypothesis, owner, and
-selected validation to the owning route; add comparison evidence when measured.
-Missing metrics identify an owner, not an instruction to run a producer.
-Recurrence feedback belongs to `$agent-learning`.
-
-When unrelated reading comes from mixed file responsibilities, follow
-[structure-refactor](structure-refactor.md#overloaded-documents) with the exact
-sections, triggering operation, and incoming reader route. Do not merely shorten
-wording or split by byte count; repair the responsibility boundary. This route
-needs no comparison session, and its token effect remains `unmeasured` without one.
+- For a budget or runtime-limit question, consult `.codex/config.toml` and the
+  relevant task family only as needed. Team, role, and context choices belong to
+  `$agent-orchestration` and `$subagent-bootstrap`.
+- For an actual session comparison, reuse or select
+  `eval/checkers/compare_codex_token_footprints.py`. Use
+  `eval/producers/evaluate_codex_agent_roles.py` only when role attribution is
+  unresolved. For an accumulated trend question, use existing dashboard
+  summaries and `eval/producers/generate_agent_runtime_dashboard.py` as its
+  owner; run collection or repair through `$agent-eval-accumulation` only when
+  selected.
+- For unresolved log interpretation, use `$agent-log-analysis` with bounded
+  evidence. Durable output uses `$result-artifact-writeout` when requested.
+- If mixed file responsibilities force unrelated reading, use
+  [structure-refactor](structure-refactor.md#overloaded-documents) when a
+  responsibility change is warranted. Use the existing
+  [communication protocol](../COMMUNICATION_PROTOCOL.md) for a selected handoff;
+  do not introduce a context capsule, manifest, schema, or new gate.
 
 ## Closeout
 
-For diagnosis, report observations separately from hypotheses, evidence scope,
-selected repair, validation, and limits on the requested claim. Do not fill an
-unused comparison-only ledger. For measured comparisons, report both sessions,
-equivalent envelope, applicable budget/role footprint, totals, ratio, and
-behavior-evaluation result; mark missing required measurements `unmeasured`.
-Token evidence does not replace owner-selected dependency review, static analysis,
-diff review, required checks, cleanup, pushed commits, or Issue/PR readback.
-
-## Runtime Contract Clauses
-
-1. Diagnose from existing summaries and a named snapshot with bounded drilldown.
-   Missing metrics limit claims; collection, sync, repairs, eval reruns, and
-   comparison sessions are not automatic prerequisites.
-2. Read configuration/task-family budget only for budget/runtime decisions;
-   inspect roles only when relevant. Task size is not evidence, and runtime
-   changes require observed cause evidence.
-3. Selected comparisons require equivalent envelopes and both sessions; reuse
-   or run the existing checker. Use the role evaluator only for unresolved
-   attribution. Missing measurements mean `unmeasured`, not a reduction claim
-   or a blocker to a source-supported repair with normal validation.
-4. Delegate team/context and selected metric/eval/artifact/archive work to
-   existing owners. Do not launch roles or traverse all owners merely to fill
-   a report; diagnosis requires no unused comparison ledger.
-5. Preserve required behavior, validation, review, cleanup, and publication;
-   token efficiency is supporting evidence, not a replacement.
+Answer in the caller's requested form, separating observation from inference
+and stating limits that affect the conclusion. For measured savings, identify
+the actual sessions and equivalence basis. Token evidence does not replace
+required task validation or authorized delivery.
