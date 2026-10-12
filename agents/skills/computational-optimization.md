@@ -1,4 +1,5 @@
 # computational-optimization
+
 <!--
 @dependency-start
 contract skill
@@ -12,366 +13,80 @@ downstream implementation ../../.codex/personal/skills/computational-optimizatio
 @dependency-end
 -->
 
-
-## Reader Map
-
-- Purpose: fix mathematical and validation contracts for numerical
-  optimization, solvers, derivatives, constraints, convergence, and benchmarks.
-- Section path: Purpose and Use When define scope; Boundary separates research,
-  experiments, tests, and review; Optimization Contract, Workflow, Validation
-  Rules, Review Route, and Outputs hold the operational rules.
-- Use when: optimizer, solver, preconditioner, KKT, residual, derivative,
-  tolerance, convergence, NaN/Inf, or numerical benchmark work is in scope.
-- Boundary: this skill owns the optimization contract and validation contract;
-  experiments, adaptive improvement, and language-specific review stay with
-  their owner skills.
-
 ## Purpose
 
-数値最適化、非線形 solver、線形 solver、preconditioner、制約条件、収束判定、gradient / Jacobian / Hessian、KKT 条件を含む変更を、数学仕様、実装責務、検証責務に分けて扱います。
+Clarify the mathematical contract and evidence needed for numerical optimization,
+solvers, derivatives, constraints, convergence, and numerical performance work.
+Fit the detail to the requested behavior; there is no mandatory field packet for
+every numerical question.
 
 ## Use When
 
-- optimizer、solver、preconditioner、line search、trust region、Newton / quasi-Newton、first-order method、stochastic optimization を変更する
-- objective、constraint、residual、KKT、stopping criterion、scaling、regularization、tolerance、dtype / device behavior を診断する
-- gradient / Jacobian / Hessian、finite difference、autodiff、implicit differentiation の正しさを確認する
-- 数値 test、benchmark、convergence regression、NaN / Inf / divergence を扱う
-- 最適化アルゴリズムの文書、実験計画、review packet を作る
+- A change or diagnosis concerns an optimizer, solver, preconditioner, objective,
+  residual, constraint, derivative, stopping rule, tolerance, or numerical status.
+- A convergence regression, non-finite result, or numerical performance claim is
+  in scope.
 
-## Boundary
+## Core Method
 
-- 外部調査や method 比較は `$research-workflow` を外側に置きます。
-- 1 つの protocol の run、rerun、result artifact は `$experiment-lifecycle` と `$result-artifact-writeout` を使います。
-- 実験結果を見ながら継続的に改善する場合は `$adaptive-improvement-loop` を使います。
-- 実装前は semantic responsibility contract に数値検証の obligation と一次 owner を割り当てます。`$test-design` は実装 mechanism 確立後の未解決 test-owned runtime risk に限ります。
-- Python / C++ 差分 review は `$python-review` / `$cpp-review` を併用します。
-- この skill は数値最適化の数学契約と検証契約を固定する責務を持ち、汎用 research workflow や実験 runner の代替ではありません。
+1. State the requested numerical property in terms of the public contract. Record
+   only the relevant parts of the problem: for example objective or residual,
+   variables and parameters, constraints, derivatives, iteration state, stopping
+   policy, and failure semantics. Keep correctness questions separate from speed
+   claims.
+2. Reuse the caller's existing solver, numerical library, oracle, and data
+   producer before adding a mechanism. If implementation work reveals a concrete
+   gap, use an existing extension point where possible instead of duplicating a
+   wrapper, runner, dispatcher, or schema.
+3. Trace the property through the current implementation. For an iterative
+   method, identify the relevant update, accepted step, stopping quantity, and
+   terminal status. Diagnose a failure from the first contract-violating state
+   or iteration and its preceding finite values; a final NaN, residual, or test
+   assertion alone does not establish the cause.
+4. Validate the property with evidence appropriate to the caller's contract and
+   prescribed execution path. Do not relax tolerances, alter expected values,
+   skip cases, or treat `not_converged`, `max_iter`, non-finite state, or a
+   constraint violation as success. Retain and report the observed failure
+   status. Require GPU evidence only when the request, contract, or runtime
+   profile requires GPU behavior; numerical subject matter alone does not.
+5. For performance claims, compare the same mathematical problem, initial
+   state, stopping policy, workload, and relevant dtype/backend context. Separate
+   numerical trajectory and algorithmic work from execution cost such as compile,
+   per-iteration, transfer, or synchronization time. Total time alone cannot
+   attribute a regression. When diagnosing iterative-solver performance, use the
+   existing [`numeric_performance.py`](../../tools/analysis/numerical/numeric_performance.py)
+   producer and follow its current input and output contract; do not recreate its
+   schema or infer a systems-level cause from prose alone. This comparison is not
+   required for ordinary numerical correctness work.
 
-## Mathematical Intent Packet
+The convergence of an iterative method is a property of its implemented update
+and stopping rule under stated assumptions. Do not add proof-only state, runtime
+proof checks, or diagnostic gates to make a convergence claim pass. Preserve the
+public numerical contract unless the task authorizes a contract change.
 
-数学または数値の挙動を修正する write-capable route は、実装者へ渡す
-`mathematical_intent_packet` を先に埋めます。この packet は説明用の設計案ではなく、
-数学担当者の書込範囲を決める source packet です。次のフィールド群から、対象の問題、
-変更、検証に関係する情報を記録します。関係しない情報を `not_applicable` として
-埋める必要はありません。選択した runtime packet consumer が closed schema を要求する
-場合は、その schema に従います。
+## Related Skills
 
-- `math_object`: 対象の数理オブジェクト、入力・出力、対象の主張
-- `problem`: 問題設定、適用範囲、求める性質
-- `variables`: 変数と固定 parameter、shape、dtype
-- `domains`: 変数・parameter の domain と dimension
-- `units`: 物理単位、scale、dimensionless 化
-- `objective`: objective、正規化、符号規約、評価点（該当時）
-- `residual`: residual、norm、符号規約、評価点（該当時）
-- `constraints`: equality、inequality、box、feasibility、projection、barrier / penalty
-- `equations`: 数式、境界条件、記号の対応
-- `definitions`: 定義と意味（該当時）
-- `assumptions`: 仮定、適用範囲、適用外条件
-- `approximations`: 近似、許容範囲、誤差の扱い（該当時）
-- `derivation`: 期待する導出、変形、gradient / Jacobian / Hessian の根拠
-- `iteration_map`: 実装対象の反復写像、状態、受理条件、`z_next` の対応
-- `update_map`: 反復ごとの更新則と実装状態の対応（反復写像と別の場合）
-- `invariants`: 不変量、保存量、有限性、対称性、単調性
-- `limits`: 期待する極限、漸近条件、極限の適用範囲
-- `stopping_scalar`: 停止量、停止条件、tolerance、max iteration
-- `failure_semantics`: infeasible、singular、non-finite、max-iter、not-converged の意味
-- `equation_to_code_map`: 各 equation / definition / update と、実装の file、symbol、call path
-- `math_oracle`: 最小の数学 oracle、期待値、検証可能な性質
-- `counterexample`: 反例、失敗ケース、または反例が無いことの根拠
-- `mathematical_definition_paths`: 数式・定義・更新則を実装する明示的な相対 path
-- `mathematical_oracle_paths`: math oracle / counterexample を実装する明示的な相対 path
-- `mathematical_documentation_paths`: 数理責務を説明する owner document の明示的な相対 path
-- `allowed_write_paths`: 上記 map から直接導ける定義、導出、algorithm implementation、
-  numerical oracle、およびそれらを所有する docs / tests の相対 path
-- `forbidden_surfaces`: math route では既定で書き込まない architecture、framework、JIT、
-  compiler、backend、runtime、container、routing、environment、Docker、common infra、
-  proof-tool / IR infrastructure の surface
-- `separate_handoff_targets`: 明示された非数理要求、または forbidden surface の原因候補を
-  別 owner へ渡す対象と理由
+- Use [`algorithm-proof-exploration`](algorithm-proof-exploration.md) when proof
+  obligations should guide an algorithm choice or change, and
+  [`formal-proof-workflow`](formal-proof-workflow.md) when a formal claim needs
+  checker-backed status.
+- Use [`research-workflow`](research-workflow.md) for external method comparisons;
+  [`experiment-lifecycle`](experiment-lifecycle.md) and
+  [`result-artifact-writeout`](result-artifact-writeout.md) for a concrete run
+  protocol and its results.
+- Use [`test-design`](test-design.md) only when a concrete test-owned runtime risk
+  remains after the mechanism and existing validation are understood. Use the
+  [semantic responsibility contract](../../documents/design/semantic-responsibility-contract.md)
+  when a change crosses owners and its obligations need allocation.
+- For JAX loop implementation details, consult
+  [the JAX rules](../../documents/conventions/python/15_jax_rules.md) only when
+  that implementation route is selected.
+- Route numerical behavior review to `scientific_computing_reviewer`, performance
+  claims to `benchmark_reviewer`, and language-specific implementation diffs to
+  `$python-review` or `$cpp-review` as applicable. Non-numerical C++ performance
+  stays on the C++ review route.
 
-`allowed_write_paths` は見えているファイル一覧やエラー発生箇所から推測せず、
-`mathematical_definition_paths`、`mathematical_oracle_paths`、
-`mathematical_documentation_paths`、および `equation_to_code_map` の code path の集合と
-完全一致させます。共通 infrastructure、JIT / backend、
-runtime、routing、environment、Docker、証明ツールを変更しないと math oracle が閉じない場合は、
-数学 writer を停止し、該当 surface の separate handoff を返します。数学 packet が無い、
-または map / oracle が未接続な状態では write-capable dispatch を開始しません。
-
-通常の run は `bootstrap_agent_run.py --math-intent-packet '<JSON>'` で packet を渡します。
-bootstrap は選択された math-intent route の run manifest と spawn handoff に同じ正規化済み
-packet を投影し、packet が無い場合は `math_packet_missing` で停止します。
-
-数学 packet は数学的な依頼にだけ要求します。Docker、JIT、backend、runtime、routing、
-environment、CI、container などを明示的に修正する非数理要求には適用せず、その owner route
-へ渡します。両方が一つの依頼に含まれる場合は clause ごとに sibling handoff を作り、数学
-writer の scope に非数理 path を混ぜません。
-
-## Optimization Contract
-
-The active design packet also references the run-local semantic responsibility
-contract. Allocate the optimization delta's implementation action and obligations
-before implementation. Assign exactly one primary verification owner to each
-invariant, transition, effect, consistency, or substitutability obligation; keep
-distinct supporting evidence with its distinct property or role. Numerical oracles
-remain owned by the declared experiment, test, compiler, static, or proof route.
-
-実装前の output は、optimization delta の action、semantic verification
-obligations、各 obligation の一次 owner、supporting property/role、hard-edge
-declaration です。`$test-design` の output は常時生成しません。owning mechanism
-が確立または修復された後にも、既存 checker、static validation、design review、
-既存 test、targeted validation で閉じない具体的な test-owned runtime risk が残る
-場合だけ、`Activation Decision` と最小の test plan を出力します。
-
-実装、実験、review の前に、対象に関わる最小の optimization contract を明らかにします。
-典型的な内容は次ですが、全カテゴリが全問題に必要とは限りません。
-
-1. Objective / Residual（最適化・残差問題の場合）
-   - 最小化する量、残差、正規化、weight、sign convention
-1. Variables / Parameters（変数・設定が意味を持つ場合）
-   - optimize する変数、固定 parameter、shape、dtype、device、batch semantics
-1. Constraints（制約問題の場合）
-   - equality、inequality、box、manifold、projection、barrier / penalty、feasibility 判定
-1. Derivatives（導関数がアルゴリズム契約に関わる場合）
-   - gradient、Jacobian、Hessian、HVP、finite-difference check、autodiff boundary
-1. Algorithm State（反復 state がある場合）
-   - iterate、step、trust radius、line-search state、preconditioner state、random seed
-1. Stopping Policy（停止挙動を主張・変更する場合）
-   - residual norm、objective delta、step norm、KKT residual、max iteration、failure status
-1. Numerical Invariants（対象の correctness claim に関わるもの）
-   - monotonicity where required、finite state、symmetry / PSD、scaling, conditioning, tolerance rationale
-1. Failure Semantics（対象の公開・検証結果に関わる terminal outcome）
-   - infeasible、singular、non-finite、max-iter、not-converged を success と分ける
-
-### Mathematical Necessity Gate
-
-数理的な runtime 判定、stopping check、test oracle、
-proof obligation は `mathematical necessity gate` を通します。採用条件は、
-public contract の precondition / invariant / postcondition、iteration map、
-stopping scalar、failure semantics、accepted theorem target、または approved
-design の acceptance criterion に接続できることです。接続先のない判定候補は
-algorithm-change guidance、proof / review backlog、または experiment hypothesis
-として記録します。
-
-この採用条件は、数値上の問題による結果の自動破棄を許可しません。数値診断を
-保存・返却の可否を決める gate にせず、原結果への注記として扱います。既存の
-停止条件と、停止までに得た結果の保持を分け、下記 Validation Rules に従います。
-
-For iterative solvers, convergence evidence is a theorem about the implemented
-iteration map and stopping scalar, not a runtime proof check. State the map as
-`z_next = Step_impl(Problem, Config, z)` and the stopping quantity as
-`R_impl(Problem, Config, z)` before changing code. If the map cannot be proved
-to satisfy the target theorem under the accepted problem/config/backend
-assumptions, change the algorithmic mechanism itself; do not add proof-only
-`Info` fields, diagnostic gates, or extra runtime checks merely to satisfy the
-proof.
-Do not make the theorem pass by fixing the backend, device, compiler route,
-runtime target, or dtype unless the user request, approved design, runtime
-profile, public API, or config explicitly fixes that backend. Backend-specific
-data is evidence for the active profile, not a replacement for the optimization
-contract. Missing backend evidence is `backend_evidence_blocker`.
-
-### Tool-Side Iterative Method Handoff
-
-When a tool or subagent is asked to implement an iterative method, treat the
-tool output as a route packet that selects an existing primitive or an explicit
-local loop contract. The packet must contain:
-
-- `iteration_map`: the concrete `Step_impl(Problem, Config, z)`.
-- `stopping_scalar`: the concrete `R_impl(Problem, Config, z)`.
-- `state_tuple`: all loop-carried state, with owner and dtype / device boundary.
-- `reuse_surface`: existing solver, library, framework primitive, or repo helper
-  selected as the first implementation surface.
-- `failure_semantics`: max-iteration, breakdown, singular, non-finite,
-  infeasible, and nonconvergence statuses.
-- `validation_surface`: static checker, smallest deterministic numerical case,
-  and any experiment or benchmark path kept separate from correctness evidence.
-
-If deterministic responsibility search routes the task to
-`numerical_iterative_algorithm_contract`, use this skill, the algorithm boundary
-document, and the JAX loop rules as the implementation source packet before
-writing code. The preferred fix is an algorithm or contract correction.
-Diagnostic fields, proof `Info`, and broader numerical tests become follow-on
-surfaces when the route packet makes them part of the product contract.
-
-## Workflow
-
-Trace the requested numerical property to its public contract and existing
-implementation. For iterative behavior, identify the recurrence, state,
-acceptance/stopping quantity, and failure result that bear on the change. For a
-reported failure, use the first contract-violating mechanism or bad iteration
-to distinguish cause from final NaN, Inf, residual, or assertion symptoms.
-
-Choose the repair surface from that cause, then select validation that can
-establish the affected property. Relevant small, boundary, ill-conditioned,
-derivative, dtype, or device cases are examples, not a universal test list.
-Keep numerical correctness, performance, and formal evidence distinct. Use the
-project's prescribed backend/runner; run GPU, benchmark, or formal validation
-when the request, contract, profile, or claim requires it, and record required
-unavailable evidence as a blocker.
-
-## Validation Rules
-
-- 数値 test / experiment / benchmark を緑化するために tolerance 緩和、assertion 削除、case skip、expected 値追従、手書きの host 計算や別 runner による代用をしません。
-- 検証 backend は project が所有する契約・configure/compile-time 設定と規定の実行経路に従います。対応する CPU/OpenMP backend の正規実行を CPU fallback とみなさず、数値処理というだけで GPU 専用に再分類しません。
-- GPU 固有の要求・契約・runtime profile・検証主張には GPU の証拠が必要です。GPU が使えない場合は `gpu_validation_blocker=<reason>` と evidence を残し、CPU smoke / CPU-only regression をその代用にしません。CPU/OpenMP の結果と CUDA/GPU の結果を明確に分け、未実行の backend へ成功を拡張しません。build 失敗で assertion に到達しなかった場合も数値検証成功にしません。
-- `converged=false`、`max_iter`、non-finite intermediate、constraint violation は pass evidence ではありません。
-  ただし原結果と実際の status は保持・報告し、数値判定による削除、置換、隠蔽、
-  保存・返却拒否はしません。生成済み artifact は `$result-artifact-writeout` に渡し、
-  成功例だけを残して失敗数や比較の母数を失わないようにします。
-- Proof-only fields and diagnostic gates do not establish convergence.
-  Keep genuine execution outputs required by the user-facing algorithm contract;
-  do not turn them into gates for result retention or return.
-- Final value だけでなく、first bad iteration、finite state、residual components、reference norm、tolerance、status flag を確認します。
-- Constraint つき問題では objective だけでなく feasibility と KKT / complementarity を分けます。
-- Linear solver / preconditioner では residual norm、reference norm、preconditioner summary、breakdown status を分けます。
-- Randomized or stochastic optimization では seed、sample budget、variance / confidence、rerun policy を保存します。
-- Performance claim は correctness evidence と分け、同じ run を両方の根拠にしません。
-
-## Convergence-First Numerical Performance Diagnosis
-
-数値 solver または反復 algorithm の速度差を扱うときは、run 後の観測を
-収束・反復の変化と実行基盤の cost に分けてから、次の owner へ handoff
-します。これは数値 performance observation にだけ適用し、非数値の C++
-performance へ compile/JIT 指標を要求する規則ではありません。run 前の
-pass / fail や experiment acceptance を作らず、実行結果の解釈として記録します。
-
-### Required post-run record
-
-before / after は、同じ mathematical problem、initial state、stopping policy、
-dtype / device contract、workload で比較します。少なくとも次の decomposition を
-同じ record に残します。
-
-$$
-T_{total} = T_{compile/JIT} + N_{iter} \times
-(T_{iter\_eval} + T_{linear\_solve} + T_{communication}) + T_{other}.
-$$
-
-`T_iter_eval`、`T_linear_solve`、`T_communication` を可能な範囲で分離し、cold
-compile/JIT、warm execution、transfer / synchronization、algorithmic iteration
-cost を合計時間だけで代用しません。`total_seconds` は summary であり、帰属可能な
-component ではありません。数値側の evidence は residual / objective /
-KKT trajectory、iteration count、step acceptance / size、termination status、
-conditioning、inner-solver work、finite / non-finite event、および per-iteration
-cost を含めます。正規化と分類は
-`python3 tools/analysis/numerical/numeric_performance.py --input <post-run-observations.json> --format json`
-で行い、prose だけで JIT handoff を決めません。
-
-入力は `agent-canon.numeric-performance-observation.v1` の closed JSON です。
-`scope` は `numeric_solver` または `non_numeric`、数値 solver では
-`trajectory_tolerance` と task-provided `math_oracle` を必須にします。各
-`before` / `after` record は `total_seconds` を必須とし、完全な数値比較には
-`compile_jit_seconds`、`iterations`、`per_iteration_seconds`、`eval_seconds`、
-`linear_solve_seconds`、`communication_seconds`、`transfer_seconds`、
-`synchronization_seconds`、`other_seconds`、`residual_trajectory`、
-`objective_trajectory`、`kkt_trajectory`、`step_acceptance`、`step_sizes`、
-`termination`、`conditioning`、`inner_solver`、`inner_solver_work`、
-`finite_nonfinite_events`、および `work_counters` を使用します。さらに
-`mathematical_problem`、`initial_state`、`stopping_policy`、`dtype`、`workload`、
-`run_mode`（`cold` / `warm`）、`compile_cache_state`、`backend`、`device`、
-`compiler` は before / after の両方に必要な比較 context です。
-未知の field は受け付けず、欠落した完全比較項目は `evidence_missing` として扱います。
-結果 JSON の `category`、`reason_code`、`owner_route`、`next_action`、`forbidden_writes`、
-`separate_handoff` をそのまま handoff に渡し、agent が prose から別の owner や
-JIT 編集を推測しません。
-
-### Classification and handoff
-
-| classification | required evidence | first owner and write boundary |
-| --- | --- | --- |
-| `convergence_changed` | trajectory、iteration count、residual / objective / KKT、step acceptance / size、termination、conditioning、または inner-solver work のいずれかが変化 | `computational-optimization` の数学 / algorithm owner。JIT、architecture、backend、compiler、runtime writer はこの math route から起動しない |
-| `systems_cost_isolated` | 数値 trajectory、KKT / finite state、iteration / work counters、termination、conditioning、inner-solver work、比較 context が同値で、compile/JIT、per-iteration、eval / linear-solve、transfer / synchronization、または total cost の少なくとも一つに after 側の正の回帰がある | JIT / backend / systems performance の sibling handoff。math writer はその surface を編集しない |
-| `evidence_missing` | total time だけ、分解・trajectory・KKT / finite state・work counters・比較 context の一部が欠落、context が不一致、数値 work が同じで正の component 回帰がない、または total だけが増加（`reason_code=unattributed_total`） | 未解決または no-action。JIT / architecture の修正へ進まず、必要な run evidence を集める |
-| `non_numeric` | solver / iterative numerical semantics を含まない native performance | 既存の `cpp-review` performance route。数値 decomposition を追加要求しない |
-
-iteration count の増加、residual / objective trajectory の悪化、rejected step、
-conditioning の悪化、または inner solver work の増加は、JIT 境界の変更ではなく
-数学 / algorithm の原因候補です。逆に `systems_cost_isolated` は数値 trajectory
-が保たれ、比較 context が一致し、かつ measured cost の正の回帰がある場合だけ成立
-します。compile/JIT の印象、total-time-only、context mismatch、同一時間、または
-component が変わらず `total_seconds` だけ増えた観測では
-成立しません。`trajectory_tolerance` は residual / objective / KKT trajectory に
-だけ適用し、work counters、termination、context、cost の差を許容する根拠にしません。
-どの classification でも tolerance、stopping rule、case mix、数値
-semantics を変えて速度差を作らないでください。
-
-## Review Route
-
-Select review by the risk in the change: `scientific_computing_reviewer` for
-mathematical behavior, `benchmark_reviewer` for performance claims, and
-`reproducibility_reviewer` when the comparison depends on reproducible runs.
-Use `$python-review` / `$cpp-review` for the corresponding implementation diff,
-and `$report-writing` for reader-facing claims with the relevant research review.
-
-## Outputs
-
-- `optimization_contract.md` or an equivalent section in `design_brief.md`
-- pre-implementation semantic responsibility allocation with action, obligations,
-  primary owners, and hard-edge declarations
-- numeric edge-case list in `test_plan.md` only when post-mechanism unresolved
-  test-owned runtime risk activates `$test-design`
-- validation commands and result paths
-- convergence / failure interpretation with observed state, first bad point, inferred cause, and unconfirmed hypotheses separated
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Read [agents/skills/computational-optimization.md](computational-optimization.md).
-1. Use this skill for optimizer, solver, preconditioner, residual, KKT, convergence, derivative, tolerance, or numerical benchmark work.
-1. Before implementation or experiment runs, fix an optimization contract: objective or residual, variables, constraints, derivatives, algorithm state, stopping policy, numerical invariants, and failure semantics.
-1. Route mathematical runtime checks, stopping checks, test
-   oracles, and proof obligations through the `mathematical necessity gate`:
-   connect each one to the public contract, iteration map, stopping scalar,
-   failure semantics, accepted theorem target, or approved design acceptance
-   criterion before adding it to implementation or validation evidence. This
-   necessity test never authorizes numerical result disposal; follow Validation
-   Rules for result retention and reporting without changing failure status.
-1. For iterative solvers, treat convergence evidence as a theorem about the
-   implemented iteration map and stopping scalar, e.g.
-   `z_next = Step_impl(Problem, Config, z)` and
-   `R_impl(Problem, Config, z)`. If this map cannot satisfy the target theorem
-   under the accepted problem/config/backend assumptions, change the algorithmic
-   mechanism itself. Do not add proof-only `Info` fields, diagnostic gates, or
-   extra runtime checks merely to satisfy the proof.
-1. When tool-side routing returns `numerical_iterative_algorithm_contract`, build
-   an explicit route packet before code changes: `iteration_map`,
-   `stopping_scalar`, `state_tuple`, `reuse_surface`, `failure_semantics`, and
-   `validation_surface`. Prefer existing solver/library/framework primitives or
-   repo helpers as the first implementation surface, and keep correctness
-   validation separate from experiment or benchmark evidence.
-1. For algorithm fixes, enter through the optimization contract and implemented
-   mechanism before changing tests. Record the public entrypoint, recurrence or
-   state transition, invariant, stopping or acceptance scalar, and failure
-   semantics; then select the code-side repair route. Existing tests are
-   symptom and placement evidence, while expected values, tolerances, and new
-   oracle cases are updated after the algorithm route is fixed.
-1. Do not make the theorem pass by fixing the backend, device, compiler route,
-   runtime target, or dtype unless the user request, approved design, runtime
-   profile, public API, or config explicitly fixes that backend. Backend-specific
-   data is evidence for the active profile, not a replacement for the
-   optimization contract. Missing backend evidence is
-   `backend_evidence_blocker`.
-1. For JAX/XLA/IREE iterative solvers, keep lowering-friendly loop structure in
-   the implementation: do not feed residual / convergence / breakdown status
-   produced inside `lax.while_loop` back into the next `cond`, and normalize
-   Python scalar settings to dtype-specific JAX arrays at the JIT boundary. Use
-   [documents/conventions/python/15_jax_rules.md](../../documents/conventions/python/15_jax_rules.md) as the detailed code-writing
-   rule.
-1. If the task includes external method comparison or claims, also use `$research-workflow`; if it includes a concrete run protocol or rerun decision, also use `$experiment-lifecycle`.
-1. If the owning mechanism is established or repaired and a concrete
-   test-owned runtime risk remains outside existing validation, activate
-   `$test-design` and emit its `Activation Decision`; otherwise keep the
-   pre-implementation obligation allocation as the test-design output and do
-   not emit a test plan. When activated, include exact small cases,
-   ill-conditioned cases, constraint-boundary cases, derivative checks,
-   non-finite guards, and not-converged status handling only when relevant.
-1. Apply [Validation Rules](#validation-rules) to the project-owned configured
-   backend and prescribed runner. Supported CPU/OpenMP execution is valid only
-   for the contract and backend actually exercised; it is not GPU evidence.
-   Keep tolerances, assertions, cases, and independently justified expected
-   values intact. For required GPU validation, CPU substitutes are not pass
-   evidence; record `gpu_validation_blocker=<reason>` when the GPU target is
-   unavailable. Numerical subject matter alone does not require a GPU run.
-1. Diagnose failed runs by first bad iteration, finite state before failure, residual components, reference norm, tolerance, status flag, and unconfirmed hypotheses; do not infer cause only from the final NaN, Inf, or residual.
-1. Keep correctness evidence separate from performance evidence; benchmark claims need reproducibility and confounder review.
-1. Route review by risk: `scientific_computing_reviewer` for math/numerical risk, `benchmark_reviewer` for performance claims, `$python-review` or `$cpp-review` for implementation diffs, and `$report-writing` for reader-facing claims.
+Report the contract details relevant to the task, observed state and likely cause
+separately from unconfirmed hypotheses, and the validation evidence with its
+actual backend and limits. Include performance decomposition only when the claim
+is about performance.
