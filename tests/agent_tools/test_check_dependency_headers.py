@@ -102,13 +102,21 @@ class DependencyHeaderCheckTest(unittest.TestCase):
 
     def test_external_provenance_stays_outside_dependency_manifest(self) -> None:
         """Keep external provenance below, rather than inside, the manifest."""
-        path = PROJECT_ROOT / "agents" / "skills" / "agent-log-analysis.md"
-        text = path.read_text(encoding="utf-8")
-        header = text.split("@dependency-start", 1)[1].split("@dependency-end", 1)[0]
-        provenance = "https://github.com/iwashita-nozomu/agent-canon-log/pull/4"
+        provenance = "https://example.invalid/provenance"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            path = root / "doc.md"
+            path.write_text(
+                manifest() + f"External provenance: {provenance}\n",
+                encoding="utf-8",
+            )
 
-        self.assertNotIn(provenance, header)
-        self.assertIn(provenance, text.split("@dependency-end", 1)[1])
+            manifest_text = "\n".join(header_checker.manifest_lines(path))
+            result = run_cli(root, "doc.md")
+
+            self.assertNotIn(provenance, manifest_text)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """Accept skill frontmatter before a valid dependency manifest."""
