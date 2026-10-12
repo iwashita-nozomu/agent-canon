@@ -139,12 +139,18 @@ gate for ordinary edits.
 
 ## 5. Implementation
 
-Use the agreed design, current canonical paths, existing semantic decisions, and
-selected validation route. Keep design-to-code correspondence at responsibility
-and symbol granularity. Correct complete mechanisms and affected consumers, retire
-superseded support, and avoid parallel copies, stale wrappers, configuration
-mirrors, and backup truth surfaces. Preserve the complete valid domain and
-necessary safety, failure, performance, and compatibility guarantees.
+Implement from the agreed design, current canonical paths, and selected
+validation route. Carry the current objective and acceptance, active
+requirements, relevant retirement reasons, and unresolved points in the existing
+task or handoff; the latest explicit user instruction governs conflicts while
+compatible earlier requirements remain active. Before editing or restoring
+behavior, define the intended outcome across changed and retained requirements;
+use history for rationale, not correctness.
+Keep design-to-code correspondence at responsibility and symbol granularity.
+Correct complete mechanisms and affected consumers, retire superseded support,
+avoid parallel copies, stale wrappers, configuration mirrors, and backup truth
+surfaces, and preserve the complete valid domain and necessary safety, failure,
+performance, and compatibility guarantees.
 
 Before new naming or renaming, use [naming](../../documents/rule/naming.md) and
 language conventions to settle concepts, vocabulary, existing naming family,

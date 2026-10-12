@@ -26,6 +26,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 ACTIONLINT_EXECUTABLE = Path("/usr/local/bin/actionlint")
 ACTIONLINT_CONFIG = Path(__file__).resolve().parents[1] / "config" / "actionlint.yaml"
 SHELLCHECK_EXECUTABLE = Path("/usr/local/bin/shellcheck")
@@ -61,6 +63,7 @@ PR_TEMPLATE_FORBIDDEN_TEXT = (
 )
 ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = ("generate_agent_improvement_guide.py",)
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
+    "pull_request:",
     "workflow_dispatch:",
     "schedule:",
     "generate_agent_runtime_dashboard.py",
@@ -200,6 +203,22 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
     for path, required in workflow_header_requirement_specs(root):
         if path.exists():
             findings.extend(require_text(path, required))
+            if path.name == "agent-runtime-dashboard.yml":
+                try:
+                    workflow = yaml.load(read_text(path), Loader=yaml.BaseLoader)
+                except yaml.YAMLError:
+                    workflow = None
+                jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
+                dashboard_job = (
+                    jobs.get("dashboard") if isinstance(jobs, dict) else None
+                )
+                if (
+                    not isinstance(dashboard_job, dict)
+                    or dashboard_job.get("if") != "github.event_name != 'pull_request'"
+                ):
+                    findings.append(
+                        Finding("error", path, "missing_dashboard_pr_job_exclusion")
+                    )
     return findings
 
 

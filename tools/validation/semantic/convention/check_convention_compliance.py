@@ -196,18 +196,6 @@ MATHEMATICAL_NECESSITY_MARKERS = {
         "Non-Numerical Alternative",
         "checker-owned property",
     ),
-    "agents/skills/computational-optimization.md": (
-        "mathematical necessity gate",
-        "iteration map",
-        "stopping scalar",
-        "failure semantics",
-    ),
-    "agents/skills/formal-proof-workflow.md": (
-        "mathematical necessity gate",
-        "program contract",
-        "theorem surface",
-        "proof obligation",
-    ),
 }
 REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
