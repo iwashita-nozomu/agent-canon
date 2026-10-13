@@ -182,8 +182,8 @@ repo-changing run では `team_manifest.yaml` の
   coordination/resumption が要求する場合だけ選択 owner の artifact route を使います。
   bounded one-writer task は owner/path/validation note で閉じます。
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
-- 不明点は notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
-- active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
+- 質問・deferred / escalation の前に [Decision Order](../skills/agent-orchestration.md#decision-order) で Goal 全体の有効な合意・進捗・残件を確認し、取得できる根拠から不明点を解決する
+- 本人の判断・入力・必要な権限が残る場合は、確認済みの根拠と依存する clause を既存記録に明示し、その clause を未完了として保持する。独立した認可済み作業は継続する
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する

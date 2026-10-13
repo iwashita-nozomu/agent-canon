@@ -28,10 +28,22 @@ owner, workflow, delegation, or execution route.
 
 ## Decision Order
 
-Classify the requested operation as advisory/read-only or repository-changing.
-Read the applicable repository instructions and selected owner. For unresolved
-choices in a local task, use the target source, current diff, and governing
-contract to decide the next action.
+Check for an active Goal using available session state and retained context.
+When one is active, begin with its whole objective and the current instruction;
+otherwise begin with the current request. Carry retained agreements and review
+the whole authorized scope, completed and remaining work, relevant dependencies,
+blockers, and available next actions using existing context and records. Classify
+the operation as advisory/read-only or repository-changing, then read the
+applicable repository instructions and selected owner.
+For local decisions, use the target source, current diff, and governing contract.
+
+Before asking the user, resolve retrievable facts through available source,
+tests, documentation, task history, and tool results. Continue investigation and
+authorized Goal work when missing information can be obtained this way. Ask only
+for a material user-owned decision, input, or required authorization that remains
+unavailable after those checks; state the checked evidence and dependent action.
+Keep independent authorized work running while that action awaits an answer,
+honoring explicit stop or pause boundaries and existing authorization.
 
 Use the [task catalog](../task_catalog.yaml) for workflow family, role, and
 execution-route decisions. Public Skill identity and prerequisites come from the
