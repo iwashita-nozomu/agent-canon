@@ -37,15 +37,20 @@ the operation as advisory/read-only or repository-changing, then read the
 applicable repository instructions and selected owner.
 For local decisions, use the target source, current diff, and governing contract.
 
-Before asking the user, resolve retrievable facts through available source,
-tests, documentation, task history, and tool results. Continue investigation and
+Before asking the user, recover applicable earlier requests and resolve
+retrievable facts through existing code, tests, documentation, task history,
+and tool results. Do not ask the user to restate those requirements or supply
+facts these sources already establish. Continue investigation and
 authorized Goal work when missing information can be obtained this way. Once
 the evidence identifies a material user-owned choice, ask early; exhaustive
 investigation is not a prerequisite for that choice.
 
 Before changing the agreed scope, expected result, or major approach, ask the
-user with the relevant evidence, proposed change, recommendation, and effects
-of the alternatives. Wait for the answer before dependent changes, and keep
+user a self-contained question stating the settled requirement, checked current
+behavior, remaining user-owned decision, proposed change, recommendation, and
+effects of the alternatives. State what would change and which action awaits
+the answer, so the user can decide without reopening source or prior messages.
+Wait for the answer before dependent changes, and keep
 independent authorized work running. An active Goal or an internal design
 decision does not authorize that change. Ask also for necessary user-owned
 input or authorization that the available evidence cannot supply.
