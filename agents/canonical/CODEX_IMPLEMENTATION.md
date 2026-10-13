@@ -146,6 +146,13 @@ task or handoff; the latest explicit user instruction governs conflicts while
 compatible earlier requirements remain active. Before editing or restoring
 behavior, define the intended outcome across changed and retained requirements;
 use history for rationale, not correctness.
+For a failed test or unavailable execution, use the
+[test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
+to distinguish missing input preparation from missing required API behavior,
+then repair the owning responsibility within the agreed contract and authority.
+Before changing that scope, expected result, or major approach, follow
+[Decision Order](../skills/agent-orchestration.md#decision-order) and obtain
+the user's decision; an internal design correction does not supply it.
 Keep design-to-code correspondence at responsibility and symbol granularity.
 Correct complete mechanisms and affected consumers, retire superseded support,
 avoid parallel copies, stale wrappers, configuration mirrors, and backup truth

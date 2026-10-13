@@ -32,8 +32,10 @@ cause from the target and relevant evidence, then use the root [local repair
 rule](../../ROOT_AGENTS.md#always-on-boundary). Do not restart discovery or add
 phases that do not affect this task.
 For execution-time clarification, follow [Decision Order](agent-orchestration.md#decision-order)
-to review the whole Goal and resolve retrievable facts before asking. Continue
-independent authorized work while a dependent decision awaits user input.
+to review the whole Goal, resolve retrievable facts, and ask before changing
+the agreed scope, expected result, or major approach. Carry out contract-derived
+repairs within existing authority. Continue independent authorized work while
+a dependent change awaits the user's decision.
 
 ## Stages
 

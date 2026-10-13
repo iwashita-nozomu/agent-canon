@@ -21,16 +21,24 @@ Use `test-design` after the owning contract and implementation mechanism are kno
    behavior risk remains open and a stable observable can distinguish correct from
    incorrect behavior.
 2. Derive the smallest case from the contract or an independently justified
-   reference. Trace its real input/setup-to-observable path; fixtures and mocks
-   must reach the owning logic rather than replace it.
+   reference. Identify its input assumptions, the target API action, and the
+   required observable property using the
+   [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract).
+   Trace the actual setup-to-API-to-observable path; fixtures and mocks must
+   reach the owning logic rather than replace it.
 3. Keep the existing test oracle and wiring when they are correct. Do not change
    expected values, include/import paths, configuration, fixture data, or skips just
    to make a test pass. Update a test only for an established API/layout/spec
    migration or when source evidence shows the test itself is wrong; record the
-   reason in the existing Issue/PR record.
+   reason in the existing Issue/PR record. Repair missing input preparation or
+   execution conditions within existing authority when the agreed assumptions,
+   input domain, API action, and required property are preserved. If valid input
+   exposes missing required behavior, repair the owning API. Changes to those
+   agreed requirements follow
+   [Decision Order](agent-orchestration.md#decision-order) before editing.
 4. Run the focused test through its existing owner. A reproduced failure is useful
-   evidence; a pass proves only the exercised contract. If the failure is in the
-   implementation, repair the owning code first rather than adding a wrapper or
+   evidence; a pass supports the property only for the exercised cases. If the
+   failure is in the implementation, repair the owning code first rather than adding a wrapper or
    weakening the oracle.
 5. For numerical/tolerance/solver/benchmark tests, use the existing numerical test
    owner and oracle, honoring the project-configured CPU/OpenMP or GPU route. Do

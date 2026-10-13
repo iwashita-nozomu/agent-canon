@@ -157,6 +157,19 @@ property や内部形状を test へ移しません。
 
 ## 3. Unit Test Contract
 
+テストは、契約上の入力・前提を準備し、対象 API を作用させ、要求された性質を
+独立した oracle で確認します。入力と fixture は前提を具体化し、製品 API は要求された
+作用を実装し、assertion は観測結果の性質を判定します。実行可能であることだけでは
+その性質の証明にならず、通常の実行テストは実際に検証したケースの証拠です。
+
+修正範囲は、期待する入力・前提と API が実際に受け取った値、要求された作用と
+観測結果を比較して決めます。必要な前提を準備できていなければテストの入力・setup を、
+前提を満たしても要求された作用が欠けていれば owning API を修正します。環境不足や
+未実行だけでは API の欠陥と断定しません。テスト側に製品の作用を実装して補ったり、
+oracle を弱めたりして API の欠落を隠しません。合意済みの契約を完成する修正は認可範囲内で
+進めます。入力の仮定・対象範囲・要求する性質や主要方針を変える案は、
+[Decision Order](../../agents/skills/agent-orchestration.md#decision-order) に従い変更前に確認します。
+
 unit test は「1 つの観測可能 behavior に対する concrete example」です。
 実装内部の call sequence や private helper の存在を固定するものではありません。
 単に script、CLI、checker、import、compile、type check、format check が

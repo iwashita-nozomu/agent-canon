@@ -39,11 +39,22 @@ For local decisions, use the target source, current diff, and governing contract
 
 Before asking the user, resolve retrievable facts through available source,
 tests, documentation, task history, and tool results. Continue investigation and
-authorized Goal work when missing information can be obtained this way. Ask only
-for a material user-owned decision, input, or required authorization that remains
-unavailable after those checks; state the checked evidence and dependent action.
-Keep independent authorized work running while that action awaits an answer,
-honoring explicit stop or pause boundaries and existing authorization.
+authorized Goal work when missing information can be obtained this way. Once
+the evidence identifies a material user-owned choice, ask early; exhaustive
+investigation is not a prerequisite for that choice.
+
+Before changing the agreed scope, expected result, or major approach, ask the
+user with the relevant evidence, proposed change, recommendation, and effects
+of the alternatives. Wait for the answer before dependent changes, and keep
+independent authorized work running. An active Goal or an internal design
+decision does not authorize that change. Ask also for necessary user-owned
+input or authorization that the available evidence cannot supply.
+
+Complete repairs derived from the agreed contract within existing authority,
+including required input preparation or missing API behavior. Determine their
+scope from the contract and cause, not merely from the files needing edits.
+Honor explicit write, stop, and pause boundaries. Do not re-ask settled choices
+or routine implementation decisions within those boundaries.
 
 Use the [task catalog](../task_catalog.yaml) for workflow family, role, and
 execution-route decisions. Public Skill identity and prerequisites come from the
