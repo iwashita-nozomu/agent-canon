@@ -1,0 +1,43 @@
+name: Issue 1522 native skill materialization
+
+on:
+  push:
+    branches:
+      - verify/1522-native-skill-materialization
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+    steps:
+      - name: Checkout the exact source candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: b155e8fdc747710184dac5fa940ff616baa4f03c
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Materialize with the existing maintainer command
+        run: |
+          mkdir -p "${RUNNER_TEMP}/issue-1522-materialization"
+          git rev-parse HEAD > "${RUNNER_TEMP}/issue-1522-materialization/source-head.txt"
+          python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all > "${RUNNER_TEMP}/issue-1522-materialization/materialization.json"
+          git diff --check
+          git diff --stat -- .codex/personal/skills > "${RUNNER_TEMP}/issue-1522-materialization/generated-diff-stat.txt"
+          mkdir -p "${RUNNER_TEMP}/issue-1522-materialization/files"
+          cp --parents .codex/personal/skills/agent-orchestration/SKILL.md .codex/personal/skills/codex-task-workflow/SKILL.md .codex/personal/skills/user-guided-debugging/SKILL.md "${RUNNER_TEMP}/issue-1522-materialization/files/"
+          sha256sum .codex/personal/skills/agent-orchestration/SKILL.md .codex/personal/skills/codex-task-workflow/SKILL.md .codex/personal/skills/user-guided-debugging/SKILL.md > "${RUNNER_TEMP}/issue-1522-materialization/adapter-sha256.txt"
+      - name: Export the selected generated files and actual result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1522-native-materialization
+          path: ${{ runner.temp }}/issue-1522-materialization/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
