@@ -34,6 +34,13 @@ The tool requires `--user-task` on every action. The compact stdout and optional
 `--summary-out` JSON include the task, repository, branch, remote verification,
 and next action. It rejects literal URL push, `.git/config` remote inference,
 branch-name inference, PR-context inference, and machine-local remote inference.
+PR readback requests fields supported by `gh pr view`, then reads `base.ref` and
+the current PR identity from `gh api repos/{owner}/{repo}/pulls/{number}`. It
+checks that the API number, URL, state, draft/merged status, base/head refs and
+SHAs, and head repository agree with `gh pr view` before accepting the identity.
+For merged PRs, the API merge SHA must also match; an unmerged PR's REST
+`merge_commit_sha` can be a synthetic test merge SHA and is not treated as an
+actual merge commit.
 
 ## Commands
 
@@ -68,6 +75,12 @@ python3 tools/repository/github/github_publish.py checks \
 CI fresh-clone fixtures validate clone/bootstrap or update behavior only. They
 are not ordinary publication evidence; publication evidence comes from the
 exact SHA ref push and the remote readback.
+If a PR create or update succeeds but its following readback fails, the failure
+summary retains the completed mutation and known PR selector, URL, repository,
+and expected base/head identity from the frozen lifecycle. The
+`expected_pr_*` fields describe publication inputs, not verified remote readback.
+The summary marks `recovery_mode=readback_only`; callers should resolve the PR
+through that identity before considering another publication attempt.
 `pr` and `publish-pr` derive a direct lifecycle from the user task, verified
 repository/permission, exact local candidate and base identities, and PR body;
 they do not materialize `.agent-canon/update-lifecycle` state. `checks` is
