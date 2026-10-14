@@ -49,8 +49,12 @@ owner location why the change was needed, why the prior approach did not fit,
 and what behavior is intentionally retained or retired; use that rationale when
 reconsidering later changes or restoration. On failure, compare expected and
 actual inputs/outputs and check what the target received or consumed. Use
-history as cause evidence, inspect only the relevant target boundary, fix the
-located cause, and rerun the selected route. Do not add speculative guards,
+history as cause evidence and inspect only the relevant target boundary. For an
+authorized repair, fix the located cause and rerun the selected route. When
+that diagnosis or repair interrupts other requested work, retain its target,
+interrupted operation, and acceptance in the existing task or handoff, then
+return to that target and continue the interrupted work. Cause-local success
+does not establish the requested outcome. Do not add speculative guards,
 fallback paths, retries, or gates without a concrete cause. Do not alter tests
 or switch routes merely to obtain a pass.
 When a separate responsibility fails, compare its actual and expected inputs

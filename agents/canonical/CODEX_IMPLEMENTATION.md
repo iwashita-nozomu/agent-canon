@@ -18,12 +18,14 @@ unselected coordination guidance by default. Return to
 
 | When | Read |
 | --- | --- |
+| A requested repair has no established causal code | [cause localization](../skills/dependency-analysis.md#method) |
 | Choosing or correcting the implementation contract | [Design Integrity Gate](#design-integrity-gate) |
 | Selected design work needs a durable packet | [Coordination design packet](#coordination-design-packet) |
 | Editing a repository file | [Edit Execution Surface](#edit-execution-surface) |
 | Selecting an implementation or adding code/API | [Library And Reuse Sweep](#library-and-reuse-sweep) |
 | Explicitly analyzing or editing a dependency-graph annotation | [File Dependency Manifest](#file-dependency-manifest) |
 | Executing the approved implementation | [5. Implementation](#5-implementation) |
+| Diagnosis or cause repair interrupts requested code work | [Return from a repair detour](#return-from-a-repair-detour) |
 | Delegating implementation under a coordination route | [Coordination handoff](#coordination-handoff) |
 
 ## 契約完全実装
@@ -37,14 +39,21 @@ when newly established contract facts require it.
 
 ## Design Integrity Gate
 
-Once cause and required guarantee show that an edit is necessary, establish the
-owner, mechanism, affected responsibility unit, evidence, and unresolved decisions
-that could change the edit before changing it.
+For a repair whose causal location or mechanism is unresolved, first use
+[cause localization](../skills/dependency-analysis.md#method) before choosing a
+fix. Reuse established evidence rather than restarting diagnosis.
+For the selected change, establish the owner, mechanism, required guarantee,
+affected responsibility unit, evidence, and unresolved decisions that could
+change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision
-returns to its design owner with `design_issue_blocker` evidence. A verified root correction preserves the agreed
-intent while changing defective contracts and their consumers as necessary.
+returns to its design owner with `design_issue_blocker` evidence. When a contract
+blocks the agreed outcome, follow [Decision Order](../skills/agent-orchestration.md#decision-order)
+to expose the conflict and ask the user about a resolution not settled by the
+available evidence; an internal blocker report alone does not resolve it.
+A verified root correction preserves the agreed intent while changing defective
+contracts and their consumers as necessary.
 
 Markdown links identify the expected owner and Skill route; they do not create a
 dispatch frontier. When delegation is selected, use the configured native
@@ -133,9 +142,10 @@ decision-relevant source evidence and consumer closure; they do not require an
 all-edge recursive listing, `dependency_edit_scope.txt`, or
 `dependency_graph.tsv` on every task.
 
-The explicit `dependency-analysis` route owns optional header scanning,
-format, graph, and design-claim tools. Do not activate that route as a generic
-gate for ordinary edits.
+The `dependency-analysis` [Method](../skills/dependency-analysis.md#method) also
+owns cause localization for a requested repair. Its optional header scanning,
+format, graph, and design-claim tools are separate conditional operations, not
+generic gates for ordinary edits.
 
 ## 5. Implementation
 
@@ -150,6 +160,8 @@ For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
 to distinguish missing input preparation from missing required API behavior,
 then repair the owning responsibility within the agreed contract and authority.
+When that repair interrupts other code work, retain and use its
+[return point](#return-from-a-repair-detour).
 Before changing that scope, expected result, or major approach, follow
 [Decision Order](../skills/agent-orchestration.md#decision-order) and obtain
 the user's decision; an internal design correction does not supply it.
@@ -188,6 +200,33 @@ stale legacy scope/log observations with their owner rather than making them new
 authority. Validation autofix follows an in-scope contract finding; unrelated
 style debt stays separate. A failed check immediately routes to its
 [topic record](../../documents/operations/notes-lifecycle.md#failed-verification-record).
+
+### Return from a repair detour
+
+Use this section when diagnosis or cause repair interrupts requested code work.
+The cause owner is a repair destination, not a replacement for the task.
+
+1. Before moving to that owner, retain the original target's repository/path and
+   symbol or block, interrupted operation, and acceptance in the existing task or
+   handoff. Reuse the known source revision and execution route. Keep this return
+   point distinct from the cause location; a changed cause hypothesis does not
+   change the requested outcome.
+2. Locate and repair the demonstrated in-scope cause. Once that repair and its
+   selected checks permit resumption, return to the retained target, inspect the
+   affected code or inputs, and perform its next unfinished operation. For nested
+   repairs, resume the most recently interrupted operation first. Reuse unchanged
+   evidence rather than restarting intake or unrelated diagnosis.
+3. Complete the target's remaining implementation and selected acceptance check
+   before taking an unrelated finding or reporting completion. When no further
+   target edit is needed, record why and continue its selected verification;
+   reopening a file, promising to resume, or a cause-side pass is not that result.
+
+A prerequisite repair's success does not prove its caller's requested behavior;
+returning preserves the original acceptance as the completion criterion. A
+blocked repair keeps that target and the affected property unresolved, with the
+failed operation and next owner/action; continue independent authorized work.
+Diagnosis-only requests and explicit stop or validation-hold boundaries retain
+their agreed scope; this return step adds no edit or execution authority.
 
 ## Coordination handoff
 

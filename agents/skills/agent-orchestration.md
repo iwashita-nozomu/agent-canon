@@ -24,7 +24,8 @@ The selected owner performs the work; this Skill does not replace its procedure.
 ## Use When
 
 Use at repository-task intake or when new evidence could change the selected
-owner, workflow, delegation, or execution route.
+owner, workflow, delegation, or execution route, or a contract blocks the requested
+outcome during implementation or validation.
 
 ## Decision Order
 
@@ -45,7 +46,19 @@ authorized Goal work when missing information can be obtained this way. Once
 the evidence identifies a material user-owned choice, ask early; exhaustive
 investigation is not a prerequisite for that choice.
 
-Before changing the agreed scope, expected result, or major approach, ask the
+When a contract blocks the agreed outcome, identify its owner and exact clause
+with a revision, path and section or symbol. Show the requested result, blocked
+operation, and evidence explaining why the clause prevents it. An existing
+implementation or an execution failure alone does not establish a governing
+contract or a conflict. Check applicable agreements and instruction precedence;
+when they and the facts uniquely determine the resolution, state that basis and
+carry out the authorized correction. Otherwise make the remaining choice to retain,
+revise, or extend the contract explicit in the question below. Do not silently
+preserve the blocker, bypass it, or weaken acceptance to make progress. Higher-priority
+safety and authority limits remain binding; do not offer bypassing them as a choice.
+
+Before changing the agreed scope, expected result, or major approach, or resolving
+a blocking contract whose resolution is not settled by that evidence, ask the
 user a self-contained question stating the settled requirement, checked current
 behavior, remaining user-owned decision, proposed change, recommendation, and
 effects of the alternatives. State what would change and which action awaits
@@ -53,7 +66,11 @@ the answer, so the user can decide without reopening source or prior messages.
 Wait for the answer before dependent changes, and keep
 independent authorized work running. An active Goal or an internal design
 decision does not authorize that change. Ask also for necessary user-owned
-input or authorization that the available evidence cannot supply.
+input or authorization that the available evidence cannot supply. Include the
+contract location and conflict evidence when applicable, and phrase the remaining
+decision as an actual question rather than only reporting a blocker. Retain the
+evidence, question, and answer with its rationale in the existing task, Issue,
+or handoff so the dependent operation can resume without re-asking.
 
 Complete repairs derived from the agreed contract within existing authority,
 including required input preparation or missing API behavior. Determine their

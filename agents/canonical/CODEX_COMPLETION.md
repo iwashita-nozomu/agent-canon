@@ -32,6 +32,12 @@ the agreed target and required input domain rather than calling an incomplete
 slice complete. Each material result has its actual operation and evidence.
 Necessary path/link presence, forbidden legacy-path absence, and sufficient
 behavior are different claims; select the evidence the changed contract requires.
+After a repair detour, distinguish cause-side changes/checks from the requested
+target's resulting behavior and acceptance evidence. If its interrupted operation
+is still unfinished, use the retained
+[return point](CODEX_IMPLEMENTATION.md#return-from-a-repair-detour). A target that
+needs no further edit still requires its selected acceptance evidence; reuse valid
+results and preserve explicit validation holds rather than adding a new check.
 
 Review source against equations, specifications, invariants, and assumptions when
 present. Treat review suggestions as hypotheses: settle them against current
