@@ -25,6 +25,7 @@ unselected coordination guidance by default. Return to
 | Selecting an implementation or adding code/API | [Library And Reuse Sweep](#library-and-reuse-sweep) |
 | Explicitly analyzing or editing a dependency-graph annotation | [File Dependency Manifest](#file-dependency-manifest) |
 | Executing the approved implementation | [5. Implementation](#5-implementation) |
+| Diagnosis or cause repair interrupts requested code work | [Return from a repair detour](#return-from-a-repair-detour) |
 | Delegating implementation under a coordination route | [Coordination handoff](#coordination-handoff) |
 
 ## 契約完全実装
@@ -159,6 +160,8 @@ For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
 to distinguish missing input preparation from missing required API behavior,
 then repair the owning responsibility within the agreed contract and authority.
+When that repair interrupts other code work, retain and use its
+[return point](#return-from-a-repair-detour).
 Before changing that scope, expected result, or major approach, follow
 [Decision Order](../skills/agent-orchestration.md#decision-order) and obtain
 the user's decision; an internal design correction does not supply it.
@@ -197,6 +200,33 @@ stale legacy scope/log observations with their owner rather than making them new
 authority. Validation autofix follows an in-scope contract finding; unrelated
 style debt stays separate. A failed check immediately routes to its
 [topic record](../../documents/operations/notes-lifecycle.md#failed-verification-record).
+
+### Return from a repair detour
+
+Use this section when diagnosis or cause repair interrupts requested code work.
+The cause owner is a repair destination, not a replacement for the task.
+
+1. Before moving to that owner, retain the original target's repository/path and
+   symbol or block, interrupted operation, and acceptance in the existing task or
+   handoff. Reuse the known source revision and execution route. Keep this return
+   point distinct from the cause location; a changed cause hypothesis does not
+   change the requested outcome.
+2. Locate and repair the demonstrated in-scope cause. Once that repair and its
+   selected checks permit resumption, return to the retained target, inspect the
+   affected code or inputs, and perform its next unfinished operation. For nested
+   repairs, resume the most recently interrupted operation first. Reuse unchanged
+   evidence rather than restarting intake or unrelated diagnosis.
+3. Complete the target's remaining implementation and selected acceptance check
+   before taking an unrelated finding or reporting completion. When no further
+   target edit is needed, record why and continue its selected verification;
+   reopening a file, promising to resume, or a cause-side pass is not that result.
+
+A prerequisite repair's success does not prove its caller's requested behavior;
+returning preserves the original acceptance as the completion criterion. A
+blocked repair keeps that target and the affected property unresolved, with the
+failed operation and next owner/action; continue independent authorized work.
+Diagnosis-only requests and explicit stop or validation-hold boundaries retain
+their agreed scope; this return step adds no edit or execution authority.
 
 ## Coordination handoff
 
