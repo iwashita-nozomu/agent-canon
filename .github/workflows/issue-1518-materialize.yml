@@ -20,10 +20,12 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: 4b55e76d6274862da806019ce8850c67eaffec01
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
       - name: Prepare the candidate using the existing CI source-sync route
         run: |
+          mkdir -p "${RUNNER_TEMP}/issue-1518-docs"
+          git rev-parse HEAD > "${RUNNER_TEMP}/issue-1518-docs/source-head.txt"
           source="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-canon-1518-${GITHUB_RUN_ID}"
           bare="${source}.git"
           printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\nAGENT_CANON_CANDIDATE_BARE=%s\n' "${source}" "${bare}" >> "${GITHUB_ENV}"
@@ -31,8 +33,6 @@ jobs:
           git push "${bare}" HEAD:refs/heads/main
           git --git-dir="${bare}" symbolic-ref HEAD refs/heads/main
           git clone --no-local --branch main --single-branch "${bare}" "${source}"
-          mkdir -p "${RUNNER_TEMP}/issue-1518-docs"
-          git rev-parse HEAD > "${RUNNER_TEMP}/issue-1518-docs/source-head.txt"
       - name: Start the existing shared tool runtime
         id: runtime
         run: |
