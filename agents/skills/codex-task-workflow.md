@@ -46,10 +46,13 @@ a material design question with [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEM
 when it changes the implementation. Keep obsolete-support retirement with the
 existing owner. A newly selected capability uses its existing CLI/API/script
 with its native arguments and process-result semantics. Before adding an
-implementation, compare the requested guarantee with capabilities already
-identified in the caller's context. Reuse or compose one that satisfies it;
-extend only to close a concrete gap. Judge overlap by responsibility and
-contract, not by names or paths alone.
+implementation, map the required operations to capabilities already identified
+in the caller's context and construct a concrete call flow using
+[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support).
+Check the producer-to-consumer contracts and resulting guarantee, and compose
+the existing operations with necessary caller wiring. Add or extend a capability
+only for a concrete gap at its owner. Judge overlap by responsibility and contract,
+not by names or paths alone.
 
 ## Coordination handoff
 

@@ -110,11 +110,14 @@ the common [Validation Routing](../../ROOT_AGENTS.md#validation-routing).
 
 ## Library And Reuse Sweep
 
-When the common direct-use rule in [ROOT_AGENTS.md](../../ROOT_AGENTS.md) leaves
-an unknown entrypoint, failed invocation, or unmet behavior, use [reuse
+Before adding an implementation that could connect existing capabilities,
+construct its concrete call flow through [reuse
 feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
-and [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
-only to resolve the decision that could change the next action.
+using the target contract and known providers. A missing all-in-one API does not
+establish a responsibility gap. Extend the investigation only for an unknown
+entrypoint, failed invocation, or unmet behavior that could change the decision;
+reuse [prior failed attempts](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding)
+when they bear on it. This does not require a repository-wide survey or new packet.
 
 When a related branch/PR or prepared checkout exists, verify it serves the same
 owner surface and continue it through [Branch Reuse Default](CODEX_INTAKE.md#branch-reuse-default)
