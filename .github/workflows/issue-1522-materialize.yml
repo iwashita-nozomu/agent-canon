@@ -1,4 +1,4 @@
-name: Issue 1522 native skill materialization
+name: Issue 1522 native Markdown verification
 
 on:
   push:
@@ -8,36 +8,76 @@ on:
 permissions:
   contents: read
 
+env:
+  AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
+
 jobs:
-  materialize:
+  docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      PYTHONDONTWRITEBYTECODE: "1"
-      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+    timeout-minutes: 15
     steps:
-      - name: Checkout the exact source candidate
+      - name: Checkout the exact PR candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: b155e8fdc747710184dac5fa940ff616baa4f03c
-          fetch-depth: 1
+          ref: 1ba714dfd7f0f6ccc009754ba69b26da1cb9e431
+          fetch-depth: 0
           persist-credentials: false
-      - name: Materialize with the existing maintainer command
+      - name: Prepare the candidate using the existing CI source-sync route
         run: |
-          mkdir -p "${RUNNER_TEMP}/issue-1522-materialization"
-          git rev-parse HEAD > "${RUNNER_TEMP}/issue-1522-materialization/source-head.txt"
-          python3 tools/agent/skills/skill_shim_materializer.py materialize --root . --all > "${RUNNER_TEMP}/issue-1522-materialization/materialization.json"
-          git diff --check
-          git diff --stat -- .codex/personal/skills > "${RUNNER_TEMP}/issue-1522-materialization/generated-diff-stat.txt"
-          mkdir -p "${RUNNER_TEMP}/issue-1522-materialization/files"
-          cp --parents .codex/personal/skills/agent-orchestration/SKILL.md .codex/personal/skills/codex-task-workflow/SKILL.md .codex/personal/skills/user-guided-debugging/SKILL.md "${RUNNER_TEMP}/issue-1522-materialization/files/"
-          sha256sum .codex/personal/skills/agent-orchestration/SKILL.md .codex/personal/skills/codex-task-workflow/SKILL.md .codex/personal/skills/user-guided-debugging/SKILL.md > "${RUNNER_TEMP}/issue-1522-materialization/adapter-sha256.txt"
-      - name: Export the selected generated files and actual result
+          mkdir -p "${RUNNER_TEMP}/issue-1522-docs"
+          git rev-parse HEAD > "${RUNNER_TEMP}/issue-1522-docs/source-head.txt"
+          source="${AGENT_CANON_CONTROL_PARENT_ROOT}/agent-canon-1522-${GITHUB_RUN_ID}"
+          bare="${source}.git"
+          printf 'AGENT_CANON_CANDIDATE_SOURCE=%s\nAGENT_CANON_CANDIDATE_BARE=%s\n' "${source}" "${bare}" >> "${GITHUB_ENV}"
+          git init --bare "${bare}"
+          git push "${bare}" HEAD:refs/heads/main
+          git --git-dir="${bare}" symbolic-ref HEAD refs/heads/main
+          git clone --no-local --branch main --single-branch "${bare}" "${source}"
+      - name: Start the existing shared tool runtime
+        id: runtime
+        run: |
+          key="$(bash "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap/container/image/digest.sh" "${AGENT_CANON_CANDIDATE_SOURCE}")"
+          image="ghcr.io/${GITHUB_REPOSITORY}:env-${key}"
+          if docker buildx imagetools inspect "${image}" >/dev/null 2>&1; then
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" install
+          else
+            "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" update --local-build
+          fi
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" start
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" target add --root "${GITHUB_WORKSPACE}" --mode read-only
+      - name: Format and check the exact Markdown copies with the native docs owner
+        run: |
+          "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" exec --root "${GITHUB_WORKSPACE}" -- bash -c '
+            set -euo pipefail
+            scratch="${AGENT_CANON_RUNTIME_ROOT}/tasks/issue-1522-format"
+            export XDG_CACHE_HOME="${AGENT_CANON_RUNTIME_ROOT}/cache"
+            export TMPDIR="${AGENT_CANON_RUNTIME_ROOT}/tmp"
+            export PYTHONDONTWRITEBYTECODE=1
+            mkdir -p "${scratch}" "${XDG_CACHE_HOME}" "${TMPDIR}"
+            tar -C "${AGENT_CANON_TARGET_ROOT}" --exclude=./.git --exclude=./.runtime -cf - . | tar -C "${scratch}" -xf -
+            paths=(agents/canonical/CODEX_IMPLEMENTATION.md agents/skills/agent-orchestration.md agents/skills/codex-task-workflow.md agents/skills/user-guided-debugging.md .codex/personal/skills/agent-orchestration/SKILL.md .codex/personal/skills/codex-task-workflow/SKILL.md .codex/personal/skills/user-guided-debugging/SKILL.md)
+            cd "${scratch}"
+            sha256sum "${paths[@]}" > before.sha256
+            "${AGENT_CANON_CACHE_ROOT}/bin/agent-canon" docs format --root "${scratch}" "${paths[@]}"
+            sha256sum "${paths[@]}" > after.sha256
+            diff -u before.sha256 after.sha256
+            "${AGENT_CANON_CACHE_ROOT}/bin/agent-canon" docs check --root "${scratch}" "${paths[@]}"
+            cat after.sha256
+          ' > "${RUNNER_TEMP}/issue-1522-docs/docs-format-check.log" 2>&1
+      - name: Export actual formatter and docs-check evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue-1522-native-materialization
-          path: ${{ runner.temp }}/issue-1522-materialization/
-          include-hidden-files: true
+          name: issue-1522-native-docs
+          path: ${{ runner.temp }}/issue-1522-docs/
           if-no-files-found: error
           retention-days: 7
+      - name: Release the owned shared runtime and helper checkouts
+        if: always()
+        run: |
+          if [[ -n "${AGENT_CANON_CANDIDATE_SOURCE:-}" ]]; then
+            if [[ -d "${AGENT_CANON_CANDIDATE_SOURCE}/.runtime" ]]; then
+              "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" uninstall
+            fi
+            rm -rf -- "${AGENT_CANON_CANDIDATE_SOURCE}" "${AGENT_CANON_CANDIDATE_BARE}"
+          fi
