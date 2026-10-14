@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import io
+import json
 import sys
 import tempfile
 import unittest
 from collections.abc import Sequence
+from contextlib import redirect_stdout
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +45,7 @@ BASE_SHA = "c" * 40
 BASE_TREE = "d" * 40
 MERGE_SHA = "1" * 40
 MERGE_TREE = "2" * 40
+OPEN_TEST_MERGE_SHA = "8f3592602c9b58651f7d79fdaf0863c18dd9d815"
 
 
 class FakeRunner:
@@ -116,6 +120,56 @@ class FakeRunner:
         self.add(
             ["gh", "api", "user", "--jq", "{id: .id, login: .login, name: .name}"],
             stdout='{"id":7,"login":"owner","name":"Owner"}',
+        )
+
+    def add_pull_request_identity(
+        self,
+        number: int,
+        *,
+        base_ref: str = "main",
+        base_sha: str = BASE_SHA,
+        head_ref: str = "topic",
+        head_sha: str = CANDIDATE_SHA,
+        head_repo: str = "owner/repo",
+        state: str = "open",
+        is_draft: bool = False,
+        merged: bool = False,
+        merge_commit_oid: str | None = None,
+        returncode: int = 0,
+        stderr: str = "",
+    ) -> None:
+        """Register exact PR identity from the supported REST endpoint."""
+        self.add(
+            [
+                "gh",
+                "api",
+                f"repos/owner/repo/pulls/{number}",
+                "--jq",
+                (
+                    "{number: .number, url: .html_url, state: .state, isDraft: .draft, "
+                    "merged: .merged, mergeCommitOid: .merge_commit_sha, "
+                    "baseRefName: .base.ref, baseRefOid: .base.sha, "
+                    "headRefName: .head.ref, headRefOid: .head.sha, "
+                    "headRepository: .head.repo.full_name}"
+                ),
+            ],
+            stdout=json.dumps(
+                {
+                    "number": number,
+                    "url": f"https://github.com/owner/repo/pull/{number}",
+                    "state": state,
+                    "isDraft": is_draft,
+                    "merged": merged,
+                    "mergeCommitOid": merge_commit_oid,
+                    "baseRefName": base_ref,
+                    "baseRefOid": base_sha,
+                    "headRefName": head_ref,
+                    "headRefOid": head_sha,
+                    "headRepository": head_repo,
+                }
+            ),
+            stderr=stderr,
+            returncode=returncode,
         )
 
     def add_local_identity(
@@ -696,7 +750,7 @@ class GithubPublishTest(unittest.TestCase):
         self.assertIn("changed across the push", raised.exception.message)
 
     def test_pr_create_uses_gh_after_branch_pr_check(self) -> None:
-        """PR creation should use gh with explicit repo, base, head, and body file."""
+        """Open PR test-merge SHA is not treated as the actual merge commit."""
         with tempfile.TemporaryDirectory() as temp_dir:
             body = Path(temp_dir) / "body.md"
             body.write_text("body\n", encoding="utf-8")
@@ -764,15 +818,19 @@ class GithubPublishTest(unittest.TestCase):
                     "--repo",
                     "owner/repo",
                     "--json",
-                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
                 ],
                 stdout=(
                     '{"number":1,"url":"https://github.com/owner/repo/pull/1",'
-                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main",'
                     f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
                     '"headRepository":{"nameWithOwner":"owner/repo"},'
                     '"reviewDecision":"","reviews":[],"mergeCommit":null}'
                 ),
+            )
+            runner.add_pull_request_identity(
+                1,
+                merge_commit_oid=OPEN_TEST_MERGE_SHA,
             )
             args = argparse.Namespace(
                 action="pr",
@@ -793,7 +851,183 @@ class GithubPublishTest(unittest.TestCase):
 
         self.assertEqual(summary["action"], "pr-create")
         self.assertEqual(summary["pr_url"], "https://github.com/owner/repo/pull/1")
+        self.assertEqual(
+            summary["pull_request_lifecycle"]["base_identity"]["commit_sha"],
+            BASE_SHA,
+        )
         self.assertNotIn("g3_gate", summary)
+
+    def test_create_readback_failure_emits_completed_mutation_for_readback_only(
+        self,
+    ) -> None:
+        """A created PR remains identifiable when exact REST readback fails."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            body = Path(temp_dir) / "body.md"
+            body.write_text("body\n", encoding="utf-8")
+            runner = FakeRunner()
+            runner.add(
+                ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+                stdout="topic\n",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "repo",
+                    "view",
+                    "owner/repo",
+                    "--json",
+                    "nameWithOwner,url,sshUrl,viewerPermission",
+                ],
+                stdout=(
+                    '{"nameWithOwner":"owner/repo",'
+                    '"url":"https://github.com/owner/repo",'
+                    '"sshUrl":"git@github.com:owner/repo.git",'
+                    '"viewerPermission":"WRITE"}'
+                ),
+            )
+            runner.add(
+                ["git", "remote", "get-url", "origin"],
+                stdout="git@github.com:owner/repo.git\n",
+            )
+            runner.add_verified_actor()
+            runner.add_publication_identity()
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--repo",
+                    "owner/repo",
+                    "--head",
+                    "topic",
+                    "--state",
+                    "open",
+                    "--json",
+                    "number,url,title,headRefName,baseRefName",
+                ],
+                stdout="[]",
+            )
+            create_command = [
+                "gh",
+                "pr",
+                "create",
+                "--repo",
+                "owner/repo",
+                "--base",
+                "main",
+                "--head",
+                "topic",
+                "--title",
+                "Title",
+                "--body-file",
+                str(body),
+            ]
+            runner.add(
+                create_command,
+                stdout="https://github.com/owner/repo/pull/9\n",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    "topic",
+                    "--repo",
+                    "owner/repo",
+                    "--json",
+                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                ],
+                stdout=(
+                    '{"number":9,"url":"https://github.com/owner/repo/pull/9",'
+                    '"state":"OPEN","isDraft":false,"baseRefName":"main",'
+                    f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
+                    '"headRepository":{"nameWithOwner":"owner/repo"},'
+                    '"reviewDecision":"","reviews":[],"mergeCommit":null}'
+                ),
+            )
+            runner.add_pull_request_identity(
+                9,
+                returncode=1,
+                stderr="temporary API readback failure",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = github_publish.main(
+                    [
+                        "--root",
+                        str(PROJECT_ROOT),
+                        "pr",
+                        "--user-task",
+                        "open PR",
+                        "--repo",
+                        "owner/repo",
+                        "--base",
+                        "main",
+                        "--title",
+                        "Title",
+                        "--body-file",
+                        str(body),
+                    ],
+                    runner=runner,
+                )
+
+        self.assertEqual(exit_code, 1)
+        rendered = output.getvalue()
+        for line in (
+            "STATUS=fail",
+            "REMOTE_VERIFIED=yes",
+            "REPO=owner/repo",
+            "BRANCH=topic",
+            "MUTATION_COMPLETED=yes",
+            "MUTATION_ACTION=pr-create",
+            "PR_NUMBER=9",
+            "PR_URL=https://github.com/owner/repo/pull/9",
+            "PR_SELECTOR=https://github.com/owner/repo/pull/9",
+            "EXPECTED_PR_HEAD_REF=topic",
+            f"EXPECTED_PR_HEAD_SHA={CANDIDATE_SHA}",
+            "EXPECTED_PR_BASE_REF=main",
+            f"EXPECTED_PR_BASE_SHA={BASE_SHA}",
+            "RECOVERY_MODE=readback_only",
+            "NEXT_ACTION=read_back_the_exact_pull_request_identity",
+        ):
+            self.assertIn(line, rendered)
+        self.assertEqual(runner.commands.count(tuple(create_command)), 1)
+
+    def test_readback_rejects_changed_head_in_second_identity_snapshot(self) -> None:
+        """The REST identity must agree with the earlier CLI head snapshot."""
+        runner = FakeRunner()
+        runner.add(
+            [
+                "gh",
+                "pr",
+                "view",
+                "7",
+                "--repo",
+                "owner/repo",
+                "--json",
+                "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+            ],
+            stdout=(
+                '{"number":7,"url":"https://github.com/owner/repo/pull/7",'
+                f'"state":"OPEN","isDraft":false,"baseRefName":"main",'
+                f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
+                '"headRepository":{"nameWithOwner":"owner/repo"},'
+                '"reviewDecision":"","reviews":[],"mergeCommit":null}'
+            ),
+        )
+        runner.add_pull_request_identity(7, head_sha="e" * 40)
+
+        with self.assertRaises(github_publish.UserVisibleFailure) as raised:
+            github_publish.pull_request_readback(
+                runner,
+                repo="owner/repo",
+                selector="7",
+            )
+
+        self.assertIn(
+            "API identity differs from CLI readback", raised.exception.message
+        )
+        self.assertEqual(len(runner.commands), 2)
 
     def test_pr_update_uses_direct_lifecycle(self) -> None:
         """PR update accepts exact local/base evidence without G1/G2/G3."""
@@ -861,16 +1095,17 @@ class GithubPublishTest(unittest.TestCase):
                     "--repo",
                     "owner/repo",
                     "--json",
-                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
                 ],
                 stdout=(
                     '{"number":3,"url":"https://github.com/owner/repo/pull/3",'
-                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main",'
                     f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
                     '"headRepository":{"nameWithOwner":"owner/repo"},'
                     '"reviewDecision":"","reviews":[],"mergeCommit":null}'
                 ),
             )
+            runner.add_pull_request_identity(3)
             args = argparse.Namespace(
                 action="pr",
                 root=".",
@@ -970,16 +1205,17 @@ class GithubPublishTest(unittest.TestCase):
                     "--repo",
                     "owner/repo",
                     "--json",
-                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                    "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
                 ],
                 stdout=(
                     '{"number":4,"url":"https://github.com/owner/repo/pull/4",'
-                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main",'
                     f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
                     '"headRepository":{"nameWithOwner":"owner/repo"},'
                     '"reviewDecision":"","reviews":[],"mergeCommit":null}'
                 ),
             )
+            runner.add_pull_request_identity(4)
             args = argparse.Namespace(
                 action="publish-pr",
                 root=".",
@@ -1268,16 +1504,23 @@ class GithubPublishTest(unittest.TestCase):
                 "--repo",
                 "owner/repo",
                 "--json",
-                "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
             ],
             stdout=(
                 '{"number":7,"url":"https://github.com/owner/repo/pull/7",'
                 f'"state":"MERGED","isDraft":false,"baseRefName":"main",'
-                f'"baseRefOid":"{MERGE_SHA}","headRefName":"topic",'
+                '"headRefName":"topic",'
                 f'"headRefOid":"{CANDIDATE_SHA}",'
                 '"headRepository":{"nameWithOwner":"owner/repo"},'
                 f'"reviewDecision":"APPROVED","reviews":[],"mergeCommit":{{"oid":"{MERGE_SHA}"}}}}'
             ),
+        )
+        runner.add_pull_request_identity(
+            7,
+            base_sha=MERGE_SHA,
+            state="closed",
+            merged=True,
+            merge_commit_oid=MERGE_SHA,
         )
         runner.add(
             [

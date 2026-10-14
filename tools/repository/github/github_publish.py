@@ -94,6 +94,7 @@ class CommandFailure(Exception):
 
     result: CommandResult
     next_action: str
+    partial_success: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,7 @@ class UserVisibleFailure(Exception):
 
     message: str
     next_action: str
+    partial_success: Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -520,7 +522,7 @@ def pull_request_readback(
         "--repo",
         repo,
         "--json",
-        "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+        "number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
     ]
     result = run_command(
         runner,
@@ -528,6 +530,94 @@ def pull_request_readback(
         next_action="read_back_the_exact_pull_request_identity",
     )
     readback = dict(json_object(result.stdout, command="gh pr view"))
+    number = int_field(readback, "number")
+    if number is None:
+        raise UserVisibleFailure(
+            message="pull request readback did not return a numeric PR number",
+            next_action="read_back_the_exact_pull_request_identity",
+        )
+    api_command = [
+        "gh",
+        "api",
+        f"repos/{repo}/pulls/{number}",
+        "--jq",
+        (
+            "{number: .number, url: .html_url, state: .state, isDraft: .draft, "
+            "merged: .merged, mergeCommitOid: .merge_commit_sha, "
+            "baseRefName: .base.ref, baseRefOid: .base.sha, "
+            "headRefName: .head.ref, headRefOid: .head.sha, "
+            "headRepository: .head.repo.full_name}"
+        ),
+    ]
+    api_result = run_command(
+        runner,
+        api_command,
+        next_action="read_back_the_exact_pull_request_identity",
+    )
+    api_identity = json_object(api_result.stdout, command="gh api pull request")
+    base_oid = string_field(api_identity, "baseRefOid")
+    head_oid = string_field(api_identity, "headRefOid")
+    api_state = string_field(api_identity, "state").upper()
+    api_merged = api_identity.get("merged")
+    api_draft = api_identity.get("isDraft")
+    api_merge_oid = api_identity.get("mergeCommitOid")
+    cli_state = str(readback.get("state", "")).upper()
+    cli_draft = readback.get("isDraft")
+    cli_merge = readback.get("mergeCommit")
+    cli_merge_oid = (
+        cli_merge.get("oid")
+        if isinstance(cli_merge, Mapping) and isinstance(cli_merge.get("oid"), str)
+        else None
+    )
+    api_remote_state = "MERGED" if api_merged is True else api_state
+    identity_matches = (
+        int_field(api_identity, "number") == number
+        and isinstance(api_identity.get("url"), str)
+        and api_identity.get("url") == readback.get("url")
+        and api_identity.get("baseRefName") == readback.get("baseRefName")
+        and re.fullmatch(r"[0-9a-f]{40}", base_oid) is not None
+        and api_identity.get("headRefName") == readback.get("headRefName")
+        and re.fullmatch(r"[0-9a-f]{40}", head_oid) is not None
+        and api_identity.get("headRefOid") == readback.get("headRefOid")
+        and api_identity.get("headRepository")
+        == (
+            readback.get("headRepository", {}).get("nameWithOwner")
+            if isinstance(readback.get("headRepository"), Mapping)
+            else None
+        )
+        and api_state in {"OPEN", "CLOSED"}
+        and (api_merged is True or api_merged is False)
+        and (not api_merged or api_state == "CLOSED")
+        and api_remote_state == cli_state
+        and isinstance(api_draft, bool)
+        and isinstance(cli_draft, bool)
+        and api_draft == cli_draft
+        and (
+            (
+                api_merged is True
+                and isinstance(api_merge_oid, str)
+                and re.fullmatch(r"[0-9a-f]{40}", api_merge_oid) is not None
+                and api_merge_oid == cli_merge_oid
+            )
+            or (
+                api_merged is False
+                and cli_merge_oid is None
+                and (
+                    api_merge_oid is None
+                    or (
+                        isinstance(api_merge_oid, str)
+                        and re.fullmatch(r"[0-9a-f]{40}", api_merge_oid) is not None
+                    )
+                )
+            )
+        )
+    )
+    if not identity_matches:
+        raise UserVisibleFailure(
+            message="pull request API identity differs from CLI readback",
+            next_action="reject_publication_readback_and_retry_exact_PR_identity",
+        )
+    readback["baseRefOid"] = base_oid
     merge_commit = readback.get("mergeCommit")
     if isinstance(merge_commit, Mapping) and isinstance(merge_commit.get("oid"), str):
         merge_oid = cast(str, merge_commit["oid"])
@@ -1510,16 +1600,30 @@ def perform_pr(
                 command,
                 next_action="fix_gh_pr_edit_auth_or_update_the_pr_body_manually",
             )
-            readback = pull_request_readback(
-                runner, repo=verification.repo, selector=str(number)
+            pr_url = string_field(existing, "url")
+            partial_success = pr_mutation_failure_evidence(
+                args,
+                verification,
+                branch,
+                lifecycle,
+                mutation_action="pr-update",
+                selector=pr_url or str(number),
+                pr_url=pr_url,
+                pr_number=number,
             )
-            lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
+            try:
+                readback = pull_request_readback(
+                    runner, repo=verification.repo, selector=str(number)
+                )
+                lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
+            except (CommandFailure, UserVisibleFailure) as exc:
+                raise failure_with_partial_success(exc, partial_success) from exc
             summary.update(
                 {
                     "action": "pr-update",
                     "status": "ok",
                     "pr_number": number,
-                    "pr_url": string_field(existing, "url"),
+                    "pr_url": pr_url,
                     "command": command,
                     "gh_stdout": result.stdout.strip(),
                     "pull_request_lifecycle": lifecycle,
@@ -1566,23 +1670,98 @@ def perform_pr(
         command,
         next_action="fix_gh_pr_create_auth_or_repository_permissions_before_retrying_verified_pr_create",
     )
-    readback = pull_request_readback(
-        runner,
-        repo=verification.repo,
-        selector=branch,
+    pr_url = result.stdout.strip()
+    pr_number = pr_number_from_url(pr_url)
+    partial_success = pr_mutation_failure_evidence(
+        args,
+        verification,
+        branch,
+        lifecycle,
+        mutation_action="pr-create",
+        selector=pr_url or branch,
+        pr_url=pr_url,
+        pr_number=pr_number,
     )
-    lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
+    try:
+        readback = pull_request_readback(
+            runner,
+            repo=verification.repo,
+            selector=branch,
+        )
+        lifecycle = lifecycle_with_pr_readback(lifecycle, readback)
+    except (CommandFailure, UserVisibleFailure) as exc:
+        raise failure_with_partial_success(exc, partial_success) from exc
     summary.update(
         {
             "action": "pr-create",
             "status": "ok",
-            "pr_url": result.stdout.strip(),
+            "pr_url": pr_url,
             "command": command,
             "pr_number": int_field(readback, "number"),
             "pull_request_lifecycle": lifecycle,
         }
     )
     return summary
+
+
+def pr_number_from_url(pr_url: str) -> int | None:
+    """Return the PR number from a GitHub pull request URL, when present."""
+    match = re.search(r"/pull/([1-9][0-9]*)/?$", urlparse(pr_url).path)
+    return int(match.group(1)) if match is not None else None
+
+
+def pr_mutation_failure_evidence(
+    args: argparse.Namespace,
+    verification: RemoteVerification,
+    branch: str,
+    lifecycle: Mapping[str, object],
+    *,
+    mutation_action: str,
+    selector: str,
+    pr_url: str,
+    pr_number: int | None,
+) -> dict[str, object]:
+    """Preserve a completed PR mutation's identity if its readback fails."""
+    base = cast(Mapping[str, object], lifecycle["base_identity"])
+    head = cast(Mapping[str, object], lifecycle["head_identity"])
+    evidence: dict[str, object] = {
+        "action": args.action,
+        "remote_verified": True,
+        "repo": verification.repo,
+        "remote": verification.remote,
+        "branch": branch,
+        "mutation_completed": True,
+        "mutation_action": mutation_action,
+        "pr_selector": selector,
+        "expected_pr_head_ref": str(head["ref"]).removeprefix("refs/heads/"),
+        "expected_pr_head_sha": str(head["commit_sha"]),
+        "expected_pr_base_ref": str(base["ref"]).removeprefix("refs/heads/"),
+        "expected_pr_base_sha": str(base["commit_sha"]),
+        "recovery_mode": "readback_only",
+    }
+    if pr_url:
+        evidence["pr_url"] = pr_url
+    if pr_number is not None:
+        evidence["pr_number"] = pr_number
+    return evidence
+
+
+def failure_with_partial_success(
+    failure: CommandFailure | UserVisibleFailure,
+    evidence: Mapping[str, object],
+) -> CommandFailure | UserVisibleFailure:
+    """Retain the original failure while attaching a completed PR mutation."""
+    if isinstance(failure, CommandFailure):
+        return CommandFailure(
+            result=failure.result,
+            next_action=failure.next_action,
+            partial_success=evidence,
+        )
+    return UserVisibleFailure(
+        message=failure.message,
+        next_action=failure.next_action,
+        partial_success=evidence,
+    )
 
 
 def perform_checks(
@@ -1637,9 +1816,16 @@ def summary_lines(summary: Mapping[str, object]) -> list[str]:
         "local_tree_sha",
         "remote_readback_sha",
         "remote_readback_ref",
+        "mutation_completed",
+        "mutation_action",
         "pr_number",
         "pr_url",
         "pr_selector",
+        "expected_pr_head_ref",
+        "expected_pr_head_sha",
+        "expected_pr_base_ref",
+        "expected_pr_base_sha",
+        "recovery_mode",
         "next_action",
         "verified_remote_policy",
     ]
@@ -1673,10 +1859,11 @@ def failure_summary(
     *,
     message: str,
     next_action: str,
+    partial_success: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Return a compact failure summary."""
     user_task = getattr(args, "user_task", "") if args is not None else ""
-    return {
+    summary: dict[str, object] = {
         "status": "fail",
         "user_task": user_task,
         "remote_verified": False,
@@ -1684,6 +1871,9 @@ def failure_summary(
         "next_action": next_action,
         "verified_remote_policy": "gh_verified_remote_required",
     }
+    if partial_success is not None:
+        summary.update(partial_success)
+    return summary
 
 
 def command_failure_message(exc: CommandFailure) -> str:
@@ -1762,13 +1952,13 @@ def run(
     )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None, *, runner: Runner | None = None) -> int:
     """Run the CLI."""
     parser = build_parser()
     args: argparse.Namespace | None = None
     try:
         args = parser.parse_args(argv)
-        summary = run(args)
+        summary = run(args) if runner is None else run(args, runner)
         emit_summary(args, summary)
         return 0
     except CommandFailure as exc:
@@ -1776,6 +1966,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args,
             message=command_failure_message(exc),
             next_action=exc.next_action,
+            partial_success=exc.partial_success,
         )
         if args is not None:
             emit_summary(args, summary)
@@ -1784,7 +1975,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     except UserVisibleFailure as exc:
         summary = failure_summary(
-            args, message=exc.message, next_action=exc.next_action
+            args,
+            message=exc.message,
+            next_action=exc.next_action,
+            partial_success=exc.partial_success,
         )
         if args is not None:
             emit_summary(args, summary)
