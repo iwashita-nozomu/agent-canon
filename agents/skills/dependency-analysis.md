@@ -14,27 +14,33 @@ upstream implementation ../../tools/analysis/dependencies/scip_index.py owns nat
 
 ## Reader Map
 
-- Purpose: use dependency evidence when it can change edit scope, ownership, or
-  validation.
-- Use When: a header edge, code relation, reference, or cross-module impact is
-  relevant to the requested decision.
+- Purpose: locate causal code and use dependency evidence to decide the owner,
+  edit, and validation.
+- Use When: a repair's cause is unresolved, or a dependency question can change
+  the requested decision. Start with [Method](#method).
 - Boundary: dependency headers, code-symbol relations, and text-search matches
   answer different questions; keep their evidence distinct.
 
 ## Purpose
 
-Choose the smallest useful evidence for a dependency question. Start from the
-requested target and its contract, then investigate further only where the
-result could change the selected owner, edit, or validation.
+Choose the smallest useful evidence for a cause or dependency question. Start
+from the requested target and its contract, then investigate further only where
+the result could change the selected owner, edit, or validation.
 
 ## Use When
 
+- A requested diagnosis or repair has no established causal code or mechanism.
 - A dependency manifest or edge is changed or disputed.
 - A possible code reference or dependency may affect the requested scope.
 - An explicit cross-module/API change needs an execution order or affected
   consumer identified.
 
 ## Method
+
+For a repair with no established cause, use steps 1-4 before choosing a fix:
+the causal mechanism determines the edit, not the first plausible patch. Reuse
+current cause evidence. New implementation and explicitly agreed replacement
+follow the current contract without requiring diagnosis of superseded code.
 
 1. Read the target, current diff, and governing contract. Use the requested
    path, source location, or finding as the starting point.
@@ -44,13 +50,23 @@ result could change the selected owner, edit, or validation.
    relations, and text-search candidates separate: a header edge is not a call
    graph, a symbol reference does not prove runtime reachability, and a text
    match does not establish that a file owns the behavior.
-4. For a failure, locate the responsible expression, branch, call, or state
-   update and explain how the relevant input or state produces the observed
-   effect. Distinguish the cause from where it becomes visible. A sufficient
-   static proof needs no extra run; unresolved alternatives remain uncertain.
-5. If the task includes a repair, change the supported cause at its owner,
-   compare the target diff with the required behavior, and use the selected
-   validation route. Do not turn an unresolved cause into a symptom-level fix.
+4. For a failure, compare expected and actual inputs, state, and outputs.
+   Trace the relevant path from source and available observations to the
+   expression, branch, call, state update, or missing operation that produces
+   the difference, rather than stopping where the error becomes visible.
+   Record the revision, path, symbol or block, and the supported chain from
+   input/state through that operation to the observed effect in the existing
+   task record. If competing explanations could change the repair, select the
+   smallest source check or authorized observation that distinguishes them;
+   keep unsupported alternatives uncertain. A sufficient static derivation
+   needs no extra run. Preserve current execution authority and explicit holds.
+5. If the task includes a repair, change the supported cause at its owner first.
+   For code changes, then follow affected definitions, references, and callers
+   through the existing [LSP route](../../documents/tools/lsp_code_analysis.md)
+   and fix concrete related problems within scope. Compare the resulting diff
+   with changed and retained guarantees, and use the selected validation route.
+   Do not turn an unresolved cause into a symptom-level fix or require inspecting
+   all related code before the located repair.
 
 Inspect additional or historical assets only when a concrete question about
 reuse, continuity, or a suspected missing predecessor could change the repair.
