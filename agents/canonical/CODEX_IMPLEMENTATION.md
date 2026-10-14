@@ -43,8 +43,12 @@ that could change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
 for decision sufficiency and reuse current owner evidence. An unresolved API,
 algorithm, dependency, configuration, naming, oracle, or responsibility decision
-returns to its design owner with `design_issue_blocker` evidence. A verified root correction preserves the agreed
-intent while changing defective contracts and their consumers as necessary.
+returns to its design owner with `design_issue_blocker` evidence. When a contract
+blocks the agreed outcome, follow [Decision Order](../skills/agent-orchestration.md#decision-order)
+to expose the conflict and ask the user about a resolution not settled by the
+available evidence; an internal blocker report alone does not resolve it.
+A verified root correction preserves the agreed intent while changing defective
+contracts and their consumers as necessary.
 
 Markdown links identify the expected owner and Skill route; they do not create a
 dispatch frontier. When delegation is selected, use the configured native
