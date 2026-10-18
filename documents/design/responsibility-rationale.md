@@ -62,7 +62,17 @@ Local issue/schema validation and remote GitHub reconciliation are separate resp
 
 ## Structure planning and visualization
 
-Structure planning exists when owner, reader route, source of truth, split/merge boundary, or validation topology is genuinely undecided. A bounded edit inside an already-decided topology does not require a structure packet or a negative `skipped` receipt.
+Before substantive prose, writing owners check that a usable content structure
+exists: ordered sections or points, their roles, and supporting sources. Reuse
+an adequate outline; create or complete one before drafting when it is missing,
+even if there is only one obvious order. A bounded edit preserving that structure
+does not need a new outline.
+
+Unsettled owner, reader route, source of truth, split/merge boundary, or validation
+topology uses the structural-decision record. An ordinary outline does not require
+that packet, a graph/DSL, a new file, or a negative `skipped` receipt. Planning
+does not add an approval wait beyond the user's instructions and existing scope
+and decision boundaries.
 
 Visualization exists when a diagram materially reduces ambiguity in state, ownership, dependency, or many-to-many flow. Mermaid is an available representation, not a default tax on every nontrivial paragraph or process. Text or a table is sufficient when it represents the relation unambiguously; only selected diagrams require render/readback validation.
 

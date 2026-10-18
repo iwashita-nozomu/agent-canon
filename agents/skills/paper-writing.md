@@ -35,8 +35,10 @@ paragraph map や細かな section contract は、実際の重複、欠落、順
 ## Procedure
 
 既存の draft、source、要求された section と claim から必要な執筆・根拠メモを
-選びます。section order、first figure/table、または invalid interpretation に
-未決定の構造選択がある場合だけ `structure-planning` を先に使います。
+選びます。本文前に [構成確認](structure-planning.md#before-prose) でsectionの順序・役割と
+claim/evidenceの対応が十分か確認し、既存構成が十分なら再利用します。構成がない・不十分なら、
+順序が自明でも先に作成・補完します。first figure/tableやinvalid interpretation等の構造選択も、
+本文へ進む前に必要な範囲で解決します。細かなparagraph mapを一律に追加しません。
 
 Reader がたどる論理順で書き、section の役割が重なる場合は reverse outline
 で整理します。レビューは実際のリスクに合わせます。構造上の断絶には
