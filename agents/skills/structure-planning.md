@@ -2,7 +2,7 @@
 <!--
 @dependency-start
 contract skill
-responsibility Plans document/artifact topology only when owner, reader, source-of-truth, split/merge, or validation topology is genuinely undecided.
+responsibility Establishes necessary content structure before prose and resolves unsettled document/artifact topology.
 upstream design ../../documents/design/responsibility-rationale.md structure and visualization activation rationale
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/conventions/common/05_docs.md document responsibility and reading-activation boundary
@@ -16,10 +16,23 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 ## Purpose
 
-owner、canonical source、reader entry、split/merge、section topology、presentation topology、または validation route に複数の候補があるときだけ構造を決めます。
-bounded な wording/link/paragraph edit、既に順序が明らかな section、長いだけの文書には起動しません。
+新規文書や構成に影響する改稿で、目的・読者・要求範囲に合う構成がまだなければ、本文より先に構成を決めます。
+複数候補があるかどうかだけで構成作成の要否を判断しません。owner、canonical source、reader entry、split/merge、section topology、presentation topology、validation route の未決事項もここで扱います。
+
+十分な既存構成は再利用し、構成を変えない bounded な wording/link/paragraph edit に新しい構成作成を要求しません。
+文書が長いことだけでは起動しません。
+
+## Before prose
+
+1. 要求、読者、根拠と、既存の見出し・brief・outlineを照合する。必要な内容の役割・順序・根拠の対応が揃っていれば、その構成を使う。
+2. 構成がない、または必要な内容が欠ける場合は、本文前に短い構成メモか既存の見出しへ、章・要点の順序、各部分が答える問い・結論、根拠・sourceとの対応を残す。一つの自明な順序しかなくても、この準備は飛ばさない。部分的な不足は該当部分だけ補う。未確認の結論・根拠は未確定と示し、構成を埋めるために創作しない。
+3. 執筆ownerがこの構成に沿って本文を書く。同じ担当でよく、新たなhandoffを要求しない。執筆中に構造上の欠落が分かったら、影響する構成を更新して本文へ戻る。構成のみ・承認待ちの明示指示は守り、それ以外に一律の承認待ちを作らない。範囲・結果・主要方針や未決契約の判断は [Decision Order](agent-orchestration.md#decision-order) に従う。
+
+通常の構成メモには独自DSL、graph、固定schema、別ファイル、全paragraphのmapを要求しません。
 
 ## Minimal structure decision
+
+以下はowner/source、読取経路、split/merge、topologyやvalidationの具体的な選択が残る場合だけ適用します。通常の構成メモをこのrecordへ変換する必要はありません。
 
 1. 既存 owner と caller の条件を読み、`structure_kind`、`audience`、`decision_context`、`owner_and_source` を決める。
 2. `selected_topology`、`source_map`、material な `invalid_interpretations`、`validation_route` だけを既存の structure record に記録する。
@@ -42,4 +55,4 @@ invalid_interpretations=<material forbidden readings>
 validation_route=<owner/check>
 ```
 
-`report-writing`、experiment、slide、HTML、refactor owner は、実際の structural choice がある場合だけこの skill を呼びます。
+執筆ownerは本文前に有効な構成を確認し、不足する場合にこのskillへ接続します。experiment、slide、HTML、refactorのownerも、既存構成を再利用し、実際に残る構造上の判断にだけ適用します。

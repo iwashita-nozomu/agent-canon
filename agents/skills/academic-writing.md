@@ -28,8 +28,11 @@ claim, evidence links, notation/assumptions, or section contract explicit to the
 extent the document needs them; reuse an existing note when it already captures
 that information.
 
-Resolve section, figure, or table ordering with `structure-planning` only when a
-real choice remains. Draft in a reader-friendly order and keep observations,
+Before drafting, check the ordered claims/sections and their evidence against
+[Before prose](structure-planning.md#before-prose). Reuse a sufficient existing
+structure; create or complete a missing outline before prose even when there
+is one obvious order. Resolve unsettled section, figure, or table ordering
+there as needed. Draft in a reader-friendly order and keep observations,
 interpretation, and limitations distinct where the document makes evidence-based
 claims. A graph or fixed handoff is not a prerequisite for ordinary drafting.
 

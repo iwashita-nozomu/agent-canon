@@ -20,10 +20,13 @@ README、workflow、guide、migration、specification などの一般説明 pros
 ## Procedure
 
 Read the request, existing text and headings, and canonical source. State the
-purpose and reader in the amount of detail needed to guide the revision. Use
-`structure-planning` only when the owner, reader path, section order,
-split/merge, or invalid interpretation still has a material unresolved choice;
-use `md-style-check` for a wording-independent typo, link, or formatting fix.
+purpose and reader in the amount of detail needed to guide the revision. Before
+drafting, establish the ordered sections or points, their roles, and source
+support using [Before prose](structure-planning.md#before-prose). Reuse a
+sufficient existing outline; if it is missing or incomplete, prepare it before
+prose even when the order is obvious. A bounded wording edit can retain the
+existing structure; use `md-style-check` for a wording-independent typo, link,
+or formatting fix.
 
 Draft from the selected structure. If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
