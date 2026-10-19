@@ -34,6 +34,10 @@ problem setting、assumptions、stopping semantics と実装 path の対応を�
 run の再現に必要な protocol、source、command、environment、seed、identity を記録し、
 結論を plan-time の成功条件にせず runtime success や parity と同一視しません。
 
+数値手法の任意の改良案は、[最初の数値を先に確認する手順](computational-optimization.md#before-optional-changes)
+に従い、基本の要求実装による結果・失敗と仮説を結び付けてから選びます。要求された手法や、
+仕様・数式から必要性が分かる処理の実装は妨げず、結果未取得を推測の工夫で埋めません。
+
 `literature-survey`、`experiment-lifecycle`、`experiment-review`、および
 `report-writing` を、実際に外部資料、run、比較判断、または reader-facing report が
 必要な範囲で使います。複数の変更を一緒に比較する場合は、設計がその帰属を支えない

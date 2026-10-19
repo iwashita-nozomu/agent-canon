@@ -61,6 +61,11 @@ to align the owning design with the latest agreement. State the required outcome
 valid inputs, and guarantees, then choose the simplest complete mechanism under
 [SEP-06](../../documents/conventions/software-engineering-principles.md#sep-06-kiss).
 
+For numerical implementation or tuning, apply
+[Before optional changes](../skills/computational-optimization.md#before-optional-changes)
+before adding mechanisms beyond the requested method. Establish the actual
+baseline first; preserve mathematically required work and explicit execution holds.
+
 For reuse decisions, apply [reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
 and reuse established evidence while its premises hold. For repairs, use
 [SEP-07 Reachability and remedy necessity](../../documents/conventions/software-engineering-principles.md#reachability-and-remedy-necessity)

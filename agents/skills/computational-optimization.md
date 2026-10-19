@@ -29,6 +29,10 @@ every numerical question.
 
 ## Core Method
 
+Follow [Before optional changes](#before-optional-changes) when implementing or
+tuning a numerical method; a plausible improvement is not evidence that it is
+needed in the first implementation.
+
 1. State the requested numerical property in terms of the public contract. Record
    only the relevant parts of the problem: for example objective or residual,
    variables and parameters, constraints, derivatives, iteration state, stopping
@@ -63,6 +67,36 @@ The convergence of an iterative method is a property of its implemented update
 and stopping rule under stated assumptions. Do not add proof-only state, runtime
 proof checks, or diagnostic gates to make a convergence claim pass. Preserve the
 public numerical contract unless the task authorizes a contract change.
+
+## Before optional changes
+
+Begin with the agreed existing implementation or the smallest complete version
+of the requested method, using the project's established defaults and runner.
+Include mechanisms required by the user's method, approved contract, or a
+supported mathematical derivation of that requirement. Do not remove a required
+line search, preconditioner, or other method component to invent a simpler baseline.
+
+Before adding an optional numerical or performance mechanism, obtain or reuse
+actual baseline numerical results or failures under the selected authorized
+route. Compilation, a smoke exit, an unrun prediction, or a method's popularity
+is not that evidence. Build, launcher, or environment errors do not establish a
+numerical deficiency. Do not add speculative epsilon, clipping, damping, scaling,
+cache, or parallel variants just in case. Do not silently absorb your own
+unapproved tweaks into the baseline; distinguish them from the agreed method.
+
+Tie an additional candidate to an observed deficiency, its supported cause or
+explicit hypothesis, and the quantity that can test it. Compare changes in an
+interpretable unit while preserving the inputs, oracle, stopping and failure
+semantics; retain the baseline failure rather than masking it as success.
+Source- or specification-proven algorithm errors can be repaired directly:
+this rule does not require running a known-invalid implementation, benchmarking
+ordinary correctness repairs, or executing a theory-only request.
+
+If execution is held or unavailable, state what remains unobserved and defer
+optional tweaks; continue independent authorized baseline implementation or
+explanation. This rule grants no new execution authority and does not require
+rerunning valid existing evidence. Changes to scope, method, or acceptance follow
+[Decision Order](agent-orchestration.md#decision-order).
 
 ## Related Skills
 
