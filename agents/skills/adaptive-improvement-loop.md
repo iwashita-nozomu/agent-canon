@@ -33,6 +33,10 @@ upstream design ../canonical/skills.md skill canon registry
 停止予算または停止条件を置き、未確定の原因は実装前に調べます。`dependency-analysis`
 または `change-review` は、依存や実装責務が選択に影響するときに使います。
 
+数値の改善では、[Before optional changes](computational-optimization.md#before-optional-changes)
+に従って、合意済みの基本実装の数値・失敗を先に確認します。最初の結果前に任意策を混ぜず、
+有効な既存baselineは再利用し、実行保留・不能なら未観測と残して推測のtuningを足しません。
+
 各意味のある変更・比較は、解釈可能な単位と run identity で記録し、選択された owner
 route で実行します。`plan -> implementation -> evidence -> next-action` は考え方の例で、
 独立した段階を常にこの順で追加する要求ではありません。結果から改善、反証、追加調査、

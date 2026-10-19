@@ -31,6 +31,9 @@ closeout are separate conditional tasks.
 2. Run through the project's existing runner and environment. Preserve their
    configured defaults and execution semantics; use a specialized profile or
    variant only when the requested evidence needs it.
+   For numerical experiments, follow [Before optional changes](computational-optimization.md#before-optional-changes):
+   obtain or reuse the agreed method's baseline before optional tweaks, preserving
+   required method components and current execution authority.
 3. Observe the actual terminal result. Distinguish completed, failed, and
    partial work, and keep source/config/command details needed to reproduce or
    interpret that result. A partial or failed run does not establish a completed
