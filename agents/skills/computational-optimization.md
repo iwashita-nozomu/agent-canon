@@ -30,8 +30,7 @@ every numerical question.
 ## Core Method
 
 Follow [Before optional changes](#before-optional-changes) when implementing or
-tuning a numerical method; a plausible improvement is not evidence that it is
-needed in the first implementation.
+tuning a numerical method.
 
 1. State the requested numerical property in terms of the public contract. Record
    only the relevant parts of the problem: for example objective or residual,

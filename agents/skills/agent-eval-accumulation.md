@@ -16,13 +16,12 @@ downstream implementation ../../.codex/personal/skills/agent-eval-accumulation/S
 ## Reader Map
 
 - Purpose: accumulates AgentCanon eval evidence through registered producers
-  and log-archive storage instead of hand-written summaries.
+  and log-archive storage.
 - Use When: eval collection or repair is selected to establish required evidence,
   not merely because read-only analysis observes missing, stale, or failing data.
 - Section path: Purpose and Use When define scope; Required Flow is the
   checklist for selected collection/repair; Boundaries limits what this skill may generate or claim.
-- Boundary: do not hand-write eval reports when a registered producer and
-  archive path own the evidence.
+- Boundary: use the registered producer and archive path for reports they own.
 
 ## Purpose
 
