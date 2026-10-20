@@ -16,7 +16,7 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 ## Purpose
 
 README、workflow、guide、migration、specification などの一般説明 prose を、既存本文・根拠・構成メモから作成/改稿します。
-選択基準は長さではなく file/document responsibility です。paper、thesis、scholarly note、report は各 owner を優先します。
+文書の責務に応じて選び、paper、thesis、scholarly note、report は各 owner を優先します。
 
 ## Procedure
 

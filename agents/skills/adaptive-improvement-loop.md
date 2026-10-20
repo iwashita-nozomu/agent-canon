@@ -38,8 +38,7 @@ upstream design ../canonical/skills.md skill canon registry
 有効な既存baselineは再利用し、実行保留・不能なら未観測と残して推測のtuningを足しません。
 
 各意味のある変更・比較は、解釈可能な単位と run identity で記録し、選択された owner
-route で実行します。`plan -> implementation -> evidence -> next-action` は考え方の例で、
-独立した段階を常にこの順で追加する要求ではありません。結果から改善、反証、追加調査、
+route で実行します。結果から改善、反証、追加調査、
 report 更新、次の変更、または停止を選び、未解決事項を残す場合は理由を記録します。
 iteration 数や run status だけでは完了を示しません。
 

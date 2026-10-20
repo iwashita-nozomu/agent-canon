@@ -14,7 +14,7 @@ downstream implementation ../../.codex/personal/skills/academic-writing/SKILL.md
 ## Purpose
 
 学術 prose、scholarly note、thesis chapter、method note、記号密度の高い claim-heavy 文書を、既存本文・根拠・構成メモから作成/改稿します。
-paper-style manuscript は `paper-writing` を優先します。選択基準は長さではなく文書責務です。
+文書の責務に応じて選び、paper-style manuscript は `paper-writing` を優先します。
 
 ## Use When
 
@@ -44,8 +44,7 @@ may use the TeX route in an explicit environment; otherwise use the document
 owner's applicable check.
 
 Use `tools/bin/agent-canon docs check` when that check is selected for the
-document. General README/workflow/guide/migration/report work does not need a
-TeX route.
+document.
 
 ## Standard command
 
