@@ -56,6 +56,13 @@ Supply the applicable relationships below, not empty headings or a universal for
 | Recognize the result | Expected behavior or success criterion, separately from observed output, error, exit status, and where that evidence can be inspected |
 | Reconstruct an explanation or decision | Definitions, premises, sources, method or derivation, and the evidence-to-conclusion relationship with assumptions and limitations |
 
+Lead with the conclusion or intended action. For each contrast, exception, or
+caveat, check whether removing it would materially change the conclusion,
+applicability, next action, or strength of evidence. Keep it only when that
+answer is yes; state its concrete condition and effect once beside the claim.
+Otherwise delete it and state the intended meaning directly. This keeps
+incidental exclusions and defensive assurances from obscuring the main point.
+
 Use precise file/symbol/section or artifact locators; use immutable references for
 snapshot-specific observations. A source link supports the explanation rather
 than replacing it. Reuse an existing procedure by identifying its applicable
@@ -98,7 +105,7 @@ necessary context without reconstructing a private conversation.
    | --- | --- |
    | Established fact | What was observed or demonstrated; distinguish inference and hypothesis |
    | Evidence and conditions | Actual command/action and result, source/snapshot, input conditions, and existing evidence reference |
-   | Meaning and scope | What decision the finding supports and what it does not establish |
+   | Meaning and scope | The decision supported and the applicable conditions affecting its use |
    | Limits and contrary evidence | Failed or unrun checks, blockers, counterevidence, rejected hypotheses and reasons |
    | Disposition | Action taken, reason for no change or deferral, and next owner/action when needed |
 
@@ -150,8 +157,8 @@ table, and an explanation can coexist. Use prose for a single brief point; do
 not fragment connected reasoning into bullets or invent a comparison axis to
 justify a table. Keep cells concise and columns relevant. When long explanations,
 sparse cells, or excessive width make a table harder to read, move explanations
-to prose or use a list instead. Never omit evidence or qualifications to fit a
-layout, and keep them visibly associated with the finding they support.
+to prose or use a list instead. Never omit material evidence or qualifications
+to fit a layout, and keep them visibly associated with the finding they support.
 
 Before writeout, check that the form exposes the intended comparison or order,
 reads clearly at the destination's width, and preserves the facts and limits
