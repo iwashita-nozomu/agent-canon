@@ -5,6 +5,7 @@ contract skill
 responsibility Documents long-form-writing for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable document structure contract
+upstream design ../internal-routines/verification-result-structuring.md reader reconstruction and relevant qualifications
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
 upstream design code-visualization.md visualization selection and native renderer delegation
@@ -28,7 +29,9 @@ prose even when the order is obvious. A bounded wording edit can retain the
 existing structure; use `md-style-check` for a wording-independent typo, link,
 or formatting fix.
 
-Draft from the selected structure. If a diagram would clarify workflow,
+Draft from the selected structure, applying
+[reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction)
+for necessary context and relevant qualifications. If a diagram would clarify workflow,
 dependency, ownership, state, or handoff, explain the specific question it
 answers and use `code-visualization` for its selected rendering. Route a
 mathematical or implementation-derived claim through `formal-proof-workflow`

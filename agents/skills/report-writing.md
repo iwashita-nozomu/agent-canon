@@ -21,7 +21,7 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 
 ## Procedure
 
-1. `reader-reproducible writing`（`../internal-routines/verification-result-structuring.md`）で source、audience/decision、requested next action、
+1. [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction) で source、audience/decision、requested next action、
    findings、counterevidence、corrections、limitations を読み直す。settled check の再実行や別の環境調査は、答えを変える具体的 gap がある場合だけ行う。
 2. 外部 reference が material claim を支える場合は、URL/DOI、access date、source identity、採否を持つ既存 source note/packet を使う。
    evaluation/experiment report では denominator、metric direction、valid/invalid comparison、次 action を明記する。
