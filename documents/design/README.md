@@ -12,9 +12,9 @@ upstream design dependency-manifest-design.md dependency evidence contract
 このディレクトリは、設計の正本を集約する入口です。
 存在しない旧パスを経由せず、ここから現在の設計文書へ直接辿れる状態を保ちます。
 
-承認済みの Target-State-First implementation contract は
-[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) です。
-この packet で digest は不変とし、projection は設計 artifact を複製または編集せず、そこへリンクします。
+Target-State-First の設計schemaとworkflow契約は
+[codex-spark-implementation-routing.md](codex-spark-implementation-routing.md) が所有します。
+同文書の過去のreceipt記録と、現在のhandoffで選ぶ検証済みpacketを区別します。
 
 文書の filename、配置、構成判断は [文書規約](../rule/README.md) を参照します。
 この index は配置規則を複製せず、個別設計の target state と実装境界への reader route を提供します。
@@ -51,7 +51,8 @@ upstream design dependency-manifest-design.md dependency evidence contract
 - [python-structure-hash.md](python-structure-hash.md)
   - Python の structural duplicate analysis と module-group dependency priority
 - [agentcanon-hook-simplification-wave3.md](agentcanon-hook-simplification-wave3.md)
-  - Wave 3 の3 active event、`hook_dispatcher.py`→`behavior_event_assembly.py` の exactly-once caller contract、`behavior_event_assembly.record_hook_invocation(parts)` の純アセンブリ公開 API、`.codex/hooks/hook_event_log.py` が no-replace per-event spool transport の serialization/append writer、活性ハンドラ毎に1 base append、行動レコード存在時のみ monitor projection、`RETIRED_CHILD_TOMBSTONES=23` / `MOVED_SOURCE_ABSENCES=1` / retired basenames `24`、分離した semantic event / hook event、skill logger 単独 owner 化、`skill_usage.jsonl` 履歴 read-only 取扱い、PR #471後 current-main inventory gate、検証コーパス
+  - hook-event / semantic-event の所有境界、移行、readback
+
 - [entrypoint-owner-map.md](entrypoint-owner-map.md)
   - repository entrypoint の責務と canonical owner への接続
 - [tool-skill-routing-refactor.md](tool-skill-routing-refactor.md)
@@ -59,24 +60,15 @@ upstream design dependency-manifest-design.md dependency evidence contract
 - [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md)
   - skill / capability / phase / tool / edge の identity、参照、coverage、readback
 - [skill-runtime-shim-materialization.md](skill-runtime-shim-materialization.md)
-  - catalog-defined Codex discovery shim の schema、単一 materializer、移行、readback、prompt 評価
-  - the native tool dispatcher owns argv execution; the SKILL.md writer is the materializer
-    一つだけとする command surface、shim routing と全体 `route.py` の所有境界
-  - 実在する `workflow_selection_eval.toml` の 525 cases、固定 prompt/expected readback、
-    graph/route/ToolID/ToolCall golden、fresh `gpt-5.4-mini` scenario と paired token contract
-  - catalog-derived な全件 transaction ではなく per-file `temp + os.replace`、全件readback、同一
-    materializer再実行による idempotent recovery。source/tests/eval producer は通常の
-    実装diffとしてruntime write setから分離
-  - determinism と idempotent fixed point の分離、2回実行時のrecord/catalog-sized projection/
-    readback equality と2回目content delta=0、route argparse error mapping、厳密な
-    measurement artifact schema/version/row contract
+  - catalog-defined discovery adapter、所有境界、materialization、移行、readback
+
 - [responsibility-rationale.md](responsibility-rationale.md)
   - 責務配置の判断根拠
 - [responsibility-scope-management.md](responsibility-scope-management.md)
   - 責務の scope 管理
 - [responsibility-cleanup.md](responsibility-cleanup.md)
-  - tree 観測、source/view/generated/project/personal 境界、dependency closure、責務単位、
-    environment/code/skill dispatch、既存 owner 再利用、統合、再レビュー、validation、rollback
+  - 責務単位の完結、owner dispatch、置換・廃止、統合、検証
+
 - [runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md)
   - AgentCanon-log #4 と AgentCanon #461 の runtime-log repository owner split
 - [request-intent-and-update-relation.md](request-intent-and-update-relation.md)

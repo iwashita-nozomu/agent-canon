@@ -19,7 +19,7 @@ downstream implementation ../../tools/bin/agent-canon stable shell wrapper
 
 Use this policy to answer which AgentCanon tools should move to Rust, which
 logic should remain in Python, and how the migration is validated. Read Goals
-and DevContainer Setup first, then Runtime Boundary, Canonical Layout, Migration
+and Shared Tool Image Setup first, then Runtime Boundary, Canonical Layout, Migration
 Order, and Sequential Migration Policy before changing tool implementations.
 The remaining sections list completed migrations, first targets, Python-only
 surfaces, audit and plan commands, MCP surfaces, deterministic search, and validation.
@@ -28,85 +28,26 @@ surfaces, audit and plan commands, MCP surfaces, deterministic search, and valid
 
 - Move heavy static-analysis and inventory tooling from Python to Rust.
 - Keep workflow orchestration and rapidly-changing agent logic in Python.
-- Declare the exact Rust toolchain and cargo source build in the mounted
-  DevContainer dependency manifest.
-- Keep template and derived Dockerfiles Rust-free unless the project runtime itself requires Rust.
+- Declare the Rust toolchain in the shared tool image dependency manifest.
+- Keep project images consumer-owned; provision Rust there when their product or development requirements call for it.
 
-## DevContainer Setup
+## Shared Tool Image Setup
 
-Rust toolchains belong in the `rust-toolchain` record of
-`.devcontainer/dependencies.toml`; the shared post-create only orchestrates the
-validated plan and lifecycle projections.
+AgentCanon's Rust toolchain belongs to the `rust-toolchain` record in
+`bootstrap/container/image/dependencies.toml`. The shared tool image and
+`bootstrap.sh` own installation; source-mounted Rust tools compile into the
+resident runtime cache. Use the bootstrap-selected CLI and cache paths.
 
-Required components:
-
-- rustup
-- cargo
-- rustfmt
-- clippy
-- rust-analyzer
-
-The shared DevContainer installs Rust, publishes the Rust toolchain on the
-container PATH for non-interactive `devcontainer exec` commands, and builds the
-canonical AgentCanon CLI into:
-
-```text
-${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}/agent-canon/bin/agent-canon
-```
-
-with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
-may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
-`~/.tools` for compiled agent-tool binaries.
-
-The `cargo-source-build` record selects `source_identity = "active-source"` and
-always invokes `cargo build --release --locked`. Cargo owns incremental/change
-detection for the mounted source tree, and the build input remains independent
-of repository metadata. The published `.build-state` records only
-`agent_canon_source_root`; active-source installation publishes no commit
-provenance or source-identity receipt.
-Records that select an explicit `commit` retain their existing Git commit
-verification and provenance checks.
-
-Repository search keeps `search.py` as a thin provider router: exact text and
-catalog patterns use Git, dependency context uses the source graph owner, and
-code facts use the LSP owner. Ranked semantic retrieval remains in the Rust
-`semantic-index` command and its external cache; the Python route does not build
-heuristic cards or combine provider scores. No model server, installer, model
-cache, or compatibility dispatch is part of the compiled-tool cache.
-
-After the AgentCanon CLI is built, DevContainer post-create also runs
-`agent-canon structured-analysis build --root <workspace> --profile devcontainer`
-as a warning-only cache rebuild. This rebuild creates the SQLite intermediate
-representation under
-`${AGENT_CANON_STRUCTURED_ANALYSIS_HOME:-$HOME/.cache/agent-canon/structured-analysis}`
-then materializes warning rows in a separate `diagnostics.sqlite` DB. It does
-not rewrite repository source files or generated README surfaces.
-
-In a template or derived repository, the normal adoption path is:
-
-1. Create or reuse an ignored qualified AgentCanon source clone and an
-   Issue-qualified standalone topic branch.
-1. Run `bootstrap.sh install` with an explicit control/runtime root. The image
-   build compiles and verifies the Rust CLI from the selected source snapshot;
-   no Host Rust toolchain or separate rebuild script is used.
-1. Use `agent-canon rust-migration-audit --root <agent-canon-source>` to confirm
-   the Rust foundation is present.
-1. Use `agent-canon rust-migration-plan --root <agent-canon-source>` before
-   porting the next tool.
-
-The parent repository does not need Rust in its project Dockerfile to use
-AgentCanon Rust tooling. The shared tool image and the project execution image
-remain separate contracts.
+In a template or derived repository, use the selected qualified AgentCanon
+source checkout and the shared bootstrap. Run `agent-canon rust-migration-audit`
+and `agent-canon rust-migration-plan` against that source root before selecting
+a tool migration. Project product/development images remain consumer-owned.
 
 ## Runtime Boundary
 
-Rust compiler toolchains must not be installed through:
-
-- `docker/Dockerfile`
-- runtime images
-- template root Docker build contracts
-
-Rust is a development/runtime ergonomics surface owned by `.devcontainer/`.
+AgentCanon Rust tooling belongs in the shared AgentCanon tool image. Project
+product or development images provide Rust when their own requirements call
+for it; AgentCanon tooling uses the shared image.
 
 ## Canonical Layout
 
@@ -125,7 +66,7 @@ tools/
 
 ## Migration Order
 
-1. DevContainer Rust toolchain setup.
+1. Reuse the shared tool image and its Rust toolchain.
 1. Rust CLI smoke tests.
 1. Rust migration inventory and migration-leak checker.
 1. Port inventory/static-analysis tools.
@@ -208,19 +149,19 @@ The first Rust command audits an AgentCanon source root:
 agent-canon rust-migration-audit --root .
 ```
 
-In a template or derived repository, the AgentCanon source root is the submodule:
+In a template or derived repository, `<agent-canon-source>` is the qualified
+AgentCanon source root selected by the caller:
 
 ```bash
-agent-canon rust-migration-audit --root vendor/agent-canon
+agent-canon rust-migration-audit --root <agent-canon-source>
 ```
 
 The audit checks:
 
 - the Rust migration document, crate manifest, CLI entrypoint, audit module,
   and stable wrapper exist;
-- `.devcontainer/dependencies.toml` declares the Rust toolchain, developer
-  components, and locked cargo source build; post-create publishes the resulting
-  `~/.tools` release CLI cache and `/usr/local/bin/agent-canon` entrypoint;
+- bootstrap entrypoints, the shared image manifest/Dockerfile, lifecycle,
+  runtime-artifact and dispatcher owners are present with their required markers;
 - `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
   convenience path.
 
@@ -235,12 +176,12 @@ agent-canon rust-migration-plan --root .
 In a template or derived repository:
 
 ```bash
-agent-canon rust-migration-plan --root vendor/agent-canon
+agent-canon rust-migration-plan --root <agent-canon-source>
 ```
 
 It reports:
 
-- whether the DevContainer and CLI foundation is present;
+- whether the shared bootstrap and CLI foundation is present;
 - how many hook log files were inspected;
 - ranked `RUST_MIGRATION_CANDIDATE` lines;
 - `RUST_MIGRATION_KEEP_PYTHON` boundaries that should not be ported just
@@ -249,6 +190,13 @@ It reports:
 ## MCP Preflight Rust Tools
 
 ## Deterministic Search Surfaces
+
+Repository search keeps `search.py` as a thin provider router: exact text and
+catalog patterns use Git, dependency context uses the source graph owner, and
+code facts use the LSP owner. Ranked semantic retrieval remains in the Rust
+`semantic-index` command and its external cache; the Python route does not build
+heuristic cards or combine provider scores. No model server, installer, model
+cache, or compatibility dispatch is part of the compiled-tool cache.
 
 The Python search entrypoint selects one or more native owners explicitly. Its
 default `text` provider is stateless Git search; `--regex` and `--word-regexp`

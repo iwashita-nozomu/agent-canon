@@ -325,13 +325,14 @@ PY_ALGORITHM_CONTRACT_PARSE_ERRORS=1
 PY_ALGORITHM_CONTRACT=fail
 ```
 
-The single fixture loader must materialize the stored `00_malformed.py.fixture` as
-`00_malformed.py`, invoke the public CLI on that temporary tree, and assert both files are
+The existing CLI regression fixture materializes the stored `00_malformed.py.fixture` as
+`00_malformed.py`, invokes the public CLI on that temporary tree, and checks both files are
 discovered, `00_malformed.py` is sorted before `10_valid.py` in diagnostics, the valid module
 remains in `algorithm_modules`/`modules`, and the JSON/text path, 1-based line, exact
-`parseable` detail, and ordering agree. All tracked fixture source files use the same non-`.py`
-`.py.fixture` storage boundary; this keeps intentionally malformed and valid source out of
-repository-wide Python source scanners without changing the CLI contract or fixture content.
+`parseable` detail, and ordering agree. Store fixture source in a representation excluded
+by repository Python-source scanners, then materialize `.py` files for the public CLI.
+The current fixtures use `.py.fixture`; preserve their contents and CLI expectations
+when changing the storage convention.
 
 text artifact は canonical prefix だけを出す。
 

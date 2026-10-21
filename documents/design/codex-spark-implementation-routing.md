@@ -27,17 +27,16 @@ downstream design ./README.md design index entry
 
 # Codex Spark implementation routing and model-specific prompt materialization
 
-Status: target structure rebound exactly once to AgentCanon main
-`404678e1e9c242737e2f610e98743328931edd8f` (tree
-`2d04030ea757d275936a6c1f441a05a67190402d`) and frozen by
-`user-contract://2026-07-18/decision-sufficiency-freeze-v1`; implementation is
-the immediate transition.
+Status: design schemas and workflow contracts with historical receipt records.
+The recorded base is AgentCanon main `404678e1e9c242737e2f610e98743328931edd8f`
+(tree `2d04030ea757d275936a6c1f441a05a67190402d`), with freeze reference
+`user-contract://2026-07-18/decision-sufficiency-freeze-v1`. The external packet
+receipts in §§2.3 and 13 are unverified in the current checkout. A current handoff
+uses its selected, validated owner packet and current evidence.
 
-Path convention: paths in this document are AgentCanon-relative because the
-review root is an isolated AgentCanon clone. In the template parent, resolve
-the same path beneath `vendor/agent-canon/`. A source packet carries both the
-relative path and its root key (`agent_canon` or `workspace`); a worker may not
-infer a different path from checkout layout.
+Path convention: paths are relative to the selected qualified AgentCanon source
+root. A source packet carries the relative path and its declared root key
+(`agent_canon` or `workspace`); resolve it through that binding.
 
 This document is the implementation contract for making `spark_worker` a
 first-class implementation-worker candidate after design or repair is fixed.
@@ -498,17 +497,16 @@ immediate default; precautionary investigation or review has no transition.
 
 #### Concrete target-state instance for this design
 
-The completed machine-readable instance is
-`/tmp/spark-design-isolation-84SDBM/target-state-contract-v1.json`. Its full-file
-SHA-256 is
-`1f38419ad25a942b098924c8a3a001e4be14f39d02698527f20a386f6e9006a4`;
-its verified canonical-contract digest is
+Historical receipt A (unverified) records
+`/tmp/spark-design-isolation-84SDBM/target-state-contract-v1.json`, full-file SHA-256
+`1f38419ad25a942b098924c8a3a001e4be14f39d02698527f20a386f6e9006a4`, and claimed
+canonical-contract digest
 `e8ae83767a4c3a7edb10a59f611c9f949ac8ea0563dcf844329f2be95c9a2762`.
-The latter uses the canonical byte grammar defined below: compact sorted UTF-8
-JSON followed by exactly one LF, with `contract_sha256` omitted. The stored
-value and a fresh computation must be equal before review or handoff.
+The referenced file is unavailable. These values remain historical receipt data;
+a current contract digest is established from the selected validated packet using
+the canonical byte grammar below.
 
-That instance contains every field in the ordered schema above. It fixes
+The historical record describes every field in the ordered schema above, including
 request clauses `RC-01` through `RC-26`; responsibility units
 `U0_claim_evidence`, `U1_model_profile_registry`, `U2_capacity_handshake`,
 `U3_implementation_route`, `U4_team_lifecycle_integration`,
@@ -520,25 +518,17 @@ the final source/generated/deleted/moved path layout; closed public API/config
 schema IDs and function names; required and forbidden import edges; the exact
 integration order; production-first checks and final PR/merge/projection
 readback; immutable base/predecessor/config evidence; review refs; digest; and
-`status=approved` as the final target value. `status=approved` is a target-state
-claim backed by the direct Decision Sufficiency freeze authority. The handoff
-gate separately requires that authority identity and live capacity bindings;
-historical review records are evidence, not another design wave.
+`status=approved` as the claimed target value. That historical status does not
+establish a current approval. The current handoff gate checks its selected
+authority identity, validated packet and live capacity bindings.
 
-The companion is the sole canonical instance. Any Markdown table or list below
-is a reader projection checked against its digest; it cannot add, remove, or
-reassign a path or responsibility. The implementation packet set is the
-generated role view of this instance at
-`/tmp/spark-design-isolation-84SDBM/implementation-packet-set-v1.json`, with
-full-file SHA-256
-`9bc9360b04edb4d96d0af63ab9d3c8f75dfadf1f5922ecfd16c4f378a644ad3f`
-and verified canonical packet-set digest
+Historical receipt A also records the packet set at
+`/tmp/spark-design-isolation-84SDBM/implementation-packet-set-v1.json`, full-file SHA-256
+`9bc9360b04edb4d96d0af63ab9d3c8f75dfadf1f5922ecfd16c4f378a644ad3f`, and claimed
+canonical packet-set digest
 `0a905876b9c01fb54535dd5395ac472a3485df8cf8c571ae148e357780d28c48`.
-Packet selection and order are already fixed there; a worker cannot choose a
-unit later.
-
-The following is the non-authoritative reader path index for that completed
-instance:
+The file is unavailable; these values do not select a current packet set. The
+following index reproduces the historical projection and its claimed status:
 
 ```text
 projection_id: codex_spark_model_profile_routing_reader_index_v1
@@ -1966,7 +1956,7 @@ The checker rejects a packet whose natural-language tool instruction has no
 matching token, whose token is not bound to the selected skill/profile, or
 whose argument schema is duplicated in prose.
 
-New identifier names are fixed here. No worker may rename them. Existing local
+Serialized field names, public types/APIs, and canonical owner/path identifiers are fixed at their declared boundaries. Private implementation names may vary while preserving those contracts. Existing local
 precedent supplies `spark_worker`, `worker`, `skill_evaluator`,
 `model_reasoning_effort`, and `agent_type`; the new `profile_id`,
 `capsule_schema_id`, `TargetStateContract`, `DecisionSufficiencyRecord`,
@@ -2552,6 +2542,10 @@ queue result from the implementation-route owner; there is no compatibility
 fallback.
 
 ### 4.3 Typed capacity owner and handshake
+
+The 26-valued projections in this section record the pre-Terra plan. The
+TERRA-09 successor in §16 and the current topology/configuration owners govern
+current capacity; the earlier examples are historical projections.
 
 New canonical policy source: `agents/capacity_policy.toml`.
 New implementation owner: `tools/agent/orchestration/capacity_handshake.py`.
@@ -4420,18 +4414,22 @@ renewed freeze identity is recorded.
 
 ## 13. Implementation Source Packet
 
-The concrete immutable packet set already exists at
-`/tmp/spark-design-isolation-84SDBM/implementation-packet-set-v1.json` with
-verified canonical digest
-`cb214816cb851301bfc2fdc5586194a4d5daf0ff4b625c76abc430cbce14cac4`.
-It is generated from the verified target-state contract digest
+Historical receipt B (unverified) also records
+`/tmp/spark-design-isolation-84SDBM/implementation-packet-set-v1.json`, with claimed
+canonical digest
+`cb214816cb851301bfc2fdc5586194a4d5daf0ff4b625c76abc430cbce14cac4`, reportedly from
+target-contract digest
 `3508982dfeb85e968ac9432a164edbea4e1b321b4eb0cdd77af865dbd9318f13`.
-The unit order, owner, profile, write/deletion projection, source anchors,
-identifiers, public shapes, dependency edges, Decision Sufficiency action,
-owner gate, validation commands/oracles, clause IDs, runtime binding slots,
-checkpoint policy, return schema, and individual packet digest are fixed before
-editing. Spark is assigned only the three rows whose profile is
-`spark_implementation_low`; cross-owner rows are explicitly Luna-owned.
+The file is unavailable, and this document supplies no supersession relationship
+between receipts A and B. Preserve both as unverified records rather than choosing
+one as current handoff authority. The packet rows below are historical claims;
+a current handoff binds its selected validated packet set.
+
+The historical record fixed the following packet order, owner/profile,
+write/deletion scope, source anchors, public shapes, dependency edges, gates,
+validation, and digests before that implementation. Its three Spark rows and
+cross-owner Luna rows record that plan's allocation. Current allocation follows
+the selected validated packet and declared workflow.
 
 | Packet | Packet SHA-256 | Exact owner/profile | Gate |
 | --- | --- | --- | --- |
@@ -4443,19 +4441,19 @@ editing. Spark is assigned only the three rows whose profile is
 | `P6_policy_document_projection` | `7754108de66a3a2dfd29b470e1a159ad06f2010efada4ac289a496f5220317a2` | `docs_workflow_steward` / Luna | `document_projection_gate` |
 | `P7_final_integration_readback` | `e56d23df675c25817b4763607a660c1f312d1656cc7ae0976630ea1c41814ef9` | `integration_executor` / worker | `final_integration_readback_gate` |
 
-The set is not a list instructing Spark to re-read every upstream document.
-Each Spark row is a minimal immutable worker projection. `P0` is the first
-eligible packet; `P1` and `P2` become ready after its gate and may be scheduled
-according to the live capacity snapshot; `P3` requires both predecessor gates.
-That readiness order is a DAG fact, not a worker or keyword choice.
+The historical projection used `P0` as the first eligible packet, then `P1` and
+`P2`, with both gates preceding `P3`. Current readiness follows the selected
+packet's predecessor edges and live capacity snapshot. Each worker receives
+the evidence needed by its unit.
 
-The packet has two explicit phases. The design-time phase is fully fixed by
-the concrete target-state instance in section 2.3: paths, owners, schemas,
-replacement set, import DAG, and validation boundary are not generated later.
+The packet has two explicit phases. The design-time phase binds its selected,
+validated target: contract-relevant paths, owners, schemas, replacement set,
+import DAG, and validation boundary. Implementation-local choices stay with the
+implementation owner within that contract.
 The post-approval materializer binds only each packet's enumerated runtime
 slots: exact approved-artifact/review identities, predecessor candidate
 digests, live capacity snapshot/reservation, and lineage. Responsibility-unit
-selection, source anchors, write/deletion sets, names, schemas, and oracles are
+selection, source anchors, write/deletion sets, boundary names, schemas, and oracles are
 not runtime slots. The materializer may not add a path, choose a schema, or
 summarize away a required artifact. The parent verifies each upstream evidence identity once at
 its owning trust boundary. The materializer projects only the fields and exact
@@ -4475,16 +4473,15 @@ its acceptance input and produces those outputs during validation.
   including responsibility graph, final paths, owner/invariant boundaries,
   public shapes, deletion/replacement set, dependency direction, migration
   order, and validation/readback boundary.
-- Direct freeze authority:
-  `user-contract://2026-07-18/decision-sufficiency-freeze-v1`, bound to the
-  current artifact, target, and packet-set identities. Historical prompt,
+- Current decision/freezing authority reference, selected by the governing
+  workflow and bound to the current artifact, target, and packet-set identities. Historical prompt,
   detailed-design, and document-flow evidence remains in the review ledger but
   is not a launch prerequisite.
-- OOP predecessor main `404678e1e9c242737e2f610e98743328931edd8f` and the
-  recorded SHA-256 identities for [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md),
+- Required predecessor snapshot and identities for [agents/skills/oop-type-design.md](../../agents/skills/oop-type-design.md),
   `tools/agent/skills/skill_route_catalog.py`,
   `tools/agent/orchestration/capability_route.py`, and `tools/agent/orchestration/route.py`;
-  these owners are immutable packet evidence, not worker choices.
+  where the selected change depends on them. Bind their actual identities in
+  the current packet; the historical ledger does not select those identities.
 - `dependency_graph.tsv`, `dependency_edit_scope.txt`, responsibility-scope
   result, stale-surface/contradiction sweep, and generated-view digest report.
   Their evidence identities are projected; their raw contents are not.
@@ -4699,12 +4696,16 @@ valid intermediate unit.
 
 ## 15. Direct freeze and implementation handoff record
 
-The latest direct user contract applies Decision Sufficiency to this artifact.
-The unresolved target-structure decision set is empty, so another design or
-document-review wave is forbidden. Earlier prompt/detailed/document-flow
-results remain durable history; no reviewer is active and none is launched.
+For a current handoff, record the applicable decision/freezing authority and
+close the actual unresolved target-structure decisions through the governing
+workflow. Reuse matching review evidence and recheck evidence invalidated by a
+changed contract. The historical empty decision set and review status do not
+establish the state of a later handoff.
 
-The external handoff record is:
+The handoff field layout is below. References and base object IDs bind to the
+current selected authority, review evidence, and checkout. The old freeze URI
+recorded above and `/tmp/spark-design-isolation-84SDBM/review-ledger.md` remain
+historical receipt values.
 
 ```text
 ImplementationHandoffGate {
@@ -4716,11 +4717,10 @@ ImplementationHandoffGate {
   target_state_status: approved
   implementation_execution_contract_ref: Ref
   unresolved_target_structure_decision_ids: empty list[Id]
-  decision_sufficiency_user_freeze_ref:
-    "user-contract://2026-07-18/decision-sufficiency-freeze-v1"
-  review_history_ref: "/tmp/spark-design-isolation-84SDBM/review-ledger.md"
-  base_commit: "404678e1e9c242737e2f610e98743328931edd8f"
-  base_tree: "2d04030ea757d275936a6c1f441a05a67190402d"
+  decision_sufficiency_user_freeze_ref: Ref
+  review_history_ref: Ref
+  base_commit: string
+  base_tree: string
   oop_predecessor_identity_manifest_ref: Ref
   oop_predecessor_identity_manifest_sha256: Sha256
   decision_sufficiency_ref: Ref
@@ -4738,7 +4738,7 @@ ImplementationHandoffGate {
 }
 ```
 
-`gate_status=pass` requires the direct freeze identity, approved executable
+`gate_status=pass` requires the selected applicable authority identity, approved executable
 target digest with an empty unresolved set, rebound base/tree and predecessor
 identities, verified immutable packet, current capacity reservation, and an
 implementation-route result with no fallback. A ready Spark packet launches
@@ -4764,6 +4764,12 @@ Spark 実装 routing 契約に対するユーザー明示の後続契約であ�
 | TERRA-07 | `team_manifest.yaml` は run 生成 artifact であり、Terra の恒久正本にはしない。role/profile は canonical source と materializer から生成する。 | runtime owners; `tools/agent/orchestration/model_profile_registry.py` |
 | TERRA-08 | `CODEX_SUBAGENTS.md` の退役 `branch_worktree_guard.py` owner 参照は現行 `hook_safety.py` route に置換する。 | hook safety owner; `tools/runtime/authority/hook_safety.py` |
 | TERRA-09 | Terra を各 workflow family の conditional candidate として宣言するため、宣言 topology の現在値は direct frontier `21` と nested reservation `6` の `27` とする。従来の `20 + 6 = 26` 投影はこの successor amendment で置換する。 | `agents/task_catalog.yaml` capacity derivation、`.codex/config.toml` loader/readback、runtime alignment |
+
+TERRA-09は、それ以前の20-direct+6-nested（26）に基づくtopology、config、CLI例、
+rolloutの投影を置き換えます。これらは当時の計画の記録です。現在のcapacityは宣言topologyと
+owner readbackに従います。この確認時点ではtask catalogがTerraを含み、`.codex/config.toml`と
+runtime alignmentの期待値は27です。現在のhandoffには、そのcheckoutで検証したpacketと
+owner readbackを使います。
 
 Terra の型契約は `agents/model_profiles.toml` の既存の role/profile projection を
 再利用する。新しい runtime class、coordinator API、write-capable implementation

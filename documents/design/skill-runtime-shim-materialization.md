@@ -720,13 +720,14 @@ generated より厳密に大きい場合だけ positive reduction row と数え�
 
 報告するのは catalog-derived row の deterministic bytes/scalars total、median、p10/p90、最大値、
 zero-denominator row 数、fresh host の paired input-token total、canonical-followup
-total、fresh evaluator の pass rate です。percentile は fixed nearest-rank p10/p50/p90 と
-し、目標は deterministic adapter measure の aggregate reduction >= 70%、全 row の
-reduction > 0、critical usability failure=0 とし、
-baseline に対する scenario pass rate の低下を 5 percentage points 未満に制限
-します。observed input token usage は usability/host evidence として保存し、tokenizer
-なしの deterministic尺度を token count と呼びません。canonical read route、ToolCall、
-owner boundary を失った場合は失敗です。
+total です。percentile は fixed nearest-rank p10/p50/p90 と
+します。aggregate reduction >= 70% と全 row の reduction > 0 は、producer が返す
+`deterministic_reduction_status` の判定条件です。このfieldは測定分類を表し、publicationや
+rolloutの完了条件は現在の依頼と選択したworkflowが決めます。
+observed host input-token usage と follow-up usage は測定evidenceとして保存します。
+`observation_status` はhost観測の妥当性を表します。シナリオの遂行品質は、選択した
+evaluation workflowの結果で示し、canonical read route、ToolCall、owner boundaryを
+失う失敗はそのreportに残します。
 
 ### Fresh Scenario Packets
 
@@ -892,7 +893,7 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
 | SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, check_skill_tool_invocation_graph.py, frozen route cases | typed identity/edge/order/route equality |
-| SHIM-010 token reduction | prompt eval owner | existing prompt/workflow CLIs plus planned skill_shim_evaluation.py tokens | observed host usage, UTF-8 bytes/Unicode scalars, envelope/cache observation, percentile/paired rows; aggregate >=70% |
+| SHIM-010 token reduction | prompt eval owner | existing prompt/workflow CLIs plus planned skill_shim_evaluation.py tokens | observed host usage, UTF-8 bytes/Unicode scalars, envelope/cache observation, percentile/paired rows; metric status uses aggregate >=70% |
 | SHIM-011 fresh mini usability | evaluator route | planned skill_shim_evaluation.py packets; checklist full/changed packet classes | three scenario variants in two packet classes, no prior context, fixed report grammar |
 | SHIM-012 no keyword/duplicate policy | route and checker tests | route tests plus shim materializer negative tests | keyword-only route and canonical-prose-in-adapter both fail |
 | SHIM-013 determinism vs fixed point | materializer acceptance | `tests/fixtures/skill-runtime-shim/fixed-point/expected.json`, `tests/agent_tools/test_skill_shim_materializer.py::test_materialize_fixed_point` | first/second catalog-sized record/projection maps, readback digest equal; second content delta=0 |

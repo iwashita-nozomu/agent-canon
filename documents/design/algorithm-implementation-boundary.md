@@ -78,8 +78,7 @@ upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 - `API / Runtime Change`: CLI、serialization、config、parallel runtime、external boundary を変える。
 - `Test / Evidence Change`: reference case、property test、analytical solution、snapshot、report を変える。
 
-1 iteration では原則 1 種類の変更だけを入れます。
-混ぜる場合は、なぜ分離できないかと、どの validation がどの変更種別を確認するかを書きます。
+差分は影響する変更種別を明示し、分離できる場合は個別に検証します。依存関係上同じ iteration に複数種別が必要な場合は、それぞれの境界と validation を区別して記録します。
 
 ## テストとレビュー
 

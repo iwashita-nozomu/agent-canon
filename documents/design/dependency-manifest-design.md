@@ -253,9 +253,10 @@ agent は file を読む前に `contract` と `responsibility` を読み、設�
 
 内部 marker と DSL は全 file type 共通です。
 外側 comment syntax だけを file type に合わせます。
-manifest は「file 先頭付近」に置き、`check_dependency_headers.py` は先頭 40 行、shell tool 群は既定で先頭 80 行を走査します。
-この範囲内であれば、`SKILL.md` の YAML frontmatter、Markdown の H1 title、shebang、encoding comment の後に manifest block を置いてよいです。
-ただし、長い前置き prose や generated banner を manifest より前に置いて、agent が責務と依存を読むまでの距離を伸ばしてはいけません。
+manifest block は、選択した scanner が読める file 冒頭付近に置きます。
+必要な YAML frontmatter、H1 title、shebang、encoding comment の後に配置できます。
+現行の `check_dependency_headers.py` は先頭 40 行、shell tool 群は既定で先頭 80 行を読みます。
+この値は現行 scanner の入力範囲です。範囲を変えるときは tool と caller の入力契約を合わせて更新します。
 
 Markdown:
 

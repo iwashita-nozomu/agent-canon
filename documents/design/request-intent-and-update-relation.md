@@ -98,7 +98,7 @@ executors を dispatch し、final closeout は各 receipt を統合します。
 | dependency/topic clone cleanup | `python3 tools/repository/workspace/dependency_module_change.py cleanup --apply` with the existing same-command authority and reconstructibility readback | `CLEANUP module=... action=removed` または owner の hold/readback evidence |
 | run bundle temporary state / retention | `python3 tools/runtime/archive/runtime_log_archive_git.py archive-agent-report` → `sync` → `check-clean` | `RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass`、`RUNTIME_LOG_ARCHIVE_SYNC=pass`、`RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass` |
 | generated report roots | artifact owner operation followed by `python3 tools/runtime/artifacts/generated_artifact_guard.py --root .` | `GENERATED_ARTIFACT_GUARD=pass` と `report_artifact_checks.py` placement readback |
-| generated local graph/cache | current graph producer `agent-canon graph build`; general delete executor は current tools に存在しない | artifact-owner cleanup operation を今回の design write set として選定し、owner receipt を追加する |
+| generated local graph/cache | current graph producer `agent-canon graph build`; general delete executor は current tools に存在しない | cleanup が選択された場合は artifact owner の経路で readback する。経路が未実装なら当該 cleanup を未完了として owner へ戻す |
 | completed agent and descendants | `task_close.py` / `agent_team.py` lifecycle materializer under [agents/canonical/CODEX_SUBAGENTS.md](../../agents/canonical/CODEX_SUBAGENTS.md) | `CleanupProof` → `G6` → terminal `close_agent` ToolCall、descendants-closed、reservations-released receipt |
 
 merge/readback → dependency cleanup receipt → scratch cleanup または typed retention receipt →

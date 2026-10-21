@@ -111,16 +111,10 @@ path has exactly one owner.
 
 ## GitHub Issue Authority
 
-GitHub Issues are the sole durable Issue authority. Every relation uses a
-repository-qualified URL/number such as
-`iwashita-nozomu/agent-canon#882` or its full GitHub URL; no local `issues/`
-directory, mirror, state database, or pending marker is maintained.
-
-`tools/repository/github/issue_sync.py` is a host adapter. Online mode reads and
-publishes GitHub Issues with title/body/state readback. Offline mode writes only
-metadata (`body_locator`, `body_digest`, repository, number/title context, and
-run/task) under the private `agent-canon-log/feedback/issue-packets/pending/`
-path. The private body remains at its owner-controlled locator.
+GitHub Issues are the sole durable Issue authority, and every reference uses a
+repository-qualified URL or number. Responsibility-scope validation checks that
+identity. Online/offline publication and readback behavior belong to
+[issue_sync.py](../../tools/repository/github/issue_sync.py).
 
 ## Eval Evidence
 
