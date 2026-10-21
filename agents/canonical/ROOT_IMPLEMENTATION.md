@@ -30,6 +30,12 @@ before choosing the simplest design, with preserved requirements, intended seman
 changes, and necessary consumer migration explicit. Do not require equivalence to
 obsolete behavior that the authorized change is meant to correct.
 
+In a design document, bind an implementation condition to an agreed requirement
+or a concrete guarantee and explain why that restriction is necessary. Where
+multiple implementation choices satisfy the contract, leave private names, layout, and
+edit order to the implementation owner. Distinguish requirements from
+recommendations and incidental facts of the current implementation.
+
 Keep the required input domain, output, safety, performance, and failure guarantees.
 Do not turn a method's limitations into stronger user preconditions, silently skip
 valid cases, or weaken guarantees to make implementation or proof easier. A changed

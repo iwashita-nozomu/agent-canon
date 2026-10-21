@@ -46,9 +46,13 @@ For the selected change, establish the owner, mechanism, required guarantee,
 affected responsibility unit, evidence, and unresolved decisions that could
 change the edit before changing it.
 Use [agent orchestration](../skills/agent-orchestration.md#decision-sufficiency-packet)
-for decision sufficiency and reuse current owner evidence. An unresolved API,
-algorithm, dependency, configuration, naming, oracle, or responsibility decision
-returns to its design owner with `design_issue_blocker` evidence. When a contract
+for decision sufficiency and reuse current owner evidence. Return an unresolved
+decision to its design owner with `design_issue_blocker` evidence when it can
+change the agreed outcome or method, a boundary interface, valid input domain,
+state/ownership invariant, or required guarantee. Resolve local naming, placement,
+and edit order during implementation when they preserve that contract, using
+[necessary design conditions](ROOT_IMPLEMENTATION.md#contract-and-valid-domain).
+When a contract
 blocks the agreed outcome, follow [Decision Order](../skills/agent-orchestration.md#decision-order)
 to expose the conflict and ask the user about a resolution not settled by the
 available evidence; an internal blocker report alone does not resolve it.

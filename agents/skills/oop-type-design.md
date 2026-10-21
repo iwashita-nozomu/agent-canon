@@ -9,6 +9,7 @@ upstream design ../../documents/conventions/coding-conventions-cpp.md C++ source
 upstream design ../../documents/design/protocols.md Protocol and dependency-direction policy
 upstream design ../../documents/design/dependency-manifest-design.md dependency-header DSL
 upstream design ../internal-routines/design-implementation-correspondence.md universal design-to-implementation correspondence route
+upstream design ../canonical/ROOT_IMPLEMENTATION.md necessary design conditions and implementation choice boundary
 downstream implementation ../../.codex/personal/skills/oop-type-design/SKILL.md runtime discovery shim
 downstream implementation ../../agents/skills/catalog.yaml public skill and capability metadata
 downstream implementation ../../tools/agent/orchestration/route.py explicit capability route
@@ -55,8 +56,11 @@ Create one language-neutral `oop_type_design_packet` before implementation.
 Use a minimal `Protocol` or interface, immutable value object, aggregate, and
 constructor/factory contract where the responsibility model requires them;
 record legal state transitions and dependency direction explicitly.
-The packet fixes responsibility, type, state, boundary, dependency, static
-delegation, implementation, and review contracts. It is a design producer, not
+The packet records responsibility, type, state, boundary, dependency, static
+delegation, and review contracts. Apply
+[necessary design conditions](../canonical/ROOT_IMPLEMENTATION.md#contract-and-valid-domain)
+when deciding which implementation details bind the implementation owner.
+It is a design producer, not
 an implementation, checker, language-specific review, test-first, or
 evaluator-writing route.
 
@@ -87,9 +91,12 @@ packet schema; do not add a second packet or schema.
   I/O/effect raw forms, normalized types, owners, validation points, and failures.
 - `Static Delegation`: existing owner tool, command, expected evidence, and why no
   runtime guard or test duplicates a statically decidable fact.
-- `Implementation Trace`: exact files, symbols, names, edit order, validation, and
-  review gate.
-- `Open Decisions`: genuine external blockers only; no worker naming or API choice.
+- `Implementation Trace`: responsibility/contract-to-target mapping, validation,
+  and review gate. Record exact paths, symbols, names, and edit order when the
+  contract, migration, or active packet schema requires them.
+- `Open Decisions`: choices affecting the agreed outcome or method, boundary
+  interface, valid domain, invariants, ownership, or required guarantee. Leave
+  contract-preserving local names, layout, and order to implementation.
 
 ## Semantic Responsibility Contract
 

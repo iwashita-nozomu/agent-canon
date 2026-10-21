@@ -5,6 +5,7 @@ contract reference
 responsibility Documents 実験レポートの書き方 for this repository.
 upstream design README.md durable document index
 upstream design result-log-retention-and-visualization.md defines artifact retention
+upstream design ../../agents/skills/report-writing.md numerical and runtime result presentation order
 @dependency-end
 -->
 
@@ -140,6 +141,9 @@ repo 用見出し、実験ログとの違いを説明します。report を作�
 - `Results` は観測したことを系統立てて report します。
 - ここでは「何が起きたか」を書き、「なぜ起きたか」は `Discussion` へ回します。
 - 図表を出すときは、本文で先にその図表が何を示すかを 1 文で述べます。
+
+数値計算では [Numerical and runtime results](../../agents/skills/report-writing.md#numerical-and-runtime-results)
+に従い、数値結果を先に、実行時・アーキテクチャの結果を後に示します。run/caseの対応と、数値結果の未取得・失敗を保ちます。
 
 書き方の順序:
 
@@ -350,6 +354,8 @@ review owner になります。この文書は確認観点を示しますが、�
     ## Artifacts and Carry-Over
 
     ## Critical Review
+
+数値計算のレポートでは、`Results` 内を `Numerical Results`、`Execution and Runtime Results` の順に分け、必要な集計・比較・例外を各部へ配置します。
 
 ## 5. 実験ログとの違い
 
