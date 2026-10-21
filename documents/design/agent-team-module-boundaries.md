@@ -72,8 +72,8 @@ flowchart LR
 | invalid split boundaries | line count、token budget、chunking convenience、近い path、同じ test oracle |
 | validation gate | changed dependency/header checks、`agent-canon docs check`、direct source readback、既存 Python static/behavior checks |
 
-行数や token 数で module を割りません。各 owner `tools/agent/orchestration/team_config.py` は独立した責務、依存方向 `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`、
-validation route、rollback 単位を持つ replaceable responsibility unit `tools/agent/orchestration/agent_team.py` とします `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`。
+各 owner は独立した責務、依存方向、検証 route、rollback 境界に基づく
+replaceable responsibility unit として定めます。
 
 ## 2. Evidence And Assumption Ledger
 
@@ -424,34 +424,16 @@ CLI、config、packet、manifest、capacity、scope の仕様変更は別 design
 
 ## 8. Migration waves と rollback
 
-1. **Preflight: source packet 固定** — `agent_team.py` の AST declaration、production
-   caller import、test caller、import mode、helper/code dependency の readback を
-   保存し、`__all__` と `vars(agent_team)` の public-name 一致、旧 forbidden facade
-   names の explicit import failure を review します。
-2. **Wave 1: config/scope owner** — `team_config.py` へ `WritePolicy` と config/catalog
-   定義を、`workspace_scope.py` へ `RoleWriteScope` と path/snapshot 定義を移します。
-   `RoleWriteScope` の production/test caller を同じ wave で owner direct import へ変更し、
-   facade re-export を作らず、移した定義を `agent_team.py` から同じ wave で削除します。
-3. **Wave 2: packet/ToolCall owner** — `packets.py` と `tool_calls.py` へ定義を移し、
-   caller import と owner tests を同時に更新して、移した旧定義を `agent_team.py` から
-   同じ wave で削除します。
-4. **Wave 3: dispatch/rendering owner** — `implementation_dispatch.py` と
-   `manifest_rendering.py` へ定義を移し、capacity と rendered output の oracle を
-   readback して、移した旧定義を `agent_team.py` から同じ wave で削除します。
-   `render_template` の caller は `manifest_rendering.py` へ直接移します。
-5. **Wave 4: canonical orchestration finalization** — `create_run_bundle`、
-   `run_active_design_packet`、`run_workflow_family` と承認済み re-export だけを
-   `agent_team.py` に残します。残る internal definition は owner へ移して同じ wave で
-   削除し、`ROOT` caller は accessor/local constant へ移します。internal collaborator を
-   underscore alias に変え、`vars(agent_team)` の public names を `__all__` と一致させます。
-   underscore alias は明示 import 可能でも public API inventory へ加えません。
+変更対象の依存関係と owner 境界に基づき、実装者が移行単位と順序を選びます。
+変更前に declarations、production/test caller、import mode、public surface の
+snapshot を残します。各単位で definition、caller/test import、owner-local test を
+一緒に移し、旧 owner の definition を削除して static/behavior を読み返します。
+宣言済みの public facade と forbidden export の契約は維持します。
 
-各 migration wave は、definition move、caller/test import update、旧 definition delete、
-static/behavior readback を一つの commit に含めます。private forwarding、module object
-forwarding、monkey-patch seam、temporary alias、wrapper、fallback、compatibility wiring、
-二重定義はどの wave にも置きません。失敗時は wave 全体を最後の成功 commit へ戻し、
-生成 report/snapshot は削除せず `tools/repository/workspace/workspace_scope.py` の read-only evidence として比較します。この確定順序は `565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a`
-`565e833b49d895577562d8ede040247fa21f951b41527ca9cfab983a71d9228a` に属します。
+private forwarding、module object forwarding、monkey-patch seam、temporary alias、
+wrapper、fallback、compatibility wiring、二重定義は残しません。失敗時は変更単位全体を
+最後の成功 commit へ戻し、report/snapshot は workspace owner が保持する
+read-only evidence として比較します。
 
 ## 9. Compiler/static trust と behavior oracle
 

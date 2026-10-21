@@ -530,52 +530,10 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 
 ## Implementation Write Set
 
-新規:
-
-```text
-bootstrap.sh
-bootstrap/host/manifest.toml
-bootstrap/container/image/Dockerfile
-bootstrap/container/lifecycle/entrypoint.sh
-bootstrap/container/image/dependencies.toml
-bootstrap/lib/*.sh
-tools/runtime/container/bootstrap_runtime.py
-tools/runtime/artifacts/runtime_artifacts.py
-tools/runtime/dispatch/tool_dispatch.py
-documents/runtime/bootstrap-runtime.md
-tests/bootstrap/*
-tests/agent_tools/test_runtime_artifacts.py
-```
-
-変更:
-
-```text
-README.md
-CONTAINER_OPERATIONS.md
-agents/USER_GUIDE_JA.md
-agents/skills/agent-canon-update.md
-agents/skills/catalog.yaml
-tools/catalog.yaml
-tools/bin/agent-canon
-tools/runtime/container/devcontainer_dependencies.py
-tools/runtime/archive/runtime_log_paths.py
-tools/runtime/archive/runtime_log_archive_git.py
-eval/producers/run_accumulated_agent_evals.py
-eval/checkers/eval_accumulation_check.py
-eval producer / dashboard / hook writers
-tools/runtime/dispatch/agent-canon/src/main.rs
-rust graph / semantic / structured-analysis output resolvers
-documents/runtime/runtime-log-archive.md
-documents/runtime/runtime-profiles-and-check-matrix.md
-```
-
-削除はBootstrap parity完了後:
-
-```text
-.devcontainer/**
-AgentCanon devcontainer validator / workflow routing
-source-local runtime default docs/tests
-```
+この設計時点の新規・変更・削除pathは
+[当時の実装計画](https://github.com/iwashita-nozomu/agent-canon/blob/8b81764fe0b926cba10c2bfa8a657b0445402fa4/documents/design/agent-canon-bootstrap-tool-runtime.md#implementation-write-set)
+に記録されています。現在の ownership と consumer は dependency header と各 owner 節を参照し、
+実際の write set は選択した変更のscopeとして定めます。
 
 ## Validation
 

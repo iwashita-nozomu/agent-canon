@@ -148,25 +148,21 @@ a cycle. Scope filters complete components by node intersection; an empty scope
 is not a full review. Incoming-only isolation and reverse lookup likewise use
 the complete topology.
 
-The former direction-specific DFS in `check_dependency_graph.sh` cannot meet
-that contract: it partitions edges and stops at one back edge. Replace that
-local algorithm with iterative SCC traversal over the existing TSV. The
-recursive SCC helper in `prose_reasoning_graph.py` owns different prose-edge
-records and importing that document-analysis module would introduce an unrelated
-dependency. Standard-library topological sorting reports a cycle, not all SCCs.
-Two iterative traversals provide O(V + E) graph work without a recursion-depth
-limit; deterministic output adds ordering costs. Do not report sorted component
-members as though they were a traversal path.
+Compute SCCs over the complete normalized topology before applying selected or
+changed reporting scope. Preserve O(V + E) graph traversal work apart from
+deterministic ordering costs, and avoid recursion-depth-dependent failure.
+The graph owner selects an algorithm that meets these guarantees. Emit
+deterministic components, not traversal paths.
 
-`dependency_documents` acquires the existing immutable projection tuple once
-per inventory scan and passes it through source resolution and manifest parsing.
-An explicitly supplied empty tuple is authoritative, not a request to reload.
-Ordinary source paths and non-generated, non-glob targets resolve without skill
-catalog reads. Generated views still require a valid binding and available
-canonical source; full inventory discovery still validates the catalog once.
-There is no process-global cache that could conceal subsequent catalog changes.
-Root containment, missing-source, and symbolic-link rejection remain in the
-existing path owner.
+A single inventory uses one consistent generated-view projection throughout
+path resolution and manifest parsing. A supplied valid projection, including
+an empty projection, is authoritative; do not rediscover the catalog or reread it
+per path. Ordinary source paths and non-generated, non-glob targets resolve
+without catalog reads. Full inventory discovery obtains and validates the
+catalog once; generated views require a valid binding and available canonical
+source. Keep reuse local to that inventory so later catalog changes remain
+visible. Preserve the path owner's root-containment, missing-source, and symlink
+behavior.
 
 ## Compatibility Boundary
 

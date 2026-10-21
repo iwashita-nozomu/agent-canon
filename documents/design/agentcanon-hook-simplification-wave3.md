@@ -73,7 +73,7 @@ python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
 
 ### exact caller/readback path set
 
-次の集合を `CALLER_READBACK_PATHS` として source packet に固定する。これは incidental な履歴 report ではなく、実行登録、import、CLI、checker、dashboard、skill lane、inventory、docs、catalog、responsibility、test の直接 caller/readback surface である。requested reviewer paths を含め、実装時にこの集合から漏れを出さない。
+cutover 前に選択した source root と revision から caller/retired-path readback を再生成し、実装の evidence に残します。実行登録、import、CLI、checker、dashboard、skill lane、inventory、docs、catalog、responsibility、test と requested reviewer paths の必要な範囲を閉じます。後続の path 一覧は、この設計時点の readback 範囲の記録です。
 
 Caller audit also has a typed artifact/read-only-consumer sidecar. It is part of the same `--contract` readback, but it does not expand the manifest's 24-basename generation rule:
 
@@ -252,7 +252,7 @@ event_id = hashlib.sha256(event_id_preimage).hexdigest()
 
 The single safety owner is `tools/runtime/authority/hook_safety.py`. It receives all pure reusable safety logic from the current `.codex/hooks/hook_safety.py`: `SECRET_PATTERNS`, `SHELL_TOOL_NAMES`, payload extractors, `secret_kind`, `secret_block_payload`, `GitCommand`, `GitIntent`, shell/backtick parsing, protected update/branch/worktree/Git intent classification, authority predicates, `first_block`, `command_sha256`, and `branch_block_payload`. No second `prompt_safety.py`, `destructive_git_safety.py`, or hook-local safety owner exists.
 
-The implementation dispatcher import contract is exact: resolve `Path(__file__).resolve().parents[2]` as source root, prepend `<source-root>` once to `sys.path` if absent, then use this direct-import list exactly once:
+Resolve the canonical source root through the repository-owned import mechanism and call the canonical owners directly. The following imports describe the reviewed implementation; preserve the owner API contracts and single-owner boundaries when choosing concrete import statements:
 
 ```text
 import hook_safety                              # canonical `tools.runtime.authority.hook_safety`
@@ -266,7 +266,7 @@ from behavior_event_assembly import HookInvocationParts, record_hook_invocation
 from workflow_monitor import emit_behavior_projection
 ```
 
-After the source-root path insertion, imports are ordinary direct Python imports. The canonical identities for the new parts-prepared precomputed values are `tools.agent.orchestration.tool_selection`, `tools.agent.orchestration.subagent_selection`, and `tools.agent.orchestration.workflow_context`; behavior assembly is `tools.runtime.archive.behavior_event_assembly` via `from behavior_event_assembly import HookInvocationParts, record_hook_invocation`; and `.codex/hooks/hook_event_log.py` is not imported as a tool module but as local hook module `from hook_event_log`. No `importlib`, dynamic path loading, CLI subprocess, or second assembly import is permitted. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. It calls the new owner directly; `.codex/hooks/hook_safety.py` is deleted after the new owner and pure-owner tests pass. The old file is not a wrapper and is not importable in target state.
+The canonical identities for the precomputed values are `tools.agent.orchestration.tool_selection`, `tools.agent.orchestration.subagent_selection`, and `tools.agent.orchestration.workflow_context`. Behavior assembly belongs to `tools.runtime.archive.behavior_event_assembly`; `.codex/hooks/hook_event_log.py` remains the local transport hook. Use direct imports without `importlib`, dynamic path loading, or CLI subprocesses, and call the single assembly owner once per active invocation. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. Delete the old `.codex/hooks/hook_safety.py` after the canonical owner and pure-owner tests pass; do not retain it as a wrapper.
 
 Raw-to-spool mapping: for every active invocation, the handler result defines one base spool record; behavior-only fields are an optional enrichment layer merged into that base before append.
 

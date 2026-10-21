@@ -417,34 +417,15 @@ bad input」「実在する filesystem/provider error」「schema mismatch」「
 
 ## 8. Migration waves、test movement、rollback
 
-1. **Preflight: inventory freeze** — 旧 `semantic_index.rs` から移した declarations、
-   `main.rs` の direct caller、catalog、shell runner、JSON/SQLite schema、test fixture、
-   `use super::*` を固定し、current output snapshot を作ります。
-2. **Wave 1: shared model/args/source** — 旧 monolith の declarations を
-   `semantic_index/mod.rs` へ移し、`model.rs` へ cross-owner domain identity だけを、
-   `args.rs` と `source.rs` へ owner-local definition/test を移します。args/source DTO は
-   defining owner に残し、移した definition と `use super::*` は同じ wave で `mod.rs`
-   から削除します。
-3. **Wave 2: storage/embedding** — schema、DB path、provider vectors、transaction/
-   atomic publish の definition、owner-local DTO、tests を `storage.rs`/`embedding.rs` へ
-   移し、移した definition を同じ wave で `mod.rs` から削除します。
-4. **Wave 3: pipeline/query/relations** — build orchestration と pipeline-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/pipeline.rs` へ移します。
-   search/context/tree の read operations と query-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/query.rs` へ移します。
-   pair/thin/natural/discourse relation analysis と relations-local DTO/tests は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/relations.rs` へ移します。
-   各 owner へ移した definition は同じ wave で `mod.rs` から削除します。`query.rs` と `relations.rs` は互いの private
-   implementation を import しません。
-5. **Wave 4: report/eval/cli/mod** — JSON/text/JSONL schema、serializer、direct report file write、report-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` へ移します。
-   Eval semantics、fixture/artifact reader、finding summary、Eval-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/eval.rs` へ移します。
-   parse、dispatch、usage、stdout/stderr、integer exit-status mapping、CLI-local DTO は future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/cli.rs` へ移します。各 owner へ移した definition
-   は同じ wave で `mod.rs` から削除します。`mod.rs` には `pub(crate) fn run` と module
-   declarations だけを残し、`main.rs` → `mod.rs::run` → `cli.rs::run` を接続します。
+変更前に declarations、direct caller、catalog、schema、fixture と output の
+snapshot を残します。定義と owner-local test は、宣言済みの責務・DAGに従い、
+実装者が選ぶ依存順で移します。各単位で explicit import の更新、旧 owner の
+定義削除、compiler/behavior readback を一緒に行います。
 
-各 migration wave は definition move、explicit test import、old definition delete、
-compiler/behavior readback を一つの commit に含めます。old/new 二重 authority、alias、
-forwarder、wrapper、compatibility wiring は置きません。failure 時は wave 全体を最後の
-成功 commit へ戻します。temp SQLite と publish file は rollback authority ではなく、future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/storage.rs` が保持する read-only failure evidence として扱います。
-report artifact は rollback authority ではなく、future owner `tools/runtime/dispatch/agent-canon/src/semantic_index/report.rs` が保持する read-only failure evidence として扱います。この確定順序は `cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8`
-`cca8ee28e25414efabd1fea6829fcf533f9c3336ae2ac0c35731d4b62347f2a8` に属します。
+public CLI、storage/report schema、visibility と所有境界の契約を維持し、old/new の
+二重 authority、alias、forwarder、wrapper、compatibility wiring は残しません。
+失敗時は変更単位全体を最後の成功 commit へ戻します。temp SQLite、publish file、
+report artifact は各 owner が保持する read-only failure evidence として扱います。
 
 ## 9. Design-To-Implementation Trace
 

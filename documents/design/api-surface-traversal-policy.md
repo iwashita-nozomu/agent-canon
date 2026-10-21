@@ -32,14 +32,9 @@ This policy permits reading public surfaces needed to call the dependency
 correctly. It does not authorize patching vendor internals, changing reusable
 first-party APIs, or adding helper wrappers before the traversal is complete.
 
-For implementation planning, record:
-
-```text
-api_surface_traversal=done
-inspected_public_paths=<path or symbol list>
-negative_conclusion=<exact missing selector or none>
-selected_fix_surface=<caller/config/adapter/library>
-```
+When planning a fix, record the public surfaces examined and the exact missing
+capability when the conclusion is negative. Select the affected owner from that
+evidence in the existing design rationale or task packet.
 
 ## After traversal: repair and migration
 

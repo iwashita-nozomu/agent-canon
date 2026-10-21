@@ -55,11 +55,9 @@ downstream design ../conventions/object-oriented-design.md consumes Protocol bou
 - `OptimizationProblem[T]` の特殊化
 - domain の実装が共有する最小限の振る舞い契約
 
-次の条件を満たさない新規 `Protocol` 追加を禁止します。
-
-- 2 個以上の実装または call site が共有する
-- 具象クラス名ではなく振る舞いで受けたい理由がある
-- 既存 `Protocol` の特殊化では表現できない
+新しい `Protocol` は、caller が振る舞い型に依存する具体的な必要があり、
+具象契約または既存 `Protocol` の特殊化では不足するときに追加します。
+共有や差し替えを必要とする用例を示します。
 
 ### 4. `experiment_runner/protocols.py` の扱い
 
