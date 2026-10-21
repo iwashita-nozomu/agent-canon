@@ -6,6 +6,7 @@ responsibility Documents experiment-review for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design experiment-lifecycle.md experiment lifecycle workflow
 upstream design research-workflow.md research claim and comparison boundary
+upstream design report-writing.md numerical and runtime result presentation order
 upstream design ../../documents/experiments/experiment-critical-review.md critical evidence review
 @dependency-end
 -->
@@ -33,6 +34,8 @@ GPU/JAX 環境の所有境界、artifact / visualization.py renderer / README �
    serial throttle がないことを確認する。child process があれば caller environment を継承することも見る。
 4. 比較対象・case set・denominator・failure pattern・baseline を揃え、correctness、stability、
    performance、解釈、limitation を分けて結果を読む。
+   数値計算のreportは [Numerical and runtime results](report-writing.md#numerical-and-runtime-results)
+   に沿って数値結果を先に示し、実行時の結果とのrun/case対応と数値結果の欠落を明記しているか確認する。
 
 ## Evidence Review
 
