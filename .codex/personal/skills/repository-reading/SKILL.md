@@ -2,7 +2,7 @@
 name: repository-reading
 description: "Use when asked to read or scan an entire repository, define reading order, track file-content coverage, and preserve contract maps through handoff or context compaction."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"baf82d599e521ff902ea4a83aafe05882e4ae1a13920cee1ac2549131b26bec1"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"83e60adb9d8aed77b86125d7d7cdbcdee4a54562d2d68f87a200c0eb72606c60"} -->
 
 <!--
 @dependency-start
