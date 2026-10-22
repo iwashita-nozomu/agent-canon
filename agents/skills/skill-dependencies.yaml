@@ -27,7 +27,18 @@ skill_dependencies:
   repo-onboarding:
     responsibility_group: intake
     required_prerequisites: []
-    routing_candidates: []
+    routing_candidates:
+    - repository-reading
+    successors: []
+    order_constraints: []
+    parallel_independent: []
+  repository-reading:
+    responsibility_group: intake
+    required_prerequisites: []
+    routing_candidates:
+    - repo-onboarding
+    - dependency-analysis
+    - agent-orchestration
     successors: []
     order_constraints: []
     parallel_independent: []
