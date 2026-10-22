@@ -1475,3 +1475,10 @@ skill_families:
         - ["integrate", "branch"]
         - ["ブランチ", "統合"]
         - ["コンフリクト", "解消"]
+  - id: repository-reading
+    purpose: Read a whole repository in dependency-aware order and preserve content coverage and source-backed contract maps across context compaction.
+    canonical_doc: agents/skills/repository-reading.md
+    shim: .codex/personal/skills/repository-reading/SKILL.md
+    discovery:
+      name: repository-reading
+      description: "Use when asked to read or scan an entire repository, define reading order, track file-content coverage, and preserve contract maps through handoff or context compaction."

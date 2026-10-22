@@ -70,6 +70,10 @@ sources, not a list to read end to end for every task. For an Issue-backed task,
 use the Issue and compatible continuation evidence before deciding whether to
 create new work; then verify current code and owner constraints.
 
+When the request calls for reading the whole repository, use
+[repository-reading](repository-reading.md) for reading order and file-content
+coverage after establishing this entry context.
+
 ## Outputs
 
 - Issue-backed task なら Issue の current requirement / progress state の短い readback
