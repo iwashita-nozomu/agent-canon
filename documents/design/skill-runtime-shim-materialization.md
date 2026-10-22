@@ -146,7 +146,7 @@ owner = {
   route_ref, graph_ref
 }
 identity = {
-  catalog_identity_digest, dependency_identity_digest,
+  catalog_identity_digest, dependency_identity_digest, route_identity_digest
 }
 provenance = {
   catalog_source_digest, dependency_source_digest, canonical_doc_digest,

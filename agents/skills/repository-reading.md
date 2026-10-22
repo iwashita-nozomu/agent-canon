@@ -20,7 +20,9 @@ downstream implementation ../../.codex/personal/skills/repository-reading/SKILL.
 
 ## 予備知識なしからの標準読取順
 
-まず対象 root、branch / revision、ローカル差分と要求範囲を確認し、次の順で読みます。
+まず対象 root、branch / revision、ローカル差分と要求範囲を確認します。repository の
+既存の読取経路、README / Reader Map、正本と責務の案内、依存関係を基準に読み進めます。
+以下の標準順は、その経路の不足や未読領域を補うために使います。
 各段階で得た全体像・用語・契約を context に置いてから、それを前提とする本文へ進みます。
 
 1. **適用する指示を読む**。root の AGENTS.md などから、正本の所在、読取境界、
@@ -58,6 +60,12 @@ downstream implementation ../../.codex/personal/skills/repository-reading/SKILL.
 未知の概念や依存が次の本文の理解を妨げる場合は、その定義・契約を先に読み、元の経路へ
 戻ります。既存の依存情報を再利用し、解けない依存には
 [dependency-analysis](dependency-analysis.md) の該当手段を使います。
+
+実際に読み進めて詰まった箇所から、修正先を判断します。読む順序や次の source の選び方に
+問題があれば Skill を、既存契約に対して役割・正本・依存の記述が不足・矛盾していれば
+repository の既存 owner 文書を直します。明示された修正範囲内で直して同じ地点から
+読み直し、契約や範囲を変える必要があれば [Decision Order](agent-orchestration.md#decision-order)
+に戻ります。観測した問題に応じて順次改善します。
 
 ## 読んだ契約を現在の context に積み上げる
 
