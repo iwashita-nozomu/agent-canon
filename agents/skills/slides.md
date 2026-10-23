@@ -2,124 +2,82 @@
 <!--
 @dependency-start
 contract skill
-responsibility Produces presentation decks from a fixed template while keeping claims, equations, images, and references readable.
+responsibility Produces editable presentation decks with a source-backed storyboard and rendered layout review.
 upstream design ../canonical/skills.md skill canon registry
-upstream design ../../documents/codex/codex-configuration-slides.md slide-deck source and layout reference
-upstream design ../../documents/contracts/template-bootstrap.md repository bootstrap and canonical runtime views
-upstream design ../../documents/experiments/experiment-report-style.md evidence and report style when a deck presents results
-upstream design code-visualization.md selected visualization rendering and coverage owner
-upstream design structure-planning.md storyboard topology owner when a real structural choice exists
-downstream implementation ../../.codex/personal/skills/slides/SKILL.md exposes this skill as a runtime skill
+upstream design ../../documents/experiments/experiment-report-style.md evidence-bearing presentation style
+upstream design code-visualization.md selected diagram rendering owner
+upstream design structure-planning.md outline before prose
+downstream implementation ../../.codex/personal/skills/slides/SKILL.md runtime discovery adapter
 @dependency-end
 -->
 
-## Reader Map
+## Purpose / Activation
 
-- Purpose: keeps a presentation deck's template, slide slots, claims, and
-  references aligned through drafting, layout review, and closeout.
-- Use When: authoring or revising a slide deck, presentation draft, or Markdown
-  deck that is intended to become a presentation asset.
-- Section path: Purpose, Activation, Source Packet, and Slot Contract establish
-  scope; Workflow and Closeout define the operating route.
-- Boundary: this skill owns deck production and layout evidence. Report claims,
-  experiment execution, raw results, HTML output, and visualization rendering
-  remain with their owning skills.
+Create or revise a requested presentation, including PowerPoint/PPTX and
+presentation-oriented Markdown. Deliver the requested format and editability.
+Deck production owns the narrative, composition, and layout review; source
+claims and experiments retain their existing owners.
 
-## Purpose
+## Sources and storyboard
 
-Use the requested template, or the applicable canonical template when none is
-supplied, with a small slot contract so that text,
-equations, generated images, and references remain readable after export. A
-deck is accepted from the rendered artifact and its layout evidence, not from
-the source text alone.
+Read the brief, intended audience, presentation setting, source material, and
+any supplied deck or template. Reuse relevant figures and assets. Load only the
+sources that affect this deck.
+For result-bearing decks, follow [experiment report style](../../documents/experiments/experiment-report-style.md)
+for evidence, interpretation, limitations, and failures. Keep source deck,
+template, and reused figure identities with the authoring inputs.
 
-## Activation
-
-Select this skill when a presentation, slide deck, PPT/PPTX artifact, or
-presentation-oriented Markdown deck is explicitly requested. A report does not
-become a slide task merely because it contains figures. Activate
-`structure-planning` only when slide order, storyboard topology, or reader-state
-has a genuine unresolved choice.
-
-## Required Source Packet
-
-Before drafting, read the source that applies:
-
-- [documents/codex/codex-configuration-slides.md](../../documents/codex/codex-configuration-slides.md)
-- [documents/contracts/template-bootstrap.md](../../documents/contracts/template-bootstrap.md)
-- [documents/experiments/experiment-report-style.md](../../documents/experiments/experiment-report-style.md) when the deck presents
-  evidence or comparative results
-
-Record the selected template path and any active source artifact paths in the
-run bundle. Do not use a blank canvas when a canonical template is available.
+Before prose, establish slide order, each slide's takeaway, supporting evidence,
+and useful visual form through [Before prose](structure-planning.md#before-prose).
+Reuse a sufficient outline; a new deck needs this preparation even when its
+order is obvious. A bounded edit can retain the existing structure.
 
 ## Slot Contract
 
-Map each slide to the slots it actually needs:
+Use the supplied template, or an available canonical presentation template that
+fits the request. Otherwise establish a coherent layout from audience needs:
+clear hierarchy, aligned grid, restrained typography and color, adequate space,
+and consistent visual roles. Use only needed slots for title, body, equations,
+figures, references, and evidence.
 
-- `Title`
-- `Body text`
-- `Equation`
-- `Generated image`
-- `Reference block`
-- `Footnotes / evidence`
+Give each slide a clear takeaway and group its supporting material. Choose
+comparison, sequence, relationship, or quantitative graphics according to the
+claim. Put labels, units, sources, and necessary qualifications near the content
+they explain; preserve equations and reference readability.
 
-Keep prose in the template and place equations or figures close to the claim
-they support. Do not add an unused slot solely to satisfy this list.
+## PowerPoint authoring
 
-## Workflow
+Use an available presentation editor or authoring library and its existing
+export/render utilities. For existing decks, inspect the original rendering,
+masters, aspect ratio, fonts, and objects before editing; preserve unaffected
+content and styling. Reuse existing helpers rather than rebuilding layout tools.
 
-Use the requested template when supplied; otherwise select the applicable
-canonical template. Record the chosen template when it constrains layout, and
-change it only when review finds a concrete failure it cannot resolve. Plan
-slide order and use only the slots each slide needs. Keep claims, equations,
-figures, and references close enough to show their relationship.
+With PptxGenJS, choose slide dimensions and theme fonts before adding objects.
+Keep text and suitable charts as editable PowerPoint objects, preserve image
+aspect ratios, and size text boxes from content. Use the installed helper API
+for text/image geometry when available. Retain chart data and formula sources.
+Use [code-visualization](code-visualization.md) for selected diagram rendering.
 
-Review the rendered deck for clipping, overlap, text and equation readability,
-reference visibility, spacing, and theme consistency. Recheck a slide after a
-change that could affect its layout. Keep the deck path, template path, and
-relevant review evidence with the deliverable; retain a preview when it helps
-resolve or communicate a non-trivial layout question, with no fixed screenshot
-count.
+A requested `.pptx` needs an actual PowerPoint file. Retain the authoring source
+and required assets so the deck can be rebuilt. For Markdown decks, use their
+existing presentation renderer and the requested export format.
 
-For selected diagrams, hand the complete source facts and rendering call to
-`code-visualization`; this skill places the returned projection but does not
-reimplement visualization coverage or omission policy.
+## Layout review and closeout
 
-## Closeout
+Render the produced deck and inspect its slides for overflow, overlap, font
+substitution, contrast, text/equation readability, image fit, reference visibility,
+and consistency. Use existing bounds/font checks where the chosen tool provides
+them. Review changed slides again after layout-affecting edits. Preserve review
+evidence useful to the request without a fixed screenshot count.
 
-This skill owns the rendered deck's layout, reference, equation, and image
-readability. Read back the rendered artifact and the source/template and layout
-evidence relevant to the requested deck.
+Deliver the deck, required authoring inputs, and actual review results. Missing
+rendering or material layout defects remain unverified or unresolved. Link a
+requested cumulative report to the reviewed deck through [report-writing](report-writing.md).
 
-When a reader-facing cumulative report is needed, delegate its production to
-`report-writing`; this skill does not reimplement report generation or archive
-operations. The report, rendered deck, and source packet must retain explicit
-cross-references so that the report describes the artifact that was actually
-reviewed.
+## Upstream reuse
 
-Do not close while material layout drift, unreadable equations, or hidden
-references remain. Do not require screenshots for a deck with no non-trivial
-layout, and do not create placeholder evidence for unused operations.
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to
-this canonical owner.
-
-1. Read [agents/skills/slides.md](slides.md).
-1. Select this skill only for an explicitly requested presentation artifact;
-   reports, HTML, experiments, and visualization rendering keep their owning
-   skill unless deck production is also requested.
-1. Read the applicable source packet before drafting and record the selected
-   template path when it constrains the deck.
-1. Use `structure-planning` only for a genuine storyboard or reader-state
-   decision, and use `code-visualization` for selected diagram rendering and
-   coverage.
-1. Use the requested or applicable canonical template, and map each slide to
-   the slots it uses.
-1. Review the rendered result for layout drift, equation readability, image
-   fit, reference visibility, and theme consistency.
-1. Re-review after a non-trivial image or equation insertion.
-1. Keep the deck, applicable template reference, and selected review evidence
-   with the deliverable; read back the rendered artifact at closeout.
+PowerPoint guidance adapts [OpenAI's slides skill at e6afb0d](https://raw.githubusercontent.com/openai/skills/e6afb0d74cc75d220df2faf3dd6c635c2dc6a108/skills/.curated/slides/SKILL.md).
+Copyright (c) Microsoft Corporation. Licensed under [Apache 2.0](../../LICENSE);
+[upstream license](https://raw.githubusercontent.com/openai/skills/e6afb0d74cc75d220df2faf3dd6c635c2dc6a108/skills/.curated/slides/LICENSE.txt).
+AgentCanon modifications: provider-neutral routing, conditional helper use,
+source/storyboard integration, and shared design and validation ownership.

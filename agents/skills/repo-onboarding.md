@@ -20,6 +20,10 @@ unfamiliar repo やサブディレクトリに入ったとき、最短で安全�
 
 ## Issue First
 
+Issue and continuation discovery below stays within the current
+[read authority](../../ROOT_AGENTS.md#always-on-boundary). Reuse known facts when
+further reading is forbidden.
+
 Issue に紐づく repository task では、対象 Issue と最新 comment から要求や
 途中状態を復元し、その後に current source で確認します。Issue の記述は
 要求の証拠ですが、現在の code state を置き換えません。Issue が task と

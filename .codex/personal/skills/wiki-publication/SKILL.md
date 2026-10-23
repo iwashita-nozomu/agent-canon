@@ -2,7 +2,7 @@
 name: wiki-publication
 description: "Use this when publishing AgentCanon wiki pages to a dedicated wiki sidecar with default-branch-only, source-bound publication checks."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"b7a24fc252407f332926af79b5215135d3a7ee11e77169437ac7e826becf6398"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"f17aa6a75271f31dc42cfc776d5d70cdc66a9ff634a76a3090103c537a89a8ab"} -->
 
 <!--
 @dependency-start

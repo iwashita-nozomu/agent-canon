@@ -54,6 +54,11 @@ checkout.
 An adapter's “Read the canonical owner” instruction uses that same point-of-use
 boundary: open the owner's Reader Map or short common conditions, then the selected
 section. The thin adapter is a pointer, not a second copy of branch policy.
+Reuse guidance already available in the current model context with the same
+source binding; selecting the Skill again does not require reopening it.
+Keep reads within the tool's output limit. After truncation, fetch only the
+missing relevant range instead of repeating the combined file read. Restore
+needed content after compaction when it is no longer in context.
 When an owner invokes a tool, use the existing CLI, API, script, or Make entrypoint
 through [the Host entrypoint](CLI_ENTRYPOINTS.md#host-entrypoint), passing its
 native argv and retaining the current registered target and source-root resolution.

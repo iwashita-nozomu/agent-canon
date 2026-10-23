@@ -1,8 +1,8 @@
 ---
 name: slides
-description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
+description: "Create or revise PowerPoint/PPTX, other slide decks, and presentation-oriented Markdown with editable content and rendered layout review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"291d7fccb44c8b2674c69e1d9aa09abd79adc38eb1524ae71b9337782bae3e91"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"775e8bbb7293a3c7263c0cc0971ae97f32636ff4af71b996c53ad0f4174ece48"} -->
 
 <!--
 @dependency-start

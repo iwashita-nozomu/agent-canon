@@ -2,7 +2,7 @@
 name: retention
 description: "Use when planning whether existing experiment results should be retained, archived, externalized, or deleted before mutation."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"a98873247ba022bb9bd3f9ee4230da6f65582fc7b75b8e700c2ff80342c57064"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"433a70e1bf79fd224562139e7c087ea90a389bf4475adcdf90c61a0bccbc9e74"} -->
 
 <!--
 @dependency-start

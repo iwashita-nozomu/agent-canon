@@ -89,6 +89,9 @@ Stop and re-scope before adding:
 Make the entry screen the usable product surface. Use a landing page only when
 the user explicitly asked for a landing page.
 
+For browser UI, apply [UI information design](html-output.md#ui-information-design)
+when deciding whether layout and control names make supplementary copy unnecessary.
+
 Use existing design system pieces and controls that the core loop requires. If
 visual assets are required, use a domain-relevant asset that makes the surface
 understandable; keep asset work tied to that supporting role.

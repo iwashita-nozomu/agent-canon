@@ -1419,12 +1419,12 @@ skill_families:
         - ["スキル", "評価"]
         - ["反復", "収束"]
   - id: slides
-    purpose: Produce presentation decks from a fixed template with readable claims, equations, images, and references.
+    purpose: Create editable presentation decks using suitable assets and readable layouts, with rendered review.
     canonical_doc: agents/skills/slides.md
     shim: .codex/personal/skills/slides/SKILL.md
     discovery:
       name: slides
-      description: "Use when authoring or revising a presentation, slide deck, or presentation-oriented Markdown deck."
+      description: "Create or revise PowerPoint/PPTX, other slide decks, and presentation-oriented Markdown with editable content and rendered layout review."
     routing:
       stage_policy: active
       reason: an explicitly requested presentation artifact needs a canonical deck owner
