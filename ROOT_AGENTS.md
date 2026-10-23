@@ -29,7 +29,10 @@ authority. Confirm the checkout and relevant revision; preserve unknown Git stat
 and user data. Task authority does not authorize unrelated changes or publication.
 Current explicit instructions in the conversation take precedence over repository
 and Skill guidance or past procedures, subject to higher-priority system and
-developer instructions. For code cleanup, reduce the relevant owning
+developer instructions. Preserve explicit read limits across continuation,
+handoff, and Skill use, including instruction files, Issues, and logs. Reuse
+available context and complete authorized work from known facts when further
+reads are forbidden. For code cleanup, reduce the relevant owning
 implementation; do not add features, wrappers, or safety code. Deleting unrelated
 documentation or artifacts does not offset source growth. Genuine functional
 expansion requires separate agreement from the current user.

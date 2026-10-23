@@ -2,7 +2,7 @@
 name: md-style-check
 description: "Use when Markdown files changed, docs formatter/fixer output must be checked, or `agent-canon docs` formatting, heading, math, Mermaid, and link checks are in scope."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"8ac8099d48777142ee3f69e2b1fa4654f1b2883c7c3e7113883838a255423fe0"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"294e6d23dd124b01055e75355844725a993f6eea27533543ad3fe5bd06567978"} -->
 
 <!--
 @dependency-start

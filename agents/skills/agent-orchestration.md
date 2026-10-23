@@ -29,54 +29,41 @@ outcome during implementation or validation.
 
 ## Decision Order
 
-Check for an active Goal using available session state and retained context.
-When one is active, begin with its whole objective and the current instruction;
-otherwise begin with the current request. Carry retained agreements and review
-the whole authorized scope, completed and remaining work, relevant dependencies,
-blockers, and available next actions using existing context and records. Classify
-the operation as advisory/read-only or repository-changing, then read the
-applicable repository instructions and selected owner.
-For local decisions, use the target source, current diff, and governing contract.
+Start from the active Goal's whole objective and current instruction, or the
+current request when no Goal exists. Retain agreements and review authorized
+scope, completed and remaining work, dependencies, blockers, and next actions.
+Classify advisory/read-only or repository-changing work. Reuse applicable
+instructions and owner context; read only within the
+[current read authority](../../ROOT_AGENTS.md#always-on-boundary).
+Local decisions use the target, current diff, and governing contract.
 
-Before asking the user, recover applicable earlier requests and resolve
-retrievable facts through existing code, tests, documentation, task history,
-and tool results. Do not ask the user to restate those requirements or supply
-facts these sources already establish. Continue investigation and
-authorized Goal work when missing information can be obtained this way. Once
-the evidence identifies a material user-owned choice, ask early; exhaustive
-investigation is not a prerequisite for that choice.
+Before asking the user, recover applicable earlier requests and retrievable
+facts from permitted code, tests, docs, history, and tool results. Continue
+authorized work when these sources can resolve the gap. Ask early once evidence
+identifies a material user-owned choice; do not ask for known requirements or
+retrievable facts, or require exhaustive investigation first.
 
-When a contract blocks the agreed outcome, identify its owner and exact clause
-with a revision, path and section or symbol. Show the requested result, blocked
-operation, and evidence explaining why the clause prevents it. An existing
-implementation or an execution failure alone does not establish a governing
-contract or a conflict. Check applicable agreements and instruction precedence;
-when they and the facts uniquely determine the resolution, state that basis and
-carry out the authorized correction. Otherwise make the remaining choice to retain,
-revise, or extend the contract explicit in the question below. Do not silently
-preserve the blocker, bypass it, or weaken acceptance to make progress. Higher-priority
-safety and authority limits remain binding; do not offer bypassing them as a choice.
+For a blocking contract, identify its owner, revision, path and clause/symbol,
+the requested result, blocked operation, and conflict evidence. Implementation
+or execution failure alone does not establish a governing contract or conflict. When
+agreements, instruction precedence, and facts uniquely settle the resolution,
+state that basis and perform the authorized correction. Otherwise ask whether
+to retain, revise, or extend the contract. Preserve acceptance and higher-priority
+safety/authority limits; do not silently preserve or bypass the blocker.
 
-Before changing the agreed scope, expected result, or major approach, or resolving
-a blocking contract whose resolution is not settled by that evidence, ask the
-user a self-contained question stating the settled requirement, checked current
-behavior, remaining user-owned decision, proposed change, recommendation, and
-effects of the alternatives. State what would change and which action awaits
-the answer, so the user can decide without reopening source or prior messages.
-Wait for the answer before dependent changes, and keep
-independent authorized work running. An active Goal or an internal design
-decision does not authorize that change. Ask also for necessary user-owned
-input or authorization that the available evidence cannot supply. Include the
-contract location and conflict evidence when applicable, and phrase the remaining
-decision as an actual question rather than only reporting a blocker. Retain the
-evidence, question, and answer with its rationale in the existing task, Issue,
-or handoff so the dependent operation can resume without re-asking.
+Before changing agreed scope, expected result, major approach, or an unsettled
+blocking contract, ask a self-contained question: settled requirement, checked
+behavior, user-owned choice, proposed change, recommendation, alternatives'
+effects, and the action awaiting an answer. Include contract location/conflict
+evidence when applicable. An active Goal or internal design does not authorize
+the change. Wait on dependent changes while continuing independent work. Ask
+also for required user-owned input/authority unavailable from permitted sources.
+Retain evidence, question, answer, and rationale in the existing task, Issue, or
+handoff; a blocker report alone is not that question.
 
-Complete repairs derived from the agreed contract within existing authority,
-including required input preparation or missing API behavior. Determine their
-scope from the contract and cause, not merely from the files needing edits.
-Honor explicit write, stop, and pause boundaries. Do not re-ask settled choices
-or routine implementation decisions within those boundaries.
+Complete authorized contract-derived repairs, including required input preparation
+or missing API behavior. Scope follows contract and cause. Honor write, stop, and
+pause boundaries; do not re-ask settled choices or routine implementation decisions.
 
 Use the [task catalog](../task_catalog.yaml) for workflow family, role, and
 execution-route decisions. Public Skill identity and prerequisites come from the
@@ -108,12 +95,10 @@ context and the selected owner route.
 
 ## Local Capability Priority
 
-Use this decision only when competing local, deferred, or split operations need
-ordering. Reuse the existing task or handoff record. Select direct-peer
-collaboration only after the runtime reports that capability; otherwise use
-parent relay or a durable artifact. The
-[communication protocol](../COMMUNICATION_PROTOCOL.md) owns receipts and packet
-fields.
+When local, deferred, or split operations compete, reuse the task/handoff record.
+Direct-peer collaboration requires a reported runtime capability; otherwise use
+parent relay or a durable artifact. The [communication protocol](../COMMUNICATION_PROTOCOL.md)
+owns receipts and packet fields.
 
 ## Write-Capable Handoff Validation Trust Boundary
 
@@ -131,19 +116,15 @@ or resumption.
 
 ## Execution-Time-Aware Work-Conservation Contract
 
-This guidance applies when coordination is selected. Use relative links from the
-selected workflow to find relevant owner instructions; a link is conditional
-guidance, not a requirement to read every linked document. Record actual native
-tool and child results using the selected workflow's existing record. A launch
-is not completion, and a route difference alone is not a failure; use existing
-Eval or owner review to assess whether necessary work was missed or unnecessary
-work was done.
+When coordination is selected, follow only applicable owner links and record
+actual tool/child results in the existing workflow record. A launch is not
+completion; a route difference alone is not failure. Use existing Eval or owner
+review to judge missing or unnecessary work.
 
-Preserve the requested work and correctness before minimizing necessary total
-work. Time limits and prompt keywords do not cut scope. Read the selected Skill's
-common constraints and the content needed for the current decision, deferring
-inactive branches until their conditions apply. Read applicable prerequisites
-under [In-flight skill reads](task-routing.md#in-flight-skill-reads).
+Preserve correctness and requested scope. Reuse current context, load missing
+common constraints and selected guidance, and defer inactive branches under
+[In-flight skill reads](task-routing.md#in-flight-skill-reads). Time limits and
+prompt keywords do not cut scope.
 
 Review a candidate once. Repair accepted in-scope findings and recheck only
 affected evidence; reopen review only when new contract, reachable-behavior, or

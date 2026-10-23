@@ -28,6 +28,17 @@ Validate the produced file and the properties needed by the request: referenced 
 
 A listen socket is not required to prove a static artifact correct.
 
+## UI information design
+
+For UI/control surfaces, make purpose, current state, and next action clear
+through hierarchy, placement, grouping, and precise control names. Before adding
+repeated captions, obvious helper text, or decorative slogans, fix the layout.
+Preserve necessary labels, units, state, errors and recovery, destructive-action
+consequences, and accessible names. This applies to interface copy; report
+arguments, evidence, and citations keep their content owner's requirements.
+Review the actual display or a concrete layout example to check that optional
+copy can be removed without losing meaning or accessibility.
+
 ## Standard document rendering
 
 For AgentCanon's document and report route, delegate ordinary Markdown-to-HTML
