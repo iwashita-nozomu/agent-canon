@@ -2,7 +2,7 @@
 name: codex-task-workflow
 description: "Use for repository-changing execution after workflow and owners are selected."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"1df17947d9981e40413e73f37d2af77036fba189c3085dbe136446e52c6e9539"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4ddd4ac841a2eea7ffcca2954487bff03dd55e464fe28a39a5fbae17959c3190"} -->
 
 <!--
 @dependency-start

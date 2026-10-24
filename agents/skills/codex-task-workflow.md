@@ -53,6 +53,8 @@ Check the producer-to-consumer contracts and resulting guarantee, and compose
 the existing operations with necessary caller wiring. Add or extend a capability
 only for a concrete gap at its owner. Judge overlap by responsibility and contract,
 not by names or paths alone.
+Use [Skill and tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
+for native execution state, completed evidence, and the next owning decision.
 
 ## Coordination handoff
 

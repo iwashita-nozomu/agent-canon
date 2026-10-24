@@ -9,6 +9,7 @@ upstream design ../task_catalog.yaml typed workflow and execution route
 upstream design ./catalog.yaml public Skill identity and discovery
 upstream design ./skill-dependencies.yaml Skill prerequisites and ordering
 upstream design ../COMMUNICATION_PROTOCOL.md collaboration capability and handoff boundary
+upstream design ../../references/skill-tool-coordination.md existing and external capability assessment
 downstream design ../canonical/CODEX_INTAKE.md owner-first read route
 downstream design ../canonical/CODEX_COMPLETION.md validation and closeout
 downstream design ./codex-task-workflow.md repository execution
@@ -112,6 +113,35 @@ adding another child, using the existing task context.
 Start with the applicable root instructions and selected Skill. For a local
 change, use the target, current diff, and governing contract. Reuse settled
 context and the selected owner route.
+
+## Skill and tool cooperation
+
+The selected Skill owns the task decision and acceptance; the tool provider owns
+its native interface, execution state, and effects. Connect the property needed
+for the next Skill decision to an available tool and its actual inputs and
+outputs. Reuse the current contract and source binding; consult exposed schemas,
+catalog entries, help, or source only for an unresolved part of that call.
+
+Compose existing operations through their native interfaces using
+[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support).
+Carry the actual target, execution plane, arguments, output location, and needed
+data conversion across the call. Preserve the provider's ordering, ownership,
+and shared effects when deciding which operations can run concurrently.
+
+Follow the provider's execution state for the requested operation. For unfinished
+work, use its returned handle with the native completion/status/resume API before consuming a completed
+result. Retain failures and partial results as evidence. For truncated output,
+use its reported locator or pagination to obtain the part needed for the
+decision. Feed actual returned values and artifacts into the next operation.
+
+Apply the Skill's acceptance to the returned evidence and its coverage. A
+successful tool exit establishes that tool's own completion guarantee. If the chain
+does not meet the task contract, compare expected and actual inputs and outputs
+at the failing boundary. Distinguish input preparation, missing API behavior,
+runtime failure, and a mismatched Skill expectation; repair through the existing
+owner within the agreed scope. Use [tool-finding-report](tool-finding-report.md)
+when findings need a repair or reporting handoff, then return to the interrupted
+operation and the requested result.
 
 ## Local Capability Priority
 
