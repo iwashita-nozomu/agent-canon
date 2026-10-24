@@ -28,6 +28,18 @@ Validate the produced file and the properties needed by the request: referenced 
 
 A listen socket is not required to prove a static artifact correct.
 
+## UI design basis
+
+Before creating or substantially revising a UI, read the relevant project design
+guidance, tokens, existing components, and user-specified reference screens.
+Reuse those assets as the visual authority. If no basis exists, briefly choose
+color, typography, spacing, and layout from the intended audience and screen's
+purpose. Keep that direction in the existing task or design context.
+
+Implement the requested surface with existing components. Explain a necessary
+departure at the owning design or review location. Preserve brand requirements,
+accessible labels, keyboard operation, and reduced-motion behavior.
+
 ## UI information design
 
 For UI/control surfaces, make purpose, current state, and next action clear
@@ -38,6 +50,14 @@ consequences, and accessible names. This applies to interface copy; report
 arguments, evidence, and citations keep their content owner's requirements.
 Review the actual display or a concrete layout example to check that optional
 copy can be removed without losing meaning or accessibility.
+
+Check consistency and layout at the requested display widths. For an added
+screen, also follow its intended entry path. For example, a report screen may
+wrap correctly at a narrow width while the reports list still has no working
+Open report link; those are separate checks. Remove a repeated "This card shows
+your report" caption when hierarchy makes it redundant; retain "Sample interval
+(ms)" and its validation error beside the input. Record source/layout inspection
+and actual browser checks with their respective coverage.
 
 ## Standard document rendering
 

@@ -40,6 +40,23 @@ access date, the claim used, known limitations, adoption or exclusion decision,
 and whether a downloaded artifact was retained or intentionally left outside the
 tracked tree.
 
+## Source Passages
+
+For each material claim used, record a retrievable passage in the existing source
+note: source version/access date and page, section, paragraph, line range, or
+timestamp as applicable. For extracted PDF/OCR line numbers, identify the retained
+artifact and extraction method so a reader can relate them to the original.
+For example, a claim may point to a paper's version 2, section 3, page 7, with
+the relevant assumption beside it. If only an abstract is accessible, keep
+full-text support unverified.
+
+Keep a short original excerpt when permitted and useful for finding or checking
+the passage. Preserve its wording; label translations, summaries, and
+interpretations. Record enough context to assess support and limitations.
+Text matching alone establishes neither context nor support for a claim.
+Full-text retention and sharing follow the source's permissions and the
+destination's visibility; a locator and a permitted short excerpt may suffice.
+
 ## DOI Metadata Capture
 
 When a DOI is already known, run this lookup from the host shell to retrieve

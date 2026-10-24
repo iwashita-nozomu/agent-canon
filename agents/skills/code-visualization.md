@@ -48,6 +48,33 @@ For an embedded diagram, identify the local claim and reader action. Use `struct
 
 When several questions are present, choose the smallest set of views that answers them. Use reader action and the requested relations to select representation; source-fact authority remains with the producing owner.
 
+## State-Transition Semantics
+
+When selecting a state diagram, identify one subject and distinguish its states,
+transition events, guards, and actions. Components that coexist, such as an API,
+queue, and worker, fit a component/dependency map. Use a sequence diagram for
+their exchanges; keep independent lifecycles separate.
+
+Preserve asynchronous phases that the implementation distinguishes. This
+illustrative job contract separates acceptance, execution, acknowledgement, and
+cleanup; its start transition has an authorization guard and an API action:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Accepted
+    Accepted --> Running: start [authorized] / invoke API
+    Running --> Applied: API succeeds
+    Applied --> Acknowledged: peer acknowledges
+    Acknowledged --> Closed: cleanup completes
+```
+
+Connect states and transitions to the existing Markdown explanation and source
+locations when their conditions need detail. Record the reviewed source revision
+and scope at that document owner. For example, updating only the execution
+transition leaves acknowledgement and cleanup at their earlier reviewed revision
+until checked. Rendering success establishes syntax/layout; source review
+establishes whether the depicted transitions match the implementation.
+
 ## Document Embedded Diagrams
 
 Use this skill when a diagram is embedded in Markdown, reports, design docs, README, workflow or skill docs, or a `visual_plan`. Pair it with `structure-planning` when document structure or reader path changes; use `md-style-check` for relevant Markdown, Mermaid, link, and heading checks.
