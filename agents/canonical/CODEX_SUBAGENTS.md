@@ -59,6 +59,11 @@ owner、scope、result と必要な cleanup を根拠に判断します。
 
 ## Principles
 
+Apply [Delegation selection](../skills/agent-orchestration.md#delegation-selection)
+before assigning a child. The role and profile inventory below describes selected
+delegation; responsibilities can remain with the current agent when the workflow
+does not require separation.
+
 - role profile/instruction は `agents/model_profiles.toml` を優先し、
   `.codex/agents/*.toml` は generated readback として扱います
 - logical role、selected Skills、execution profile、authority は別々に選びます。Luna profile は `$direct-luna-communication` の bounded packet で direct child として起動し、role-specific alias を physical team identity や capacity 根拠にしません
