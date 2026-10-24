@@ -87,16 +87,24 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
 
 
 @pytest.mark.parametrize(
-    ("producer_status", "checker_status", "smoke_status", "expected_names"),
+    (
+        "regression_status",
+        "producer_status",
+        "checker_status",
+        "smoke_status",
+        "expected_names",
+    ),
     [
-        (0, 0, 0, ["producer", "checker", "smoke"]),
-        (7, 0, 0, ["producer"]),
-        (0, 9, 0, ["producer", "checker"]),
-        (0, 0, 11, ["producer", "checker", "smoke"]),
+        (0, 0, 0, 0, ["regression", "producer", "checker", "smoke"]),
+        (0, 7, 0, 0, ["regression", "producer"]),
+        (0, 0, 9, 0, ["regression", "producer", "checker"]),
+        (0, 0, 0, 11, ["regression", "producer", "checker", "smoke"]),
+        (1, 0, 0, 0, ["regression"]),
     ],
 )
 def test_eval_preserves_failed_producer_logs_until_ci_capture(
     tmp_path: Path,
+    regression_status: int,
     producer_status: int,
     checker_status: int,
     smoke_status: int,
@@ -107,6 +115,20 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     runtime = tmp_path / "runtime with spaces"
     runtime.mkdir()
     calls = tmp_path / "calls.jsonl"
+    regression = source / "tests/agent_tools/test_eval_accumulation_check.py"
+    regression.parent.mkdir(parents=True)
+    regression.write_text(
+        "import json, os\nfrom pathlib import Path\n"
+        "def test_isolated_eval_regression_context():\n"
+        "    assert 'AGENT_CANON_HOOK_ARCHIVE_DIR' not in os.environ\n"
+        "    assert 'AGENT_CANON_LOG_ROOT' not in os.environ\n"
+        f"    assert os.environ['AGENT_CANON_RUNTIME_ROOT'] == {str(runtime)!r}\n"
+        "    with Path(os.environ['CALLS']).open('a') as stream:\n"
+        "        stream.write(json.dumps(['regression', None, None, "
+        "os.environ['AGENT_CANON_RUNTIME_ROOT']]) + '\\n')\n"
+        f"    assert {regression_status} == 0, 'requested prerequisite failure'\n",
+        encoding="utf-8",
+    )
     paths = (
         ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
         ("eval/checkers/eval_accumulation_check.py", "checker", checker_status),
@@ -178,9 +200,9 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         text=True,
         check=False,
     )
-    assert result.returncode == (producer_status or checker_status or smoke_status), (
-        result.stdout + result.stderr
-    )
+    assert result.returncode == (
+        regression_status or producer_status or checker_status or smoke_status
+    ), result.stdout + result.stderr
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
     assert all(
@@ -195,11 +217,14 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         / "workflow-selection"
         / "agent-canon-pr-gate-pass.md"
     )
-    assert report_path.is_file()
+    assert report_path.is_file() is (regression_status == 0)
     temporary_logs = (
         runtime / "eval/agent-canon-pr-gate/agent-eval-runs/agent-canon-pr-gate"
     )
-    if producer_status or checker_status or smoke_status:
+    if regression_status:
+        assert temporary_logs.is_dir()
+        assert not list(temporary_logs.iterdir())
+    elif producer_status or checker_status or smoke_status:
         assert temporary_logs.is_dir()
         assert "producer stdout line 161" in (
             temporary_logs / "02-workflow-selection.stdout.txt"
