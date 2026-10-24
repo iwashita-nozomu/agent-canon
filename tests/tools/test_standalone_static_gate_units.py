@@ -90,6 +90,19 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         (("eval/definitions/example.toml",), ("eval",)),
         ((".github/PULL_REQUEST_TEMPLATE.md",), ("docs", "workflow-container")),
         (("bootstrap/container/image/Dockerfile",), ("workflow-container",)),
+        (("bootstrap.sh",), ("workflow-container",)),
+        (
+            ("tools/runtime/container/bootstrap_runtime.py",),
+            ("contracts", "workflow-container"),
+        ),
+        (
+            ("tests/bootstrap/test_bootstrap_runtime.py",),
+            ("contracts", "workflow-container"),
+        ),
+        (
+            ("tests/agent_tools/test_eval_accumulation_check.py",),
+            ("contracts", "eval"),
+        ),
         (("documents/notes/example.yaml",), ("contracts",)),
         (("documents/example.rst",), ("contracts",)),
         (

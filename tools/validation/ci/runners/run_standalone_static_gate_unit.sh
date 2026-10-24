@@ -230,6 +230,8 @@ print(
 PY
   )"
   mkdir -p "${eval_log_dir}" "${eval_results_parent}"
+  python3 -m pytest -p no:cacheprovider -q \
+    tests/agent_tools/test_eval_accumulation_check.py
   set +e
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
     python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \

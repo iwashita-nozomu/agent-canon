@@ -258,19 +258,31 @@ def _validate_tool_plane_argv(
     )
 
 
+def _target_git_environment(root: Path) -> dict[str, str]:
+    """Scope the existing exec Git policy to the path seen by this process."""
+    return {
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": str(root.resolve()),
+    }
+
+
 def _source_snapshot(root: Path) -> dict[str, Any]:
     """Capture tracked and non-ignored source state without scanning runtime artifacts."""
+    environment = {**os.environ, **_target_git_environment(root)}
     status = subprocess.run(
         ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"],
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
     head = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "--verify", "HEAD"],
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
     inventory = subprocess.run(
         [
@@ -285,6 +297,7 @@ def _source_snapshot(root: Path) -> dict[str, Any]:
         ],
         check=False,
         capture_output=True,
+        env=environment,
     )
     if status.returncode != 0 or head.returncode != 0 or inventory.returncode != 0:
         raise BootstrapError(
@@ -334,17 +347,20 @@ def _source_snapshot(root: Path) -> dict[str, Any]:
 
 def _changed_source_paths(root: Path) -> set[str]:
     """Return tracked and non-ignored untracked paths changed from HEAD."""
+    environment = {**os.environ, **_target_git_environment(root)}
     tracked = subprocess.run(
         ["git", "-C", str(root), "diff", "--name-only", "HEAD"],
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
     untracked = subprocess.run(
         ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard"],
         check=False,
         capture_output=True,
         text=True,
+        env=environment,
     )
     if tracked.returncode != 0 or untracked.returncode != 0:
         raise BootstrapError("source_snapshot_failed", "cannot enumerate changed paths")
@@ -2041,9 +2057,7 @@ class BootstrapRuntime:
                 environment = {
                     "AGENT_CANON_TARGET_ROOT": f"/targets/{target['digest']}",
                     "AGENT_CANON_TASK_ROOT": f"/targets/{target['digest']}",
-                    "GIT_CONFIG_COUNT": "1",
-                    "GIT_CONFIG_KEY_0": "safe.directory",
-                    "GIT_CONFIG_VALUE_0": f"/targets/{target['digest']}",
+                    **_target_git_environment(Path(f"/targets/{target['digest']}")),
                     "AGENT_CANON_MOUNT_REGISTRY": REGISTRY_DESTINATION,
                     # Runtime log readers use the existing explicit archive
                     # override. The host-owned private-log bind is the sole
@@ -2272,7 +2286,6 @@ class BootstrapRuntime:
         exchange_tasks = self.paths.container_runtime / "tasks"
         exchange_task = exchange_tasks / task_id
         exchange = exchange_task / exchange_nonce
-        before_source = _source_snapshot(source)
         capabilities = [
             "target-read-only",
             "producer-definitions-image-owned",
@@ -2280,32 +2293,7 @@ class BootstrapRuntime:
             "external-runtime-write",
             "no-network",
         ]
-        collection: dict[str, Any] = {
-            "schema": "agent_canon.eval_collection.v1",
-            "run_id": run_id,
-            "task_id": run_id,
-            "source_repository": str(source),
-            "source_head_before": before_source["head"],
-            "source_git_status_before": before_source["git_status"],
-            "source_tree_digest_before": before_source["tree_digest"],
-            "agent_canon_commit": os.environ.get(
-                "AGENT_CANON_SOURCE_HEAD",
-                _source_snapshot(self.repository_root)["head"],
-            ),
-            "manifest_digest": self.manifest_digest,
-            "tool_image_digest": None,
-            "exchange_nonce": exchange_nonce,
-            "request_digest": sha256_text(
-                f"{run_id}:{source}:{exchange_nonce}:{self.manifest_digest}"
-            ),
-            "capabilities": capabilities,
-            "family_status": {},
-            "producer_matrix": [],
-            "metrics": {},
-            "timestamp": _now(),
-            "source_tree_unchanged": False,
-            "status": "running",
-        }
+        collection: dict[str, Any] | None = None
         task_outcome = "failed"
         with self.locked():
             state = self._read_state()
@@ -2329,6 +2317,31 @@ class BootstrapRuntime:
                 )
             task_path = self.paths.tasks / task_id
             try:
+                before_source = _source_snapshot(source)
+                collection = {
+                    "schema": "agent_canon.eval_collection.v1",
+                    "run_id": run_id,
+                    "task_id": run_id,
+                    "source_repository": str(source),
+                    "source_head_before": before_source["head"],
+                    "source_git_status_before": before_source["git_status"],
+                    "source_tree_digest_before": before_source["tree_digest"],
+                    "agent_canon_commit": os.environ.get("AGENT_CANON_SOURCE_HEAD")
+                    or _source_snapshot(self.repository_root)["head"],
+                    "manifest_digest": self.manifest_digest,
+                    "tool_image_digest": None,
+                    "exchange_nonce": exchange_nonce,
+                    "request_digest": sha256_text(
+                        f"{run_id}:{source}:{exchange_nonce}:{self.manifest_digest}"
+                    ),
+                    "capabilities": capabilities,
+                    "family_status": {},
+                    "producer_matrix": [],
+                    "metrics": {},
+                    "timestamp": _now(),
+                    "source_tree_unchanged": False,
+                    "status": "running",
+                }
                 _ensure_directory(spool)
                 for directory in (exchange_tasks, exchange_task, exchange):
                     _ensure_directory(directory, mode=0o1733)
@@ -2370,9 +2383,7 @@ class BootstrapRuntime:
                     environment={
                         "AGENT_CANON_TARGET_ROOT": target_path,
                         "AGENT_CANON_TASK_ROOT": target_path,
-                        "GIT_CONFIG_COUNT": "1",
-                        "GIT_CONFIG_KEY_0": "safe.directory",
-                        "GIT_CONFIG_VALUE_0": target_path,
+                        **_target_git_environment(Path(target_path)),
                     },
                     timeout=int(self.manifest["container"]["task_timeout_seconds"]),
                 )
@@ -2503,7 +2514,7 @@ class BootstrapRuntime:
             except BootstrapError:
                 # Preserve partial exchange and host spool for diagnosis. A
                 # source snapshot is still written when the runner returned.
-                if not (spool / "collection.json").exists():
+                if collection is not None and not (spool / "collection.json").exists():
                     collection["status"] = "failed"
                     collection["failure"] = collection.get(
                         "failure", "eval_runtime_failed"
@@ -2735,6 +2746,7 @@ class BootstrapRuntime:
                     state=state,
                 )
             )
+
 
 def _runtime_from_args(args: argparse.Namespace) -> BootstrapRuntime:
     repository_root = Path(args.repository_root).resolve()

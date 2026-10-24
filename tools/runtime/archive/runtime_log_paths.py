@@ -54,6 +54,7 @@ except ImportError:
 
 HOOK_ARCHIVE_DIR_ENV = "AGENT_CANON_HOOK_ARCHIVE_DIR"
 HOOK_EVENT_SPOOL_DIR_ENV = "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
+HOOK_SPOOL_INDEX_NAME = ".spool-index.jsonl"
 LOG_ENV_ENV = "AGENT_CANON_LOG_ENV"
 LOG_ARCHIVE_PARENT = Path("archive") / "agent-canon-log"
 LOG_ARCHIVE_REMOTE = "git@github.com:iwashita-nozomu/agent-canon-log.git"
