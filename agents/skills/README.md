@@ -22,6 +22,7 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 
 作成・公開範囲は [Rules](#rules) と [Skill Visibility Naming](#skill-visibility-naming)、
 選択は [Codex Defaults](#codex-defaults)、正本の変更は [Updating Skills](#updating-skills) を参照します。
+外部配布物の導入・更新は [External Skill Installation And Updates](#external-skill-installation-and-updates) を参照します。
 各 skill の長い手順はその正本文書が所有し、この索引や [AGENTS.md](../../AGENTS.md) へ複製しません。
 以下のリンクは必要時の参照先であり、全項目の起動・読了を要求する一覧ではありません。
 
@@ -109,9 +110,37 @@ OpenAI system skill の本文は host runtime が提供します。AgentCanon �
 | --- | --- |
 | `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
 | `$skill-creator` | Direct owner for general skill creation, refactoring, and instruction quality; AgentCanon source changes also use [Updating Skills](#updating-skills). |
-| `$skill-installer` | External skill installation and curated skill listing. |
+| `$skill-installer` | External skill installation and curated skill listing; follow [the local install/update route](#external-skill-installation-and-updates). |
 | `$imagegen` | Bitmap visual asset generation for HTML, reports, dashboards, or visual mockups. |
 | `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
+
+## External Skill Installation And Updates
+
+外部配布スキルの導入・再導入・更新は、host が提供する `$skill-installer` を使います。
+配布元の既定 branch や公式の latest 経路を操作時に確認し、ユーザーが指定した場合に版を固定します。
+出典、実際に導入した版・取得 revision・内容の照合結果は、既存 task / Issue の導入記録に残します。
+
+1. 配布元と対象 Skill、ライセンス、導入先を確認します。導入先に既存物があれば、版情報と内容、
+   local 変更を照合します。版番号が同じか不明でも内容差分を確認します。
+2. 初回は依頼された最新の配布物を導入します。既存物と同じ内容なら保持します。
+   更新候補は helper の `--dest` で外部 task 配下に取得し、既存物を保持したまま差分を読みます。
+3. 新しい内容へ置換する前に、導入済み版と候補、変更点、呼出し方・依存・権限への影響を示し、
+   更新するか現状を維持するかユーザーに質問します。local 変更があれば、その扱いも含めます。
+   回答を待つ間は導入済み内容を使います。
+4. 承認後、候補のファイル一覧とハッシュが確認時と一致することを確かめます。
+   旧 Skill directory を local 変更ごと外部 task の未使用の復元先へ移し、空いた導入先へ
+   確認済み候補の directory をコピーします。ここで branch を再取得しません。
+   helper は既存先への上書きを拒否するため、確認済み候補の配置はこの filesystem 操作で行います。
+5. 導入先の `SKILL.md` と必要な同梱物、実 runtime の Skill 一覧・有効状態を確認します。
+   次の turn で利用でき、一覧に現れなければ Codex を再起動して確認します。
+   候補と導入物のファイル一覧・ハッシュの一致と検出成功まで復元先を保持します。
+   配置や検証に失敗したら、新しく配置した directory を外部 task へ退避して旧 directory を戻し、
+   失敗結果を残します。
+
+例えば `$skill-installer https://github.com/nanaism/yomiyasu/tree/main/skills/yomiyasu` で
+Yomiyasu を依頼できます。外部 Skill は配布元の本文・参照・ライセンスをまとめて扱い、
+AgentCanon の管理リンクや生成 adapter を導入先にしません。使用時の読み込みはその Skill の
+適用条件に従い、AgentCanon の常時指示へ本文を複製しません。
 
 ## Codex Defaults
 
