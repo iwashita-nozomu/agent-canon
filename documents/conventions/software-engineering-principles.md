@@ -64,6 +64,13 @@ downstream design ../../documents/notes/knowledge/coding_decision_methods.md ext
 原則が競合する場合は、次の順序で判断します。下位の原則は上位の contract を
 弱める根拠になりません。
 
+すべてのコード改修で、メモリ安全性を最優先の成立条件とします。性能や実装・実行の
+都合でこの保証を弱めません。変更が影響する所有権と解放責任、寿命、有効なアクセス
+範囲、共有メモリの同期を確認し、言語・runtime の安全な抽象を使います。
+FFI、native 拡張、buffer / view の受渡しでも同じ保証を保ちます。
+検証は変更が影響する保証に合わせ、既存の検証経路から型検査、静的解析、test、
+sanitizer 等を選びます。未確認の保証は未検証として報告します。
+
 1. 最新の明示的なユーザー合意と user / domain contract、safety、correctness
 2. semantic invariant、state / lifecycle owner
 3. root-cause closure、reachable failure handling、cleanup / recovery
