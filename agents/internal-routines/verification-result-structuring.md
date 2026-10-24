@@ -92,6 +92,23 @@ reader's task. Progress may identify a specific retained record for unchanged
 conditions, but an independently consumed document or handoff must resolve its
 necessary context without reconstructing a private conversation.
 
+## Japanese revision
+
+日本語を推敲するときは、動作主・対象・述語を確かめ、操作や結果が追えない抽象語・
+比喩を、資料で確認できる内容へ具体化します。接続語・指示語、修飾・否定・条件の
+掛かり先を読み直し、文を分割・統合しても関係を保ちます。資料にない主体や因果は
+補いません。自然な表現、意味を担う比喩、必要な専門用語や箇条書きはそのまま使います。
+
+推敲前後で、数値・対象・時制・主張の比重、断定と可能性、許可と義務、説明・依頼・
+予定の区別を照合します。次の例では、右欄の条件を維持します。
+
+| 原文 → 推敲例 | 保持する意味・根拠 |
+| --- | --- |
+| 「APIが入力を整える」→「APIが入力の前後の空白を除去する」 | 空白除去が前後の説明や実装から確認できる場合の具体化 |
+| 「入力が妥当な場合、APIは結果を保存できる」→「入力が妥当なら、APIは結果を保存できる」 | 妥当性の条件と可能性。「必ず保存する」へ変えない |
+| 「実装は完了。検証は明日予定」→「実装は完了しました。検証は明日行う予定です」 | 実装の完了と検証の予定 |
+| 「設定変更後に処理が失敗。変更者は不明」→「設定変更後に処理が失敗しました。変更した担当者は不明です」 | 時間的な順序と不明な主体。担当者や因果を創作しない |
+
 ## Structure before writeout
 
 1. At normal work boundaries, retain established findings and evidence in the

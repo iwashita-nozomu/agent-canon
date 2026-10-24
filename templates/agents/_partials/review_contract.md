@@ -3,6 +3,7 @@
 contract template
 responsibility Provides reusable review evidence, oracle, failure, and conflict fields.
 upstream design ../README.md partial expansion and generated artifact boundary.
+upstream design ../../../agents/skills/change-review.md conditional security-audit evidence and coverage.
 downstream implementation ../../../tools/agent/orchestration/agent_team.py expands this partial.
 @dependency-end
 -->
@@ -22,3 +23,6 @@ static proof がそろい、owner・実装・validation・publication の判断�
 - conflict intent と保持した user/design intent:
 - independent reviewer と証跡 readback:
 - rejected finding の reason code と evidence reference:
+
+明示的なセキュリティ監査では、`change-review` の Explicit security audit 手順に従い、
+既存の証跡に防御経路・候補の判定・調査範囲を残します。

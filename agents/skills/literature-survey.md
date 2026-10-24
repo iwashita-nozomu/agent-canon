@@ -51,6 +51,7 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
   制限・反証資料も探し、source の直接の記述と自分の解釈を分けます。
 - 回答、report、design に使う source は tracked note / packet に残し、URL / DOI、
   access date、利用した claim、limitation、保存 artifact の場所を記録します。
+  重要な claim は [原文位置](../../references/README.md#source-passages) へ結び付けます。
   query、探索日、採否理由は、探索範囲や除外判断を再現するのに
   必要な場合に残します。
 - `prose-reasoning-graph` handoff がある場合は、その unsupported-claim や
@@ -63,6 +64,16 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 それを弱める条件を区別します。必要なら `Known` / `Contested` / `Open` に整理し、
 使った source を追跡できる形で記録します。query pack、除外一覧、全 source の要約は、
 検索規模や依頼に必要な場合だけ作ります。
+
+用語や探索先が未確定なら、総説から専門用語・著者・引用・被引用・リンクをたどり、
+問いに必要な資料へ探索を広げます。結論を変え得る代替説明も確認します。
+終了時には、必要な根拠が揃った、重要な未確認点が残る、追加探索で新しい資料が
+得られなくなった、のどれが判断の根拠かを示します。未探索・アクセス不能・探索した
+範囲で見つからなかった状態を区別します。
+
+引用・翻訳・要約・自分の解釈を区別し、引用の文字照合に加えて前後文脈・適用条件・
+反証を評価します。ユーザーが求めた要約や結論を返し、探索資料を求められた場合は
+未解決点と読む箇所を示します。
 
 DOI が既知の source では、host shell から
 [Crossref CSL lookup](../../tools/analysis/documents/literature_metadata.sh) を使って書誌
