@@ -357,7 +357,7 @@ _agent_canon_sync_operation() (
       --archive-root "$AGENT_CANON_PRIVATE_LOG_ROOT" \
       --runtime-root "$AGENT_CANON_RUNTIME_ROOT" \
       --remote "${AGENT_CANON_LOG_REMOTE:-git@github.com:iwashita-nozomu/agent-canon-log.git}" \
-      sync --no-agent-reports || hook_rc=$?
+      sync --no-agent-reports --include-main-evals || hook_rc=$?
   else
     _agent_canon_json_error runtime_archive_unavailable \
       "runtime archive owner is unavailable for scheduled hook delivery"

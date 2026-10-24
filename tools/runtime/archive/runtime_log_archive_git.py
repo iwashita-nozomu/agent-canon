@@ -5,6 +5,7 @@
 # upstream design ../../../documents/runtime/runtime-log-archive.md runtime log archive ownership and branch policy
 # upstream design ../../../documents/design/request-intent-and-update-relation.md run-bundle retention receipt projection
 # upstream implementation ./runtime_log_paths.py resolves archive paths and source repo keys
+# upstream implementation ./github_eval_delivery.py trusted main-push Eval artifact input
 # downstream design ../../../documents/runtime/runtime-log-archive.md documents this tool as the normal Git workflow
 # downstream implementation ../../../tests/agent_tools/test_runtime_log_archive_git.py validates clone, branch, status, and push behavior
 # @dependency-end
@@ -910,7 +911,16 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("--message", help="Commit message. Defaults to 'Append <stable-source-repository-id> runtime logs'.")
     sync.add_argument("--no-pull", action="store_true", help="Do not pull --rebase before pushing.")
     sync.add_argument("--no-push", action="store_true", help="Copy artifacts into the archive without pushing.")
-    sync.add_argument("--no-agent-reports", action="store_true", help="Do not copy reports/agents artifacts.")
+    sync.add_argument(
+        "--no-agent-reports",
+        action="store_true",
+        help="Do not copy reports/agents artifacts.",
+    )
+    sync.add_argument(
+        "--include-main-evals",
+        action="store_true",
+        help="Deliver successful main-push Eval artifacts through the existing publisher.",
+    )
     sync.add_argument(
         "--report-root",
         type=Path,
@@ -7048,15 +7058,84 @@ def command_push(context: ArchiveContext, args: argparse.Namespace) -> int:
         return 0 if receipt.status == "committed" else 1
 
 
+def _deliver_main_evals(
+    context: ArchiveContext,
+    receipt: ArchivePublicationReceipt,
+    *,
+    no_pull: bool = False,
+) -> None:
+    """Extend host sync with Actions input after the archive's acknowledged head."""
+    from tools.runtime.archive.github_eval_delivery import (
+        EvalArtifactLimits,
+        GitHubEvalDeliveryError,
+        deliver_main_evals,
+    )
+
+    if context.runtime_root is None:
+        raise ArchiveGitError("github_eval_runtime_root_required")
+    paths = git(
+        context.archive_root,
+        [
+            "ls-tree",
+            "-r",
+            "--name-only",
+            receipt.archive_commit_oid,
+            "--",
+            "eval-results/collections",
+        ],
+    ).stdout.splitlines()
+    if paths:
+        _verify_remote_archive_readback(
+            context,
+            receipt,
+            tuple(context.archive_root / path for path in paths),
+        )
+    published = {Path(path).stem for path in paths}
+
+    def publish(spool: Path, run_id: str) -> None:
+        try:
+            result = command_archive_eval(
+                context,
+                argparse.Namespace(spool_root=spool, run_id=run_id, no_pull=no_pull),
+            )
+        except ArchiveGitError as exc:
+            raise GitHubEvalDeliveryError(
+                "github_eval_archive_publication_failed"
+            ) from exc
+        if result != 0:
+            raise GitHubEvalDeliveryError("github_eval_archive_publication_failed")
+
+    try:
+        limits = EvalArtifactLimits.from_manifest(
+            context.canon_root / "bootstrap" / "host" / "manifest.toml",
+        )
+        count = deliver_main_evals(
+            source_root=context.source_root,
+            runtime_root=context.runtime_root,
+            published_run_ids=published,
+            limits=limits,
+            publish=publish,
+        )
+    except GitHubEvalDeliveryError as exc:
+        raise ArchiveGitError(str(exc)) from exc
+    print(f"RUNTIME_LOG_ARCHIVE_MAIN_EVAL_DELIVERED={count}")
+
+
 def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
     """Run the normal unattended archive sync flow."""
+    if getattr(args, "include_main_evals", False) and getattr(args, "no_push", False):
+        raise ArchiveGitError("main_evals_require_publication")
     with prepare_archive_transaction(context, fetch=True) as transaction:
         spool_snapshot = snapshot_hook_spool_events(transaction)
         ingest_result = ingest_hook_event_spool(transaction, spool_snapshot)
         print_context(context)
         print(f"RUNTIME_LOG_ARCHIVE_SPOOL_SOURCE_EVENTS={len(spool_snapshot)}")
-        print(f"RUNTIME_LOG_ARCHIVE_SPOOL_ACCEPTED={len(ingest_result.accepted_events)}")
-        print(f"RUNTIME_LOG_ARCHIVE_SPOOL_DUPLICATES={len(ingest_result.duplicate_events)}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_SPOOL_ACCEPTED={len(ingest_result.accepted_events)}"
+        )
+        print(
+            f"RUNTIME_LOG_ARCHIVE_SPOOL_DUPLICATES={len(ingest_result.duplicate_events)}"
+        )
         if not args.no_agent_reports:
             summary = copy_agent_reports_prepared(
                 transaction,
@@ -7068,7 +7147,9 @@ def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
         receipt = publish_prepared_archive(transaction, args)
         removed = finalize_hook_spool_readback(transaction, receipt, ingest_result)
         print(f"RUNTIME_LOG_ARCHIVE_SPOOL_FINALIZED={removed}")
-        print(f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}")
+        print(
+            f"RUNTIME_LOG_ARCHIVE_COMMITTED={'yes' if receipt.commit_created else 'no'}"
+        )
         print(f"RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS={receipt.status}")
         print(f"RUNTIME_LOG_ARCHIVE_PUSH_STATUS={receipt.push_status}")
         if receipt.status == "partial_retained":
@@ -7081,8 +7162,12 @@ def command_sync(context: ArchiveContext, args: argparse.Namespace) -> int:
         if receipt.status == "failed":
             print("RUNTIME_LOG_ARCHIVE_SYNC=failed")
             return 1
-        print("RUNTIME_LOG_ARCHIVE_SYNC=pass")
-        return 0
+    if getattr(args, "include_main_evals", False):
+        _deliver_main_evals(
+            context, receipt, no_pull=bool(getattr(args, "no_pull", False))
+        )
+    print("RUNTIME_LOG_ARCHIVE_SYNC=pass")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

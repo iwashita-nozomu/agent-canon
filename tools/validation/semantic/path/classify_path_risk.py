@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # @dependency-start
 # contract tool
 # responsibility Classifies changed paths into runtime risk profiles and canonical static-gate execution units.
@@ -30,6 +29,8 @@ class PathRisk:
 
 DOC_SUFFIXES = {".md"}
 DOC_CHECK_INPUTS = {
+    "tools/validation/documentation/config/lychee.toml",
+    "tests/tools/test_docs_link_inputs.py",
     "tools/runtime/dispatch/agent-canon/src/docs.rs",
     "documents/runtime/runtime-profiles-and-check-matrix.json",
     "tests/tools/test_fix_mermaid.py",
@@ -43,6 +44,27 @@ CONTAINER_PATHS = {
 }
 GITHUB_PREFIXES = (".github/",)
 EVAL_PREFIXES = ("eval/", "reports/agent-runtime-dashboard/")
+EVAL_SOURCE_PREFIXES = (
+    "agents/",
+    ".codex/",
+    "templates/agents/",
+    "tools/agent/",
+    ".github/workflows/",
+    "tools/validation/ci/",
+    "documents/conventions/",
+    "documents/operations/",
+    "documents/rule/",
+)
+EVAL_PATHS = {
+    "AGENTS.md",
+    "ROOT_AGENTS.md",
+    "bootstrap.sh",
+    "bootstrap/host/manifest.toml",
+    "bootstrap/host/lifecycle/entrypoint.sh",
+    "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/archive/runtime_log_archive_git.py",
+    "tools/runtime/archive/github_eval_delivery.py",
+}
 EVAL_TEST_PATHS = {"tests/agent_tools/test_eval_accumulation_check.py"}
 RUST_PREFIXES = ("tools/runtime/dispatch/agent-canon/",)
 DEPENDENCY_PATHS = {
@@ -133,7 +155,11 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
                 ("python3 tools/validation/ci/checks/check_github_workflows.py",),
             )
         )
-    if any(path.startswith(EVAL_PREFIXES) or path in EVAL_TEST_PATHS for path in paths):
+    if any(
+        path.startswith(EVAL_PREFIXES + EVAL_SOURCE_PREFIXES)
+        or path in EVAL_PATHS | EVAL_TEST_PATHS
+        for path in paths
+    ):
         active.append(
             PathRisk(
                 "agent-eval",
@@ -162,6 +188,13 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
     return tuple(dict.fromkeys(active))
 
 
+def _needs_contracts_fallback(path: str) -> bool:
+    """An additive Eval selection cannot retire an existing unknown-path check."""
+    return not any(risk.profile != "agent-eval" for risk in classify((path,))) and not (
+        path.startswith(EVAL_PREFIXES) or path in EVAL_TEST_PATHS
+    )
+
+
 def select_static_gate_units(
     paths: tuple[str, ...], *, full_confidence: bool = False
 ) -> tuple[str, ...]:
@@ -175,7 +208,7 @@ def select_static_gate_units(
     if "rust" in profiles:
         selected.append("rust")
     if profiles & {"python-tooling", "dependency"} or any(
-        not classify((path,)) for path in paths
+        _needs_contracts_fallback(path) for path in paths
     ):
         selected.append("contracts")
     if "agent-eval" in profiles:

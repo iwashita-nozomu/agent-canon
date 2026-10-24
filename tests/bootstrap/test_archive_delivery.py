@@ -89,6 +89,7 @@ _agent_canon_private_feedback_sync() {
   printf 'feedback-sync\n' >> "$TEST_CALLS"
 }
 python3() {
+  [[ "$*" == *"sync --no-agent-reports --include-main-evals"* ]] || return 98
   printf 'hook-sync\n' >> "$TEST_CALLS"
 }
 fixture_docker() { printf 'sha256:fixture\n'; }

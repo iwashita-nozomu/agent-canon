@@ -146,6 +146,51 @@ mechanism nor a prerequisite for reading existing evidence.
 
 ## Collection contract
 
+### Main-change Eval collection
+
+Related Skill, role, workflow, and instruction-owner changes on `main` select
+the existing eval unit through
+[the changed-path classifier](../tools/classify_path_risk.md). The existing
+Static Gates workflow uses the push's before/head range; an unavailable before
+commit selects eval conservatively. Each push head and run attempt gets its
+own `main-<sha>-<run>-<attempt>` identity. PR and manual validation retain their
+existing unit execution route.
+
+For a main push, that eval unit calls `bootstrap.sh ... eval collect` once in
+the existing shared runtime. It uploads a dedicated
+`agent-canon-main-eval-<run>-<attempt>` artifact only after successful collection.
+Failed and partial collections, including a bootstrap receipt when no spool
+could be created, stay in the existing static-validation diagnostic artifact.
+They do not enter the accumulated successful family directories.
+
+The host scheduler's existing archive sync selects these Actions artifacts
+through the configured `gh` connection. It checks the source repository,
+completed push run and attempt, workflow identity, main head, artifact digest,
+clean source before/after, and the collection's source and producer revisions.
+It processes all qualifying artifacts rather than only the latest main head.
+The existing `archive-eval` publisher then appends the original bytes and
+verifies remote ref/tree/blob readback. Remotely acknowledged collections are
+the deduplication index; no separate delivery cursor is maintained.
+
+Transport staging reuses the manifest's task-state, task-log, and runtime byte
+budgets; `archive.main_eval_max_members` bounds ZIP entries. Metadata reads,
+download size, entry size, expansion, and total retained staging are checked
+before the corresponding writes. The parser has an independent cumulative
+metadata-byte budget before accepted entries are counted. Aggregate admission
+accounts for the whole runtime root. Retries reuse the verified stage in place.
+Cleanup is retried after remote acknowledgement, including when the Actions
+artifact is no longer listed.
+
+Collection runs in CI after the push; publication follows on the next existing
+host sync. Actions retains these artifacts and diagnostic evidence for seven
+days. Acquired bundles remain in the explicit runtime spool on failure and can
+be replayed from their verified original ZIP even after Actions expiry. An
+undelivered artifact that expires before acquisition remains a delivery failure
+requiring the CI owner to rerun its source revision. A transport or publication
+failure does not authorize new credentials or discard pending data.
+
+### Collection fields and source boundary
+
 `eval collect` runs existing producers in the shared tool container and writes
 an `agent_canon.eval_collection.v1` bundle and receipt under the runtime spool.
 The producer definitions, role/config surfaces, and eval manifests are part of
