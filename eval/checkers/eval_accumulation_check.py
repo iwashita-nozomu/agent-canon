@@ -39,6 +39,7 @@ if __package__ in (None, ""):
 from eval.checkers.eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
 from tools.agent.orchestration.prompt_capture import redact_sensitive_text  # noqa: E402
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
+    HOOK_SPOOL_INDEX_NAME,
     eval_result_search_dirs,
     hook_result_search_dirs,
     mounted_log_archive_root,
@@ -604,6 +605,7 @@ def hook_result_findings(
             for hook_dir in hook_dirs
             if hook_dir.is_dir()
             for path in hook_dir.rglob("*.jsonl")
+            if path.name != HOOK_SPOOL_INDEX_NAME
         }
     )
     entries = 0

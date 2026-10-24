@@ -1933,7 +1933,7 @@ def test_reconciliation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_eval_precondition_failure_creates_no_spool_or_exchange(
-    tmp_path: Path
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An unregistered eval target can be retried after registration."""
     manager = runtime(tmp_path)
@@ -1956,6 +1956,11 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
         cwd=target,
         check=True,
     )
+
+    def reject_snapshot(_root: Path) -> dict[str, Any]:
+        raise AssertionError("unregistered targets must not be read")
+
+    monkeypatch.setattr(bootstrap_runtime_module, "_source_snapshot", reject_snapshot)
     with pytest.raises(BootstrapError) as failure:
         manager.eval_collect(target, "precondition")
     assert failure.value.code == "target_not_registered"
@@ -1963,6 +1968,25 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
     assert not (
         manager.paths.container_runtime / "tasks" / "eval-precondition"
     ).exists()
+
+
+def test_eval_snapshot_failure_releases_admission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed metadata read must not leave an active task or invalid collection."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+
+    def fail_snapshot(_root: Path) -> dict[str, Any]:
+        raise BootstrapError("source_snapshot_failed", "fixture metadata failure")
+
+    monkeypatch.setattr(bootstrap_runtime_module, "_source_snapshot", fail_snapshot)
+    with pytest.raises(BootstrapError, match="fixture metadata failure"):
+        manager.eval_collect(target, "snapshot-failure")
+
+    state = manager._read_state()
+    assert state["active_task_count"] == 0
+    assert all(task["state"] != "active" for task in state["tasks"].values())
+    assert not (manager.paths.spool / "snapshot-failure").exists()
 
 
 def test_eval_collect_runs_existing_producers_and_prepares_sync_request(
@@ -2040,12 +2064,41 @@ def test_eval_collect_runs_existing_producers_and_prepares_sync_request(
     monkeypatch.setattr(
         bootstrap_runtime_module, "_run_resident_command", run_mounted_command
     )
+    # Exercise the actual mixed-owner Git rejection without changing ownership
+    # or any host/global Git configuration.
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "0")
+    unscoped = subprocess.run(
+        ["git", "-C", str(target), "rev-parse", "HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert unscoped.returncode != 0
+    assert "dubious ownership" in unscoped.stderr
+    provided_head = "a" * 40
+    monkeypatch.setenv("AGENT_CANON_SOURCE_HEAD", provided_head)
+    snapshot = bootstrap_runtime_module._source_snapshot
+
+    def snapshot_target_only(root: Path) -> dict[str, Any]:
+        assert root == target, (
+            "provided source identity must not trigger fallback reads"
+        )
+        return snapshot(root)
+
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "_source_snapshot", snapshot_target_only
+    )
     run_id = "resident-eval-success"
     result = manager.eval_collect(target, run_id)
 
     assert result["code"] == "eval_spooled"
     collection = result["details"]["collection"]
     assert collection["status"] == "collected"
+    assert collection["agent_canon_commit"] == provided_head
+    assert os.environ["GIT_CONFIG_COUNT"] == "0"
     assert collection["source_tree_unchanged"] is True
     assert {
         producer["name"]: producer["status"]

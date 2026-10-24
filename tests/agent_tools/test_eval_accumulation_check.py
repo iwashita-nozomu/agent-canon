@@ -21,6 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "eval_accumulation_check.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.archive.runtime_log_paths import (
+    HOOK_SPOOL_INDEX_NAME,
     mounted_log_archive_root,
     repo_log_key,
 )  # noqa: E402
@@ -94,6 +95,58 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("duplicate", result.stdout)
+
+    def test_transport_index_is_not_a_hook_event(self) -> None:
+        """Archive delivery metadata must not create hook-field failures."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "source"
+            root.mkdir()
+            self.write_fixture(root)
+            index = self.hook_path(root).parent.parent / HOOK_SPOOL_INDEX_NAME
+            index.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent_canon.hook_spool_index.v1",
+                        "event_id": "0" * 64,
+                        "event_sha256": "1" * 64,
+                        "hook_name": "pretooluse",
+                        "projection_path": "test/hook.jsonl",
+                        "runtime_namespace": "test",
+                        "transaction_id": "2" * 64,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--format", "json")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["hook_files"], 1)
+            self.assertEqual(payload["hook_entries"], 1)
+            self.assertEqual(payload["blocking_finding_count"], 0)
+
+    def test_other_hidden_jsonl_still_validates_as_events(self) -> None:
+        """Excluding metadata must not hide malformed canonical events."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "source"
+            root.mkdir()
+            self.write_fixture(root)
+            hidden = self.hook_path(root).parent / ".hidden-hook.jsonl"
+            # Schema-less archived rows are compatibility warnings. This case
+            # must exercise the canonical event contract's blocking checks.
+            entry = self.hook_entry("hidden-canonical-event")
+            entry.update(
+                {"schema": "agent-canon.behavior-event.v1", "event_kind": "invalid"}
+            )
+            hidden.write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(".hidden-hook.jsonl", result.stdout)
+            self.assertIn("behavior_event", result.stdout)
 
     def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
         """Compact mode writes finding stats to JSON and keeps stdout bounded."""

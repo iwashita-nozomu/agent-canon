@@ -35,9 +35,15 @@ DOC_CHECK_INPUTS = {
     "tests/tools/test_fix_mermaid.py",
 }
 PYTHON_SUFFIXES = {".py", ".pyi"}
-CONTAINER_PREFIXES = ("docker/", "bootstrap/")
+CONTAINER_PREFIXES = ("docker/", "bootstrap/", "tests/bootstrap/")
+CONTAINER_PATHS = {
+    "bootstrap.sh",
+    "tools/runtime/container/bootstrap_runtime.py",
+    "tests/tools/test_bootstrap_container_contract.py",
+}
 GITHUB_PREFIXES = (".github/",)
 EVAL_PREFIXES = ("eval/", "reports/agent-runtime-dashboard/")
+EVAL_TEST_PATHS = {"tests/agent_tools/test_eval_accumulation_check.py"}
 RUST_PREFIXES = ("tools/runtime/dispatch/agent-canon/",)
 DEPENDENCY_PATHS = {
     "agents/skills/catalog.yaml",
@@ -106,7 +112,9 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
                 ),
             )
         )
-    if any(path.startswith(CONTAINER_PREFIXES) for path in paths):
+    if any(
+        path.startswith(CONTAINER_PREFIXES) or path in CONTAINER_PATHS for path in paths
+    ):
         active.append(
             PathRisk(
                 "container-runtime",
@@ -125,7 +133,7 @@ def classify(paths: tuple[str, ...]) -> tuple[PathRisk, ...]:
                 ("python3 tools/validation/ci/checks/check_github_workflows.py",),
             )
         )
-    if any(path.startswith(EVAL_PREFIXES) for path in paths):
+    if any(path.startswith(EVAL_PREFIXES) or path in EVAL_TEST_PATHS for path in paths):
         active.append(
             PathRisk(
                 "agent-eval",

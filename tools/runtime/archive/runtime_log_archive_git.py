@@ -56,6 +56,7 @@ from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     parse_review_identity,
 )
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
+    HOOK_SPOOL_INDEX_NAME,
     LOG_ARCHIVE_REMOTE,
     agent_canon_git_commit_key,
     codex_trace_key,
@@ -188,7 +189,6 @@ ARCHIVE_FORBIDDEN_CONTENT = re.compile(
 HOOK_SPOOL_INDEX_SCHEMA = "agent_canon.hook_spool_index.v1"
 HOOK_SPOOL_CURSOR_SCHEMA = "agent_canon.hook_spool_cursor.v1"
 HOOK_SPOOL_CURSOR_SCHEMA_VERSION = 1
-HOOK_SPOOL_INDEX_NAME = ".spool-index.jsonl"
 HOOK_SPOOL_CURSOR_NAME = ".spool-cursor.json"
 ARCHIVE_TRANSACTION_LOCK_RELATIVE = Path("locks") / "archive-transaction.lock"
 HOOK_SPOOL_ZERO_SHA256 = "0" * 64
