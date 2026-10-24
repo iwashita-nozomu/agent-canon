@@ -155,6 +155,30 @@ necessary context without reconstructing a private conversation.
    destination does not erase results or justify withholding them from another
    authorized output.
 
+## Completion reports
+
+Build a task completion report from the retained findings and decisions. Lead
+with the requested outcome, its concrete effect, and the completed scope. Explain
+the material approach choices before giving supporting validation and limits.
+
+For an approach actually tried that affected implementation, validation, or the
+conclusion, state its purpose, observed result, grounds for retaining, rejecting,
+or replacing it, and effect on the final choice. Preserve a material failed
+attempt after a successful retry. Identify relevant source-based assessments and untried
+proposals as such; distinguish observed outcomes from hypotheses about causes
+or expected benefits.
+
+Put these decisive findings and choice grounds in the final chat itself. Use
+Issue, PR, and artifact references for supporting detail; a link or a statement
+that the details were recorded cannot replace that explanation. Carry the
+relevant validation coverage, remaining uncertainty, and delivery state through
+the existing result structure.
+
+Choose detail by the significance of the findings and decisions. Compress
+repeated procedure narration while retaining the explanation needed to assess
+the result. Include material discarded approaches when the task record contains them;
+simple work needs no invented alternatives or empty sections.
+
 ## Choose the presentation
 
 After structuring the content and before drafting or revising the output, choose

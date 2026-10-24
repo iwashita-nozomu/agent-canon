@@ -93,6 +93,9 @@ use [verification result structuring](../internal-routines/verification-result-s
 Use its retained findings and coverage check for the following report; this
 specialization does not limit the writing boundary above.
 
+For task completion, apply [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports)
+to those retained findings before drafting the final chat response.
+
 A result report leads with the answer to the user's request, not an inventory
 of work. Explain whether the goal was met or what the investigation establishes,
 what changed relative to the relevant baseline, and why that matters for the

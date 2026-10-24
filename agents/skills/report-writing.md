@@ -15,7 +15,7 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 
 ## Purpose
 
-既存 evidence から status、audit、evaluation、experiment、review、decision、recommendation、presentation の
+既存 evidence からタスク完了報告、status、audit、evaluation、experiment、review、decision、recommendation、presentation の
 reader-facing prose を作ります。material claim は source に辿れ、observation と inference、limitation、next action を分けます。
 raw artifact は `result-artifact-writeout` が所有し、report は第二の policy/source-of-truth になりません。
 
@@ -23,6 +23,7 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 
 1. [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction) で source、audience/decision、requested next action、
    findings、counterevidence、corrections、limitations を読み直す。settled check の再実行や別の環境調査は、答えを変える具体的 gap がある場合だけ行う。
+   タスク完了報告には [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports) を適用し、重要な試行と採否の根拠も本文へ含める。
 2. 外部 reference が material claim を支える場合は、URL/DOI、access date、source identity、採否を持つ既存 source note/packet を使う。
    evaluation/experiment report では denominator、metric direction、valid/invalid comparison、次 action を明記する。
 3. draft前に [構成確認](structure-planning.md#before-prose) を行う。readerの問いに沿った要点・sectionの順序と役割、claim/evidenceの対応を、既存構成で満たせるなら再利用し、不足すれば先に作成・補完する。複数のtopology候補がなくても飛ばさない。
