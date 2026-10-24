@@ -129,8 +129,9 @@ data conversion across the call. Preserve the provider's ordering, ownership,
 and shared effects when deciding which operations can run concurrently.
 
 Follow the provider's execution state for the requested operation. For unfinished
-work, use its returned handle with the native completion/status/resume API before consuming a completed
-result. Retain failures and partial results as evidence. For truncated output,
+work, follow its documented completion mechanism and preserve any returned
+handle. Consume the completed result when completion is reported. Retain failures
+and partial results as evidence. For truncated output,
 use its reported locator or pagination to obtain the part needed for the
 decision. Feed actual returned values and artifacts into the next operation.
 
