@@ -33,9 +33,13 @@ developer instructions. Preserve explicit read limits across continuation,
 handoff, and Skill use, including instruction files, Issues, and logs. Reuse
 available context and complete authorized work from known facts when further
 reads are forbidden. For code cleanup, reduce the relevant owning
-implementation; do not add features, wrappers, or safety code. Deleting unrelated
+implementation while preserving its required guarantees. Deleting unrelated
 documentation or artifacts does not offset source growth. Genuine functional
 expansion requires separate agreement from the current user.
+
+Prioritize memory safety in every code change. Preserve ownership, lifetimes,
+memory-access bounds, and synchronization before optimizing performance or
+implementation convenience.
 
 For a local repair, start from the target code, diff, and governing contract;
 do not make use-site or out-of-scope investigation a prerequisite. If those facts
