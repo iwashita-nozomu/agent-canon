@@ -41,6 +41,10 @@ Prioritize memory safety in every code change. Preserve ownership, lifetimes,
 memory-access bounds, and synchronization before optimizing performance or
 implementation convenience.
 
+Prefer extending a capability at its existing owner before introducing a
+separate implementation. Justify a separate capability with the concrete
+requirement, responsibility, or contract gap that extension cannot satisfy.
+
 For a local repair, start from the target code, diff, and governing contract;
 do not make use-site or out-of-scope investigation a prerequisite. If those facts
 cannot resolve a concrete decision, state the missing fact and smallest reference
