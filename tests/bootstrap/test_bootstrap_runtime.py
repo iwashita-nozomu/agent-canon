@@ -1970,6 +1970,42 @@ def test_eval_precondition_failure_creates_no_spool_or_exchange(
     ).exists()
 
 
+@pytest.mark.parametrize("matching_root", [True, False])
+def test_eval_uses_declared_target_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, matching_root: bool
+) -> None:
+    """A host-derived digest binds only its registered resident path."""
+    manager, target = _ready_runtime_with_target(tmp_path)
+    state = manager._read_state()
+    record = dict(next(iter(state["targets"].values())))
+    host_root = "/host/project-source"
+    declared_digest = bootstrap_runtime_module.sha256_text(host_root)
+    record.update(digest=declared_digest, host_root=host_root)
+    if not matching_root:
+        other = tmp_path / "other-target"
+        other.mkdir()
+        record["root"] = str(other)
+    state["targets"] = {declared_digest: record}
+    state["generations"][state["current_generation"]]["targets"] = dict(
+        state["targets"]
+    )
+    manager._write_state(state)
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", declared_digest)
+
+    def admission_reached(
+        _state: dict[str, Any], _task: str, *, target_root: Path
+    ) -> None:
+        assert target_root == target
+        raise BootstrapError("admission_reached", "registered binding accepted")
+
+    monkeypatch.setattr(manager, "_admit_task_locked", admission_reached)
+    with pytest.raises(BootstrapError) as failure:
+        manager.eval_collect(target, "binding")
+    assert failure.value.code == (
+        "admission_reached" if matching_root else "target_not_registered"
+    )
+
+
 def test_eval_snapshot_failure_releases_admission(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

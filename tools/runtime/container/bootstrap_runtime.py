@@ -2299,8 +2299,13 @@ class BootstrapRuntime:
             state = self._read_state()
             before_state = state.get("state")
             target = self._target_record(source, "read-only")
+            declared_digest = os.environ.get("AGENT_CANON_TARGET_DIGEST")
+            if declared_digest and declared_digest in state.get("targets", {}):
+                target = state["targets"][declared_digest]
             registered = state.get("targets", {}).get(target["digest"])
-            if not isinstance(registered, dict):
+            if not isinstance(registered, dict) or registered.get("root") != str(
+                source
+            ):
                 raise BootstrapError(
                     "target_not_registered", "eval root is not registered"
                 )
