@@ -29,6 +29,10 @@ Keep the canonical source, generated adapter, and Codex discovery entry distinct
 | Git-distributed adapter | `.codex/personal/skills/<skill>/SKILL.md`; authored from the catalog and committed with source changes |
 | Installed AgentCanon entry | `~/.agents/skills/<skill>/SKILL.md`, through the bootstrap-managed directory link |
 | Repository-owned skill | `.agents/skills/<skill>/SKILL.md` in the owning repository or subtree |
+| External user skill | Host `$skill-installer` destination; its GitHub helper defaults to `${CODEX_HOME:-$HOME/.codex}/skills/<skill>/SKILL.md`. |
+
+External installation, newer-version questions, and discovery readback follow
+[External Skill Installation And Updates](../skills/README.md#external-skill-installation-and-updates).
 
 [Codex skill discovery](https://developers.openai.com/codex/skills/) scans
 `.agents/skills` from the working directory to the repository root and the user
