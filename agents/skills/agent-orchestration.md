@@ -87,6 +87,26 @@ when the selected owner or a distinct unresolved decision requires them. A
 related document or repository change alone does not select a specialist
 workflow.
 
+## Delegation selection
+
+Apply the [current-agent default](../../ROOT_AGENTS.md#task-entry) before choosing
+a child. Identify the separate judgment or bounded work it would own and the
+concrete benefit of separating it. Weigh that benefit against context transfer,
+duplicated investigation, waiting, verification, and integration. Qualitative
+task evidence is sufficient; keep the work in the current agent when the
+benefit is unclear.
+
+Keep tightly coupled or sequential steps together. Select the smallest
+sufficient delegation when independent work can usefully proceed in parallel or
+the task requires an independent judgment. Preserve explicit collaboration
+requests and required independent reviews. Use existing deterministic checks
+for the properties they establish.
+
+A need for durable coordination, resumption, or publication can be handled by
+the current agent; choose additional agents separately. Role inventories and
+available capacity describe candidates and limits. Reassess the benefit before
+adding another child, using the existing task context.
+
 ## Owner-First Read Trace
 
 Start with the applicable root instructions and selected Skill. For a local

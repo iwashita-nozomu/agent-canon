@@ -6,6 +6,7 @@ contract skill
 responsibility Launches selected child handoffs and durable coordination without duplicating role policy.
 upstream design ../task_catalog.yaml typed child and run-bundle selection
 upstream design ../canonical/CODEX_SUBAGENTS.md role, authority, and lifecycle policy
+upstream design ./agent-orchestration.md current-agent default and delegation selection
 upstream design ../COMMUNICATION_PROTOCOL.md handoff and context boundary
 upstream design ./direct-luna-communication.md selected Luna runtime exchange
 upstream design ../internal-routines/subagent-startup.md selected private startup route
@@ -25,6 +26,9 @@ Use when the typed task route requires a child or durable coordination or
 resumption. Repository-changing work alone does not select either.
 
 ## Launch and Handoff
+
+Apply [Delegation selection](agent-orchestration.md#delegation-selection) before
+preparing a child handoff. Durable coordination can remain with the current agent.
 
 Resolve the task and role from the selected catalog route and
 [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md). Use relative links from the

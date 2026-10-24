@@ -105,6 +105,11 @@ The selected workflow owns execution, delegation, and validation. Activate desig
 research, or specialist routes only when their conditions apply. AgentCanon source
 maintenance does not authorize editing a consumer's generated instructions.
 
+Prefer completing work in the current agent. Use additional agents when explicit
+task requirements, a needed independent judgment, or a clear benefit from
+separable parallel work justifies the context-transfer and integration cost.
+When the benefit is unclear, continue with the current agent.
+
 For authorized implementation or repair, complete the requested in-scope outcome,
 including existing failures; diagnosis, checkpoints, and no-op checks alone do
 not complete it. Honor explicit stop boundaries. Keep independent problems in
