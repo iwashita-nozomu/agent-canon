@@ -14,6 +14,8 @@ name: AgentCanon Static Gates
 
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +25,7 @@ env:
   AGENT_CANON_CONTROL_PARENT_ROOT: ${{ github.workspace }}/..
 
 concurrency:
-  group: agent-canon-static-gates-${{ github.event.pull_request.head.sha || github.sha }}
+  group: agent-canon-static-gates-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -38,16 +40,32 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Select validation units from trusted PR diff
+      - name: Select validation units from trusted event diff
         id: select
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             git -c core.quotePath=false diff --name-only --no-renames "${BASE_SHA}" HEAD > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
             python3 tools/validation/semantic/path/classify_path_risk.py \
               --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
               --format github-output | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            if git cat-file -e "${PUSH_BEFORE_SHA}^{commit}" 2>/dev/null; then
+              git -c core.quotePath=false diff --name-only --no-renames "${PUSH_BEFORE_SHA}" HEAD > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
+              selection="$(python3 tools/validation/semantic/path/classify_path_risk.py \
+                --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" --format github-output)"
+            else
+              selection="$(python3 tools/validation/semantic/path/classify_path_risk.py \
+                --full-confidence --format github-output)"
+            fi
+            units="$(printf '%s\n' "${selection}" | sed -n 's/^units=//p')"
+            if [[ ",${units}," == *,eval,* ]]; then
+              printf 'units=eval\ndocs_paths=[]\n' | tee -a "${GITHUB_OUTPUT}"
+            else
+              printf 'units=\ndocs_paths=[]\n' | tee -a "${GITHUB_OUTPUT}"
+            fi
           else
             python3 tools/validation/semantic/path/classify_path_risk.py \
               --full-confidence --format github-output | tee -a "${GITHUB_OUTPUT}"
@@ -123,6 +141,11 @@ jobs:
           status=0
           eval_unit_status=not-selected
           unit_index=0
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            main_eval_run_id="main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            main_eval_spool="${AGENT_CANON_CONTROL_PARENT_ROOT}/.runtime/container-state/spool/${main_eval_run_id}"
+            printf 'MAIN_EVAL_RUN_ID=%s\nMAIN_EVAL_SPOOL=%s\n' "${main_eval_run_id}" "${main_eval_spool}" >> "${GITHUB_ENV}"
+          fi
           for unit in "${units[@]}"; do
             unit_index=$((unit_index + 1))
             receipt="${evidence}/unit-${unit_index}.log"
@@ -130,9 +153,14 @@ jobs:
             case "${unit}" in
               docs) args=("${docs_paths[@]}") ;;
             esac
-            if "${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}" \
-              exec --root "${GITHUB_WORKSPACE}" -- bash \
-              /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}" > "${receipt}" 2>&1; then
+            unit_command=("${AGENT_CANON_CANDIDATE_SOURCE}/bootstrap.sh" --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}")
+            if [[ "${GITHUB_EVENT_NAME}" == "push" && "${unit}" == "eval" ]]; then
+              unit_command+=(eval collect --root "${GITHUB_WORKSPACE}" --run-id "${main_eval_run_id}")
+            else
+              unit_command+=(exec --root "${GITHUB_WORKSPACE}" -- bash \
+                /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}")
+            fi
+            if "${unit_command[@]}" > "${receipt}" 2>&1; then
               if [[ "${unit}" == "eval" ]]; then
                 eval_unit_status=pass
               fi
@@ -164,7 +192,11 @@ jobs:
           # drift. Export data without starting a command or extracting paths.
           docker cp -- "${container}:/var/lib/agent-canon/runtime/tasks" - > "${evidence}/runtime-task-output.tar.part"
           mv -- "${evidence}/runtime-task-output.tar.part" "${evidence}/runtime-task-output.tar"
-          if [[ ",${SELECTED_UNITS}," == *,eval,* ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            if [[ -d "${MAIN_EVAL_SPOOL:-}" ]]; then
+              cp -a -- "${MAIN_EVAL_SPOOL}" "${evidence}/main-eval-collection"
+            fi
+          elif [[ ",${SELECTED_UNITS}," == *,eval,* ]]; then
             docker cp -- "${container}:/var/lib/agent-canon/runtime/archive/agent-canon-log/eval-results" - > "${evidence}/runtime-eval-results.tar.part"
             mv -- "${evidence}/runtime-eval-results.tar.part" "${evidence}/runtime-eval-results.tar"
             if [[ "${EVAL_UNIT_STATUS}" == "fail" ]]; then
@@ -172,6 +204,18 @@ jobs:
               mv -- "${evidence}/runtime-eval-producer-logs.tar.part" "${evidence}/runtime-eval-producer-logs.tar"
             fi
           fi
+
+      - name: Upload successful main Eval collection
+        if: always() && github.event_name == 'push' && steps.run_units.outputs.eval_unit_status == 'pass'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: agent-canon-main-eval-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.MAIN_EVAL_SPOOL }}/collection.json
+            ${{ env.MAIN_EVAL_SPOOL }}/eval-results/
+            ${{ env.MAIN_EVAL_SPOOL }}/producer-logs/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload static validation evidence
         if: always() && steps.start_runtime.outcome == 'success'

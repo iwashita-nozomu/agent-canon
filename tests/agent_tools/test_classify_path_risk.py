@@ -15,12 +15,39 @@ import sys
 import unittest
 from pathlib import Path
 
+from tools.validation.semantic.path.classify_path_risk import select_static_gate_units
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASSIFIER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "path" / "classify_path_risk.py"
+CLASSIFIER = (
+    PROJECT_ROOT
+    / "tools"
+    / "validation"
+    / "semantic"
+    / "path"
+    / "classify_path_risk.py"
+)
 
 
 class ClassifyPathRiskTest(unittest.TestCase):
     """Validate representative path-risk profiles."""
+
+    def test_behavior_sources_add_eval_without_retiring_existing_units(self) -> None:
+        cases = {
+            "agents/skills/example.md": ("docs", "eval"),
+            "agents/internal-routines/example.md": ("docs", "eval"),
+            "ROOT_AGENTS.md": ("docs", "eval"),
+            ".codex/agents/worker.toml": ("contracts", "eval"),
+            "agents/agents_config.json": ("contracts", "eval"),
+            "tools/agent/orchestration/route.py": ("contracts", "eval"),
+            "documents/conventions/example.md": ("docs", "eval"),
+            "bootstrap/host/manifest.toml": ("eval", "workflow-container"),
+            "tools/runtime/archive/github_eval_delivery.py": ("contracts", "eval"),
+            ".github/workflows/other.yml": ("eval", "workflow-container"),
+            "documents/design/example.md": ("docs",),
+        }
+        for path, expected in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(select_static_gate_units((path,)), expected)
 
     def test_docs_python_and_github_profiles_are_reported(self) -> None:
         """Classifier should expose active profile and checks."""

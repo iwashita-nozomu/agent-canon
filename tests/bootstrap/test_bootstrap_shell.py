@@ -453,6 +453,8 @@ def test_shell_install_preserves_unowned_skill_directory(
     home = tmp_path / "home"
     repository = tmp_path / "repository"
     state = tmp_path / "state"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
     source = repository / ".codex" / "personal" / "skills"
     agents = repository / ".codex" / "agents"
     source.mkdir(parents=True)
@@ -471,7 +473,8 @@ HOME={str(home)!r}
 AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
-export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_RUNTIME_ROOT
 _agent_canon_install_global_links
 """
     result = subprocess.run(
@@ -488,6 +491,8 @@ def test_shell_install_preserves_foreign_codex_config_symlink(tmp_path: Path) ->
     home = tmp_path / "home"
     repository = tmp_path / "repository"
     state = tmp_path / "state"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
     foreign = tmp_path / "foreign-config.toml"
     source = repository / ".codex" / "personal" / "skills"
     source.mkdir(parents=True)
@@ -505,7 +510,8 @@ HOME={str(home)!r}
 AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
-export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_RUNTIME_ROOT
 _agent_canon_install_global_links
 """
     result = subprocess.run(
@@ -522,6 +528,8 @@ def test_shell_install_applies_only_canonical_context_defaults(tmp_path: Path) -
     home = tmp_path / "home"
     repository = tmp_path / "repository"
     state = tmp_path / "state"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
     source = repository / ".codex" / "personal" / "skills"
     source.mkdir(parents=True)
     (source / "current" / "SKILL.md").parent.mkdir(parents=True)
@@ -550,7 +558,8 @@ HOME={str(home)!r}
 AGENT_CANON_CONTROL_ROOT={str(home)!r}
 AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_STATE_ROOT={str(state)!r}
-export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+export HOME AGENT_CANON_CONTROL_ROOT AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_STATE_ROOT AGENT_CANON_RUNTIME_ROOT
 _agent_canon_container_exec() {{
   [[ "$1" == candidate ]] || return 90
   shift
@@ -3506,6 +3515,9 @@ fi
         encoding="utf-8",
     )
     fake_docker.chmod(0o755)
+    archive_owner = repository / "tools/runtime/archive/runtime_log_archive_git.py"
+    archive_owner.parent.mkdir(parents=True)
+    archive_owner.write_text("# fixture archive provider\n", encoding="utf-8")
     shell_args = " ".join(repr(argument) for argument in compatibility_args)
     script = f"""
 source {str(ADAPTER)!r}
@@ -3524,6 +3536,12 @@ _agent_canon_image_reference() {{ AGENT_CANON_IMAGE_REF=ghcr.io/example/agent-ca
 _agent_canon_image() {{ AGENT_CANON_IMAGE_REF=ghcr.io/example/agent-canon:fixed; return 0; }}
 _agent_canon_replace_resident_locked() {{ return 0; }}
 _agent_canon_scheduler_locked() {{ return 0; }}
+_agent_canon_use_active_image() {{ return 0; }}
+_agent_canon_ensure_container() {{ printf 'fixture-container'; }}
+_agent_canon_init_state_volume() {{ return 0; }}
+_agent_canon_volume_copy() {{ return 0; }}
+_agent_canon_private_feedback_sync() {{ return 0; }}
+python3() {{ return 0; }}
 bootstrap_host_entrypoint {str(repository)!r} --control-parent-root {str(tmp_path)!r} \
   sync --install-root {str(repository)!r} {shell_args}
 """
@@ -3810,7 +3828,7 @@ def test_help_does_not_require_python_or_docker(tmp_path: Path) -> None:
         env=environment,
     )
     assert completed.returncode == 0
-    assert "AgentCanon Python and Rust" in completed.stdout
+    assert "AgentCanon Python and Rust" in " ".join(completed.stdout.split())
 
 
 @pytest.mark.parametrize("operation", ["install", "update", "status", "sync"])

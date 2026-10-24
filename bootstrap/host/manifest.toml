@@ -30,6 +30,7 @@ target = "runtime-root/codex-home/skills"
 
 [archive]
 remote = "git@github.com:iwashita-nozomu/agent-canon-log.git"
+main_eval_max_members = 128
 
 [registry]
 image = "ghcr.io/iwashita-nozomu/agent-canon"

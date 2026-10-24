@@ -20,6 +20,10 @@ evidence. Read-only observation of missing, old, or failing data stays with
 [agent-log-analysis](agent-log-analysis.md). Registered producers own reports;
 this Skill does not create or edit eval results by hand.
 
+Related main changes select the registered producers automatically through
+[main Eval collection and delivery](../../documents/runtime/runtime-log-archive.md#main-change-eval-collection).
+Use the flow below for a selected manual collection or repair.
+
 ## Required Flow
 
 1. Fix the target, producer-source revision, requested freshness, and a unique

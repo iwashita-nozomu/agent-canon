@@ -26,9 +26,17 @@ separate manual workflow wrapper.
 ## Standalone CI ownership
 
 [Static Gates](../../.github/workflows/agent-canon-static-gates.yml) runs on pull
-requests and manual dispatch. This classifier alone selects execution units;
+requests, main pushes, and manual dispatch. This classifier alone selects execution units;
 [the unit runner](../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh)
-owns their commands. A selector failure fails the final `static-gates` job.
+owns PR/manual commands. A selector failure fails the final `static-gates` job.
+
+Skill, role/config, workflow, instruction owners, and their collection/delivery
+sources add the eval unit while preserving the pre-existing contract checks. On main pushes the
+workflow projects this selection to eval alone, using the event's before/head
+diff and conservatively selecting eval when the before commit is unavailable.
+That main unit calls the existing bootstrap collector once; its successful
+bundle follows [main Eval delivery](../runtime/runtime-log-archive.md#main-change-eval-collection).
+PR/manual units keep their existing static runner.
 
 | Changed surface | Unit |
 | --- | --- |

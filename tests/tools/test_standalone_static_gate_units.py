@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -90,10 +91,10 @@ def selected_units(*paths: str) -> tuple[str, ...]:
         (("eval/definitions/example.toml",), ("eval",)),
         ((".github/PULL_REQUEST_TEMPLATE.md",), ("docs", "workflow-container")),
         (("bootstrap/container/image/Dockerfile",), ("workflow-container",)),
-        (("bootstrap.sh",), ("workflow-container",)),
+        (("bootstrap.sh",), ("eval", "workflow-container")),
         (
             ("tools/runtime/container/bootstrap_runtime.py",),
-            ("contracts", "workflow-container"),
+            ("contracts", "eval", "workflow-container"),
         ),
         (
             ("tests/bootstrap/test_bootstrap_runtime.py",),
@@ -154,7 +155,8 @@ def test_selector_preserves_document_arguments_and_full_docs_inputs() -> None:
 
 def test_workflow_triggers_and_one_authoritative_selector() -> None:
     config = workflow()
-    assert set(config["on"]) == {"pull_request", "workflow_dispatch"}
+    assert set(config["on"]) == {"pull_request", "push", "workflow_dispatch"}
+    assert config["on"]["push"]["branches"] == ["main"]
     assert config["permissions"] == {"contents": "read"}
     assert set(config["jobs"]) == {"select-static-units", "static-gates"}
     selector = config["jobs"]["select-static-units"]
@@ -191,6 +193,12 @@ def test_empty_selection_does_not_start_a_runtime() -> None:
             "Require successful unit selection",
             "Release shared tool runtime",
         }:
+            continue
+        if item["name"] == "Upload successful main Eval collection":
+            assert (
+                item["if"]
+                == "always() && github.event_name == 'push' && steps.run_units.outputs.eval_unit_status == 'pass'"
+            )
             continue
         if item["name"] in {
             "Capture shared runtime validation output",
@@ -281,8 +289,10 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
         SELECTED_UNITS="docs,contracts,eval",
         DOCS_PATHS='["documents/has space.md", "documents/$data.md"]',
         BASE_SHA="fixed-base",
+        GITHUB_EVENT_NAME="pull_request",
         GITHUB_STEP_SUMMARY=str(summary),
         CALLS=str(calls),
+        GITHUB_OUTPUT=str(tmp_path / "outputs"),
     )
     assert result.returncode == 1, result.stderr
     called = calls.read_text().splitlines()
@@ -301,6 +311,128 @@ def test_unit_failures_are_aggregated_without_skipping_later_units(
     assert all("native stderr" in path.read_text() for path in receipts)
     assert "receipt for" in result.stdout
     assert "base=fixed-base" in (evidence / "source-identity.txt").read_text()
+
+
+@pytest.mark.parametrize("collect_exit", [0, 7])
+def test_main_eval_runs_one_canonical_collection_and_records_failure(
+    tmp_path: Path,
+    collect_exit: int,
+) -> None:
+    source = executable_fixture_root(tmp_path) / "main-candidate"
+    source.mkdir()
+    bootstrap = source / "bootstrap.sh"
+    bootstrap.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$CALLS"\n'
+        'printf "canonical collection receipt\\n"\nexit "$COLLECT_EXIT"\n'
+    )
+    bootstrap.chmod(0o755)
+    head = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    calls, outputs, environment = (
+        tmp_path / name for name in ("calls", "outputs", "environment")
+    )
+    actual = run_shell(
+        step("Run selected units in the shared runtime")["run"],
+        root=ROOT,
+        AGENT_CANON_CANDIDATE_SOURCE=str(source),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        GITHUB_WORKSPACE=str(ROOT),
+        RUNNER_TEMP=str(tmp_path),
+        SELECTED_UNITS="eval",
+        DOCS_PATHS="[]",
+        BASE_SHA="",
+        GITHUB_EVENT_NAME="push",
+        GITHUB_SHA=head,
+        GITHUB_RUN_ID="77",
+        GITHUB_RUN_ATTEMPT="2",
+        GITHUB_STEP_SUMMARY=str(tmp_path / "summary"),
+        GITHUB_OUTPUT=str(outputs),
+        GITHUB_ENV=str(environment),
+        CALLS=str(calls),
+        COLLECT_EXIT=str(collect_exit),
+    )
+    assert actual.returncode == (0 if collect_exit == 0 else 1), actual.stderr
+    assert calls.read_text().splitlines() == [
+        f"--control-parent-root {tmp_path} eval collect --root {ROOT} --run-id main-{head}-77-2",
+    ]
+    assert outputs.read_text().strip() == "eval_unit_status=" + (
+        "pass" if collect_exit == 0 else "fail"
+    )
+    assert f"MAIN_EVAL_RUN_ID=main-{head}-77-2" in environment.read_text()
+    assert (
+        "canonical collection receipt"
+        in (tmp_path / "agent-canon-static-evidence/unit-1.log").read_text()
+    )
+
+
+@pytest.mark.parametrize(
+    "changed_path,known_base,expected",
+    [
+        ("agents/skills/sample.md", True, "eval"),
+        ("documents/design/sample.md", True, ""),
+        ("documents/design/sample.md", False, "eval"),
+    ],
+)
+def test_main_selection_uses_push_range_and_handles_unavailable_base(
+    tmp_path: Path,
+    changed_path: str,
+    known_base: bool,
+    expected: str,
+) -> None:
+    root = executable_fixture_root(tmp_path) / "event-source"
+    root.mkdir()
+    copied = root / SELECTOR.relative_to(ROOT)
+    copied.parent.mkdir(parents=True)
+    shutil.copyfile(SELECTOR, copied)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+
+    def commit(message):
+        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                message,
+            ],
+            check=True,
+        )
+        return subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+        ).strip()
+
+    before = commit("base")
+    target = root / changed_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("changed\n")
+    commit("changed")
+    select = next(
+        item
+        for item in workflow()["jobs"]["select-static-units"]["steps"]
+        if item.get("id") == "select"
+    )
+    output = tmp_path / "selected"
+    actual = run_shell(
+        select["run"],
+        root=root,
+        GITHUB_EVENT_NAME="push",
+        PUSH_BEFORE_SHA=before if known_base else "0" * 40,
+        RUNNER_TEMP=str(tmp_path),
+        GITHUB_OUTPUT=str(output),
+    )
+    assert actual.returncode == 0, actual.stderr
+    assert (
+        dict(line.split("=", 1) for line in output.read_text().splitlines())["units"]
+        == expected
+    )
 
 
 def test_contracts_unit_rejects_retired_baseline_argument() -> None:
@@ -580,6 +712,7 @@ def test_capture_exports_only_the_bootstrap_validated_container(
         RUNNER_TEMP=str(tmp_path),
         SELECTED_UNITS="docs",
         EVAL_UNIT_STATUS="not-selected",
+        GITHUB_EVENT_NAME="pull_request",
         PATH=f"{bin_dir}:{os.environ['PATH']}",
         CALLS=str(calls),
         STATUS_JSON=json.dumps(native_status),

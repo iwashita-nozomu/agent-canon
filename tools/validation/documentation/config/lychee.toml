@@ -6,4 +6,4 @@
 offline = true
 include_fragments = "full"
 require_https = false
-exclude_path = [".git", ".runtime", "reports", "target", "node_modules"]
+exclude_path = ['(^|/)\.git(/|$)', '(^|/)\.runtime(/|$)', '(^|/)reports(/|$)', '(^|/)target(/|$)', '(^|/)node_modules(/|$)']
