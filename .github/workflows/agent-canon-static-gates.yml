@@ -143,7 +143,7 @@ jobs:
           unit_index=0
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             main_eval_run_id="main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-            main_eval_spool="${AGENT_CANON_CONTROL_PARENT_ROOT}/.runtime/container-state/spool/${main_eval_run_id}"
+            main_eval_spool="$(realpath -m -- "${AGENT_CANON_CONTROL_PARENT_ROOT}/.runtime/container-state/spool/${main_eval_run_id}")"
             printf 'MAIN_EVAL_RUN_ID=%s\nMAIN_EVAL_SPOOL=%s\n' "${main_eval_run_id}" "${main_eval_spool}" >> "${GITHUB_ENV}"
           fi
           for unit in "${units[@]}"; do

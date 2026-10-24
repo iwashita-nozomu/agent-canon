@@ -332,11 +332,13 @@ def test_main_eval_runs_one_canonical_collection_and_records_failure(
     calls, outputs, environment = (
         tmp_path / name for name in ("calls", "outputs", "environment")
     )
+    (tmp_path / "parent").mkdir()
+    control_parent_input = str(tmp_path / "parent" / "..")
     actual = run_shell(
         step("Run selected units in the shared runtime")["run"],
         root=ROOT,
         AGENT_CANON_CANDIDATE_SOURCE=str(source),
-        AGENT_CANON_CONTROL_PARENT_ROOT=str(tmp_path),
+        AGENT_CANON_CONTROL_PARENT_ROOT=control_parent_input,
         GITHUB_WORKSPACE=str(ROOT),
         RUNNER_TEMP=str(tmp_path),
         SELECTED_UNITS="eval",
@@ -354,12 +356,16 @@ def test_main_eval_runs_one_canonical_collection_and_records_failure(
     )
     assert actual.returncode == (0 if collect_exit == 0 else 1), actual.stderr
     assert calls.read_text().splitlines() == [
-        f"--control-parent-root {tmp_path} eval collect --root {ROOT} --run-id main-{head}-77-2",
+        f"--control-parent-root {control_parent_input} eval collect --root {ROOT} --run-id main-{head}-77-2",
     ]
     assert outputs.read_text().strip() == "eval_unit_status=" + (
         "pass" if collect_exit == 0 else "fail"
     )
     assert f"MAIN_EVAL_RUN_ID=main-{head}-77-2" in environment.read_text()
+    exported = dict(line.split("=", 1) for line in environment.read_text().splitlines())
+    spool = Path(exported["MAIN_EVAL_SPOOL"])
+    assert spool == tmp_path / ".runtime/container-state/spool" / f"main-{head}-77-2"
+    assert spool.is_absolute() and not {".", ".."}.intersection(spool.parts)
     assert (
         "canonical collection receipt"
         in (tmp_path / "agent-canon-static-evidence/unit-1.log").read_text()
