@@ -42,6 +42,10 @@ Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only
 guidance を読み直します。最初に解決した選択は、影響する前提が変わらない限り
 そのまま使います。
 
+For a selected operation backed by tools, use
+[Skill and tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
+to connect the selected owner's decision to actual tool inputs and returned evidence.
+
 ## In-flight skill reads
 
 呼び出し元スキルの操作中に新しい条件が成立したら、その判断や操作に必要な
