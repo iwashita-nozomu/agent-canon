@@ -15,9 +15,10 @@ downstream design ../../documents/runtime/runtime-log-archive.md eval archive ow
 
 Use this skill when a task changes AgentCanon source, its shared tool runtime,
 bootstrap image, skills, workflow contracts, or the parent-to-AgentCanon update
-route. The source deliverable is one reviewed change and its published PR.
-When parent adoption is also requested, the parent consumes the selected revision
-through its own update contract, without vendoring or copying AgentCanon internals.
+route. The source deliverable is one reviewed change. When source PR delivery is
+selected and authorized, publish it through the existing route. If parent
+adoption is also requested, the parent consumes the selected revision through
+its own update contract, without vendoring or copying AgentCanon internals.
 
 Issue ownership must be explicit. `iwashita-nozomu/agent-canon#841` owns local
 bootstrap, one shared tool container, source side-effect isolation, skill

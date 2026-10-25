@@ -25,11 +25,11 @@ downstream implementation ../../.codex/personal/skills/mvp-skeleton/SKILL.md exp
 ## Purpose
 
 `mvp-skeleton` defines an MVP or prototype as the smallest complete final product
-scope. It owns the scope line: one core user, one core loop, one runnable path,
-one smoke check, and the required failure handling, cleanup, and acceptance for
-that path. A smaller scope is valid when it is explicitly selected and complete;
-this skill does not define partial completion: waves may sequence the complete
-target state, but no wave is a completed first implementation.
+scope. Establish one core user, one core loop, one runnable path, and an
+observable acceptance check. Define failure recovery or cleanup when the path
+has a reachable failure or creates state that needs cleanup. A smaller scope is
+valid when it is explicitly selected and complete; waves may sequence the
+complete target state, but no wave is a completed first implementation.
 
 Route product strategy, growth planning, production hardening, architecture
 design, visual polish, deployment, and comprehensive test strategy to their
@@ -39,36 +39,27 @@ slice.
 
 ## MVP Contract
 
-Before editing, fix this compact contract:
-
-```text
-core_user=<who uses the skeletal slice>
-core_loop=<one input-to-useful-output path>
-success_signal=<observable result that proves the core loop>
-runtime_floor=<local run or inspection path that exercises the loop>
-scope_line=<tempting work that is outside the selected scope>
-failure_recovery=<required failure and recovery behavior for the loop>
-cleanup=<required cleanup or rollback for the loop>
-acceptance=<observable acceptance condition for the selected scope>
-```
+Before editing, establish the core user, input-to-useful-output path, a run or
+smoke check that exercises it, and observable acceptance. State a scope boundary
+when a plausible addition could change the selected work. Include failure
+recovery and cleanup when the selected path makes them relevant. Carry these
+decisions in the existing task context; no fixed field list or separate packet
+is needed.
 
 When the core loop is unclear from the request or repo context, ask one concise
 question. Otherwise make a conservative assumption and continue.
 
 ## Scope Sort
 
-Classify every candidate item before building it:
-
-| Class | Meaning | Default Action |
-| ----- | ------- | -------------- |
-| `required` | Removing it breaks the selected final product scope, including its failure, cleanup, or acceptance contract. | Implement it completely. |
-| `excluded` | It is outside the explicitly selected final product scope. | Leave it out; do not promise it as later completion. |
-
-When classification is unclear, resolve it against the selected target scope before editing.
+Build the selected core loop and any explicitly requested scope. Classify a
+candidate only when its inclusion could change the core path or acceptance;
+leave unrelated possibilities unlisted. Keep unrequested additions out of the
+selected scope unless they are needed to complete that path.
 
 ## Overbuild Tripwires
 
-Stop and re-scope before adding:
+Before adding an unrequested capability beyond the selected loop, check whether
+it is needed for the user's scope or acceptance. Common additions include:
 
 - extra workflows before the core loop runs
 - dashboards, settings, onboarding, roles, permissions, billing,
@@ -81,8 +72,11 @@ Stop and re-scope before adding:
   libraries, theme systems, or extensive responsive variants
 - a stub class, placeholder, hard-coded replacement, or no-op integration for
   required behavior
-- deferred completion of required failure handling, cleanup, or acceptance
+- deferring required failure handling, cleanup, or acceptance
 - tests for excluded behavior instead of one smoke check for the MVP path
+
+Implement requested or required behavior through its real path; omit other
+additions without treating them as future commitments.
 
 ## Frontend Rule
 
@@ -99,15 +93,9 @@ understandable; keep asset work tied to that supporting role.
 
 ## Closeout
 
-Report these items:
-
-```text
-mvp_skeleton=complete
-mvp_core_loop=<one sentence>
-mvp_runtime_floor=<command, URL, or file path>
-mvp_smoke_check=<command or manual check>
-mvp_excluded=<up to five items>
-```
-
-Describe excluded items as outside the selected final product scope, not as
-unfinished work or a promise of later completion.
+Report whether the selected path is runnable and its acceptance check result.
+Include a command, URL, or file locator when the delivered outcome does not make
+clear how to reach or run it. State a scope boundary or unresolved
+failure/cleanup only when it affects the expected outcome. Describe out-of-scope
+work as excluded from the selected product scope, not as a promise of later
+completion.

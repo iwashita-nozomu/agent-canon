@@ -158,8 +158,10 @@ contains one resolved geometry, axis mapping, scale, grouping, and facet plan.
 
 ## Output Schema
 
-Produce a human-readable Markdown figure inventory by default, with one row or
-section per requested figure and its relevant calculation and geometry details.
+Keep each requested figure's relevant calculation and geometry in the existing
+task or report output. Use a compact Markdown inventory when multiple figures
+need comparison or handoff; a single figure does not require a separate
+inventory unless requested.
 
 If a figure renderer consumes machine-readable input, include only the required machine-readable form in that renderer path and cite the file.
 

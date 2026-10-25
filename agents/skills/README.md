@@ -157,8 +157,8 @@ For host-runtime policy, see [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md).
 Use this route when changing AgentCanon's skill source, registration, or
 distribution. Before changing a procedure, use
 [Skill procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
-to turn the applicable rule into operations, decisions, and observable results,
-with the decision-relevant reason beside the affected step.
+to map the applicable rule to necessary operations, decisions, observable
+results, and reasons, and assess existing requirements as well as new steps.
 Preserve the skill's reusable method; use the caller's current
 request and governing owner for concrete goals, inputs, paths, environment,
 validation, and output. Keep extra capabilities conditional, and retain native
@@ -169,35 +169,46 @@ responsibility and contract, not names or paths alone.
 
 ### Improvement cycle
 
-Before implementation or delegation, adapt this cycle to the current task's
-goal, inputs, constraints, and evidence. Keep that task-specific sequence in the
-existing task or handoff so the writer starts from an executable workflow.
+Adapt the relevant stages to the task's goal, inputs, constraints, and evidence
+before a substantive procedure change or delegation. Put a task-specific
+sequence in the existing task or handoff when batching, delegation,
+interruption, or resumption needs one; a bounded same-writer edit can use the
+applicable steps in place.
 
-1. Establish the requested outcome, the observed problem or preference, the
-   current Skill contract, and its owner. Reuse valid source and results to keep
-   the change tied to the actual gap.
-2. Select the operations, branches, expected results, and completion checks for
-   this task using [procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation).
-   This makes the applicable rules and operative reasons available before edits.
-   Resolve material scope or approach choices through the existing decision owner.
-3. Choose the writer through [delegation selection](agent-orchestration.md#delegation-selection).
-   For a selected child, pass this workflow, source binding, bounded write paths,
-   current evidence, and the validation route through [subagent-bootstrap](subagent-bootstrap.md).
-   The same task contract then governs the author and parent handback.
-4. Improve the owning procedure and its rationale together. When actual work
-   exposes a missing step or branch, update the task workflow before continuing.
-   Amend this reusable cycle when the gap belongs here; keep case-specific
-   parameters in the task. Return repairs to a compatible active writer to retain
-   context, and ask before expanding the agreed outcome or authority.
-5. Run the selected native checks and Markdown formatter, and refresh affected
-   generated views through their owner. Use [empirical-prompt-tuning](empirical-prompt-tuning.md)
-   when a behavior question needs fresh observations. This distinguishes source
-   consistency from evidence that an instruction changes behavior.
-6. Compare the actual result with the whole requested outcome. Retain material
-   attempts, rejection grounds, validation limits, and workflow corrections in
-   the existing task and [completion report](../internal-routines/verification-result-structuring.md#completion-reports).
-   Continue an authorized repair or the next useful iteration; finish when the
-   task's acceptance is established, or hand back a concrete unresolved boundary.
+1. Establish the requested outcome, any observed problem or preference, the
+   current Skill contract, and its owner. Reuse valid source and results; do not
+   infer a gap from wording alone.
+2. Use [procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
+   to select the operations, decisions, and observable results needed for the
+   requested guarantee. For a mandatory instruction under review, identify the
+   request, invariant, reachable failure, or decision it serves and whether an
+   existing owner already supplies that result. Preserve authority, safety, and
+   accepted behavior; remove unsupported or duplicate work, or make
+   context-specific work conditional. This keeps required guarantees while
+   reducing steps that add no needed evidence or protection. Resolve material
+   scope or approach choices through the existing decision owner.
+3. Keep work with the current agent by default. Use
+   [delegation selection](agent-orchestration.md#delegation-selection) when a
+   separate judgment or bounded task has a concrete benefit. When a child is
+   selected, pass the adapted workflow, source binding, bounded write paths,
+   current evidence, and validation route through [subagent-bootstrap](subagent-bootstrap.md).
+4. Improve the owning procedure and its rationale together. If actual work
+   reveals a missing step, an unnecessary mandate, or a branch that is too broad,
+   update the task sequence before continuing. Amend this reusable cycle only
+   when the lesson applies to other Skill changes; keep case-specific inputs in
+   the task. Return repairs to a compatible active writer and ask before
+   expanding the agreed outcome or authority.
+5. Run checks selected for changed guarantees, format changed Markdown, and
+   refresh affected generated views through their owner. Use
+   [empirical-prompt-tuning](empirical-prompt-tuning.md) when a behavior question
+   needs fresh observations. Reuse valid checks whose inputs and contracts have
+   not changed; source consistency does not establish changed behavior.
+6. Compare the result with the whole requested outcome. In the final user-facing
+   [completion report](../internal-routines/verification-result-structuring.md#completion-reports),
+   use facts from the existing task record to include material attempts,
+   acceptance or rejection grounds, validation limits, and workflow corrections.
+   Continue authorized repairs until acceptance is established, or return a
+   concrete unresolved boundary.
 
 Update the canonical document and only the catalog, dependency, caller, or
 adapter surfaces affected by the change. The catalog owns public identity and

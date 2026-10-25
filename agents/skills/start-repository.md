@@ -33,6 +33,10 @@ static seed を通常 file として所有し、AgentCanon source や runtime li
 
 ## Default Sequence
 
+Run this sequence from the root of the new template-derived repository. The
+initializer and project config paths are project-owned and resolve relative to
+that checkout.
+
 1. `git status --short --branch` で clone 直後の状態を確認します。
 1. repository identity と project config を初期化します。
 

@@ -30,19 +30,18 @@ outcome during implementation or validation.
 
 ## Decision Order
 
-Start from the active Goal's whole objective and current instruction, or the
-current request when no Goal exists. Retain agreements and review authorized
-scope, completed and remaining work, dependencies, blockers, and next actions.
-Classify advisory/read-only or repository-changing work. Reuse applicable
-instructions and owner context; read only within the
+Start from the active Goal and current instruction, or the current request when
+no Goal exists. For resumed work, reuse settled scope and remaining work from
+the current context or existing task record. Classify advisory/read-only or
+repository-changing work. Reuse applicable instructions and owner context; read
+only within the
 [current read authority](../../ROOT_AGENTS.md#always-on-boundary).
 Local decisions use the target, current diff, and governing contract.
 
-Before asking the user, recover applicable earlier requests and retrievable
-facts from permitted code, tests, docs, history, and tool results. Continue
-authorized work when these sources can resolve the gap. Ask early once evidence
-identifies a material user-owned choice; do not ask for known requirements or
-retrievable facts, or require exhaustive investigation first.
+Before asking the user, use relevant context and targeted permitted sources to
+resolve facts that could settle the choice. Continue authorized work when they
+resolve it. Ask when the remaining choice belongs to the user; do not ask for
+known requirements or retrievable facts, or require exhaustive investigation.
 
 For a blocking contract, identify its owner, revision, path and clause/symbol,
 the requested result, blocked operation, and conflict evidence. Implementation
@@ -52,15 +51,16 @@ state that basis and perform the authorized correction. Otherwise ask whether
 to retain, revise, or extend the contract. Preserve acceptance and higher-priority
 safety/authority limits; do not silently preserve or bypass the blocker.
 
-Before changing agreed scope, expected result, major approach, or an unsettled
-blocking contract, ask a self-contained question: settled requirement, checked
-behavior, user-owned choice, proposed change, recommendation, alternatives'
-effects, and the action awaiting an answer. Include contract location/conflict
-evidence when applicable. An active Goal or internal design does not authorize
-the change. Wait on dependent changes while continuing independent work. Ask
-also for required user-owned input/authority unavailable from permitted sources.
-Retain evidence, question, answer, and rationale in the existing task, Issue, or
-handoff; a blocker report alone is not that question.
+Before changing agreed scope, expected result, or major approach, or resolving an
+unsettled blocking contract, ask a self-contained, focused question that gives
+the relevant request and checked facts when applicable, explains the remaining
+user-owned choice and its effect, and states which next action depends on the
+answer. Include a recommendation when useful. If user input is missing, state
+what is needed without implying it was checked. Include contract location and
+conflict evidence when applicable. An active Goal or internal design does not
+authorize the change. Wait on dependent changes while continuing independent
+work. Carry the decision into the existing task or handoff when resumed work
+depends on it.
 
 Complete authorized contract-derived repairs, including required input preparation
 or missing API behavior. Scope follows contract and cause. Honor write, stop, and
@@ -160,10 +160,10 @@ Unavailable required validation remains unverified.
 
 ## Decision Sufficiency Packet
 
-Before execution, settle the owner, replaceable responsibility, mechanism,
-validation route, and any unresolved branch that could change them. Reuse the
-existing task or handoff evidence; create a durable packet only for coordination
-or resumption.
+For a selected implementation, use current owner evidence to resolve design
+questions that could change the agreed outcome, implementation, or validation.
+Reuse the existing task or handoff; create a durable packet only when
+coordination or resumption needs one.
 
 ## Execution-Time-Aware Work-Conservation Contract
 
@@ -195,6 +195,7 @@ witness or static-proof evidence.
 
 ## Outputs
 
-Return the selected route and owners, required validation, and any unresolved
-fact that could change the next action. Reuse the existing task update, tool
-result, or handoff.
+When routing is the requested result, return the selected route and owners, its
+required validation, and unresolved facts that could change the next action.
+Otherwise, use the route during execution and surface unresolved facts that
+affect progress. Reuse the existing task update, tool result, or handoff.

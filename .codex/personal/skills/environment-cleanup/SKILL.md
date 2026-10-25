@@ -2,7 +2,7 @@
 name: environment-cleanup
 description: "Use when environment dependencies or runtime capabilities need cleanup through dependency-design and environment-maintenance with version, scope, security, and rollback evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"33eac9985a578ae0520ce094514ba9dc454ec3546c7893149e1a30fe56c4fda4"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"feca50741d0f832d27b42067b120a9ca3cfeb6cee7dc4cd9b03d1916969f617d"} -->
 
 <!--
 @dependency-start

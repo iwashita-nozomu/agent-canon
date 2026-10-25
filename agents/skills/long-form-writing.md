@@ -24,10 +24,11 @@ Read the request, existing text and headings, and canonical source. State the
 purpose and reader in the amount of detail needed to guide the revision. Before
 drafting, establish the ordered sections or points, their roles, and source
 support using [Before prose](structure-planning.md#before-prose). Reuse a
-sufficient existing outline; if it is missing or incomplete, prepare it before
-prose even when the order is obvious. A bounded wording edit can retain the
-existing structure; use `md-style-check` for a wording-independent typo, link,
-or formatting fix.
+sufficient outline or order already settled by the request and source. If no
+sufficient structure exists, create or complete it before prose even when one
+order is obvious. Do not duplicate a sufficient request/source structure in a
+separate outline. A bounded wording edit can retain the existing structure; use
+`md-style-check` for a wording-independent typo, link, or formatting fix.
 
 Draft from the selected structure, applying
 [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction)

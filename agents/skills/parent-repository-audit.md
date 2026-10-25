@@ -59,9 +59,9 @@ summary、inventory、runtime shim は再生成可能な projection であり un
 親 root から resolver が返す owner command を実行します。
 
 ```bash
-python3 tools/analysis/code/parent_repository_audit.py list \
+python3 -m tools.analysis.code.parent_repository_audit list \
   --root <parent-root> --format text
-python3 tools/analysis/code/parent_repository_audit.py list \
+python3 -m tools.analysis.code.parent_repository_audit list \
   --root <parent-root> --surface <stable-surface> \
   --scope <tracked-evidence-path> --format text
 ```
@@ -78,7 +78,7 @@ unknown surface、invalid unit、source/root path escape、missing evidence scop
 check packet は unit receipt の全体状態を集約します。
 
 ```bash
-python3 tools/analysis/code/parent_repository_audit.py check \
+python3 -m tools.analysis.code.parent_repository_audit check \
   --root <parent-root> \
   --unit-status <pass|closed|failed|deferred|blocked> \
   --format text

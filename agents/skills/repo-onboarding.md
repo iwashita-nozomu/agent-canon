@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents repo-onboarding for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ./pr-processing.md Issue and PR write authorization and readback
 @dependency-end
 -->
 
@@ -48,7 +49,7 @@ evidence 不一致のうち該当する理由を記録します。無関係な b
 
 ## Issue Progress Writeback
 
-Issue-backed task は、作業が未完了の状態で handoff、停止、別 task への移動、または user turn の終了に入る前に、対象 Issue へ current state を comment します。chat や PR body だけに途中状態を残しません。
+Issue-backed task は、current task の authority が Issue comment write を認める場合に限り、作業が未完了の状態で handoff、停止、別 task への移動、または user turn の終了に入る前に、対象 Issue へ current state を comment します。この skill 自体は remote write authority を付与しません。authority がない場合は途中状態を既存 task / handoff に残し、Issue update は未実行として明示します。許可された Issue write は [pr-processing](pr-processing.md#publication-boundary) の既存 route を使います。
 
 進捗 comment は短く、次の continuation に必要な事実だけを持ちます。
 
@@ -80,10 +81,9 @@ coverage after establishing this entry context.
 
 ## Outputs
 
-- Issue-backed task なら Issue の current requirement / progress state の短い readback
-- resume する既存 work の PR / branch / topic clone / worktree、または compatible な途中作業が無いという短い readback
-- repo shape の短い要約
-- 触るべきディレクトリ
-- 追加で読むべき正本
-- selected Skill / operational owner と、次の判断に使った source evidence
-- 未完了で handoff / stop する場合は Issue progress comment の URL または comment identity
+Report only the onboarding facts that help answer the request or choose the
+next action. Include Issue and compatible continuation state when they decide
+whether to resume or create work; summarize the repository shape and owner paths
+when orientation is needed. If an Issue-backed task stops or hands off while
+unfinished, identify the authorized progress comment or state that it was not
+written.

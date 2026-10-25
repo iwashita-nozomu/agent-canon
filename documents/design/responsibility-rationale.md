@@ -36,14 +36,20 @@ produces the next result, how that result guides a decision, and when to branch,
 recover, or finish. Express the relationships needed by that task without a
 fixed field schema or a new Skill for each rule.
 
-When a skill procedure has a material, non-obvious operation order, branch
-condition, or completion check, record in the existing owning design the relevant
-principle, requirement, or assumption and why it supports that choice. Link the
-affected procedure section to that rationale; one decision may cover several
-steps. Shared principles remain in
-[PHILOSOPHY](../../PHILOSOPHY.md) and
-[engineering principles](../conventions/software-engineering-principles.md); do
-not copy them into individual skills.
+For a material change to an operation order, branch, completion check, or
+mandatory work, record in the existing owning design the governing request,
+principle, invariant, or assumption and why it supports the retained procedure.
+When reducing a requirement, trace the request, invariant, reachable failure,
+or decision it serves and check whether an existing owner already supplies its
+guarantee. Remove duplicate or unsupported work, or make path-specific work
+conditional, while preserving authority, safety, and accepted behavior. Apply
+[SEP-06 KISS](../conventions/software-engineering-principles.md#sep-06-kiss)
+and [SEP-07 YAGNI](../conventions/software-engineering-principles.md#sep-07-yagni)
+to reduce execution and maintenance cost while retaining the required outcome.
+Link the affected procedure section to this rationale; one decision may cover
+several steps. Shared principles remain in [PHILOSOPHY](../../PHILOSOPHY.md)
+and [engineering principles](../conventions/software-engineering-principles.md);
+do not copy them into individual skills.
 
 Keep a compact operative reason beside a scope, order, branch, or completion
 decision when it is needed to apply the procedure correctly. This puts the

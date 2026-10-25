@@ -535,7 +535,7 @@ skill_families:
     shim: .codex/personal/skills/repository-topic-clone/SKILL.md
     discovery:
       name: repository-topic-clone
-      description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/<topic>/<repo>; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
+      description: "Use for any parent, dependency, or standalone repository topic checkout under workspace/{topic}/{repo}; linked-worktree or independent-clone mode is selected by repository relationship, and repository kind is a post-checkout policy decorator."
     routing:
       stage_policy: active
       reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope

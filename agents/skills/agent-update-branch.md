@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents Agent Update Branch Skill for this repository.
 upstream design ../canonical/CODEX_WORKFLOW.md provides branch and closeout policy
+upstream design ../../documents/operations/BRANCH_SCOPE.md commit/push authority and local-only state
 upstream design ./agent-canon-update.md owns standalone AgentCanon source PRs
 upstream implementation ../../tools/repository/git/agent_update_branch.sh validates update branch lanes
 @dependency-end
@@ -50,13 +51,16 @@ checkers, and static fixtures remain under `eval/`; generated reports and
 packets go to the explicit external runtime spool and are published through
 the `agent-canon-log` archive.
 
-Run the lane validator, then commit with a message identifying this as a
-private knowledge/eval-only update and push through the lane adapter:
+Commit with a message identifying this as a private knowledge/eval-only update
+only when the current task authorizes that commit. Push through the lane adapter
+only when task authority selects publication to the designated remote:
 
 ```bash
-bash tools/repository/git/agent_update_branch.sh validate knowledge-eval
 bash tools/repository/git/agent_update_branch.sh push knowledge-eval <branch>
 ```
+
+Lane selection and validation grant neither commit nor push authority. When
+either action is not selected, preserve that local state and report it.
 
 ## AgentCanon Source Updates
 
@@ -72,16 +76,17 @@ to `$integration`. That skill owns fetching, merge/conflict resolution,
 integrated-head validation, push/readback, and the final `main` merge. This
 skill does not repeat integration commands or merge gates.
 
-## Required Gates
+## Validation
 
-- Validate the lane with `bash tools/repository/git/agent_update_branch.sh validate <lane>`.
-- Push the branch with `bash tools/repository/git/agent_update_branch.sh push <lane> <branch>`.
-- Run the convention compliance check before handoff or closeout:
+Before a local commit or handoff, validate the selected lane's changed paths:
 
 ```bash
-python3 tools/validation/semantic/convention/check_convention_compliance.py
+bash tools/repository/git/agent_update_branch.sh validate <lane>
 ```
 
-Integration dependency review and repository static analysis are selected by
-`$integration`; do not treat them as an additional gate for non-integration
+When an authorized `push` is selected, the adapter performs the same lane
+validation; run the standalone command only when a pre-commit result could change
+the commit decision. Run convention compliance when the selected change touches
+a convention contract it checks. Integration dependency review and repository
+static analysis are selected by `$integration`; they do not apply to other
 lanes.
