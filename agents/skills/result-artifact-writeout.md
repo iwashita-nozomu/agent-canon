@@ -33,7 +33,7 @@ summary がある場合は、同じ source result に結び付けます。
 
 ## Ownership Contract
 
-Persist concrete outputs without inventing a second experiment, report, or publication state. For each selected artifact that actually exists, record its parent result/run reference, path, semantic role, content checksum or equivalent immutable identity, producer/source reference when needed, destination, and successful readback. Do not overwrite different bytes at the same identity; identical replay may be treated as idempotent.
+Persist concrete outputs without inventing a second experiment, report, or publication state. For each selected artifact that actually exists, identify its saved path, semantic role, content checksum or equivalent immutable identity, and successful readback. Retain the parent result/run and producer/source references when needed to attribute or reproduce it. Follow an existing manifest or owner receipt when the saved artifact is transferred to another destination; reuse existing records instead of duplicating provenance. Do not overwrite different bytes at the same identity; identical replay may be treated as idempotent.
 
 For structured artifacts, validate the saved readback with the existing parser
 or consumer to confirm format validity as well as byte identity.

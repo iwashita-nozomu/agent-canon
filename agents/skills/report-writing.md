@@ -26,7 +26,7 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
    タスク完了報告には [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports) を適用し、重要な試行と採否の根拠も本文へ含める。
 2. 外部 reference が material claim を支える場合は、URL/DOI、access date、source identity、採否を持つ既存 source note/packet を使う。
    evaluation/experiment report では denominator、metric direction、valid/invalid comparison、次 action を明記する。
-3. draft前に [構成確認](structure-planning.md#before-prose) を行う。readerの問いに沿った要点・sectionの順序と役割、claim/evidenceの対応を、既存構成で満たせるなら再利用し、不足すれば先に作成・補完する。複数のtopology候補がなくても飛ばさない。
+3. draft前に reader の問いと結果・根拠の順序を確認する。[構成確認](structure-planning.md#before-prose) を使い、依頼や既存構成が十分なら再利用し、別の outline を重ねて作らない。十分な構成がなければ、順序が自明でも必要な要点・役割・根拠対応を本文前に補う。
    数値計算の結果は [Numerical and runtime results](#numerical-and-runtime-results) の順序で構成する。
 4. その構成からreader orderでdraftし、`Results/Observations`、`Interpretation`、`Limitations` を混同しない。各material claimをevidenceまたは明示したinferenceに結ぶ。
 5. 図が理解を大きく改善する場合だけ `code-visualization`、HTML/PPTが明示された場合だけ `html-output`/`slides` を追加する。描画やlayoutで構成の欠落が見つかったら、該当構成を直して本文へ戻る。

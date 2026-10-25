@@ -133,9 +133,10 @@ stages every tool run must complete.
    priority.
 1. report では機械結果と agent interpretation を分けます。reader-facing report に
    する場合は `report-writing` を使います。
-   - user が「レポート」「まとめ」「結果を解釈」「Markdown にして」などを求めた場合、
-     `report-writing` は必須です。validation summary、command log、top-N excerpt、
-     raw JSON path だけで closeout してはいけません。
+   - Use `report-writing` for a requested reader-facing narrative or
+     interpretation; a validation summary, command log, excerpt, or raw JSON
+     path alone does not provide that report. A requested Markdown or table
+     export can stay in its selected format without adding narrative.
    - Use `structure-planning` before drafting when the report has an unresolved
      reader-flow or comparison decision; a nontrivial finding packet alone does
      not require a separate structure contract.

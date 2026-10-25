@@ -51,12 +51,6 @@ checkers, and static fixtures remain under `eval/`; generated reports and
 packets go to the explicit external runtime spool and are published through
 the `agent-canon-log` archive.
 
-Run the lane validator first:
-
-```bash
-bash tools/repository/git/agent_update_branch.sh validate knowledge-eval
-```
-
 Commit with a message identifying this as a private knowledge/eval-only update
 only when the current task authorizes that commit. Push through the lane adapter
 only when task authority selects publication to the designated remote:
@@ -82,15 +76,17 @@ to `$integration`. That skill owns fetching, merge/conflict resolution,
 integrated-head validation, push/readback, and the final `main` merge. This
 skill does not repeat integration commands or merge gates.
 
-## Required Gates
+## Validation
 
-- Validate the lane with `bash tools/repository/git/agent_update_branch.sh validate <lane>`.
-- Run the convention compliance check before handoff or closeout:
+Before a local commit or handoff, validate the selected lane's changed paths:
 
 ```bash
-python3 tools/validation/semantic/convention/check_convention_compliance.py
+bash tools/repository/git/agent_update_branch.sh validate <lane>
 ```
 
-Integration dependency review and repository static analysis are selected by
-`$integration`; do not treat them as an additional gate for non-integration
+When an authorized `push` is selected, the adapter performs the same lane
+validation; run the standalone command only when a pre-commit result could change
+the commit decision. Run convention compliance when the selected change touches
+a convention contract it checks. Integration dependency review and repository
+static analysis are selected by `$integration`; they do not apply to other
 lanes.

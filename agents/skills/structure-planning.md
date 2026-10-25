@@ -20,12 +20,13 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 複数候補があるかどうかだけで構成作成の要否を判断しません。owner、canonical source、reader entry、split/merge、section topology、presentation topology、validation route の未決事項もここで扱います。
 
 十分な既存構成は再利用し、構成を変えない bounded な wording/link/paragraph edit に新しい構成作成を要求しません。
+依頼や既存 source が小さな成果物の十分な順序を定めている場合は、その構造を使い、別の outline を作りません。
 文書が長いことだけでは起動しません。
 
 ## Before prose
 
 1. 要求、読者、根拠と、既存の見出し・brief・outlineを照合する。必要な内容の役割・順序・根拠の対応が揃っていれば、その構成を使う。
-2. 構成がない、または必要な内容が欠ける場合は、本文前に短い構成メモか既存の見出しへ、章・要点の順序、各部分が答える問い・結論、根拠・sourceとの対応を残す。一つの自明な順序しかなくても、この準備は飛ばさない。部分的な不足は該当部分だけ補う。未確認の結論・根拠は未確定と示し、構成を埋めるために創作しない。
+2. 十分な構成がなければ、順序が自明でも本文前に短い構成メモか既存の見出しへ作成・補完する。依頼、source、既存の見出しに必要な順序・役割・根拠対応がすでにあれば、それを再利用し、別の outline へ重ねて記録しない。部分的な不足は該当部分だけ補う。未確認の結論・根拠は未確定と示し、構成を埋めるために創作しない。
 3. 執筆ownerがこの構成に沿って本文を書く。同じ担当でよく、新たなhandoffを要求しない。執筆中に構造上の欠落が分かったら、影響する構成を更新して本文へ戻る。構成のみ・承認待ちの明示指示は守り、それ以外に一律の承認待ちを作らない。範囲・結果・主要方針や未決契約の判断は [Decision Order](agent-orchestration.md#decision-order) に従う。
 
 通常の構成メモには独自DSL、graph、固定schema、別ファイル、全paragraphのmapを要求しません。

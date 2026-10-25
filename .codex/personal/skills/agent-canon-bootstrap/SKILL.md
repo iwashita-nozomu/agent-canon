@@ -2,7 +2,7 @@
 name: agent-canon-bootstrap
 description: "Use when AgentCanon's shared Python, Rust, or LSP tool runtime must be installed, started, targeted, inspected, updated, evaluated, or removed; project builds and tests remain in the project Docker/test-runner plane."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"af4d96032f7b397f759ea8fa0986f2c59b544062f5813189497a78017f0750ea"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"4c4e16b856b3c4f295af8420615fd7052a608fb1e3092ab7259c9f40c110b2ef"} -->
 
 <!--
 @dependency-start

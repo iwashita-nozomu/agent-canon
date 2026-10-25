@@ -86,10 +86,11 @@ C++-only. The tool should decide which files are relevant by suffix.
 
 ## Mechanical Result
 
-When the user requests a Markdown report or the result must persist beyond chat,
-create a report artifact. A tool run for a chat-only answer does not require a
-file. When persistence is required, use `result-artifact-writeout`: retain the
-checker output as the raw result and derive the Markdown summary from that run.
+Create a report artifact when the user requests a saved report or the result
+must persist beyond chat. For a chat-only Markdown answer, return the requested
+mechanical result inline. When an artifact is created, use
+`result-artifact-writeout`: retain the checker output as the raw result and
+derive the Markdown summary from that run.
 
 Default artifact path:
 
@@ -137,9 +138,9 @@ usage guidance.
 Reports should preserve all five headings when present: Single responsibility,
 Open/closed, Liskov substitution, Interface segregation, and Dependency inversion.
 
-The user-facing response must include the artifact path, status, and headline
-counts. It may include a short table excerpt, but the durable report is the
-Markdown artifact.
+When a report artifact is created, include its path, status, and headline counts
+in the user-facing response. For a chat-only answer, return the requested status
+and headline counts inline.
 
 Do not mix prioritization, false-positive calls, or design recommendations into
 the mechanical result.

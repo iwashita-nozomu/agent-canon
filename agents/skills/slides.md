@@ -29,8 +29,10 @@ template, and reused figure identities with the authoring inputs.
 
 Before prose, establish slide order, each slide's takeaway, supporting evidence,
 and useful visual form through [Before prose](structure-planning.md#before-prose).
-Reuse a sufficient outline; a new deck needs this preparation even when its
-order is obvious. A bounded edit can retain the existing structure.
+Reuse a sufficient outline or sequence already settled by the brief and source.
+If no sufficient structure exists, create or complete one before prose even when
+the sequence is obvious. Do not duplicate a sufficient brief/source structure
+in another outline. A bounded edit can retain the existing structure.
 
 ## Slot Contract
 

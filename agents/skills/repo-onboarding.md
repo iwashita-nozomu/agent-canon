@@ -81,10 +81,9 @@ coverage after establishing this entry context.
 
 ## Outputs
 
-- Issue-backed task なら Issue の current requirement / progress state の短い readback
-- resume する既存 work の PR / branch / topic clone / worktree、または compatible な途中作業が無いという短い readback
-- repo shape の短い要約
-- 触るべきディレクトリ
-- 追加で読むべき正本
-- selected Skill / operational owner と、次の判断に使った source evidence
-- 未完了で handoff / stop する場合は Issue progress comment の URL または comment identity
+Report only the onboarding facts that help answer the request or choose the
+next action. Include Issue and compatible continuation state when they decide
+whether to resume or create work; summarize the repository shape and owner paths
+when orientation is needed. If an Issue-backed task stops or hands off while
+unfinished, identify the authorized progress comment or state that it was not
+written.
