@@ -135,7 +135,9 @@ accepting a path or dependency-direction change.
 3. For a structural refactor, fix the canonical root and update the surfaces in
    the requested change. Remove obsolete entrypoints, wrappers, aliases, and
    exclusive support under RC-09. Keep API/structure mapping only where the
-   change actually moves or deletes a public surface.
+   change actually moves or deletes a public surface. A caller migration is in
+   scope only when it is requested; source retirement alone does not add
+   unrelated consumer migration.
 4. Preserve the agreed behavior and failure semantics. Add `structure-planning`,
    `tool-finding-report`, or a domain reviewer only when the changed contract or
    unresolved risk requires that owner. Prompt/doc/static-contract changes use the
@@ -176,12 +178,3 @@ Review the current diff against the changed behavior, ownership, consumer
 migration, and selected validation. Treat reviewer findings as hypotheses and
 repair only source-backed reachable effects. Language or document specialists
 are conditional on the changed surface; they do not replace the owning review.
-
-## Runtime Contract Clauses
-
-For replacement or duplicate retirement, apply RC-09: retain the canonical
-mechanism and remove obsolete support. A caller migration belongs to the change
-only when that migration is explicitly requested. Use the selected static or
-targeted validation route, inspect the resulting diff, and hand back unavailable
-or unrelated work to its owner. Do not add a new packet, field list, approval
-stage, full scan, or review gate in this skill.

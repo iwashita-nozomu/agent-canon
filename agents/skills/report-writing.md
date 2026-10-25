@@ -26,8 +26,7 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
    タスク完了報告には [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports) を適用し、重要な試行と採否の根拠も本文へ含める。
 2. 外部 reference が material claim を支える場合は、URL/DOI、access date、source identity、採否を持つ既存 source note/packet を使う。
    evaluation/experiment report では denominator、metric direction、valid/invalid comparison、次 action を明記する。
-3. draft前に reader の問いと結果・根拠の順序を確認する。[構成確認](structure-planning.md#before-prose) を使い、依頼や既存構成が十分なら再利用し、別の outline を重ねて作らない。十分な構成がなければ、順序が自明でも必要な要点・役割・根拠対応を本文前に補う。
-   数値計算の結果は [Numerical and runtime results](#numerical-and-runtime-results) の順序で構成する。
+3. 読者の問いに沿う結果・根拠の順序は [structure-planning](structure-planning.md#before-prose) に委譲する。数値計算の結果は [Numerical and runtime results](#numerical-and-runtime-results) の順序で構成する。
 4. その構成からreader orderでdraftし、`Results/Observations`、`Interpretation`、`Limitations` を混同しない。各material claimをevidenceまたは明示したinferenceに結ぶ。
 5. 図が理解を大きく改善する場合だけ `code-visualization`、HTML/PPTが明示された場合だけ `html-output`/`slides` を追加する。描画やlayoutで構成の欠落が見つかったら、該当構成を直して本文へ戻る。
 6. material factual error、unsupported claim、broken mapping、missing context、omitted counterevidence を close してから finalize する。
@@ -48,6 +47,9 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 
 Markdown が既定です。小さな内部 status は数段落や小表で足り、固定 heading 数や `finding_count == 0` は完了条件ではありません。
 独立 reviewer は claim impact、外部公開、曖昧さ、evidence complexity が必要な場合だけ選びます。
+For requested native Google Docs delivery, use the
+[Google Docs handoff](README.md#installed-external-skill-handoffs); this Skill
+retains report claims, evidence, and interpretation.
 
 ## Boundary
 

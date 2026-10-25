@@ -200,17 +200,3 @@ ones to repair.
 For a write-capable handoff, carry the packet path and the current repair
 boundary, including forbidden semantic changes and any established new-finding
 constraint. Include prompt feedback only when a prompt gap was found.
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-Use `Finding Packet`, `Procedure`, and `Refactor Integration` according to the
-request and the selected consumer. Choose the scope, tool families, ranking, and
-durable artifacts from the question and handoff need; preserve all findings in
-the selected scope. Use the existing validation-failure-response or
-dependency-analysis packet when a finding is handed to implementation or
-planning. Track actionable warnings and reusable prompt/tool gaps only through
-an active owner that needs that evidence. Use `report-writing` for a requested
-reader-facing report, and `structure-planning` only for an unresolved structure
-decision. Repair selection remains with the caller.

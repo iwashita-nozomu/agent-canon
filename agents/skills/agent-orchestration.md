@@ -151,6 +151,11 @@ Direct-peer collaboration requires a reported runtime capability; otherwise use
 parent relay or a durable artifact. The [communication protocol](../COMMUNICATION_PROTOCOL.md)
 owns receipts and packet fields.
 
+When a registered host Skill owns the selected capability, use the matching
+[external handoff](README.md#installed-external-skill-handoffs) and pass only
+the task-relevant input. Return its result to the AgentCanon owner that retains
+local source, content, and acceptance decisions.
+
 ## Write-Capable Handoff Validation Trust Boundary
 
 Run the commands selected in the handoff, plus only mechanism-required static or

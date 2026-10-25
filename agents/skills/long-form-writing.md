@@ -21,14 +21,11 @@ README、workflow、guide、migration、specification などの一般説明 pros
 ## Procedure
 
 Read the request, existing text and headings, and canonical source. State the
-purpose and reader in the amount of detail needed to guide the revision. Before
-drafting, establish the ordered sections or points, their roles, and source
-support using [Before prose](structure-planning.md#before-prose). Reuse a
-sufficient outline or order already settled by the request and source. If no
-sufficient structure exists, create or complete it before prose even when one
-order is obvious. Do not duplicate a sufficient request/source structure in a
-separate outline. A bounded wording edit can retain the existing structure; use
-`md-style-check` for a wording-independent typo, link, or formatting fix.
+purpose and reader in the amount of detail needed to guide the revision. Use
+[structure-planning](structure-planning.md#before-prose) to settle section order
+and source support before drafting. A bounded wording edit can retain the
+existing structure; use `md-style-check` for a wording-independent typo, link,
+or formatting fix.
 
 Draft from the selected structure, applying
 [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction)
@@ -48,4 +45,7 @@ Run `tools/bin/agent-canon docs check` when selected for the document.
 
 ## Boundary
 
-この skill は approved structure を prose にする owner です。構造 decision、paper/academic prose、report evidence、Markdown の体裁だけの check はそれぞれ `structure-planning`、`paper-writing`/`academic-writing`、`report-writing`、`md-style-check` に委譲します。
+この skill は selected structure を prose にする owner です。構造 decision、paper/academic prose、report
+evidence、Markdown の体裁だけの check はそれぞれ `structure-planning`、`paper-writing`/`academic-writing`、
+`report-writing`、`md-style-check` に委譲します。Requested native Google Docs delivery と明示的な Yomiyasu
+polish は [external handoffs](README.md#installed-external-skill-handoffs) を使い、本文の範囲・主張はこの owner に残します。

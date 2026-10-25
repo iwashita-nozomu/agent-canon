@@ -27,12 +27,16 @@ For result-bearing decks, follow [experiment report style](../../documents/exper
 for evidence, interpretation, limitations, and failures. Keep source deck,
 template, and reused figure identities with the authoring inputs.
 
-Before prose, establish slide order, each slide's takeaway, supporting evidence,
-and useful visual form through [Before prose](structure-planning.md#before-prose).
-Reuse a sufficient outline or sequence already settled by the brief and source.
-If no sufficient structure exists, create or complete one before prose even when
-the sequence is obvious. Do not duplicate a sufficient brief/source structure
-in another outline. A bounded edit can retain the existing structure.
+Set slide order through [structure-planning](structure-planning.md#before-prose).
+The [Slot Contract](#slot-contract) owns each slide's takeaway, supporting
+evidence, and useful visual form. A bounded edit can retain the existing
+structure.
+
+For an existing native Google Slides deck or reference deck, use the
+[Google Slides handoff](README.md#installed-external-skill-handoffs). New PPTX
+decks use the local authoring route below; selected bitmap assets may use the
+[`$imagegen`](README.md#official-system-skill-delegation). Keep image
+placement and claim/evidence review with the deck owner.
 
 ## Slot Contract
 

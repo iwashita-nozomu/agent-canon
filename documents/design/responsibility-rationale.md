@@ -36,6 +36,12 @@ produces the next result, how that result guides a decision, and when to branch,
 recover, or finish. Express the relationships needed by that task without a
 fixed field schema or a new Skill for each rule.
 
+When an installed host Skill owns a selected external capability, keep its
+procedure with that provider. The AgentCanon caller states when the handoff
+applies and binds the task-relevant input and returned result to its local
+source and acceptance contract; it does not copy the provider procedure or add
+the provider to the AgentCanon catalog.
+
 For a material change to an operation order, branch, completion check, or
 mandatory work, record in the existing owning design the governing request,
 principle, invariant, or assumption and why it supports the retained procedure.
