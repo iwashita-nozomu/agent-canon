@@ -28,7 +28,7 @@ checklist into every Skill.
 | Python | [`ruff.toml`](../../ruff.toml) | `ruff format <edited Python paths...>` |
 | C, C++, CUDA | [`.clang-format`](../../.clang-format) | `clang-format -i --style=file <edited paths...>` |
 | Rust | [`rustfmt.toml`](../../rustfmt.toml) | Owning crate's existing formatting command, or `rustfmt` on edited files using its declared edition |
-| Markdown | [Existing docs tool](../tools/agent-canon.md) | `tools/bin/agent-canon docs format <edited Markdown paths...>` |
+| Markdown | [AgentCanon docs tool](../tools/agent-canon.md) | `agent-canon docs format --root . <edited Markdown paths...>` through the shared runtime |
 | VS Code integration | [Settings](../../.vscode/settings.json), [recommendations](../../.vscode/extensions.json) | Format on save for Python, C/C++/CUDA and Rust using the selected native formatter |
 
 Run commands from the repository's existing working context and name the edited
@@ -37,10 +37,9 @@ command, not a new runtime selector or a value copied into the shared style.
 A crate-wide command is appropriate only within the repository's accepted scope;
 do not expand a bounded edit to a whole-workspace reformat.
 
-Markdown stays with its existing formatter. This change does not introduce an
-unused markdownlint or Prettier configuration, change the Markdown mechanism,
-or make Ruff's Python formatting a replacement for Markdown formatting. Other
-file types retain their existing owner-selected formatter and settings.
+Markdown uses AgentCanon's existing `docs format` operation. Invoke it through
+the [shared runtime](../../agents/skills/agent-canon-bootstrap.md#command-shape)
+from the registered target and name the edited Markdown paths.
 
 ## Engineering rationale
 

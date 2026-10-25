@@ -6,6 +6,7 @@ contract skill
 responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
+upstream design agent-canon-bootstrap.md shared runtime and registered target execution
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 upstream design report-writing.md report evidence and optional structure boundary
 upstream design structure-planning.md actual structural decision owner
@@ -25,9 +26,13 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 ## Procedure
 
-Identify the changed Markdown owner and use its existing formatter/check route.
-Read command help when an option is needed; a Markdown edit alone does not imply
-an AgentCanon checker. If a check reports a path, inspect the relevant text and
+For Markdown formatting, run AgentCanon's native
+`agent-canon docs format --root . <changed Markdown paths...>` through the
+[shared runtime route](agent-canon-bootstrap.md#command-shape), with the
+registered target as the working directory. Pass the changed files and retain
+the command's diagnostics and exit status. Read help when an option is needed.
+
+Identify the changed document's content owner. If a check reports a path, inspect the relevant text and
 repair that formatting, link, heading, math, or Mermaid issue. Route semantic or
 cross-document findings to the content owner.
 
