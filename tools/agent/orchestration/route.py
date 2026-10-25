@@ -663,15 +663,6 @@ def decide_execution(root: Path, context: object) -> dict[str, object]:
         if status == "unavailable"
         else status,
     }
-    if not bounded:
-        # The full scheduling fields belong only to an activated coordination route.
-        scheduling = catalog.get("execution_time_policy")
-        if (
-            not isinstance(scheduling, dict)
-            or scheduling.get("applies_to") != "coordination"
-        ):
-            raise ValueError("execution-scheduling-policy-invalid")
-        result["execution_time_policy"] = scheduling
     return result
 
 
