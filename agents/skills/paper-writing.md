@@ -35,11 +35,9 @@ paragraph map や細かな section contract は、実際の重複、欠落、順
 ## Procedure
 
 既存の draft、source、要求された section と claim から必要な執筆・根拠メモを
-選びます。本文前に [構成確認](structure-planning.md#before-prose) でsectionの順序・役割と
-claim/evidenceの対応を確かめ、既存構成または依頼・sourceで決まる順序を再利用します。
-十分な構成がなければ、順序が自明でも本文前に作成・補完します。依頼やsourceにすでにある
-十分な順序は別の outline へ重ねて記録しません。細かなparagraph mapは、実際の重複、欠落、
-順序の問題を解く場合だけ作ります。
+選びます。本文前に [structure-planning](structure-planning.md#before-prose) を使い、
+paper-specific section roles、claim/evidence対応、必要な figure/table の順序を決めます。
+細かな paragraph map は、実際の重複、欠落、順序の問題を解く場合だけ作ります。
 
 Reader がたどる論理順で書き、section の役割が重なる場合は reverse outline
 で整理します。レビューは実際のリスクに合わせます。構造上の断絶には

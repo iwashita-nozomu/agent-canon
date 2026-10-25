@@ -135,11 +135,3 @@ actual attempted operation, observed result, unperformed scope, and next owner/a
 Keep saved spool with its owner. Do not claim unsaved content is saved or put private
 text in public source as a fallback. Unrelated runtime repairs, a new conversation,
 or a whole evaluation rerun are not prerequisites for independent recording work.
-
-## Runtime Contract Clauses
-
-Use the matching Reader Map branch in the task that activates it. Preserve topic
-search before a private adoption/rejection decision and exact-record readback after
-writing. Public failure recording retains the Notes Lifecycle contract. Behavior
-calibration/evaluation applies only under its own condition, and each output reports
-the actual result and limitations through the existing task/Issue owner.

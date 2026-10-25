@@ -29,6 +29,11 @@ downstream implementation ../../.codex/personal/skills/code-visualization/SKILL.
 
 Start from the reader's question and requested scope. Identify the existing skill, tool, or artifact that owns the source facts. Consider timing, precision, reader action, and document context only when they change the evidence or representation. If a diagram family is requested, check that it answers the question; add another view only when a requested relation would otherwise remain unclear.
 
+For an in-chat interactive exploration, use the conditional
+[`visualize:visualize` handoff](README.md#installed-external-skill-handoffs)
+when interaction materially helps the reader. For a browsable Nessa system map,
+use its handoff there; source facts remain with this Skill's selected owners.
+
 For an embedded diagram, identify the local claim and reader action. Use `structure-planning` when document structure or reader path changes, and `md-style-check` for the changed Markdown properties.
 
 ## Question-To-Diagram Projection

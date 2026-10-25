@@ -28,12 +28,9 @@ claim, evidence links, notation/assumptions, or section contract explicit to the
 extent the document needs them; reuse an existing note when it already captures
 that information.
 
-Before drafting, establish the order of claims or sections and their evidence
-against [Before prose](structure-planning.md#before-prose). Reuse a sufficient
-structure or an order already settled by the request and source. If the
-structure is missing or incomplete, create or complete it before prose even when
-one order is obvious. Do not duplicate a sufficient request/source structure in
-a separate outline. Draft in a reader-friendly order and keep observations,
+Before drafting, use [structure-planning](structure-planning.md#before-prose) to
+settle claim/section order and evidence. Draft in a reader-friendly order and
+keep observations,
 interpretation, and limitations distinct where the document makes evidence-based
 claims. A graph or fixed handoff is not a prerequisite for ordinary drafting.
 

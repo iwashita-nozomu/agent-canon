@@ -21,6 +21,10 @@ downstream implementation ../../tools/validation/semantic/dependencies/check_dep
 ## Activation
 
 Use this skill when HTML/browser output is explicitly requested. Reports otherwise default to their normal text/document format. Structure planning activates only if a genuine page-topology decision exists.
+For a website build, existing Sites edit, or hosting task that fits the provider,
+use the [Sites handoff](README.md#installed-external-skill-handoffs). Pass the
+local-only versus deployment condition to Sites; keep already-selected project
+edits and standalone HTML with their current owners.
 
 ## Artifact validation
 
@@ -32,9 +36,11 @@ A listen socket is not required to prove a static artifact correct.
 
 Before creating or substantially revising a UI, read the relevant project design
 guidance, tokens, existing components, and user-specified reference screens.
-Reuse those assets as the visual authority. If no basis exists, briefly choose
-color, typography, spacing, and layout from the intended audience and screen's
-purpose. Keep that direction in the existing task or design context.
+Reuse them as the visual authority. For a new or substantially restyled UI that
+needs a distinct direction, use the [frontend-design handoff](README.md#installed-external-skill-handoffs)
+with the brief and constraints. Use the [`$imagegen` route](README.md#official-system-skill-delegation)
+for selected raster assets; code-native diagrams and plots stay with their existing renderers. This
+Skill retains the project boundary and checks the resulting browser artifact.
 
 Implement the requested surface with existing components. Explain a necessary
 departure at the owning design or review location. Preserve brand requirements,

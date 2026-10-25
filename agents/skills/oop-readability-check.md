@@ -196,12 +196,3 @@ when it is useful.
 - This skill must not start a refactor or broad validation pass.
 - This skill must not clean unrelated hook logs except to avoid presenting them
   as product changes.
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Use `$result-artifact-writeout` when the result must persist beyond chat; save the checker output as the raw artifact and derive Markdown tables from the same source result.
-1. Add agent analysis only in `analyze-existing` or `run-and-analyze`, as defined above.
-   Keep it separate from mechanical output and follow `Agent Analysis`.
-1. Use `Timing Token` when the active run bundle requires that event.

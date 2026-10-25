@@ -46,9 +46,9 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 - 外部検索、PDF取得、citation lookup の前に、同じ source / claim が既存の
   `references/`、`documents/notes/`、`documents/`、topic report にないか確認します。
   既存 note がある場合は更新または参照し、並行する正本を増やしません。
-- 選択した資料では source type（peer-reviewed paper、preprint、vendor doc、blog など）と
-  関連性を確かめます。claim の位置づけに影響する
-  制限・反証資料も探し、source の直接の記述と自分の解釈を分けます。
+- 問いに合う source mix を選び、使える場合は primary / official sources を優先します。
+  source type（peer-reviewed paper、preprint、vendor doc、blog など）と関連性を確かめます。
+  claim の位置づけに影響する制限・反証資料も探し、source の直接の記述と解釈を分けます。
 - 回答、report、design に使う source は tracked note / packet に残し、URL / DOI、
   access date、利用した claim、limitation、保存 artifact の場所を記録します。
   重要な claim は [原文位置](../../references/README.md#source-passages) へ結び付けます。
@@ -65,8 +65,9 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 使った source を追跡できる形で記録します。query pack、除外一覧、全 source の要約は、
 検索規模や依頼に必要な場合だけ作ります。
 
-用語や探索先が未確定なら、総説から専門用語・著者・引用・被引用・リンクをたどり、
-問いに必要な資料へ探索を広げます。結論を変え得る代替説明も確認します。
+用語や探索先が未確定なら、問いに必要な資料へ探索を広げます。用語・人・venues・引用経路から原文へ
+たどる必要がある場合は、[Imozuru handoff](README.md#installed-external-skill-handoffs) を source discovery に
+使います。返された locator と原文はここで評価・記録し、結論を変え得る代替説明も確認します。
 終了時には、必要な根拠が揃った、重要な未確認点が残る、追加探索で新しい資料が
 得られなくなった、のどれが判断の根拠かを示します。未探索・アクセス不能・探索した
 範囲で見つからなかった状態を区別します。
@@ -98,12 +99,3 @@ artifact の場所は既存の [reference note guidance](../../references/README
 - reader-facing な report の確認は report review を使います
 - repo-wide な workflow や review policy の外部根拠索引は [agents/workflows/workflow-references.md](../workflows/workflow-references.md) に残します。
   この索引は source bibliography であり、検索手順の正本ではありません。
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Read this owner. Consult [agents/workflows/workflow-references.md](../workflows/workflow-references.md) only when a repo-wide external-rule bibliography is needed.
-1. Before external lookup, reuse or update any existing record for the source or claim. Select the search scope and source mix from the question; prefer primary and official sources when available, and seek contrary or scope-limiting evidence when it could change the conclusion.
-1. If a source informs the answer or artifact, leave a durable record with its identity, URL/DOI, access date, claim used, limitation, and artifact location. Keep search logs and exclusion reasons when they are needed to explain a consequential selection.
-1. Use prose-graph findings as search candidates when a handoff supplies them; they do not themselves establish a citation gap.
