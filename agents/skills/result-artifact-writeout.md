@@ -35,6 +35,9 @@ summary がある場合は、同じ source result に結び付けます。
 
 Persist concrete outputs without inventing a second experiment, report, or publication state. For each selected artifact that actually exists, record its parent result/run reference, path, semantic role, content checksum or equivalent immutable identity, producer/source reference when needed, destination, and successful readback. Do not overwrite different bytes at the same identity; identical replay may be treated as idempotent.
 
+For structured artifacts, validate the saved readback with the existing parser
+or consumer to confirm format validity as well as byte identity.
+
 Preserve a raw machine-readable result, summary, or manifest only when the
 producer or request selects it. If a manifest is created, include provenance
 available from the run, such as command, inputs, revision, runtime, timestamps,

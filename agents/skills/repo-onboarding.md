@@ -4,6 +4,7 @@
 contract skill
 responsibility Documents repo-onboarding for this repository.
 upstream design ../canonical/skills.md skill canon registry
+upstream design ./pr-processing.md Issue and PR write authorization and readback
 @dependency-end
 -->
 
@@ -48,7 +49,7 @@ evidence 不一致のうち該当する理由を記録します。無関係な b
 
 ## Issue Progress Writeback
 
-Issue-backed task は、作業が未完了の状態で handoff、停止、別 task への移動、または user turn の終了に入る前に、対象 Issue へ current state を comment します。chat や PR body だけに途中状態を残しません。
+Issue-backed task は、current task の authority が Issue comment write を認める場合に限り、作業が未完了の状態で handoff、停止、別 task への移動、または user turn の終了に入る前に、対象 Issue へ current state を comment します。この skill 自体は remote write authority を付与しません。authority がない場合は途中状態を既存 task / handoff に残し、Issue update は未実行として明示します。許可された Issue write は [pr-processing](pr-processing.md#publication-boundary) の既存 route を使います。
 
 進捗 comment は短く、次の continuation に必要な事実だけを持ちます。
 

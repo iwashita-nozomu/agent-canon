@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the public skill/dependency graph; do not edit by hand. -->
 # Public Skill Dependency Graph
 
-<!-- graph_digest=706e3f3bf06e2290dcc8f8b4f35376ad653abd9967e7a41695343c5bd79cc892 -->
+<!-- graph_digest=fbbec7f55987c152c5fe2329b0f86aa15cd88aec0ee65e7392b0bd2cbfcfa769 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -337,7 +337,7 @@ graph LR
   %% source kind=time id=source:time:00069:4dec3cb10a13c8a4 digest=27ea7495e19fb0725b13bdc34894473f2b64873936e0dc582727c73900fade04 locator=agents/skills/skill-dependencies.yaml#invocation:repository-reading ordinal=69
   %% source kind=evidence id=source:evidence:00143:095db0e9bde06360 digest=7f01673161d66f450b706f93265fa03328fc877cd9dc041027b3565f43c7a18a locator=agents/skills/catalog.yaml ordinal=143
   %% source kind=evidence id=source:evidence:00144:c1c7152410f36e25 digest=26fdc5d62b6a16c21498c9da24516184275dd12894adb506d838e84ea2dc703e locator=agents/skills/skill-dependencies.yaml ordinal=144
-  %% source kind=evidence id=source:evidence:00145:7e918603745bf63c digest=6beb13672bf91230b7a4e26cfb286be34abe8bd533c134d92269244c0a201944 locator=agents/canonical/skills.md ordinal=145
+  %% source kind=evidence id=source:evidence:00145:314cea484b8f0b28 digest=97f33c60cecca7ed7dcf973a69d92d986d4c8c2dde43f283bbe9677a7d0c398a locator=agents/canonical/skills.md ordinal=145
   %% source kind=evidence id=source:evidence:00146:340b0ceb92be33e7 digest=891be9f83899d08bec499aa7da8a34752b53e000564249e82c2d2ae3063ecc68 locator=agents/skills/catalog.yaml#routing ordinal=146
   %% source kind=edge id=source:edge:00000:5b957a2fcdcd074a digest=eb17bbaff7ba9731f798b2496f34b960c1afffa1975f3fdf491fe9d0e34f8f37 locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:0d99ad0ac7373d81 digest=fbad305b37a341ddc3479505cee14bb72bb8cdb7b39e0e6d49f6e4b06a4c7387 locator=graph:edge:00001 ordinal=1
@@ -1268,4 +1268,4 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Graph digest: `706e3f3bf06e2290dcc8f8b4f35376ad653abd9967e7a41695343c5bd79cc892`.
+Graph digest: `fbbec7f55987c152c5fe2329b0f86aa15cd88aec0ee65e7392b0bd2cbfcfa769`.
