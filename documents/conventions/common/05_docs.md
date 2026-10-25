@@ -63,9 +63,10 @@ downstream implementation ../../../tools/runtime/lifecycle/task_close.py validat
 - workflow、依存関係、責務境界、状態遷移、routing、review gate、multi-step 手順を説明する reader-facing Markdown では、Mermaid 図を既定の visual 候補にします。
 - Mermaid 図は Markdown 内の fenced `mermaid` code block として保持し、本文の責務説明と併記して正本化します。
 - Mermaid 図は本文と併用します。図の直前または直後に、図が答える問い、読者が入口として見る node / edge、本文で扱う制約を短く書きます。
-- リポジトリ root の `.markdownlint.json` を Markdown 体裁チェックの既定設定として扱います。
-- Markdown は `markdownlint` に準拠させ、例外が必要な場合は設定ファイルと規約文書を同時に更新します。
-- まとまった Markdown 変更の前後では、少なくとも変更したファイルに対して `markdownlint` を実行して体裁崩れを確認します。
+- Markdown の整形は、変更したファイルを対象に AgentCanon の `agent-canon docs format` を実行します。
+  [Markdown style check の実行手順](../../../agents/skills/md-style-check.md#procedure) に従い、共有 runtime と登録 target を使います。
+- 体裁チェックの設定はリポジトリ root の [`.markdownlint-cli2.jsonc`](../../../.markdownlint-cli2.jsonc) を使います。
+  例外が必要な場合は設定ファイルと規約文書を同時に更新します。
 - 空行は 1 行に保ち、見出しには本文または箇条書きを続けます。
 - 箇条書きは `-` を基本にし、literal な path・識別子・command はバッククォートで示します。
   reader-facing な文書・skill の navigation は、上記の標準 Markdown link を使います。
