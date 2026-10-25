@@ -7,6 +7,7 @@ responsibility Documents md-style-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../ROOT_AGENTS.md shared post-edit formatting boundary
 upstream design agent-canon-bootstrap.md shared runtime and registered target execution
+upstream design ../../documents/design/formatting.md final edited and validated content correspondence
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 upstream design report-writing.md report evidence and optional structure boundary
 upstream design structure-planning.md actual structural decision owner
@@ -26,15 +27,31 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
 
 ## Procedure
 
-For Markdown formatting, run AgentCanon's native
-`agent-canon docs format --root . <changed Markdown paths...>` through the
-[shared runtime route](agent-canon-bootstrap.md#command-shape), with the
-registered target as the working directory. Pass the changed files and retain
-the command's diagnostics and exit status. Read help when an option is needed.
-
-Identify the changed document's content owner. If a check reports a path, inspect the relevant text and
-repair that formatting, link, heading, math, or Mermaid issue. Route semantic or
-cross-document findings to the content owner.
+1. Identify the changed Markdown paths and content owner. This binds the
+   operation and returned findings to the requested scope.
+2. Run AgentCanon's native
+   `agent-canon docs format --root . <changed Markdown paths...>` through the
+   [shared runtime route](agent-canon-bootstrap.md#command-shape), with the
+   registered target as the working directory. This entrypoint applies the
+   configured formatter and checks together on the selected files. Read help
+   only when an option remains unresolved. If a provider requires writable
+   cache or temporary output, place a task-specific directory under
+   `AGENT_CANON_RUNTIME_ROOT` and pass it through that invocation's supported
+   environment variable. The registered target or private home may be
+   read-only, so generated state belongs outside them under the
+   [shared runtime boundary](agent-canon-bootstrap.md#command-shape).
+3. Inspect the formatter's changes and diagnostics, then repair relevant
+   formatting, link, heading, math, or Mermaid findings. The formatter
+   normalizes line endings, trailing whitespace, and repeated blank lines; it
+   does not decide the correctness of claims or mathematical/diagram meaning.
+   The content owner handles semantic and cross-document findings for that
+   reason.
+4. After repairs or later edits, rerun the formatter on the changed scope and
+   inspect the final diff for readability and meaning. Retain the actual
+   command, diagnostics, exit status, and remaining verification limits.
+   Earlier results do not cover subsequent edits, so this keeps the
+   [edited, validated, and submitted content](../../documents/design/formatting.md#engineering-rationale)
+   aligned.
 
 The AgentCanon docs route invokes the configured `markdownlint-cli2` and offline
 `lychee` providers directly, then uses Quarto's embedded Pandoc AST for
@@ -43,13 +60,6 @@ validates Mermaid syntax in a temporary output directory without rewriting the
 source. The repository-specific residuals are per-depth unordered-marker
 consistency, exact math delimiter spelling, bootstrap documentation, and the
 runtime-profile inventory. Standard-tool output and exit status remain native.
-
-`agent-canon docs format` only normalizes line endings, trailing whitespace, and
-repeated blank lines before rerunning `docs check`. It does not change math or
-diagram meaning. Make content repairs deliberately, then run the selected check
-when it establishes the corrected property. Inspect the final change for
-readability and meaning; formatting success alone does not establish content
-correctness.
 
 ## Boundary
 

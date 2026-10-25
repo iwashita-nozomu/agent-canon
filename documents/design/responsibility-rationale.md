@@ -17,6 +17,7 @@ downstream design ../../agents/skills/pr-processing.md consumes queue-planning a
 downstream design ../../agents/skills/html-output.md consumes HTML artifact-versus-serving boundary
 downstream design ../../agents/skills/structure-refactor.md consumes drift-repair and review-scope rationale
 downstream design ../../agents/skills/task-routing.md consumes routing-state rationale
+downstream design ../../agents/skills/md-style-check.md demonstrates operative steps and their reasons
 @dependency-end
 -->
 
@@ -28,6 +29,13 @@ The common rule is reachability: a responsibility is selected only when the chan
 
 ## Skill procedure derivation
 
+A reusable way of applying a rule belongs in its existing owning Skill. Shared
+constraints remain with their common owner. Derive the operative sequence from
+the applicable condition and input: what evidence is needed, what action or tool
+produces the next result, how that result guides a decision, and when to branch,
+recover, or finish. Express the relationships needed by that task without a
+fixed field schema or a new Skill for each rule.
+
 When a skill procedure has a material, non-obvious operation order, branch
 condition, or completion check, record in the existing owning design the relevant
 principle, requirement, or assumption and why it supports that choice. Link the
@@ -37,11 +45,26 @@ steps. Shared principles remain in
 [engineering principles](../conventions/software-engineering-principles.md); do
 not copy them into individual skills.
 
+Keep a compact operative reason beside a scope, order, branch, or completion
+decision when it is needed to apply the procedure correctly. This puts the
+necessary why in the execution context. The owning design retains the full
+derivation and evidence; link to it for detail rather than copying its history
+into the Skill.
+
 Use actual specifications and evidence when they support the choice. Distinguish
 reasoned derivation, static confirmation, and observed behavior, and leave unknown
 assumptions explicit. Do not invent historical intent, alternatives, or test
 results. Review that the linked rationale supports the changed procedure; link
 existence alone is not evidence.
+
+When an AgentCanon tool executing in the [AgentCanon shared
+runtime](../../agents/skills/agent-canon-bootstrap.md#command-shape) needs
+writable cache or temporary output, assign a task-specific path under that
+runtime and pass it through that invocation's supported setting. The
+registered source target or private home may be read-only, so generated state
+stays outside the source boundary. Keep the concrete path and provider setting
+in the task context; this does not set output locations for project-native tools
+or impose a global cache convention.
 
 Update the rationale and affected procedure together when a relevant premise or
 guarantee changes. Routine wording edits and self-evident steps need no additional

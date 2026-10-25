@@ -155,13 +155,49 @@ For host-runtime policy, see [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md).
 ## Updating Skills
 
 Use this route when changing AgentCanon's skill source, registration, or
-distribution. Preserve the skill's reusable method; use the caller's current
+distribution. Before changing a procedure, use
+[Skill procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
+to turn the applicable rule into operations, decisions, and observable results,
+with the decision-relevant reason beside the affected step.
+Preserve the skill's reusable method; use the caller's current
 request and governing owner for concrete goals, inputs, paths, environment,
 validation, and output. Keep extra capabilities conditional, and retain native
 CLI/API behavior instead of introducing a wrapper or mandatory context packet.
 Prefer an existing capability identified in that context when it meets the
 requested guarantee; extend it only to close a concrete gap. Compare functional
 responsibility and contract, not names or paths alone.
+
+### Improvement cycle
+
+Before implementation or delegation, adapt this cycle to the current task's
+goal, inputs, constraints, and evidence. Keep that task-specific sequence in the
+existing task or handoff so the writer starts from an executable workflow.
+
+1. Establish the requested outcome, the observed problem or preference, the
+   current Skill contract, and its owner. Reuse valid source and results to keep
+   the change tied to the actual gap.
+2. Select the operations, branches, expected results, and completion checks for
+   this task using [procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation).
+   This makes the applicable rules and operative reasons available before edits.
+   Resolve material scope or approach choices through the existing decision owner.
+3. Choose the writer through [delegation selection](agent-orchestration.md#delegation-selection).
+   For a selected child, pass this workflow, source binding, bounded write paths,
+   current evidence, and the validation route through [subagent-bootstrap](subagent-bootstrap.md).
+   The same task contract then governs the author and parent handback.
+4. Improve the owning procedure and its rationale together. When actual work
+   exposes a missing step or branch, update the task workflow before continuing.
+   Amend this reusable cycle when the gap belongs here; keep case-specific
+   parameters in the task. Return repairs to a compatible active writer to retain
+   context, and ask before expanding the agreed outcome or authority.
+5. Run the selected native checks and Markdown formatter, and refresh affected
+   generated views through their owner. Use [empirical-prompt-tuning](empirical-prompt-tuning.md)
+   when a behavior question needs fresh observations. This distinguishes source
+   consistency from evidence that an instruction changes behavior.
+6. Compare the actual result with the whole requested outcome. Retain material
+   attempts, rejection grounds, validation limits, and workflow corrections in
+   the existing task and [completion report](../internal-routines/verification-result-structuring.md#completion-reports).
+   Continue an authorized repair or the next useful iteration; finish when the
+   task's acceptance is established, or hand back a concrete unresolved boundary.
 
 Update the canonical document and only the catalog, dependency, caller, or
 adapter surfaces affected by the change. The catalog owns public identity and
