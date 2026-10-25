@@ -56,13 +56,13 @@ def test_document_and_code_tasks_use_the_bounded_route(context, oracle):
 )
 def test_real_edge_or_resumption_selects_existing_coordination(context, reason):
     result = decide_execution(ROOT, {**context, "coordination": [reason]})
-    catalog = yaml.safe_load((ROOT / "agents/task_catalog.yaml").read_text())
-    assert result["execution_route"] == "coordination"
-    assert result["commands"] == [
-        "python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"
-    ]
-    assert result["execution_time_policy"] == catalog["execution_time_policy"]
-    assert len(result["execution_time_policy"]["executable_fields"]) == 13
+    assert result == {
+        "execution_route": "coordination",
+        "next_action": "run_existing_coordinated_closeout",
+        "commands": ["python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"],
+        "selected_validation": context["validation"],
+        "verification_status": "pending",
+    }
 
 
 @pytest.mark.parametrize("count", ["roots", "owners", "writers"])
@@ -114,9 +114,16 @@ def test_missing_owner_fact_is_not_an_implicit_single_owner(context):
 
 
 @pytest.mark.parametrize("risk", RISK_VALUES)
-def test_cli_is_artifact_free_and_does_not_route_by_risk(context, tmp_path, risk):
+@pytest.mark.parametrize(
+    ("coordination", "expected_route"),
+    [([], "bounded_fast_path"), (["dependency"], "coordination")],
+)
+def test_cli_is_artifact_free_and_does_not_route_by_risk(
+    context, tmp_path, risk, coordination, expected_route
+):
     # Commands in the oracle are data, not executable authority for this router.
     context["validation"] = "touch must-not-exist"
+    context["coordination"] = coordination
     result = subprocess.run(
         [
             sys.executable,
@@ -140,7 +147,7 @@ def test_cli_is_artifact_free_and_does_not_route_by_risk(context, tmp_path, risk
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["execution_route"] == "bounded_fast_path"
+    assert json.loads(result.stdout)["execution_route"] == expected_route
     assert list(tmp_path.iterdir()) == []
 
 
@@ -187,12 +194,16 @@ def test_non_closeout_selector_rejects_execution_context(context, tmp_path):
     assert "requires --area closeout" in result.stderr
 
 
-def test_unselected_gate_count_does_not_expand_bounded_output(context, tmp_path):
+@pytest.mark.parametrize("coordination", [[], ["dependency"]])
+def test_unselected_gate_count_does_not_expand_selected_output(
+    context, tmp_path, coordination
+):
+    context["coordination"] = coordination
     expected = decide_execution(ROOT, context)
     catalog = yaml.safe_load((ROOT / "agents/task_catalog.yaml").read_text())
-    catalog["execution_time_policy"]["unselected_gates"] = [
-        f"gate-{index}" for index in range(1000)
-    ]
+    catalog["execution_time_policy"] = {
+        "unselected_gates": [f"gate-{index}" for index in range(1000)]
+    }
     catalog["execution_route_policy"]["routes"]["bounded_fast_path"][
         "inactive_not_applicable"
     ] = True

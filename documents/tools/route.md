@@ -78,7 +78,12 @@ to either execution route. Risk and changed-file counts do not select this path.
 For a bounded task, output identifies the selected route and next action, with
 no shell closeout command or inactive gate records. Coordinated output instead
 includes the existing `task_close.py --run-id <run-id>` command and its
-scheduling projection. With no context, `--area closeout` asks for route
+catalog-defined next action. Both routes project `execution_route`, `next_action`,
+`commands`, `selected_validation`, and `verification_status` from the current
+route policy and established context. The current catalog's route policy is
+sufficient; the router neither requires nor returns a separate
+`execution_time_policy`. This removes the obsolete scheduling dependency that
+rejected valid coordination requests. With no context, `--area closeout` asks for route
 selection and does not advertise a nonexistent lightweight checker.
 
 Optional `validation_status` is `pending` (default), `pass`, `failed`, or
