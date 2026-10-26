@@ -109,9 +109,9 @@ AgentCanon adds the local contract that the built-in does not own.
 `$plugin-creator` is an additional host capability only when registered; it is
 not part of this assumed base. Provider procedures stay with their owners.
 
-## Installed External Skill Handoffs
+<a id="installed-external-skill-handoffs"></a>
 
-### Task Skill Sets
+## Task Skill Sets
 
 Choose the smallest applicable composition once from the requested outcome.
 Reuse the selected owners, available definitions, and task facts while they
@@ -140,14 +140,20 @@ limit; it does not select installation or a substitute implicitly.
 
 ## External Skill Installation And Updates
 
-外部配布Skillの一覧・導入は、host の `$skill-installer` と現行helperに委譲します。
-取得方式・導入先はその標準に従い、ユーザーの版指定がなければ配布元の既定・最新経路を使います。
+利用するCodexで、導入するSkill名または配布元URLを `$skill-installer` へ渡します。
+候補を探す場合は同じSkillへ一覧を依頼します。
 
-既存Skillの更新では、導入済み内容と候補の差分、local変更への影響を示し、置換前にユーザーへ確認します。
+```text
+$skill-installer <Skill名または配布元URL> を、このCodex環境へ導入して。
+```
+
+取得・導入先の解決はinstallerに委譲し、版指定がなければ配布元の既定・最新経路を使います。
+
+導入済みの同一内容は保持します。更新時は差分とlocal変更への影響を示し、置換前にユーザーへ確認します。
 回答までは既存内容を使います。local変更を保全し、承認した内容と一致するものを適用します。
 
-出典・取得revision・実際の結果は既存taskに残し、導入物がruntimeに検出されることを確かめます。
-AgentCanonの管理source・生成adapterは、この節の外部導入先と分けて既存の保守経路で扱います。
+対象Codexで導入物の登録名と有効状態を確認し、出典・取得revision・導入先・結果を既存taskに残して完了とします。
+AgentCanon自身のsource・生成adapterの変更は [Updating Skills](#updating-skills) で扱います。
 
 ## Codex Defaults
 

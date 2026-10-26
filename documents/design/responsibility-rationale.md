@@ -51,6 +51,10 @@ applies and binds the task-relevant input and returned result to its local
 source and acceptance contract; it does not copy the provider procedure or add
 the provider to the AgentCanon catalog.
 
+External Skills are installed and discovered in the Codex environment that uses
+them. Its installer owns platform and destination handling; setup entrypoints
+link to one shared installation policy.
+
 For a material change to an operation order, branch, completion check, or
 mandatory work, record in the existing owning design the governing request,
 principle, invariant, or assumption and why it supports the retained procedure.

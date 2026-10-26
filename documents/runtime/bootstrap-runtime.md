@@ -247,6 +247,9 @@ the owned discovery link only.
 The migration never scans or removes `~/.codex/skills/.system` or another user
 entry.
 
+For external Skills, use the
+[target Codex installation route](../../agents/skills/README.md#external-skill-installation-and-updates).
+
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
 no-new-privileges, and a writable `/tmp` tmpfs. The default maximum is two
