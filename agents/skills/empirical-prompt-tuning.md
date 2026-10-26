@@ -38,8 +38,9 @@ Start from the instruction's intended user, trigger, and observable outcome.
 Use prior task results or feedback to identify a concrete behavior question;
 separate a demonstrated miss from a hypothesis about its cause. If evaluation
 will change the decision, choose representative scenarios that exercise the
-affected behavior. Add a hold-out case when the edit could overfit to a known
-example. Identify the retained instruction and candidate separately, and define
+affected behavior. Use an unused final evaluation set appropriate to a claim
+about unseen tasks; otherwise limit the claim to the selected cases. Identify
+the retained instruction and candidate separately, and define
 the required outcome and unacceptable regressions before seeing fresh results.
 Keep model, tools, inputs, and verification conditions comparable; record material
 differences that limit attribution. Freeze the scenario and criteria, and give
