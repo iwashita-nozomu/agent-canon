@@ -21,7 +21,7 @@ downstream implementation ../../tools/agent/skills/skill_dependency_map.py valid
 ## Reader Map
 
 作成・公開範囲は [Rules](#rules) と [Skill Visibility Naming](#skill-visibility-naming)、
-選択は [Codex Defaults](#codex-defaults)、正本の変更は [Updating Skills](#updating-skills) を参照します。
+選択は [Task Skill Sets](#task-skill-sets) と [Codex Defaults](#codex-defaults)、正本の変更は [Updating Skills](#updating-skills) を参照します。
 外部配布物の導入・更新は [External Skill Installation And Updates](#external-skill-installation-and-updates) を参照します。
 各 skill の長い手順はその正本文書が所有し、この索引や [AGENTS.md](../../AGENTS.md) へ複製しません。
 以下のリンクは必要時の参照先であり、全項目の起動・読了を要求する一覧ではありません。
@@ -101,40 +101,42 @@ carry-over は `documents/notes/` と worktree log を正本とし、独立 publ
 
 ## Official System Skill Delegation
 
-OpenAI system skill の本文は host runtime が提供します。AgentCanon は routing trigger、local evidence、repo 固有契約だけを持ちます。
-
-| Official System Skill | AgentCanon Route |
-| --- | --- |
-| `$openai-docs` | Current OpenAI / Codex product docs, model guidance, API reference, and Codex manual source route. |
-| `$skill-creator` | Direct owner for general skill creation, refactoring, and instruction quality; AgentCanon source changes also use [Updating Skills](#updating-skills). |
-| `$skill-installer` | External skill installation and curated skill listing; follow [the local install/update route](#external-skill-installation-and-updates). |
-| `$imagegen` | Pass a bitmap brief and, when relevant, a visible reference image; it returns a raster artifact for the selected consumer to place and validate. Vector diagrams, code-native visuals, and scientific plots keep their existing owners. |
-| `$plugin-creator` | Codex plugin scaffold, manifest defaults, marketplace entries, and plugin reinstall flow. |
+The host provides `$skill-creator`, `$skill-installer`, `$openai-docs`, and
+`$imagegen` as the built-in base for this skill set. Their availability is an
+assumption, not a per-task installation or discovery step. Select only the
+capability needed by the request and use its registered entry directly.
+AgentCanon adds the local contract that the built-in does not own.
+`$plugin-creator` is an additional host capability only when registered; it is
+not part of this assumed base. Provider procedures stay with their owners.
 
 ## Installed External Skill Handoffs
 
-The host Skill registry and each installed provider own their names, availability,
-and operating procedures, as defined by
-[Skill procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation).
-Use a handoff only when its request condition applies;
-pass the relevant task input and return the provider's result to the AgentCanon
-owner that retains the local content, source facts, and acceptance contract.
+### Task Skill Sets
 
-| Provider | Select when | AgentCanon handoff and returned result |
+Choose the smallest applicable composition once from the requested outcome.
+Reuse the selected owners, available definitions, and task facts while they
+remain valid. A set describes how responsibilities compose; it does not activate
+every member or create another routing state. External members are selected
+from the active registry when their condition applies.
+
+| Requested outcome | Primary skill and AgentCanon additions | Conditional members and result boundary |
 | --- | --- | --- |
-| `$frontend-design` | A new or substantially restyled user interface is in scope. | Provide the audience, UI goal, brief, applicable constraints, and existing design references when supplied; receive a design direction and UI artifact. `html-output` or the project UI owner integrates it and checks accessibility and acceptance. |
-| `$nessa-docs` | A browsable system map or high-level statechart for the Nessa Docs browser is requested. | Provide the reviewed source boundary and reader goal; receive `docs/state` pages with their source checkpoint and check result. `code-visualization` selects the source facts. |
-| `$imozuru` | The user requests chain research, or a selected research question needs a trail through unfamiliar terms, people, venues, and original sources. | Provide the topic and claims; receive a map and raw-source locators in its research area. `literature-survey` evaluates those sources and owns AgentCanon claim/citation records. |
-| `$yomiyasu:yomiyasu` | The user names Yomiyasu or explicitly requests Japanese polishing with that Skill. | Provide the approved prose and constraints; receive revised prose. The selected writing owner checks that claims, source meaning, and requirements remain intact; Japanese text alone does not select this handoff. |
-| `$google-drive:google-drive` → `$google-drive:google-docs` | Native Google Docs creation or editing is requested. | Use Drive to ground the target (discover it only when unknown), then Docs for the document operation; receive the provider's verified native Doc result. The selected AgentCanon writing owner retains claims, structure, and evidence. |
-| `$google-drive:google-drive` → `$google-drive:google-slides` | An existing native Slides deck or reference deck is part of the requested edit. | Use Drive to ground the deck (discover it only when unknown), then Slides for the native edit; receive the updated native deck. [`slides`](slides.md) retains the narrative and source evidence; new PPTX decks stay with its local authoring route. |
-| `$visualize:visualize` | An in-conversation interactive visual materially helps explain or explore a question. | Provide the question and selected evidence; receive an inline visual. The source owner retains factual correctness; use existing renderers for exported diagrams and standard plotting for static scientific figures. |
-| `$sites:sites` | A requested website build, existing Sites edit, or hosting task matches the provider. | Pass the site brief or target and existing-project/deployment conditions; receive a saved result or deployed URL. Sites handles local-only versus deployment. Repository-file edits and standalone HTML stay with their current owners. |
+| Create or revise a Skill | Built-in `$skill-creator` owns generic authoring. Use [Updating Skills](#updating-skills) for AgentCanon source/distribution changes. | Local formatting, generated adapter and owner checks follow the changed contract; generic instruction design is not repeated here. |
+| Install or update an external Skill | Built-in `$skill-installer` owns acquisition and destination behavior. | Apply [the update-choice policy](#external-skill-installation-and-updates) for existing different content; return the actual installed/discovered result. |
+| OpenAI/Codex guidance | Built-in `$openai-docs` owns official product, API and model guidance. | Add the project source owner only for local behavior or implementation; reuse known project facts. |
+| Repository implementation or repair | The existing project owner and selected [repository workflow](codex-task-workflow.md) carry the local change. | Add only checks, language/type/design owners, or dependency work required by changed guarantees. A built-in is selected only for a capability it owns. |
+| UI or website | `$frontend-design` supplies a new visual direction/UI artifact from the audience, brief and project references; the project/UI or [`html-output`](html-output.md) owner integrates it and accepts the result. | Built-in `$imagegen` receives selected bitmap brief/reference and returns a raster asset for placement. `$sites:sites` owns matching website/Site/hosting work with project/deployment constraints; save-only or publication follows that provider. Selected repository-file and standalone-HTML work retains its owner. |
+| Report or prose | Select the relevant writing owner, such as [report](report-writing.md), [long-form](long-form-writing.md), or [paper](paper-writing.md). Reuse sufficient structure; create missing structure before prose, even when order is obvious, through [Before prose](structure-planning.md#before-prose). | Explicitly named Yomiyasu or explicit Skill-based Japanese polishing adds `$yomiyasu:yomiyasu`: selected prose and constraints in, revised prose back for meaning/evidence acceptance. Requested native Docs adds `$google-drive:google-drive` → `$google-drive:google-docs`, using the known target or discovering it when unknown; return the verified native Doc result. |
+| Presentation | [`slides`](slides.md) owns the narrative and local new-PPTX authoring. | An existing native Slides/reference deck adds `$google-drive:google-drive` → `$google-drive:google-slides`; pass the known deck/content constraints and return the native edit result. Built-in `$imagegen` is added for selected raster assets. |
+| Literature and source discovery | [`literature-survey`](literature-survey.md) owns claim evaluation, contrary evidence and citation records. | `$imozuru` performs selected link-trail discovery through unfamiliar terms/people/venues/originals; topic/claims in, source map and raw-source locators back. Reuse those locators rather than a second source store. |
+| Diagram or visual explanation | [`code-visualization`](code-visualization.md) selects source facts and an existing renderer; scientific figures keep standard plotting. | Requested Nessa browser maps add `$nessa-docs`: reviewed source scope/reader goal in, `docs/state` pages with per-page checkpoints and check results back. In-conversation exploration adds `$visualize:visualize`; exported figures keep their output owner. Bitmap generation/editing uses built-in `$imagegen`. |
 
-The mapping does not register external providers in the public catalog or grant
-authority for an external write. Follow the active provider's procedure when it
-is selected and keep AgentCanon-owned evidence and acceptance with their current
-owners.
+Use an already-known provider directly when its task boundary is resolved;
+this table is a selection aid, not an extra read or validation before every
+provider call. Keep caller-specific input, source/evidence and acceptance with
+their owner. Native APIs, permissions and operation completion belong to the
+selected provider. An actual missing required capability remains an explicit
+limit; it does not select installation or a substitute implicitly.
 
 ## External Skill Installation And Updates
 

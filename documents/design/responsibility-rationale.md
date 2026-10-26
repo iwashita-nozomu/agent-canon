@@ -36,6 +36,13 @@ produces the next result, how that result guides a decision, and when to branch,
 recover, or finish. Express the relationships needed by that task without a
 fixed field schema or a new Skill for each rule.
 
+Assume the declared host built-in base and compose a task set from the needed
+capabilities. Availability alone does not activate a Skill. A known host-only
+operation needs no second local route or availability probe; AgentCanon adds
+only its unresolved local contract. Keep the composition at the existing Skill
+owner and reuse resolved boundaries so modularity does not impose repeated
+lookup and process work.
+
 When an installed host Skill owns a selected external capability, keep its
 procedure with that provider. The AgentCanon caller states when the handoff
 applies and binds the task-relevant input and returned result to its local

@@ -66,7 +66,11 @@ Complete authorized contract-derived repairs, including required input preparati
 or missing API behavior. Scope follows contract and cause. Honor write, stop, and
 pause boundaries; do not re-ask settled choices or routine implementation decisions.
 
-Use the [task catalog](../task_catalog.yaml) for workflow family, role, and
+Use the assumed built-in base and [task skill sets](README.md#task-skill-sets)
+to compose only the capabilities the request needs. A request fully owned by a
+built-in uses that registered entry directly; known host ownership does not
+require an AgentCanon routing lookup. For local repository responsibilities,
+use the [task catalog](../task_catalog.yaml) for workflow family, role, and
 execution-route decisions. Public Skill identity and prerequisites come from the
 [Skill catalog](catalog.yaml) and
 [dependency map](skill-dependencies.yaml). Choose Skills by the requested
@@ -151,10 +155,11 @@ Direct-peer collaboration requires a reported runtime capability; otherwise use
 parent relay or a durable artifact. The [communication protocol](../COMMUNICATION_PROTOCOL.md)
 owns receipts and packet fields.
 
-When a registered host Skill owns the selected capability, use the matching
-[external handoff](README.md#installed-external-skill-handoffs) and pass only
-the task-relevant input. Return its result to the AgentCanon owner that retains
-local source, content, and acceptance decisions.
+Compose the selected host and local owners through the
+[task skill set](README.md#task-skill-sets). Reuse known activation conditions,
+inputs and current context; consult the composition only for an unresolved
+boundary. Return the host result to the local owner for source, content and
+acceptance decisions when that local responsibility exists.
 
 ## Write-Capable Handoff Validation Trust Boundary
 
