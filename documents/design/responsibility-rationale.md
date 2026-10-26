@@ -18,6 +18,8 @@ downstream design ../../agents/skills/html-output.md consumes HTML artifact-vers
 downstream design ../../agents/skills/structure-refactor.md consumes drift-repair and review-scope rationale
 downstream design ../../agents/skills/task-routing.md consumes routing-state rationale
 downstream design ../../agents/skills/md-style-check.md demonstrates operative steps and their reasons
+downstream design ../../agents/skills/empirical-prompt-tuning.md evidence-based candidate revision and retention
+downstream design ../../agents/skills/research-workflow.md selection data and final evaluation boundary
 @dependency-end
 -->
 
@@ -89,6 +91,36 @@ Update the rationale and affected procedure together when a relevant premise or
 guarantee changes. Routine wording edits and self-evident steps need no additional
 rationale. Ordinary skill use follows operative instructions and does not require
 reading design history.
+
+## Evidence-based instruction revision
+
+Instruction revision is a proposal until the selected evidence supports adoption.
+[Rethinking Self-Evolving Agent Skills](https://arxiv.org/html/2608.02636v1)
+retains the incumbent after validation regression and freezes validation-selected
+skills before test evaluation; byte-identical score changes count as execution
+variability. This supports explicit candidate identity, outcome/regression
+criteria, and retaining the old version when evidence is insufficient. It does
+not establish that AgentCanon edits improve model performance.
+
+[ACE](https://arxiv.org/html/2510.04618v1) motivates localized edits that preserve
+useful knowledge. [MCE](https://arxiv.org/html/2601.21557v1) uses skills, resulting
+contexts, and evaluation history to inform the next candidate. AgentCanon can
+reuse its existing task/evaluation records for that history.
+[Write, Execute, Refine](https://arxiv.org/html/2608.17587v1) trains a skill
+optimizer from execution feedback, including matched successes and failures.
+That motivates contrasting comparable traces when available, without requiring
+pairs for every task or importing model training, fixed teams, databases, or
+search budgets.
+
+Selection evidence answers which candidate to retain; claims about unseen tasks
+need evaluation independent of that choice. Results reused to revise a candidate
+become selection evidence even if called hold-out or produced by another reviewer.
+This is the research owner boundary tracked in
+[#1586](https://github.com/iwashita-nozomu/agent-canon/issues/1586).
+The empirical Skill links there rather than duplicating the protocol. Evaluation
+and revision remain within the user's existing authority and approval conditions;
+routine wording edits without an unresolved behavior claim keep their bounded
+validation route.
 
 ## Validation selection and remote execution
 
