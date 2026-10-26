@@ -49,6 +49,14 @@ applies and binds the task-relevant input and returned result to its local
 source and acceptance contract; it does not copy the provider procedure or add
 the provider to the AgentCanon catalog.
 
+External Skill installation is bound to the Codex environment that will use it.
+Its existing installer resolves the helper and destination from that environment;
+the same user-facing route can therefore serve different operating systems and
+Codex homes. Confirm discovery in the target Codex, since another environment's
+installation or the AgentCanon distribution link does not establish that result.
+Keep this route with the existing installer and installation policy so setup
+entrypoints share acquisition, update decisions and completion evidence.
+
 For a material change to an operation order, branch, completion check, or
 mandatory work, record in the existing owning design the governing request,
 principle, invariant, or assumption and why it supports the retained procedure.

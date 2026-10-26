@@ -140,13 +140,25 @@ limit; it does not select installation or a substitute implicitly.
 
 ## External Skill Installation And Updates
 
-外部配布Skillの一覧・導入は、host の `$skill-installer` と現行helperに委譲します。
-取得方式・導入先はその標準に従い、ユーザーの版指定がなければ配布元の既定・最新経路を使います。
+外部配布Skillは、利用するCodexで組み込みの `$skill-installer` を呼びます。
+導入するSkill名または配布元URLを渡します。候補を探す場合は同じSkillへ一覧を依頼します。
+初回セットアップでも、追加導入でも入口は共通です。
 
+```text
+$skill-installer <Skill名または配布元URL> を、このCodex環境へ導入して。
+```
+
+OSごとのコマンドや固定パスに分岐せず、対象Codexで使う登録済みhelperと設定から導入先を解決します。
+helperの標準は `CODEX_HOME` 配下の `skills` です。未指定時の既定はinstallerが解決します。
+別の導入先が明示された場合は現行helperの `--dest` へ渡し、そのCodexが読む先と一致させます。
+取得方式はinstallerに委譲し、ユーザーの版指定がなければ配布元の既定・最新経路を使います。
+
+導入済みの同一内容は保持します。
 既存Skillの更新では、導入済み内容と候補の差分、local変更への影響を示し、置換前にユーザーへ確認します。
 回答までは既存内容を使います。local変更を保全し、承認した内容と一致するものを適用します。
 
-出典・取得revision・実際の結果は既存taskに残し、導入物がruntimeに検出されることを確かめます。
+出典・取得revision・導入先・実際の結果は既存taskに残します。
+対象Codexが導入したSkillの名前と有効状態を検出したことを確かめて完了とします。
 AgentCanonの管理source・生成adapterは、この節の外部導入先と分けて既存の保守経路で扱います。
 
 ## Codex Defaults
