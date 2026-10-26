@@ -161,6 +161,39 @@ helperの標準は `CODEX_HOME` 配下の `skills` です。未指定時の既�
 対象Codexが導入したSkillの名前と有効状態を検出したことを確かめて完了とします。
 AgentCanonの管理source・生成adapterは、この節の外部導入先と分けて既存の保守経路で扱います。
 
+### OfficeCLI
+
+OfficeCLI の配布元Skillは同じ入口で導入します。
+
+```text
+$skill-installer https://github.com/iOfficeAI/OfficeCLI/tree/main/skills/officecli を、このCodex環境へ導入して。
+```
+
+本体は共有tool imageの [依存manifest](../../bootstrap/container/image/dependencies.toml) が
+`@officecli/officecli` を管理します。npm providerは版に対応するnative binaryを取得するため、
+npmの配置成功だけでなく `officecli --version` の実行まで確認します。
+共有runtimeでは、既存の `bootstrap.sh --control-parent-root <control-root> exec
+--root <registered-project-root> -- officecli <args...>` 経路で呼びます。
+`control-root` は導入済みruntimeの親、`registered-project-root` は登録済み対象です。
+CLIを使う環境に既存の本体があればそれを利用し、hostへの導入が必要な場合は
+[公式手順](https://github.com/iOfficeAI/OfficeCLI#installation) の
+`brew install officecli` または `npm install -g @officecli/officecli` を、その環境の依存管理で扱います。
+Office / .NET SDK は配布済みnative binaryの実行には不要です。
+
+Skillの配置・更新は上記installerだけが所有します。
+`officecli install` / `officecli skills install` は実行しません。配布元のinstallerは
+検出した複数agentへSkillを配置し、MCPも登録し得るため、AgentCanonの管理リンクや
+対象Codexの外部Skill管理と競合します。共有imageでは `OFFICECLI_NO_AUTO_INSTALL=1` と
+`OFFICECLI_SKIP_UPDATE=1` を設定し、自動配置・自己更新を止めます。
+hostで利用する場合もこの2変数を設定し、本体の更新は選んだpackage managerに任せます。
+専門Skillは配布元の `officecli load_skill` で必要時に読み、AgentCanon catalogや生成adapterへ複製しません。
+
+PowerPointコメントの読み取り例は [slides](slides.md#powerpoint-comments) を参照してください。
+導入先CodexでのSkill検出と、その実行環境でのCLI動作は別々に確認します。
+配置と自動更新の動作根拠は配布元の
+[Installer](https://github.com/iOfficeAI/OfficeCLI/blob/v1.0.158/src/officecli/Core/Installer.cs) と
+[SkillInstaller](https://github.com/iOfficeAI/OfficeCLI/blob/v1.0.158/src/officecli/Core/SkillInstaller.cs) です。
+
 ## Codex Defaults
 
 When a repository task has no selected workflow or owner, start with

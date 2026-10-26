@@ -3474,6 +3474,7 @@ class DependencyModelTests(unittest.TestCase):
                 "scip-python",
                 "bash-language-server",
                 "markdownlint-cli2",
+                "officecli",
                 "gnupg",
                 "node",
                 "puppeteer-fonts-liberation",

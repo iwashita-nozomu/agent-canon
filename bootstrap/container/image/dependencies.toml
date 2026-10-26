@@ -114,6 +114,19 @@ provides = ["markdownlint-cli2"]
 failure_policy = "fail"
 
 [[records]]
+# The npm provider downloads its version-matched native binary; verification
+# must execute it because postinstall alone can succeed after a download failure.
+id = "officecli"
+package = "@officecli/officecli"
+method = "npm-global"
+version = "1.0.158"
+source = "https://registry.npmjs.org/@officecli%2fofficecli"
+verification = { kind = "npm-package", executable = "officecli", args = ["--version"], output_contains = "1.0.158" }
+deps = ["node"]
+provides = ["officecli"]
+failure_policy = "fail"
+
+[[records]]
 id = "gnupg"
 package = "gnupg"
 method = "apt-package"
