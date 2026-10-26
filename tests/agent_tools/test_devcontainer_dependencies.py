@@ -3521,6 +3521,7 @@ class DependencyModelTests(unittest.TestCase):
                 "actionlint",
                 "zizmor",
                 "python3-pytest",
+                "python3-pylsp-jsonrpc",
                 "quarto",
                 "puppeteer-unzip",
                 "vl-convert",

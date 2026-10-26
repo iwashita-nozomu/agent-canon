@@ -1,5 +1,12 @@
 """Target removal unit regressions; Docker/lifecycle I/O is modeled explicitly."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies target-removal phase ordering and ownership guards.
+# upstream implementation ../../bootstrap/host/lifecycle/entrypoint.sh target lifecycle
+# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py controller target parser
+# @dependency-end
+
 from __future__ import annotations
 
 import hashlib
@@ -192,7 +199,7 @@ docker_fixture() {
   esac
 }
 AGENT_CANON_DOCKER=docker_fixture
-_agent_canon_validate_roots() { :; }
+_agent_canon_validate_roots() { AGENT_CANON_RUNTIME_ROOT="$fixture/.runtime"; }
 _agent_canon_select_existing_runtime() { :; }
 _agent_canon_prepare_host_runtime() {
   AGENT_CANON_STATE_ROOT="$fixture/state"
@@ -263,7 +270,7 @@ docker_fixture() {
   printf '%s\n' "$1" >> "$fixture/mutations"
 }
 AGENT_CANON_DOCKER=docker_fixture
-_agent_canon_validate_roots() { :; }
+_agent_canon_validate_roots() { AGENT_CANON_RUNTIME_ROOT="$fixture/.runtime"; }
 _agent_canon_prepare_host_runtime() {
   AGENT_CANON_STATE_ROOT="$fixture"
   mkdir -p "$AGENT_CANON_RUNTIME_ROOT/host-state"

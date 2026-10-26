@@ -75,6 +75,9 @@ For local PPTX review comments, use the external
 and review acceptance here; CLI behavior and specialized instructions stay with
 the provider. Read both legacy comments and modern threads:
 
+Use `OFFICECLI_NO_AUTO_RESIDENT=1` for this bounded read so the command releases
+the document on exit.
+
 ```bash
 officecli query deck.pptx comment --json
 officecli query deck.pptx modernComment --json
