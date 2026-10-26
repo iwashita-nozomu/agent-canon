@@ -6,6 +6,7 @@ responsibility Owns research-driven change: external evidence, comparison design
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/algorithm-implementation-boundary.md equation-to-code boundary policy
 upstream design ../../documents/experiments/experiment-critical-review.md critical evidence review
+upstream design ../../documents/design/responsibility-rationale.md evidence-based instruction revision and evaluation reuse
 downstream design literature-survey.md source search and source packet owner
 downstream design experiment-lifecycle.md single-run and rerun owner
 downstream design adaptive-improvement-loop.md backlog-driven iteration owner
@@ -65,6 +66,16 @@ run の再現に必要な protocol、source、command、environment、seed、ide
 Run note には、解釈に必要な問い・比較・protocol、変更、観測、limitation、decision、
 next action、および利用した commit/run path を残します。artifact identity と report の
 構成はそれぞれの owner に委譲します。
+
+### Selection and Final Evaluation
+
+候補選択を反復し、未見条件への一般化を主張する場合は、候補・設定・停止判断に使った
+評価集合を selection data として、未使用の最終 test と区別します。選択への利用範囲を
+既存 protocol/run note に残し、最終 test の前に選択した artifact を凍結します。test の
+結果を見て再編集したものは新候補であり、その test を再び未使用とは呼べません。
+fresh run ID、seed、reviewer の交代でも未見性は戻りません。独立した評価を用意できなければ
+探索的結果として claim を限定します。同じ既知ケースでの比較や解析解との照合に、
+機械的なデータ分割は要求しません。
 
 ## Boundary
 
