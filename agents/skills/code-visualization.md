@@ -33,6 +33,10 @@ For an in-chat interactive exploration, use the conditional
 [`visualize:visualize` handoff](README.md#installed-external-skill-handoffs)
 when interaction materially helps the reader. For a browsable Nessa system map,
 use its handoff there; source facts remain with this Skill's selected owners.
+For a Nessa handoff, pass the source files and revision reviewed for each page
+with its selected diagram relationships. Match each returned page's source
+metadata to that review scope and its diagram bindings to actual nodes and pages
+before accepting it. Use the provider's catalog check when available.
 
 For an embedded diagram, identify the local claim and reader action. Use `structure-planning` when document structure or reader path changes, and `md-style-check` for the changed Markdown properties.
 

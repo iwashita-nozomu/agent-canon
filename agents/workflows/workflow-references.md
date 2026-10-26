@@ -92,7 +92,7 @@ OpenAI / Codex の current product evidence をこの文書へ source-by-source 
   - scientific-computing review の基礎です。
 - [Good Enough Practices in Scientific Computing](https://doi.org/10.1371/journal.pcbi.1005510)
   - 軽量な研究運用と実務レベルの checklist の根拠です。
-- [Guidance on Reproducibility for Papers Using Computational Tools](https://www.nature.com/articles/d41586-022-00563-z)
+- [Guidance on Reproducibility for Papers Using Computational Tools](https://www.nature.com/documents/Computational_tools_reporting_guidelines.pdf)
   - computational paper の再現性要件を整理するときに使う資料です。
 - [Implementing Code Review in the Scientific Workflow](https://doi.org/10.12688/f1000research.27137.2)
   - scientific workflow に code review を組み込む根拠です。

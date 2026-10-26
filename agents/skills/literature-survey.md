@@ -49,6 +49,9 @@ upstream design prose-reasoning-graph.md prose graph claim and evidence handoff 
 - 問いに合う source mix を選び、使える場合は primary / official sources を優先します。
   source type（peer-reviewed paper、preprint、vendor doc、blog など）と関連性を確かめます。
   claim の位置づけに影響する制限・反証資料も探し、source の直接の記述と解釈を分けます。
+  複数資料の一致を根拠にするときは、claimごとに転載・共通原典・同じdataや実験への依存を確認します。
+  同じ根拠の再掲を独立した裏付けに数えず、結論に影響する依存関係と未確認の範囲を
+  既存source noteに残します。
 - 回答、report、design に使う source は tracked note / packet に残し、URL / DOI、
   access date、利用した claim、limitation、保存 artifact の場所を記録します。
   重要な claim は [原文位置](../../references/README.md#source-passages) へ結び付けます。
