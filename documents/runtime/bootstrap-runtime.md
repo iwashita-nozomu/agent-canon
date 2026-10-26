@@ -247,6 +247,11 @@ the owned discovery link only.
 The migration never scans or removes `~/.codex/skills/.system` or another user
 entry.
 
+External Skills use the selected Codex environment's built-in installer and
+discovery through the [common installation route](../../agents/skills/README.md#external-skill-installation-and-updates).
+That environment resolves its own destination and confirms the installed Skill;
+the AgentCanon distribution link covers the AgentCanon-owned Skills.
+
 The container is bounded by the manifest: two CPUs, 4 GiB memory, 512 PIDs,
 network disabled, read-only root filesystem, all Linux capabilities dropped,
 no-new-privileges, and a writable `/tmp` tmpfs. The default maximum is two
