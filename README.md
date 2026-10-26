@@ -31,11 +31,13 @@ subagent の canonical owner は `agents/`、設計と runtime contract の owne
 `documents/`、実行可能な tool と checker の owner は `tools/` と
 `tools/runtime/dispatch/agent-canon/` です。
 
-## Quick install
+## External Skills
 
 外部Skillを追加するときは、利用するCodexで
 [外部Skillの共通導入手順](agents/skills/README.md#external-skill-installation-and-updates)
 を使います。導入するSkill名または配布元URLを組み込みの`skill-installer`へ渡します。
+
+## Quick install
 
 `bootstrap.sh` は `BASH_SOURCE` の script location から repository root を解決するため、
 どの current working directory から呼び出しても同じ install root を使います。
