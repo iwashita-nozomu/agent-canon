@@ -51,6 +51,12 @@ cannot resolve a concrete decision, state the missing fact and smallest referenc
 needed. For an explicitly cross-module change or API migration, use only its
 declared dependency scope.
 
+Distinguish descriptions of current behavior or conventions from governing
+requirements. When current source and applicable tests, when present, establish
+that a description is stale, follow the established convention for in-scope work and
+briefly report the mismatch. Keep governing requirements, authorized migrations,
+and safety/permission constraints authoritative.
+
 Carry authorized work through the requested outcome. Base implementation on
 the current request and target's input/output contract while preserving external
 boundaries. Earlier implementations and diffs can explain behavior, but do not
