@@ -36,6 +36,13 @@ Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_S
 
 ## Operation
 
+Use an assumed built-in or an already-selected host provider directly when it
+owns the requested result. [Task skill sets](README.md#task-skill-sets) add only
+unresolved local responsibility. The native public-catalog route projects the
+AgentCanon members; host names remain owned by the registered host rather than
+being added to the public catalog. Reuse settled selection instead of probing
+built-in availability or rerouting a known owner.
+
 Use `python3 tools/agent/orchestration/route.py --prompt ... --mode routing-only` or the canonical changed-path route. The caller must pass `--mode repo-changing` for an explicitly authorized edit; omitted mode remains non-write. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
 作業途中で新しい観測や要求変更が生じたら、変わった判断に必要な owner
