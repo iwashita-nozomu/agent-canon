@@ -691,7 +691,7 @@ version = "12.0.0"
 source = "https://registry.npmjs.org/@mermaid-js/mermaid-cli"
 verification = { kind = "npm-package", executable = "mmdc", args = ["--version"], output_contains = "12.0.0" }
 deps = ["node", "puppeteer"]
-provides = ["mermaid-cli", "mmdc"]
+provides = ["mmdc"]
 failure_policy = "fail"
 
 [[records]]
