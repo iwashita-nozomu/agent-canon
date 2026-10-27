@@ -50,14 +50,17 @@ This comparison uses that snapshot and the public authoring guide below.
 | Source | Comparison and adopted change |
 | --- | --- |
 | [Skill Creator](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator/SKILL.md), overview, Writing Style and Improving the skill | Start from the current stage, explain reasons and remove instructions that add no useful work. The Updating Skills introduction repeated its operative cycle; keep procedure derivation in step 2. Reuse the existing empirical evaluation owner when behavior evidence is needed. |
-| [MCP Builder](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/mcp-builder/SKILL.md), phases 1–3 | Delegate server-specific design and implementation with the agreed API surface, language, transport and acceptance as inputs. Generic tool coordination remains with its existing owner. |
+| [MCP Builder](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/mcp-builder/SKILL.md), phases 1–4 | Pass the outcome, API references, constraints, acceptance and fixed choices to the selected design/implementation phases. Open choices return as proposals. Select phase 4 when tool-effectiveness evaluation is requested. Generic tool coordination retains its owner. |
 | [Webapp Testing](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/webapp-testing/SKILL.md), decision tree and helper usage | Delegate requested interactions with an existing artifact or running URL and expected behavior; consume actual browser evidence. Static file validation and preview/serving authority remain separate. |
-| [Theme Factory](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/theme-factory/SKILL.md), usage and application | Pass supplied theme choices and artifact constraints; return palette/fonts to existing authoring. Keep theme assets with the provider and narrative/layout acceptance with slides. |
+| [Theme Factory](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/theme-factory/SKILL.md), usage and application | Reuse supplied theme choices and artifact constraints; otherwise follow its showcase/confirmation flow before application. Return palette/fonts to existing authoring. Keep theme assets with the provider and narrative/layout acceptance with slides. |
 
-No universal help-first rule, fixed evaluation count/viewer, extra wrapper or
-external catalog copy was added. Selected providers retain their own native
-procedures. Shared reuse and native-interface rules remain in ROOT_AGENTS and
-agent-orchestration; the improvement cycle retains the required derivation.
+No universal help-first rule, extra wrapper or external catalog copy was added.
+MCP Builder phase 4 specifies ten questions for tool-effectiveness evaluation;
+that phase is selected for requests that include that evaluation. Generic Skill
+improvement gains no fixed evaluation count/viewer. Selected providers retain
+their native procedures for the selected scope. Shared reuse and native-interface
+rules remain in ROOT_AGENTS and agent-orchestration; the improvement cycle
+retains the required derivation.
 Source consistency and discovery establish these connections, not improved
 model behavior, token savings or live MCP/browser/deck acceptance.
 
