@@ -27,9 +27,7 @@ SKILLS = Path(".codex/personal/skills")
 
 
 @pytest.fixture(autouse=True)
-def resident_private_log_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def resident_private_log_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Provide the private-log mount required by resident controller calls."""
     private_log = tmp_path / "private-log"
     private_log.mkdir()
@@ -57,8 +55,9 @@ def git(root: Path, *args: str) -> str:
 
 def install_links(home: Path, checkout: Path) -> subprocess.CompletedProcess[str]:
     """Exercise skill links while leaving separately tested config merge alone."""
-    state = home / "state"
-    state.mkdir(exist_ok=True)
+    runtime = home / ".runtime"
+    state = runtime / "container-state"
+    state.mkdir(parents=True, exist_ok=True)
     return subprocess.run(
         [
             "bash",
@@ -76,6 +75,7 @@ def install_links(home: Path, checkout: Path) -> subprocess.CompletedProcess[str
             "HOME": str(home),
             "AGENT_CANON_CONTROL_ROOT": str(home),
             "AGENT_CANON_REPOSITORY_ROOT": str(checkout),
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_STATE_ROOT": str(state),
         },
     )
@@ -99,7 +99,9 @@ def test_every_public_skill_is_tracked_and_matches_catalog() -> None:
         assert git(ROOT, "check-ignore", ".codex/personal/" + private)
 
 
-def test_git_pull_updates_adds_and_removes_skills_without_relinking(tmp_path: Path) -> None:
+def test_git_pull_updates_adds_and_removes_skills_without_relinking(
+    tmp_path: Path,
+) -> None:
     """A fixed global and isolated directory link see the same Git update."""
     publisher = tmp_path / "publisher"
     publisher.mkdir()
@@ -120,7 +122,9 @@ def test_git_pull_updates_adds_and_removes_skills_without_relinking(tmp_path: Pa
     global_link = home / ".agents/skills"
     global_identity = global_link.lstat()
     manager = BootstrapRuntime(
-        home, home / "runtime", repository_root=checkout,
+        home,
+        home / "runtime",
+        repository_root=checkout,
         manifest_path=ROOT / "bootstrap/host/manifest.toml",
     )
     manager.codex_prepare()
@@ -134,7 +138,9 @@ def test_git_pull_updates_adds_and_removes_skills_without_relinking(tmp_path: Pa
     integration.write_text(integration.read_text() + "\nUpdated instructions.\n")
     added = publisher / SKILLS / "new-skill/SKILL.md"
     added.parent.mkdir()
-    added.write_text("---\nname: new-skill\ndescription: Test addition\n---\nNew skill.\n")
+    added.write_text(
+        "---\nname: new-skill\ndescription: Test addition\n---\nNew skill.\n"
+    )
     git(publisher, "add", "-A")
     git(publisher, "commit", "-m", "Change, add and remove skills")
     git(checkout, "pull", "--ff-only")
@@ -147,9 +153,13 @@ def test_git_pull_updates_adds_and_removes_skills_without_relinking(tmp_path: Pa
     repeated = install_links(home, checkout)
     assert repeated.returncode == 0, repeated.stderr
     manager.codex_prepare()
-    for link, before in ((global_link, global_identity), (isolated_link, isolated_identity)):
+    for link, before in (
+        (global_link, global_identity),
+        (isolated_link, isolated_identity),
+    ):
         assert (link.lstat().st_ino, link.lstat().st_mtime_ns) == (
-            before.st_ino, before.st_mtime_ns,
+            before.st_ino,
+            before.st_mtime_ns,
         )
     assert git(checkout, "status", "--porcelain") == ""
     assert not (manager.paths.container_runtime / "skill-projection").exists()
@@ -175,7 +185,9 @@ def test_global_foreign_skill_link_is_preserved(tmp_path: Path, dangling: bool) 
     assert link.lstat().st_ino == before.st_ino
 
 
-def test_missing_distribution_fails_without_creating_an_empty_view(tmp_path: Path) -> None:
+def test_missing_distribution_fails_without_creating_an_empty_view(
+    tmp_path: Path,
+) -> None:
     """Bootstrap cannot report success for an absent Git distribution."""
     home = tmp_path / "home"
     home.mkdir()
@@ -187,7 +199,9 @@ def test_missing_distribution_fails_without_creating_an_empty_view(tmp_path: Pat
     assert not (checkout / SKILLS).exists()
     assert not (home / ".agents/skills").is_symlink()
     manager = BootstrapRuntime(
-        home, home / "runtime", repository_root=checkout,
+        home,
+        home / "runtime",
+        repository_root=checkout,
         manifest_path=ROOT / "bootstrap/host/manifest.toml",
     )
     with pytest.raises(BootstrapError, match="skill_source_missing"):
@@ -204,7 +218,9 @@ def test_runtime_has_no_skill_writer_or_transfer() -> None:
     assert "skill-projection" not in shell
 
 
-def test_pull_migrates_ignored_adapters_without_removing_personal_config(tmp_path: Path) -> None:
+def test_pull_migrates_ignored_adapters_without_removing_personal_config(
+    tmp_path: Path,
+) -> None:
     """Git replaces previously ignored adapters when the distribution is tracked."""
     publisher = tmp_path / "publisher"
     publisher.mkdir()
@@ -234,11 +250,16 @@ def test_pull_migrates_ignored_adapters_without_removing_personal_config(tmp_pat
     git(checkout, "pull", "--ff-only")
     assert (link / "integration/SKILL.md").read_bytes() == new.read_bytes()
     assert config.read_text() == "# private settings\n"
-    assert (link.lstat().st_ino, link.lstat().st_mtime_ns) == (before.st_ino, before.st_mtime_ns)
+    assert (link.lstat().st_ino, link.lstat().st_mtime_ns) == (
+        before.st_ino,
+        before.st_mtime_ns,
+    )
     assert git(checkout, "status", "--porcelain") == ""
 
 
-def test_isolated_prepare_retires_only_previous_managed_file_links(tmp_path: Path) -> None:
+def test_isolated_prepare_retires_only_previous_managed_file_links(
+    tmp_path: Path,
+) -> None:
     """The prior per-file manifest converges to the fixed public directory link."""
     import json
 
@@ -247,7 +268,9 @@ def test_isolated_prepare_retires_only_previous_managed_file_links(tmp_path: Pat
     checkout = tmp_path / "checkout"
     shutil.copytree(ROOT / SKILLS, checkout / SKILLS)
     manager = BootstrapRuntime(
-        home, home / "runtime", repository_root=checkout,
+        home,
+        home / "runtime",
+        repository_root=checkout,
         manifest_path=ROOT / "bootstrap/host/manifest.toml",
     )
     manager.codex_prepare()

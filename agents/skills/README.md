@@ -156,6 +156,25 @@ $skill-installer <Skill名または配布元URL> を、このCodex環境へ導�
 対象Codexで導入物の登録名と有効状態を確認し、出典・取得revision・導入先・結果を既存taskに残して完了とします。
 AgentCanon自身のsource・生成adapterの変更は [Updating Skills](#updating-skills) で扱います。
 
+### OfficeCLI
+
+[配布元Skill](https://github.com/iOfficeAI/OfficeCLI/tree/main/skills/officecli) は、
+上記の `$skill-installer` で対象Codexへ導入します。
+本体は共有imageの [依存manifest](../../bootstrap/container/image/dependencies.toml) が管理し、
+配置と `officecli --version` の実行を検証します。
+共有runtimeでの呼び出しは [既存のexec経路](agent-canon-bootstrap.md#command-shape) を使います。
+
+共有imageは `OFFICECLI_NO_AUTO_INSTALL=1` と `OFFICECLI_SKIP_UPDATE=1` を設定します。
+既存host CLIを使う場合も、この2変数を呼出しに適用します。
+Skill配置やMCP登録を行う `officecli install` / `officecli skills install` は、
+対象Codexのinstaller管理と競合するため使いません。
+専門Skillは必要時に配布元の `officecli load_skill` で読みます。
+根拠は配布元の [Installer](https://github.com/iOfficeAI/OfficeCLI/blob/v1.0.158/src/officecli/Core/Installer.cs) と
+[更新仕様](https://github.com/iOfficeAI/OfficeCLI/tree/v1.0.158#installation) にあります。
+
+PowerPointコメントは [slides](slides.md#powerpoint-comments) の手順を使います。
+対象CodexでのSkill検出と、CLIでの文書操作をそれぞれ確認します。
+
 ## Codex Defaults
 
 When a repository task has no selected workflow or owner, start with

@@ -294,6 +294,7 @@ def test_dependency_manifest_contains_only_shared_tools() -> None:
         "scip-python",
         "bash-language-server",
         "markdownlint-cli2",
+        "officecli",
         "gnupg",
         "node",
         "quarto",

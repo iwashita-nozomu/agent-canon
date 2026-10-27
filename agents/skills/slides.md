@@ -68,6 +68,30 @@ A requested `.pptx` needs an actual PowerPoint file. Retain the authoring source
 and required assets so the deck can be rebuilt. For Markdown decks, use their
 existing presentation renderer and the requested export format.
 
+## PowerPoint comments
+
+For local PPTX review comments, use the external
+[OfficeCLI route](README.md#officecli) when selected and available. Keep narrative
+and review acceptance here; CLI behavior and specialized instructions stay with
+the provider. Read both legacy comments and modern threads:
+
+Use `OFFICECLI_NO_AUTO_RESIDENT=1` for this bounded read so the command releases
+the document on exit.
+
+```bash
+officecli query deck.pptx comment --json
+officecli query deck.pptx modernComment --json
+officecli get deck.pptx '/slide[1]/modernComment[1]' --depth 1 --json
+```
+
+Use paths returned by the query for `get`; the last command illustrates a thread
+on slide 1. Modern thread nodes include replies as children and the thread's
+`resolved` state; resolution belongs to the parent thread, not individual replies.
+Retain slide/path, author, text, replies, and resolution when reporting review
+feedback. A legacy-comment query alone cannot establish that all feedback was
+read. These commands inspect comments; changing replies or resolution requires
+the requested editing scope.
+
 ## Layout review and closeout
 
 Render the produced deck and inspect its slides for overflow, overlap, font
