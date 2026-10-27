@@ -46,6 +46,11 @@ clear hierarchy, aligned grid, restrained typography and color, adequate space,
 and consistent visual roles. Use only needed slots for title, body, equations,
 figures, references, and evidence.
 
+For requested theme selection or application, use registered `$theme-factory`
+with the supplied theme choice and deck/template constraints. Apply its palette
+and font choices through the existing authoring route; keep content, structure
+and layout acceptance here.
+
 Give each slide a clear takeaway and group its supporting material. Choose
 comparison, sequence, relationship, or quantitative graphics according to the
 claim. Put labels, units, sources, and necessary qualifications near the content

@@ -125,9 +125,11 @@ from the active registry when their condition applies.
 | Install or update an external Skill | Built-in `$skill-installer` owns acquisition and destination behavior. | Apply [the update-choice policy](#external-skill-installation-and-updates) for existing different content; return the actual installed/discovered result. |
 | OpenAI/Codex guidance | Built-in `$openai-docs` owns official product, API and model guidance. | Add the project source owner only for local behavior or implementation; reuse known project facts. |
 | Repository implementation or repair | The existing project owner and selected [repository workflow](codex-task-workflow.md) carry the local change. | Add only checks, language/type/design owners, or dependency work required by changed guarantees. A built-in is selected only for a capability it owns. |
+| MCP server implementation | The project owner supplies the agreed API surface, language, transport and acceptance. | Registered `$mcp-builder` owns MCP-specific design and implementation; return server source and actual validation to the project owner. |
 | UI or website | `$frontend-design` supplies a new visual direction/UI artifact from the audience, brief and project references; the project/UI or [`html-output`](html-output.md) owner integrates it and accepts the result. | Built-in `$imagegen` receives selected bitmap brief/reference and returns a raster asset for placement. `$sites:sites` owns matching website/Site/hosting work with project/deployment constraints; save-only or publication follows that provider. Selected repository-file and standalone-HTML work retains its owner. |
+| Browser interaction checks | The project test/UI owner supplies the artifact or running URL and expected behavior. | Registered `$webapp-testing` owns browser interactions; return observed assertions, screenshots and console findings. Server lifecycle stays with the environment/preview owner. |
 | Report or prose | Select the relevant writing owner, such as [report](report-writing.md), [long-form](long-form-writing.md), or [paper](paper-writing.md). Reuse sufficient structure; create missing structure before prose, even when order is obvious, through [Before prose](structure-planning.md#before-prose). | Explicitly named Yomiyasu or explicit Skill-based Japanese polishing adds `$yomiyasu:yomiyasu`: selected prose and constraints in, revised prose back for meaning/evidence acceptance. Requested native Docs adds `$google-drive:google-drive` → `$google-drive:google-docs`, using the known target or discovering it when unknown; return the verified native Doc result. |
-| Presentation | [`slides`](slides.md) owns the narrative and local new-PPTX authoring. | An existing native Slides/reference deck adds `$google-drive:google-drive` → `$google-drive:google-slides`; pass the known deck/content constraints and return the native edit result. Built-in `$imagegen` is added for selected raster assets. |
+| Presentation | [`slides`](slides.md) owns the narrative and local new-PPTX authoring. | An existing native Slides/reference deck adds `$google-drive:google-drive` → `$google-drive:google-slides`; pass the known deck/content constraints and return the native edit result. Requested theme work adds registered `$theme-factory`: supplied theme choice and deck/template constraints in, palette/font choices back. Built-in `$imagegen` is added for selected raster assets. |
 | Literature and source discovery | [`literature-survey`](literature-survey.md) owns claim evaluation, contrary evidence and citation records. | `$imozuru` performs selected link-trail discovery through unfamiliar terms/people/venues/originals; topic/claims in, source map and raw-source locators back. Reuse those locators rather than a second source store. |
 | Diagram or visual explanation | [`code-visualization`](code-visualization.md) selects source facts and an existing renderer; scientific figures keep standard plotting. | Requested Nessa browser maps add `$nessa-docs`: reviewed source scope/reader goal in, `docs/state` pages with per-page checkpoints and check results back. In-conversation exploration adds `$visualize:visualize`; exported figures keep their output owner. Bitmap generation/editing uses built-in `$imagegen`. |
 
@@ -188,17 +190,8 @@ For host-runtime policy, see [CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md).
 ## Updating Skills
 
 Use this route when changing AgentCanon's skill source, registration, or
-distribution. Before changing a procedure, use
-[Skill procedure derivation](../../documents/design/responsibility-rationale.md#skill-procedure-derivation)
-to map the applicable rule to necessary operations, decisions, observable
-results, and reasons, and assess existing requirements as well as new steps.
-Preserve the skill's reusable method; use the caller's current
-request and governing owner for concrete goals, inputs, paths, environment,
-validation, and output. Keep extra capabilities conditional, and retain native
-CLI/API behavior instead of introducing a wrapper or mandatory context packet.
-Prefer an existing capability identified in that context when it meets the
-requested guarantee; extend it only to close a concrete gap. Compare functional
-responsibility and contract, not names or paths alone.
+distribution. Keep the reusable method with its owner; take concrete goals,
+inputs, paths, execution conditions and acceptance from the current task.
 
 ### Improvement cycle
 

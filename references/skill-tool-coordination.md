@@ -26,7 +26,7 @@ semantics remain authoritative. The retired operation/binding language and
 mandatory command packet from [Issue #1233](https://github.com/iwashita-nozomu/agent-canon/issues/1233)
 are not part of this procedure.
 
-## MCP Builder
+## MCP Builder design assessment, 2026-10-25
 
 - Source: [Anthropic mcp-builder Skill](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/mcp-builder/SKILL.md).
 - Revision observed: `dbd4588f9e1033efb41dad4bef2f7947c8993d44`;
@@ -39,6 +39,27 @@ are not part of this procedure.
   coordinates existing tools. Server implementation, dependencies, and its fixed
   evaluation procedure were not adopted. No external code or Skill text was copied.
 - Limits: no MCP server, SDK integration, or effectiveness benchmark was run.
+
+## Anthropic comparison, 2026-10-27
+
+The installed `mcp-builder`, `webapp-testing` and `theme-factory` match official
+commit `dbd4588f9e1033efb41dad4bef2f7947c8993d44`, including their Apache-2.0
+licenses and supporting files. Codex discovery returned all three enabled.
+This comparison uses that snapshot and the public authoring guide below.
+
+| Source | Comparison and adopted change |
+| --- | --- |
+| [Skill Creator](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator/SKILL.md), overview, Writing Style and Improving the skill | Start from the current stage, explain reasons and remove instructions that add no useful work. The Updating Skills introduction repeated its operative cycle; keep procedure derivation in step 2. Reuse the existing empirical evaluation owner when behavior evidence is needed. |
+| [MCP Builder](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/mcp-builder/SKILL.md), phases 1–3 | Delegate server-specific design and implementation with the agreed API surface, language, transport and acceptance as inputs. Generic tool coordination remains with its existing owner. |
+| [Webapp Testing](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/webapp-testing/SKILL.md), decision tree and helper usage | Delegate requested interactions with an existing artifact or running URL and expected behavior; consume actual browser evidence. Static file validation and preview/serving authority remain separate. |
+| [Theme Factory](https://github.com/anthropics/skills/blob/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/theme-factory/SKILL.md), usage and application | Pass supplied theme choices and artifact constraints; return palette/fonts to existing authoring. Keep theme assets with the provider and narrative/layout acceptance with slides. |
+
+No universal help-first rule, fixed evaluation count/viewer, extra wrapper or
+external catalog copy was added. Selected providers retain their own native
+procedures. Shared reuse and native-interface rules remain in ROOT_AGENTS and
+agent-orchestration; the improvement cycle retains the required derivation.
+Source consistency and discovery establish these connections, not improved
+model behavior, token savings or live MCP/browser/deck acceptance.
 
 ## Using Superpowers
 
