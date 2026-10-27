@@ -283,6 +283,25 @@ python3 -m pytest -q tests/agent_tools/test_runtime_artifacts.py \
   tests/agent_tools/test_tool_dispatch.py
 ```
 
+For a selected offline image-receipt check, use the image-owned manifest and
+verification context. The runtime Cargo home is a writable build cache; project
+configuration can also suppress tool version banners. Use the immutable Cargo
+home and the neutral image workspace, keeping all receipt checks enabled:
+
+```bash
+./bootstrap.sh --repository-root <install-root> \
+  --control-parent-root <authorized-parent-root> \
+  exec --root <registered-agent-canon-source> -- \
+  env CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
+  python3 tools/analysis/dependencies/dependency_plan.py image-verify \
+    --workspace /usr/local/share/agent-canon/runtime \
+    --manifest /usr/local/share/agent-canon/runtime/dependencies.toml
+```
+
+The registered source supplies the verifier; the installed manifest supplies the
+image plan. Omit `--records` to verify its stored selection. That option describes
+a reduced image selection, rather than an arbitrary subset of a full image.
+
 Then run the canonical checks selected by
 [Runtime Profiles And Check Matrix](documents/runtime/runtime-profiles-and-check-matrix.md).
 Tests must identify whether a failure belongs to the AgentCanon tool runtime,
