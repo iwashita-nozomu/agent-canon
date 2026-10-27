@@ -30,7 +30,10 @@ edits and standalone HTML with their current owners.
 
 Validate the produced file and the properties needed by the request: referenced assets exist, internal links/IDs resolve where applicable, required data/content is present, and selected layout/render checks succeed. Use `code-visualization` for selected graph rendering/coverage.
 
-A listen socket is not required to prove a static artifact correct.
+Check static artifacts directly from their files. For requested browser
+interaction checks, use registered `$webapp-testing` with the artifact or
+running URL and expected behavior. Accept its observed assertions, screenshots
+and console findings here; server lifecycle follows [Preview and serving](#preview-and-serving).
 
 ## UI design basis
 

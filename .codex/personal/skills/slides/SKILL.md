@@ -2,7 +2,7 @@
 name: slides
 description: "Create or revise PowerPoint/PPTX, other slide decks, and presentation-oriented Markdown with editable content and rendered layout review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"93159f7e843ebfb6670989a9e3888e5e528f06347888cfe781d77920a1ae2f40"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"c99216dd4c10631bb1efe3de71675571ccf553e15e75531d8a889ab79c0712ee"} -->
 
 <!--
 @dependency-start
