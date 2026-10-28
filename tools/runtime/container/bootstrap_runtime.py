@@ -2254,7 +2254,7 @@ class BootstrapRuntime:
             [
                 "export",
                 "--source-root",
-                f"/targets/{target['digest']}",
+                target["root"],
                 "--source-ref",
                 "HEAD",
                 "--profile",
