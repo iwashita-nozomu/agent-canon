@@ -19,6 +19,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -31,6 +32,39 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 class ToolDispatchTest(unittest.TestCase):
     """Exercise the dispatcher without starting Docker or a resident runtime."""
+
+    def test_child_git_trust_is_scoped_to_the_admitted_target(self) -> None:
+        specs, _ = tool_dispatch.load_specs(PROJECT_ROOT)
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "target"
+            target.mkdir()
+            for policy in ("allowlisted", "clean"):
+                with (
+                    self.subTest(policy=policy),
+                    patch.dict(
+                        os.environ,
+                        {
+                            "AGENT_CANON_TARGET_ROOT": str(target),
+                            "GIT_CONFIG_COUNT": "2",
+                            "GIT_CONFIG_KEY_0": "color.ui",
+                            "GIT_CONFIG_VALUE_0": "always",
+                            "GIT_CONFIG_KEY_1": "safe.directory",
+                            "GIT_CONFIG_VALUE_1": "*",
+                        },
+                    ),
+                ):
+                    environment = tool_dispatch._environment(
+                        PROJECT_ROOT,
+                        replace(specs["template-bundle"], env_policy=policy),
+                        Path(temporary) / "runtime",
+                        None,
+                    )
+                    self.assertEqual(environment["GIT_CONFIG_COUNT"], "1")
+                    self.assertEqual(environment["GIT_CONFIG_KEY_0"], "safe.directory")
+                    self.assertEqual(
+                        environment["GIT_CONFIG_VALUE_0"], str(target.resolve())
+                    )
+                    self.assertNotIn("GIT_CONFIG_KEY_1", environment)
 
     def test_repository_inventory_is_typed_and_versioned(self) -> None:
         """The repository publishes typed Python, Rust, and native catalog surfaces."""

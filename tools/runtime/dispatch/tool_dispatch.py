@@ -567,12 +567,16 @@ def _resolve_container_argv(root: Path, spec: ToolSpec, args: Sequence[str]) -> 
     return command
 
 
-def _environment(root: Path, spec: ToolSpec, runtime: Path, output: Path | None) -> dict[str, str]:
+def _environment(
+    root: Path, spec: ToolSpec, runtime: Path, output: Path | None
+) -> dict[str, str]:
     """Build the exact bootstrap environment without wildcard inheritance."""
     if spec.env_policy == "clean":
         result: dict[str, str] = {}
     else:
-        result = {key: value for key, value in os.environ.items() if key in ENV_ALLOWLIST}
+        result = {
+            key: value for key, value in os.environ.items() if key in ENV_ALLOWLIST
+        }
     result.update(
         {
             "AGENT_CANON_SOURCE_ROOT": str(root),
@@ -593,10 +597,26 @@ def _environment(root: Path, spec: ToolSpec, runtime: Path, output: Path | None)
     result["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
     if output is not None:
         result["AGENT_CANON_OUTPUT_ROOT"] = str(output)
-    for key in ("AGENT_CANON_CONTROL_PARENT_ROOT", "AGENT_CANON_TASK_ROOT", "AGENT_CANON_TARGET_ROOT", "AGENT_CANON_EXPLICIT_CWD"):
+    for key in (
+        "AGENT_CANON_CONTROL_PARENT_ROOT",
+        "AGENT_CANON_TASK_ROOT",
+        "AGENT_CANON_TARGET_ROOT",
+        "AGENT_CANON_EXPLICIT_CWD",
+    ):
         value = os.environ.get(key)
         if value:
             result[key] = value
+    target_root = result.get("AGENT_CANON_TARGET_ROOT")
+    if target_root:
+        # This target was admitted by bootstrap. Do not inherit arbitrary Git
+        # configuration or expand its trust to the source mount/all repositories.
+        result.update(
+            {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "safe.directory",
+                "GIT_CONFIG_VALUE_0": str(Path(target_root).resolve()),
+            }
+        )
     return result
 
 
