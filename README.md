@@ -63,6 +63,30 @@ newer interpreter. The standalone adapter can write and inspect the private
 spool; the existing host/container sync publication lifecycle remains owned by
 the shared runtime.
 
+### Native CLI CI/CD
+
+Pull requests and main updates run distribution contract tests, Rust formatting,
+Clippy and Rust tests on all five supported host targets, followed by archive
+verification and source-free command smoke. The `native-cli` check summarizes
+that validation. Check output and built archives are retained for 14 days.
+
+To publish a stable release:
+
+1. Update the crate's `package.version` in
+   [Cargo.toml](tools/runtime/dispatch/agent-canon/Cargo.toml) and its lockfile
+   record, then verify the source through CI.
+2. Push a `v<version>` tag for that source, where `<version>` is the crate
+   version. The existing manual workflow also accepts `publish_release=true`
+   and the matching `release_tag` on the selected source ref.
+3. Check the publication receipt and release assets. Publication verifies the
+   source, target, version and checksums before making a complete draft public.
+
+If publication is interrupted, rerun the failed publication job in the same
+workflow run to reuse its built archives. Matching uploaded assets are retained
+and missing assets are added. A matching published release completes without
+changes; conflicting assets or source references fail with their state preserved.
+This keeps the source and artifact identity established by CI through publication.
+
 ## External Skills
 
 外部Skillを追加するときは、利用するCodexで

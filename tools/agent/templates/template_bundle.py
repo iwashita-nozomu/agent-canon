@@ -21,11 +21,11 @@ import stat
 import subprocess
 import sys
 import tarfile
+import zipfile
 from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
-import zipfile
 
 import tomllib
 
@@ -671,20 +671,22 @@ def _native_package_output(output: Path, source_root: Path) -> Path:
 def _native_tar_bytes(root_name: str, payload: dict[str, tuple[bytes, int]]) -> bytes:
     """Build a timestamp-stable gzip tar package from relative payload paths."""
     buffer = io.BytesIO()
-    with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compressed:
-        with tarfile.open(
+    with (
+        gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compressed,
+        tarfile.open(
             fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
-        ) as archive:
-            for relative, (content, mode) in sorted(payload.items()):
-                info = tarfile.TarInfo(f"{root_name}/{relative}")
-                info.size = len(content)
-                info.mode = mode
-                info.mtime = 0
-                info.uid = 0
-                info.gid = 0
-                info.uname = ""
-                info.gname = ""
-                archive.addfile(info, io.BytesIO(content))
+        ) as archive,
+    ):
+        for relative, (content, mode) in sorted(payload.items()):
+            info = tarfile.TarInfo(f"{root_name}/{relative}")
+            info.size = len(content)
+            info.mode = mode
+            info.mtime = 0
+            info.uid = 0
+            info.gid = 0
+            info.uname = ""
+            info.gname = ""
+            archive.addfile(info, io.BytesIO(content))
     return buffer.getvalue()
 
 
@@ -703,6 +705,21 @@ def _native_zip_bytes(root_name: str, payload: dict[str, tuple[bytes, int]]) -> 
             info.external_attr = (stat.S_IFREG | mode) << 16
             archive.writestr(info, content)
     return buffer.getvalue()
+
+
+def _native_version(source_root: Path, commit: str) -> str:
+    try:
+        cargo = tomllib.loads(
+            _blob(source_root, commit, NATIVE_CLI_CARGO_MANIFEST).decode("utf-8")
+        )
+        version = cargo["package"]["version"]
+    except (KeyError, UnicodeDecodeError, tomllib.TOMLDecodeError, TypeError) as exc:
+        raise TemplateBundleError(
+            "native CLI Cargo package version is invalid"
+        ) from exc
+    if not isinstance(version, str) or not PACKAGE_COMPONENT.fullmatch(version):
+        raise TemplateBundleError("native CLI Cargo package version is invalid")
+    return version
 
 
 def package_native_cli(
@@ -748,17 +765,7 @@ def package_native_cli(
             )
         package_paths[relative] = _blob(source_root, commit, source)
 
-    try:
-        cargo = tomllib.loads(
-            _blob(source_root, commit, NATIVE_CLI_CARGO_MANIFEST).decode("utf-8")
-        )
-        version = cargo["package"]["version"]
-    except (KeyError, UnicodeDecodeError, tomllib.TOMLDecodeError, TypeError) as exc:
-        raise TemplateBundleError(
-            "native CLI Cargo package version is invalid"
-        ) from exc
-    if not isinstance(version, str) or not PACKAGE_COMPONENT.fullmatch(version):
-        raise TemplateBundleError("native CLI Cargo package version is invalid")
+    version = _native_version(source_root, commit)
 
     binary_name = (
         "agent-canon.exe" if target.endswith("-windows-msvc") else "agent-canon"
@@ -809,6 +816,157 @@ def package_native_cli(
             stream.write(f"{checksum}  {archive_path.name}\n")
         archives.append({"path": str(archive_path), "sha256": checksum})
     return {**provenance, "output": str(output), "archives": archives}
+
+
+def _native_archive_payload(path: Path, prefix: str) -> dict[str, bytes]:
+    """Read regular archive members without extracting them onto the filesystem."""
+    payload: dict[str, bytes] = {}
+
+    def add(name: str, content: bytes) -> None:
+        if not name.startswith(prefix + "/"):
+            raise TemplateBundleError("native archive root differs")
+        relative = name[len(prefix) + 1 :]
+        _bundle_relative(relative)
+        if relative in payload:
+            raise TemplateBundleError("native archive contains duplicate members")
+        payload[relative] = content
+
+    try:
+        if path.name.endswith(".tar.gz"):
+            with tarfile.open(path, "r:gz") as archive:
+                for member in archive.getmembers():
+                    if not member.isfile():
+                        raise TemplateBundleError(
+                            "native archive member is not regular"
+                        )
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise TemplateBundleError("native archive member is unreadable")
+                    add(member.name, stream.read())
+        else:
+            with zipfile.ZipFile(path) as archive:
+                for member in archive.infolist():
+                    if stat.S_IFMT(member.external_attr >> 16) != stat.S_IFREG:
+                        raise TemplateBundleError(
+                            "native archive member is not regular"
+                        )
+                    add(member.filename, archive.read(member))
+    except (OSError, ValueError, tarfile.TarError, zipfile.BadZipFile) as exc:
+        raise TemplateBundleError(f"native archive is unreadable: {path.name}") from exc
+    return payload
+
+
+def verify_native_packages(
+    *, source_root: Path, source_ref: str, root: Path, targets: list[str]
+) -> dict[str, Any]:
+    """Verify the exact source-bound native release set before publication."""
+    source_root = source_root.resolve()
+    commit = _commit(source_root, source_ref)
+    tree = _git(source_root, "rev-parse", f"{commit}^{{tree}}").decode().strip()
+    manifest, manifest_digest = _manifest(source_root, commit)
+    version = _native_version(source_root, commit)
+    if (
+        not targets
+        or len(set(targets)) != len(targets)
+        or any(not PACKAGE_COMPONENT.fullmatch(target) for target in targets)
+    ):
+        raise TemplateBundleError("native release targets are invalid")
+    expected = {
+        f"agent-canon-{version}-{target}.{suffix}"
+        for target in targets
+        for suffix in ("tar.gz", "tar.gz.sha256", "zip", "zip.sha256")
+    }
+    if root.is_symlink() or not root.is_dir():
+        raise TemplateBundleError("native package directory is missing or unsafe")
+    paths = list(root.iterdir())
+    if {path.name for path in paths} != expected or any(
+        path.is_symlink() or not path.is_file() for path in paths
+    ):
+        raise TemplateBundleError("native release file set differs")
+    resources = {
+        destination: _blob(source_root, commit, source)
+        for source, destination in manifest["profiles"][NATIVE_CLI_PROFILE][
+            "layout"
+        ].items()
+    }
+    provenance_path = "share/agent-canon/provenance.json"
+    sums_path = "share/agent-canon/SHA256SUMS"
+    records: list[dict[str, Any]] = []
+    try:
+        for target in sorted(targets):
+            prefix = f"agent-canon-{version}-{target}"
+            binary = (
+                "bin/agent-canon.exe"
+                if target.endswith("-windows-msvc")
+                else "bin/agent-canon"
+            )
+            previous: dict[str, bytes] | None = None
+            for suffix in ("tar.gz", "zip"):
+                path = root / f"{prefix}.{suffix}"
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                sidecar = path.with_name(path.name + ".sha256")
+                if sidecar.read_text(encoding="ascii") != f"{digest}  {path.name}\n":
+                    raise TemplateBundleError("native archive checksum differs")
+                payload = _native_archive_payload(path, prefix)
+                if set(payload) != {*resources, binary, provenance_path, sums_path}:
+                    raise TemplateBundleError("native archive resource set differs")
+                if any(payload[name] != content for name, content in resources.items()):
+                    raise TemplateBundleError(
+                        "native archive resource differs from source"
+                    )
+                provenance = json.loads(payload[provenance_path])
+                identity = {
+                    "schema": NATIVE_CLI_SCHEMA,
+                    "version": version,
+                    "target": target,
+                    "source_commit": commit,
+                    "source_tree": tree,
+                    "manifest_digest": manifest_digest,
+                }
+                if not isinstance(provenance, dict) or any(
+                    provenance.get(key) != value for key, value in identity.items()
+                ):
+                    raise TemplateBundleError("native archive source identity differs")
+                hashes = {
+                    name: hashlib.sha256(data).hexdigest()
+                    for name, data in payload.items()
+                }
+                expected_sums = "".join(
+                    f"{hashes[name]}  {name}\n"
+                    for name in sorted(payload)
+                    if name != sums_path
+                )
+                if payload[sums_path].decode("ascii") != expected_sums:
+                    raise TemplateBundleError("native resource checksum differs")
+                if provenance.get("files") != [
+                    {"path": name, "sha256": hashes[name]}
+                    for name in sorted(payload)
+                    if name not in {provenance_path, sums_path}
+                ]:
+                    raise TemplateBundleError("native provenance file digests differ")
+                if previous is not None and payload != previous:
+                    raise TemplateBundleError(
+                        "native archive formats contain different payloads"
+                    )
+                previous = payload
+                for artifact in (path, sidecar):
+                    records.append(
+                        {
+                            "path": artifact.name,
+                            "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+                            "size": artifact.stat().st_size,
+                        }
+                    )
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise TemplateBundleError("native release metadata is unreadable") from exc
+    return {
+        "schema": "agent-canon.native-release.v1",
+        "source_commit": commit,
+        "source_tree": tree,
+        "version": version,
+        "targets": sorted(targets),
+        "files": sorted(records, key=lambda item: item["path"]),
+    }
 
 
 def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
@@ -1006,10 +1164,22 @@ def main(argv: list[str] | None = None) -> int:
     native.add_argument("--target", required=True)
     native.add_argument("--output", required=True)
     native.add_argument("--toolchain", default="")
+    native_verify = sub.add_parser("native-verify")
+    native_verify.add_argument("--source-root", required=True)
+    native_verify.add_argument("--source-ref", required=True)
+    native_verify.add_argument("--root", required=True)
+    native_verify.add_argument("--target", action="append", required=True)
     args = parser.parse_args(argv)
     try:
         if args.operation == "verify":
             result = verify_codex_user_bundle(Path(args.root))
+        elif args.operation == "native-verify":
+            result = verify_native_packages(
+                source_root=Path(args.source_root),
+                source_ref=args.source_ref,
+                root=Path(args.root),
+                targets=args.target,
+            )
         elif args.operation == "export":
             result = export_bundle(
                 source_root=Path(args.source_root),

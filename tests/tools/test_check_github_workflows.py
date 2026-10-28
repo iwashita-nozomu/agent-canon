@@ -3,6 +3,7 @@
 # responsibility Tests the standalone AgentCanon GitHub workflow convention checker.
 # upstream implementation ../../tools/validation/ci/checks/check_github_workflows.py convention checker
 # upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml dashboard event contract
+# upstream implementation ../../.github/workflows/agent-canon-native-release.yml native publication planning
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml standalone gate workflow
 # @dependency-end
 
@@ -10,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -24,6 +26,91 @@ CHECKER = ROOT / "tools" / "validation" / "ci" / "checks" / "check_github_workfl
 RUNTIME_DASHBOARD_WORKFLOW = (
     ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
 )
+
+
+def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/agent-canon-native-release.yml").read_text()
+    )
+    step = next(
+        value
+        for value in workflow["jobs"]["prepare"]["steps"]
+        if value.get("id") == "plan"
+    )
+    cases = (
+        ("main", "push", "refs/heads/main", "false", "", False, ""),
+        ("pr", "pull_request", "refs/pull/1/merge", "false", "", False, ""),
+        ("tag", "push", "refs/tags/v1.2.3", "false", "", True, "v1.2.3"),
+        (
+            "manual-check-tag",
+            "workflow_dispatch",
+            "refs/tags/v1.2.3",
+            "false",
+            "",
+            False,
+            "",
+        ),
+        (
+            "manual-publish",
+            "workflow_dispatch",
+            "refs/heads/main",
+            "true",
+            "v1.2.3",
+            True,
+            "v1.2.3",
+        ),
+        (
+            "manual-publish-tag",
+            "workflow_dispatch",
+            "refs/tags/v1.2.3",
+            "true",
+            "",
+            True,
+            "v1.2.3",
+        ),
+        ("wrong-tag", "push", "refs/tags/v9.9.9", "false", "", None, ""),
+        ("missing-tag", "workflow_dispatch", "refs/heads/main", "true", "", None, ""),
+    )
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        manifest = root / "tools/runtime/dispatch/agent-canon/Cargo.toml"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text('[package]\nversion = "1.2.3"\n')
+        commands = root / "bin"
+        commands.mkdir()
+        (commands / "python").symlink_to(sys.executable)
+        for name, event, ref, requested, tag_input, published, tag in cases:
+            output = root / (name + ".output")
+            env = {
+                **os.environ,
+                "PATH": str(commands) + os.pathsep + os.environ["PATH"],
+                "GITHUB_EVENT_NAME": event,
+                "GITHUB_REF": ref,
+                "GITHUB_REF_NAME": ref.rsplit("/", 1)[-1],
+                "GITHUB_OUTPUT": str(output),
+                "PUBLISH_REQUEST": requested,
+                "RELEASE_TAG_INPUT": tag_input,
+                "MATRIX_JSON": step["env"]["MATRIX_JSON"],
+            }
+            result = subprocess.run(
+                ["bash", "-c", step["run"]],
+                cwd=root,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if published is None:
+                assert result.returncode != 0, name
+                assert not output.exists(), name
+            else:
+                assert result.returncode == 0, (name, result.stderr)
+                values = dict(
+                    line.split("=", 1) for line in output.read_text().splitlines()
+                )
+                assert values["publish"] == str(published).lower(), name
+                assert values["tag"] == tag, name
+                assert values["version"] == "1.2.3", name
 
 
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
