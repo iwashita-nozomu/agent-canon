@@ -14,6 +14,7 @@ downstream implementation ../../tools/runtime/container/bootstrap_runtime.py res
 downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
 downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced typed dispatcher
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
+downstream implementation ../../.github/workflows/agent-canon-native-release.yml builds and publishes native CLI archives
 @dependency-end
 -->
 
@@ -26,24 +27,47 @@ downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootst
 ## Reader Map
 
 - Host は Skill、[AGENTS.md](../../AGENTS.md)、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
-- 共有 tool container は AgentCanon の Python / Rust / LSP tool と catalog-declared native CLI を実行する。
+- native binary は first-class Rust command を host 上で実行し、共有 tool container は既存 Python / LSP tool と catalog-declared native CLI を実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
 - runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
   一般の eval、report、SQLite、log、analysis、archive artifact は source tree 外に置く。
 - public command の互換性、resource lifecycle、eval publication、skill discovery を
   完了条件に含める。
 
+## Native CLI Distribution
+
+Rust first-class public commands ship as the agent-canon native executable in
+OS/architecture-specific zip and tar.gz archives. Basic commands do not need
+an AgentCanon source checkout, user-side Cargo, or Docker. Archives contain
+bin/agent-canon, LICENSE, source/toolchain provenance, an archive checksum,
+and per-resource checksums. A Rust-only operation such as codex-config runs
+from the extracted directory. Commands that invoke external executables or
+interpreters keep their command-specific requirements.
+
+The source checkout wrapper at tools/bin/agent-canon directly execs an existing
+native executable. It uses AGENT_CANON_NATIVE_BIN when set; otherwise it looks
+in the crate's target/release and target/debug directories. Rust commands do
+not start bootstrap, Docker, or Cargo builds implicitly.
+
+The generic agent-canon tool run catalog dispatcher remains a transitional
+route and still requires its registered shared runtime. Archives also include
+the optional knowledge/feedback Python adapter, which is found beside the
+installed executable under share/agent-canon and requires host Python 3.10 or
+newer. The adapter supports private spool reads and writes. Host/container sync
+publication remains owned by the existing shared runtime.
+
 ## Responsibility Boundary
 
 ```text
 Host
-  bootstrap.sh
-  AGENTS.md / Skills / workflow shell
+  native agent-canon Rust CLI
+  bootstrap.sh / Skills / workflow shell
   Git / GitHub / Docker / Codex adapters
             |
+            | generic catalog tool run only
             v
 Shared AgentCanon Tool Container (maximum one)
-  Rust CLI / Python tools / LSP / catalog-native CLI / static analysis
+  Python tools / LSP / catalog-native CLI / static analysis
             |
             +-- external runtime root
             +-- allowlisted repository mounts
@@ -97,7 +121,9 @@ capability を受けた場合だけ source を変更します。
 
 ## Top-Level Bootstrap
 
-唯一の入口は repository top-level `bootstrap.sh` です。
+repository top-level `bootstrap.sh` は shared-runtime lifecycle と transitional
+catalog tool route の入口です。Rust first-class command は native executable
+から直接実行し、この bootstrap path を通りません。
 
 ```bash
 ./bootstrap.sh --control-parent-root <path> install
@@ -118,7 +144,7 @@ capability を受けた場合だけ source を変更します。
 ./bootstrap.sh --control-parent-root <path> uninstall
 ```
 
-コマンドを実行する cwd は runtime の選択に使わず、cwd に関する warning は出しません。
+Bootstrap command を実行する cwd は runtime の選択に使わず、cwd に関する warning は出しません。
 経路は `cwd -> bootstrap.sh -> install root -> control root ->
 <install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
