@@ -24,17 +24,19 @@ pub(crate) fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, Stri
             source_root.display()
         )
     })?;
-    Ok(test_runtime_root_for_source(&source))
+    test_runtime_root_for_source(&source)
 }
 
 #[cfg(test)]
-fn test_runtime_root_for_source(source: &Path) -> PathBuf {
+fn test_runtime_root_for_source(source: &Path) -> Result<PathBuf, String> {
     let digest = Sha256::digest(source.to_string_lossy().as_bytes());
     let key = digest[..8]
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
-    env::temp_dir().join(format!("agent-canon-test-runtime-{key}"))
+    let temporary = fs::canonicalize(env::temp_dir())
+        .map_err(|error| format!("canonicalize test temporary root: {error}"))?;
+    Ok(temporary.join(format!("agent-canon-test-runtime-{key}")))
 }
 
 fn absolute(path: &Path) -> Result<PathBuf, String> {
@@ -98,7 +100,7 @@ pub(crate) fn resolve_runtime_root_at(
         None => {
             #[cfg(test)]
             {
-                Some(test_runtime_root_for_source(&source))
+                Some(test_runtime_root_for_source(&source)?)
             }
             #[cfg(not(test))]
             {

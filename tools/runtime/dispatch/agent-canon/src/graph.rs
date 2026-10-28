@@ -2315,13 +2315,43 @@ fn publish_graph_bytes_at(
     }
     fs::rename(publication_temp, published).map_err(|error| GraphError::Io(error.to_string()))?;
     owned_temp.disarm();
-    File::open(published)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    File::open(graph_root)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    sync_owned_graph_file(published)?;
+    sync_graph_directory(graph_root)?;
     Ok(())
+}
+
+fn sync_owned_graph_file(path: &Path) -> Result<(), GraphError> {
+    // Windows FlushFileBuffers requires a writable handle after the writer closes.
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| {
+            GraphError::Io(format!(
+                "synchronize graph file {}: {error}",
+                path.display()
+            ))
+        })
+}
+
+fn sync_graph_directory(path: &Path) -> Result<(), GraphError> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x02000000;
+        options.write(true).custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+    }
+    options
+        .open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| {
+            GraphError::Io(format!(
+                "synchronize graph directory {}: {error}",
+                path.display()
+            ))
+        })
 }
 
 fn build_graph_staging(
@@ -2516,9 +2546,7 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
         ));
     }
     let integration = build_graph_staging(material, &staging.database)?;
-    File::open(&staging.database)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    sync_owned_graph_file(&staging.database)?;
     let staged_bytes =
         fs::read(&staging.database).map_err(|error| GraphError::Io(error.to_string()))?;
     let staged_sha256 = sha256(&staged_bytes);
@@ -3985,9 +4013,7 @@ mod tests {
             build_graph_staging(&material, &staging.database).expect("local SQLite build");
         assert!(!published.exists());
         assert!(!publication_temp.exists());
-        File::open(&staging.database)
-            .and_then(|file| file.sync_all())
-            .expect("staging fsync");
+        sync_owned_graph_file(&staging.database).expect("staging fsync");
         let staged_bytes = fs::read(&staging.database).expect("staging bytes");
         let staged_sha256 = sha256(&staged_bytes);
 
