@@ -3959,10 +3959,11 @@ mod tests {
     }
 
     fn test_graph_root(root: &Path) -> PathBuf {
-        resolve_runtime_root_at(root, None)
+        let root = root.canonicalize().expect("canonical test source root");
+        resolve_runtime_root_at(&root, None)
             .expect("test runtime root")
             .join("graph")
-            .join(stable_source_key(root))
+            .join(stable_source_key(&root))
     }
 
     fn test_graph_db(root: &Path) -> PathBuf {
