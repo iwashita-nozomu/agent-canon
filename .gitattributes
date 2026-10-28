@@ -1,3 +1,14 @@
+# @dependency-start
+# contract configuration
+# responsibility Preserves Rust source newlines and raw parser fixture bytes.
+# upstream design documents/design/formatting.md native formatter ownership
+# upstream implementation .editorconfig shared LF editing policy
+# upstream implementation rustfmt.toml Rust LF formatting contract
+# @dependency-end
+
+# Match rustfmt's LF policy on every host without changing global Git settings.
+tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
+
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff

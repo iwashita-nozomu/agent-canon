@@ -604,6 +604,8 @@ fn value_after(args: &[String], index: usize, flag: &str) -> Result<String, Stri
 
 fn run_check(args: Args) -> Result<Report, String> {
     let root = resolve_like_cwd(&args.root);
+    // Match discovered file identities before crossing the Python AST boundary.
+    let root = fs::canonicalize(&root).unwrap_or(root);
     let files = source_files(&root, &args.paths, &args.excludes);
     let payload = extract_ast_modules(&root, &files)?;
     let parse_errors = payload

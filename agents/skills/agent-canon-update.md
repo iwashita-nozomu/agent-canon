@@ -7,6 +7,7 @@ responsibility Owns editing, publishing, and consuming AgentCanon as a standalon
 upstream design ../../documents/design/agent-canon-bootstrap-tool-runtime.md shared runtime design
 upstream design ../../documents/runtime/bootstrap-runtime.md user lifecycle contract
 upstream implementation ../../bootstrap.sh Host lifecycle entrypoint
+upstream design ../../README.md native CLI CI and release procedure
 downstream design ../../documents/runtime/runtime-log-archive.md eval archive owner
 @dependency-end
 -->
@@ -163,6 +164,10 @@ skills. Uninstall removes the AgentCanon-owned skills directory link only.
 After update, launch a new session.
 
 ## Tool route
+
+For selected native CLI CI or release work, follow
+[Native CLI CI/CD](../../README.md#native-cli-cicd). Use its verified archive and
+draft-resumption route to retain source/artifact identity through publication.
 
 Preserve the existing public Rust command shape. Do not add flat global Python
 executables. A catalog entry uses its typed route:

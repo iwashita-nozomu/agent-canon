@@ -347,7 +347,10 @@ fn runtime_relative_path(value: &str) -> bool {
 }
 
 fn runtime_absolute_path(value: &str) -> bool {
-    value.starts_with('/')
+    // Source locators use the producer's POSIX separators, including Windows drives.
+    let absolute = value.starts_with('/')
+        || matches!(value.as_bytes(), [drive, b':', b'/', ..] if drive.is_ascii_alphabetic());
+    absolute
         && !value.contains('\0')
         && !value.contains('\\')
         && !value
@@ -631,7 +634,7 @@ fn decode_base64(value: &str) -> Result<Vec<u8>, GraphError> {
         ));
     }
     let mut output = Vec::new();
-    for (index, chunk) in bytes.chunks_exact(4).enumerate() {
+    for (index, chunk) in bytes.as_chunks::<4>().0.iter().enumerate() {
         let final_chunk = index + 1 == bytes.len() / 4;
         if chunk[0] == b'='
             || chunk[1] == b'='
@@ -2312,13 +2315,43 @@ fn publish_graph_bytes_at(
     }
     fs::rename(publication_temp, published).map_err(|error| GraphError::Io(error.to_string()))?;
     owned_temp.disarm();
-    File::open(published)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
-    File::open(graph_root)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    sync_owned_graph_file(published)?;
+    sync_graph_directory(graph_root)?;
     Ok(())
+}
+
+fn sync_owned_graph_file(path: &Path) -> Result<(), GraphError> {
+    // Windows FlushFileBuffers requires a writable handle after the writer closes.
+    OpenOptions::new()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| {
+            GraphError::Io(format!(
+                "synchronize graph file {}: {error}",
+                path.display()
+            ))
+        })
+}
+
+fn sync_graph_directory(path: &Path) -> Result<(), GraphError> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x02000000;
+        options.write(true).custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+    }
+    options
+        .open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| {
+            GraphError::Io(format!(
+                "synchronize graph directory {}: {error}",
+                path.display()
+            ))
+        })
 }
 
 fn build_graph_staging(
@@ -2513,9 +2546,7 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
         ));
     }
     let integration = build_graph_staging(material, &staging.database)?;
-    File::open(&staging.database)
-        .and_then(|file| file.sync_all())
-        .map_err(|error| GraphError::Io(error.to_string()))?;
+    sync_owned_graph_file(&staging.database)?;
     let staged_bytes =
         fs::read(&staging.database).map_err(|error| GraphError::Io(error.to_string()))?;
     let staged_sha256 = sha256(&staged_bytes);
@@ -3773,7 +3804,7 @@ mod tests {
                 "reports/agents/run-graph/validation_result.json",
             ],
         );
-        let rollout_path = rollout.display().to_string();
+        let rollout_path = rollout.display().to_string().replace('\\', "/");
         let publication_path = artifact_target
             .strip_prefix(&root)
             .expect("artifact relative")
@@ -3928,10 +3959,11 @@ mod tests {
     }
 
     fn test_graph_root(root: &Path) -> PathBuf {
-        resolve_runtime_root_at(root, None)
+        let root = root.canonicalize().expect("canonical test source root");
+        resolve_runtime_root_at(&root, None)
             .expect("test runtime root")
             .join("graph")
-            .join(stable_source_key(root))
+            .join(stable_source_key(&root))
     }
 
     fn test_graph_db(root: &Path) -> PathBuf {
@@ -3982,9 +4014,7 @@ mod tests {
             build_graph_staging(&material, &staging.database).expect("local SQLite build");
         assert!(!published.exists());
         assert!(!publication_temp.exists());
-        File::open(&staging.database)
-            .and_then(|file| file.sync_all())
-            .expect("staging fsync");
+        sync_owned_graph_file(&staging.database).expect("staging fsync");
         let staged_bytes = fs::read(&staging.database).expect("staging bytes");
         let staged_sha256 = sha256(&staged_bytes);
 
@@ -4004,10 +4034,20 @@ mod tests {
         let immutable_uri = sqlite_immutable_uri(&canonical).expect("immutable URI");
         assert!(immutable_uri.starts_with("file:"));
         assert!(immutable_uri.ends_with("?immutable=1"));
+        let (reserved_path, expected_uri) = if cfg!(windows) {
+            (
+                "C:/graph storage?#%.sqlite",
+                "file:C%3A/graph%20storage%3F%23%25.sqlite?immutable=1",
+            )
+        } else {
+            (
+                "/graph storage?#%.sqlite",
+                "file:/graph%20storage%3F%23%25.sqlite?immutable=1",
+            )
+        };
         assert_eq!(
-            sqlite_immutable_uri(Path::new("/graph storage?#%.sqlite"))
-                .expect("reserved path encoding"),
-            "file:/graph%20storage%3F%23%25.sqlite?immutable=1"
+            sqlite_immutable_uri(Path::new(reserved_path)).expect("reserved path encoding"),
+            expected_uri
         );
         let readback = open_db_at(&material.graph_root).expect("immutable graph readback");
         validate_graph_connection(&readback).expect("published graph contract");
@@ -4119,9 +4159,17 @@ mod tests {
         drop(statement);
         drop(connection);
 
-        let probe = probe_input_fingerprint(&fixture.root, &args.profile, None, None, None)
+        let probe_root = fixture
+            .root
+            .canonicalize()
+            .expect("canonical probe source root");
+        let probe = probe_input_fingerprint(&probe_root, &args.profile, None, None, None)
             .expect("component-complete probe");
-        assert!(probe.reason.is_none());
+        assert!(
+            probe.reason.is_none(),
+            "unexpected probe reason: {:?}",
+            probe.reason
+        );
         assert_eq!(
             probe.artifact_sha256.as_deref(),
             fixture.artifact_value["artifact_sha256"].as_str()
@@ -4714,6 +4762,25 @@ mod tests {
             read_graph_status(&explicit_args),
             Err(GraphError::Validation(_))
         ));
+    }
+
+    #[test]
+    fn runtime_source_locators_use_portable_absolute_path_syntax() {
+        for path in [
+            "/home/user/rollout.jsonl",
+            "C:/Users/user/rollout.jsonl",
+            "//server/share/rollout.jsonl",
+        ] {
+            assert!(runtime_absolute_path(path), "{path}");
+        }
+        for path in [
+            "relative/rollout.jsonl",
+            "C:relative.jsonl",
+            "C:/../rollout.jsonl",
+            r"C:\Users\user\rollout.jsonl",
+        ] {
+            assert!(!runtime_absolute_path(path), "{path}");
+        }
     }
 
     #[test]
