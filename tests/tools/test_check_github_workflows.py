@@ -38,7 +38,7 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
         if value.get("id") == "plan"
     )
     cases = (
-        ("main", "push", "refs/heads/main", "false", "", False, ""),
+        ("main", "push", "refs/heads/main", "false", "", True, "v1.2.3"),
         ("pr", "pull_request", "refs/pull/1/merge", "false", "", False, ""),
         ("tag", "push", "refs/tags/v1.2.3", "false", "", True, "v1.2.3"),
         (
@@ -76,6 +76,18 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
         manifest = root / "tools/runtime/dispatch/agent-canon/Cargo.toml"
         manifest.parent.mkdir(parents=True)
         manifest.write_text('[package]\nversion = "1.2.3"\n')
+        for args in (
+            ["init", "-q"],
+            ["config", "user.name", "Plan Fixture"],
+            ["config", "user.email", "plan@example.invalid"],
+            ["add", "tools"],
+            ["commit", "-qm", "baseline"],
+            ["update-ref", "refs/remotes/origin/main", "HEAD"],
+        ):
+            subprocess.run(
+                ["git", "-C", str(root), *args], check=True, capture_output=True
+            )
+
         commands = root / "bin"
         commands.mkdir()
         (commands / "python").symlink_to(sys.executable)
@@ -84,6 +96,7 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
             env = {
                 **os.environ,
                 "PATH": str(commands) + os.pathsep + os.environ["PATH"],
+                "PYTHONPATH": str(ROOT),
                 "GITHUB_EVENT_NAME": event,
                 "GITHUB_REF": ref,
                 "GITHUB_REF_NAME": ref.rsplit("/", 1)[-1],
