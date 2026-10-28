@@ -45,6 +45,7 @@ class FakeGitHub:
         self.release: dict[str, Any] | None = None
         self.tagged: str | None = None
         self.fail_upload = False
+        self.hide_draft_lists = False
 
     def __call__(self, command: Sequence[str]) -> CommandResult:
         args = list(command)
@@ -58,28 +59,22 @@ class FakeGitHub:
                     else None
                 )
             elif "/releases?" in args[3]:
-                value = [self.release] if self.release else []
-            else:
+                value = (
+                    [self.release] if self.release and not self.hide_draft_lists else []
+                )
+            elif "/releases/tags/" in args[3]:
                 value = (
                     self.release if self.release and not self.release["draft"] else None
                 )
+            else:
+                value = self.release
             status = 200 if value is not None else 404
             stdout = f"HTTP/2.0 {status}\ncontent-type: application/json\n\n{json.dumps(value)}"
             code = 0 if value is not None else 1
-        elif args[:3] == ["gh", "release", "create"]:
-            self.release = {
-                "id": 1,
-                "tag_name": args[3],
-                "draft": True,
-                "prerelease": False,
-                "target_commitish": args[args.index("--target") + 1],
-                "assets": [],
-                "html_url": "https://github.com/owner/repo/releases/tag/v0.1.0",
-            }
-        elif args[:3] == ["gh", "release", "upload"]:
-            assert self.release is not None
-            for name in args[args.index("--repo") + 2 :]:
-                path = Path(name)
+        elif args[:4] == ["gh", "api", "--method", "POST"]:
+            if args[4].startswith("https://uploads.github.com/"):
+                assert self.release is not None
+                path = Path(args[args.index("--input") + 1])
                 self.release["assets"].append(
                     {
                         "name": path.name,
@@ -91,7 +86,20 @@ class FakeGitHub:
                 )
                 if self.fail_upload:
                     code, stderr = 1, "interrupted after one upload"
-                    break
+                else:
+                    stdout = json.dumps(self.release["assets"][-1])
+            else:
+                fields = dict(value.split("=", 1) for value in args[6::2])
+                self.release = {
+                    "id": 1,
+                    "tag_name": fields["tag_name"],
+                    "draft": True,
+                    "prerelease": False,
+                    "target_commitish": fields["target_commitish"],
+                    "assets": [],
+                    "html_url": "https://github.com/owner/repo/releases/tag/untagged-test",
+                }
+                stdout = json.dumps(self.release)
         elif args[:4] == ["gh", "api", "--method", "PATCH"]:
             assert self.release is not None
             self.release["draft"] = False
@@ -105,8 +113,7 @@ class FakeGitHub:
         return [
             args
             for args in self.commands
-            if args[:2] == ["gh", "release"]
-            or args[:4] == ["gh", "api", "--method", "PATCH"]
+            if args[:2] == ["gh", "release"] or args[:3] == ["gh", "api", "--method"]
         ]
 
     def publications(self) -> list[list[str]]:
@@ -295,6 +302,19 @@ class NativeReleaseTest(unittest.TestCase):
         self.assertEqual(github.writes()[-1][:4], ["gh", "api", "--method", "PATCH"])
         self.assertIn("make_latest=legacy", github.writes()[-1])
 
+    def test_creation_response_is_used_while_tag_and_list_reads_lag(self) -> None:
+        github = FakeGitHub()
+        github.hide_draft_lists = True
+        result = self.publish(github)
+        self.assertEqual(result["status"], "published")
+        creates = [
+            args
+            for args in github.writes()
+            if args[:4] == ["gh", "api", "--method", "POST"]
+            and not args[4].startswith("https://uploads.github.com/")
+        ]
+        self.assertEqual(len(creates), 1)
+
     def test_interrupted_upload_resumes_only_missing_assets(self) -> None:
         github = FakeGitHub()
         github.fail_upload = True
@@ -307,8 +327,13 @@ class NativeReleaseTest(unittest.TestCase):
         github.fail_upload = False
         result = self.publish(github)
         self.assertEqual(result["status"], "published")
-        uploads = [args for args in github.writes() if args[2] == "upload"]
-        paths = uploads[-1][uploads[-1].index("--repo") + 2 :]
+        uploads = [
+            args
+            for args in github.writes()
+            if args[:4] == ["gh", "api", "--method", "POST"]
+            and args[4].startswith("https://uploads.github.com/")
+        ]
+        paths = [args[args.index("--input") + 1] for args in uploads[1:]]
         self.assertEqual(len(paths), 3)
         self.assertNotIn(uploaded, [Path(path).name for path in paths])
         self.assertFalse(any("--clobber" in args for args in github.commands))
@@ -365,7 +390,9 @@ class NativeReleaseTest(unittest.TestCase):
         class ChangedSourceGitHub(FakeGitHub):
             def __call__(self, command: Sequence[str]) -> CommandResult:
                 result = super().__call__(command)
-                if list(command[:3]) == ["gh", "release", "upload"]:
+                if list(command[:4]) == ["gh", "api", "--method", "POST"] and command[
+                    4
+                ].startswith("https://uploads.github.com/"):
                     assert self.release is not None
                     self.release["target_commitish"] = "0" * 40
                 return result
@@ -393,7 +420,9 @@ class NativeReleaseTest(unittest.TestCase):
         class ChangedTagGitHub(FakeGitHub):
             def __call__(self, command: Sequence[str]) -> CommandResult:
                 result = super().__call__(command)
-                if list(command[:3]) == ["gh", "release", "upload"]:
+                if list(command[:4]) == ["gh", "api", "--method", "POST"] and command[
+                    4
+                ].startswith("https://uploads.github.com/"):
                     self.tagged = "0" * 40
                 return result
 
