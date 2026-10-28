@@ -4034,10 +4034,20 @@ mod tests {
         let immutable_uri = sqlite_immutable_uri(&canonical).expect("immutable URI");
         assert!(immutable_uri.starts_with("file:"));
         assert!(immutable_uri.ends_with("?immutable=1"));
+        let (reserved_path, expected_uri) = if cfg!(windows) {
+            (
+                "C:/graph storage?#%.sqlite",
+                "file:C%3A/graph%20storage%3F%23%25.sqlite?immutable=1",
+            )
+        } else {
+            (
+                "/graph storage?#%.sqlite",
+                "file:/graph%20storage%3F%23%25.sqlite?immutable=1",
+            )
+        };
         assert_eq!(
-            sqlite_immutable_uri(Path::new("/graph storage?#%.sqlite"))
-                .expect("reserved path encoding"),
-            "file:/graph%20storage%3F%23%25.sqlite?immutable=1"
+            sqlite_immutable_uri(Path::new(reserved_path)).expect("reserved path encoding"),
+            expected_uri
         );
         let readback = open_db_at(&material.graph_root).expect("immutable graph readback");
         validate_graph_connection(&readback).expect("published graph contract");
@@ -4149,9 +4159,17 @@ mod tests {
         drop(statement);
         drop(connection);
 
-        let probe = probe_input_fingerprint(&fixture.root, &args.profile, None, None, None)
+        let probe_root = fixture
+            .root
+            .canonicalize()
+            .expect("canonical probe source root");
+        let probe = probe_input_fingerprint(&probe_root, &args.profile, None, None, None)
             .expect("component-complete probe");
-        assert!(probe.reason.is_none());
+        assert!(
+            probe.reason.is_none(),
+            "unexpected probe reason: {:?}",
+            probe.reason
+        );
         assert_eq!(
             probe.artifact_sha256.as_deref(),
             fixture.artifact_value["artifact_sha256"].as_str()
