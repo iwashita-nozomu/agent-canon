@@ -73,7 +73,10 @@ fn main() {
     }
 
     if args.len() >= 2 && (args[1] == "--version" || args[1] == "version") {
-        println!("agent-canon {}", env!("CARGO_PKG_VERSION"));
+        println!(
+            "agent-canon {}",
+            option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+        );
         return;
     }
 

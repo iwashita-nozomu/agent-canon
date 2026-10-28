@@ -107,18 +107,21 @@ jobs:
           import json
           import os
           import pathlib
-          import tomllib
+          from tools.agent.templates.template_bundle import native_release_version
+          from tools.repository.github.native_release import require_mainline_source
 
           matrix = json.loads(os.environ["MATRIX_JSON"])
-          manifest = pathlib.Path("tools/runtime/dispatch/agent-canon/Cargo.toml")
-          version = tomllib.loads(manifest.read_text())["package"]["version"]
+          version = native_release_version(pathlib.Path.cwd(), "HEAD")
           tagged = os.environ["GITHUB_REF"].startswith("refs/tags/v")
-          publish = (os.environ["GITHUB_EVENT_NAME"] == "push" and tagged) or os.environ.get("PUBLISH_REQUEST") == "true"
-          tag = os.environ.get("RELEASE_TAG_INPUT") or (os.environ["GITHUB_REF_NAME"] if tagged else "")
+          main_push = os.environ["GITHUB_EVENT_NAME"] == "push" and os.environ["GITHUB_REF"] == "refs/heads/main"
+          publish = main_push or (os.environ["GITHUB_EVENT_NAME"] == "push" and tagged) or os.environ.get("PUBLISH_REQUEST") == "true"
+          tag = "v" + version if main_push else os.environ.get("RELEASE_TAG_INPUT") or (os.environ["GITHUB_REF_NAME"] if tagged else "")
           if not publish:
               tag = ""
+          if publish:
+              require_mainline_source(pathlib.Path.cwd(), "HEAD")
           if publish and tag != "v" + version:
-              raise SystemExit("release tag must match Cargo version v" + version)
+              raise SystemExit("release tag must match source release version v" + version)
           outputs = {
               "matrix": json.dumps(matrix, separators=(",", ":")),
               "targets": json.dumps([row["target"] for row in matrix["include"]]),
@@ -142,6 +145,7 @@ jobs:
       TARGET: ${{ matrix.target }}
       EXECUTABLE: ${{ matrix.executable }}
       RUSTFLAGS: ${{ matrix.rustflags }}
+      AGENT_CANON_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - name: Checkout source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -235,7 +239,7 @@ jobs:
     if: >-
       needs.check.result == 'success' &&
       (
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) ||
         (github.event_name == 'workflow_dispatch' && inputs.publish_release)
       )
     runs-on: ubuntu-24.04

@@ -35,6 +35,40 @@ class NativeReleaseError(RuntimeError):
     """Release state cannot safely advance with the supplied artifacts."""
 
 
+def require_mainline_source(source_root: Path, source_ref: str) -> str:
+    """Keep the stable patch namespace exclusive to the repository mainline."""
+    resolved = subprocess_runner(
+        [
+            "git",
+            "-C",
+            str(source_root),
+            "rev-parse",
+            "--verify",
+            f"{source_ref}^{{commit}}",
+        ]
+    )
+    history = subprocess_runner(
+        [
+            "git",
+            "-C",
+            str(source_root),
+            "rev-list",
+            "--first-parent",
+            "refs/remotes/origin/main",
+        ]
+    )
+    commit = resolved.stdout.strip()
+    if (
+        resolved.returncode
+        or history.returncode
+        or commit not in history.stdout.splitlines()
+    ):
+        raise NativeReleaseError(
+            "stable releases require a commit on origin/main's first-parent history"
+        )
+    return commit
+
+
 def select_native_artifacts(
     artifacts: list[dict[str, Any]],
     targets: list[str],
@@ -64,9 +98,7 @@ def select_native_artifacts(
     return [selected[target] for target in targets]
 
 
-def _api(
-    runner: Runner, endpoint: str, *, optional: bool = False
-) -> dict[str, Any] | None:
+def _api_json(runner: Runner, endpoint: str, *, optional: bool = False) -> Any:
     result = runner(["gh", "api", "--include", endpoint])
     headers, separator, body = result.stdout.replace("\r\n", "\n").partition("\n\n")
     status = re.match(r"HTTP/\S+ (\d+)", headers)
@@ -79,10 +111,40 @@ def _api(
         raise NativeReleaseError(
             f"GitHub read failed with HTTP {code}: {result.stderr.strip()}"
         )
-    value = json.loads(body)
+    return json.loads(body)
+
+
+def _api(
+    runner: Runner, endpoint: str, *, optional: bool = False
+) -> dict[str, Any] | None:
+    value = _api_json(runner, endpoint, optional=optional)
+    if value is None and optional:
+        return None
     if not isinstance(value, dict):
         raise NativeReleaseError("GitHub returned invalid release metadata")
     return value
+
+
+def _release_for_tag(runner: Runner, repo: str, tag: str) -> dict[str, Any] | None:
+    release = _api(
+        runner, f"repos/{repo}/releases/tags/{quote(tag, safe='')}", optional=True
+    )
+    if release is not None:
+        return release
+    # Tag lookup is for published releases; resumable drafts are listed separately.
+    page = 1
+    while True:
+        releases = _api_json(runner, f"repos/{repo}/releases?per_page=100&page={page}")
+        if not isinstance(releases, list):
+            raise NativeReleaseError("GitHub returned invalid draft metadata")
+        for item in releases:
+            if not isinstance(item, dict):
+                raise NativeReleaseError("GitHub returned invalid draft metadata")
+            if item.get("draft") is True and item.get("tag_name") == tag:
+                return item
+        if len(releases) < 100:
+            return None
+        page += 1
 
 
 def _tag_commit(runner: Runner, repo: str, tag: str) -> str | None:
@@ -154,15 +216,16 @@ def publish_native_release(
         targets=targets,
     )
     if tag != "v" + identity["version"]:
-        raise NativeReleaseError("release tag must match the Cargo version")
+        raise NativeReleaseError("release tag must match the source release version")
     commit = identity["source_commit"]
+    require_mainline_source(source_root, commit)
     endpoint = f"repos/{repo}/releases/tags/{quote(tag, safe='')}"
     expected = {item["path"]: item for item in identity["files"]}
     recovered: list[dict[str, str]] = []
     tagged = _tag_commit(runner, repo, tag)
     if tagged is not None and tagged != commit:
         raise NativeReleaseError("release tag points to a different source commit")
-    release = _api(runner, endpoint, optional=True)
+    release = _release_for_tag(runner, repo, tag)
     if release is not None:
         missing = _validate_release(release, expected, tag, commit)
         if not release["draft"]:
@@ -203,7 +266,7 @@ def publish_native_release(
                 notes,
             ]
         )
-        release = _api(runner, endpoint, optional=True)
+        release = _release_for_tag(runner, repo, tag)
         if release is None:
             raise NativeReleaseError(
                 f"draft creation did not complete: {created.stderr.strip()}"
@@ -226,7 +289,7 @@ def publish_native_release(
                 *[str(artifacts / name) for name in missing],
             ]
         )
-        release = _api(runner, endpoint)
+        release = _release_for_tag(runner, repo, tag)
         if release is None:
             raise NativeReleaseError("draft disappeared after upload")
         missing = _validate_release(release, expected, tag, commit)
@@ -244,7 +307,17 @@ def publish_native_release(
     publish_error = ""
     if release["draft"]:
         published = runner(
-            ["gh", "release", "edit", tag, "--repo", repo, "--draft=false"]
+            [
+                "gh",
+                "api",
+                "--method",
+                "PATCH",
+                f"repos/{repo}/releases/{release['id']}",
+                "-F",
+                "draft=false",
+                "-f",
+                "make_latest=legacy",
+            ]
         )
         publish_error = published.stderr.strip()
         if published.returncode:

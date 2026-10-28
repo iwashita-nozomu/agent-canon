@@ -70,16 +70,24 @@ Clippy and Rust tests on all five supported host targets, followed by archive
 verification and source-free command smoke. The `native-cli` check summarizes
 that validation. Check output and built archives are retained for 14 days.
 
-To publish a stable release:
+Every successful main update publishes a stable release, including documentation,
+Skill, test and CI-only changes. The existing five-host validation completes
+before publication. Pull requests build and test without publishing.
 
-1. Update the crate's `package.version` in
-   [Cargo.toml](tools/runtime/dispatch/agent-canon/Cargo.toml) and its lockfile
-   record, then verify the source through CI.
-2. Push a `v<version>` tag for that source, where `<version>` is the crate
-   version. The existing manual workflow also accepts `publish_release=true`
-   and the matching `release_tag` on the selected source ref.
-3. Check the publication receipt and release assets. Publication verifies the
-   source, target, version and checksums before making a complete draft public.
+The crate's `package.version` is the release baseline. The patch number advances
+by the first-parent commit distance from its matching baseline tag; before that
+tag exists, the commit introducing the baseline is used. This assigns the same
+version on retries and distinct versions to parallel main updates without
+version-bump commits. A new major/minor baseline is set in
+[Cargo.toml](tools/runtime/dispatch/agent-canon/Cargo.toml) and its lockfile.
+CI compiles this release version into the CLI and uses it for archives,
+provenance and `v<version>` tags. GitHub selects the latest semantic release.
+
+Version tags and the explicit manual `publish_release=true`/`release_tag` route
+remain available for commits on main's first-parent history; their tag must
+match the version assigned to that source. This keeps branches from consuming
+a main release's version.
+Check the publication receipt and release assets after delivery.
 
 If publication is interrupted, rerun the failed publication job in the same
 workflow run to reuse its built archives. Matching uploaded assets are retained

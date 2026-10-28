@@ -707,7 +707,7 @@ def _native_zip_bytes(root_name: str, payload: dict[str, tuple[bytes, int]]) -> 
     return buffer.getvalue()
 
 
-def _native_version(source_root: Path, commit: str) -> str:
+def _native_cargo_version(source_root: Path, commit: str) -> str:
     try:
         cargo = tomllib.loads(
             _blob(source_root, commit, NATIVE_CLI_CARGO_MANIFEST).decode("utf-8")
@@ -720,6 +720,58 @@ def _native_version(source_root: Path, commit: str) -> str:
     if not isinstance(version, str) or not PACKAGE_COMPONENT.fullmatch(version):
         raise TemplateBundleError("native CLI Cargo package version is invalid")
     return version
+
+
+def native_release_version(source_root: Path, source_ref: str) -> str:
+    """Assign one stable patch version to each first-parent source update."""
+    commit = _commit(source_root, source_ref)
+    base = _native_cargo_version(source_root, commit)
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", base)
+    if match is None:
+        raise TemplateBundleError(
+            "native release baseline must be a stable Cargo version"
+        )
+    history = (
+        _git(source_root, "rev-list", "--first-parent", commit).decode().splitlines()
+    )
+    anchor: str | None = None
+    tag = f"v{base}"
+    if _git(source_root, "tag", "--list", tag).decode().strip() == tag:
+        tagged = _commit(source_root, f"refs/tags/{tag}")
+        if tagged in history:
+            anchor = tagged
+    if anchor is None:
+        if _git(source_root, "rev-parse", "--is-shallow-repository").strip() == b"true":
+            raise TemplateBundleError(
+                "native release baseline needs complete source history"
+            )
+        changes = (
+            _git(
+                source_root,
+                "log",
+                "--first-parent",
+                "--format=%H",
+                commit,
+                "--",
+                NATIVE_CLI_CARGO_MANIFEST,
+            )
+            .decode()
+            .splitlines()
+        )
+        for candidate in changes:
+            try:
+                candidate_version = _native_cargo_version(source_root, candidate)
+            except TemplateBundleError:
+                break
+            if candidate_version != base:
+                break
+            anchor = candidate
+    if anchor is None or anchor not in history:
+        raise TemplateBundleError(
+            "native release baseline is not on the source mainline"
+        )
+    major, minor, patch = map(int, match.groups())
+    return f"{major}.{minor}.{patch + history.index(anchor)}"
 
 
 def package_native_cli(
@@ -765,7 +817,7 @@ def package_native_cli(
             )
         package_paths[relative] = _blob(source_root, commit, source)
 
-    version = _native_version(source_root, commit)
+    version = native_release_version(source_root, commit)
 
     binary_name = (
         "agent-canon.exe" if target.endswith("-windows-msvc") else "agent-canon"
@@ -864,7 +916,7 @@ def verify_native_packages(
     commit = _commit(source_root, source_ref)
     tree = _git(source_root, "rev-parse", f"{commit}^{{tree}}").decode().strip()
     manifest, manifest_digest = _manifest(source_root, commit)
-    version = _native_version(source_root, commit)
+    version = native_release_version(source_root, commit)
     if (
         not targets
         or len(set(targets)) != len(targets)
@@ -1169,10 +1221,20 @@ def main(argv: list[str] | None = None) -> int:
     native_verify.add_argument("--source-ref", required=True)
     native_verify.add_argument("--root", required=True)
     native_verify.add_argument("--target", action="append", required=True)
+    native_version = sub.add_parser("native-version")
+    native_version.add_argument("--source-root", required=True)
+    native_version.add_argument("--source-ref", required=True)
     args = parser.parse_args(argv)
+    result: dict[str, Any]
     try:
         if args.operation == "verify":
             result = verify_codex_user_bundle(Path(args.root))
+        elif args.operation == "native-version":
+            result = {
+                "version": native_release_version(
+                    Path(args.source_root), args.source_ref
+                )
+            }
         elif args.operation == "native-verify":
             result = verify_native_packages(
                 source_root=Path(args.source_root),

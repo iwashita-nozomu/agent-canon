@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import tempfile
 import unittest
 from collections.abc import Callable, Sequence
@@ -23,6 +24,7 @@ from tools.agent.templates.template_bundle import (
     _native_archive_payload,
     _native_tar_bytes,
     _native_zip_bytes,
+    native_release_version,
     package_native_cli,
     verify_native_packages,
 )
@@ -30,6 +32,7 @@ from tools.repository.github.github_publish import CommandResult
 from tools.repository.github.native_release import (
     NativeReleaseError,
     publish_native_release,
+    require_mainline_source,
     select_native_artifacts,
 )
 
@@ -54,11 +57,15 @@ class FakeGitHub:
                     if self.tagged
                     else None
                 )
+            elif "/releases?" in args[3]:
+                value = [self.release] if self.release else []
             else:
-                value = self.release
-            status = 200 if value else 404
+                value = (
+                    self.release if self.release and not self.release["draft"] else None
+                )
+            status = 200 if value is not None else 404
             stdout = f"HTTP/2.0 {status}\ncontent-type: application/json\n\n{json.dumps(value)}"
-            code = 0 if value else 1
+            code = 0 if value is not None else 1
         elif args[:3] == ["gh", "release", "create"]:
             self.release = {
                 "id": 1,
@@ -85,7 +92,7 @@ class FakeGitHub:
                 if self.fail_upload:
                     code, stderr = 1, "interrupted after one upload"
                     break
-        elif args[:3] == ["gh", "release", "edit"]:
+        elif args[:4] == ["gh", "api", "--method", "PATCH"]:
             assert self.release is not None
             self.release["draft"] = False
             if self.tagged is None:
@@ -95,7 +102,19 @@ class FakeGitHub:
         return CommandResult(tuple(args), code, stdout, stderr)
 
     def writes(self) -> list[list[str]]:
-        return [args for args in self.commands if args[:2] == ["gh", "release"]]
+        return [
+            args
+            for args in self.commands
+            if args[:2] == ["gh", "release"]
+            or args[:4] == ["gh", "api", "--method", "PATCH"]
+        ]
+
+    def publications(self) -> list[list[str]]:
+        return [
+            args
+            for args in self.commands
+            if args[:4] == ["gh", "api", "--method", "PATCH"]
+        ]
 
 
 @dataclass(frozen=True)
@@ -123,6 +142,17 @@ class NativeReleaseTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         source = _source_fixture(root)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source),
+                "update-ref",
+                "refs/remotes/origin/main",
+                "HEAD",
+            ],
+            check=True,
+        )
         binary = root / "agent-canon"
         binary.write_bytes(b"fixture-native-binary")
         target = "x86_64-unknown-linux-gnu"
@@ -262,7 +292,8 @@ class NativeReleaseTest(unittest.TestCase):
         assert github.release is not None
         self.assertFalse(github.release["draft"])
         self.assertEqual(len(github.release["assets"]), 4)
-        self.assertEqual(github.writes()[-1][:3], ["gh", "release", "edit"])
+        self.assertEqual(github.writes()[-1][:4], ["gh", "api", "--method", "PATCH"])
+        self.assertIn("make_latest=legacy", github.writes()[-1])
 
     def test_interrupted_upload_resumes_only_missing_assets(self) -> None:
         github = FakeGitHub()
@@ -272,7 +303,7 @@ class NativeReleaseTest(unittest.TestCase):
         assert github.release is not None
         self.assertTrue(github.release["draft"])
         uploaded = github.release["assets"][0]["name"]
-        self.assertFalse(any(args[2] == "edit" for args in github.writes()))
+        self.assertEqual(github.publications(), [])
         github.fail_upload = False
         result = self.publish(github)
         self.assertEqual(result["status"], "published")
@@ -308,6 +339,23 @@ class NativeReleaseTest(unittest.TestCase):
             self.publish(github)
         self.assertEqual(github.writes(), [])
 
+    def test_missing_mainline_does_not_issue_any_remote_write(self) -> None:
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(self.fixture.source),
+                "update-ref",
+                "-d",
+                "refs/remotes/origin/main",
+            ],
+            check=True,
+        )
+        github = FakeGitHub()
+        with self.assertRaisesRegex(NativeReleaseError, "first-parent history"):
+            self.publish(github)
+        self.assertEqual(github.commands, [])
+
     def test_check_only_does_not_create_a_draft(self) -> None:
         github = FakeGitHub()
         self.assertEqual(self.publish(github, check_only=True)["status"], "checked")
@@ -325,7 +373,7 @@ class NativeReleaseTest(unittest.TestCase):
         github = ChangedSourceGitHub()
         with self.assertRaisesRegex(NativeReleaseError, "not bound"):
             self.publish(github)
-        self.assertFalse(any(args[2] == "edit" for args in github.writes()))
+        self.assertEqual(github.publications(), [])
 
     def test_unrelated_draft_assets_are_not_published(self) -> None:
         github = FakeGitHub()
@@ -352,7 +400,74 @@ class NativeReleaseTest(unittest.TestCase):
         github = ChangedTagGitHub()
         with self.assertRaisesRegex(NativeReleaseError, "tag changed"):
             self.publish(github)
-        self.assertFalse(any(args[2] == "edit" for args in github.writes()))
+        self.assertEqual(github.publications(), [])
+
+
+class NativeReleaseVersionTest(unittest.TestCase):
+    def git(self, root: Path, *args: str) -> str:
+        return subprocess.check_output(
+            ["git", "-C", str(root), *args], text=True
+        ).strip()
+
+    def commit_file(self, root: Path, name: str, text: str) -> str:
+        (root / name).write_text(text)
+        self.git(root, "add", name)
+        self.git(root, "commit", "-qm", name)
+        return self.git(root, "rev-parse", "HEAD")
+
+    def test_every_main_update_has_a_stable_distinct_patch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = _source_fixture(Path(directory))
+            self.git(root, "tag", "v0.1.0")
+            first = self.commit_file(root, "README.md", "small documentation fix\n")
+            self.assertEqual(native_release_version(root, first), "0.1.1")
+            second = self.commit_file(root, "ci-note.txt", "CI-only fix\n")
+            self.assertEqual(native_release_version(root, second), "0.1.2")
+            # Publishing another commit does not change an already assigned version.
+            self.git(root, "tag", "v0.1.1", first)
+            self.assertEqual(native_release_version(root, second), "0.1.2")
+            self.assertEqual(native_release_version(root, first), "0.1.1")
+            self.assertEqual(self.git(root, "status", "--porcelain"), "")
+
+    def test_new_cargo_baseline_works_before_its_first_release_tag(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = _source_fixture(Path(directory))
+            self.git(root, "tag", "v0.1.0")
+            manifest = "tools/runtime/dispatch/agent-canon/Cargo.toml"
+            content = (
+                (root / manifest)
+                .read_text()
+                .replace('version = "0.1.0"', 'version = "0.2.0"')
+            )
+            first = self.commit_file(root, manifest, content)
+            self.assertEqual(native_release_version(root, first), "0.2.0")
+            second = self.commit_file(root, "README.md", "next small change\n")
+            self.assertEqual(native_release_version(root, second), "0.2.1")
+            self.git(root, "tag", "v0.2.0", first)
+            self.assertEqual(native_release_version(root, second), "0.2.1")
+
+    def test_unmerged_topic_cannot_consume_a_main_release_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = _source_fixture(Path(directory))
+            self.git(root, "tag", "v0.1.0")
+            self.git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+            self.git(root, "switch", "-qc", "unmerged")
+            branch = self.commit_file(root, "README.md", "unmerged small change\n")
+            self.assertEqual(native_release_version(root, branch), "0.1.1")
+            with self.assertRaisesRegex(NativeReleaseError, "first-parent history"):
+                require_mainline_source(root, branch)
+
+    def test_topic_commits_count_as_one_main_merge(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = _source_fixture(Path(directory))
+            main = self.git(root, "branch", "--show-current")
+            self.git(root, "tag", "v0.1.0")
+            self.git(root, "switch", "-qc", "topic")
+            self.commit_file(root, "first.txt", "one\n")
+            self.commit_file(root, "second.txt", "two\n")
+            self.git(root, "switch", "-q", main)
+            self.git(root, "merge", "--no-ff", "-qm", "merge small fix", "topic")
+            self.assertEqual(native_release_version(root, "HEAD"), "0.1.1")
 
 
 class NativeArtifactSelectionTest(unittest.TestCase):
