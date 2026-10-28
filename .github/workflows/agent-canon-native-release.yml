@@ -221,4 +221,4 @@ jobs:
           gh release create "$release_tag" "${assets[@]}" \
             --target "$GITHUB_SHA" \
             --title "AgentCanon $release_tag" \
-            --generate-notes
+            --notes "Native CLI archives for Linux (x86_64/arm64), macOS (Intel/arm64), and Windows (x86_64). Verify the .sha256 sidecar, extract the archive, and add bin/ to PATH. Source: $GITHUB_SHA. Usage and command dependencies: https://github.com/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/README.md#native-cli-distribution"
