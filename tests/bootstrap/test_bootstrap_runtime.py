@@ -1,5 +1,11 @@
 """Resident controller state, task, tool, and eval contracts."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies shared runtime control and typed request boundaries.
+# upstream implementation ../../tools/runtime/container/bootstrap_runtime.py control-plane owner
+# @dependency-end
+
 from __future__ import annotations
 
 import json
@@ -246,6 +252,30 @@ def test_global_skill_projection_is_a_directory_link() -> None:
     assert 'ln -s -- "$skill_source_root" "$skills_link"' in adapter
     assert 'for source in "$skill_source_root"/*' not in adapter
     assert "_migrate_legacy_prompt_skill" not in adapter
+
+
+def test_template_export_passes_the_validated_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = runtime(tmp_path)
+    source = tmp_path / "registered-mount"
+    source.mkdir()
+    observed: list[Path] = []
+
+    def capture(tool_id: str, args: list[str], **options: Any) -> dict[str, Any]:
+        assert tool_id == "template-bundle"
+        actual = Path(args[args.index("--source-root") + 1])
+        assert actual == source.resolve()
+        assert actual.is_dir()
+        assert options["root"] == source
+        observed.append(actual)
+        return {"status": "captured"}
+
+    monkeypatch.setattr(manager, "tool_run", capture)
+    assert manager.template_export(source, "codex-user", "bundle") == {
+        "status": "captured"
+    }
+    assert observed == [source.resolve()]
 
 
 def test_resident_state_lock_cannot_be_bypassed_by_environment_marker(
