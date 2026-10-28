@@ -23,7 +23,7 @@ evidence.
 
 ## Boundary
 
-- `bootstrap.sh` is the only host entrypoint. The host adapter invokes no
+- For the shared runtime, `bootstrap.sh` is the host entrypoint. The host adapter invokes no
   AgentCanon Python; it builds/adopts the image and starts exactly one resident
   container before using `docker exec` for the controller. Always pass explicit
   `--repository-root` and `--control-parent-root`; the effective runtime is
@@ -77,8 +77,8 @@ evidence.
   authentication, session, history, cache, plugins, rules, MCP, and TUI/trust
   state remain outside this link set. `codex prepare` remains runtime-local.
 - The optional `codex-user` template profile is a source-free Codex plugin
-  package. Export it from a source-backed AgentCanon checkout with the existing
-  `template export` route and install/enable it through Codex's marketplace
+  package. Use the [standard plugin distribution](../../README.md#codex-plugin-distribution)
+  build from a source-backed checkout and install/enable it through Codex's marketplace
   manager; plugin hooks and skills remain under Codex's plugin owner. The
   shared resident is still provisioned by the source-backed bootstrap
   lifecycle; the bundle does not build or install a separate runtime. It ships
@@ -97,17 +97,10 @@ evidence.
   `global-links.tsv` owner. Run bundle-uninstall before removing the plugin
   through Codex if those copies are no longer wanted. These commands do not
   install or remove the plugin, mutate plugin cache, or edit config/trust settings. From a source-backed
-  install, the selected checkout must already be a read-only target; the
-  existing route exports under the control runtime, outside source:
-
-  ```bash
-  "$BOOTSTRAP" "${COMMON[@]}" template export \
-    --root <registered-agent-canon-source> --profile codex-user \
-    --output codex-user
-  BUNDLE="$ROOT/.runtime/template-exports/codex-user"
-  # Add marketplace.json and install/enable with Codex's official plugin manager.
-  bash "$BUNDLE/bootstrap.sh" --control-parent-root "$ROOT" codex bundle-install
-  ```
+  install, `template export` remains available for a registered read-only target;
+  its receipt identifies the output inside the control runtime. Use a host-built
+  package directory for Codex registration rather than treating a volume path as
+  a host directory.
 - `install` and `sync` use one source transition under `replacement.lock`:
   `git -C <install-root> fetch origin main` followed by
   `git -C <install-root> checkout --force -B main FETCH_HEAD`. It publishes

@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
 # @dependency-start
 # contract tool
 # responsibility Exports canonical template profiles to fresh external directories.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md template ownership
 # upstream design ../../../documents/contracts/template-bundle-manifest.toml profile manifest
+# upstream implementation ./entrypoint_composer.py portable root guidance composer
 # downstream implementation ../../../tests/agent_tools/test_template_bundle.py exporter tests
 # @dependency-end
 """Deterministic source-commit-bound template bundle exporter."""
@@ -13,21 +13,27 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import posixpath
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10 image/runtime
-    import tomli as tomllib  # type: ignore[no-redef]
+import tomllib
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from tools.agent.templates.entrypoint_composer import Composition
 
 MANIFEST = "documents/contracts/template-bundle-manifest.toml"
 CODEX_USER_PROFILE = "codex-user"
 CODEX_USER_SCHEMA = "agent-canon.codex-user-bundle.v1"
 CODEX_USER_MANIFEST = "codex-user-bundle.json"
+CODEX_MARKETPLACE = ".agents/plugins/marketplace.json"
 CODEX_HOOK_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
@@ -69,6 +75,14 @@ def _manifest(root: Path, commit: str) -> tuple[dict[str, Any], str]:
 
 
 def _entries(root: Path, commit: str, roots: list[str]) -> list[tuple[str, str]]:
+    return [
+        (path, mode)
+        for path, mode in _tree_entries(root, commit)
+        if any(path == item or path.startswith(item + "/") for item in roots)
+    ]
+
+
+def _tree_entries(root: Path, commit: str) -> list[tuple[str, str]]:
     records = _git(root, "ls-tree", "-r", "-z", commit).split(b"\0")
     entries: list[tuple[str, str]] = []
     for record in records:
@@ -77,15 +91,189 @@ def _entries(root: Path, commit: str, roots: list[str]) -> list[tuple[str, str]]
         metadata, raw_path = record.split(b"\t", 1)
         mode, kind, _object_id = metadata.decode().split(" ", 2)
         path = raw_path.decode()
-        if kind == "blob" and any(
-            path == root_path or path.startswith(root_path + "/") for root_path in roots
-        ):
+        if kind == "blob":
             entries.append((path, mode))
     return sorted(entries)
 
 
 def _blob(root: Path, commit: str, path: str) -> bytes:
     return _git(root, "show", f"{commit}:{path}")
+
+
+def _bundle_relative(value: object) -> PurePosixPath:
+    """Accept one portable relative file name in every producer/reader."""
+    if not isinstance(value, str) or not value:
+        raise TemplateBundleError("bundle file path is missing")
+    path = PurePosixPath(value)
+    reserved = {"CON", "PRN", "AUX", "NUL"} | {
+        f"{prefix}{number}" for prefix in ("COM", "LPT") for number in range(1, 10)
+    }
+    if (
+        not path.parts
+        or path.is_absolute()
+        or path.as_posix() != value
+        or any(part in {".", ".."} for part in path.parts)
+        or any(character in value for character in '\\:<>"|?*')
+        or any(ord(character) < 32 for character in value)
+        or any(
+            part.rstrip(" .") != part
+            or part.split(".", 1)[0].rstrip(" ").upper() in reserved
+            for part in path.parts
+        )
+    ):
+        raise TemplateBundleError(f"unsafe bundle file path: {value}")
+    return path
+
+
+def _bundle_destination(root: Path, relative: str) -> Path:
+    destination = root.joinpath(*_bundle_relative(relative).parts)
+    if root.resolve() not in destination.resolve(strict=False).parents:
+        raise TemplateBundleError(f"bundle file escapes output: {relative}")
+    return destination
+
+
+def _markdown_destinations(text: str) -> Iterator[tuple[int, int, str]]:
+    """Locate authored inline/image/reference destinations, excluding code."""
+    offset = 0
+    fence = ""
+    frontmatter = text.startswith("---\n")
+    for line_number, line in enumerate(text.splitlines(keepends=True)):
+        if frontmatter:
+            if line_number and line.strip() in {"---", "..."}:
+                frontmatter = False
+            offset += len(line)
+            continue
+        marker = re.match(r" {0,3}(`{3,}|~{3,})", line)
+        if marker:
+            ticks = marker.group(1)
+            if not fence:
+                fence = ticks
+            elif ticks[0] == fence[0] and len(ticks) >= len(fence):
+                fence = ""
+            offset += len(line)
+            continue
+        if not fence:
+            code = [match.span() for match in re.finditer(r"(`+).*?\1", line)]
+            for match in re.finditer(r"\]\([ \t]*|^ {0,3}\[[^\]\n]+\]:[ \t]*", line):
+                if any(start <= match.start() < end for start, end in code):
+                    continue
+                start = end = match.end()
+                if start < len(line) and line[start] == "<":
+                    start += 1
+                    end = line.find(">", start)
+                    if end < 0:
+                        raise TemplateBundleError("unterminated Markdown resource")
+                else:
+                    depth = 0
+                    while end < len(line) and not line[end].isspace():
+                        character = line[end]
+                        if character == "\\":
+                            end += 2
+                            continue
+                        if character == ")":
+                            if depth == 0:
+                                break
+                            depth -= 1
+                        elif character == "(":
+                            depth += 1
+                        end += 1
+                if end > start:
+                    yield offset + start, offset + end, line[start:end]
+        offset += len(line)
+
+
+def _local_resource(source: str, target: str) -> str | None:
+    parsed = urlsplit(target)
+    if parsed.scheme or parsed.netloc or not parsed.path:
+        return None
+    path = unquote(re.sub(r"\\([\\() ])", r"\1", parsed.path))
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(source), path))
+    if path.startswith("/") or resolved == ".." or resolved.startswith("../"):
+        raise TemplateBundleError(
+            f"Markdown resource escapes source: {source}: {target}"
+        )
+    return resolved
+
+
+def _codex_user_entries(
+    root: Path, commit: str, entries: list[tuple[str, str]]
+) -> list[tuple[str, str]]:
+    """Close local references at the same commit, retaining source-relative topology."""
+    inventory = dict(_tree_entries(root, commit))
+    selected = dict(entries)
+    profiles = _manifest(root, commit)[0]["profiles"]
+    template_roots = [
+        item
+        for name, profile in profiles.items()
+        if name != CODEX_USER_PROFILE and isinstance(profile, dict)
+        for item in profile.get("roots", [])
+        if isinstance(item, str)
+    ]
+
+    def template_asset(path: str) -> bool:
+        return any(
+            path == item or path.startswith(item + "/") for item in template_roots
+        )
+
+    pending = list(selected)
+    visited: set[str] = set()
+    while pending:
+        source = pending.pop()
+        # Template links describe the eventual consumer instance, not this package.
+        if source in visited or not source.endswith(".md") or template_asset(source):
+            continue
+        visited.add(source)
+        content = _blob(root, commit, source).decode("utf-8")
+        for _, _, target in _markdown_destinations(content):
+            resource = _local_resource(source, target)
+            if resource is None:
+                continue
+            if resource in inventory:
+                resources = [resource]
+            else:
+                prefix = "" if resource == "." else resource + "/"
+                children = [path for path in inventory if path.startswith(prefix)]
+                index = prefix + "README.md"
+                resources = (
+                    [index]
+                    if index in inventory and not template_asset(resource)
+                    else children
+                )
+                if not resources:
+                    raise TemplateBundleError(
+                        f"missing Markdown resource: {source}: {target}"
+                    )
+            for path in resources:
+                if inventory[path] not in {"100644", "100755"}:
+                    raise TemplateBundleError(f"unsafe Markdown resource: {path}")
+                if path not in selected:
+                    selected[path] = inventory[path]
+                    pending.append(path)
+    return sorted(selected.items())
+
+
+def _codex_skill_body(source: str, destination: str, content: bytes) -> bytes:
+    """Move only link destinations; referenced files keep their original paths."""
+    text = content.decode("utf-8")
+    # Source-maintenance edges retain their original base in the copied source.
+    # They are not runtime instructions and would have a false base in this view.
+    text = re.sub(
+        r"(?ms)^<!--\s*\n@dependency-start\n.*?^@dependency-end\n-->\n?",
+        "",
+        text,
+        count=1,
+    )
+    for start, end, target in reversed(list(_markdown_destinations(text))):
+        resource = _local_resource(source, target)
+        if resource is None:
+            continue
+        parsed = urlsplit(target)
+        relative = quote(
+            posixpath.relpath(resource, posixpath.dirname(destination)), safe="/._-"
+        )
+        replacement = urlunsplit(("", "", relative, parsed.query, parsed.fragment))
+        text = text[:start] + replacement + text[end:]
+    return text.encode("utf-8")
 
 
 def _codex_user_hook_configuration(root: Path, commit: str) -> bytes:
@@ -159,17 +347,34 @@ def _codex_user_payload(
     root_guidance: bytes | None = None
     skill_frontmatter: dict[str, bytes] = {}
     canonical_skills: dict[str, bytes] = {}
+    source_paths = {path for path, _ in entries}
+    if CODEX_USER_MANIFEST in source_paths:
+        raise TemplateBundleError(
+            f"Codex generated path collides with source: {CODEX_USER_MANIFEST}"
+        )
+
+    def project(path: str, content: bytes, mode: str = "100644") -> None:
+        if path in source_paths or path in payload:
+            raise TemplateBundleError(
+                f"Codex generated path collides with source: {path}"
+            )
+        payload[path] = content
+        payload_modes[path] = mode
+
     for source_path, mode in entries:
         if mode not in {"100644", "100755"}:
             raise TemplateBundleError(
                 f"Codex bundle source is not a regular file: {source_path}"
             )
         content = _blob(root, commit, source_path)
+        # Preserve source-relative resources alongside the generated Codex views.
+        payload[source_path] = content
+        payload_modes[source_path] = mode
         if source_path == "ROOT_AGENTS.md":
             root_guidance = content
             continue
         if source_path == ".codex/hooks.json":
-            payload["hooks/hooks.json"] = _codex_user_hook_configuration(root, commit)
+            project("hooks/hooks.json", _codex_user_hook_configuration(root, commit))
             continue
         if source_path.startswith(".codex/agents/"):
             filename = source_path.rsplit("/", 1)[-1]
@@ -178,12 +383,7 @@ def _codex_user_payload(
                     "Codex bundle agent source is not a direct TOML child"
                 )
             destination = f"agents/agent-canon-{filename}"
-            if destination in payload:
-                raise TemplateBundleError(
-                    "Codex bundle agent destination is duplicated"
-                )
-            payload[destination] = content
-            payload_modes[destination] = mode
+            project(destination, content, mode)
             install_files.append(
                 {
                     "component": "agent",
@@ -204,38 +404,31 @@ def _codex_user_payload(
                 raise TemplateBundleError(f"Codex skill view is duplicated: {skill}")
             skill_frontmatter[skill] = _codex_skill_frontmatter(content, skill)
             continue
-        if source_path.startswith("agents/skills/"):
-            if source_path.endswith(".md"):
-                skill = source_path.rsplit("/", 1)[-1][:-3]
-                if skill in skill_frontmatter:
-                    canonical_skills[skill] = content
-            continue
-        payload[source_path] = content
-        payload_modes[source_path] = mode
-
+        if source_path.startswith("agents/skills/") and source_path.endswith(".md"):
+            skill = source_path.rsplit("/", 1)[-1][:-3]
+            if skill in skill_frontmatter:
+                canonical_skills[skill] = content
     if set(skill_frontmatter) != set(canonical_skills):
         raise TemplateBundleError("Codex skill views and canonical owners differ")
     for skill, frontmatter in sorted(skill_frontmatter.items()):
-        payload[f"skills/{skill}/SKILL.md"] = (
-            frontmatter + b"\n" + canonical_skills[skill]
+        destination = f"skills/{skill}/SKILL.md"
+        project(
+            destination,
+            frontmatter
+            + b"\n"
+            + _codex_skill_body(
+                f"agents/skills/{skill}.md", destination, canonical_skills[skill]
+            ),
         )
 
     if root_guidance is None:
         raise TemplateBundleError("portable common ROOT_AGENTS.md is missing")
-    if "plugin.json" in payload or "marketplace.json" in payload:
-        raise TemplateBundleError("Codex bundle plugin paths collide with source files")
-
     # Reuse the canonical root composer, with an empty consumer-owned layer:
     # user bundle guidance contains only the portable common base.
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    from tools.agent.templates.entrypoint_composer import Composition
-
-    payload["guidance/AGENTS.md"] = Composition(
-        source_commit=commit,
-        base=root_guidance,
-        specific=b"",
-    ).render()
+    project(
+        "guidance/AGENTS.md",
+        Composition(source_commit=commit, base=root_guidance, specific=b"").render(),
+    )
     install_files.append(
         {
             "component": "guidance",
@@ -250,22 +443,28 @@ def _codex_user_payload(
         "version": "0.1.0",
         "description": "AgentCanon user-scoped agents, guidance, skills, and trusted-project hooks.",
     }
-    payload["plugin.json"] = (
-        json.dumps(plugin, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode()
+    project(
+        "plugin.json",
+        (
+            json.dumps(plugin, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode(),
+    )
     marketplace = {
         "name": "agent-canon-user-bundle",
         "plugins": [
             {
                 "name": "agent-canon",
-                "source": {"path": "./"},
+                "source": {"source": "local", "path": "./"},
                 "interface": {"displayName": "AgentCanon"},
             }
         ],
     }
-    payload["marketplace.json"] = (
-        json.dumps(marketplace, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode()
+    project(
+        CODEX_MARKETPLACE,
+        (
+            json.dumps(marketplace, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode(),
+    )
     for path in payload:
         payload_modes.setdefault(path, "100644")
     install_files.sort(key=lambda item: (item["destination"], item["bundle_path"]))
@@ -317,6 +516,8 @@ def bundle_identity(root: Path, source_ref: str, profile: str) -> dict[str, Any]
     digest.update(str(manifest["version"]).encode())
     digest.update(b"\0" + profile.encode() + b"\0" + manifest_digest.encode() + b"\0")
     entries = _entries(root, commit, roots)
+    if profile == CODEX_USER_PROFILE:
+        entries = _codex_user_entries(root, commit, entries)
     for path, mode in entries:
         content = _blob(root, commit, path)
         digest.update(path.encode() + b"\0" + mode.encode() + b"\0")
@@ -387,12 +588,16 @@ def export_bundle(
     resolved_output = output.resolve(strict=False)
     if resolved_output == source_root or source_root in resolved_output.parents:
         raise TemplateBundleError("output must be outside AgentCanon source")
-    if output.exists() or output.is_symlink():
+    # The dispatcher prepares an empty artifact root before invoking producers.
+    # Existing content and symlinks remain outside this export's write authority.
+    if output.is_symlink() or (
+        output.exists() and (not output.is_dir() or any(output.iterdir()))
+    ):
         raise TemplateBundleError("output must be a fresh directory")
     if profile == "static-seed":
         raise TemplateBundleError("static-seed uses export_static_seed.py")
     identity = bundle_identity(source_root, source_ref, profile)
-    output.mkdir(parents=True)
+    output.mkdir(parents=True, exist_ok=True)
     if profile == CODEX_USER_PROFILE:
         entries = _entries(
             source_root,
@@ -404,31 +609,38 @@ def export_bundle(
                 ][profile]["roots"]
             ],
         )
+        entries = _codex_user_entries(source_root, identity["source_commit"], entries)
         payload, payload_modes, install_files = _codex_user_payload(
             source_root, identity["source_commit"], entries
         )
         for path, content in sorted(payload.items()):
-            destination = output.joinpath(*PurePosixPath(path).parts)
+            destination = _bundle_destination(output, path)
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(content)
+            with destination.open("xb") as stream:
+                stream.write(content)
             if payload_modes[path] == "100755":
                 destination.chmod(0o755)
         bundle_manifest = _codex_user_manifest(identity, payload, install_files)
-        (output / CODEX_USER_MANIFEST).write_text(
-            json.dumps(bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True)
-            + "\n",
-            encoding="utf-8",
-        )
+        with (output / CODEX_USER_MANIFEST).open("x", encoding="utf-8") as stream:
+            stream.write(
+                json.dumps(
+                    bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True
+                )
+                + "\n"
+            )
         return {**identity, "output": str(output)}
     for path in identity["paths"]:
-        destination = output.joinpath(*PurePosixPath(path).parts)
+        destination = _bundle_destination(output, path)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(_blob(source_root, identity["source_commit"], path))
+        with destination.open("xb") as stream:
+            stream.write(_blob(source_root, identity["source_commit"], path))
     provenance = {**identity, "output": str(output)}
-    (output / "template-bundle-provenance.json").write_text(
-        json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    with (output / "template-bundle-provenance.json").open(
+        "x", encoding="utf-8"
+    ) as stream:
+        stream.write(
+            json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        )
     return provenance
 
 
@@ -478,16 +690,10 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
     for row in rows:
         if not isinstance(row, dict) or set(row) != {"path", "sha256"}:
             raise TemplateBundleError("Codex user bundle file record is invalid")
-        relative = row["path"]
+        relative = _bundle_relative(row["path"]).as_posix()
         sha256 = row["sha256"]
         if (
-            not isinstance(relative, str)
-            or not relative
-            or "\\" in relative
-            or any(character in relative for character in "\x00\t\n\r")
-            or PurePosixPath(relative).is_absolute()
-            or ".." in PurePosixPath(relative).parts
-            or not isinstance(sha256, str)
+            not isinstance(sha256, str)
             or not HEX_64.fullmatch(sha256)
             or relative <= previous
         ):
@@ -495,12 +701,12 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
                 "Codex user bundle file path or digest is invalid"
             )
         previous = relative
-        candidate = root.joinpath(*PurePosixPath(relative).parts)
         current = root
         for part in PurePosixPath(relative).parts:
             current = current / part
             if current.is_symlink():
                 raise TemplateBundleError("Codex user bundle contains a symlink")
+        candidate = _bundle_destination(root, relative)
         if not candidate.is_file():
             raise TemplateBundleError(f"Codex user bundle file is missing: {relative}")
         content = candidate.read_bytes()
@@ -526,7 +732,7 @@ def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
         ".codex/hooks/hook_dispatcher.py",
         "hooks/hooks.json",
         "plugin.json",
-        "marketplace.json",
+        CODEX_MARKETPLACE,
         "skills/agent-canon-bootstrap/SKILL.md",
         "guidance/AGENTS.md",
     }
