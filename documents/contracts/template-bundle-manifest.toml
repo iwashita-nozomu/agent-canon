@@ -1,4 +1,10 @@
 # Canonical template bundle profiles owned by AgentCanon.
+# @dependency-start
+# contract configuration
+# responsibility Declares canonical template and Codex plugin export inputs.
+# upstream design ../design/agent-canon-bootstrap-tool-runtime.md distribution boundary
+# downstream implementation ../../tools/agent/templates/template_bundle.py snapshot exporter
+# @dependency-end
 version = 1
 source_index = "templates/README.md"
 
@@ -18,9 +24,11 @@ roots = ["templates/experiments"]
 # This is a bounded source-free Codex consumer package, not a source checkout.
 # The exporter maps tracked role views into the plugin's agents/ root, pairs
 # materialized skill discovery metadata with canonical skill bodies, and
-# composes guidance/AGENTS.md from ROOT_AGENTS.md.
+# composes guidance/AGENTS.md from ROOT_AGENTS.md. Local Markdown references
+# close over commit-bound resources; template assets retain consumer-relative links.
 producer = "tools/agent/templates/template_bundle.py"
 roots = [
+  "LICENSE",
   "ROOT_AGENTS.md",
   "documents/runtime/runtime-profiles-and-check-matrix.json",
   "schemas/agent-canon/skill-catalog.schema.json",

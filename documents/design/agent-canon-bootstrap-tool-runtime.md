@@ -475,6 +475,18 @@ removalを開始しません。失敗時はsource fileとspoolを保持します
 
 ## User Journey
 
+Codex plugin distribution uses the existing template exporter with Python and
+Git, independently of this shared-runtime lifecycle. Its standard marketplace
+entry is `.agents/plugins/marketplace.json`. Local Markdown references are
+resolved at the selected commit, retained at source-relative resource paths,
+and remapped in relocated skill bodies. Template-profile assets keep their
+consumer-instance links. Source-maintenance dependency comments stay in the
+canonical resource; runtime skill views omit those source-relative comments.
+This preserves the resources needed by readers without
+requiring a source checkout or installing a second runtime. The dispatcher may
+prepare an empty output directory; export accepts that directory and creates
+files exclusively, rejecting occupied output and source/generated-path collisions.
+
 正常系:
 
 ```text

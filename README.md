@@ -37,7 +37,29 @@ subagent の canonical owner は `agents/`、設計と runtime contract の owne
 [外部Skillの共通導入手順](agents/skills/README.md#external-skill-installation-and-updates)
 を使います。導入するSkill名または配布元URLを組み込みの`skill-installer`へ渡します。
 
+## Codex plugin distribution
+
+The `codex-user` profile exports a source-free plugin with its local references
+and LICENSE. Build it from an AgentCanon checkout with Python 3.11+ and Git;
+the build command and Codex registration do not require Docker:
+
+```bash
+python3 tools/agent/templates/template_bundle.py export --source-root . --source-ref HEAD --profile codex-user --output /path/outside-source/agent-canon-plugin
+codex plugin marketplace add /path/outside-source/agent-canon-plugin
+codex plugin add agent-canon@agent-canon-user-bundle
+```
+
+The output must be missing or an empty regular directory. The package uses
+`.agents/plugins/marketplace.json`; registered skill names have the
+`agent-canon:` prefix. Export reads the selected commit, including referenced
+resources, so uncommitted changes are not shipped. Plugin installation manages
+skills and hooks; optional agent/guidance projection remains separate. The
+current hook integration still uses the shared runtime described below.
+
 ## Quick install
+
+The following commands manage the shared tool runtime. Plugin build and
+registration use the separate distribution route above.
 
 `bootstrap.sh` は `BASH_SOURCE` の script location から repository root を解決するため、
 どの current working directory から呼び出しても同じ install root を使います。
