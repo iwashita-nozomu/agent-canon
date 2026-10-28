@@ -99,7 +99,9 @@ def select_native_artifacts(
 
 
 def _api_json(runner: Runner, endpoint: str, *, optional: bool = False) -> Any:
-    result = runner(["gh", "api", "--include", endpoint])
+    result = runner(
+        ["gh", "api", "--include", endpoint, "--header", "Cache-Control: no-cache"]
+    )
     headers, separator, body = result.stdout.replace("\r\n", "\n").partition("\n\n")
     status = re.match(r"HTTP/\S+ (\d+)", headers)
     if not separator or status is None:
@@ -219,7 +221,6 @@ def publish_native_release(
         raise NativeReleaseError("release tag must match the source release version")
     commit = identity["source_commit"]
     require_mainline_source(source_root, commit)
-    endpoint = f"repos/{repo}/releases/tags/{quote(tag, safe='')}"
     expected = {item["path"]: item for item in identity["files"]}
     recovered: list[dict[str, str]] = []
     tagged = _tag_commit(runner, repo, tag)
@@ -252,21 +253,28 @@ def publish_native_release(
         created = runner(
             [
                 "gh",
-                "release",
-                "create",
-                tag,
-                "--repo",
-                repo,
-                "--draft",
-                "--target",
-                commit,
-                "--title",
-                f"AgentCanon {tag}",
-                "--notes",
-                notes,
+                "api",
+                "--method",
+                "POST",
+                f"repos/{repo}/releases",
+                "-f",
+                f"tag_name={tag}",
+                "-f",
+                f"target_commitish={commit}",
+                "-F",
+                "draft=true",
+                "-f",
+                f"name=AgentCanon {tag}",
+                "-f",
+                f"body={notes}",
             ]
         )
-        release = _release_for_tag(runner, repo, tag)
+        if created.returncode == 0:
+            release = json.loads(created.stdout)
+            if not isinstance(release, dict):
+                raise NativeReleaseError("draft creation returned invalid metadata")
+        else:
+            release = _release_for_tag(runner, repo, tag)
         if release is None:
             raise NativeReleaseError(
                 f"draft creation did not complete: {created.stderr.strip()}"
@@ -277,29 +285,41 @@ def publish_native_release(
         missing = _validate_release(release, expected, tag, commit)
         if created.returncode:
             recovered.append({"operation": "create", "error": created.stderr.strip()})
+    release_endpoint = f"repos/{repo}/releases/{release['id']}"
     if missing:
-        uploaded = runner(
-            [
-                "gh",
-                "release",
-                "upload",
-                tag,
-                "--repo",
-                repo,
-                *[str(artifacts / name) for name in missing],
-            ]
-        )
-        release = _release_for_tag(runner, repo, tag)
+        upload_error = ""
+        for name in missing:
+            upload_url = (
+                f"https://uploads.github.com/repos/{repo}/releases/{release['id']}/assets"
+                f"?name={quote(name, safe='')}"
+            )
+            uploaded = runner(
+                [
+                    "gh",
+                    "api",
+                    "--method",
+                    "POST",
+                    upload_url,
+                    "--header",
+                    "Content-Type: application/octet-stream",
+                    "--input",
+                    str(artifacts / name),
+                ]
+            )
+            if uploaded.returncode:
+                upload_error = uploaded.stderr.strip()
+                break
+        release = _api(runner, release_endpoint)
         if release is None:
             raise NativeReleaseError("draft disappeared after upload")
-        missing = _validate_release(release, expected, tag, commit)
-        if missing:
+        remaining = _validate_release(release, expected, tag, commit)
+        if remaining:
             raise NativeReleaseError(
-                f"upload incomplete; rerun the failed publication job to resume {missing}: "
-                f"{uploaded.stderr.strip()}"
+                f"upload incomplete; rerun the failed publication job to resume {remaining}: "
+                f"{upload_error}"
             )
-        if uploaded.returncode:
-            recovered.append({"operation": "upload", "error": uploaded.stderr.strip()})
+        if upload_error:
+            recovered.append({"operation": "upload", "error": upload_error})
     # A stable release becomes visible only after every expected asset is verified.
     tagged = _tag_commit(runner, repo, tag)
     if tagged is not None and tagged != commit:
@@ -322,7 +342,7 @@ def publish_native_release(
         publish_error = published.stderr.strip()
         if published.returncode:
             recovered.append({"operation": "publish", "error": publish_error})
-    release = _api(runner, endpoint)
+    release = _api(runner, release_endpoint)
     if release is None or release["draft"]:
         raise NativeReleaseError(
             f"release publication did not complete: {publish_error}"
