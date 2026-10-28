@@ -104,6 +104,15 @@ fn unique_temp_dir(name: &str) -> PathBuf {
     path
 }
 
+fn replace_fixture(source: &str, from: &str, to: &str) -> String {
+    let changed = source.replace(from, to);
+    assert_ne!(
+        changed, source,
+        "fixture replacement must match its source template"
+    );
+    changed
+}
+
 fn write_variant(name: &str, source: String) -> PathBuf {
     let root = unique_temp_dir(name);
     let path = root.join("variant.py");
@@ -225,10 +234,12 @@ fn nested_dependency_rows_preserve_local_config_exemption_and_parent_config_orac
     }
 
     let parent = fs::read_to_string(root.join("nested").join("parent_config.py"))
-        .expect("parent fixture reads");
+        .expect("parent fixture reads")
+        .replace("\r\n", "\n");
     let missing = write_variant(
         "missing-parent-config",
-        parent.replace(
+        replace_fixture(
+            &parent,
             "    child_initialize: child.InitializeConfig\n",
             "    pass\n",
         ),
@@ -273,7 +284,9 @@ fn protocol_only_imports_have_one_non_allowlisted_finding_and_allowlisted_zero()
 #[test]
 fn public_surface_and_info_findings_use_canonical_kinds() {
     let source_root = materialize_fixture("valid.py");
-    let source = fs::read_to_string(source_root.join("valid.py")).expect("valid fixture reads");
+    let source = fs::read_to_string(source_root.join("valid.py"))
+        .expect("valid fixture reads")
+        .replace("\r\n", "\n");
     let assert_kind = |name: &str, variant: String, kind: &str, expected_status: Option<i32>| {
         let path = write_variant(name, variant);
         let output = run_cli(&[
@@ -294,7 +307,8 @@ fn public_surface_and_info_findings_use_canonical_kinds() {
 
     let extra_all = write_variant(
         "extra-all",
-        source.replace(
+        replace_fixture(
+            &source,
             "    \"initialize\",\n]",
             "    \"initialize\",\n    \"solve\",\n]",
         ),
@@ -316,7 +330,11 @@ fn public_surface_and_info_findings_use_canonical_kinds() {
 
     let info_alias = write_variant(
         "info-alias",
-        source.replace("class Info(amp.Info):\n    pass", "Info = amp.Info"),
+        replace_fixture(
+            &source,
+            "class Info(amp.Info):\n    pass",
+            "Info = amp.Info",
+        ),
     );
     let output = run_cli(&[
         "python-algorithm-contract-check",
@@ -356,19 +374,19 @@ fn public_surface_and_info_findings_use_canonical_kinds() {
     );
     assert_kind(
         "missing-all-name",
-        source.replace("    \"Info\",\n", ""),
+        replace_fixture(&source, "    \"Info\",\n", ""),
         "missing_all_name",
         Some(1),
     );
     assert_kind(
         "missing-public-definition",
-        source.replace("class Info(amp.Info):\n    pass\n\n", ""),
+        replace_fixture(&source, "class Info(amp.Info):\n    pass\n\n", ""),
         "missing_public_definition",
         Some(1),
     );
     assert_kind(
         "algorithm-not-callable",
-        source.replace(
+        replace_fixture(&source,
             "    def __call__(self, problem: Problem, state: State, config: SolveConfig) -> Answer:\n        return Answer()\n",
             "    pass\n",
         ),
@@ -377,7 +395,7 @@ fn public_surface_and_info_findings_use_canonical_kinds() {
     );
     assert_kind(
         "missing-algorithm-function-object",
-        source.replace(
+        replace_fixture(&source,
             "class Algorithm(amp.Algorithm):\n    def __call__(self, problem: Problem, state: State, config: SolveConfig) -> Answer:\n        return Answer()\n",
             "Algorithm = amp.Algorithm\n",
         ),
