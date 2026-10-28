@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn repository_root() -> PathBuf {
@@ -94,14 +95,25 @@ fn run_cli(args: &[&str]) -> Output {
         .expect("agent-canon CLI runs")
 }
 
+static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
 fn unique_temp_dir(name: &str) -> PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("clock is after epoch")
-        .as_nanos();
-    let path = std::env::temp_dir().join(format!("agent-canon-python-contract-{name}-{nonce}"));
-    fs::create_dir_all(&path).expect("temporary fixture directory creates");
-    path
+    loop {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock is after epoch")
+            .as_nanos();
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "agent-canon-python-contract-{name}-{}-{sequence}-{nonce}",
+            std::process::id()
+        ));
+        match fs::create_dir(&path) {
+            Ok(()) => return path,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("temporary fixture directory {}: {error}", path.display()),
+        }
+    }
 }
 
 fn replace_fixture(source: &str, from: &str, to: &str) -> String {
@@ -428,7 +440,11 @@ fn exclude_globs_and_repeatable_union_match_fixture_counts() {
         "--format",
         "json",
     ]);
-    assert!(no_exclude.status.success());
+    assert!(
+        no_exclude.status.success(),
+        "{}",
+        String::from_utf8_lossy(&no_exclude.stderr)
+    );
     assert_eq!(json(&no_exclude)["summary"]["files"], 3);
     assert_eq!(json(&no_exclude)["summary"]["algorithm_modules"], 3);
 
