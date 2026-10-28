@@ -347,7 +347,10 @@ fn runtime_relative_path(value: &str) -> bool {
 }
 
 fn runtime_absolute_path(value: &str) -> bool {
-    value.starts_with('/')
+    // Source locators use the producer's POSIX separators, including Windows drives.
+    let absolute = value.starts_with('/')
+        || matches!(value.as_bytes(), [drive, b':', b'/', ..] if drive.is_ascii_alphabetic());
+    absolute
         && !value.contains('\0')
         && !value.contains('\\')
         && !value
@@ -3773,7 +3776,7 @@ mod tests {
                 "reports/agents/run-graph/validation_result.json",
             ],
         );
-        let rollout_path = rollout.display().to_string();
+        let rollout_path = rollout.display().to_string().replace('\\', "/");
         let publication_path = artifact_target
             .strip_prefix(&root)
             .expect("artifact relative")
@@ -4714,6 +4717,25 @@ mod tests {
             read_graph_status(&explicit_args),
             Err(GraphError::Validation(_))
         ));
+    }
+
+    #[test]
+    fn runtime_source_locators_use_portable_absolute_path_syntax() {
+        for path in [
+            "/home/user/rollout.jsonl",
+            "C:/Users/user/rollout.jsonl",
+            "//server/share/rollout.jsonl",
+        ] {
+            assert!(runtime_absolute_path(path), "{path}");
+        }
+        for path in [
+            "relative/rollout.jsonl",
+            "C:relative.jsonl",
+            "C:/../rollout.jsonl",
+            r"C:\Users\user\rollout.jsonl",
+        ] {
+            assert!(!runtime_absolute_path(path), "{path}");
+        }
     }
 
     #[test]

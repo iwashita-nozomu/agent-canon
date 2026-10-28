@@ -717,6 +717,8 @@ fn positive_usize(value: &str) -> Result<usize, String> {
 
 fn analyze(args: &Args) -> Result<Analysis, String> {
     let root = resolve_like_cwd(&args.root);
+    // File discovery canonicalizes paths; use the same identity for their source root.
+    let root = fs::canonicalize(&root).unwrap_or(root);
     let files = source_files(&root, &args.paths, &args.excludes);
     let files = expand_with_repo_import_neighborhood(&root, files, &args.excludes);
     let analyzed_files = files
@@ -2275,6 +2277,8 @@ mod tests {
         fs::write(pkg.join("c.py"), "class C: pass\n").expect("c.py");
         fs::write(python_pkg.join("d.py"), "class D: pass\n").expect("d.py");
 
+        let requested_root = root.clone();
+        let root = root.canonicalize().expect("canonical fixture root");
         let initial = source_files(&root, &["pkg/a.py".to_string()], &[]);
         let expanded = expand_with_repo_import_neighborhood(&root, initial, &[]);
         let relative = expanded
@@ -2295,6 +2299,19 @@ mod tests {
                 "pkg/c.py".to_string(),
                 "python/pkg/d.py".to_string()
             ])
+        );
+        let analysis = analyze(&Args {
+            root: requested_root,
+            paths: vec!["pkg/a.py".to_string()],
+            excludes: Vec::new(),
+            min_tokens: 1,
+            max_findings: 20,
+            format: OutputFormat::Json,
+        })
+        .expect("public analysis accepts the requested root spelling");
+        assert_eq!(
+            analysis.analyzed_files.into_iter().collect::<BTreeSet<_>>(),
+            relative
         );
         fs::remove_dir_all(root).expect("cleanup temp tree");
     }

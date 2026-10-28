@@ -1324,7 +1324,8 @@ fn default_db_path_uses_test_runtime_and_stays_outside_repo() {
     assert!(!db.starts_with(&root));
     assert!(db.ends_with("index.sqlite"));
     let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
-    assert!(db.starts_with(runtime_root));
+    crate::runtime_boundary::validate_external_target(&root, &runtime_root, &db, "default-db")
+        .expect("default database is contained by the canonical external runtime root");
 }
 
 #[test]

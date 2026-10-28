@@ -1161,13 +1161,15 @@ mod tests {
 
     #[test]
     fn workspace_absolute_link_policy_uses_ast_targets() {
-        let root = Path::new("/repo");
-        assert!(workspace_absolute_target(
-            root,
-            "/repo/docs/guide.md#section"
+        let root = std::env::temp_dir().join("agent-canon-docs-workspace");
+        let inside = format!("{}#section", root.join("docs/guide.md").display());
+        let outside = std::env::temp_dir().join("agent-canon-docs-other/guide.md");
+        assert!(workspace_absolute_target(&root, &inside));
+        assert!(!workspace_absolute_target(&root, "docs/guide.md"));
+        assert!(!workspace_absolute_target(
+            &root,
+            &outside.to_string_lossy()
         ));
-        assert!(!workspace_absolute_target(root, "docs/guide.md"));
-        assert!(!workspace_absolute_target(root, "/elsewhere/guide.md"));
     }
 
     #[test]
