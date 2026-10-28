@@ -631,7 +631,7 @@ fn decode_base64(value: &str) -> Result<Vec<u8>, GraphError> {
         ));
     }
     let mut output = Vec::new();
-    for (index, chunk) in bytes.chunks_exact(4).enumerate() {
+    for (index, chunk) in bytes.as_chunks::<4>().0.iter().enumerate() {
         let final_chunk = index + 1 == bytes.len() / 4;
         if chunk[0] == b'='
             || chunk[1] == b'='

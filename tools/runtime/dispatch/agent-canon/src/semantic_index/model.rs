@@ -86,12 +86,10 @@ pub(super) fn vector_to_blob(vector: &[f32]) -> Vec<u8> {
 }
 
 pub(super) fn blob_to_vector(blob: &[u8]) -> Vec<f32> {
-    blob.chunks_exact(4)
-        .map(|chunk| {
-            let mut bytes = [0_u8; 4];
-            bytes.copy_from_slice(chunk);
-            f32::from_le_bytes(bytes)
-        })
+    blob.as_chunks::<4>()
+        .0
+        .iter()
+        .map(|chunk| f32::from_le_bytes(*chunk))
         .collect()
 }
 
