@@ -31,6 +31,38 @@ subagent の canonical owner は `agents/`、設計と runtime contract の owne
 `documents/`、実行可能な tool と checker の owner は `tools/` と
 `tools/runtime/dispatch/agent-canon/` です。
 
+## Native CLI distribution
+
+The Rust agent-canon executable is the primary route for first-class CLI
+commands. Download the matching OS/architecture archive from
+[GitHub Releases](https://github.com/iwashita-nozomu/agent-canon/releases),
+verify its .sha256 sidecar, extract it, and add its bin/ directory to PATH:
+
+```bash
+tar -xzf agent-canon-<version>-<target>.tar.gz
+export PATH="$PWD/agent-canon-<version>-<target>/bin:$PATH"
+agent-canon --version
+agent-canon --help
+```
+
+The archive contains the executable, LICENSE, per-file checksums, and
+source/toolchain provenance. Running native Rust commands does not require an
+AgentCanon checkout, Cargo, or Docker. codex-config is an example of a
+standalone Rust operation; commands that call external tools keep their
+command-specific requirements.
+
+The source checkout wrapper at tools/bin/agent-canon directly executes an
+existing native binary from the crate's target/release or target/debug
+directory. Set AGENT_CANON_NATIVE_BIN to select a binary stored elsewhere.
+The generic agent-canon tool run catalog route is still transitional and
+continues to use its registered shared runtime.
+
+The archive also carries the stdlib Python adapter for the optional
+knowledge and feedback commands. Those commands require a host Python 3.10 or
+newer interpreter. The standalone adapter can write and inspect the private
+spool; the existing host/container sync publication lifecycle remains owned by
+the shared runtime.
+
 ## External Skills
 
 外部Skillを追加するときは、利用するCodexで
@@ -59,15 +91,16 @@ current hook integration still uses the shared runtime described below.
 ## Quick install
 
 The following commands manage the shared tool runtime. Plugin build and
-registration use the separate distribution route above.
+registration use the separate distribution route above. The native Rust CLI
+described earlier runs directly from its downloaded executable.
 
 `bootstrap.sh` は `BASH_SOURCE` の script location から repository root を解決するため、
 どの current working directory から呼び出しても同じ install root を使います。
 `ROOT` には認可された親 repository root を指定してください。
 
-通常の利用では、source checkout の中で依存を直接実行せず、top-level
-[`bootstrap.sh`](bootstrap.sh) から共有 tool runtime を起動します。control root は
-必須で、runtime は既定で install root の ignored `.runtime/` を使います。
+Shared-runtime lifecycle and generic catalog commands use top-level
+bootstrap.sh. These routes require an authorized control root and the ignored
+install-root .runtime/ state described below.
 
 `bootstrap.sh` が解決した install root、明示した control root、install root 配下の
 `.runtime/` の順に状態をたどります。`install` は image と resident を構築し、
@@ -100,9 +133,9 @@ The complete user journey, target modes, generation rollback, limits, failure
 codes, cleanup, and archive handoff are in
 [Standalone Bootstrap And Shared Tool Runtime](documents/runtime/bootstrap-runtime.md).
 
-There is one shared image and at most one resident AgentCanon tool container per
-authorized control root. The image contains Python, Rust, and language-server
-tools only. The project owns its own Docker/test runner; AgentCanon never mounts
+The shared-runtime route has one image and at most one resident AgentCanon tool
+container per authorized control root. The image contains Python, Rust, and
+language-server tools only. The project owns its own Docker/test runner; AgentCanon never mounts
 project test directories into the tool runtime and does not create a project-
 specific image, container, virtualenv, Cargo toolchain, or volume.
 

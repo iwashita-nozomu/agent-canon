@@ -217,17 +217,14 @@ def test_spool_writer_waits_for_host_snapshot_cleanup_lock(
     attempting_lock = threading.Event()
     finished = threading.Event()
     errors: list[BaseException] = []
-    original_flock = private_feedback.fcntl.flock
+    original_lock = private_feedback._lock_spool_descriptor
 
-    def observe_flock(descriptor: int, operation: int) -> None:
-        if (
-            threading.current_thread().name == "feedback-writer"
-            and operation == private_feedback.fcntl.LOCK_EX
-        ):
+    def observe_lock(descriptor: int) -> None:
+        if threading.current_thread().name == "feedback-writer":
             attempting_lock.set()
-        original_flock(descriptor, operation)
+        original_lock(descriptor)
 
-    monkeypatch.setattr(private_feedback.fcntl, "flock", observe_flock)
+    monkeypatch.setattr(private_feedback, "_lock_spool_descriptor", observe_lock)
 
     def write_feedback() -> None:
         started.set()
@@ -252,3 +249,14 @@ def test_spool_writer_waits_for_host_snapshot_cleanup_lock(
     assert finished.is_set()
     assert (spool / "feedback/concurrent").is_dir()
     assert (spool / "sync-request.json").is_file()
+
+
+def test_spool_lock_is_initialized_for_cross_platform_byte_range_locking(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    spool = private_feedback._spool_root(runtime)
+    lock_path = runtime / "spool/.private-feedback.lock"
+    with private_feedback._private_feedback_spool_lock(spool):
+        assert lock_path.is_file()
+        assert lock_path.read_bytes() == b"\0"

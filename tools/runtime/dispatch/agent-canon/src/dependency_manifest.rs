@@ -12,8 +12,6 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::Write;
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -983,7 +981,7 @@ fn read_source_path(root: &Path, relative: &str) -> Result<SourcePathRead, Manif
             Err(error) => return Err(ManifestError::Io(error.to_string())),
         };
         return Ok(SourcePathRead {
-            bytes: target.as_os_str().as_bytes().to_vec(),
+            bytes: target.as_os_str().as_encoded_bytes().to_vec(),
             file_mode: "120000".to_string(),
             exists: true,
         });

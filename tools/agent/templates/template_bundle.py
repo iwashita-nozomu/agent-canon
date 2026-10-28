@@ -1,6 +1,6 @@
 # @dependency-start
 # contract tool
-# responsibility Exports canonical template profiles to fresh external directories.
+# responsibility Exports canonical template profiles and native CLI resources to external packages.
 # upstream design ../../../documents/design/agent-canon-bootstrap-tool-runtime.md template ownership
 # upstream design ../../../documents/contracts/template-bundle-manifest.toml profile manifest
 # upstream implementation ./entrypoint_composer.py portable root guidance composer
@@ -11,16 +11,21 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
+import io
 import json
 import posixpath
 import re
+import stat
 import subprocess
 import sys
+import tarfile
 from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
+import zipfile
 
 import tomllib
 
@@ -34,9 +39,13 @@ CODEX_USER_PROFILE = "codex-user"
 CODEX_USER_SCHEMA = "agent-canon.codex-user-bundle.v1"
 CODEX_USER_MANIFEST = "codex-user-bundle.json"
 CODEX_MARKETPLACE = ".agents/plugins/marketplace.json"
+NATIVE_CLI_PROFILE = "native-cli"
+NATIVE_CLI_CARGO_MANIFEST = "tools/runtime/dispatch/agent-canon/Cargo.toml"
+NATIVE_CLI_SCHEMA = "agent-canon.native-cli-package.v1"
 CODEX_HOOK_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
+PACKAGE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
 
 
 class TemplateBundleError(RuntimeError):
@@ -644,6 +653,164 @@ def export_bundle(
     return provenance
 
 
+def _native_package_output(output: Path, source_root: Path) -> Path:
+    output = output if output.is_absolute() else Path.cwd() / output
+    resolved = output.resolve(strict=False)
+    if resolved == source_root or source_root in resolved.parents:
+        raise TemplateBundleError(
+            "native package output must be outside AgentCanon source"
+        )
+    if output.is_symlink() or (
+        output.exists() and (not output.is_dir() or any(output.iterdir()))
+    ):
+        raise TemplateBundleError("native package output must be a fresh directory")
+    output.mkdir(parents=True, exist_ok=True)
+    return output
+
+
+def _native_tar_bytes(root_name: str, payload: dict[str, tuple[bytes, int]]) -> bytes:
+    """Build a timestamp-stable gzip tar package from relative payload paths."""
+    buffer = io.BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="wb", filename="", mtime=0) as compressed:
+        with tarfile.open(
+            fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
+        ) as archive:
+            for relative, (content, mode) in sorted(payload.items()):
+                info = tarfile.TarInfo(f"{root_name}/{relative}")
+                info.size = len(content)
+                info.mode = mode
+                info.mtime = 0
+                info.uid = 0
+                info.gid = 0
+                info.uname = ""
+                info.gname = ""
+                archive.addfile(info, io.BytesIO(content))
+    return buffer.getvalue()
+
+
+def _native_zip_bytes(root_name: str, payload: dict[str, tuple[bytes, int]]) -> bytes:
+    """Build a stable zip package with Unix executable bits preserved."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(
+        buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
+        for relative, (content, mode) in sorted(payload.items()):
+            info = zipfile.ZipInfo(
+                f"{root_name}/{relative}", date_time=(1980, 1, 1, 0, 0, 0)
+            )
+            info.create_system = 3
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (stat.S_IFREG | mode) << 16
+            archive.writestr(info, content)
+    return buffer.getvalue()
+
+
+def package_native_cli(
+    *,
+    source_root: Path,
+    source_ref: str,
+    binary: Path,
+    target: str,
+    output: Path,
+    toolchain: str,
+) -> dict[str, Any]:
+    """Package the native executable and its declared optional adapter resource."""
+    source_root = source_root.resolve()
+    if binary.is_symlink() or not binary.is_file():
+        raise TemplateBundleError("native executable must be a regular file")
+    binary = binary.resolve(strict=True)
+    if not PACKAGE_COMPONENT.fullmatch(target):
+        raise TemplateBundleError("native target is invalid")
+    commit = _commit(source_root, source_ref)
+    manifest, manifest_digest = _manifest(source_root, commit)
+    profile = manifest["profiles"].get(NATIVE_CLI_PROFILE)
+    if not isinstance(profile, dict) or not isinstance(profile.get("roots"), list):
+        raise TemplateBundleError("native CLI package profile is missing")
+    entries = _entries(source_root, commit, [str(item) for item in profile["roots"]])
+    if any(mode not in {"100644", "100755"} for _path, mode in entries):
+        raise TemplateBundleError("native CLI resources must be regular files")
+    layout = profile.get("layout")
+    if not isinstance(layout, dict) or set(layout) != {path for path, _mode in entries}:
+        raise TemplateBundleError(
+            "native CLI package layout must cover its declared resources"
+        )
+    package_paths: dict[str, bytes] = {}
+    for source, destination in layout.items():
+        try:
+            relative = _bundle_relative(destination).as_posix()
+        except TemplateBundleError as exc:
+            raise TemplateBundleError(
+                "native CLI package layout contains an unsafe path"
+            ) from exc
+        if relative in package_paths:
+            raise TemplateBundleError(
+                "native CLI package layout contains duplicate destinations"
+            )
+        package_paths[relative] = _blob(source_root, commit, source)
+
+    try:
+        cargo = tomllib.loads(
+            _blob(source_root, commit, NATIVE_CLI_CARGO_MANIFEST).decode("utf-8")
+        )
+        version = cargo["package"]["version"]
+    except (KeyError, UnicodeDecodeError, tomllib.TOMLDecodeError, TypeError) as exc:
+        raise TemplateBundleError(
+            "native CLI Cargo package version is invalid"
+        ) from exc
+    if not isinstance(version, str) or not PACKAGE_COMPONENT.fullmatch(version):
+        raise TemplateBundleError("native CLI Cargo package version is invalid")
+
+    binary_name = (
+        "agent-canon.exe" if target.endswith("-windows-msvc") else "agent-canon"
+    )
+    package_paths[f"bin/{binary_name}"] = binary.read_bytes()
+    modes = {path: 0o644 for path in package_paths}
+    modes[f"bin/{binary_name}"] = 0o755
+    provenance = {
+        "schema": NATIVE_CLI_SCHEMA,
+        "version": version,
+        "target": target,
+        "source_commit": commit,
+        "source_tree": _git(source_root, "rev-parse", "--verify", f"{commit}^{{tree}}")
+        .decode()
+        .strip(),
+        "manifest_digest": manifest_digest,
+        "toolchain": toolchain,
+        "files": [
+            {"path": path, "sha256": hashlib.sha256(content).hexdigest()}
+            for path, content in sorted(package_paths.items())
+        ],
+    }
+    package_paths["share/agent-canon/provenance.json"] = (
+        json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    modes["share/agent-canon/provenance.json"] = 0o644
+    checksums = "".join(
+        f"{hashlib.sha256(content).hexdigest()}  {path}\n"
+        for path, content in sorted(package_paths.items())
+    )
+    package_paths["share/agent-canon/SHA256SUMS"] = checksums.encode("ascii")
+    modes["share/agent-canon/SHA256SUMS"] = 0o644
+    payload = {path: (content, modes[path]) for path, content in package_paths.items()}
+
+    output = _native_package_output(output, source_root)
+    root_name = f"agent-canon-{version}-{target}"
+    archives: list[dict[str, str]] = []
+    for suffix, content in (
+        ("tar.gz", _native_tar_bytes(root_name, payload)),
+        ("zip", _native_zip_bytes(root_name, payload)),
+    ):
+        archive_path = output / f"{root_name}.{suffix}"
+        with archive_path.open("xb") as stream:
+            stream.write(content)
+        checksum = hashlib.sha256(content).hexdigest()
+        checksum_path = archive_path.with_name(f"{archive_path.name}.sha256")
+        with checksum_path.open("x", encoding="ascii", newline="\n") as stream:
+            stream.write(f"{checksum}  {archive_path.name}\n")
+        archives.append({"path": str(archive_path), "sha256": checksum})
+    return {**provenance, "output": str(output), "archives": archives}
+
+
 def _verify_codex_user_bundle(root: Path) -> dict[str, Any]:
     """Validate the exact source-free user package and its install projection."""
     if root.is_symlink() or not root.is_dir():
@@ -832,16 +999,32 @@ def main(argv: list[str] | None = None) -> int:
     verify = sub.add_parser("verify")
     verify.add_argument("--root", required=True)
     verify.add_argument("--format", choices=("json", "install-tsv"), default="json")
+    native = sub.add_parser("native-package")
+    native.add_argument("--source-root", required=True)
+    native.add_argument("--source-ref", required=True)
+    native.add_argument("--binary", required=True)
+    native.add_argument("--target", required=True)
+    native.add_argument("--output", required=True)
+    native.add_argument("--toolchain", default="")
     args = parser.parse_args(argv)
     try:
         if args.operation == "verify":
             result = verify_codex_user_bundle(Path(args.root))
-        else:
+        elif args.operation == "export":
             result = export_bundle(
                 source_root=Path(args.source_root),
                 source_ref=args.source_ref,
                 profile=args.profile,
                 output=Path(args.output),
+            )
+        else:
+            result = package_native_cli(
+                source_root=Path(args.source_root),
+                source_ref=args.source_ref,
+                binary=Path(args.binary),
+                target=args.target,
+                output=Path(args.output),
+                toolchain=args.toolchain,
             )
     except TemplateBundleError as exc:
         print(json.dumps({"status": "error", "error": str(exc)}), file=sys.stderr)

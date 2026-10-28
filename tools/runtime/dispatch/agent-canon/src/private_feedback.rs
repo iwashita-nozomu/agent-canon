@@ -14,20 +14,42 @@
 //! executable or a second command namespace.
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+const ADAPTER_RELATIVE: &str = "tools/runtime/archive/private_feedback.py";
+const INSTALLED_ADAPTER_RELATIVE: &str = "share/agent-canon/private_feedback.py";
+
 fn adapter_path() -> Option<PathBuf> {
-    let candidates = [
-        env::var_os("AGENT_CANON_RUNTIME_TOOLS_ROOT")
-            .map(PathBuf::from)
-            .map(|root| root.join("tools/runtime/archive/private_feedback.py")),
-        env::var_os("AGENT_CANON_SOURCE_ROOT")
-            .map(PathBuf::from)
-            .map(|root| root.join("tools/runtime/archive/private_feedback.py")),
-        Some(PathBuf::from("tools/runtime/archive/private_feedback.py")),
-    ];
-    candidates.into_iter().flatten().find(|path| path.is_file())
+    let mut candidates = Vec::new();
+    let executable = env::current_exe().ok();
+    if let Some(executable) = &executable {
+        if let Some(bin_dir) = executable.parent() {
+            if let Some(prefix) = bin_dir.parent() {
+                candidates.push(prefix.join(INSTALLED_ADAPTER_RELATIVE));
+            }
+        }
+    }
+    candidates.extend(
+        [
+            env::var_os("AGENT_CANON_RUNTIME_TOOLS_ROOT")
+                .map(PathBuf::from)
+                .map(|root| root.join(ADAPTER_RELATIVE)),
+            env::var_os("AGENT_CANON_SOURCE_ROOT")
+                .map(PathBuf::from)
+                .map(|root| root.join(ADAPTER_RELATIVE)),
+        ]
+        .into_iter()
+        .flatten(),
+    );
+    if let Some(executable) = executable {
+        candidates.extend(
+            executable
+                .ancestors()
+                .map(|ancestor| ancestor.join(ADAPTER_RELATIVE)),
+        );
+    }
+    candidates.into_iter().find(|path| Path::is_file(path))
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -35,7 +57,14 @@ pub fn run(args: &[String]) -> i32 {
         eprintln!("PRIVATE_FEEDBACK=fail error=adapter_unavailable");
         return 2;
     };
-    let mut command = Command::new("python3");
+    let python = env::var_os("AGENT_CANON_PYTHON").unwrap_or_else(|| {
+        if cfg!(windows) {
+            "python".into()
+        } else {
+            "python3".into()
+        }
+    });
+    let mut command = Command::new(python);
     command.arg(adapter).args(args);
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());

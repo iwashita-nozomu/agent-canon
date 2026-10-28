@@ -18,7 +18,7 @@ logs are never used as a knowledge store.
 from __future__ import annotations
 
 import argparse
-import fcntl
+import errno
 import hashlib
 import json
 import os
@@ -26,10 +26,16 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 SCHEMA = "agent-canon.private-feedback.v1"
 PRIVATE_SPOOL_NAME = "private-feedback"
@@ -136,14 +142,45 @@ def _private_feedback_spool_lock(spool: Path) -> Iterator[None]:
     """Serialize spool mutations with the host's exact-snapshot cleanup."""
     lock_path = spool.parent / ".private-feedback.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    flags = os.O_CREAT | os.O_RDWR
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_BINARY", 0)
+    descriptor = os.open(lock_path, flags, 0o600)
     try:
-        os.fchmod(descriptor, 0o600)
-        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        if os.name != "nt":
+            os.fchmod(descriptor, 0o600)
+        if os.fstat(descriptor).st_size == 0:
+            os.write(descriptor, b"\0")
+        _lock_spool_descriptor(descriptor)
         yield
     finally:
+        try:
+            _unlock_spool_descriptor(descriptor)
+        finally:
+            os.close(descriptor)
+
+
+def _lock_spool_descriptor(descriptor: int) -> None:
+    if os.name == "nt":
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while True:
+            try:
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                return
+            except OSError as exc:
+                if exc.errno not in {errno.EACCES, errno.EDEADLK}:
+                    raise
+                time.sleep(0.01)
+    else:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+
+
+def _unlock_spool_descriptor(descriptor: int) -> None:
+    if os.name == "nt":
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+    else:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
-        os.close(descriptor)
 
 
 def _sync_request_path(spool: Path) -> Path:
