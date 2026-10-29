@@ -543,7 +543,6 @@ linked_rules = [
   "documents/operations/BRANCH_SCOPE.md",
   "agents/skills/research-workflow.md",
 ]
-
 [[eval]]
 id = "devcontainer-closeout-preserves-tracking-scope"
 category = "wrong-artifact"
@@ -563,4 +562,29 @@ forbidden_route = [
 ]
 linked_rules = [
   "agents/skills/devcontainer-exec.md",
+]
+
+[[eval]]
+id = "pr-operation-selects-required-checks"
+category = "scope-creep"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "PR body-only work reuses current supplied evidence without unrelated status checks",
+  "authorized merge retains required check and review gates",
+  "explicit CI status requests inspect and report the requested status",
+]
+expected_route = [
+  "derive reads from the requested PR operation and reuse supplied current facts",
+  "check required status and review state before an authorized merge",
+  "inspect CI/check status when the user explicitly requests it",
+]
+forbidden_route = [
+  "require merge checks for a body-only wording update with current validation facts",
+  "skip required merge gates or ignore an explicit status request",
+]
+linked_rules = [
+  "agents/skills/pr-processing.md",
+  "agents/internal-routines/github-connected-work.md",
+  "agents/internal-routines/verification-result-structuring.md",
 ]
