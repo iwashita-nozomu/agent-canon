@@ -1396,7 +1396,7 @@ fn eval_fixture_reports_pass() {
     .unwrap();
     let args = EvalArgs {
         fixture: fixture.clone(),
-        db: fixture.join("eval.sqlite"),
+        db: default_db_path(&fixture.join("input")),
         report: None,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
@@ -1436,12 +1436,28 @@ fn eval_run_returns_nonzero_when_quality_fails() {
             }"#,
     )
     .unwrap();
+    let db = default_db_path(&fixture.join("input"));
+    let witness = run_eval(&EvalArgs {
+        fixture: fixture.clone(),
+        db: db.clone(),
+        report: None,
+        provider: DEFAULT_PROVIDER.to_string(),
+        model: DEFAULT_MODEL.to_string(),
+        dim: 64,
+        embedding_url: None,
+        top_k: 5,
+        format: OutputFormat::Json,
+    })
+    .expect("valid fixture should produce an eval report");
+    assert_eq!(witness["semantic_index_eval"], "fail");
+    assert!(witness["search"]["failed"].as_u64().unwrap() > 0);
+
     let args = vec![
         "eval".to_string(),
         "--fixture".to_string(),
         fixture.display().to_string(),
         "--db".to_string(),
-        fixture.join("eval.sqlite").display().to_string(),
+        db.display().to_string(),
         "--format".to_string(),
         "json".to_string(),
     ];
@@ -1471,7 +1487,7 @@ fn eval_missing_must_not_path_fails() {
     .unwrap();
     let args = EvalArgs {
         fixture: fixture.clone(),
-        db: fixture.join("eval.sqlite"),
+        db: default_db_path(&fixture.join("input")),
         report: None,
         provider: DEFAULT_PROVIDER.to_string(),
         model: DEFAULT_MODEL.to_string(),
