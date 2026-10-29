@@ -74,7 +74,8 @@ Windows uses MSVC's `/Brepro` linker option to derive link timestamps and debug
 identifiers deterministically. CI repeats the release build in a fresh Cargo
 target directory, packages it through the same producer, and requires the
 executable, ZIP, tar.gz and checksum files to match byte for byte. This checks
-reproducibility for the same source and toolchain recorded in provenance.
+reproducibility for the same source and build environment. Provenance records
+the Rust/Cargo versions and compiler flags.
 
 Every successful main update publishes a stable release, including documentation,
 Skill, test and CI-only changes. The existing five-host validation completes
