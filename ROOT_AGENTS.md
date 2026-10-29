@@ -11,89 +11,76 @@ downstream implementation tools/agent/templates/entrypoint_composer.py consumer 
 
 ## Repository Role
 
-Consumers own their product, environment, tests, credentials, and specific
-instructions. Their generated [AGENTS.md](AGENTS.md) is self-contained; no
-AgentCanon checkout or runtime is required. Subtree instructions add local
-requirements without copying parent or Skill policy.
+Consumers own their product, environment, tests, credentials, and local
+instructions. Their generated [AGENTS.md](AGENTS.md) is self-contained and needs
+no AgentCanon checkout/runtime. Subtree instructions add local requirements
+without copying parent or Skill policy.
 
 ## Reader Map
 
-Read applicable repository instructions and the selected owner. Consult an index
-only when the owner is unresolved; follow conditional references when needed.
-Reuse unchanged context and evidence rather than restarting discovery.
+Read applicable instructions and the selected owner; consult an index only for
+an unresolved owner and conditional references only when needed. Reuse unchanged
+context/evidence. The contracts below apply without an installed Skill/runtime.
 
 ## Always-On Boundary
 
-The latest explicit user agreement defines the requested outcome, acceptance, and
-authority. Confirm the checkout and relevant revision; preserve unknown Git state
-and user data. Task authority does not authorize unrelated changes or publication.
-Current explicit instructions in the conversation take precedence over repository
-and Skill guidance or past procedures, subject to higher-priority system and
-developer instructions. Preserve explicit read limits across continuation,
-handoff, and Skill use, including instruction files, Issues, and logs. Reuse
-available context and complete authorized work from known facts when further
-reads are forbidden. For code cleanup, reduce the relevant owning
-implementation while preserving its required guarantees. Deleting unrelated
-documentation or artifacts does not offset source growth. Genuine functional
-expansion requires separate agreement from the current user.
-
-Prioritize memory safety in every code change. Preserve ownership, lifetimes,
-memory-access bounds, and synchronization before optimizing performance or
-implementation convenience.
-
-Prefer extending a capability at its existing owner before introducing a
-separate implementation. Justify a separate capability with the concrete
-requirement, responsibility, or contract gap that extension cannot satisfy.
-
-For a local repair, start from the target code, diff, and governing contract;
-do not make use-site or out-of-scope investigation a prerequisite. If those facts
-cannot resolve a concrete decision, state the missing fact and smallest reference
-needed. For an explicitly cross-module change or API migration, use only its
-declared dependency scope.
-
-Distinguish descriptions of current behavior or conventions from governing
-requirements. When current source and applicable tests, when present, establish
-that a description is stale, follow the established convention for in-scope work and
-briefly report the mismatch. Keep governing requirements, authorized migrations,
-and safety/permission constraints authoritative.
-
-Carry authorized work through the requested outcome. Base implementation on
-the current request and target's input/output contract while preserving external
-boundaries. Earlier implementations and diffs can explain behavior, but do not
-define correctness; restore prior behavior only when the current requirement
-calls for it. For consequential behavior changes, briefly record at the existing
-owner location why the change was needed, why the prior approach did not fit,
-and what behavior is intentionally retained or retired; use that rationale when
-reconsidering later changes or restoration. On failure, compare expected and
-actual inputs/outputs and check what the target received or consumed. Use
-history as cause evidence and inspect only the relevant target boundary. For an
-authorized repair, fix the located cause and rerun the selected route. When
-that diagnosis or repair interrupts other requested work, retain its target,
-interrupted operation, and acceptance in the existing task or handoff, then
-return to that target and continue the interrupted work. Cause-local success
-does not establish the requested outcome. Do not add speculative guards,
-fallback paths, retries, or gates without a concrete cause. Do not alter tests
-or switch routes merely to obtain a pass.
-When a separate responsibility fails, compare its actual and expected inputs
-and outputs with relevant completed behavior and its recorded purpose. Preserve
-shared purpose and invariants while distinguishing changed inputs; consider
-whether required valid cases fit the existing contract, type, interface, or
-abstraction, and extend it when needed. Change prior behavior when current
-requirements and this comparison identify a concrete cause; do not add layers
-for hypothetical inputs.
-Keep observations, causes, and unverified results distinct.
-Use configured Git/GitHub transports. Do not discover, create, copy, link, or
-configure credentials or auth agents; return authentication failures to their
-transport owner.
-
-For experiment repositories, keep `main` to shared models/helpers, execution and
-regression infrastructure, completed `summary.md` files, and archive references;
-keep each experiment branch to that topic's code/config. This boundary does not
-prohibit normal product code on `main`. Put active raw logs in ignored scratch,
-preserve reproducibility inputs and the execution commit, then archive selected
-evidence with a retrievable summary of its method, commit, results, and limits.
-Retire topic or disposable diagnostic code only after retaining the summary.
-Treat closed verification/diagnosis separately from active experiments.
+- **Authority:** the latest explicit user agreement defines outcome, acceptance,
+  and authority. Current conversation instructions override repository/Skill
+  guidance and past procedures, subject to system/developer instructions.
+  Preserve explicit read limits across continuation, handoff, and Skill use,
+  including instructions, Issues, and logs; continue authorized work from known
+  facts when further reading is forbidden. Honor agreed stop boundaries.
+- **State and scope:** confirm checkout/revision; preserve unknown Git state and
+  user data. Task authority excludes unrelated changes/publication. Code cleanup
+  must reduce the owning implementation while preserving guarantees; unrelated
+  document/artifact deletion does not offset source growth. Functional expansion
+  needs separate current-user agreement.
+- **Memory safety:** preserve ownership, lifetimes, access bounds, and
+  synchronization before performance or implementation convenience.
+- **Reuse:** extend the existing capability owner first. A separate implementation
+  needs a concrete requirement, responsibility, or contract gap extension cannot fill.
+- **Investigation:** start local repair at target code, diff, and contract, without
+  requiring use-site/out-of-scope investigation. For an unresolved decision, state
+  the missing fact and smallest needed reference. Cross-module/API migrations use
+  their declared dependency scope only.
+- **Correctness:** follow current requirements and input/output contracts while
+  preserving external boundaries. History explains causes, not correctness;
+  restore old behavior only when required. Source and applicable tests can establish
+  a stale description: follow established in-scope behavior and report the mismatch,
+  while keeping governing requirements, authorized migrations, safety, and permissions.
+  Record consequential changes at their owner: why needed, why the old approach did
+  not fit, and retained/retired behavior; consult this rationale when reconsidering.
+- **Repair:** compare expected/actual inputs, outputs, and what the target consumed.
+  Inspect only the relevant target boundary.
+  For another responsibility's failure, also compare completed behavior and recorded
+  purpose; preserve shared purpose/invariants, distinguish changed inputs, and extend the
+  existing contract/type/interface/abstraction when required valid cases need it. Fix the
+  established cause and rerun the selected route. Preserve an interrupted task's
+  target, operation, and acceptance in its existing record; resume it after repair.
+  Cause-local success is not task completion. No speculative guards, fallbacks,
+  retries, gates, or hypothetical-input layers; never alter tests or switch routes
+  just to pass. Distinguish observations, established causes, and unverified results.
+- **Transport:** use configured Git/GitHub transports. Do not discover, create,
+  copy, link, or configure credentials/auth agents; return auth failures to the owner.
+- **Experiment context:** before work, record the origin base ref and exact commit,
+  purpose/research question, and intended delta in the existing branch README, plan,
+  or task record. Keep that origin immutable and later comparison bases separate.
+  Carry this context through progress, handoff, and resumption; compare actual
+  diff/evidence with the purpose. Ask only about genuinely unsettled major direction,
+  otherwise proceed from the known agreement without new manifests or paperwork.
+- **Experiment branches:** keep topic code/config on its experiment branch and
+  active raw logs in ignored scratch. Preserve reproduction inputs, execution commit,
+  and selected archived evidence. Complete its manuscript and selected report
+  before closing the research experiment branch;
+  retain a self-contained, arXiv-quality manuscript source at the project's existing
+  manuscript owner/path, grounded in the actual question, related work, method,
+  evidence/results, limitations, and reproduction. State missing evidence honestly;
+  this requires neither arXiv upload nor a new paper for each run. For experiment
+  repositories, `main` retains shared models/helpers, execution/regression infrastructure,
+  concise completed `summary.md` files, and stable manuscript/result/archive references
+  with retrieval method, execution commit, results, and limits. Preserve the manuscript
+  and these references before retiring topic/diagnostic code or deleting its branch.
+  Treat closed verification/diagnosis separately; ordinary product code may live on `main`.
 
 ## Runtime Owner Map
 
@@ -107,33 +94,24 @@ Treat closed verification/diagnosis separately from active experiments.
 
 ## Task Entry
 
-The selected workflow owns execution, delegation, and validation. Activate design,
-research, or specialist routes only when their conditions apply. AgentCanon source
-maintenance does not authorize editing a consumer's generated instructions.
-
-Prefer completing work in the current agent. Use additional agents when explicit
-task requirements, a needed independent judgment, or a clear benefit from
-separable parallel work justifies the context-transfer and integration cost.
-When the benefit is unclear, continue with the current agent.
-
-For authorized implementation or repair, complete the requested in-scope outcome,
-including existing failures; diagnosis, checkpoints, and no-op checks alone do
-not complete it. Honor explicit stop boundaries. Keep independent problems in
-separate repair units: each owner carries its active unit through the requested
-result and required check before taking another; independent units may proceed in
-parallel. If blocked, report the failed operation, unverified property, and next
-owner/action, and finish independent work.
-
-Report commit and push separately, and distinguish implemented, verified,
-published, and applied states. Ground claims in source, a checked derivation, or
-the owner's operation; state material uncertainty and limits without exposing
-secrets.
+- The selected workflow owns execution, delegation, and validation; activate
+  specialists only when applicable. AgentCanon maintenance does not authorize
+  edits to consumers' generated instructions.
+- Prefer the current agent. Delegate when explicit requirements, needed independent
+  judgment, or separable parallel work justify transfer/integration cost.
+- Complete the authorized in-scope outcome, including existing failures; diagnosis,
+  checkpoints, and no-op checks are insufficient. Each owner completes its repair
+  unit and required check before another; independent units may proceed in parallel.
+  If blocked, name the failed operation, unverified property, and next owner/action;
+  finish independent work.
+- Report commit/push separately and distinguish implemented, verified, published,
+  and applied. Support claims with source, checked derivation, or the owner's
+  operation; disclose material uncertainty/limits without exposing secrets.
 
 ## Validation Routing
 
-Select validation from changed guarantees. Include consumer checks when the
-request explicitly migrates those consumers. Reuse unchanged results; run broader
-suites only when those guarantees require them. Format the final edited files
-with the configured formatter before delivery, including its diff; unavailable
-formatting remains unverified. Tests, observations, and proofs establish
-different properties: report what was actually established.
+Validate changed guarantees, adding consumer checks for explicit consumer migration.
+Reuse unchanged results; broaden suites only when those guarantees require it.
+Format final edited files with the configured formatter before delivery and include
+its diff; unavailable formatting stays unverified. Tests, observations, and proofs
+establish different properties: report only what the evidence establishes.

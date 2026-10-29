@@ -516,6 +516,35 @@ linked_rules = [
 ]
 
 [[eval]]
+id = "experiment-branch-closeout-keeps-artifact-scope"
+category = "scope-creep"
+source_issue = 1628
+oracle_type = "rubric"
+protects = [
+  "work begins from the original origin ref and exact commit with its purpose and intended delta recorded",
+  "active handoff or resumed work preserves the original origin separately from an updated comparison base",
+  "branch completion contains the requested manuscript or summary and its evidence",
+  "per-run papers and uploads are not added without an explicit request",
+]
+expected_route = [
+  "record the origin ref, full commit, purpose, and intended delta before changing the experiment branch",
+  "on handoff or resume, retain the original origin and record any updated comparison base separately",
+  "complete the requested manuscript or summary inside the experiment branch and retain a retrievable evidence reference",
+  "distinguish run evidence from the reader-facing manuscript or summary",
+]
+forbidden_route = [
+  "replace the original origin with a later comparison base or lose the purpose and intended delta on resume",
+  "leave the requested manuscript outside the branch completion result",
+  "create a separate paper or upload for every run without an explicit request",
+  "declare branch completion without the requested artifact or evidence reference",
+]
+linked_rules = [
+  "agents/skills/experiment-lifecycle.md",
+  "documents/operations/BRANCH_SCOPE.md",
+  "agents/skills/research-workflow.md",
+]
+
+[[eval]]
 id = "guided-debugging-requires-explicit-trigger"
 category = "workflow-bypass"
 source_issue = 1627
