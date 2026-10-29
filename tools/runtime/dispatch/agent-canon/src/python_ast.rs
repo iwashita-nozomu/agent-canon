@@ -291,6 +291,14 @@ fn dump_string(value: &str) -> String {
     ast::Constant::Str(value.to_string()).to_string()
 }
 
+fn dump_constant(value: &ast::Constant) -> String {
+    if matches!(value, ast::Constant::Ellipsis) {
+        "Ellipsis".into()
+    } else {
+        value.to_string()
+    }
+}
+
 fn dump_expr(expr: &ast::Expr, names: &BTreeMap<String, String>) -> String {
     use ast::Expr as E;
     match expr {
@@ -411,7 +419,7 @@ fn dump_expr(expr: &ast::Expr, names: &BTreeMap<String, String>) -> String {
             "FormattedValue",
             [
                 ("value", dump_expr(&node.value, names)),
-                ("conversion", (node.conversion as u8).to_string()),
+                ("conversion", (node.conversion as i8).to_string()),
                 ("format_spec", dump_optional(node.format_spec.as_deref(), |value| dump_expr(value, names))),
             ],
         ),
@@ -422,7 +430,7 @@ fn dump_expr(expr: &ast::Expr, names: &BTreeMap<String, String>) -> String {
         E::Constant(node) => dump_node(
             "Constant",
             [
-                ("value", node.value.to_string()),
+                ("value", dump_constant(&node.value)),
                 ("kind", dump_optional(node.kind.as_ref(), |value| dump_string(value))),
             ],
         ),
@@ -609,7 +617,7 @@ fn dump_pattern(node: &ast::Pattern, names: &BTreeMap<String, String>) -> String
     use ast::Pattern as P;
     match node {
         P::MatchValue(value) => dump_node("MatchValue", [("value", dump_expr(&value.value, names))]),
-        P::MatchSingleton(value) => dump_node("MatchSingleton", [("value", value.value.to_string())]),
+        P::MatchSingleton(value) => dump_node("MatchSingleton", [("value", dump_constant(&value.value))]),
         P::MatchSequence(value) => dump_node(
             "MatchSequence",
             [("patterns", dump_list(value.patterns.iter().map(|pattern| dump_pattern(pattern, names))))],
