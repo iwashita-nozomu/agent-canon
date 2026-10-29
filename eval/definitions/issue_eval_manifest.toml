@@ -544,6 +544,27 @@ linked_rules = [
   "agents/skills/research-workflow.md",
 ]
 [[eval]]
+id = "guided-debugging-requires-explicit-trigger"
+category = "workflow-bypass"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "one-issue-at-a-time interaction activates only when the user explicitly requests it",
+  "ordinary repair retains the selected workflow without adding an interview gate",
+]
+expected_route = [
+  "skip user-guided-debugging for a routine repair request",
+  "activate the read-only issue-by-issue flow for an explicit one-at-a-time request",
+]
+forbidden_route = [
+  "treat general debugging or repair language as an explicit guided-debugging request",
+  "skip the guided flow when the user explicitly requests one issue at a time",
+]
+linked_rules = [
+  "agents/skills/user-guided-debugging.md",
+]
+
+[[eval]]
 id = "devcontainer-closeout-preserves-tracking-scope"
 category = "wrong-artifact"
 source_issue = 1627
@@ -588,6 +609,7 @@ linked_rules = [
   "agents/skills/structure-planning.md",
   "documents/operations/BRANCH_SCOPE.md",
 ]
+
 
 [[eval]]
 id = "pr-operation-selects-required-checks"
