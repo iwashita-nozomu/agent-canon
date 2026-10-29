@@ -42,7 +42,7 @@ filename を `agent-canon-naming-rules.md` にして repository と親 directory
 - 関数、tool、theorem、artifact、branch、run、report も、利用者に見える文脈と名前を合わせて対象と責務を検索・識別できる粒度にします。
 - 公開 API や単体配布 artifact では、利用者に見えない repository/branch/path を省略の根拠にしません。衝突回避に必要な区別と外部固定名は保持します。
 - proof や generated artifact は探索手順ではなく、対象 theorem profile、public root、projection などの安定した対象を表します。
-- Python helper / local function は、`helper_function_inventory.py` が推定する role と整合する action token を含めます。
+- Python helper / local function は、`tools/bin/agent-canon helper-function-inventory` が推定する role と整合する action token を含めます。
 
 ## 命名計画
 

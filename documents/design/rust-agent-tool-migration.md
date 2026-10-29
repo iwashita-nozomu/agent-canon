@@ -193,6 +193,23 @@ remain derived from dependency declarations and upstream coverage rules.
 Preserve this owner rather than restoring a Python compatibility implementation.
 Other commands in the same crate may still have the delegation gaps above.
 
+## Native Helper Function Inventory Port and Caller Closure
+
+`agent-canon helper-function-inventory` owns Python helper-function and class
+role analysis. Its Rust implementation reuses the crate's RustPython parser
+and shared `python_ast` source/span helpers; the former
+`tools/analysis/code/helper_function_inventory.py` implementation is retired.
+The typed `helper-function-inventory` catalog entry selects this Rust command.
+
+Preserve existing path/exclusion and changed-file rules, whole-repository
+call-graph context, baseline/ref filtering, role scores and evidence order,
+feature inference, candidate and design-judgment rules, redundancy projection,
+JSON/text/Markdown output, and exit behavior. Keep the Python test file's 18
+fixture/assertion oracles and run them through the explicitly selected native
+CLI. The frozen pre-port source/input and 19 invocation outcomes provide the
+differential baseline. Naming conventions and branch-scope guidance use the
+native public command.
+
 ## Native Surface Manifest and Producer Identity
 
 `agent-canon surface-manifest` owns the normalized snapshot, document check, and

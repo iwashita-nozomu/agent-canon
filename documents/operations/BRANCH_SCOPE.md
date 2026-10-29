@@ -299,7 +299,7 @@ selected_validation(T_i, E_i) = pass
 - validation が読む source、config、schema、fixture、文書、tool entrypoint は、宣言した
   外部入力を除き、その commit の tracked tree に含めます。ignored / generated runtime
   output は artifact、cache、log、result のどれかに分類して evidence に残します。
-- code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
+- code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `tools/bin/agent-canon helper-function-inventory --changed --all-functions --format json` を関数単位 evidence に使います。
 - commit evidence には branch、commit SHA / tree、前提 commit と外部依存 identity、source clone SHA/PR readback（該当時）、validation command・対象 path・終了結果、残った dirty / untracked path の分類を含めます。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。

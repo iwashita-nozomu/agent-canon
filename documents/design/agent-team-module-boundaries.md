@@ -13,7 +13,7 @@ downstream implementation ../../tools/agent/orchestration/tool_calls.py owner so
 downstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owner source identity
 downstream implementation ../../tools/runtime/manifest/manifest_rendering.py owner source identity
 downstream implementation ../../tools/repository/workspace/workspace_scope.py owner source identity
-upstream implementation ../../tools/analysis/code/helper_function_inventory.py function/class inventory producer
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs function/class inventory producer
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py run-bundle caller
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py task-start caller
 downstream implementation ../../tools/runtime/lifecycle/task_close.py close-agent caller
@@ -78,7 +78,7 @@ replaceable responsibility unit として定めます。
 ## 2. Evidence And Assumption Ledger
 
 - Evidence sources は `tools/agent/orchestration/agent_team.py` と
-  `tools/analysis/code/helper_function_inventory.py` です。inventory
+  `tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs` です。inventory
   の対象 source は AgentCanon origin/main source snapshot
   `ebba9ea058ec61abad6cdaf96f22badf2784c8b3` です。
 - Approved target-state contract は
@@ -442,7 +442,7 @@ runtime を信頼します。
 
 | 判定 | 一次 evidence | oracle |
 | --- | --- | --- |
-| owner/path/DAG | `agent_team.py` の import structure、Python AST、`helper_function_inventory.py` | source import graph に cycle がないこと、各 symbol に一 owner があること |
+| owner/path/DAG | `agent_team.py` の import structure、Python AST、`python_helper_function_inventory.rs` | source import graph に cycle がないこと、各 symbol に一 owner があること |
 | public surface | `agent_team.py` の `__all__`、`vars(agent_team)`、caller AST、`git grep` | public names と `__all__` が一致し、旧 forbidden facade names だけが explicit import で `ImportError` になること。underscore alias は判定対象外 |
 | Python shape | pyright/ruff と owner module import | direct/package の同一 return/exception shape |
 | packet/config | `ACTIVE_DESIGN_PACKET_SCHEMA`、future owner `tools/agent/orchestration/packets.py` の field inventories | normalization、reference projection、malformed input の既存エラー |

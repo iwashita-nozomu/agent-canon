@@ -3,26 +3,33 @@
 # @dependency-start
 # contract test
 # responsibility Tests helper function inventory and role inference.
-# upstream implementation ../../tools/analysis/code/helper_function_inventory.py inventories helper roles
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs inventories helper roles
 # upstream design ../../documents/tools/README.md documents tool entrypoints
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from textwrap import dedent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INVENTORY = PROJECT_ROOT / "tools" / "analysis" / "code" / "helper_function_inventory.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+AGENT_CANON_PREFIX = [AGENT_CANON_CLI or "", "helper-function-inventory"]
 
 
 class HelperFunctionInventoryTest(unittest.TestCase):
     """Verify helper candidate and role reports."""
+
+    def setUp(self) -> None:
+        self.assertIsNotNone(
+            AGENT_CANON_CLI,
+            "AGENT_CANON_CLI must select the current native executable",
+        )
 
     def test_role_inference_uses_static_body_facts(self) -> None:
         """Roles should reflect AST/call facts, not only function names."""
@@ -66,8 +73,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -116,8 +122,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -188,8 +193,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--changed",
@@ -234,8 +238,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -285,8 +288,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -339,8 +341,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -392,14 +393,14 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             default_result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root), "--format", "json"],
+                [*AGENT_CANON_PREFIX, "--root", str(root), "--format", "json"],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
             )
             all_result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root), "--all-functions", "--format", "json"],
+                [*AGENT_CANON_PREFIX, "--root", str(root), "--all-functions", "--format", "json"],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -456,8 +457,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -507,8 +507,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -574,8 +573,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -629,8 +627,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--only-name-gaps",
@@ -694,8 +691,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -740,7 +736,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root)],
+                [*AGENT_CANON_PREFIX, "--root", str(root)],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -773,8 +769,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -822,8 +817,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -872,8 +866,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -917,8 +910,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -965,8 +957,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
