@@ -1,1 +1,2 @@
 pkg/crlf.py.fixture -text -diff
+expected/* -text
