@@ -151,17 +151,6 @@ accepting a path or dependency-direction change.
    existing subagent and parallel-write owners for placement, lifecycle, and
    handback; this skill does not reproduce their field lists or approval gates.
 
-## Shared-structure order
-
-For a request that explicitly spans a shared source and consumers, use the declared
-dependency edges to order only the required changes: establish the target contract,
-update the canonical source and inseparable consumers, publish when a dependent
-checkout requires that revision, then migrate and validate consumers affected by
-that request. Source publication and consumer adoption remain separate claims.
-Independent consumers may proceed in parallel when their inputs and write scopes
-are ready; keep dependent changes in one commit only when they cannot be validated
-independently.
-
 ## Subagent Routing
 
 Use delegation only when the selected coordination route requires a replaceable
