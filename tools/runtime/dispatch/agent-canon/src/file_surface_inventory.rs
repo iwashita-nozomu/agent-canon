@@ -149,10 +149,7 @@ impl Args {
                 "--root" | "--json-out" | "--markdown-out" | "--max-markdown-entries" => {
                     let (value, consumed) = match inline_value {
                         Some(value) => (value, 1),
-                        None => (
-                            next_option_value(args, index, option)?,
-                            2,
-                        ),
+                        None => (next_option_value(args, index, option)?, 2),
                     };
                     match option {
                         "--root" => root = PathBuf::from(value),
@@ -215,7 +212,11 @@ impl Args {
     }
 }
 
-fn next_option_value<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str, String> {
+fn next_option_value<'a>(
+    args: &'a [String],
+    index: usize,
+    option: &str,
+) -> Result<&'a str, String> {
     let value = args
         .get(index + 1)
         .ok_or_else(|| format!("{option} requires a value"))?;
@@ -694,11 +695,17 @@ mod tests {
             "--help".into()
         ])
         .is_err());
-        assert!(Args::parse(&["--unknown".into(), "--help".into()]).unwrap().is_none());
-        assert!(Args::parse(&["--help".into(), "--unknown".into()]).unwrap().is_none());
-        assert!(Args::parse(&["--root".into(), "/tmp/repo".into(), "--help".into()])
+        assert!(Args::parse(&["--unknown".into(), "--help".into()])
             .unwrap()
             .is_none());
+        assert!(Args::parse(&["--help".into(), "--unknown".into()])
+            .unwrap()
+            .is_none());
+        assert!(
+            Args::parse(&["--root".into(), "/tmp/repo".into(), "--help".into()])
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             Args::parse(&["--json-out=--help".into()])
                 .unwrap()

@@ -79,9 +79,15 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                 sentinel.write_text("preserve this file\n", encoding="utf-8")
 
             cases = (
-                (["--root", "--root-only", "--json-out", str(root_output)], root_output),
+                (
+                    ["--root", "--root-only", "--json-out", str(root_output)],
+                    root_output,
+                ),
                 (["--root", str(root), "--json-out", "--root-only"], root_flag),
-                (["--root", str(root), "--markdown-out", "--agentcanon-only"], agentcanon_flag),
+                (
+                    ["--root", str(root), "--markdown-out", "--agentcanon-only"],
+                    agentcanon_flag,
+                ),
             )
             self.assertIsNotNone(
                 AGENT_CANON_CLI,
@@ -96,7 +102,9 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                         capture_output=True,
                         text=True,
                     )
-                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertEqual(
+                        result.returncode, 2, result.stdout + result.stderr
+                    )
                     self.assertEqual(
                         sentinel.read_text(encoding="utf-8"), "preserve this file\n"
                     )
@@ -156,7 +164,9 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(inline_path.returncode, 0, inline_path.stdout + inline_path.stderr)
+            self.assertEqual(
+                inline_path.returncode, 0, inline_path.stdout + inline_path.stderr
+            )
             self.assertEqual(
                 json.loads(output.read_text(encoding="utf-8"))["status"], "pass"
             )
