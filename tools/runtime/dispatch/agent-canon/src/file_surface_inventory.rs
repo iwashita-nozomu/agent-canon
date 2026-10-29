@@ -115,29 +115,46 @@ impl Args {
         let mut max_markdown_entries = 200;
         let mut index = 0;
         while index < args.len() {
-            let option = args[index].as_str();
+            let raw_option = args[index].as_str();
+            let (option, inline_value) = raw_option
+                .split_once('=')
+                .map_or((raw_option, None), |(option, value)| (option, Some(value)));
             match option {
                 "--root" | "--json-out" | "--markdown-out" | "--max-markdown-entries" => {
-                    let value = args.get(index + 1).ok_or_else(|| format!("{option} requires a value"))?;
+                    let (value, consumed) = match inline_value {
+                        Some(value) => (value, 1),
+                        None => (
+                            args.get(index + 1)
+                                .ok_or_else(|| format!("{option} requires a value"))?
+                                .as_str(),
+                            2,
+                        ),
+                    };
                     match option {
                         "--root" => root = PathBuf::from(value),
                         "--json-out" => json_out = Some(PathBuf::from(value)),
                         "--markdown-out" => markdown_out = Some(PathBuf::from(value)),
                         _ => max_markdown_entries = value.parse().map_err(|_| format!("invalid integer value: '{value}'"))?,
                     }
-                    index += 2;
+                    index += consumed;
                 }
                 "--root-only" => {
+                    if inline_value.is_some() {
+                        return Err("argument --root-only does not take a value".into());
+                    }
                     if agentcanon_only { return Err("--root-only and --agentcanon-only are mutually exclusive".into()); }
                     root_only = true;
                     index += 1;
                 }
                 "--agentcanon-only" => {
+                    if inline_value.is_some() {
+                        return Err("argument --agentcanon-only does not take a value".into());
+                    }
                     if root_only { return Err("--root-only and --agentcanon-only are mutually exclusive".into()); }
                     agentcanon_only = true;
                     index += 1;
                 }
-                _ => return Err(format!("unrecognized argument: {option}")),
+                _ => return Err(format!("unrecognized argument: {raw_option}")),
             }
         }
         let mode = if agentcanon_only { "agentcanon-only" } else { "root-only" }.to_string();
@@ -224,20 +241,28 @@ fn make_entry(scope: &str, root: &Path, relative: &Path, full: &Path, git_mode: 
         else { "product_file" };
     let suffix = relative.extension().map(|extension| format!(".{}", extension.to_string_lossy())).unwrap_or_default();
     let real_source_path = if surface_exists(full) { relative_real_path(root, full) } else { String::new() };
-    FileEntry { scope: scope.to_string(), path: relative.to_string_lossy().replace('\\', "/"), kind: kind.to_string(), checkable: CHECKABLE_SUFFIXES.contains(&suffix.as_str()) && git_mode != "160000", suffix, git_mode: git_mode.to_string(), symlink_target, real_source_path }
+    FileEntry { scope: scope.to_string(), path: posix_path(relative), kind: kind.to_string(), checkable: CHECKABLE_SUFFIXES.contains(&suffix.as_str()) && git_mode != "160000", suffix, git_mode: git_mode.to_string(), symlink_target, real_source_path }
 }
 
 fn relative_real_path(root: &Path, path: &Path) -> String {
     let resolved_root = resolve_non_strict(root);
     let resolved_path = resolve_non_strict(path);
     match resolved_path.strip_prefix(&resolved_root) {
-        Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
-        Err(_) => resolved_path.to_string_lossy().replace('\\', "/"),
+        Ok(relative) => posix_path(relative),
+        Err(_) => posix_path(&resolved_path),
     }
 }
 
 fn posix_path(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    let value = path.to_string_lossy();
+    #[cfg(windows)]
+    {
+        value.replace('\\', "/")
+    }
+    #[cfg(not(windows))]
+    {
+        value.into_owned()
+    }
 }
 
 fn resolve_non_strict(path: &Path) -> PathBuf {
@@ -359,6 +384,38 @@ mod tests {
         assert_eq!(parsed.mode, "agentcanon-only");
         assert_eq!(parsed.max_markdown_entries, -3);
         assert!(Args::parse(&["--root-only".into(), "--agentcanon-only".into()]).is_err());
+    }
+
+    #[test]
+    fn parses_equals_style_values_and_preserves_embedded_equals() {
+        let args = vec![
+            "--root=/tmp/repo=fixture".into(),
+            "--json-out=reports/inventory=full.json".into(),
+            "--markdown-out=reports/inventory.md".into(),
+            "--max-markdown-entries=7".into(),
+        ];
+        let parsed = Args::parse(&args).unwrap();
+        assert_eq!(parsed.root, PathBuf::from("/tmp/repo=fixture"));
+        assert_eq!(parsed.json_out, Some(PathBuf::from("reports/inventory=full.json")));
+        assert_eq!(parsed.markdown_out, Some(PathBuf::from("reports/inventory.md")));
+        assert_eq!(parsed.max_markdown_entries, 7);
+        assert!(Args::parse(&["--root-only=yes".into()]).is_err());
+        assert!(Args::parse(&["--unknown=value".into()]).unwrap_err().contains("--unknown=value"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preserves_literal_backslash_in_unix_path() {
+        let root = scratch();
+        let name = "literal\\name.md";
+        fs::write(root.join(name), "backslash is a filename character\n").unwrap();
+        git(&root, &["init", "-q"]);
+        git(&root, &["add", "--", name]);
+        let scope = inventory_scope("root", &root).unwrap();
+        let entry = scope.entries.iter().find(|entry| entry.path == name).unwrap();
+        assert_eq!(entry.path, name);
+        assert_eq!(entry.real_source_path, name);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
