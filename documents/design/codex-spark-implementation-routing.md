@@ -3849,7 +3849,7 @@ python3 tools/repository/github/github_publish.py publish-pr \
   --title "$PR_TITLE" \
   --body-file "$PR_BODY" \
   --summary-out "$PUBLISH_SUMMARY"
-python3 tools/validation/ci/checks/check_merge_structure.py \
+tools/bin/agent-canon check-merge-structure \
   --source "$BRANCH" --target origin/main --compare-commit HEAD
 gh pr checks "$PR_NUMBER" --watch
 gh pr merge "$PR_NUMBER" --merge
