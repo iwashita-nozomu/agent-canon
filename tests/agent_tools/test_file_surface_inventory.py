@@ -3,20 +3,20 @@
 # @dependency-start
 # contract test
 # responsibility Tests file-surface inventory scope classification.
-# upstream implementation ../../tools/analysis/code/file_surface_inventory.py builds inventory reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs builds inventory reports
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INVENTORY = PROJECT_ROOT / "tools" / "analysis" / "code" / "file_surface_inventory.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class FileSurfaceInventoryTest(unittest.TestCase):
@@ -67,9 +67,10 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             self.assertEqual(paths, ["kept.md", "untracked.py"])
 
     def run_inventory(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run inventory in the repository tool environment."""
+        """Run inventory through the explicitly selected native CLI."""
+        self.assertIsNotNone(AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable")
         return subprocess.run(
-            [sys.executable, str(INVENTORY), "--root", str(root), *args],
+            [str(AGENT_CANON_CLI), "file-surface-inventory", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,

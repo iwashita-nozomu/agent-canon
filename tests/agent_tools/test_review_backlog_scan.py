@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests integrated review backlog scan reporting behavior.
 # upstream implementation ../../tools/repository/github/review_backlog_scan.sh runs scan wrapper
-# upstream implementation ../../tools/analysis/code/file_surface_inventory.py writes inventory reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs writes inventory reports
 # upstream design ../../tools/validation/code/static/common/README.md documents scan entrypoint
 # @dependency-end
 
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -20,6 +19,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 REVIEW_SCAN = PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class ReviewBacklogScanTest(unittest.TestCase):
@@ -30,13 +30,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "parent"
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            fixture_tools = root / "tools" / "analysis" / "code"
-            fixture_tools.mkdir(parents=True)
-            for tool_name in ("file_surface_inventory.py",):
-                shutil.copy2(
-                    PROJECT_ROOT / "tools" / "analysis" / "code" / tool_name,
-                    fixture_tools / tool_name,
-                )
+            self.assertIsNotNone(AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable")
             runtime = root.parent / "runtime"
             report_dir = runtime / "reports"
             configured_target = runtime / "cargo-target"
@@ -61,6 +55,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
                     "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(configured_target),
+                    "AGENT_CANON_CLI": str(AGENT_CANON_CLI),
                 },
             )
 
