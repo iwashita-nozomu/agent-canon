@@ -267,7 +267,7 @@ Canonical tool commands:
 ```bash
 python3 tools/validation/semantic/structure/repo_structure_contract.py --root <root> --format json > <run>/repo_structure_contract.json
 python3 tools/validation/semantic/responsibility/responsibility_scope.py --root <root> --format json > <run>/responsibility_scope.json
-python3 tools/analysis/code/file_surface_inventory.py --root <root> --submodule-aware --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
+agent-canon file-surface-inventory --root <root> --root-only --json-out <run>/file_surface_inventory.json --markdown-out <run>/file_surface_inventory.md
 agent-canon structured-analysis document-inventory --root <root> > <run>/document_inventory.txt
 ```
 
