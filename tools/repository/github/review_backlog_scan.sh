@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
-# upstream implementation ../../analysis/code/file_surface_inventory.py writes inventory reports
+# upstream implementation ../../runtime/dispatch/agent-canon/src/file_surface_inventory.rs writes inventory reports
 # upstream implementation ../../analysis/dependencies/run_repo_dependency_review.sh validates dependency manifests
 # upstream implementation ../../analysis/dependencies/scip_index.py projects native SCIP impact evidence
 # upstream implementation ../../validation/code/oop/python/readability.py writes Python OOP readability reports
@@ -301,10 +301,14 @@ run_agent_canon() {
 run_inventory() {
   local scope_flag
   scope_flag="$(scope_args)"
+  if [[ -z "$AGENT_CANON_CLI" || ! -x "$AGENT_CANON_CLI" ]]; then
+    echo "REVIEW_BACKLOG_SCAN=fail reason=runtime_cli_missing path=$AGENT_CANON_CLI" >&2
+    return 127
+  fi
   record_command \
     "inventory" \
     "$REPORT_DIR/file_surface_inventory.log" \
-        python3 "$TOOL_DIR/analysis/code/file_surface_inventory.py" \
+    "$AGENT_CANON_CLI" file-surface-inventory \
       --root "$ROOT_DIR" \
       "$scope_flag" \
       --json-out "$REPORT_DIR/file_surface_inventory.json" \
@@ -557,7 +561,7 @@ write_report() {
 @dependency-start
 responsibility Records integrated review backlog scan output.
 upstream implementation ../../tools/repository/github/review_backlog_scan.sh generates this report
-upstream implementation ../../tools/analysis/code/file_surface_inventory.py generates inventory artifacts
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs generates inventory artifacts
 @dependency-end
 -->
 
