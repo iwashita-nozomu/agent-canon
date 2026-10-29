@@ -1,222 +1,228 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents Rust migration policy for AgentCanon tools.
+responsibility Owns the complete Python-to-Rust migration scope and preservation contract for AgentCanon tools.
 upstream design README.md AgentCanon documentation index
-upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream implementation ../../bootstrap/container/image/dependencies.toml declares Rust toolchain and CLI build records
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs Rust CLI entrypoint
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/migration_audit.rs validates migration boundaries
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs prints sequential migration candidates
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs implements structured document inventory migration target
-downstream implementation ../../tools/bin/agent-canon stable shell wrapper
+upstream design ../../CONTAINER_OPERATIONS.md consumer and shared-runtime ownership
+upstream design ../../tools/catalog.yaml public commands and external provider identities
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs native command registration
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/migration_audit.rs shared source foundation checks
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs discovered implementation inventory and family ordering
+downstream implementation ../../tools/analysis/code/file_surface_inventory.py selected next port and current behavior owner
+downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 @dependency-end
 -->
 
 # Rust Agent Tool Migration
 
-## Reader Map
+## Scope and Intent
 
-Use this policy to answer which AgentCanon tools should move to Rust, which
-logic should remain in Python, and how the migration is validated. Read Goals
-and Shared Tool Image Setup first, then Runtime Boundary, Canonical Layout, Migration
-Order, and Sequential Migration Policy before changing tool implementations.
-The remaining sections list completed migrations, first targets, Python-only
-surfaces, audit and plan commands, MCP surfaces, deterministic search, and validation.
+Migrate every AgentCanon-owned Python tool implementation to Rust, including
+workflow orchestration, runtime lifecycle, Eval producers and checkers, and
+active hooks. This replaces the earlier policy that kept frequently changing
+workflow tools in Python. Stability and usage may inform implementation work;
+they do not exempt an owned tool from migration.
 
-## Goals
+Preserve the tool's external CLI/API, schema, exit behavior, filesystem effects,
+mount and credential boundaries, and consumer functionality. Prioritize memory
+safety and reuse existing native owners. Moving Python logic into Rust string
+payloads, calling the old Python implementation from a Rust wrapper, or moving
+that implementation into a consumer repository does not complete a port.
 
-- Move heavy static-analysis and inventory tooling from Python to Rust.
-- Keep workflow orchestration and rapidly-changing agent logic in Python.
-- Declare the Rust toolchain in the shared tool image dependency manifest.
-- Keep project images consumer-owned; provision Rust there when their product or development requirements call for it.
+This document owns scope, ordering, and completion evidence. The plan and audit
+are migration foundations; delivering them does not complete the actual ports.
 
-## Shared Tool Image Setup
+## Inventory Boundaries
 
-AgentCanon's Rust toolchain belongs to the `rust-toolchain` record in
-`bootstrap/container/image/dependencies.toml`. The shared tool image and
-`bootstrap.sh` own installation; source-mounted Rust tools compile into the
-resident runtime cache. Use the bootstrap-selected CLI and cache paths.
+Discover source under `tools`, `eval`, and `.codex/hooks`. Inventory `tests` and
+`templates` separately so file-extension totals cannot be mistaken for remaining
+tool implementations. Ignore build/cache directories and do not follow source
+symlinks. The plan inventories the current filesystem, including new source
+files; it does not claim a Git snapshot or a complete Python import graph.
 
-In a template or derived repository, use the selected qualified AgentCanon
-source checkout and the shared bootstrap. Run `agent-canon rust-migration-audit`
-and `agent-canon rust-migration-plan` against that source root before selecting
-a tool migration. Project product/development images remain consumer-owned.
+| Classification | Migration treatment |
+| --- | --- |
+| Owned Python implementation | Migrate, including uncatalogued helpers and active hooks |
+| Package marker | Empty/comment/docstring-only `__init__.py`; an executable initializer remains an implementation |
+| Test | Preserve behavior oracles; tests are not production tool ports |
+| Template or fixture | Preserve consumer/example semantics; do not count as an AgentCanon implementation |
+| Third-party source | Keep provider ownership distinct from AgentCanon orchestration |
+| Source view | Record separately; do not count a symlink as another implementation |
+| Native source, unverified | Native source presence alone establishes neither behavior preservation nor Python independence |
+| External runtime | Preserve provider contracts; the AgentCanon adapter remains in migration scope |
 
-## Runtime Boundary
+Join discovered paths with `tools/catalog.yaml` IDs, including Rust command
+selectors. Report owned implementations without a catalog row. Multiple command
+IDs may refer to one source module; catalog rows are not module counts. Paths,
+not basenames, distinguish owners such as the several `readability.py` files.
 
-AgentCanon Rust tooling belongs in the shared AgentCanon tool image. Project
-product or development images provide Rust when their own requirements call
-for it; AgentCanon tooling uses the shared image.
+The planner also reports known Python delegation at these native owners when
+the corresponding source evidence is present:
 
-## Canonical Layout
+- `private_feedback.rs`: private feedback storage and sync Python adapter.
+- `dependency_manifest.rs`: Python surface-manifest snapshot producer.
+- `python_structure_hash.rs` and `python_algorithm_contract.rs`: embedded Python
+  AST extraction implementations.
 
-```text
-tools/runtime/dispatch/
-  agent-canon/
-    Cargo.toml
-    src/
+This is a declared set of known gaps, not an exhaustive detector for arbitrary
+Python execution. An absent known marker does not establish completion. The
+plan always leaves overall completion unverified; a port needs the evidence
+below.
 
-tools/
-  bin/
-    agent-canon
-```
+## Runtime and External Providers
 
-`tools/bin/agent-canon` is the stable runtime entrypoint.
+The stable entrypoint is `tools/bin/agent-canon`; native source belongs under
+`tools/runtime/dispatch/agent-canon/src`. Use the selected shared build and
+release route. Consumer project images, runtime dependencies, and credentials
+remain consumer-owned.
 
-## Migration Order
+Host bootstrap starts in `bootstrap.sh` and delegates to
+`bootstrap/host/lifecycle/entrypoint.sh`. The resident container receives its
+numeric caller identity through the host adapter's `--user` argument. A
+Dockerfile `USER agentcanon` declaration or host Python bootstrap entrypoint is
+not the current ownership contract. The audit checks source foundation markers,
+not actual container admission or runtime identity.
 
-1. Reuse the shared tool image and its Rust toolchain.
-1. Rust CLI smoke tests.
-1. Rust migration inventory and migration-leak checker.
-1. Port inventory/static-analysis tools.
-1. Keep workflow/orchestration tools in Python until stable.
+Retain consumer Python functions, JAX execution, and explicitly contracted
+external Python producer interfaces. Keep basic CLI paths independent of Python.
+External runtime connections do not exempt AgentCanon-owned logic from migration;
+the default surface-manifest producer must become native while explicit external
+producer identity, root/foreign restrictions, and stale guards are preserved.
+No substantial Python implementation belongs in Rust or bootstrap strings.
 
-## Sequential Migration Policy
+Preserve these existing provider capabilities:
 
-Parent repositories should not invent their own Rust migration order. After
-updating the qualified AgentCanon source clone, run:
+- Managed experiment orchestration already exchanges typed request/result
+  files with the pinned `experiment-runner-admitted` provider declared in
+  `agent-canon-environment.toml`. Port admission, fingerprints, receipts,
+  lifecycle checks, and artifacts while preserving that provider and consumer
+  `experiments/<topic>/run.py` execution.
+- JIT extraction accepts `path.py::qualname` and an input factory, dynamically
+  calls Equinox/JAX lowering and shape/tree APIs, and produces StableHLO,
+  public-interface, and backend evidence. The native `jit_ir_to_lean.rs` owner
+  consumes downstream JSON; it does not replace this lowering contract.
+  Select a reviewed safe native connection to the external CPython/JAX runtime.
+  Requiring only pre-exported StableHLO would remove existing functionality.
+- Preserve configured LSP servers while migrating `pylsp_jsonrpc` transport
+  responsibilities. PDF extraction currently supports both `pypdf` and
+  `pdftotext`; removing the pypdf-only case needs an explicit replacement
+  dependency decision.
 
-```bash
-agent-canon rust-migration-plan --root <agent-canon-source> --limit 12
-```
+Native parser, Python runtime binding, and filesystem capability dependencies
+require their own investigated design and validation. Do not weaken
+Python-AST semantics or descriptor-relative writes, inode/device identity,
+no-follow handling, locks, and authenticated handoffs to avoid that work.
+`runtime_boundary.rs` provides useful external-artifact checks but does not yet
+replace all guarantees of `parent_root_side_effects.py` and
+`runtime_artifacts.py`.
 
-Standalone AgentCanon checkouts use:
+## Dependency Order
 
-```bash
-agent-canon rust-migration-plan --root . --limit 12
-```
+The planner applies these responsibility prerequisites to the discovered
+remaining owners. This is an explicit family policy, not a claim that source
+imports have been fully analyzed. Resolve the selected module's actual imports,
+callers, and test contracts before implementation. Keep shared CLI/catalog
+registration under one integration owner while implementation modules have
+disjoint write sets.
 
-The plan combines this document's fixed first-target list with accumulated
-hook and skill feedback logs from the mounted runtime log archive and legacy
-`agents/evals/results/hook-runs/`. It emits
-`port-now` entries for stable, repo-wide inventory or static-analysis tools,
-`observe-before-port` entries for tools that appear in feedback logs but are
-not yet stable migration targets, and `keep-python` entries for orchestration
-tools that should stay Python-first.
+| Order | Family | Required earlier families |
+| --- | --- | --- |
+| 0 | Independent file-surface inventory | None |
+| 10 | Catalog, surface manifests, projection identities, tool-path policy | None |
+| 20 | Artifact/root capabilities, authority, source identity, shared values and support | None |
+| 30 | Source/dependency/search/document analysis | Catalog foundation |
+| 30 | AST inventory, readability, embedded AST extractors | Authority foundation; native parser contract |
+| 40 | Container and tool dispatch, execution runners | Catalog and authority foundations |
+| 50 | Archive, audit logging, private feedback, lifecycle | Authority foundation and runtime execution |
+| 60 | Agent workflow, packets, teams, manifest rendering, skills and templates | Catalog and authority foundations, archive/lifecycle |
+| 60 | Repository checkout, Git and publication operations | Authority foundation and archive/lifecycle |
+| 60 | Experiments, HLO, numerical and proof tooling | Authority foundation and runtime execution |
+| 70 | Remaining validation, Eval and hook dispatch | Agent workflow, source analysis, AST analysis, archive/lifecycle |
 
-Port one tool family at a time. A port is ready for review only when the Rust
-tool preserves the old command's machine-readable output contract, the Python
-entrypoint is either retired or kept as a caller-warning legacy migration shim,
-and the tool catalog, docs, tests, and hook or workflow references point at the
-current canonical command.
+The family order does not authorize mutation, publication, a new dependency, or
+execution of consumer code. A remaining prerequisite produces `dependency-first`;
+a selected native parser/provider/capability design produces `contract-first`.
+Other candidates are `port-now`, subject to their existing authority and
+behavior contracts. No `keep-python` class remains.
 
-## Completed Rust Migrations
+## Next Native Port and Caller Closure
 
-- Document-canon inventory has been absorbed into
-  `agent-canon structured-analysis document-inventory`. The old Python
-  entrypoint has been retired; callers use the Rust command directly.
-- `agent-canon structured-analysis build` materializes the git-visible file
-  tree as an `artifact` layer and imports document inventory findings into the
-  `document-canon` layer of `prose_graph.sqlite`, then writes current warnings
-  into `diagnostics.sqlite`.
-- Tool-document responsibility checks have been absorbed into
-  `agent-canon structured-analysis document-inventory` as generic
-  `document_responsibility_gap` findings. The Rust checker derives these gaps
-  from dependency-manifest responsibility and reusable coverage rules declared
-  by upstream design documents. For example, any document that cites the Prose
-  Reasoning Graph DSL as `upstream design` must cover the DSL spec's declared
-  coverage groups, such as source-truth anchors, lower graph typed relations,
-  derived projection views, and graph format records. It must not warn merely
-  because a named heading or visual block is absent. No Python
-  `prose_reasoning_graph.py` compatibility route emits those responsibility
-  findings.
+File-surface inventory is the selected next independent port. Its current
+implementation and catalog route remain
+`tools/analysis/code/file_surface_inventory.py`; this foundation does not provide
+a native file-surface command. The port must introduce
+`agent-canon file-surface-inventory` while preserving default `root-only`,
+mutually exclusive `--root-only`/`--agentcanon-only`, explicit `--json-out` and
+`--markdown-out`, and `--max-markdown-entries`.
 
-## First Rust Targets
+Inventory indexed and untracked nonignored Git paths, preserving gitlinks,
+executable and symlink modes, deleted-index exclusion, dangling symlink
+presence, path exclusions, classifications, and deterministic sorting. Retain
+the JSON fields, Markdown structure, machine-readable stdout markers, and
+success/inventory-failure/argument-error exits 0/1/2. Markdown truncation must
+not truncate JSON. Reports remain explicit; stdout-only inspection creates no
+report or implicit cache.
 
-Recommended first migrations:
+Caller closure includes `review_backlog_scan.sh`, the existing catalog ID,
+`agents/COMMUNICATION_PROTOCOL.md`, and the direct CLI and backlog-scan fixture
+tests. The current protocol example uses unsupported `--submodule-aware`; the
+port must correct it to the existing `--root-only` mode rather than inventing
+that functionality.
 
-- file_surface_inventory.py
-- helper_function_inventory.py
-- log_surface_inventory.py
-- tools/validation/code/oop/python/readability.py
-- dependency graph scanners
+The catalog's current fixed `ToolSpec` cannot express optional report-output
+capabilities: changing `writes` to true requires an output root even for
+stdout-only use, and `explicit-target-write` asks for source-target authority.
+Keep stdout-only admission free of report or source-write requirements.
+Argument-sensitive artifact admission belongs to the dispatcher Rust port; a
+report destination is not a source mutation capability. The native port must
+retain explicit report destinations. This unresolved catalog limitation is not proof
+that report-producing calls are read-only.
 
-## Keep In Python
+Document-canon inventory is already implemented by native
+`structured-analysis document-inventory`. Its generic responsibility findings
+remain derived from dependency declarations and upstream coverage rules.
+Preserve this owner rather than restoring a Python compatibility implementation.
+Other commands in the same crate may still have the delegation gaps above.
 
-Keep these Python-first until behavior stabilizes:
-
-- bootstrap_agent_run.py
-- task_close.py
-- evaluate_agent_run.py
-- agent_canon_update_todos.py
-
-## Rust Migration Audit
-
-The first Rust command audits an AgentCanon source root:
-
-```bash
-agent-canon rust-migration-audit --root .
-```
-
-In a template or derived repository, `<agent-canon-source>` is the qualified
-AgentCanon source root selected by the caller:
+## Plan and Audit Interfaces
 
 ```bash
 agent-canon rust-migration-audit --root <agent-canon-source>
+agent-canon rust-migration-plan --root <agent-canon-source> --limit 12
+agent-canon rust-migration-plan --root <agent-canon-source> --format json
 ```
 
-The audit checks:
+The audit and planner share source foundation checks for the native crate,
+entrypoint, wrapper, shell bootstrap, image, and lifecycle. They do not require
+retired files or permanent Python implementation paths. The audit also retains
+the source check against agent-tool Cargo/rustup provisioning in the consumer
+`docker/Dockerfile`.
 
-- the Rust migration document, crate manifest, CLI entrypoint, audit module,
-  and stable wrapper exist;
-- bootstrap entrypoints, the shared image manifest/Dockerfile, lifecycle,
-  runtime-artifact and dispatcher owners are present with their required markers;
-- `docker/Dockerfile` does not install rustup or run cargo as an agent-tooling
-  convenience path.
+The read-only plan reports classifications, catalog coverage, known native
+Python delegations, declared external providers, and dependency-ordered
+candidates. JSON schema `agent-canon.rust-migration-plan.v2` includes the full
+inventory; `--limit` bounds only candidate presentation. Missing scan roots,
+missing catalog source paths, unreadable source, and invalid registry inputs
+are reported rather than silently counted as empty success. Foundation status
+is reported separately from inventory status and overall migration completion.
 
-## Rust Migration Plan
+Candidate ordering no longer derives from basename matches in feedback logs.
+The old planner read only a legacy log directory despite prose claiming mounted
+archive coverage. This planner uses observed source and registry evidence and
+does not claim to inspect those logs.
 
-The planning command is read-only:
+## Port Acceptance and Validation
 
-```bash
-agent-canon rust-migration-plan --root .
-```
+A port is ready only after the native implementation preserves the selected
+CLI/API, schemas, output and exit semantics, side effects, root capabilities,
+and consumer/provider contracts. Retire the old own-Python implementation and
+update the complete known caller closure. A native wrapper, catalog row,
+successful compile, or smaller Python-file count is insufficient evidence.
 
-In a template or derived repository:
-
-```bash
-agent-canon rust-migration-plan --root <agent-canon-source>
-```
-
-It reports:
-
-- whether the shared bootstrap and CLI foundation is present;
-- how many hook log files were inspected;
-- ranked `RUST_MIGRATION_CANDIDATE` lines;
-- `RUST_MIGRATION_KEEP_PYTHON` boundaries that should not be ported just
-  because a tool was recently used.
-
-## MCP Preflight Rust Tools
-
-## Deterministic Search Surfaces
-
-Repository search keeps `search.py` as a thin provider router: exact text and
-catalog patterns use Git, dependency context uses the source graph owner, and
-code facts use the LSP owner. Ranked semantic retrieval remains in the Rust
-`semantic-index` command and its external cache; the Python route does not build
-heuristic cards or combine provider scores. No model server, installer, model
-cache, or compatibility dispatch is part of the compiled-tool cache.
-
-The Python search entrypoint selects one or more native owners explicitly. Its
-default `text` provider is stateless Git search; `--regex` and `--word-regexp`
-use Git's own query syntax. Tool-catalog search is scoped to `tools/catalog.yaml`.
-Dependency and code providers return source-graph and LSP results separately.
-
-`semantic-index` owns ranked semantic/vector evidence and its cache. Selecting
-that provider does not implicitly build or repair the cache. Provider outputs
-remain separate and advisory; none is edit or review authority.
-
-## Validation
-
-```bash
-cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
-cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
-cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
-agent-canon rust-migration-audit --root .
-agent-canon rust-migration-plan --root .
-python3 tools/analysis/search/search.py --help
-python3 tools/runtime/manifest/tool_catalog.py
-python3 tools/validation/semantic/tools/tool_drift.py
-python3 tools/validation/ci/runners/container_runtime.py
-```
+Preserve existing behavior oracles. Compare old/new behavior on the same
+fixtures, including failure and authority-boundary cases, before retiring the
+old implementation. Add focused cases for changed guarantees without weakening
+assertions. Use the shared runtime for selected Rust formatting, clippy,
+tests/build, catalog and caller checks, and the existing five-host release
+matrix where native distribution guarantees change. The integration owner
+selects and records those runs; source-only planning is not validation.
