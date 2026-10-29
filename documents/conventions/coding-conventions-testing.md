@@ -145,6 +145,40 @@ push し、完了報告や引継ぎの前に Issue から辿れるようにし�
 残したりしません。検証不能時の status と publication は既存の GitHub lifecycle
 owner に従い、証拠を保存しただけで修正検証済みとは扱いません。
 
+### Test classification axes
+
+分類は別々の問いに答える軸として扱い、必要なものを組み合わせます。
+すべての軸を埋める checklist ではありません。
+
+| 軸 | 問うこと | 例 |
+|---|---|---|
+| Scope | どの境界で観測するか | unit / service・API / integration / system / end-to-end |
+| Purpose | どの保証を調べるか | contract / regression / robustness / performance |
+| Technique | どう入力と oracle を選ぶか | example-based / property-based / metamorphic / differential / snapshot |
+| Execution environment and size | どの実行条件と資源量が必要か | isolated local / process・network・GPU / small・large |
+
+ひとつの test は複数軸のラベルを持てます。たとえば、既知 regression を
+property-based technique で小さな unit scope 上で検証できます。ラベルが重なるだけで
+test を複製せず、同じ性質を区別する既存 case と oracle を再利用します。追加 case は、
+異なる observable path または未保証の性質がある場合に限ります。
+
+`smoke` は scope の種類ではなく、重要な経路を短時間で確かめるために選んだ validation
+set です。複数 scope や technique の case を含められます。process success や no-crash
+だけで要求された性質を確認したことにはなりません。
+
+静的解析・型検査・compile check は、それぞれの checker が判定するソースや型の制約を
+示します。実行 test は対象 API の behavior を指定入力で観測し、formal proof は明示した
+model と仮定の下で命題を示します。根拠の種類と、それが支える claim を区別し、相互に
+置き換えません。
+
+Python tool の Rust port では、既存の契約入力・前提と独立した oracle を再利用し、
+同じ API behavior を比べられるようにします。Rust の境界や serialization が違う場合は、
+合意した入力 domain、API action、要求 property を保ったまま fixture/setup を調整します。
+前提を満たす入力が owning API に届いて property が崩れる場合は実装側の regression 候補です。
+fixture または runtime 条件が経路を成立させていない場合は setup / execution condition の
+問題として切り分け、製品 behavior の regression と扱いません。fixture の言語や owner は
+個別に判断し、port を理由に test code 全体を一律に書き換えません。
+
 ## 2.5 Semantic responsibility test ownership
 
 実装前に active design packet が参照する run-local semantic responsibility
