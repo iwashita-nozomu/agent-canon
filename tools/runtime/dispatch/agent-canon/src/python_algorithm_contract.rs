@@ -1,18 +1,18 @@
 // @dependency-start
 // contract implementation
-// responsibility Checks Python algorithm-module public surface, nested ownership, and diagnostics from AST JSON.
+// responsibility Checks Python algorithm-module public surface, nested ownership, and diagnostics from Python ASTs.
 // upstream design ../../../../../documents/design/jax_util/algorithm_module_contract.md algorithm module contract
 // upstream implementation python_structure_hash.rs provides the Python-AST-to-Rust analysis pattern
 // downstream implementation main.rs exposes python-algorithm-contract-check
 // @dependency-end
 
+use rustpython_ast::{Expr, Ranged, Stmt, Visitor};
+use rustpython_parser::{ast, Parse};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 const DEFAULT_EXCLUDES: &[&str] = &[
     ".git",
@@ -61,304 +61,6 @@ const STOPPING_PRIMITIVE_CALLS: &[&str] = &[
     "forcing_tolerance",
     "reference_residual_norm",
 ];
-
-const AST_EXTRACTOR: &str = r##"
-import ast
-import json
-import pathlib
-import sys
-
-
-def module_name(root, path):
-    relative = pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())
-    without_suffix = relative.with_suffix("")
-    if without_suffix.name == "__init__":
-        without_suffix = without_suffix.parent
-    return ".".join(without_suffix.parts)
-
-
-def relative_path(root, path):
-    return str(pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())).replace("\\", "/")
-
-
-def ref_name(node):
-    if node is None:
-        return ""
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = ref_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    if isinstance(node, ast.Subscript):
-        return ref_name(node.value)
-    if isinstance(node, ast.Call):
-        return ref_name(node.func)
-    if isinstance(node, ast.Constant):
-        return repr(node.value)
-    return ast.dump(node, annotate_fields=False, include_attributes=False)
-
-
-def annotation_text(node):
-    if node is None:
-        return ""
-    try:
-        return ast.unparse(node)
-    except Exception:
-        return ref_name(node)
-
-
-def imports_algorithm_module_protocol(tree):
-    for node in tree.body:
-        if isinstance(node, ast.ImportFrom):
-            if node.module and node.module.endswith("algorithm_module_protocol"):
-                return True
-            if any(alias.name == "algorithm_module_protocol" for alias in node.names):
-                return True
-        elif isinstance(node, ast.Import):
-            if any(alias.name.endswith("algorithm_module_protocol") for alias in node.names):
-                return True
-    return False
-
-
-def public_definitions(tree):
-    definitions = []
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            if not node.name.startswith("_"):
-                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "class"})
-        elif isinstance(node, ast.FunctionDef):
-            if not node.name.startswith("_"):
-                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "function"})
-        elif isinstance(node, ast.AsyncFunctionDef):
-            if not node.name.startswith("_"):
-                definitions.append({"name": node.name, "line": getattr(node, "lineno", 1), "kind": "async_function"})
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and not target.id.startswith("_") and target.id != "__all__":
-                    definitions.append({"name": target.id, "line": getattr(node, "lineno", 1), "kind": "assignment"})
-        elif isinstance(node, ast.AnnAssign):
-            target = node.target
-            if isinstance(target, ast.Name) and not target.id.startswith("_") and target.id != "__all__":
-                definitions.append({"name": target.id, "line": getattr(node, "lineno", 1), "kind": "annotation"})
-    return definitions
-
-
-def literal_string_sequence(value):
-    if not isinstance(value, (ast.List, ast.Tuple, ast.Set)):
-        return None
-    names = []
-    for element in value.elts:
-        if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
-            return None
-        names.append(element.value)
-    return names
-
-
-def all_state(tree):
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
-        ):
-            names = literal_string_sequence(node.value)
-            if names is None:
-                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
-            return {"state": "literal", "names": names, "line": getattr(node, "lineno", 1)}
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "__all__":
-            if node.value is None:
-                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
-            names = literal_string_sequence(node.value)
-            if names is None:
-                return {"state": "dynamic", "names": [], "line": getattr(node, "lineno", 1)}
-            return {"state": "literal", "names": names, "line": getattr(node, "lineno", 1)}
-    return {"state": "missing", "names": [], "line": 1}
-
-
-def imported_aliases(tree):
-    aliases = []
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name.endswith("algorithm_module_protocol"):
-                    continue
-                aliases.append({
-                    "alias": alias.asname or alias.name.rsplit(".", 1)[-1],
-                    "module": alias.name,
-                    "from_module": "",
-                    "name": "",
-                    "level": 0,
-                    "line": getattr(node, "lineno", 1),
-                })
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            if module.endswith("algorithm_module_protocol"):
-                continue
-            for alias in node.names:
-                if alias.name == "algorithm_module_protocol":
-                    continue
-                imported = "." * node.level + module
-                if module:
-                    imported = f"{imported}.{alias.name}"
-                aliases.append({
-                    "alias": alias.asname or alias.name,
-                    "module": imported,
-                    "from_module": module,
-                    "name": alias.name,
-                    "level": node.level,
-                    "line": getattr(node, "lineno", 1),
-                })
-    return aliases
-
-
-def top_level_aliases(tree):
-    aliases = {}
-    for node in tree.body:
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
-            aliases[node.target.id] = annotation_text(node.value)
-        elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            aliases[node.targets[0].id] = annotation_text(node.value)
-    return aliases
-
-
-def base_facts(node):
-    return [ref_name(base) for base in node.bases]
-
-
-def class_defs(tree):
-    classes = []
-    for node in tree.body:
-        if not isinstance(node, ast.ClassDef):
-            continue
-        fields = []
-        methods = []
-        for child in node.body:
-            if isinstance(child, ast.AnnAssign):
-                fields.append({
-                    "name": ref_name(child.target),
-                    "annotation": annotation_text(child.annotation),
-                    "line": getattr(child, "lineno", getattr(node, "lineno", 1)),
-                })
-            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                methods.append(child.name)
-        classes.append({
-            "name": node.name,
-            "line": getattr(node, "lineno", 1),
-            "bases": base_facts(node),
-            "fields": fields,
-            "methods": methods,
-        })
-    return classes
-
-
-def uses_parent_config_field(node):
-    return any(
-        isinstance(child, ast.Attribute)
-        and isinstance(child.value, ast.Name)
-        and child.value.id == "config"
-        for child in ast.walk(node)
-    )
-
-
-def is_local_child_config(node, dependency_alias):
-    return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "InitializeConfig"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == dependency_alias
-    )
-
-
-class UsageVisitor(ast.NodeVisitor):
-    def __init__(self, aliases):
-        self.aliases = set(aliases)
-        self.alias_attrs = {}
-        self.calls = []
-        self.references = []
-        self.initialize_calls = []
-
-    def visit_Attribute(self, node):
-        if isinstance(node.value, ast.Name) and node.value.id in self.aliases:
-            self.alias_attrs.setdefault(node.value.id, set()).add(node.attr)
-        name = ref_name(node)
-        if name:
-            self.references.append({"name": name, "line": getattr(node, "lineno", 1)})
-        self.generic_visit(node)
-
-    def visit_Name(self, node):
-        self.references.append({"name": node.id, "line": getattr(node, "lineno", 1)})
-
-    def visit_Call(self, node):
-        name = ref_name(node.func)
-        if name:
-            self.calls.append({"name": name, "line": getattr(node, "lineno", 1)})
-        if (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr == "initialize"
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id in self.aliases
-        ):
-            first_arg = node.args[0] if node.args else None
-            self.initialize_calls.append({
-                "alias": node.func.value.id,
-                "line": getattr(node, "lineno", 1),
-                "uses_parent_config": uses_parent_config_field(first_arg),
-                "local_child_config": is_local_child_config(first_arg, node.func.value.id),
-            })
-        self.generic_visit(node)
-
-
-def usage(tree, aliases):
-    visitor = UsageVisitor(alias["alias"] for alias in aliases)
-    visitor.visit(tree)
-    return {
-        "alias_attrs": {key: sorted(value) for key, value in sorted(visitor.alias_attrs.items())},
-        "calls": visitor.calls,
-        "references": visitor.references,
-        "initialize_calls": visitor.initialize_calls,
-    }
-
-
-def main():
-    request = json.load(sys.stdin)
-    root = request["root"]
-    modules = []
-    errors = []
-    for path in request["files"]:
-        try:
-            text = pathlib.Path(path).read_text(encoding="utf-8")
-            tree = ast.parse(text, filename=path)
-        except SyntaxError as exc:
-            errors.append({
-                "path": relative_path(root, path),
-                "line": exc.lineno or 1,
-                "kind": "syntax_error",
-                "detail": "parseable",
-            })
-            continue
-        except Exception as exc:
-            print(f"AST extractor failed for {path}: {exc}", file=sys.stderr)
-            raise
-        aliases = imported_aliases(tree)
-        state = all_state(tree)
-        modules.append({
-            "path": relative_path(root, path),
-            "module": module_name(root, path),
-            "imports_amp": imports_algorithm_module_protocol(tree),
-            "public_definitions": public_definitions(tree),
-            "all_state": state["state"],
-            "all_names": state["names"],
-            "all_line": state["line"],
-            "imports": aliases,
-            "aliases": top_level_aliases(tree),
-            "classes": class_defs(tree),
-            "usage": usage(tree, aliases),
-        })
-    print(json.dumps({"modules": modules, "errors": errors}, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()
-"##;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
@@ -604,7 +306,7 @@ fn value_after(args: &[String], index: usize, flag: &str) -> Result<String, Stri
 
 fn run_check(args: Args) -> Result<Report, String> {
     let root = resolve_like_cwd(&args.root);
-    // Match discovered file identities before crossing the Python AST boundary.
+    // Keep file identities canonical before parsing source into the native AST.
     let root = fs::canonicalize(&root).unwrap_or(root);
     let files = source_files(&root, &args.paths, &args.excludes);
     let payload = extract_ast_modules(&root, &files)?;
@@ -779,35 +481,795 @@ fn match_character_class(value: &char, pattern: &[char], start: usize) -> Option
 }
 
 fn extract_ast_modules(root: &Path, files: &[PathBuf]) -> Result<Value, String> {
-    let request = json!({"root": root, "files": files});
-    let mut child = Command::new("python3")
-        .arg("-c")
-        .arg(AST_EXTRACTOR)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("failed to start python3 AST extractor: {error}"))?;
+    let mut modules = Vec::new();
+    let mut errors = Vec::new();
+    for path in files {
+        let source = fs::read_to_string(path)
+            .map_err(|error| format!("failed to read Python source {}: {error}", path.display()))?;
+        let source = normalize_python_newlines(&source);
+        let source_path = path.to_string_lossy();
+        let suite = match ast::Suite::parse(&source, source_path.as_ref()) {
+            Ok(suite) => suite,
+            Err(error) => {
+                let relative = relative_source_path(root, path)?;
+                errors.push(json!({
+                    "path": relative,
+                    "line": line_at_offset(&source, error.offset.to_usize()),
+                    "kind": "syntax_error",
+                    "detail": "parseable"
+                }));
+                continue;
+            }
+        };
+        modules.push(extract_module_json(root, path, &source, &suite)?);
+    }
+    Ok(json!({"modules": modules, "errors": errors}))
+}
+
+fn extract_module_json(
+    root: &Path,
+    path: &Path,
+    source: &str,
+    suite: &ast::Suite,
+) -> Result<Value, String> {
+    let relative = relative_source_path(root, path)?;
+    let module_path = PathBuf::from(&relative);
+    let mut import_aliases = Vec::new();
+    let mut imports_amp = false;
+    for statement in suite {
+        match statement {
+            Stmt::Import(import) => {
+                for alias in &import.names {
+                    let name = alias.name.to_string();
+                    if name.ends_with("algorithm_module_protocol") {
+                        imports_amp = true;
+                        continue;
+                    }
+                    import_aliases.push(json!({
+                        "alias": alias.asname.as_ref().map(ToString::to_string).unwrap_or_else(|| {
+                            name.rsplit('.').next().unwrap_or(name.as_str()).to_string()
+                        }),
+                        "module": name,
+                        "from_module": "",
+                        "name": "",
+                        "level": 0,
+                        "line": node_line(source, statement)
+                    }));
+                }
+            }
+            Stmt::ImportFrom(import) => {
+                let module = import
+                    .module
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_default();
+                if module.ends_with("algorithm_module_protocol")
+                    || import
+                        .names
+                        .iter()
+                        .any(|alias| alias.name.as_str() == "algorithm_module_protocol")
+                {
+                    imports_amp = true;
+                }
+                let level = import
+                    .level
+                    .as_ref()
+                    .map(|value| value.to_usize())
+                    .unwrap_or(0);
+                for alias in &import.names {
+                    let name = alias.name.to_string();
+                    if module.ends_with("algorithm_module_protocol")
+                        || name == "algorithm_module_protocol"
+                    {
+                        continue;
+                    }
+                    let mut imported = ".".repeat(level);
+                    imported.push_str(&module);
+                    if !module.is_empty() {
+                        imported.push('.');
+                        imported.push_str(&name);
+                    }
+                    import_aliases.push(json!({
+                        "alias": alias.asname.as_ref().unwrap_or(&alias.name).to_string(),
+                        "module": imported,
+                        "from_module": module,
+                        "name": name,
+                        "level": level,
+                        "line": node_line(source, statement)
+                    }));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let public_definitions = public_definitions(source, suite);
+    let (all_state, all_names, all_line) = all_state(source, suite);
+    let aliases = top_level_aliases(suite);
+    let classes = class_definitions(source, suite);
+    let usage = usage(source, suite, &import_aliases);
+    let module = module_name(&module_path);
+    Ok(json!({
+        "path": relative,
+        "module": module,
+        "imports_amp": imports_amp,
+        "public_definitions": public_definitions,
+        "all_state": all_state,
+        "all_names": all_names,
+        "all_line": all_line,
+        "imports": import_aliases,
+        "aliases": aliases,
+        "classes": classes,
+        "usage": usage
+    }))
+}
+
+fn relative_source_path(root: &Path, path: &Path) -> Result<String, String> {
+    let relative = path.strip_prefix(root).map_err(|_| {
+        format!(
+            "Python source path {} is outside root {}",
+            path.display(),
+            root.display()
+        )
+    })?;
+    Ok(posix_path(relative))
+}
+
+fn posix_path(path: &Path) -> String {
+    let value = path.to_string_lossy();
+    #[cfg(windows)]
     {
-        let stdin = child
-            .stdin
-            .as_mut()
-            .ok_or_else(|| "failed to open python3 stdin".to_string())?;
-        stdin
-            .write_all(request.to_string().as_bytes())
-            .map_err(|error| format!("failed to write AST request: {error}"))?;
+        value.replace('\\', "/")
     }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("failed to wait for python3 AST extractor: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "python3 AST extractor failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+    #[cfg(not(windows))]
+    {
+        value.into_owned()
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("failed to parse AST extractor JSON: {error}"))
+}
+
+fn normalize_python_newlines(source: &str) -> String {
+    source.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+fn module_name(relative_path: &Path) -> String {
+    let mut module_path = relative_path.to_path_buf();
+    module_path.set_extension("");
+    if module_path
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy() == "__init__")
+    {
+        module_path.pop();
+    }
+    module_path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+fn line_at_offset(source: &str, offset: usize) -> usize {
+    source
+        .as_bytes()
+        .iter()
+        .take(offset.min(source.len()))
+        .filter(|byte| **byte == b'\n')
+        .count()
+        + 1
+}
+
+fn node_line(source: &str, node: &impl Ranged) -> usize {
+    line_at_offset(source, node.start().to_usize())
+}
+
+fn expr_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Name(name) => Some(name.id.to_string()),
+        _ => None,
+    }
+}
+
+fn ref_name(expr: &Expr) -> String {
+    match expr {
+        Expr::Name(name) => name.id.to_string(),
+        Expr::Attribute(attribute) => {
+            let parent = ref_name(&attribute.value);
+            if parent.is_empty() {
+                attribute.attr.to_string()
+            } else {
+                format!("{parent}.{}", attribute.attr)
+            }
+        }
+        Expr::Subscript(subscript) => ref_name(&subscript.value),
+        Expr::Call(call) => ref_name(&call.func),
+        Expr::Constant(constant) => constant.value.to_string(),
+        _ => ast_dump_expr(expr),
+    }
+}
+
+fn ast_dump_expr(expr: &Expr) -> String {
+    use ast::Expr as E;
+    match expr {
+        E::BoolOp(node) => ast_dump_node(
+            "BoolOp",
+            [
+                ast_dump_node(&format!("{:?}", node.op), []),
+                ast_dump_expr_list(&node.values),
+            ],
+        ),
+        E::NamedExpr(node) => ast_dump_node(
+            "NamedExpr",
+            [ast_dump_expr(&node.target), ast_dump_expr(&node.value)],
+        ),
+        E::BinOp(node) => ast_dump_node(
+            "BinOp",
+            [
+                ast_dump_expr(&node.left),
+                ast_dump_node(&format!("{:?}", node.op), []),
+                ast_dump_expr(&node.right),
+            ],
+        ),
+        E::UnaryOp(node) => ast_dump_node(
+            "UnaryOp",
+            [
+                ast_dump_node(&format!("{:?}", node.op), []),
+                ast_dump_expr(&node.operand),
+            ],
+        ),
+        E::Lambda(node) => ast_dump_node(
+            "Lambda",
+            [ast_dump_arguments(&node.args), ast_dump_expr(&node.body)],
+        ),
+        E::IfExp(node) => ast_dump_node(
+            "IfExp",
+            [
+                ast_dump_expr(&node.test),
+                ast_dump_expr(&node.body),
+                ast_dump_expr(&node.orelse),
+            ],
+        ),
+        E::Dict(node) => ast_dump_node(
+            "Dict",
+            [
+                ast_dump_list(node.keys.iter().map(|key| {
+                    key.as_ref()
+                        .map(ast_dump_expr)
+                        .unwrap_or_else(|| "None".into())
+                })),
+                ast_dump_expr_list(&node.values),
+            ],
+        ),
+        E::Set(node) => ast_dump_node("Set", [ast_dump_expr_list(&node.elts)]),
+        E::ListComp(node) => ast_dump_node(
+            "ListComp",
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
+        ),
+        E::SetComp(node) => ast_dump_node(
+            "SetComp",
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
+        ),
+        E::DictComp(node) => ast_dump_node(
+            "DictComp",
+            [
+                ast_dump_expr(&node.key),
+                ast_dump_expr(&node.value),
+                ast_dump_comprehensions(&node.generators),
+            ],
+        ),
+        E::GeneratorExp(node) => ast_dump_node(
+            "GeneratorExp",
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
+        ),
+        E::Await(node) => ast_dump_node("Await", [ast_dump_expr(&node.value)]),
+        E::Yield(node) => ast_dump_node(
+            "Yield",
+            [node
+                .value
+                .as_ref()
+                .map(|value| ast_dump_expr(value))
+                .unwrap_or_else(|| "None".into())],
+        ),
+        E::YieldFrom(node) => ast_dump_node("YieldFrom", [ast_dump_expr(&node.value)]),
+        E::Compare(node) => ast_dump_node(
+            "Compare",
+            [
+                ast_dump_expr(&node.left),
+                ast_dump_list(
+                    node.ops
+                        .iter()
+                        .map(|op| ast_dump_node(&format!("{op:?}"), [])),
+                ),
+                ast_dump_expr_list(&node.comparators),
+            ],
+        ),
+        E::Call(node) => ast_dump_node(
+            "Call",
+            [
+                ast_dump_expr(&node.func),
+                ast_dump_expr_list(&node.args),
+                ast_dump_list(node.keywords.iter().map(ast_dump_keyword)),
+            ],
+        ),
+        E::FormattedValue(node) => ast_dump_node(
+            "FormattedValue",
+            [
+                ast_dump_expr(&node.value),
+                (node.conversion as i8).to_string(),
+                node.format_spec
+                    .as_ref()
+                    .map(|spec| ast_dump_expr(spec))
+                    .unwrap_or_else(|| "None".into()),
+            ],
+        ),
+        E::JoinedStr(node) => ast_dump_node("JoinedStr", [ast_dump_expr_list(&node.values)]),
+        E::Constant(node) => ast_dump_node(
+            "Constant",
+            [
+                node.value.to_string(),
+                node.kind
+                    .as_ref()
+                    .map(|kind| ast_dump_string(kind))
+                    .unwrap_or_else(|| "None".into()),
+            ],
+        ),
+        E::Attribute(node) => ast_dump_node(
+            "Attribute",
+            [
+                ast_dump_expr(&node.value),
+                ast_dump_string(node.attr.as_str()),
+                ast_dump_context(&node.ctx),
+            ],
+        ),
+        E::Subscript(node) => ast_dump_node(
+            "Subscript",
+            [
+                ast_dump_expr(&node.value),
+                ast_dump_expr(&node.slice),
+                ast_dump_context(&node.ctx),
+            ],
+        ),
+        E::Starred(node) => ast_dump_node(
+            "Starred",
+            [ast_dump_expr(&node.value), ast_dump_context(&node.ctx)],
+        ),
+        E::Name(node) => ast_dump_node(
+            "Name",
+            [
+                ast_dump_string(node.id.as_str()),
+                ast_dump_context(&node.ctx),
+            ],
+        ),
+        E::List(node) => ast_dump_node(
+            "List",
+            [ast_dump_expr_list(&node.elts), ast_dump_context(&node.ctx)],
+        ),
+        E::Tuple(node) => ast_dump_node(
+            "Tuple",
+            [ast_dump_expr_list(&node.elts), ast_dump_context(&node.ctx)],
+        ),
+        E::Slice(node) => ast_dump_node(
+            "Slice",
+            [
+                node.lower
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
+                node.upper
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
+                node.step
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
+            ],
+        ),
+    }
+}
+
+fn ast_dump_node<const N: usize>(name: &str, fields: [String; N]) -> String {
+    format!("{name}({})", fields.join(", "))
+}
+
+fn ast_dump_list(values: impl IntoIterator<Item = String>) -> String {
+    format!("[{}]", values.into_iter().collect::<Vec<_>>().join(", "))
+}
+
+fn ast_dump_expr_list(values: &[Expr]) -> String {
+    ast_dump_list(values.iter().map(ast_dump_expr))
+}
+
+fn ast_dump_string(value: &str) -> String {
+    ast::Constant::Str(value.to_string()).to_string()
+}
+
+fn ast_dump_context(context: &ast::ExprContext) -> String {
+    ast_dump_node(&format!("{context:?}"), [])
+}
+
+fn ast_dump_keyword(keyword: &ast::Keyword) -> String {
+    ast_dump_node(
+        "keyword",
+        [
+            keyword
+                .arg
+                .as_ref()
+                .map(|name| ast_dump_string(name.as_str()))
+                .unwrap_or_else(|| "None".into()),
+            ast_dump_expr(&keyword.value),
+        ],
+    )
+}
+
+fn ast_dump_comprehensions(values: &[ast::Comprehension]) -> String {
+    ast_dump_list(values.iter().map(|value| {
+        ast_dump_node(
+            "comprehension",
+            [
+                ast_dump_expr(&value.target),
+                ast_dump_expr(&value.iter),
+                ast_dump_expr_list(&value.ifs),
+                u8::from(value.is_async).to_string(),
+            ],
+        )
+    }))
+}
+
+fn ast_dump_arg(argument: &ast::Arg) -> String {
+    ast_dump_node(
+        "arg",
+        [
+            ast_dump_string(argument.arg.as_str()),
+            argument
+                .annotation
+                .as_ref()
+                .map(|annotation| ast_dump_expr(annotation))
+                .unwrap_or_else(|| "None".into()),
+            argument
+                .type_comment
+                .as_ref()
+                .map(|comment| ast_dump_string(comment))
+                .unwrap_or_else(|| "None".into()),
+        ],
+    )
+}
+
+fn ast_dump_arguments(arguments: &ast::Arguments) -> String {
+    ast_dump_node(
+        "arguments",
+        [
+            ast_dump_list(
+                arguments
+                    .posonlyargs
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
+            ast_dump_list(
+                arguments
+                    .args
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
+            arguments
+                .vararg
+                .as_ref()
+                .map(|argument| ast_dump_arg(argument))
+                .unwrap_or_else(|| "None".into()),
+            ast_dump_list(
+                arguments
+                    .kwonlyargs
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
+            ast_dump_list(arguments.kwonlyargs.iter().map(|argument| {
+                argument
+                    .default
+                    .as_deref()
+                    .map(ast_dump_expr)
+                    .unwrap_or_else(|| "None".into())
+            })),
+            arguments
+                .kwarg
+                .as_ref()
+                .map(|argument| ast_dump_arg(argument))
+                .unwrap_or_else(|| "None".into()),
+            ast_dump_list(
+                arguments
+                    .posonlyargs
+                    .iter()
+                    .chain(&arguments.args)
+                    .filter_map(|argument| argument.default.as_deref().map(ast_dump_expr)),
+            ),
+        ],
+    )
+}
+
+fn literal_string_sequence(expr: &Expr) -> Option<Vec<String>> {
+    let elements = match expr {
+        Expr::List(list) => &list.elts,
+        Expr::Tuple(tuple) => &tuple.elts,
+        Expr::Set(set) => &set.elts,
+        _ => return None,
+    };
+    elements
+        .iter()
+        .map(|element| match element {
+            Expr::Constant(constant) => match &constant.value {
+                ast::Constant::Str(value) => Some(value.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+fn public_definitions(source: &str, suite: &ast::Suite) -> Vec<Value> {
+    let mut definitions = Vec::new();
+    for statement in suite {
+        let line = node_line(source, statement);
+        match statement {
+            Stmt::ClassDef(class) if is_public_name(class.name.as_str()) => {
+                definitions
+                    .push(json!({"name": class.name.to_string(), "line": line, "kind": "class"}));
+            }
+            Stmt::FunctionDef(function) if is_public_name(function.name.as_str()) => {
+                definitions.push(
+                    json!({"name": function.name.to_string(), "line": line, "kind": "function"}),
+                );
+            }
+            Stmt::AsyncFunctionDef(function) if is_public_name(function.name.as_str()) => {
+                definitions.push(json!({"name": function.name.to_string(), "line": line, "kind": "async_function"}));
+            }
+            Stmt::Assign(assign) => {
+                for target in &assign.targets {
+                    if let Some(name) = expr_name(target).filter(|name| is_public_name(name)) {
+                        definitions.push(json!({"name": name, "line": line, "kind": "assignment"}));
+                    }
+                }
+            }
+            Stmt::AnnAssign(assign) => {
+                if let Some(name) = expr_name(&assign.target).filter(|name| is_public_name(name)) {
+                    definitions.push(json!({"name": name, "line": line, "kind": "annotation"}));
+                }
+            }
+            _ => {}
+        }
+    }
+    definitions
+}
+
+fn is_public_name(name: &str) -> bool {
+    !name.starts_with('_') && name != "__all__"
+}
+
+fn all_state(source: &str, suite: &ast::Suite) -> (&'static str, Vec<String>, usize) {
+    for statement in suite {
+        let value = match statement {
+            Stmt::Assign(assign)
+                if assign
+                    .targets
+                    .iter()
+                    .any(|target| expr_name(target).as_deref() == Some("__all__")) =>
+            {
+                Some(assign.value.as_ref())
+            }
+            Stmt::AnnAssign(assign) if expr_name(&assign.target).as_deref() == Some("__all__") => {
+                assign.value.as_deref()
+            }
+            _ => None,
+        };
+        if let Stmt::AnnAssign(assign) = statement {
+            if expr_name(&assign.target).as_deref() == Some("__all__") && assign.value.is_none() {
+                return ("dynamic", Vec::new(), node_line(source, statement));
+            }
+        }
+        if let Some(value) = value {
+            return match literal_string_sequence(value) {
+                Some(names) => ("literal", names, node_line(source, statement)),
+                None => ("dynamic", Vec::new(), node_line(source, statement)),
+            };
+        }
+    }
+    ("missing", Vec::new(), 1)
+}
+
+fn top_level_aliases(suite: &ast::Suite) -> BTreeMap<String, String> {
+    let mut aliases = BTreeMap::new();
+    for statement in suite {
+        match statement {
+            Stmt::AnnAssign(assign) => {
+                if let (Some(name), Some(value)) =
+                    (expr_name(&assign.target), assign.value.as_deref())
+                {
+                    aliases.insert(name, value.to_string());
+                }
+            }
+            Stmt::Assign(assign) if assign.targets.len() == 1 => {
+                if let Some(name) = expr_name(&assign.targets[0]) {
+                    aliases.insert(name, assign.value.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    aliases
+}
+
+fn class_definitions(source: &str, suite: &ast::Suite) -> Vec<Value> {
+    let mut classes = Vec::new();
+    for statement in suite {
+        let Stmt::ClassDef(class) = statement else {
+            continue;
+        };
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+        for child in &class.body {
+            match child {
+                Stmt::AnnAssign(assign) => fields.push(json!({
+                    "name": ref_name(&assign.target),
+                    "annotation": assign.annotation.to_string(),
+                    "line": node_line(source, child)
+                })),
+                Stmt::FunctionDef(function) => methods.push(function.name.to_string()),
+                Stmt::AsyncFunctionDef(function) => methods.push(function.name.to_string()),
+                _ => {}
+            }
+        }
+        let bases = class.bases.iter().map(ref_name).collect::<Vec<_>>();
+        classes.push(json!({
+            "name": class.name.to_string(),
+            "line": node_line(source, statement),
+            "bases": bases,
+            "fields": fields,
+            "methods": methods
+        }));
+    }
+    classes
+}
+
+struct UsageCollector<'a> {
+    source: &'a str,
+    aliases: BTreeSet<String>,
+    alias_attrs: BTreeMap<String, BTreeSet<String>>,
+    calls: Vec<Value>,
+    references: Vec<Value>,
+    initialize_calls: Vec<Value>,
+}
+
+impl<'a> UsageCollector<'a> {
+    fn new(source: &'a str, aliases: BTreeSet<String>) -> Self {
+        Self {
+            source,
+            aliases,
+            alias_attrs: BTreeMap::new(),
+            calls: Vec::new(),
+            references: Vec::new(),
+            initialize_calls: Vec::new(),
+        }
+    }
+
+    fn into_json(self) -> Value {
+        json!({
+            "alias_attrs": self.alias_attrs,
+            "calls": self.calls,
+            "references": self.references,
+            "initialize_calls": self.initialize_calls
+        })
+    }
+}
+
+impl Visitor for UsageCollector<'_> {
+    fn visit_expr_attribute(&mut self, node: ast::ExprAttribute) {
+        let line = node_line(self.source, &node);
+        if let Expr::Name(name) = node.value.as_ref() {
+            let alias = name.id.to_string();
+            if self.aliases.contains(&alias) {
+                self.alias_attrs
+                    .entry(alias)
+                    .or_default()
+                    .insert(node.attr.to_string());
+            }
+        }
+        let parent = ref_name(&node.value);
+        let name = if parent.is_empty() {
+            node.attr.to_string()
+        } else {
+            format!("{parent}.{}", node.attr)
+        };
+        if !name.is_empty() {
+            self.references.push(json!({"name": name, "line": line}));
+        }
+        self.generic_visit_expr_attribute(node);
+    }
+
+    fn visit_expr_name(&mut self, node: ast::ExprName) {
+        self.references.push(json!({
+            "name": node.id.to_string(),
+            "line": node_line(self.source, &node)
+        }));
+        self.generic_visit_expr_name(node);
+    }
+
+    fn visit_expr_call(&mut self, node: ast::ExprCall) {
+        let line = node_line(self.source, &node);
+        let name = ref_name(&node.func);
+        if !name.is_empty() {
+            self.calls.push(json!({"name": name, "line": line}));
+        }
+        if let Expr::Attribute(function) = node.func.as_ref() {
+            if function.attr.as_str() == "initialize" {
+                if let Expr::Name(alias) = function.value.as_ref() {
+                    let alias_name = alias.id.to_string();
+                    if self.aliases.contains(&alias_name) {
+                        let first_arg = node.args.first();
+                        let uses_parent_config = first_arg.is_some_and(uses_parent_config_field);
+                        let local_child_config = first_arg
+                            .is_some_and(|argument| is_local_child_config(argument, &alias_name));
+                        self.initialize_calls.push(json!({
+                            "alias": alias_name,
+                            "line": line,
+                            "uses_parent_config": uses_parent_config,
+                            "local_child_config": local_child_config
+                        }));
+                    }
+                }
+            }
+        }
+        self.generic_visit_expr_call(node);
+    }
+}
+
+struct ParentConfigVisitor(bool);
+
+impl Visitor for ParentConfigVisitor {
+    fn visit_expr_attribute(&mut self, node: ast::ExprAttribute) {
+        if matches!(node.value.as_ref(), Expr::Name(name) if name.id.as_str() == "config") {
+            self.0 = true;
+        }
+        self.generic_visit_expr_attribute(node);
+    }
+}
+
+fn usage(source: &str, suite: &ast::Suite, imports: &[Value]) -> Value {
+    let aliases = imports
+        .iter()
+        .filter_map(|import| {
+            import
+                .get("alias")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<BTreeSet<_>>();
+    let mut visitor = UsageCollector::new(source, aliases);
+    for statement in suite.iter().cloned() {
+        visitor.visit_stmt(statement);
+    }
+    visitor.into_json()
+}
+
+fn uses_parent_config_field(expr: &Expr) -> bool {
+    let mut visitor = ParentConfigVisitor(false);
+    visitor.visit_expr(expr.clone());
+    visitor.0
+}
+
+fn is_local_child_config(expr: &Expr, dependency_alias: &str) -> bool {
+    matches!(
+        expr,
+        Expr::Call(call)
+            if matches!(call.func.as_ref(), Expr::Attribute(attribute)
+                if attribute.attr.as_str() == "InitializeConfig"
+                    && matches!(attribute.value.as_ref(), Expr::Name(name)
+                        if name.id.as_str() == dependency_alias))
+    )
 }
 
 fn parse_parse_error(value: &Value) -> Result<ParseError, String> {
