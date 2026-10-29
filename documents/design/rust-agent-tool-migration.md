@@ -59,13 +59,19 @@ not basenames, distinguish owners such as the several `readability.py` files.
 The planner also reports known Python delegation at these native owners when
 the corresponding source evidence is present:
 
-- `python_structure_hash.rs` and `python_algorithm_contract.rs`: embedded Python
-  AST extraction implementations.
+- `python_structure_hash.rs`: embedded Python AST extraction implementation.
 
 This is a declared set of known gaps, not an exhaustive detector for arbitrary
 Python execution. An absent known marker does not establish completion. The
 plan always leaves overall completion unverified; a port needs the evidence
 below.
+
+The `python-algorithm-contract-check` extractor is ported to the registry
+`rustpython-parser` and `rustpython-ast` 0.4.0 crates. The existing Rust file
+selection, analyzer, CLI, and report schema remain the owner contract. Selected
+AST features provide source locations, arbitrary-size integer literals,
+expression unparse, and visitor traversal. Old/new fixture comparison remains
+the acceptance oracle for CPython AST behavior.
 
 Private feedback/knowledge storage now belongs to `private_feedback.rs`; its
 packaged Python adapter is retired. `workflow_monitor.py` remains an owned Python
