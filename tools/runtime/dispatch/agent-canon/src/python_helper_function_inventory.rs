@@ -730,7 +730,7 @@ fn call_passes_parameters(call: &ast::ExprCall, parameters: &BTreeSet<String>) -
         .iter()
         .all(|argument| argument_passes_parameter(argument, parameters))
         && call.keywords.iter().all(|keyword| {
-            matches!(&*keyword.value, ast::Expr::Name(value) if parameters.contains(value.id.as_str()))
+            matches!(&keyword.value, ast::Expr::Name(value) if parameters.contains(value.id.as_str()))
         })
 }
 
