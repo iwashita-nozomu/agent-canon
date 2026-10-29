@@ -11,6 +11,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
@@ -35,7 +36,9 @@ mod python_structure_hash_scope_plan;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
+mod skill_projection_registry;
 mod structured_analysis;
+mod surface_manifest;
 mod test_design;
 
 use std::env;
@@ -55,6 +58,7 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
+  surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
   semantic-index <operation>
   structured-analysis <operation>
@@ -96,6 +100,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "check-dependency-headers" {
         std::process::exit(dependency_headers::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "surface-manifest" {
+        std::process::exit(surface_manifest::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
