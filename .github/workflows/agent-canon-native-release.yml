@@ -98,7 +98,7 @@ jobs:
                   "target": "x86_64-pc-windows-msvc",
                   "runs_on": "windows-2025",
                   "executable": "agent-canon.exe",
-                  "rustflags": "-C target-feature=+crt-static"
+                  "rustflags": "-C target-feature=+crt-static -C link-arg=/Brepro"
                 }
               ]
             }
@@ -202,6 +202,50 @@ jobs:
             --root "$PACKAGE_DIR" --target "$TARGET"
           python tests/agent_tools/test_native_cli_distribution.py \
             --package-dir "$PACKAGE_DIR" --target "$TARGET" --version "$VERSION"
+
+      - name: Rebuild Windows archives and require byte equality
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: bash
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-${{ matrix.target }}
+          PACKAGE_DIR: ${{ runner.temp }}/agent-canon-native-package
+          REBUILD_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-rebuild-${{ matrix.target }}
+          REBUILD_PACKAGE_DIR: ${{ runner.temp }}/agent-canon-native-rebuild
+        run: |
+          set -euo pipefail
+          # A separate cold build must reproduce MSVC timestamps and CodeView IDs.
+          test ! -e "$REBUILD_TARGET_DIR"
+          cargo build --locked --release \
+            --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
+            --target-dir "$REBUILD_TARGET_DIR" 2>&1 | tee -a "$RUNNER_TEMP/native-checks.log"
+          python tools/agent/templates/template_bundle.py native-package \
+            --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
+            --binary "$REBUILD_TARGET_DIR/release/$EXECUTABLE" --target "$TARGET" \
+            --output "$REBUILD_PACKAGE_DIR" \
+            --toolchain "rustc=$(rustc -V); cargo=$(cargo -V); rustflags=$RUSTFLAGS"
+          python tools/agent/templates/template_bundle.py native-verify \
+            --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
+            --root "$REBUILD_PACKAGE_DIR" --target "$TARGET"
+          python - <<'PY' 2>&1 | tee -a "$RUNNER_TEMP/native-checks.log"
+          import hashlib
+          import os
+          from pathlib import Path
+
+          original = Path(os.environ["CARGO_TARGET_DIR"]) / "release" / os.environ["EXECUTABLE"]
+          rebuilt = Path(os.environ["REBUILD_TARGET_DIR"]) / "release" / os.environ["EXECUTABLE"]
+          pairs = [(original, rebuilt)]
+          packages = Path(os.environ["PACKAGE_DIR"])
+          rebuilt_packages = Path(os.environ["REBUILD_PACKAGE_DIR"])
+          names = {path.name for path in packages.iterdir()}
+          if names != {path.name for path in rebuilt_packages.iterdir()}:
+              raise SystemExit("rebuilt package file set differs")
+          pairs.extend((packages / name, rebuilt_packages / name) for name in sorted(names))
+          for first, second in pairs:
+              content = first.read_bytes()
+              if content != second.read_bytes():
+                  raise SystemExit("independent rebuild differs: " + first.name)
+              print("reproduced " + hashlib.sha256(content).hexdigest() + "  " + first.name)
+          PY
 
       - name: Upload check output
         if: always()

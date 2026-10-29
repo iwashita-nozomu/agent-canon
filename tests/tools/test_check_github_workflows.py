@@ -126,6 +126,81 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
                 assert values["version"] == "1.2.3", name
 
 
+def test_windows_rebuild_comparison_rejects_changed_or_missing_output() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/agent-canon-native-release.yml").read_text()
+    )
+    step = next(
+        value
+        for value in workflow["jobs"]["build"]["steps"]
+        if value["name"] == "Rebuild Windows archives and require byte equality"
+    )
+    comparison = (
+        step["run"]
+        .split("python - <<'PY'", 1)[1]
+        .split("\n", 1)[1]
+        .rsplit("\nPY", 1)[0]
+    )
+    for changed in (
+        None,
+        "agent-canon.exe",
+        "release.zip",
+        "release.zip.sha256",
+        "missing",
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = root / "original build"
+            rebuilt = root / "rebuilt build"
+            packages = root / "packages"
+            rebuilt_packages = root / "rebuilt packages"
+            pairs = [
+                (
+                    original / "release/agent-canon.exe",
+                    rebuilt / "release/agent-canon.exe",
+                )
+            ]
+            pairs.extend(
+                (packages / name, rebuilt_packages / name)
+                for name in (
+                    "release.zip",
+                    "release.tar.gz",
+                    "release.zip.sha256",
+                    "release.tar.gz.sha256",
+                )
+            )
+            for first, second in pairs:
+                first.parent.mkdir(parents=True, exist_ok=True)
+                second.parent.mkdir(parents=True, exist_ok=True)
+                first.write_bytes(b"same bytes\n")
+                second.write_bytes(b"same bytes\n")
+                if second.name == changed:
+                    second.write_bytes(b"diff bytes\n")
+            if changed == "missing":
+                (rebuilt_packages / "release.tar.gz").unlink()
+            result = subprocess.run(
+                [sys.executable, "-c", comparison],
+                env={
+                    **os.environ,
+                    "EXECUTABLE": "agent-canon.exe",
+                    "CARGO_TARGET_DIR": str(original),
+                    "REBUILD_TARGET_DIR": str(rebuilt),
+                    "PACKAGE_DIR": str(packages),
+                    "REBUILD_PACKAGE_DIR": str(rebuilt_packages),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if changed is None:
+                assert result.returncode == 0, result.stderr
+                assert len(result.stdout.splitlines()) == 5
+            else:
+                assert result.returncode != 0, changed
+                expected = "file set differs" if changed == "missing" else changed
+                assert expected in result.stderr
+
+
 def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(CHECKER), "--root", str(root)],
