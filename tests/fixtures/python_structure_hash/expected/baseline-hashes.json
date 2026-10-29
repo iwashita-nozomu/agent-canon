@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "python": "3.12.3",
+    "extractor_source": "d7b4cb1b13e12eb553cf12f4164ce7e32d42a23c",
+    "extractor_blob": "8327cdb50262c47b6058fd05ddd89693198270c2",
+    "cli_source": "7d03fc03d198e2b525807c90a3deaf77f6bbdb2f",
+    "cli_sha256": "857902fc05a5122d17f46d0ad4d12bd37594b2fe47a42315d4983cbf17535330"
+  },
+  "duplicate_pair_hashes": {
+    "alias_pair": "9ddcba2239474ebf",
+    "alpha_beta": "56dbfad942f82da2",
+    "first_second_record": "2977ecd86177a932",
+    "implementation_pair": "b46c609fb35c00b0",
+    "protocol_pair": "cf5d55784b8fd408"
+  },
+  "summary": {
+    "analyzed_file_count": 4,
+    "groups": 13,
+    "duplicate_groups": 8,
+    "single_caller_findings": 3,
+    "single_callee_findings": 2
+  }
+}

@@ -1,0 +1,16 @@
+from typing import Protocol
+
+
+@decorate_beta
+def beta(item: str) -> str:
+    """A different name and literal should normalize with alpha."""
+    return item + 99
+
+
+class SecondRecord(BaseB):
+    other: str
+
+
+class SecondProto(Protocol):
+    def execute(self, thing: bytes) -> bytes:
+        ...
