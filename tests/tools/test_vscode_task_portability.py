@@ -71,15 +71,11 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             workspace = Path(tmp_dir)
             self.write_exec(
                 workspace / "tools" / "bin" / "agent-canon",
-                '#!/usr/bin/env bash\necho DOCS_BIN=standalone',
+                '#!/usr/bin/env bash\ncase "$1 $2" in\n  "docs check") echo DOCS_BIN=standalone ;;\n  "check-dependency-headers --changed") echo DEP_HEADERS=standalone ;;\n  *) exit 2 ;;\nesac',
             )
             self.write_py(
                 workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
-            )
-            self.write_py(
-                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py",
-                'print("DEP_HEADERS=standalone")',
             )
             self.write_exec(
                 workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",
@@ -111,14 +107,13 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
             workspace = Path(tmp_dir)
             # A conflicting legacy view must never win over the source checkout.
             self.write_exec(workspace / "tools" / "agent-canon" / "bin" / "agent-canon", "echo BAD_PARENT_VIEW")
-            self.write_exec(workspace / "tools" / "bin" / "agent-canon", "echo DOCS_BIN=standalone")
+            self.write_exec(
+                workspace / "tools" / "bin" / "agent-canon",
+                '#!/usr/bin/env bash\ncase "$1 $2" in\n  "docs check") echo DOCS_BIN=standalone ;;\n  "check-dependency-headers --changed") echo DEP_HEADERS=standalone ;;\n  *) exit 2 ;;\nesac',
+            )
             self.write_py(
                 workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
-            )
-            self.write_py(
-                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_headers.py",
-                'print("DEP_HEADERS=standalone")',
             )
             self.write_exec(
                 workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",

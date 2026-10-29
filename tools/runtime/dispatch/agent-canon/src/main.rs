@@ -6,6 +6,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
+// downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -17,6 +18,7 @@
 // @dependency-end
 
 mod config;
+mod dependency_headers;
 mod dependency_manifest;
 mod docs;
 mod file_surface_inventory;
@@ -46,6 +48,7 @@ Commands:
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
+  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
@@ -89,6 +92,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {
         std::process::exit(rust_migration_plan::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-dependency-headers" {
+        std::process::exit(dependency_headers::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {

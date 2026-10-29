@@ -2,7 +2,7 @@
 name: html-output
 description: "Use when the user explicitly asks for HTML output, a browser-readable page, dashboard/report HTML, external browser publication, or local preview server; defaults reports to Markdown unless HTML is explicit."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"94ac25f7dd17becd473956dfaabe0efd233725af2251e8a92119f65bd256ac88"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"0358f0d1f831c407b6a5cef28de0a00cdab267a4b20fb6f8afd3788eaaad4f99"} -->
 
 <!--
 @dependency-start

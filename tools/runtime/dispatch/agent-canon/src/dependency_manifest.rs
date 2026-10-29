@@ -1,7 +1,8 @@
 // @dependency-start
 // contract implementation
-// responsibility Owns the complete-file dependency manifest snapshot consumed by the graph transaction.
+// responsibility Owns per-file dependency manifest parsing and the complete source snapshot consumed by the graph transaction.
 // upstream design ../../../../../documents/design/dependency-manifest-design.md canonical dependency-header grammar
+// downstream implementation dependency_headers.rs composes the per-file parser for selected-header checks
 // downstream implementation graph.rs builds one graph from this source snapshot
 // @dependency-end
 
@@ -72,6 +73,24 @@ pub(crate) struct ManifestAst {
     pub path: String,
     pub responsibility: String,
     pub contract_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedDependencyLine {
+    pub line_number: usize,
+    pub line: String,
+    pub direction: String,
+    pub kind: String,
+    pub target: String,
+    pub reason: String,
+    pub normalized_target: Result<String, TargetPathError>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedDependencyHeader {
+    pub entries: Vec<(usize, String)>,
+    pub declarations: Vec<ParsedDependencyLine>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -642,7 +661,7 @@ fn load_surface_manifest_snapshot(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TargetPathError {
+pub(crate) enum TargetPathError {
     Absolute,
     EscapesRoot,
 }
@@ -1264,6 +1283,13 @@ fn dependency_comment_payload<'a>(path: &Path, raw: &'a str) -> Option<&'a str> 
     trimmed.strip_prefix('#').map(str::trim)
 }
 
+pub(crate) fn has_dependency_markers(text: &str) -> bool {
+    let lines = text.lines().take(80).collect::<Vec<_>>();
+    let has_start = lines.iter().any(|line| line.contains("@dependency-start"));
+    let has_end = lines.iter().any(|line| line.contains("@dependency-end"));
+    has_start && has_end
+}
+
 fn manifest_lines(path: &Path, text: &str) -> Vec<(usize, String)> {
     let mut inside = false;
     let mut markup_comment = false;
@@ -1312,6 +1338,80 @@ fn manifest_lines(path: &Path, text: &str) -> Vec<(usize, String)> {
         lines
     } else {
         Vec::new()
+    }
+}
+
+pub(crate) fn parse_dependency_header(
+    relative: &str,
+    path: &Path,
+    text: &str,
+) -> ParsedDependencyHeader {
+    let entries = manifest_lines(path, text);
+    let mut declarations = Vec::new();
+    let mut diagnostics = Vec::new();
+    for (line_number, line) in &entries {
+        let mut fields = line.split_whitespace();
+        let direction = fields.next().unwrap_or_default();
+        let kind = fields.next().unwrap_or_default();
+        let target = fields.next().unwrap_or_default();
+        let reason = fields.collect::<Vec<_>>().join(" ");
+        if matches!(direction, "contract" | "responsibility" | "coverage") {
+            continue;
+        }
+        if !matches!(direction, "upstream" | "downstream") {
+            diagnostics.push(source_diagnostic(
+                "manifest-grammar",
+                format!("{relative}:{line_number}:{line}"),
+                "error",
+                source_span(relative, *line_number, line),
+                declaration_identity(direction, kind, target, &reason),
+            ));
+            continue;
+        }
+        let valid_kind = matches!(
+            kind,
+            "design" | "implementation" | "environment" | "reference"
+        );
+        if !valid_kind || target.is_empty() || reason.is_empty() {
+            diagnostics.push(source_diagnostic(
+                "manifest-grammar",
+                format!("{relative}:{line_number}:{line}"),
+                "error",
+                source_span(relative, *line_number, line),
+                declaration_identity(direction, kind, target, &reason),
+            ));
+        }
+        if target.is_empty() {
+            continue;
+        }
+        let normalized_target = resolve_source_relative_target(relative, target);
+        if let Err(error) = &normalized_target {
+            diagnostics.push(target_path_diagnostic(
+                relative,
+                *line_number,
+                line,
+                target,
+                *error,
+                declaration_identity(direction, kind, target, &reason),
+            ));
+        }
+        if !valid_kind || reason.is_empty() {
+            continue;
+        }
+        declarations.push(ParsedDependencyLine {
+            line_number: *line_number,
+            line: line.clone(),
+            direction: direction.to_string(),
+            kind: kind.to_string(),
+            target: target.to_string(),
+            reason,
+            normalized_target,
+        });
+    }
+    ParsedDependencyHeader {
+        entries,
+        declarations,
+        diagnostics,
     }
 }
 
@@ -1483,15 +1583,17 @@ pub(crate) fn capture_snapshot(
             continue;
         };
         let path = root.join(relative);
-        let entries = manifest_lines(&path, &text);
-        if entries.is_empty() {
+        let parsed_header = parse_dependency_header(relative, &path, &text);
+        if parsed_header.entries.is_empty() {
             continue;
         }
-        let responsibility = entries
+        let responsibility = parsed_header
+            .entries
             .iter()
             .find_map(|(_, line)| line.strip_prefix("responsibility ").map(str::to_string))
             .unwrap_or_default();
-        let contract_kind = entries
+        let contract_kind = parsed_header
+            .entries
             .iter()
             .find_map(|(_, line)| line.strip_prefix("contract ").map(str::to_string))
             .unwrap_or_default();
@@ -1503,100 +1605,59 @@ pub(crate) fn capture_snapshot(
                 contract_kind,
             },
         );
-        for (line_number, line) in entries {
-            let mut fields = line.split_whitespace();
-            let direction = fields.next().unwrap_or_default();
-            let kind = fields.next().unwrap_or_default();
-            let target = fields.next().unwrap_or_default();
-            let reason = fields.collect::<Vec<_>>().join(" ");
-            if matches!(direction, "contract" | "responsibility" | "coverage") {
-                continue;
-            }
-            if !matches!(direction, "upstream" | "downstream") {
-                diagnostics.push(source_diagnostic(
-                    "manifest-grammar",
-                    format!("{relative}:{line_number}:{line}"),
-                    "error",
-                    source_span(relative, line_number, &line),
-                    declaration_identity(direction, kind, target, &reason),
-                ));
-                continue;
-            }
-            if !matches!(
-                kind,
-                "design" | "implementation" | "environment" | "reference"
-            ) || target.is_empty()
-                || reason.is_empty()
+        diagnostics.extend(parsed_header.diagnostics.iter().cloned());
+        for declaration in parsed_header.declarations {
+            let (resolved, attestation_key, canonical_target) = match declaration.normalized_target
             {
-                diagnostics.push(source_diagnostic(
-                    "manifest-grammar",
-                    format!("{relative}:{line_number}:{line}"),
-                    "error",
-                    source_span(relative, line_number, &line),
-                    declaration_identity(direction, kind, target, &reason),
-                ));
-                continue;
-            }
-            let (resolved, attestation_key, canonical_target) =
-                match resolve_source_relative_target(relative, target) {
-                    Ok(target_path) => {
-                        let canonical_target_path =
-                            canonicalize_surface_path(&surface_manifest, &target_path)?;
-                        if manifest_repo_state_entry(&surface_manifest, &canonical_target_path)
-                            .is_some()
-                        {
-                            (None, "surface-manifest-repo-state", canonical_target_path)
-                        } else {
-                            let resolved = identity_by_path
-                                .get(&canonical_target_path)
-                                .filter(|_| !excluded_set.contains(&canonical_target_path))
-                                .cloned();
-                            if resolved.is_none() {
-                                diagnostics.push(target_unresolved_diagnostic(
-                                    relative,
-                                    line_number,
-                                    &line,
-                                    target,
-                                    declaration_identity(
-                                        direction,
-                                        kind,
-                                        &canonical_target_path,
-                                        &reason,
-                                    ),
-                                ));
-                            }
-                            (resolved, "dependency-header", canonical_target_path)
+                Ok(target_path) => {
+                    let canonical_target_path =
+                        canonicalize_surface_path(&surface_manifest, &target_path)?;
+                    if manifest_repo_state_entry(&surface_manifest, &canonical_target_path)
+                        .is_some()
+                    {
+                        (None, "surface-manifest-repo-state", canonical_target_path)
+                    } else {
+                        let resolved = identity_by_path
+                            .get(&canonical_target_path)
+                            .filter(|_| !excluded_set.contains(&canonical_target_path))
+                            .cloned();
+                        if resolved.is_none() {
+                            diagnostics.push(target_unresolved_diagnostic(
+                                relative,
+                                declaration.line_number,
+                                &declaration.line,
+                                &declaration.target,
+                                declaration_identity(
+                                    &declaration.direction,
+                                    &declaration.kind,
+                                    &canonical_target_path,
+                                    &declaration.reason,
+                                ),
+                            ));
                         }
+                        (resolved, "dependency-header", canonical_target_path)
                     }
-                    Err(error) => {
-                        diagnostics.push(target_path_diagnostic(
-                            relative,
-                            line_number,
-                            &line,
-                            target,
-                            error,
-                            declaration_identity(direction, kind, target, &reason),
-                        ));
-                        (
-                            None,
-                            "dependency-header",
-                            normalize_declaration_component(target),
-                        )
-                    }
-                };
+                }
+                Err(_) => (
+                    None,
+                    "dependency-header",
+                    normalize_declaration_component(&declaration.target),
+                ),
+            };
             declarations.push(DependencyDeclaration {
                 declaration_id: hash_text(&format!(
-                    "{snapshot_id}\0{relative}\0{line_number}\0{line}"
+                    "{snapshot_id}\0{relative}\0{}\0{}",
+                    declaration.line_number, declaration.line
                 )),
                 source_identity_id: identity_by_path.get(relative).cloned().unwrap_or_default(),
-                declared_direction: direction.to_string(),
-                declared_kind: kind.to_string(),
-                declared_target: target.to_string(),
+                declared_direction: declaration.direction,
+                declared_kind: declaration.kind,
+                declared_target: declaration.target,
                 canonical_target,
                 resolved_target_identity_id: resolved,
-                source_span: source_span(relative, line_number, &line),
-                reason,
-                raw_line_hash: hash_text(&line),
+                source_span: source_span(relative, declaration.line_number, &declaration.line),
+                reason: declaration.reason,
+                raw_line_hash: hash_text(&declaration.line),
                 attestation_key: attestation_key.to_string(),
                 snapshot_id: snapshot_id.clone(),
             });
@@ -1734,7 +1795,7 @@ pub(crate) fn write_snapshot_jsonl(
 mod tests {
     use super::{
         canonicalize_surface_path, declaration_identity, diagnostic_identity_json, manifest_lines,
-        resolve_source_relative_target, source_diagnostic, source_span,
+        parse_dependency_header, resolve_source_relative_target, source_diagnostic, source_span,
         target_path_diagnostic_code, GeneratedProjectionEntry, SurfaceManifestSnapshot,
         TargetPathError, SOURCE_DIAGNOSTIC_SCHEMA,
     };
@@ -1769,6 +1830,44 @@ mod tests {
             .1,
             "contract implementation"
         );
+    }
+
+    #[test]
+    fn selected_header_parser_reports_actual_bad_edge_kind_and_escaping_target() {
+        let autonomous_path = Path::new("tools/agent/orchestration/autonomous_convergence.py");
+        let autonomous = "# @dependency-start\n# contract implementation\n# responsibility Owns autonomous closeout.\n# downstream test ../../../tests/agent_tools/test_distributed_guarantee.py exercises the owner-receipt projection.\n# @dependency-end\n";
+        let parsed = parse_dependency_header(
+            autonomous_path.to_str().expect("UTF-8 path"),
+            autonomous_path,
+            autonomous,
+        );
+        assert_eq!(
+            parsed
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["manifest-grammar"]
+        );
+        assert!(parsed.declarations.is_empty());
+
+        let inventory_path =
+            Path::new("tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs");
+        let inventory = "// @dependency-start\n// contract implementation\n// responsibility Builds machine-readable file-surface inventories for repo review.\n// downstream test ../../../../../../tests/agent_tools/test_file_surface_inventory.py exercises the inventory CLI\n// @dependency-end\n";
+        let parsed = parse_dependency_header(
+            inventory_path.to_str().expect("UTF-8 path"),
+            inventory_path,
+            inventory,
+        );
+        assert_eq!(
+            parsed
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code.as_str())
+                .collect::<Vec<_>>(),
+            vec!["manifest-grammar", "target-escapes-root"]
+        );
+        assert!(parsed.declarations.is_empty());
     }
 
     #[test]

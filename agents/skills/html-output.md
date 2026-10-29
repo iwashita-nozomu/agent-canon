@@ -10,7 +10,7 @@ upstream design report-writing.md reader-facing report content owner
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 upstream environment ../../bootstrap/container/image/dependencies.toml supplies the standard Quarto renderer and offline link checker
 downstream implementation ../../.codex/personal/skills/html-output/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this adapter dependency header
 @dependency-end
 -->
 
