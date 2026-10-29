@@ -50,9 +50,9 @@ is required, preserve unknown state and prove cleanup.
 
 ## Closeout
 
-Report the repository-qualified Issue/PR, selector, workspace, identity when
-available from execution or failure diagnosis, execution plane, exact command,
-output, exit/signal, and any typed
+Report any associated repository-qualified Issue/PR, selector, workspace,
+identity when available from execution or failure diagnosis, execution plane,
+exact command, output, exit/signal, and any typed
 `container_not_running` or cleanup evidence. This skill's success proves only
 the requested command inside an existing project container; it does not prove
 AgentCanon bootstrap health, tool parity, project image build, or project test
