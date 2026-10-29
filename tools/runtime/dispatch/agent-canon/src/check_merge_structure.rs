@@ -90,7 +90,8 @@ impl Args {
             }
         }
 
-        let source = source.ok_or_else(|| "the following argument is required: --source".to_string())?;
+        let source =
+            source.ok_or_else(|| "the following argument is required: --source".to_string())?;
         Ok(Some(Self {
             source,
             target,
@@ -180,10 +181,20 @@ fn check(args: &Args) -> i32 {
     1
 }
 
-fn structural_paths(repo_root: &Path, merge_base: &str, source: &str) -> Result<Vec<String>, String> {
+fn structural_paths(
+    repo_root: &Path,
+    merge_base: &str,
+    source: &str,
+) -> Result<Vec<String>, String> {
     let output = run_git(
         repo_root,
-        &["diff", "--name-status", "--find-renames", merge_base, source],
+        &[
+            "diff",
+            "--name-status",
+            "--find-renames",
+            merge_base,
+            source,
+        ],
     )?;
     let mut paths = BTreeSet::new();
     for line in output.lines().filter(|line| !line.trim().is_empty()) {
