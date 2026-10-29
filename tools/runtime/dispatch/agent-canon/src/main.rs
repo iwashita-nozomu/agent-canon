@@ -10,6 +10,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
@@ -31,7 +32,9 @@ mod python_structure_hash_scope_plan;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
+mod skill_projection_registry;
 mod structured_analysis;
+mod surface_manifest;
 mod test_design;
 
 use std::env;
@@ -49,7 +52,8 @@ Commands:
   test-design <check> [paths...]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   rust-migration-audit --root <repo-root>
-  rust-migration-plan --root <repo-root> [--limit N]
+  rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
+  surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   semantic-index <operation>
   structured-analysis <operation>
   python-structure-hash --root <repo-root> [paths...]
@@ -86,6 +90,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {
         std::process::exit(rust_migration_plan::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "surface-manifest" {
+        std::process::exit(surface_manifest::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "docs" {

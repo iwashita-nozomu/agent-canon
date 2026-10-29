@@ -132,7 +132,7 @@ fn forbidden_roots(document: &DocumentMut) -> Result<Vec<String>, SurfaceError> 
     }).collect()
 }
 
-fn selected_manifest_path(root: &Path, prefix: &str, raw_manifest: &Path) -> PathBuf {
+pub(crate) fn selected_manifest_path(root: &Path, prefix: &str, raw_manifest: &Path) -> PathBuf {
     let prefixed = root.join(prefix).join(raw_manifest);
     if prefixed.is_file() { prefixed } else { root.join(raw_manifest) }
 }

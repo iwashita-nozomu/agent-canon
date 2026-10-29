@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Owns the one-build AgentCanon dependency graph and optional persisted runtime-evidence snapshot.
 // upstream implementation dependency_manifest.rs provides the complete-file source snapshot
-// upstream implementation ../../../../agent/skills/skill_projection_registry.py provides generated skill-view owner mapping
+// upstream implementation skill_projection_registry.rs provides native generated skill-view owner mapping
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
 // downstream implementation ../../../../analysis/dependencies/graph_client.py consumes typed graph responses
@@ -3051,7 +3051,7 @@ fn probe_input_fingerprint(
         validate_producer_identity(identity, Some(producer))
             .map_err(|error| GraphError::Validation(error.to_string()))?;
     }
-    let source = probe_snapshot_identity(root, "parent", producer, manifest)
+    let source = probe_snapshot_identity(root, "parent", producer, manifest, producer_identity)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     let base = InputFingerprintProbe {
         runtime_evidence_present: false,
@@ -3688,14 +3688,6 @@ mod tests {
     fn materialize_standalone_surface_manifest(root: &Path) {
         let files: &[(&str, &[u8])] = &[
             (
-                "tools/runtime/manifest/surface_manifest.py",
-                include_bytes!("../../../../../tools/runtime/manifest/surface_manifest.py"),
-            ),
-            (
-                "tools/agent/skills/skill_projection_registry.py",
-                include_bytes!("../../../../../tools/agent/skills/skill_projection_registry.py"),
-            ),
-            (
                 "documents/runtime/shared-runtime-surfaces.toml",
                 include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
             ),
@@ -3711,6 +3703,48 @@ mod tests {
             fs::write(target, bytes).expect("fixture canonical file");
             writeln!(exclude, "/{relative}").expect("fixture canonical file exclusion");
         }
+    }
+
+    fn external_producer_identity(root: &Path) -> ProducerIdentity {
+        let root = root.canonicalize().expect("external producer root");
+        let producer = root.join("external_surface_producer.py");
+        if !producer.is_file() {
+            // Independent external-provider response fixture, not a Python
+            // copy of the native parser or an AgentCanon implementation.
+            let snapshot = json!({
+                "schema": "agent-canon.surface-manifest.v2", "prefix": ".",
+                "entries": [
+                    {"path":"bootstrap","mode":"runtime","source":"bootstrap","projection_producer":"agent-canon-bootstrap","projection_kind":"runtime_surface","local_override_allowed":false,"optional":false},
+                    {"path":"tools","mode":"tool","source":"tools","projection_producer":"agent-canon","projection_kind":"tool_surface","local_override_allowed":false,"optional":false},
+                    {"path":"eval","mode":"eval","source":"eval","projection_producer":"agent-canon-log","projection_kind":"eval_surface","local_override_allowed":false,"optional":false},
+                    {"path":"tools/runtime/dispatch/agent-canon","mode":"tool","source":"tools/runtime/dispatch/agent-canon","projection_producer":"agent-canon","projection_kind":"tool_surface","local_override_allowed":false,"optional":false}
+                ],
+                "generated_projections": []
+            });
+            let literal = serde_json::to_string(&snapshot.to_string()).expect("response literal");
+            fs::write(&producer, format!("print({literal})\n")).expect("external response fixture");
+            let mut exclude = OpenOptions::new().append(true)
+                .open(root.join(".git/info/exclude")).expect("external fixture exclusion");
+            writeln!(exclude, "/external_surface_producer.py").expect("exclude external fixture");
+        }
+        let manifest = root.join("documents/runtime/shared-runtime-surfaces.toml");
+        ProducerIdentity {
+            source_root: root.to_string_lossy().into_owned(),
+            producer_path: producer.to_string_lossy().into_owned(),
+            version: crate::dependency_manifest::EXTERNAL_PRODUCER_IDENTITY_VERSION.to_string(),
+            contract: crate::dependency_manifest::PRODUCER_IDENTITY_CONTRACT.to_string(),
+            producer_sha256: sha256(&fs::read(&producer).expect("external producer bytes")),
+            manifest_path: manifest.to_string_lossy().into_owned(),
+            manifest_sha256: sha256(&fs::read(&manifest).expect("external manifest bytes")),
+        }
+    }
+
+    fn external_graph_args(root: &Path) -> GraphArgs {
+        let identity = external_producer_identity(root);
+        let mut args = graph_args(root);
+        args.surface_manifest_producer = Some(PathBuf::from(&identity.producer_path));
+        args.producer_identity = Some(identity);
+        args
     }
 
     fn unique_graph_fixture_root() -> PathBuf {
@@ -4625,19 +4659,19 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let first =
-            build_graph_with_failure(&graph_args(&fixture.root)).expect("first graph build");
+            build_graph_with_failure(&external_graph_args(&fixture.root)).expect("first graph build");
         OpenOptions::new()
             .append(true)
             .open(
                 fixture
                     .root
-                    .join("tools/runtime/manifest/surface_manifest.py"),
+                    .join("external_surface_producer.py"),
             )
             .expect("producer for mutation")
             .write_all(b"\n# producer semantic mutation\n")
             .expect("mutate producer");
         let second =
-            build_graph_with_failure(&graph_args(&fixture.root)).expect("second graph build");
+            build_graph_with_failure(&external_graph_args(&fixture.root)).expect("second graph build");
         assert_ne!(first["graph_fingerprint"], second["graph_fingerprint"]);
         assert_ne!(first["input_fingerprint"], second["input_fingerprint"]);
     }
@@ -4662,10 +4696,10 @@ mod tests {
             .open(
                 fixture
                     .root
-                    .join("tools/runtime/manifest/surface_manifest.py"),
+                    .join("documents/runtime/shared-runtime-surfaces.toml"),
             )
-            .expect("producer for mutation")
-            .write_all(b"\n# producer status mutation\n")
+            .expect("manifest dependency for mutation")
+            .write_all(b"\n# native identity manifest dependency mutation\n")
             .expect("mutate producer");
         let stale = read_graph_status(&canonical_args).expect("modified producer status");
         assert_eq!(stale["status"], "stale");
@@ -4715,7 +4749,7 @@ mod tests {
         let fixture = graph_fixture();
         let producer_fixture = graph_fixture();
         let producer_identity =
-            current_producer_identity(&producer_fixture.root).expect("external producer identity");
+            external_producer_identity(&producer_fixture.root);
         let mut explicit_args = graph_args(&fixture.root);
         explicit_args.surface_manifest_producer =
             Some(PathBuf::from(&producer_identity.producer_path));
@@ -4753,7 +4787,7 @@ mod tests {
             .open(
                 producer_fixture
                     .root
-                    .join("tools/runtime/manifest/surface_manifest.py"),
+                    .join("external_surface_producer.py"),
             )
             .expect("external producer for mutation")
             .write_all(b"\n# concurrent producer replacement\n")

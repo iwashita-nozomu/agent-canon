@@ -3,8 +3,8 @@
 contract reference
 responsibility Explains the standalone AgentCanon runtime-surface inventory and archive boundary.
 upstream design ./bootstrap-runtime.md bootstrap lifecycle and resource policy
-upstream implementation ../../tools/runtime/manifest/surface_manifest.py validates source classifications
-upstream implementation ../../tools/agent/skills/skill_projection_registry.py resolves generated skill owners
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/surface_manifest.rs validates native source classifications
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_projection_registry.rs resolves native generated skill owners
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs consumes normalized classifications
 @dependency-end
 -->
@@ -12,7 +12,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependenc
 # AgentCanon Runtime Surfaces
 
 This document is an auxiliary reader guide for the standalone AgentCanon tool
-runtime. It does not define parent-repository links, copies, submodules, root
+and bootstrap runtime. It grants no parent-repository synchronization authority.
+It does not define parent-repository links, copies, submodules, root
 views, deletion targets, or synchronization commands. A normal project keeps
 its own source tree and invokes the shared runtime through `bootstrap.sh`.
 
@@ -33,9 +34,35 @@ is the catalog/materializer mapping for ignored
 `.codex/personal/skills/<skill>/SKILL.md` views; graph consumers resolve those
 paths to tracked owners without creating the ignored view.
 
-The producer identity is
-`agent-canon.surface-manifest-producer.v2`; consumers must reject older or
-incomplete snapshots instead of silently treating them as equivalent.
+The default producer identity is
+`agent-canon.surface-manifest-producer.v3`. Its producer path and SHA-256 bind
+the canonical executable running the command. Native snapshot loading stays
+inside that process and requires no Python interpreter. The selected source
+root and manifest remain bound into the identity; the manifest must be a
+canonical regular file within that source root.
+
+An installed native executable can live outside the source root. This exception
+applies only to v3 and only when the producer path equals the current executable.
+A different outside-root artifact cannot obtain that authority by claiming v3.
+
+Explicit external Python producers retain
+`agent-canon.surface-manifest-producer.v2`: the producer and manifest must remain
+canonical regular files beneath the declared source root, their hashes must
+match, and producer path and identity must be supplied together. Their existing
+Python execution interface is retained. The native default does not fall back
+to an external producer on failure.
+
+Graph build and status preserve explicit producer replay and content-change
+rejection. Query and context remain bound to the current root's native identity.
+A graph built with an external v2 identity does not become a native v3 graph;
+default status requires a rebuild when the identities differ. Missing or invalid
+persisted identity evidence remains stale or rejected by the existing guards.
+The normalized snapshot schema itself remains `agent-canon.surface-manifest.v2`.
+
+The former owned Python surface-manifest entrypoint is retired. The Python
+skill-projection library remains for the source-only Python dependency graph
+and as an independent migration oracle; it is still counted as pending in the
+all-owned-tools migration.
 
 Evaluation results are collected into the external `agent-canon-log` repository.
 Runtime state, caches, temporary files, and receipts stay below the explicit
@@ -61,6 +88,6 @@ standalone source checks for the changed tool or runtime surface. Check the
 inventory with:
 
 ```bash
-python3 tools/runtime/manifest/surface_manifest.py --root . --prefix . \
+agent-canon surface-manifest --root . --prefix . \
   --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
 ```
