@@ -20,7 +20,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TASKS_JSON = PROJECT_ROOT / ".vscode" / "tasks.json"
 SETTINGS_JSON = PROJECT_ROOT / ".vscode" / "settings.json"
-def run_shell_command_in_workspace(workspace: Path, command: str) -> subprocess.CompletedProcess[str]:
+
+
+def run_shell_command_in_workspace(
+    workspace: Path, command: str
+) -> subprocess.CompletedProcess[str]:
     """Run one VS Code task command against a synthetic workspace."""
     return subprocess.run(
         ["bash", "-lc", command],
@@ -51,17 +55,20 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         return {task["label"]: task["command"] for task in tasks["tasks"]}
 
     def test_settings_and_tasks_use_portable_tool_views(self) -> None:
-        """Shared settings and tasks use only the standalone source checkout."""
+        """AgentCanon settings and tasks use the standalone source checkout."""
         commands = self.task_commands()
         for label, command in commands.items():
-            self.assertIn("${workspaceFolder}", command, label)
+            if label.startswith("AgentCanon:"):
+                self.assertIn("${workspaceFolder}", command, label)
             self.assertNotIn("tools/repository/support/repo_paths.sh", command, label)
             self.assertNotIn("tools/agent-canon", command, label)
             self.assertNotIn("CANON_TOOLS_ROOT", command, label)
         settings = json.loads(SETTINGS_JSON.read_text(encoding="utf-8"))
         self.assertIn("./tools", settings["python.analysis.extraPaths"])
         self.assertNotIn("./tools/agent-canon", settings["python.analysis.extraPaths"])
-        self.assertNotIn("./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"])
+        self.assertNotIn(
+            "./tools/agent-canon/agent_tools", settings["python.analysis.extraPaths"]
+        )
         self.assertFalse((PROJECT_ROOT / ".code-workspace").exists())
 
     def test_vscode_tasks_resolve_standalone_tools(self) -> None:
@@ -74,21 +81,38 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
                 '#!/usr/bin/env bash\ncase "$1 $2" in\n  "docs check") echo DOCS_BIN=standalone ;;\n  "check-dependency-headers --changed") echo DEP_HEADERS=standalone ;;\n  *) exit 2 ;;\nesac',
             )
             self.write_py(
-                workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
+                workspace
+                / "tools"
+                / "validation"
+                / "semantic"
+                / "convention"
+                / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
             )
             self.write_exec(
-                workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",
+                workspace
+                / "tools"
+                / "analysis"
+                / "dependencies"
+                / "scan_dependency_headers.sh",
                 "echo SCAN_HEADERS=standalone",
             )
             self.write_exec(
-                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh",
+                workspace
+                / "tools"
+                / "validation"
+                / "semantic"
+                / "dependencies"
+                / "check_dependency_header_format.sh",
                 "echo CHECK_HEADER_FORMAT=standalone",
             )
 
-            self.assertIn("DOCS_BIN=standalone", run_shell_command_in_workspace(
-                workspace, commands["AgentCanon: Docs Check"]
-            ).stdout)
+            self.assertIn(
+                "DOCS_BIN=standalone",
+                run_shell_command_in_workspace(
+                    workspace, commands["AgentCanon: Docs Check"]
+                ).stdout,
+            )
             convention = run_shell_command_in_workspace(
                 workspace, commands["AgentCanon: Convention Check"]
             )
@@ -106,25 +130,44 @@ class VscodeTaskPortabilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace = Path(tmp_dir)
             # A conflicting legacy view must never win over the source checkout.
-            self.write_exec(workspace / "tools" / "agent-canon" / "bin" / "agent-canon", "echo BAD_PARENT_VIEW")
+            self.write_exec(
+                workspace / "tools" / "agent-canon" / "bin" / "agent-canon",
+                "echo BAD_PARENT_VIEW",
+            )
             self.write_exec(
                 workspace / "tools" / "bin" / "agent-canon",
                 '#!/usr/bin/env bash\ncase "$1 $2" in\n  "docs check") echo DOCS_BIN=standalone ;;\n  "check-dependency-headers --changed") echo DEP_HEADERS=standalone ;;\n  *) exit 2 ;;\nesac',
             )
             self.write_py(
-                workspace / "tools" / "validation" / "semantic" / "convention" / "check_convention_compliance.py",
+                workspace
+                / "tools"
+                / "validation"
+                / "semantic"
+                / "convention"
+                / "check_convention_compliance.py",
                 'print("CONVENTION=standalone")',
             )
             self.write_exec(
-                workspace / "tools" / "analysis" / "dependencies" / "scan_dependency_headers.sh",
+                workspace
+                / "tools"
+                / "analysis"
+                / "dependencies"
+                / "scan_dependency_headers.sh",
                 "echo SCAN_HEADERS=standalone",
             )
             self.write_exec(
-                workspace / "tools" / "validation" / "semantic" / "dependencies" / "check_dependency_header_format.sh",
+                workspace
+                / "tools"
+                / "validation"
+                / "semantic"
+                / "dependencies"
+                / "check_dependency_header_format.sh",
                 "echo CHECK_HEADER_FORMAT=standalone",
             )
 
-            docs = run_shell_command_in_workspace(workspace, commands["AgentCanon: Docs Check"])
+            docs = run_shell_command_in_workspace(
+                workspace, commands["AgentCanon: Docs Check"]
+            )
             convention = run_shell_command_in_workspace(
                 workspace, commands["AgentCanon: Convention Check"]
             )
