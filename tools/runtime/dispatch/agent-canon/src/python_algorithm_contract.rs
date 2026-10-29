@@ -545,7 +545,7 @@ fn extract_module_json(
                     imports_amp = true;
                 }
                 let level = import.level.as_ref()
-                    .and_then(|value| value.to_string().parse::<usize>().ok())
+                    .map(|value| value.to_usize())
                     .unwrap_or(0);
                 for alias in &import.names {
                     let name = alias.name.to_string();
@@ -953,13 +953,13 @@ fn public_definitions(source: &str, suite: &ast::Suite) -> Vec<Value> {
         let line = node_line(source, statement);
         match statement {
             Stmt::ClassDef(class) if is_public_name(class.name.as_str()) => {
-                definitions.push(json!({"name": class.name, "line": line, "kind": "class"}));
+                definitions.push(json!({"name": class.name.to_string(), "line": line, "kind": "class"}));
             }
             Stmt::FunctionDef(function) if is_public_name(function.name.as_str()) => {
-                definitions.push(json!({"name": function.name, "line": line, "kind": "function"}));
+                definitions.push(json!({"name": function.name.to_string(), "line": line, "kind": "function"}));
             }
             Stmt::AsyncFunctionDef(function) if is_public_name(function.name.as_str()) => {
-                definitions.push(json!({"name": function.name, "line": line, "kind": "async_function"}));
+                definitions.push(json!({"name": function.name.to_string(), "line": line, "kind": "async_function"}));
             }
             Stmt::Assign(assign) => {
                 for target in &assign.targets {
@@ -1053,7 +1053,7 @@ fn class_definitions(source: &str, suite: &ast::Suite) -> Vec<Value> {
         }
         let bases = class.bases.iter().map(ref_name).collect::<Vec<_>>();
         classes.push(json!({
-            "name": class.name,
+            "name": class.name.to_string(),
             "line": node_line(source, statement),
             "bases": bases,
             "fields": fields,
