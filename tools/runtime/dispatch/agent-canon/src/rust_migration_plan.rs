@@ -873,13 +873,23 @@ mod tests {
         let root = fixture();
         let path = "tools/runtime/manifest/manifest_rendering.py";
         write(&root, path, "VALUE = 1\n");
-        write(&root, "tools/runtime/lifecycle/task_close.py", "VALUE = 1\n");
+        write(
+            &root,
+            "tools/runtime/lifecycle/task_close.py",
+            "VALUE = 1\n",
+        );
 
         let plan = build_plan(&root, 12).unwrap();
-        let rendering = plan.candidates.iter().find(|item| item.path == path).unwrap();
+        let rendering = plan
+            .candidates
+            .iter()
+            .find(|item| item.path == path)
+            .unwrap();
         assert_eq!(rendering.family, "agent-workflow");
         assert_eq!(rendering.class, "dependency-first");
-        assert!(rendering.remaining_prerequisites.contains(&"archive-lifecycle"));
+        assert!(rendering
+            .remaining_prerequisites
+            .contains(&"archive-lifecycle"));
         fs::remove_dir_all(root).unwrap();
     }
 
