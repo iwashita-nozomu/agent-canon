@@ -93,13 +93,11 @@ roots = [
 ]
 
 [profiles.native-cli]
-# Optional Python adapter shipped beside the native CLI. The Rust executable
-# resolves this path relative to its installed bin/ directory.
-roots = ["LICENSE", "tools/runtime/archive/private_feedback.py"]
+# Feedback and knowledge are implemented in the native executable.
+roots = ["LICENSE"]
 
 [profiles.native-cli.layout]
 "LICENSE" = "LICENSE"
-"tools/runtime/archive/private_feedback.py" = "share/agent-canon/private_feedback.py"
 
 [profiles.static-seed]
 roots = []

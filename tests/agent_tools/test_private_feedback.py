@@ -1,64 +1,174 @@
-#!/usr/bin/env python3
+"""Public native private feedback contracts; Python is only the test oracle."""
+
 # @dependency-start
 # contract test
-# responsibility Verifies the private feedback/knowledge adapter's owner-local observations.
-# upstream implementation ../../tools/runtime/archive/private_feedback.py private feedback adapter behavior
-# upstream design ../../documents/runtime/private-feedback-knowledge.md private feedback command and storage contract
+# responsibility Verifies native private storage, body-free output and OS lock interoperability.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs native behavior
+# upstream design ../../documents/runtime/private-feedback-knowledge.md storage contract
 # @dependency-end
-"""Focused tests for private feedback storage and promotion."""
 
 from __future__ import annotations
 
+import hashlib
 import json
-import sys
-import threading
+import os
+import re
+import shutil
+import subprocess
+import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tools.runtime.archive import private_feedback
+SCHEMA = "agent-canon.private-feedback-sync-request.v1"
 
 
-def invoke(runtime: Path, *argv: str, log_root: Path | None = None) -> int:
-    """Invoke the private feedback adapter against a test-owned runtime."""
-    args = ["--runtime-root", str(runtime)]
+@pytest.fixture(scope="session")
+def native() -> str:
+    """Use the selected built executable; never build or substitute the old adapter."""
+    executable = os.environ.get("AGENT_CANON_NATIVE_BIN") or shutil.which("agent-canon")
+    if not executable:
+        raise RuntimeError(
+            "Set AGENT_CANON_NATIVE_BIN to the candidate native executable"
+        )
+    return executable
+
+
+def invoke(
+    native: str,
+    runtime: Path,
+    *argv: str,
+    log_root: Path | None = None,
+    body: str | None = None,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    # Test configuration stays before a caller's literal-argument delimiter.
+    args = [native, argv[0], "--runtime-root", str(runtime)]
     if log_root is not None:
         args.extend(["--log-root", str(log_root)])
-    args.extend(argv)
-    return private_feedback.main(args)
+    args.extend(argv[1:])
+    return subprocess.run(
+        args,
+        input=body,
+        text=True,
+        capture_output=True,
+        check=False,
+        env={
+            **os.environ,
+            "AGENT_CANON_SOURCE_COMMIT": "a" * 40,
+            "AGENT_CANON_PYTHON": str(runtime / "must-not-run-python"),
+            **(extra_env or {}),
+        },
+    )
 
 
-def test_direct_text_and_stdin_write_metadata_only(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def metadata(result: subprocess.CompletedProcess[str]) -> dict[str, str]:
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    return json.loads(result.stdout.splitlines()[0])
+
+
+@pytest.mark.parametrize("literal", ["--help", "-h"])
+def test_literal_help_after_delimiter_is_stored(
+    native: str, tmp_path: Path, literal: str
 ) -> None:
-    """Direct prose and stdin both land in the external spool."""
     runtime = tmp_path / "runtime"
-    assert (
-        invoke(
-            runtime, "k", "add", "topic", "direct prose", "--run", "r1", "--task", "t1"
-        )
-        == 0
+    result = invoke(
+        native, runtime, "k", "add", "literal-help", "--", literal, "sentinel"
     )
-    monkeypatch.setattr("sys.stdin", __import__("io").StringIO("stdin prose"))
+    meta = metadata(result)
+    body = f"{literal} sentinel\n"
+    record = runtime / "spool/private-feedback" / meta["locator"]
+    assert record.read_text(encoding="utf-8").endswith(f"\n\n{body}")
     assert (
-        invoke(
-            runtime, "k", "add", "stdin-topic", "--stdin", "--run", "r2", "--task", "t2"
-        )
-        == 0
+        meta["content_digest"] == "sha256:" + hashlib.sha256(body.encode()).hexdigest()
     )
-    output = capsys.readouterr().out
-    assert "direct prose" not in output
-    assert "stdin prose" not in output
-    assert (
-        runtime / "spool/private-feedback/knowledge/topics/topic/candidate.md"
-    ).is_file()
+    assert meta["status"] == "spooled"
+    assert "sentinel" not in result.stdout + result.stderr
+    assert (runtime / "spool/private-feedback/sync-request.json").is_file()
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("k", "add", "topic", "--run", "--help"),
+        ("k", "search", "--query", "--help"),
+        ("k", "unknown-operation", "--help"),
+        ("k", "add", "topic", "--unknown"),
+    ],
+)
+def test_parse_failure_before_help_is_not_success(
+    native: str, tmp_path: Path, argv: tuple[str, ...]
+) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, *argv)
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "usage"
+    assert result.stdout == ""
+    assert not runtime.exists()
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("k", "--help"),
+        ("k", "add", "--help"),
+        ("k", "--unknown", "--help"),
+        ("k", "add", "topic", "--unknown", "--help"),
+        ("k", "add", "topic", "--help", "--unknown"),
+    ],
+)
+def test_ordered_help_precedes_deferred_unknown_errors(
+    native: str, tmp_path: Path, argv: tuple[str, ...]
+) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, *argv)
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "Private AgentCanon feedback and knowledge" in result.stdout
+    assert not runtime.exists()
+
+
+def test_direct_text_and_stdin_write_metadata_only(native: str, tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime"
+    direct = invoke(
+        native,
+        runtime,
+        "k",
+        "add",
+        "topic",
+        "direct prose",
+        "--run",
+        "r1",
+        "--task",
+        "t1",
+    )
+    via_stdin = invoke(
+        native,
+        runtime,
+        "k",
+        "add",
+        "stdin-topic",
+        "--stdin",
+        "--run",
+        "r2",
+        "--task",
+        "t2",
+        body="stdin prose",
+    )
+    assert metadata(direct)["input_mode"] == "text"
+    assert metadata(via_stdin)["input_mode"] == "stdin"
+    assert "direct prose" not in direct.stdout + direct.stderr
+    assert "stdin prose" not in via_stdin.stdout + via_stdin.stderr
+    candidate = runtime / "spool/private-feedback/knowledge/topics/topic/candidate.md"
+    assert candidate.read_text(encoding="utf-8").endswith("\n\ndirect prose\n")
     assert (
         runtime / "spool/private-feedback/knowledge/topics/stdin-topic/candidate.md"
     ).is_file()
     request = runtime / "spool/private-feedback/sync-request.json"
     payload = json.loads(request.read_text(encoding="utf-8"))
-    assert payload["schema"] == private_feedback.SYNC_REQUEST_SCHEMA
     assert set(payload) == {
         "execution_plane",
         "operation",
@@ -66,85 +176,154 @@ def test_direct_text_and_stdin_write_metadata_only(
         "schema",
         "source_commit",
     }
+    assert payload["schema"] == SCHEMA
+    assert payload["source_commit"] == "a" * 40
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", payload["requested_at"])
+    assert (
+        request.read_text(encoding="utf-8")
+        == json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n"
+    )
     assert "direct prose" not in request.read_text(encoding="utf-8")
-    assert "stdin prose" not in request.read_text(encoding="utf-8")
 
 
-def test_k_and_f_sync_reuse_the_body_free_publication_request(tmp_path: Path) -> None:
-    """The existing aliases keep one stable request while adding spool items."""
+def test_k_and_f_sync_reuse_body_free_request(native: str, tmp_path: Path) -> None:
     runtime = tmp_path / "runtime"
-    assert (
-        invoke(runtime, "k", "add", "knowledge", "private knowledge", "--task", "t1")
-        == 0
-    )
-    assert invoke(runtime, "k", "sync") == 0
-    request = runtime / "spool/private-feedback/sync-request.json"
-    first_request = request.read_bytes()
-    assert (
-        invoke(runtime, "f", "add", "feedback", "private feedback", "--task", "t1") == 0
-    )
-    assert invoke(runtime, "f", "sync") == 0
-    assert request.read_bytes() == first_request
-    payload = json.loads(first_request)
-    assert payload["schema"] == private_feedback.SYNC_REQUEST_SCHEMA
-    assert payload["operation"] == "sync"
-    assert payload["execution_plane"] == "agentcanon_tool_container"
-    assert "private knowledge" not in first_request.decode("utf-8")
-    assert "private feedback" not in first_request.decode("utf-8")
-    assert (
-        runtime / "spool/private-feedback/knowledge/topics/knowledge/candidate.md"
-    ).is_file()
-    assert (runtime / "spool/private-feedback/feedback/feedback").is_dir()
-
-
-def test_body_redaction_receipt_rejects_secret_and_never_prints_body(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Credential-shaped payloads are refused before private persistence."""
-    with pytest.raises(
-        private_feedback.PrivateFeedbackError, match="private_data_rejected"
-    ):
-        invoke(tmp_path / "runtime", "f", "add", "secret-topic", "token=do-not-store")
-    assert "do-not-store" not in capsys.readouterr().err
-
-
-def test_structured_runtime_feedback_auto_capture(tmp_path: Path) -> None:
-    """The existing structured feedback route can write an external spool record."""
-    meta = private_feedback.capture_runtime_feedback(
-        "source=user target=agent-log action=knowledge_record runtime_feedback=observed",
-        runtime_root=tmp_path / "runtime",
-        run="run-1",
-        task="task-1",
-    )
-    assert meta["input_mode"] == "structured-log"
-    assert meta["sync_request"] == "created"
-    assert (
-        tmp_path / "runtime/spool/private-feedback/feedback/runtime-feedback"
-    ).is_dir()
-    request = tmp_path / "runtime/spool/private-feedback/sync-request.json"
-    assert request.is_file()
-    assert "runtime_feedback=observed" not in request.read_text(encoding="utf-8")
-
-
-def test_two_distinct_tasks_promote_to_private_skill_and_same_task_dedupes(
-    tmp_path: Path,
-) -> None:
-    """Promotion needs two task scopes; repeat reads in one task count once."""
-    runtime = tmp_path / "runtime"
-    log_root = tmp_path / "missing-log"
-    invoke(
-        runtime,
-        "k",
-        "add",
-        "promotion",
-        "Keep the owner boundary",
-        "--run",
-        "r1",
-        "--task",
-        "t1",
-    )
-    assert (
+    metadata(
         invoke(
+            native,
+            runtime,
+            "k",
+            "add",
+            "knowledge",
+            "private knowledge",
+            "--task",
+            "t1",
+        )
+    )
+    request = runtime / "spool/private-feedback/sync-request.json"
+    before = request.read_bytes()
+    assert metadata(invoke(native, runtime, "k", "sync"))["request_reused"] == "yes"
+    metadata(
+        invoke(
+            native, runtime, "f", "add", "feedback", "private feedback", "--task", "t1"
+        )
+    )
+    assert metadata(invoke(native, runtime, "f", "sync"))["request_reused"] == "yes"
+    assert request.read_bytes() == before
+    assert b"private knowledge" not in before
+    assert b"private feedback" not in before
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "token=do-not-store",
+        "Bearer do-not-store",
+        "APİ_KEY=do-not-store",
+        "-----BEGIN OPENSSH KEY-----",
+    ],
+)
+def test_redaction_precedes_persistence(native: str, tmp_path: Path, body: str) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, "f", "add", "secret-topic", "--stdin", body=body)
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "private_data_rejected"
+    assert body not in result.stdout + result.stderr
+    assert "do-not-store" not in result.stdout + result.stderr
+    assert not runtime.exists()
+
+
+@pytest.mark.parametrize("family", ["k", "knowledge", "f", "feedback"])
+def test_capture_has_runtime_topic(native: str, tmp_path: Path, family: str) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(
+        native,
+        runtime,
+        family,
+        "capture",
+        "--stdin",
+        body="source=user target=skill action=repair",
+    )
+    meta = metadata(result)
+    assert meta["topic"] == "runtime-feedback"
+    assert meta["kind"] == "feedback"
+    assert meta["status"] == "spooled"
+    assert (runtime / "spool/private-feedback" / meta["locator"]).is_file()
+
+
+def test_structured_capture_preserves_monitor_metadata(
+    native: str, tmp_path: Path
+) -> None:
+    runtime = tmp_path / "runtime"
+    body = "  source=user target=agent-log action=knowledge_record runtime_feedback=observed  "
+    result = invoke(
+        native,
+        runtime,
+        "f",
+        "capture",
+        "--structured-log",
+        "--stdin",
+        "--run",
+        "run-1",
+        body=body,
+        extra_env={"AGENT_CANON_TASK_ID": "unrelated-task"},
+    )
+    meta = metadata(result)
+    assert meta["input_mode"] == "structured-log"
+    assert meta["status"] == "observed"
+    assert meta["run"] == "run-1"
+    assert meta["task"] == ""
+    assert (
+        meta["content_digest"]
+        == "sha256:" + hashlib.sha256((body.strip() + "\n").encode()).hexdigest()
+    )
+    assert meta["sync_request"] == "created"
+    stored = (runtime / "spool/private-feedback" / meta["locator"]).read_text(
+        encoding="utf-8"
+    )
+    assert "input_mode: structured-log" in stored
+    assert stored.endswith(body.strip() + "\n")
+    assert body.strip() not in result.stdout + result.stderr
+    assert (
+        "runtime_feedback=observed"
+        not in (runtime / "spool/private-feedback/sync-request.json").read_text()
+    )
+
+
+def test_capture_limit_is_utf8_bytes(native: str, tmp_path: Path) -> None:
+    result = invoke(
+        native,
+        tmp_path / "runtime",
+        "f",
+        "capture",
+        "--structured-log",
+        "--stdin",
+        body="あ" * 6000,
+    )
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "private_data_rejected"
+    assert not (tmp_path / "runtime").exists()
+
+
+def test_two_tasks_promote_and_same_task_dedupes(native: str, tmp_path: Path) -> None:
+    runtime, log_root = tmp_path / "runtime", tmp_path / "missing-log"
+    metadata(
+        invoke(
+            native,
+            runtime,
+            "k",
+            "add",
+            "promotion",
+            "Keep the owner boundary",
+            "--run",
+            "r1",
+            "--task",
+            "t1",
+        )
+    )
+    first = metadata(
+        invoke(
+            native,
             runtime,
             "k",
             "read",
@@ -155,10 +334,10 @@ def test_two_distinct_tasks_promote_to_private_skill_and_same_task_dedupes(
             "t1",
             log_root=log_root,
         )
-        == 0
     )
-    assert (
+    duplicate = metadata(
         invoke(
+            native,
             runtime,
             "k",
             "read",
@@ -169,11 +348,13 @@ def test_two_distinct_tasks_promote_to_private_skill_and_same_task_dedupes(
             "t1",
             log_root=log_root,
         )
-        == 0
     )
+    assert first["status"] == "read"
+    assert duplicate["status"] == "duplicate"
     assert not (runtime / "private-skills/promotion/SKILL.md").exists()
-    assert (
+    second = metadata(
         invoke(
+            native,
             runtime,
             "k",
             "read",
@@ -184,79 +365,184 @@ def test_two_distinct_tasks_promote_to_private_skill_and_same_task_dedupes(
             "t2",
             log_root=log_root,
         )
-        == 0
     )
-    skill = runtime / "private-skills/promotion/SKILL.md"
-    assert skill.is_file()
-    assert "Keep the owner boundary" in skill.read_text(encoding="utf-8")
-    assert "not public AgentCanon policy" in skill.read_text(encoding="utf-8")
+    assert second["promotion"] == "private-skill-candidate"
+    skill = (runtime / "private-skills/promotion/SKILL.md").read_text(encoding="utf-8")
+    assert "Keep the owner boundary" in skill
+    assert "not public AgentCanon policy" in skill
+    assert "- task:t1" in skill and "- task:t2" in skill
+    assert (
+        runtime / "spool/private-feedback/runtime/skills/promotion/SKILL.md"
+    ).read_text(encoding="utf-8") == skill
 
 
-def test_invalid_sync_request_is_a_preserved_typed_blocker(tmp_path: Path) -> None:
-    """A conflicting request is never replaced or discarded by a retry."""
+def test_read_show_is_opt_in_and_search_hashes_file(
+    native: str, tmp_path: Path
+) -> None:
+    runtime, log_root = tmp_path / "runtime", tmp_path / "private-log"
+    metadata(invoke(native, runtime, "k", "add", "topic", "local body"))
+    archived = log_root / "knowledge/topics/topic/candidate.md"
+    archived.parent.mkdir(parents=True)
+    archived.write_text("archived body\n", encoding="utf-8")
+    read = invoke(
+        native, runtime, "k", "read", "topic", "--task", "t1", log_root=log_root
+    )
+    assert metadata(read)["status"] == "read"
+    assert "archived body" not in read.stdout
+    shown = invoke(
+        native,
+        runtime,
+        "k",
+        "read",
+        "topic",
+        "--task",
+        "t1",
+        "--show",
+        log_root=log_root,
+    )
+    assert shown.stdout.splitlines()[1:] == ["archived body"]
+    result = invoke(
+        native, runtime, "k", "search", "--query", "topic", log_root=log_root
+    )
+    assert result.returncode == 0, result.stderr
+    records = json.loads(result.stdout)["results"]
+    assert any(
+        record["content_digest"]
+        == "sha256:" + hashlib.sha256(archived.read_bytes()).hexdigest()
+        for record in records
+    )
+    assert "archived body" not in result.stdout
+
+
+def test_invalid_request_and_existing_content_are_preserved(
+    native: str, tmp_path: Path
+) -> None:
     runtime = tmp_path / "runtime"
     request = runtime / "spool/private-feedback/sync-request.json"
     request.parent.mkdir(parents=True)
-    request.write_text('{"schema":"wrong"}\n', encoding="utf-8")
-    before = request.read_bytes()
-    with pytest.raises(
-        private_feedback.PrivateFeedbackError, match="sync_request_invalid"
-    ):
-        invoke(runtime, "k", "sync")
-    assert request.read_bytes() == before
+    request.write_bytes(b'{"schema":"wrong"}\n')
+    result = invoke(native, runtime, "k", "sync")
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "sync_request_invalid"
+    assert request.read_bytes() == b'{"schema":"wrong"}\n'
+    request.unlink()  # The test owns this invalid fixture, not the product.
+    metadata(invoke(native, runtime, "k", "add", "topic", "first"))
+    candidate = runtime / "spool/private-feedback/knowledge/topics/topic/candidate.md"
+    before = candidate.read_bytes()
+    result = invoke(native, runtime, "k", "add", "topic", "different")
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "content_conflict"
+    assert candidate.read_bytes() == before
 
 
-def test_spool_writer_waits_for_host_snapshot_cleanup_lock(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A producer cannot change feedback while the host compares and clears it."""
-    runtime = tmp_path / "runtime"
-    spool = private_feedback._spool_root(runtime)
-    started = threading.Event()
-    attempting_lock = threading.Event()
-    finished = threading.Event()
-    errors: list[BaseException] = []
-    original_lock = private_feedback._lock_spool_descriptor
+@contextmanager
+def independent_lock(runtime: Path) -> Iterator[Path]:
+    """Hold the host protocol lock without importing product implementation."""
+    path = runtime / "spool/.private-feedback.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+b") as handle:
+        if path.stat().st_size == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
 
-    def observe_lock(descriptor: int) -> None:
-        if threading.current_thread().name == "feedback-writer":
-            attempting_lock.set()
-        original_lock(descriptor)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
 
-    monkeypatch.setattr(private_feedback, "_lock_spool_descriptor", observe_lock)
-
-    def write_feedback() -> None:
-        started.set()
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
-            invoke(runtime, "f", "add", "concurrent", "new bytes", "--task", "t1")
-        except BaseException as exc:
-            errors.append(exc)
+            yield path
         finally:
-            finished.set()
-
-    with private_feedback._private_feedback_spool_lock(spool):
-        writer = threading.Thread(target=write_feedback, name="feedback-writer")
-        writer.start()
-        assert started.wait(1)
-        assert attempting_lock.wait(1)
-        assert not finished.wait(0.05)
-        assert not (spool / "feedback/concurrent").exists()
-    writer.join(1)
-
-    assert not writer.is_alive()
-    assert not errors
-    assert finished.is_set()
-    assert (spool / "feedback/concurrent").is_dir()
-    assert (spool / "sync-request.json").is_file()
+            if os.name == "nt":
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def test_spool_lock_is_initialized_for_cross_platform_byte_range_locking(
-    tmp_path: Path,
+def test_native_writer_waits_for_independent_host_lock(
+    native: str, tmp_path: Path
 ) -> None:
     runtime = tmp_path / "runtime"
-    spool = private_feedback._spool_root(runtime)
-    lock_path = runtime / "spool/.private-feedback.lock"
-    with private_feedback._private_feedback_spool_lock(spool):
-        assert lock_path.is_file()
+    record_root = runtime / "spool/private-feedback"
+    writer = None
+    try:
+        with independent_lock(runtime) as lock_path:
+            writer = subprocess.Popen(
+                [
+                    native,
+                    "f",
+                    "add",
+                    "concurrent",
+                    "new bytes",
+                    "--runtime-root",
+                    str(runtime),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            deadline = time.monotonic() + 5
+            while (
+                not record_root.is_dir()
+                and writer.poll() is None
+                and time.monotonic() < deadline
+            ):
+                time.sleep(0.01)
+            assert record_root.is_dir(), "writer did not reach the spool boundary"
+            with pytest.raises(subprocess.TimeoutExpired):
+                writer.wait(timeout=0.2)
+            assert not (record_root / "feedback/concurrent").exists()
+        stdout, stderr = writer.communicate(timeout=5)
+        assert writer.returncode == 0, stderr
+        assert "new bytes" not in stdout + stderr
+        assert (record_root / "feedback/concurrent").is_dir()
+        assert (record_root / "sync-request.json").is_file()
         assert lock_path.read_bytes() == b"\0"
+    finally:
+        if writer is not None and writer.poll() is None:
+            writer.kill()
+            writer.communicate()
+
+
+def test_concurrent_records_share_one_valid_request(
+    native: str, tmp_path: Path
+) -> None:
+    runtime = tmp_path / "runtime"
+    writers = [
+        subprocess.Popen(
+            [
+                native,
+                "f",
+                "add",
+                f"topic-{index}",
+                f"record-{index}",
+                "--runtime-root",
+                str(runtime),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for index in range(4)
+    ]
+    try:
+        for writer in writers:
+            stdout, stderr = writer.communicate(timeout=10)
+            assert writer.returncode == 0, stderr
+            assert "record-" not in stdout + stderr
+        records = list((runtime / "spool/private-feedback/feedback").rglob("*.md"))
+        assert len(records) == 4
+        request = json.loads(
+            (runtime / "spool/private-feedback/sync-request.json").read_text()
+        )
+        assert request["schema"] == SCHEMA
+        assert request["operation"] == "sync"
+    finally:
+        for writer in writers:
+            if writer.poll() is None:
+                writer.kill()
+                writer.communicate()
