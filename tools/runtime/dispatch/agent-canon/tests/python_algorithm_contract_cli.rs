@@ -117,9 +117,10 @@ fn unique_temp_dir(name: &str) -> PathBuf {
 }
 
 fn replace_fixture(source: &str, from: &str, to: &str) -> String {
-    let changed = source.replace(from, to);
+    let normalized = source.replace("\r\n", "\n");
+    let changed = normalized.replace(from, to);
     assert_ne!(
-        changed, source,
+        changed, normalized,
         "fixture replacement must match its source template"
     );
     changed
