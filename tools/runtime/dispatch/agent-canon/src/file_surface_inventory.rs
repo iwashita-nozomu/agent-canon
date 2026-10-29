@@ -146,9 +146,7 @@ impl Args {
                     let (value, consumed) = match inline_value {
                         Some(value) => (value, 1),
                         None => (
-                            args.get(index + 1)
-                                .ok_or_else(|| format!("{option} requires a value"))?
-                                .as_str(),
+                            next_option_value(args, index, option)?,
                             2,
                         ),
                     };
@@ -205,6 +203,35 @@ impl Args {
             max_markdown_entries,
         })
     }
+}
+
+fn next_option_value<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str, String> {
+    let value = args
+        .get(index + 1)
+        .ok_or_else(|| format!("{option} requires a value"))?;
+    if looks_like_option(value) {
+        return Err(format!("{option} requires a value"));
+    }
+    Ok(value)
+}
+
+fn looks_like_option(value: &str) -> bool {
+    value.starts_with('-') && value != "-" && !is_argparse_negative_number(value)
+}
+
+fn is_argparse_negative_number(value: &str) -> bool {
+    let Some(number) = value.strip_prefix('-') else {
+        return false;
+    };
+    if !number.is_empty() && number.chars().all(|character| character.is_ascii_digit()) {
+        return true;
+    }
+    let Some((whole, fraction)) = number.split_once('.') else {
+        return false;
+    };
+    !fraction.is_empty()
+        && fraction.chars().all(|character| character.is_ascii_digit())
+        && (whole.is_empty() || whole.chars().all(|character| character.is_ascii_digit()))
 }
 
 fn inventory_scope(name: &str, root: &Path) -> Result<ScopeInventory, String> {
@@ -605,6 +632,36 @@ mod tests {
         assert!(Args::parse(&["--unknown=value".into()])
             .unwrap_err()
             .contains("--unknown=value"));
+    }
+
+    #[test]
+    fn rejects_option_tokens_as_missing_values_but_accepts_argparse_dash_values() {
+        for option in [
+            "--root",
+            "--json-out",
+            "--markdown-out",
+            "--max-markdown-entries",
+        ] {
+            assert!(Args::parse(&[option.into(), "--root-only".into()]).is_err());
+        }
+
+        assert_eq!(
+            Args::parse(&["--json-out".into(), "-".into()])
+                .unwrap()
+                .json_out,
+            Some(PathBuf::from("-"))
+        );
+        assert_eq!(
+            Args::parse(&["--root".into(), "-3".into()]).unwrap().root,
+            PathBuf::from("-3")
+        );
+        assert_eq!(
+            Args::parse(&["--max-markdown-entries".into(), "-3".into()])
+                .unwrap()
+                .max_markdown_entries,
+            -3
+        );
+        assert!(Args::parse(&["--json-out".into(), "-report.json".into()]).is_err());
     }
 
     #[cfg(unix)]

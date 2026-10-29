@@ -66,6 +66,41 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             self.assertEqual(scope["entries"][0]["kind"], "canon_source")
             self.assertEqual(scope["by_kind"], {"canon_source": 1})
 
+    def test_missing_option_values_followed_by_flags_do_not_write_reports(self) -> None:
+        """Option flags cannot be consumed as output paths or repository roots."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "product.md").write_text("# Product\n", encoding="utf-8")
+            self.init_git(root, "product.md")
+            root_flag = root / "--root-only"
+            agentcanon_flag = root / "--agentcanon-only"
+            root_output = root / "root-output.json"
+            for sentinel in (root_flag, agentcanon_flag, root_output):
+                sentinel.write_text("preserve this file\n", encoding="utf-8")
+
+            cases = (
+                (["--root", "--root-only", "--json-out", str(root_output)], root_output),
+                (["--root", str(root), "--json-out", "--root-only"], root_flag),
+                (["--root", str(root), "--markdown-out", "--agentcanon-only"], agentcanon_flag),
+            )
+            self.assertIsNotNone(
+                AGENT_CANON_CLI,
+                "AGENT_CANON_CLI must select the current native executable",
+            )
+            for args, sentinel in cases:
+                with self.subTest(args=args):
+                    result = subprocess.run(
+                        [str(AGENT_CANON_CLI), "file-surface-inventory", *args],
+                        cwd=root,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertEqual(
+                        sentinel.read_text(encoding="utf-8"), "preserve this file\n"
+                    )
+
     def test_git_inventory_skips_deleted_and_includes_untracked_files(self) -> None:
         """Inventory describes current worktree files, not deleted index entries."""
         with tempfile.TemporaryDirectory() as tmp_dir:
