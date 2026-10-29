@@ -59,7 +59,6 @@ not basenames, distinguish owners such as the several `readability.py` files.
 The planner also reports known Python delegation at these native owners when
 the corresponding source evidence is present:
 
-- `private_feedback.rs`: private feedback storage and sync Python adapter.
 - `dependency_manifest.rs`: Python surface-manifest snapshot producer.
 - `python_structure_hash.rs` and `python_algorithm_contract.rs`: embedded Python
   AST extraction implementations.
@@ -68,6 +67,13 @@ This is a declared set of known gaps, not an exhaustive detector for arbitrary
 Python execution. An absent known marker does not establish completion. The
 plan always leaves overall completion unverified; a port needs the evidence
 below.
+
+Private feedback/knowledge storage now belongs to `private_feedback.rs`; its
+packaged Python adapter is retired. `workflow_monitor.py` remains an owned Python
+implementation pending its own port and invokes native capture through stdin.
+That remaining caller is not a feedback implementation fallback. The planner
+retains its adapter-marker observation so a future reintroduced delegation is
+still visible. Host archive Git/annex publication remains at its existing owner.
 
 ## Runtime and External Providers
 

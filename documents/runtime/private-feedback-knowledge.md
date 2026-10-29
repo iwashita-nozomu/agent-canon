@@ -2,8 +2,8 @@
 @dependency-start
 contract agent-runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
-downstream implementation ../../tools/runtime/archive/private_feedback.py owns private storage and sync semantics
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs exposes the Rust command boundary
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs owns native private storage and sync semantics
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns handle-relative files and spool locks
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture
 @dependency-end
 -->
@@ -49,7 +49,8 @@ credentials and never publishes or mutates that checkout.
 
 ## Commands
 
-The Rust CLI owns the public namespace. `k` and `f` are short aliases:
+The Rust CLI owns the implementation and public namespace; installed feedback
+commands need no Python adapter. `k` and `f` are short aliases:
 
 ```bash
 agent-canon k add <topic> <prose>
@@ -59,6 +60,7 @@ agent-canon k search [--query <text>]
 agent-canon k status
 agent-canon k sync
 agent-canon k capture <structured-feedback>
+agent-canon f capture --structured-log --stdin
 
 agent-canon f add <topic> <prose>
 agent-canon f add <topic> --stdin
@@ -71,6 +73,19 @@ Direct prose is convenient but can be retained in shell history. Use
 headers, private keys, raw datasets, private source files, and embedding
 payloads are rejected. Bodies do not appear in ordinary receipts, dashboards,
 Issues, PRs, or agent handoffs.
+
+`capture` uses the existing `runtime-feedback` topic. The monitor's
+`--structured-log --stdin` mode preserves structured-log provenance, explicit
+run/task values and the 16 KiB input boundary; private text never enters its
+argument vector or monitoring receipt. The monitor remains a thin Python caller
+until its separate port. This replaces its import of the retired implementation
+and fixes the former public capture route's missing topic, without moving archive
+publication or parent authentication into feedback.
+
+Spool mutations share `spool/.private-feedback.lock` with host snapshot export
+and cleanup. The native producer uses standard descriptor locks on Rust 1.89 or
+later, including Windows. Existing records and invalid sync requests are retained
+on conflict; no retry discards unknown private data.
 
 The published paths are used without a second schema:
 

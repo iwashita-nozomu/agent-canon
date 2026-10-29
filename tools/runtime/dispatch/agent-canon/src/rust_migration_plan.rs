@@ -384,7 +384,7 @@ fn python_delegation(path: &str, text: &str) -> Option<&'static str> {
     let (suffix, marker, detail) = if path.ends_with("/private_feedback.rs") {
         (
             ".rs",
-            "private_feedback.py",
+            "tools/runtime/archive/private_feedback.py",
             "private-feedback Python implementation adapter",
         )
     } else if path.ends_with("/dependency_manifest.rs") {
@@ -805,7 +805,7 @@ mod tests {
         write(
             &root,
             "tools/runtime/dispatch/agent-canon/src/private_feedback.rs",
-            "const ADAPTER: &str = \"private_feedback.py\";\n",
+            "const ADAPTER: &str = \"tools/runtime/archive/private_feedback.py\";\n",
         );
         let plan = build_plan(&root, 20).unwrap();
         assert_eq!(plan.catalogued_implementations, 1);
@@ -818,6 +818,11 @@ mod tests {
         assert_eq!(limited.candidates.len(), 1);
         assert_eq!(limited.candidate_total, 2);
         assert_eq!(limited.inventory.len(), plan.inventory.len());
+        // A behavior-test reference is not an owned Python implementation call.
+        assert!(python_delegation(
+            "tools/runtime/dispatch/agent-canon/src/private_feedback.rs",
+            "// downstream implementation tests/agent_tools/test_private_feedback.py",
+        ).is_none());
         fs::remove_dir_all(root).unwrap();
     }
 
