@@ -42,9 +42,11 @@ def invoke(
     body: str | None = None,
     extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    args = [native, *argv, "--runtime-root", str(runtime)]
+    # Test configuration stays before a caller's literal-argument delimiter.
+    args = [native, argv[0], "--runtime-root", str(runtime)]
     if log_root is not None:
         args.extend(["--log-root", str(log_root)])
+    args.extend(argv[1:])
     return subprocess.run(
         args,
         input=body,
@@ -64,6 +66,51 @@ def metadata(result: subprocess.CompletedProcess[str]) -> dict[str, str]:
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     return json.loads(result.stdout.splitlines()[0])
+
+
+@pytest.mark.parametrize("literal", ["--help", "-h"])
+def test_literal_help_after_delimiter_is_stored(native: str, tmp_path: Path, literal: str) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, "k", "add", "literal-help", "--", literal, "sentinel")
+    meta = metadata(result)
+    body = f"{literal} sentinel\n"
+    record = runtime / "spool/private-feedback" / meta["locator"]
+    assert record.read_text(encoding="utf-8").endswith(f"\n\n{body}")
+    assert meta["content_digest"] == "sha256:" + hashlib.sha256(body.encode()).hexdigest()
+    assert meta["status"] == "spooled"
+    assert "sentinel" not in result.stdout + result.stderr
+    assert (runtime / "spool/private-feedback/sync-request.json").is_file()
+
+
+@pytest.mark.parametrize("argv", [
+    ("k", "add", "topic", "--run", "--help"),
+    ("k", "search", "--query", "--help"),
+    ("k", "unknown-operation", "--help"),
+    ("k", "add", "topic", "--unknown"),
+])
+def test_parse_failure_before_help_is_not_success(native: str, tmp_path: Path, argv: tuple[str, ...]) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, *argv)
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "usage"
+    assert result.stdout == ""
+    assert not runtime.exists()
+
+
+@pytest.mark.parametrize("argv", [
+    ("k", "--help"),
+    ("k", "add", "--help"),
+    ("k", "--unknown", "--help"),
+    ("k", "add", "topic", "--unknown", "--help"),
+    ("k", "add", "topic", "--help", "--unknown"),
+])
+def test_ordered_help_precedes_deferred_unknown_errors(native: str, tmp_path: Path, argv: tuple[str, ...]) -> None:
+    runtime = tmp_path / "runtime"
+    result = invoke(native, runtime, *argv)
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "Private AgentCanon feedback and knowledge" in result.stdout
+    assert not runtime.exists()
 
 
 def test_direct_text_and_stdin_write_metadata_only(native: str, tmp_path: Path) -> None:

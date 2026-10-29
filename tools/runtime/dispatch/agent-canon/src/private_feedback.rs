@@ -64,11 +64,29 @@ struct Args {
     query: String,
 }
 
-fn parse(raw: &[String]) -> Result<Args> {
+fn looks_like_option(value: &str) -> bool {
+    static NEGATIVE_NUMBER: OnceLock<Regex> = OnceLock::new();
+    value.starts_with('-') && value != "-" &&
+        !NEGATIVE_NUMBER.get_or_init(|| Regex::new(r"^-\d+$|^-\d*\.\d+$")
+            .expect("static argparse negative-number expression")).is_match(value)
+}
+
+fn option_value(raw: &[String], index: usize) -> Result<String> {
+    let value = raw.get(index + 1).filter(|value| !looks_like_option(value))
+        .ok_or_else(|| fail("usage", "option value required"))?;
+    Ok(value.clone())
+}
+
+/// Like the inventory parser, help is an ordered parse result, not a raw scan.
+fn parse(raw: &[String]) -> Result<Option<Args>> {
     let mut args = Args::default();
     let mut rest = Vec::new();
     let mut index = 0;
     while index < raw.len() {
+        if raw[index] == "--" {
+            rest.extend(raw[index..].iter().cloned());
+            break;
+        }
         let destination = match raw[index].as_str() {
             "--runtime-root" => Some(0),
             "--log-root" => Some(1),
@@ -77,7 +95,7 @@ fn parse(raw: &[String]) -> Result<Args> {
             _ => None,
         };
         if let Some(destination) = destination {
-            let value = raw.get(index + 1).ok_or_else(|| fail("usage", "option value required"))?.clone();
+            let value = option_value(raw, index)?;
             match destination {
                 0 => args.runtime = Some(value),
                 1 => args.log = Some(value),
@@ -90,48 +108,98 @@ fn parse(raw: &[String]) -> Result<Args> {
             index += 1;
         }
     }
-    if rest.len() < 2 {
-        return Err(fail("usage", "family and operation required"));
+    args.family = rest.first().ok_or_else(|| fail("usage", "family required"))?.clone();
+    if matches!(args.family.as_str(), "-h" | "--help") {
+        return Ok(None);
     }
-    args.family = rest[0].clone();
-    args.operation = rest[1].clone();
     let knowledge = matches!(args.family.as_str(), "knowledge" | "k");
     if !knowledge && !matches!(args.family.as_str(), "feedback" | "f") {
         return Err(fail("usage", "unknown private feedback family"));
+    }
+    // argparse defers unknown options, but an invalid command choice is immediate.
+    let mut unknown = false;
+    index = 1;
+    while index < rest.len() {
+        if matches!(rest[index].as_str(), "-h" | "--help") {
+            return Ok(None);
+        }
+        if looks_like_option(&rest[index]) {
+            if rest[index] == "--" {
+                return Err(fail("usage", "operation required before literal arguments"));
+            }
+            unknown = true;
+            index += 1;
+        } else {
+            args.operation = rest[index].clone();
+            index += 1;
+            break;
+        }
     }
     if !matches!(args.operation.as_str(), "add" | "capture" | "status" | "sync")
         && !(knowledge && matches!(args.operation.as_str(), "read" | "search"))
     {
         return Err(fail("usage", "unknown private feedback operation"));
     }
-    index = 2;
-    if matches!(args.operation.as_str(), "add" | "read") {
-        args.topic = rest.get(index).ok_or_else(|| fail("usage", "topic required"))?.clone();
-        index += 1;
-    }
+    let mut literal = false;
+    let mut topic_present = false;
     while index < rest.len() {
         let value = &rest[index];
-        match value.as_str() {
-            "--stdin" if matches!(args.operation.as_str(), "add" | "capture") => args.stdin = true,
-            "--show" if args.operation == "read" => args.show = true,
-            "--structured-log" if args.operation == "capture" => args.structured = true,
-            "--query" if args.operation == "search" => {
-                index += 1;
-                args.query = rest.get(index).ok_or_else(|| fail("usage", "query value required"))?.clone();
+        if !literal {
+            match value.as_str() {
+                "-h" | "--help" => return Ok(None),
+                "--" => {
+                    literal = true;
+                    index += 1;
+                    continue;
+                }
+                "--stdin" if matches!(args.operation.as_str(), "add" | "capture") => {
+                    args.stdin = true;
+                    index += 1;
+                    continue;
+                }
+                "--show" if args.operation == "read" => {
+                    args.show = true;
+                    index += 1;
+                    continue;
+                }
+                "--structured-log" if args.operation == "capture" => {
+                    args.structured = true;
+                    index += 1;
+                    continue;
+                }
+                "--query" if args.operation == "search" => {
+                    args.query = option_value(&rest, index)?;
+                    index += 2;
+                    continue;
+                }
+                _ if looks_like_option(value) => {
+                    unknown = true;
+                    index += 1;
+                    continue;
+                }
+                _ => {}
             }
-            "--" if matches!(args.operation.as_str(), "add" | "capture") => {
-                args.text.extend(rest[index + 1..].iter().cloned());
-                break;
-            }
-            _ if !value.starts_with('-') && matches!(args.operation.as_str(), "add" | "capture") => args.text.push(value.clone()),
-            _ => return Err(fail("usage", "unsupported private feedback argument")),
+        }
+        if !topic_present && matches!(args.operation.as_str(), "add" | "read") {
+            args.topic = value.clone();
+            topic_present = true;
+        } else if matches!(args.operation.as_str(), "add" | "capture") {
+            args.text.push(value.clone());
+        } else {
+            unknown = true;
         }
         index += 1;
+    }
+    if matches!(args.operation.as_str(), "add" | "read") && !topic_present {
+        return Err(fail("usage", "topic required"));
+    }
+    if unknown {
+        return Err(fail("usage", "unsupported private feedback argument"));
     }
     if args.structured && (!args.stdin || !args.text.is_empty()) {
         return Err(fail("input_required", "structured capture requires --stdin"));
     }
-    Ok(args)
+    Ok(Some(args))
 }
 
 fn digest(bytes: &[u8]) -> String {
@@ -522,11 +590,15 @@ fn execute(args: &Args) -> Result<()> {
 }
 
 pub fn run(args: &[String]) -> i32 {
-    if args.iter().any(|argument| matches!(argument.as_str(), "--help" | "-h")) {
-        println!("Private AgentCanon feedback and knowledge\nagent-canon <knowledge|k|feedback|f> <add|capture|read|search|status|sync>\nGlobal options: --runtime-root PATH --log-root PATH --run ID --task ID\nadd TOPIC [TEXT ... | --stdin]; capture [TEXT ... | --stdin] [--structured-log]\nknowledge read TOPIC [--show]; knowledge search [--query TEXT]");
-        return 0;
-    }
-    match parse(args).and_then(|args| execute(&args)) {
+    let outcome = match parse(args) {
+        Ok(None) => {
+            println!("Private AgentCanon feedback and knowledge\nagent-canon <knowledge|k|feedback|f> <add|capture|read|search|status|sync>\nGlobal options: --runtime-root PATH --log-root PATH --run ID --task ID\nadd TOPIC [TEXT ... | --stdin]; capture [TEXT ... | --stdin] [--structured-log]\nknowledge read TOPIC [--show]; knowledge search [--query TEXT]");
+            return 0;
+        }
+        Ok(Some(args)) => execute(&args),
+        Err(error) => Err(error),
+    };
+    match outcome {
         Ok(()) => 0,
         Err(error) => {
             eprintln!("{}", json!({"schema": SCHEMA, "status": "error", "code": error.code, "detail": error.detail}));
