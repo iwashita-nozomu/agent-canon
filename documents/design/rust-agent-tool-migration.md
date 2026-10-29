@@ -61,13 +61,19 @@ the corresponding source evidence is present:
 
 - `private_feedback.rs`: private feedback storage and sync Python adapter.
 - `dependency_manifest.rs`: Python surface-manifest snapshot producer.
-- `python_structure_hash.rs` and `python_algorithm_contract.rs`: embedded Python
-  AST extraction implementations.
+- `python_structure_hash.rs`: embedded Python AST extraction implementation.
 
 This is a declared set of known gaps, not an exhaustive detector for arbitrary
 Python execution. An absent known marker does not establish completion. The
 plan always leaves overall completion unverified; a port needs the evidence
 below.
+
+The `python-algorithm-contract-check` extractor is ported to the registry
+`rustpython-parser` and `rustpython-ast` 0.4.0 crates. The existing Rust file
+selection, analyzer, CLI, and report schema remain the owner contract. Selected
+AST features provide source locations, arbitrary-size integer literals,
+expression unparse, and visitor traversal. Old/new fixture comparison remains
+the acceptance oracle for CPython AST behavior.
 
 ## Runtime and External Providers
 
