@@ -6,6 +6,7 @@ responsibility Writes evidence-backed reader-facing reports with semantic claim/
 upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
 upstream design ../internal-routines/verification-result-structuring.md reader reconstruction, pre-write structuring, and finding coverage
 upstream design structure-planning.md pre-write outline and structural-decision owner
+upstream design academic-writing.md conditional mathematical preliminary preparation
 upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design result-visualize.md reusable result visualization contract
 upstream design code-visualization.md sole public visualization owner and typed projection contract
@@ -31,6 +32,15 @@ establish each branch's origin or baseline, purpose, and delta before synthesizi
 the final paper-level report. Preserve material external references with their
 URL/DOI, access date, source identity, and adoption status.
 
+If selecting mathematical premises needed for the report is still unsettled,
+first use [academic-writing](academic-writing.md#mathematical-preliminary-preparation)
+to settle the purpose, minimum abstract premises and model facts, relevant model
+owner references, and verification goal with its support status. Carry those
+settled premises, references, and conclusion boundary into the outline. Reuse
+known facts; do not re-expand the model or create a separate math packet. Skip
+this handoff when the premises are already settled or the report does not need
+mathematical premise selection.
+
 Follow this writing sequence:
 
 1. **Outline.** Settle the reader-facing order of results and supporting evidence
@@ -50,7 +60,9 @@ Follow this writing sequence:
    a visual. Update the outline if asset review exposes a material gap.
 4. **Draft the body with the selected writing owner.** Explicitly read and use
    [paper-writing](paper-writing.md) for a scholarly manuscript or
-   [long-form-writing](long-form-writing.md) for other reader-facing reports.
+   [academic-writing](academic-writing.md) for a scholarly note where applicable,
+   or [long-form-writing](long-form-writing.md) for other reader-facing reports.
+   Select and use the appropriate prose owner without loading every owner skill.
    Pass the settled outline, figure plan, and created or reused assets so the
    writing stage can proceed without restarting those decisions. Keep
    `Results/Observations`, `Interpretation`, and `Limitations` distinct, and tie
