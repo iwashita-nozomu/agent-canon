@@ -390,8 +390,8 @@ fn python_delegation(path: &str, text: &str) -> Option<&'static str> {
     } else if path.ends_with("/dependency_manifest.rs") {
         (
             ".rs",
-            "Command::new(\"python3\")",
-            "surface-manifest Python snapshot producer",
+            "tools/runtime/manifest/surface_manifest.py",
+            "owned surface-manifest Python snapshot producer",
         )
     } else if path.ends_with("/python_structure_hash.rs")
         || path.ends_with("/python_algorithm_contract.rs")
@@ -897,6 +897,19 @@ mod tests {
             .remaining_prerequisites
             .contains(&"archive-lifecycle"));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn explicit_external_producer_execution_is_not_an_owned_python_delegation() {
+        let path = "tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs";
+        assert!(
+            python_delegation(path, "Command::new(\"python3\").arg(external_producer)").is_none()
+        );
+        assert!(python_delegation(
+            path,
+            "root.join(\"tools/runtime/manifest/surface_manifest.py\")"
+        )
+        .is_some());
     }
 
     #[test]
