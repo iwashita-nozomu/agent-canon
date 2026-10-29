@@ -2070,7 +2070,7 @@ fn function_parameter_count(args: &ast::Arguments) -> usize {
 fn body_without_docstring(body: &[ast::Stmt]) -> &[ast::Stmt] {
     match body.first() {
         Some(ast::Stmt::Expr(expr))
-            if matches!(&expr.value, ast::Expr::Constant(value) if matches!(value.value, ast::Constant::Str(_))) =>
+            if matches!(&*expr.value, ast::Expr::Constant(value) if matches!(value.value, ast::Constant::Str(_))) =>
         {
             &body[1..]
         }
