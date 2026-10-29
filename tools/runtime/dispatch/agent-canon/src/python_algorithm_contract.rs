@@ -1084,7 +1084,7 @@ impl<'a> UsageCollector<'a> {
         }
     }
 
-    fn as_json(self) -> Value {
+    fn into_json(self) -> Value {
         json!({
             "alias_attrs": self.alias_attrs,
             "calls": self.calls,
@@ -1175,7 +1175,7 @@ fn usage(source: &str, suite: &ast::Suite, imports: &[Value]) -> Value {
     for statement in suite.iter().cloned() {
         visitor.visit_stmt(statement);
     }
-    visitor.as_json()
+    visitor.into_json()
 }
 
 fn uses_parent_config_field(expr: &Expr) -> bool {
