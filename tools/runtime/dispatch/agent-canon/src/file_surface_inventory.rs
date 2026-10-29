@@ -15,12 +15,20 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 const CHECKABLE_SUFFIXES: &[&str] = &[
-    ".bash", ".cfg", ".css", ".h", ".hpp", ".html", ".c", ".cc", ".cpp", ".json",
-    ".md", ".py", ".rst", ".sh", ".toml", ".txt", ".yaml", ".yml", ".zsh",
+    ".bash", ".cfg", ".css", ".h", ".hpp", ".html", ".c", ".cc", ".cpp", ".json", ".md", ".py",
+    ".rst", ".sh", ".toml", ".txt", ".yaml", ".yml", ".zsh",
 ];
 const EXCLUDED_PARTS: &[&str] = &[
-    ".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "build",
-    "dist", "node_modules", "reports",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "reports",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +63,10 @@ struct ScopeInventory {
 }
 
 pub fn run(args: &[String]) -> i32 {
-    if args.iter().any(|argument| matches!(argument.as_str(), "-h" | "--help")) {
+    if args
+        .iter()
+        .any(|argument| matches!(argument.as_str(), "-h" | "--help"))
+    {
         println!("usage: agent-canon file-surface-inventory --root <path> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries <integer>]");
         return 0;
     }
@@ -85,13 +96,19 @@ pub fn run(args: &[String]) -> i32 {
     let markdown_text = render_markdown(&parsed.mode, &root, &scopes, parsed.max_markdown_entries);
     if let Some(path) = &parsed.json_out {
         if let Err(error) = write_optional(path, &json_text) {
-            eprintln!("agent-canon file-surface-inventory: write {}: {error}", path.display());
+            eprintln!(
+                "agent-canon file-surface-inventory: write {}: {error}",
+                path.display()
+            );
             return 1;
         }
     }
     if let Some(path) = &parsed.markdown_out {
         if let Err(error) = write_optional(path, &markdown_text) {
-            eprintln!("agent-canon file-surface-inventory: write {}: {error}", path.display());
+            eprintln!(
+                "agent-canon file-surface-inventory: write {}: {error}",
+                path.display()
+            );
             return 1;
         }
     }
@@ -102,7 +119,7 @@ pub fn run(args: &[String]) -> i32 {
     println!("FILE_SURFACE_INVENTORY_FILES={files}");
     println!("FILE_SURFACE_INVENTORY_CHECKABLE={checkable}");
     if let Some(path) = &parsed.json_out {
-    println!("FILE_SURFACE_INVENTORY_JSON={}", path.to_string_lossy());
+        println!("FILE_SURFACE_INVENTORY_JSON={}", path.to_string_lossy());
     }
     if let Some(path) = &parsed.markdown_out {
         println!("FILE_SURFACE_INVENTORY_MARKDOWN={}", path.to_string_lossy());
@@ -139,7 +156,11 @@ impl Args {
                         "--root" => root = PathBuf::from(value),
                         "--json-out" => json_out = Some(PathBuf::from(value)),
                         "--markdown-out" => markdown_out = Some(PathBuf::from(value)),
-                        _ => max_markdown_entries = value.parse().map_err(|_| format!("invalid integer value: '{value}'"))?,
+                        _ => {
+                            max_markdown_entries = value
+                                .parse()
+                                .map_err(|_| format!("invalid integer value: '{value}'"))?
+                        }
                     }
                     index += consumed;
                 }
@@ -147,7 +168,11 @@ impl Args {
                     if inline_value.is_some() {
                         return Err("argument --root-only does not take a value".into());
                     }
-                    if agentcanon_only { return Err("--root-only and --agentcanon-only are mutually exclusive".into()); }
+                    if agentcanon_only {
+                        return Err(
+                            "--root-only and --agentcanon-only are mutually exclusive".into()
+                        );
+                    }
                     root_only = true;
                     index += 1;
                 }
@@ -155,15 +180,30 @@ impl Args {
                     if inline_value.is_some() {
                         return Err("argument --agentcanon-only does not take a value".into());
                     }
-                    if root_only { return Err("--root-only and --agentcanon-only are mutually exclusive".into()); }
+                    if root_only {
+                        return Err(
+                            "--root-only and --agentcanon-only are mutually exclusive".into()
+                        );
+                    }
                     agentcanon_only = true;
                     index += 1;
                 }
                 _ => return Err(format!("unrecognized argument: {raw_option}")),
             }
         }
-        let mode = if agentcanon_only { "agentcanon-only" } else { "root-only" }.to_string();
-        Ok(Self { root, mode, json_out, markdown_out, max_markdown_entries })
+        let mode = if agentcanon_only {
+            "agentcanon-only"
+        } else {
+            "root-only"
+        }
+        .to_string();
+        Ok(Self {
+            root,
+            mode,
+            json_out,
+            markdown_out,
+            max_markdown_entries,
+        })
     }
 }
 
@@ -172,38 +212,89 @@ fn inventory_scope(name: &str, root: &Path) -> Result<ScopeInventory, String> {
     let mut entries = Vec::new();
     for (git_mode, path) in rows {
         let relative = PathBuf::from(&path);
-        if relative.components().any(|part| EXCLUDED_PARTS.contains(&part.as_os_str().to_string_lossy().as_ref())) {
+        if relative
+            .components()
+            .any(|part| EXCLUDED_PARTS.contains(&part.as_os_str().to_string_lossy().as_ref()))
+        {
             continue;
         }
         let full_path = root.join(&relative);
-        if git_mode != "160000" && !surface_exists(&full_path) { continue; }
+        if git_mode != "160000" && !surface_exists(&full_path) {
+            continue;
+        }
         entries.push(make_entry(name, root, &relative, &full_path, &git_mode));
     }
     let mut by_kind = BTreeMap::new();
-    for entry in &entries { *by_kind.entry(entry.kind.clone()).or_insert(0) += 1; }
+    for entry in &entries {
+        *by_kind.entry(entry.kind.clone()).or_insert(0) += 1;
+    }
     let files = entries.len();
     let checkable_files = entries.iter().filter(|entry| entry.checkable).count();
-    Ok(ScopeInventory { name: name.to_string(), root: posix_path(root), files, checkable_files, by_kind, entries })
+    Ok(ScopeInventory {
+        name: name.to_string(),
+        root: posix_path(root),
+        files,
+        checkable_files,
+        by_kind,
+        entries,
+    })
 }
 
 fn git_files(root: &Path) -> Result<Vec<(String, String)>, String> {
-    let tracked = Command::new("git").arg("-C").arg(root).args(["ls-files", "-z", "-s"]).output()
-        .map_err(|error| format!("git ls-files failed for inventory scope: {} ({error})", root.display()))?;
-    if !tracked.status.success() { return Err(format!("git ls-files failed for inventory scope: {}", root.display())); }
-    let mut rows = Vec::new();
-    for record in tracked.stdout.split(|byte| *byte == 0).filter(|record| !record.is_empty()) {
-        let Some(tab) = record.iter().position(|byte| *byte == b'\t') else { continue };
-        let metadata = String::from_utf8_lossy(&record[..tab]);
-        let mode = metadata.split_whitespace().next().unwrap_or_default().to_string();
-        rows.push((mode, String::from_utf8_lossy(&record[tab + 1..]).into_owned()));
+    let tracked = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "-z", "-s"])
+        .output()
+        .map_err(|error| {
+            format!(
+                "git ls-files failed for inventory scope: {} ({error})",
+                root.display()
+            )
+        })?;
+    if !tracked.status.success() {
+        return Err(format!(
+            "git ls-files failed for inventory scope: {}",
+            root.display()
+        ));
     }
-    let untracked = Command::new("git").arg("-C").arg(root).args(["ls-files", "-z", "--others", "--exclude-standard"]).output();
+    let mut rows = Vec::new();
+    for record in tracked
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+    {
+        let Some(tab) = record.iter().position(|byte| *byte == b'\t') else {
+            continue;
+        };
+        let metadata = String::from_utf8_lossy(&record[..tab]);
+        let mode = metadata
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        rows.push((
+            mode,
+            String::from_utf8_lossy(&record[tab + 1..]).into_owned(),
+        ));
+    }
+    let untracked = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "-z", "--others", "--exclude-standard"])
+        .output();
     if let Ok(output) = untracked {
         if output.status.success() {
-            for path in output.stdout.split(|byte| *byte == 0).filter(|path| !path.is_empty()) {
+            for path in output
+                .stdout
+                .split(|byte| *byte == 0)
+                .filter(|path| !path.is_empty())
+            {
                 let path_string = String::from_utf8_lossy(path).into_owned();
                 let full = root.join(&path_string);
-                if surface_exists(&full) { rows.push((mode_for_untracked_path(&full), path_string)); }
+                if surface_exists(&full) {
+                    rows.push((mode_for_untracked_path(&full), path_string));
+                }
             }
         }
     }
@@ -212,15 +303,21 @@ fn git_files(root: &Path) -> Result<Vec<(String, String)>, String> {
 }
 
 fn mode_for_untracked_path(path: &Path) -> String {
-    if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) { return "120000".into(); }
+    if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+        return "120000".into();
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0) { return "100755".into(); }
+        if fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0) {
+            return "100755".into();
+        }
     }
     #[cfg(not(unix))]
     {
-        if fs::metadata(path).is_ok_and(|metadata| is_executable(path, &metadata)) { return "100755".into(); }
+        if fs::metadata(path).is_ok_and(|metadata| is_executable(path, &metadata)) {
+            return "100755".into();
+        }
     }
     "100644".into()
 }
@@ -236,17 +333,52 @@ fn surface_exists(path: &Path) -> bool {
 }
 
 fn make_entry(scope: &str, root: &Path, relative: &Path, full: &Path, git_mode: &str) -> FileEntry {
-    let symlink = fs::symlink_metadata(full).is_ok_and(|metadata| metadata.file_type().is_symlink());
-    let symlink_target = if symlink { fs::read_link(full).map(|target| target.to_string_lossy().into_owned()).unwrap_or_default() } else { String::new() };
-    let kind = if git_mode == "160000" { "gitlink" }
-        else if scope == "root" && relative == Path::new("tools") && symlink { "agentcanon_tool_view" }
-        else if scope == "agentcanon" && relative.components().next().is_some_and(|part| part.as_os_str() == OsStr::new("tools")) { "agentcanon_tool_source" }
-        else if symlink { "symlink_view" }
-        else if scope == "agentcanon" { "canon_source" }
-        else { "product_file" };
-    let suffix = relative.extension().map(|extension| format!(".{}", extension.to_string_lossy())).unwrap_or_default();
-    let real_source_path = if surface_exists(full) { relative_real_path(root, full) } else { String::new() };
-    FileEntry { scope: scope.to_string(), path: posix_path(relative), kind: kind.to_string(), checkable: CHECKABLE_SUFFIXES.contains(&suffix.as_str()) && git_mode != "160000", suffix, git_mode: git_mode.to_string(), symlink_target, real_source_path }
+    let symlink =
+        fs::symlink_metadata(full).is_ok_and(|metadata| metadata.file_type().is_symlink());
+    let symlink_target = if symlink {
+        fs::read_link(full)
+            .map(|target| target.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let kind = if git_mode == "160000" {
+        "gitlink"
+    } else if scope == "root" && relative == Path::new("tools") && symlink {
+        "agentcanon_tool_view"
+    } else if scope == "agentcanon"
+        && relative
+            .components()
+            .next()
+            .is_some_and(|part| part.as_os_str() == OsStr::new("tools"))
+    {
+        "agentcanon_tool_source"
+    } else if symlink {
+        "symlink_view"
+    } else if scope == "agentcanon" {
+        "canon_source"
+    } else {
+        "product_file"
+    };
+    let suffix = relative
+        .extension()
+        .map(|extension| format!(".{}", extension.to_string_lossy()))
+        .unwrap_or_default();
+    let real_source_path = if surface_exists(full) {
+        relative_real_path(root, full)
+    } else {
+        String::new()
+    };
+    FileEntry {
+        scope: scope.to_string(),
+        path: posix_path(relative),
+        kind: kind.to_string(),
+        checkable: CHECKABLE_SUFFIXES.contains(&suffix.as_str()) && git_mode != "160000",
+        suffix,
+        git_mode: git_mode.to_string(),
+        symlink_target,
+        real_source_path,
+    }
 }
 
 fn relative_real_path(root: &Path, path: &Path) -> String {
@@ -287,18 +419,30 @@ fn resolve_non_strict_depth(path: &Path, depth: usize) -> PathBuf {
             return resolve_non_strict_depth(&target, depth + 1);
         }
     }
-    let absolute = if path.is_absolute() { path.to_path_buf() } else { env::current_dir().unwrap_or_default().join(path) };
-    if let Ok(canonical) = fs::canonicalize(&absolute) { return canonical; }
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir().unwrap_or_default().join(path)
+    };
+    if let Ok(canonical) = fs::canonicalize(&absolute) {
+        return canonical;
+    }
     let mut cursor = absolute.clone();
     let mut tail = Vec::new();
     while !cursor.exists() {
-        let Some(name) = cursor.file_name() else { break };
+        let Some(name) = cursor.file_name() else {
+            break;
+        };
         tail.push(name.to_os_string());
-        if !cursor.pop() { break; }
+        if !cursor.pop() {
+            break;
+        }
     }
     let base = fs::canonicalize(&cursor).unwrap_or(cursor);
     let mut resolved = base;
-    for component in tail.iter().rev() { resolved.push(component); }
+    for component in tail.iter().rev() {
+        resolved.push(component);
+    }
     normalize_path(resolved)
 }
 
@@ -306,8 +450,10 @@ fn normalize_path(path: PathBuf) -> PathBuf {
     let mut normalized = PathBuf::new();
     for component in path.components() {
         match component {
-            Component::CurDir => {},
-            Component::ParentDir => { normalized.pop(); },
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
             other => normalized.push(other.as_os_str()),
         }
     }
@@ -332,11 +478,22 @@ fn render_json(mode: &str, root: &Path, scopes: &[ScopeInventory]) -> String {
 fn markdown_rows(scopes: &[ScopeInventory], limit: i64) -> Vec<String> {
     let mut rows = Vec::new();
     let mut remaining = limit.max(0) as usize;
-    for scope in scopes { for entry in &scope.entries {
-        if remaining == 0 { return rows; }
-        rows.push(format!("| {} | {} | {} | {} | {} |", entry.scope, entry.path, entry.kind, if entry.checkable { "yes" } else { "no" }, entry.real_source_path));
-        remaining -= 1;
-    }}
+    for scope in scopes {
+        for entry in &scope.entries {
+            if remaining == 0 {
+                return rows;
+            }
+            rows.push(format!(
+                "| {} | {} | {} | {} | {} |",
+                entry.scope,
+                entry.path,
+                entry.kind,
+                if entry.checkable { "yes" } else { "no" },
+                entry.real_source_path
+            ));
+            remaining -= 1;
+        }
+    }
     rows
 }
 
@@ -353,16 +510,35 @@ fn render_markdown(mode: &str, root: &Path, scopes: &[ScopeInventory], limit: i6
         "| ----- | ---- | ----- | --------- | ------- |".into(),
     ];
     for scope in scopes {
-        let by_kind = scope.by_kind.iter().map(|(key, value)| format!("{key}={value}")).collect::<Vec<_>>().join(", ");
-        lines.push(format!("| {} | {} | {} | {} | {} |", scope.name, scope.root, scope.files, scope.checkable_files, by_kind));
+        let by_kind = scope
+            .by_kind
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        lines.push(format!(
+            "| {} | {} | {} | {} | {} |",
+            scope.name, scope.root, scope.files, scope.checkable_files, by_kind
+        ));
     }
-    lines.extend(["".into(), "## File Rows".into(), "".into(), "| Scope | Path | Kind | Checkable | Real Source Path |".into(), "| ----- | ---- | ---- | --------- | ---------------- |".into()]);
+    lines.extend([
+        "".into(),
+        "## File Rows".into(),
+        "".into(),
+        "| Scope | Path | Kind | Checkable | Real Source Path |".into(),
+        "| ----- | ---- | ---- | --------- | ---------------- |".into(),
+    ]);
     lines.extend(markdown_rows(scopes, limit));
     format!("{}\n", lines.join("\n").trim_end())
 }
 
 fn write_optional(path: &Path, text: &str) -> std::io::Result<()> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) { fs::create_dir_all(parent)?; }
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)?;
+    }
     fs::write(path, text)
 }
 
@@ -372,19 +548,34 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn scratch() -> PathBuf {
-        let id = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
         let path = env::temp_dir().join(format!("file-surface-inventory-{id}"));
         fs::create_dir_all(&path).unwrap();
         path
     }
 
     fn git(root: &Path, args: &[&str]) {
-        assert!(Command::new("git").arg("-C").arg(root).args(args).status().unwrap().success());
+        assert!(Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .status()
+            .unwrap()
+            .success());
     }
 
     #[test]
     fn parses_modes_and_rejects_mutually_exclusive_scope() {
-        let args = vec!["--agentcanon-only".into(), "--root".into(), "/tmp/source".into(), "--max-markdown-entries".into(), "-3".into()];
+        let args = vec![
+            "--agentcanon-only".into(),
+            "--root".into(),
+            "/tmp/source".into(),
+            "--max-markdown-entries".into(),
+            "-3".into(),
+        ];
         let parsed = Args::parse(&args).unwrap();
         assert_eq!(parsed.mode, "agentcanon-only");
         assert_eq!(parsed.max_markdown_entries, -3);
@@ -401,11 +592,19 @@ mod tests {
         ];
         let parsed = Args::parse(&args).unwrap();
         assert_eq!(parsed.root, PathBuf::from("/tmp/repo=fixture"));
-        assert_eq!(parsed.json_out, Some(PathBuf::from("reports/inventory=full.json")));
-        assert_eq!(parsed.markdown_out, Some(PathBuf::from("reports/inventory.md")));
+        assert_eq!(
+            parsed.json_out,
+            Some(PathBuf::from("reports/inventory=full.json"))
+        );
+        assert_eq!(
+            parsed.markdown_out,
+            Some(PathBuf::from("reports/inventory.md"))
+        );
         assert_eq!(parsed.max_markdown_entries, 7);
         assert!(Args::parse(&["--root-only=yes".into()]).is_err());
-        assert!(Args::parse(&["--unknown=value".into()]).unwrap_err().contains("--unknown=value"));
+        assert!(Args::parse(&["--unknown=value".into()])
+            .unwrap_err()
+            .contains("--unknown=value"));
     }
 
     #[cfg(unix)]
@@ -417,7 +616,11 @@ mod tests {
         git(&root, &["init", "-q"]);
         git(&root, &["add", "--", name]);
         let scope = inventory_scope("root", &root).unwrap();
-        let entry = scope.entries.iter().find(|entry| entry.path == name).unwrap();
+        let entry = scope
+            .entries
+            .iter()
+            .find(|entry| entry.path == name)
+            .unwrap();
         assert_eq!(entry.path, name);
         assert_eq!(entry.real_source_path, name);
         fs::remove_dir_all(root).unwrap();
@@ -434,15 +637,26 @@ mod tests {
         fs::create_dir(root.join("reports")).unwrap();
         fs::write(root.join("reports/hidden.md"), "hidden").unwrap();
         fs::write(root.join("target"), "target").unwrap();
-        #[cfg(unix)] std::os::unix::fs::symlink("missing", root.join("dangling.md")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("missing", root.join("dangling.md")).unwrap();
         let scope = inventory_scope("root", &root).unwrap();
-        let paths: Vec<_> = scope.entries.iter().map(|entry| entry.path.as_str()).collect();
+        let paths: Vec<_> = scope
+            .entries
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect();
         assert!(paths.contains(&"kept.md"));
-        #[cfg(unix)] assert!(paths.contains(&"dangling.md"));
+        #[cfg(unix)]
+        assert!(paths.contains(&"dangling.md"));
         assert!(!paths.contains(&"deleted.md"));
         assert!(!paths.iter().any(|path| path.starts_with("reports/")));
-        #[cfg(unix)] {
-            let dangling = scope.entries.iter().find(|entry| entry.path == "dangling.md").unwrap();
+        #[cfg(unix)]
+        {
+            let dangling = scope
+                .entries
+                .iter()
+                .find(|entry| entry.path == "dangling.md")
+                .unwrap();
             assert_eq!(dangling.symlink_target, "missing");
             assert_eq!(dangling.real_source_path, "missing");
         }
@@ -461,36 +675,102 @@ mod tests {
     fn preserves_gitlink_and_tracked_modes() {
         let root = scratch();
         fs::write(root.join("run.sh"), "echo ok\n").unwrap();
-        #[cfg(unix)] {
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(root.join("run.sh"), fs::Permissions::from_mode(0o755)).unwrap();
         }
         fs::write(root.join("link-target"), "ok").unwrap();
-        #[cfg(unix)] std::os::unix::fs::symlink("link-target", root.join("link.md")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("link-target", root.join("link.md")).unwrap();
         git(&root, &["init", "-q"]);
         git(&root, &["add", "run.sh"]);
-        #[cfg(unix)] git(&root, &["add", "link.md"]);
-        git(&root, &["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "fixture"]);
-        let commit = Command::new("git").arg("-C").arg(&root).args(["rev-parse", "HEAD"]).output().unwrap();
+        #[cfg(unix)]
+        git(&root, &["add", "link.md"]);
+        git(
+            &root,
+            &[
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+        );
+        let commit = Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
         let commit = String::from_utf8(commit.stdout).unwrap().trim().to_string();
-        git(&root, &["update-index", "--add", "--cacheinfo", &format!("160000,{commit},submodule")]);
+        git(
+            &root,
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("160000,{commit},submodule"),
+            ],
+        );
         let scope = inventory_scope("root", &root).unwrap();
-        let executable = scope.entries.iter().find(|entry| entry.path == "run.sh").unwrap();
+        let executable = scope
+            .entries
+            .iter()
+            .find(|entry| entry.path == "run.sh")
+            .unwrap();
         assert_eq!(executable.git_mode, "100755");
-        let gitlink = scope.entries.iter().find(|entry| entry.path == "submodule").unwrap();
+        let gitlink = scope
+            .entries
+            .iter()
+            .find(|entry| entry.path == "submodule")
+            .unwrap();
         assert_eq!(gitlink.kind, "gitlink");
         assert!(!gitlink.checkable);
-        #[cfg(unix)] assert_eq!(scope.entries.iter().find(|entry| entry.path == "link.md").unwrap().git_mode, "120000");
+        #[cfg(unix)]
+        assert_eq!(
+            scope
+                .entries
+                .iter()
+                .find(|entry| entry.path == "link.md")
+                .unwrap()
+                .git_mode,
+            "120000"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn markdown_limit_does_not_truncate_json_inventory() {
-        let entries = vec![FileEntry { scope: "root".into(), path: "a.md".into(), kind: "product_file".into(), suffix: ".md".into(), checkable: true, git_mode: "100644".into(), symlink_target: String::new(), real_source_path: "a.md".into() }];
-        let scopes = vec![ScopeInventory { name: "root".into(), root: "/repo".into(), files: 1, checkable_files: 1, by_kind: BTreeMap::from([("product_file".into(), 1)]), entries }];
+        let entries = vec![FileEntry {
+            scope: "root".into(),
+            path: "a.md".into(),
+            kind: "product_file".into(),
+            suffix: ".md".into(),
+            checkable: true,
+            git_mode: "100644".into(),
+            symlink_target: String::new(),
+            real_source_path: "a.md".into(),
+        }];
+        let scopes = vec![ScopeInventory {
+            name: "root".into(),
+            root: "/repo".into(),
+            files: 1,
+            checkable_files: 1,
+            by_kind: BTreeMap::from([("product_file".into(), 1)]),
+            entries,
+        }];
         assert_eq!(markdown_rows(&scopes, 0).len(), 0);
-        assert_eq!(json_count(&render_json("root-only", Path::new("/repo"), &scopes)), 1);
+        assert_eq!(
+            json_count(&render_json("root-only", Path::new("/repo"), &scopes)),
+            1
+        );
     }
 
-    fn json_count(text: &str) -> usize { let value: Value = serde_json::from_str(text).unwrap(); value["scopes"][0]["entries"].as_array().unwrap().len() }
+    fn json_count(text: &str) -> usize {
+        let value: Value = serde_json::from_str(text).unwrap();
+        value["scopes"][0]["entries"].as_array().unwrap().len()
+    }
 }

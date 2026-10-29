@@ -31,7 +31,12 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             json_out = root / "reports" / "inventory.json"
             markdown_out = root / "reports" / "inventory.md"
             result = self.run_inventory(
-                root, "--root-only", "--json-out", str(json_out), "--markdown-out", str(markdown_out)
+                root,
+                "--root-only",
+                "--json-out",
+                str(json_out),
+                "--markdown-out",
+                str(markdown_out),
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(json_out.read_text(encoding="utf-8"))
@@ -49,7 +54,9 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             (root / "README.md").write_text("# Canon\n", encoding="utf-8")
             self.init_git(root, "README.md")
             json_out = root / "inventory.json"
-            result = self.run_inventory(root, "--agentcanon-only", "--json-out", str(json_out))
+            result = self.run_inventory(
+                root, "--agentcanon-only", "--json-out", str(json_out)
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("FILE_SURFACE_INVENTORY_MODE=agentcanon-only", result.stdout)
             self.assertIn("FILE_SURFACE_INVENTORY_FILES=1", result.stdout)
@@ -72,14 +79,27 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             output = root / "inventory.json"
             result = self.run_inventory(root, "--root-only", "--json-out", str(output))
             self.assertEqual(result.returncode, 0, result.stderr)
-            paths = [entry["path"] for entry in json.loads(output.read_text(encoding="utf-8"))["scopes"][0]["entries"]]
+            paths = [
+                entry["path"]
+                for entry in json.loads(output.read_text(encoding="utf-8"))["scopes"][
+                    0
+                ]["entries"]
+            ]
             self.assertEqual(paths, ["kept.md", "untracked.py"])
 
     def run_inventory(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run inventory through the explicitly selected native CLI."""
-        self.assertIsNotNone(AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable")
+        self.assertIsNotNone(
+            AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+        )
         return subprocess.run(
-            [str(AGENT_CANON_CLI), "file-surface-inventory", "--root", str(root), *args],
+            [
+                str(AGENT_CANON_CLI),
+                "file-surface-inventory",
+                "--root",
+                str(root),
+                *args,
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -89,7 +109,9 @@ class FileSurfaceInventoryTest(unittest.TestCase):
     def init_git(self, root: Path, *paths: str) -> None:
         """Initialize a fixture repository and track selected paths."""
         subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-        subprocess.run(["git", "add", *paths], cwd=root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "add", *paths], cwd=root, check=True, capture_output=True
+        )
 
 
 if __name__ == "__main__":
