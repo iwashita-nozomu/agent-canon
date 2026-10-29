@@ -1270,12 +1270,13 @@ fn dependency_comment_payload<'a>(path: &Path, raw: &'a str) -> Option<&'a str> 
     let extension = path
         .extension()
         .and_then(|value| value.to_str())
-        .unwrap_or_default();
-    if matches!(extension, "md" | "html" | "xml" | "svg") {
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if matches!(extension.as_str(), "md" | "html" | "xml" | "svg") {
         return Some(trimmed.trim());
     }
     if matches!(
-        extension,
+        extension.as_str(),
         "rs" | "c" | "cc" | "cpp" | "h" | "hpp" | "js" | "ts"
     ) {
         return trimmed.strip_prefix("//").map(str::trim);
@@ -1295,12 +1296,14 @@ fn manifest_lines(path: &Path, text: &str) -> Vec<(usize, String)> {
     let mut markup_comment = false;
     let mut ended = false;
     let mut lines = Vec::new();
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
     for (index, raw) in text.lines().enumerate().take(80) {
         let raw_trimmed = raw.trim();
-        if matches!(
-            path.extension().and_then(|value| value.to_str()),
-            Some("md" | "html" | "xml" | "svg")
-        ) {
+        if matches!(extension.as_str(), "md" | "html" | "xml" | "svg") {
             if raw_trimmed == "<!--" {
                 markup_comment = true;
                 continue;
@@ -1830,6 +1833,33 @@ mod tests {
             .1,
             "contract implementation"
         );
+    }
+
+    #[test]
+    fn dependency_header_comment_forms_ignore_extension_case() {
+        let markup = "<!--\n@dependency-start\ncontract implementation\nresponsibility canonical\n@dependency-end\n-->\n";
+        let slash = "// @dependency-start\n// contract implementation\n// responsibility canonical\n// @dependency-end\n";
+        let hash = "# @dependency-start\n# contract implementation\n# responsibility canonical\n# @dependency-end\n";
+        for (extensions, header) in [
+            (&["md", "html", "xml", "svg"][..], markup),
+            (&["rs", "c", "cc", "cpp", "h", "hpp", "js", "ts"][..], slash),
+            (
+                &[
+                    "bash", "cfg", "css", "py", "rst", "sh", "toml", "txt", "yaml", "yml", "zsh",
+                ][..],
+                hash,
+            ),
+        ] {
+            for extension in extensions {
+                for candidate in [extension.to_string(), extension.to_ascii_uppercase()] {
+                    let filename = format!("source.{candidate}");
+                    assert!(
+                        !manifest_lines(Path::new(&filename), header).is_empty(),
+                        "extension={candidate}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

@@ -459,7 +459,7 @@ fn class_match(pattern: &[char], start: usize, value: Option<char>) -> Option<(u
     let mut index = start + 1;
     let negated = pattern
         .get(index)
-        .is_some_and(|character| *character == '!' || *character == '^');
+        .is_some_and(|character| *character == '!');
     if negated {
         index += 1;
     }
@@ -612,5 +612,15 @@ mod tests {
             "agents/canonical/nested/example.md",
             &["agents/canonical/**".to_string()]
         ));
+    }
+
+    #[test]
+    fn character_classes_match_python_fnmatchcase_negation() {
+        assert!(fnmatch_case("pkg/a.py", "pkg/[^a].py"));
+        assert!(fnmatch_case("pkg/^.py", "pkg/[^a].py"));
+        assert!(!fnmatch_case("pkg/b.py", "pkg/[^a].py"));
+        assert!(fnmatch_case("pkg/b.py", "pkg/[!a].py"));
+        assert!(fnmatch_case("pkg/^.py", "pkg/[!a].py"));
+        assert!(!fnmatch_case("pkg/a.py", "pkg/[!a].py"));
     }
 }

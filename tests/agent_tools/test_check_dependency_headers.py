@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import subprocess
 import tempfile
@@ -379,6 +380,30 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("extra.py: missing top dependency manifest block", result.stdout)
+
+    def test_surface_character_class_matches_fnmatchcase_caret_semantics(self) -> None:
+        """Select paths according to Python fnmatchcase's literal-caret class rule."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["unselected/**"]\n')
+            init_git(root, "documents/design/dependency-contract-kinds.toml")
+            paths = ("pkg/a.py", "pkg/^.py", "pkg/b.py")
+            for relative in paths:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# no header\n", encoding="utf-8")
+            surface = "pkg/[^a].py"
+            expected = {
+                relative for relative in paths if fnmatch.fnmatchcase(relative, surface)
+            }
+            self.assertEqual(expected, {"pkg/a.py", "pkg/^.py"})
+
+            result = run_cli(root, changed=True, surfaces=(surface,))
+
+            self.assertNotEqual(result.returncode, 0)
+            for relative in expected:
+                self.assertIn(f"{relative}: missing top dependency manifest block", result.stdout)
+            self.assertNotIn("pkg/b.py: missing top dependency manifest block", result.stdout)
 
     def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
         """Resolve AgentCanon's registry when the selected parent has no copy."""
