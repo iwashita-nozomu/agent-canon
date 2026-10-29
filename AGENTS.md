@@ -23,14 +23,14 @@ operation is selected; this is not a checklist for every task.
 
 ## Runtime Owner Map
 
-| Operation | Required action | Canonical owner |
+| Operation | Canonical owner | Required action / reader route |
 | --- | --- | --- |
-| Branch lifecycle | Use an Issue-qualified topic and current handoff scope. Preserve unknown state, integrate by real merge, and read back selected publication/cleanup. | [branch contract](documents/operations/BRANCH_SCOPE.md), [checkout lifecycle](documents/rule/repository-topic-clone.md) |
-| Skill improvement cycle | Define outcome/evidence, revise the canonical Skill, validate/review/evaluate as selected, and record adoption/rejection. Selected delivery includes publication/readback; static checks cannot prove improved agent behavior. | [empirical revision](agents/skills/empirical-prompt-tuning.md), [source delivery](agents/skills/agent-canon-update.md) |
-| Report writing | Follow the report owner: outline → figure decision → necessary figure creation/reuse → body with the selected writing Skill. | [report-writing](agents/skills/report-writing.md) |
-| Test responsibility | Setup supplies inputs, the product API performs the action, and an independent oracle checks the result. Repair the owning failure; do not implement the product in tests, weaken the oracle, or infer defects from unrun tests. Changes to input assumptions, scope, required properties, or major approach need prior agreement. | [test-role contract](documents/conventions/coding-conventions-testing.md#3-unit-test-contract) |
-| AgentCanon tool migration | All AgentCanon-owned tool implementations, including orchestration, target Rust through the existing owner in bounded units. Preserve command/output contracts and retire replaced implementations. Consumer product and test code keep their own language choices. | [tool migration](documents/design/rust-agent-tool-migration.md) |
-| unresolved source owner | Read the selected owner row only. | [source map](agents/canonical/SOURCE_ROUTING.md) |
+| Branch lifecycle | [branch contract](documents/operations/BRANCH_SCOPE.md), [checkout lifecycle](documents/rule/repository-topic-clone.md) | Use an Issue-qualified topic and current handoff scope. Preserve unknown state, integrate by real merge, and read back selected publication/cleanup. |
+| Skill improvement cycle | [empirical revision](agents/skills/empirical-prompt-tuning.md), [source delivery](agents/skills/agent-canon-update.md) | Define outcome/evidence, revise the canonical Skill, validate/review/evaluate as selected, and record adoption/rejection. Selected delivery includes publication/readback; static checks cannot prove improved agent behavior. |
+| Report writing | [report-writing](agents/skills/report-writing.md) | Follow the report owner: outline → figure decision → necessary figure creation/reuse → body with the selected writing Skill. |
+| Test responsibility | [test-role contract](documents/conventions/coding-conventions-testing.md#3-unit-test-contract) | Setup supplies inputs, the product API performs the action, and an independent oracle checks the result. Repair the owning failure; do not implement the product in tests, weaken the oracle, or infer defects from unrun tests. Changes to input assumptions, scope, required properties, or major approach need prior agreement. |
+| AgentCanon tool migration | [tool migration](documents/design/rust-agent-tool-migration.md) | All AgentCanon-owned tool implementations, including orchestration, target Rust through the existing owner in bounded units. Preserve command/output contracts and retire replaced implementations. Consumer product and test code keep their own language choices. |
+| unresolved source owner | [source map](agents/canonical/SOURCE_ROUTING.md) | selected row only |
 
 When a selected Skill's adapter or command context is unresolved, use
 [Skill Paths](agents/canonical/skills.md#skill-paths). For formatting AgentCanon
