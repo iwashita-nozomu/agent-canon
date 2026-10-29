@@ -561,7 +561,7 @@ write_report() {
 @dependency-start
 responsibility Records integrated review backlog scan output.
 upstream implementation ../../tools/repository/github/review_backlog_scan.sh generates this report
-upstream implementation ../../tools/analysis/code/file_surface_inventory.py generates inventory artifacts
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs generates inventory artifacts
 @dependency-end
 -->
 
