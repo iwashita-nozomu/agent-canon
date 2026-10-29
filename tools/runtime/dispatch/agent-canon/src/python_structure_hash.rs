@@ -2,16 +2,21 @@
 // contract implementation
 // responsibility Finds duplicate Python function and class structures by normalized AST hash.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation python_ast.rs shares native Python source, span, and expression-dump helpers
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // @dependency-end
 
+use crate::python_ast::{
+    ast_dump_expr, line_at_offset, module_name, node_line, normalize_python_newlines,
+};
+use rustpython_ast::{Ranged, Visitor};
+use rustpython_parser::{ast, Parse};
+use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 const DEFAULT_EXCLUDES: &[&str] = &[
     ".git",
@@ -26,456 +31,6 @@ const DEFAULT_EXCLUDES: &[&str] = &[
 ];
 const DEFAULT_MIN_TOKENS: usize = 8;
 const DEFAULT_MAX_FINDINGS: usize = usize::MAX;
-
-const AST_EXTRACTOR: &str = r##"
-import ast
-import json
-import pathlib
-import sys
-
-
-def module_name(root, path):
-    relative = pathlib.Path(path).resolve().relative_to(pathlib.Path(root).resolve())
-    without_suffix = relative.with_suffix("")
-    if without_suffix.name == "__init__":
-        without_suffix = without_suffix.parent
-    return ".".join(without_suffix.parts)
-
-
-def import_facts(tree):
-    facts = []
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                facts.append(("import", alias.name))
-        elif isinstance(node, ast.ImportFrom):
-            level = "." * node.level
-            module = level + (node.module or "")
-            for alias in node.names:
-                facts.append(("from", module, alias.name))
-    return sorted(facts)
-
-
-def ref_name(node):
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = ref_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    if isinstance(node, ast.Subscript):
-        return ref_name(node.value)
-    if isinstance(node, ast.Call):
-        return ref_name(node.func)
-    return ast.dump(node, annotate_fields=False, include_attributes=False)
-
-
-def decorator_facts(node):
-    return sorted(ref_name(decorator) for decorator in getattr(node, "decorator_list", []))
-
-
-def base_facts(node):
-    return sorted(ref_name(base) for base in getattr(node, "bases", []))
-
-
-def is_direct_protocol_base(base):
-    return base == "Protocol" or base.endswith(".Protocol")
-
-
-def class_identities(module, qualname):
-    simple = qualname.rsplit(".", 1)[-1]
-    return {simple, qualname, f"{module}.{qualname}"}
-
-
-def base_matches_known_protocol(base, protocol_names):
-    if is_direct_protocol_base(base):
-        return True
-    base_tail = base.rsplit(".", 1)[-1]
-    return base in protocol_names or base_tail in protocol_names
-
-
-class ClassIndexVisitor(ast.NodeVisitor):
-    def __init__(self, module):
-        self.module = module
-        self.stack = []
-        self.classes = []
-
-    def visit_ClassDef(self, node):
-        qualname = ".".join(self.stack + [node.name])
-        self.classes.append(
-            {
-                "module": self.module,
-                "qualname": qualname,
-                "name": node.name,
-                "bases": base_facts(node),
-            }
-        )
-        self.stack.append(node.name)
-        self.generic_visit(node)
-        self.stack.pop()
-
-
-def build_protocol_names(parsed_modules):
-    classes = []
-    for parsed in parsed_modules:
-        visitor = ClassIndexVisitor(parsed["module"])
-        visitor.visit(parsed["tree"])
-        classes.extend(visitor.classes)
-
-    protocol_names = set()
-    changed = True
-    while changed:
-        changed = False
-        for item in classes:
-            if any(base_matches_known_protocol(base, protocol_names) for base in item["bases"]):
-                identities = class_identities(item["module"], item["qualname"])
-                before = len(protocol_names)
-                protocol_names.update(identities)
-                changed = changed or len(protocol_names) != before
-    return protocol_names
-
-
-def type_alias_names(tree):
-    names = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            annotation = ref_name(node.annotation)
-            if annotation == "TypeAlias" or annotation.endswith(".TypeAlias"):
-                names.add(node.target.id)
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and isinstance(node.value, ast.Subscript):
-                    value_name = ref_name(node.value.value)
-                    if value_name in {"TypeAlias", "typing.TypeAlias"}:
-                        names.add(target.id)
-    return names
-
-
-def module_all_names(tree):
-    names = set()
-    found = False
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            targets = [target for target in node.targets if isinstance(target, ast.Name)]
-            if not any(target.id == "__all__" for target in targets):
-                continue
-            found = True
-            values = []
-            if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
-                values = node.value.elts
-            for value in values:
-                if isinstance(value, ast.Constant) and isinstance(value.value, str):
-                    names.add(value.value)
-    return names if found else None
-
-
-def parameter_count(node):
-    args = node.args
-    names = []
-    for arg in list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs):
-        names.append(arg.arg)
-    if args.vararg is not None:
-        names.append("*" + args.vararg.arg)
-    if args.kwarg is not None:
-        names.append("**" + args.kwarg.arg)
-    return sum(1 for name in names if name not in {"self", "cls"})
-
-
-def body_without_docstring(body):
-    if not body:
-        return body
-    first = body[0]
-    if isinstance(first, ast.Expr):
-        value = first.value
-        if isinstance(value, ast.Constant) and isinstance(value.value, str):
-            return body[1:]
-        if isinstance(value, ast.Str):
-            return body[1:]
-    return body
-
-
-class BlockCallVisitor(ast.NodeVisitor):
-    def __init__(self):
-        self.calls = []
-
-    def visit_FunctionDef(self, node):
-        return
-
-    def visit_AsyncFunctionDef(self, node):
-        return
-
-    def visit_ClassDef(self, node):
-        return
-
-    def visit_Call(self, node):
-        self.calls.append(
-            {
-                "name": ref_name(node.func),
-                "line": getattr(node, "lineno", 0),
-            }
-        )
-        self.generic_visit(node)
-
-
-def block_calls(node):
-    visitor = BlockCallVisitor()
-    for child in body_without_docstring(node.body):
-        visitor.visit(child)
-    return sorted(visitor.calls, key=lambda item: (item["line"], item["name"]))
-
-
-class BlockReferenceVisitor(ast.NodeVisitor):
-    def __init__(self):
-        self.references = []
-
-    def visit_FunctionDef(self, node):
-        return
-
-    def visit_AsyncFunctionDef(self, node):
-        return
-
-    def visit_ClassDef(self, node):
-        return
-
-    def visit_AnnAssign(self, node):
-        self._add_annotation_refs(node.annotation)
-        self.visit(node.value) if node.value is not None else None
-
-    def _add_annotation_refs(self, node):
-        if node is None:
-            return
-        line = getattr(node, "lineno", 0)
-        for child in ast.walk(node):
-            if isinstance(child, (ast.Name, ast.Attribute, ast.Subscript, ast.Call)):
-                name = ref_name(child)
-                if name:
-                    self.references.append({"name": name, "line": line})
-
-
-def block_references(node):
-    visitor = BlockReferenceVisitor()
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        for arg in list(node.args.posonlyargs) + list(node.args.args) + list(node.args.kwonlyargs):
-            visitor._add_annotation_refs(arg.annotation)
-        if node.args.vararg is not None:
-            visitor._add_annotation_refs(node.args.vararg.annotation)
-        if node.args.kwarg is not None:
-            visitor._add_annotation_refs(node.args.kwarg.annotation)
-        visitor._add_annotation_refs(node.returns)
-    elif isinstance(node, ast.ClassDef):
-        for base in node.bases:
-            visitor._add_annotation_refs(base)
-    for child in body_without_docstring(node.body):
-        visitor.visit(child)
-    unique = {
-        (item["line"], item["name"]): item
-        for item in visitor.references
-        if item["name"]
-    }
-    return [unique[key] for key in sorted(unique)]
-
-
-def canonical(value):
-    if isinstance(value, ast.AST):
-        fields = []
-        for field, child in ast.iter_fields(value):
-            if field in {
-                "name",
-                "id",
-                "arg",
-                "attr",
-                "asname",
-                "lineno",
-                "col_offset",
-                "end_lineno",
-                "end_col_offset",
-                "ctx",
-                "type_comment",
-            }:
-                continue
-            if field == "returns" or field == "annotation":
-                fields.append((field, "TYPE"))
-                continue
-            fields.append((field, canonical(child)))
-        return [value.__class__.__name__, fields]
-    if isinstance(value, list):
-        return [canonical(item) for item in value]
-    if isinstance(value, tuple):
-        return [canonical(item) for item in value]
-    if isinstance(value, str):
-        return "STR"
-    if isinstance(value, (int, float, complex)):
-        return "NUM"
-    if isinstance(value, bytes):
-        return "BYTES"
-    if value is None or isinstance(value, bool):
-        return value
-    return value.__class__.__name__
-
-
-class Collector(ast.NodeVisitor):
-    def __init__(self, root, path, tree, protocol_names):
-        self.root = root
-        self.path = path
-        self.module = module_name(root, path)
-        self.imports = import_facts(tree)
-        self.protocol_names = protocol_names
-        self.type_aliases = type_alias_names(tree)
-        self.module_all = module_all_names(tree)
-        self.stack = []
-        self.blocks = []
-
-    def visit_FunctionDef(self, node):
-        self._visit_block("Function", node)
-
-    def visit_AsyncFunctionDef(self, node):
-        self._visit_block("Function", node)
-
-    def visit_ClassDef(self, node):
-        self._visit_block("Class", node)
-
-    def visit_AnnAssign(self, node):
-        if isinstance(node.target, ast.Name):
-            annotation = ref_name(node.annotation)
-            if annotation == "TypeAlias" or annotation.endswith(".TypeAlias"):
-                self._record_alias(node.target.id, node, node.value or node.annotation)
-                return
-        self.generic_visit(node)
-
-    def visit_Assign(self, node):
-        value_name = ref_name(node.value.value) if isinstance(node.value, ast.Subscript) else ""
-        if value_name in {"TypeAlias", "typing.TypeAlias"}:
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    self._record_alias(target.id, node, node.value)
-            return
-        self.generic_visit(node)
-
-    def _visit_block(self, kind, node):
-        parent = self.stack[-1] if self.stack else None
-        qualname = ".".join([entry["name"] for entry in self.stack] + [node.name])
-        class_is_protocol = kind == "Class" and any(
-            identity in self.protocol_names
-            for identity in class_identities(self.module, qualname)
-        )
-        inside_protocol = parent["inside_protocol"] if parent else False
-        role = "protocol" if class_is_protocol or inside_protocol else "implementation"
-        if parent is None:
-            public_api = (
-                node.name in self.module_all
-                if self.module_all is not None
-                else not node.name.startswith("_")
-            )
-        elif parent["kind"] == "Class" and parent["public_api"]:
-            public_api = not node.name.startswith("_")
-        else:
-            public_api = False
-        payload = {
-            "path": str(pathlib.Path(self.path).resolve().relative_to(pathlib.Path(self.root).resolve())).replace("\\", "/"),
-            "module": self.module,
-            "line": getattr(node, "lineno", 0),
-            "end_line": getattr(node, "end_lineno", getattr(node, "lineno", 0)),
-            "kind": kind,
-            "name": node.name,
-            "qualname": qualname,
-            "parent_kind": parent["kind"] if parent else None,
-            "parent_name": parent["name"] if parent else None,
-            "role": role,
-            "public_api": public_api,
-            "parameter_count": parameter_count(node) if kind == "Function" else len(node.bases),
-            "decorators": decorator_facts(node),
-            "bases": base_facts(node),
-            "imports": self.imports,
-            "calls": block_calls(node),
-            "references": block_references(node),
-            "canonical": canonical(body_without_docstring(node.body)),
-        }
-        self.blocks.append(payload)
-        self.stack.append(
-            {
-                "kind": kind,
-                "name": node.name,
-                "inside_protocol": class_is_protocol or inside_protocol,
-                "public_api": public_api,
-            }
-        )
-        self.generic_visit(node)
-        self.stack.pop()
-
-    def _record_alias(self, name, node, canonical_node):
-        parent = self.stack[-1] if self.stack else None
-        qualname = ".".join([entry["name"] for entry in self.stack] + [name])
-        self.blocks.append(
-            {
-                "path": str(pathlib.Path(self.path).resolve().relative_to(pathlib.Path(self.root).resolve())).replace("\\", "/"),
-                "module": self.module,
-                "line": getattr(node, "lineno", 0),
-                "end_line": getattr(node, "end_lineno", getattr(node, "lineno", 0)),
-                "kind": "Alias",
-                "name": name,
-                "qualname": qualname,
-                "parent_kind": parent["kind"] if parent else None,
-                "parent_name": parent["name"] if parent else None,
-                "role": "alias",
-                "public_api": (
-                    name in self.module_all
-                    if self.module_all is not None
-                    else parent is None and not name.startswith("_")
-                ),
-                "parameter_count": 0,
-                "decorators": [],
-                "bases": [],
-                "imports": self.imports,
-                "calls": [],
-                "references": [],
-                "canonical": canonical(canonical_node),
-            }
-        )
-
-
-def main():
-    request = json.load(sys.stdin)
-    root = request["root"]
-    blocks = []
-    errors = []
-    parsed_modules = []
-    for path in request["files"]:
-        try:
-            text = pathlib.Path(path).read_text(encoding="utf-8")
-            tree = ast.parse(text, filename=path)
-        except Exception as exc:
-            errors.append({"path": str(path), "error": str(exc)})
-            continue
-        parsed_modules.append(
-            {
-                "path": path,
-                "tree": tree,
-                "module": module_name(root, path),
-            }
-        )
-    protocol_names = build_protocol_names(parsed_modules)
-    for parsed in parsed_modules:
-        path = parsed["path"]
-        tree = parsed["tree"]
-        collector = Collector(root, path, tree, protocol_names)
-        collector.visit(tree)
-        blocks.extend(collector.blocks)
-    print(
-        json.dumps(
-            {
-                "blocks": blocks,
-                "errors": errors,
-                "summary": {
-                    "protocol_symbols": len(protocol_names),
-                },
-            },
-            sort_keys=True,
-        )
-    )
-
-
-if __name__ == "__main__":
-    main()
-"##;
 
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
@@ -517,10 +72,46 @@ struct Block {
     references: Vec<CallRef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct CallRef {
     name: String,
     line: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ExtractedBlock {
+    path: String,
+    module: String,
+    line: usize,
+    end_line: usize,
+    kind: String,
+    name: String,
+    qualname: String,
+    parent_kind: Option<String>,
+    parent_name: Option<String>,
+    role: String,
+    public_api: bool,
+    parameter_count: usize,
+    decorators: Vec<String>,
+    bases: Vec<String>,
+    imports: Vec<Value>,
+    calls: Vec<CallRef>,
+    references: Vec<CallRef>,
+    canonical: Value,
+}
+
+struct ParsedModule {
+    relative_path: String,
+    module: String,
+    source: String,
+    suite: ast::Suite,
+}
+
+struct AstExtraction {
+    blocks: Vec<ExtractedBlock>,
+    #[cfg(test)]
+    protocol_symbol_count: usize,
+    parse_error_count: usize,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -725,11 +316,17 @@ fn analyze(args: &Args) -> Result<Analysis, String> {
         .iter()
         .map(|path| relative_path(&root, path))
         .collect::<Vec<_>>();
-    let ast_blocks = extract_ast_blocks(&root, &files)?;
+    let extraction = extract_ast_blocks(&root, &files)?;
+    if extraction.parse_error_count > 0 {
+        eprintln!(
+            "PY_STRUCTURE_HASH_PARSE_ERRORS={}",
+            extraction.parse_error_count
+        );
+    }
     let mut all_blocks = Vec::new();
     let mut buckets: BTreeMap<String, Vec<Block>> = BTreeMap::new();
-    for value in ast_blocks {
-        let block = block_from_ast_value(value)?;
+    for extracted in extraction.blocks {
+        let block = block_from_extracted(extracted)?;
         all_blocks.push(block.clone());
         if block.token_count < args.min_tokens {
             continue;
@@ -1086,149 +683,1607 @@ fn excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
     })
 }
 
-fn extract_ast_blocks(root: &Path, files: &[PathBuf]) -> Result<Vec<Value>, String> {
-    let request = json!({
-        "root": root,
-        "files": files,
-    });
-    let mut child = Command::new("python3")
-        .arg("-c")
-        .arg(AST_EXTRACTOR)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("failed to start python3 AST extractor: {error}"))?;
-    {
-        let stdin = child
-            .stdin
-            .as_mut()
-            .ok_or_else(|| "failed to open python3 stdin".to_string())?;
-        stdin
-            .write_all(request.to_string().as_bytes())
-            .map_err(|error| format!("failed to write AST request: {error}"))?;
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| format!("failed to wait for python3 AST extractor: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "python3 AST extractor failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    let payload: Value = serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("failed to parse AST extractor JSON: {error}"))?;
-    let errors = payload
-        .get("errors")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    if !errors.is_empty() {
-        eprintln!("PY_STRUCTURE_HASH_PARSE_ERRORS={}", errors.len());
-    }
-    Ok(payload
-        .get("blocks")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default())
-}
 
-fn block_from_ast_value(value: Value) -> Result<Block, String> {
-    let canonical = value
-        .get("canonical")
-        .ok_or_else(|| "AST block missing canonical payload".to_string())?;
-    let imports = value
-        .get("imports")
-        .ok_or_else(|| "AST block missing imports payload".to_string())?;
-    let decorators = value
-        .get("decorators")
-        .ok_or_else(|| "AST block missing decorators payload".to_string())?;
-    let bases = value
-        .get("bases")
-        .ok_or_else(|| "AST block missing bases payload".to_string())?;
-    let calls = call_refs_field(&value, "calls")?;
-    let references = call_refs_field(&value, "references")?;
-    let kind = string_field(&value, "kind")?;
-    let role = string_field(&value, "role")?;
-    let parameter_count = usize_field(&value, "parameter_count")?;
-    let canonical_text = serde_json::to_string(canonical)
-        .map_err(|error| format!("failed to serialize canonical AST: {error}"))?;
-    let imports_text = serde_json::to_string(imports)
-        .map_err(|error| format!("failed to serialize import facts: {error}"))?;
-    let decorators_text = serde_json::to_string(decorators)
-        .map_err(|error| format!("failed to serialize decorator facts: {error}"))?;
-    let bases_text = serde_json::to_string(bases)
-        .map_err(|error| format!("failed to serialize base facts: {error}"))?;
-    let module = string_field(&value, "module")?;
-    let owner_text = format!(
-        "{}:{}",
-        optional_string_field(&value, "parent_kind").unwrap_or_else(|| "<module>".to_string()),
-        optional_string_field(&value, "parent_name").unwrap_or_else(|| "<module>".to_string())
-    );
-    let context_text =
-        format!("{module}:{imports_text}:{decorators_text}:{bases_text}:{owner_text}");
-    Ok(Block {
-        path: string_field(&value, "path")?,
-        module,
-        line: usize_field(&value, "line")?,
-        end_line: usize_field(&value, "end_line")?,
-        kind: kind.clone(),
-        role: role.clone(),
-        name: string_field(&value, "name")?,
-        qualname: string_field(&value, "qualname")?,
-        parent_kind: optional_string_field(&value, "parent_kind"),
-        parent_name: optional_string_field(&value, "parent_name"),
-        parameter_count,
-        decorators_hash: stable_hash(&decorators_text),
-        bases_hash: stable_hash(&bases_text),
-        import_hash: stable_hash(&imports_text),
-        structure_hash: stable_hash(&format!("{role}:{kind}:{parameter_count}:{canonical_text}")),
-        context_hash: stable_hash(&context_text),
-        token_count: ast_token_count(canonical),
-        public_api: value
-            .get("public_api")
-            .and_then(Value::as_bool)
-            .unwrap_or(false),
-        calls,
-        references,
+fn extract_ast_blocks(root: &Path, files: &[PathBuf]) -> Result<AstExtraction, String> {
+    let mut modules = Vec::new();
+    let mut parse_error_count = 0;
+    for path in files {
+        let source = match fs::read_to_string(path) {
+            Ok(source) => normalize_python_newlines(&source),
+            Err(_) => {
+                parse_error_count += 1;
+                continue;
+            }
+        };
+        let source_path = path.to_string_lossy();
+        let suite = match ast::Suite::parse(&source, source_path.as_ref()) {
+            Ok(suite) => suite,
+            Err(_) => {
+                parse_error_count += 1;
+                continue;
+            }
+        };
+        let relative_path = relative_path(root, path);
+        let module = module_name(Path::new(&relative_path));
+        modules.push(ParsedModule {
+            relative_path,
+            module,
+            source,
+            suite,
+        });
+    }
+
+    let protocol_names = build_protocol_names(&modules);
+    #[cfg(test)]
+    let protocol_symbol_count = protocol_names.len();
+    let mut blocks = Vec::new();
+    for module in &modules {
+        let imports = import_facts(&module.suite);
+        let module_all = module_all_names(&module.suite);
+        let mut collector = BlockCollector {
+            path: module.relative_path.clone(),
+            module: module.module.clone(),
+            source: &module.source,
+            imports: &imports,
+            module_all: &module_all,
+            protocol_names: &protocol_names,
+            stack: Vec::new(),
+            blocks: Vec::new(),
+        };
+        for statement in &module.suite {
+            collector.visit_stmt(statement.clone());
+        }
+        blocks.extend(collector.blocks);
+    }
+
+    Ok(AstExtraction {
+        blocks,
+        #[cfg(test)]
+        protocol_symbol_count,
+        parse_error_count,
     })
 }
 
-fn string_field(value: &Value, field: &str) -> Result<String, String> {
-    value
-        .get(field)
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| format!("AST block field {field} must be a string"))
-}
-
-fn optional_string_field(value: &Value, field: &str) -> Option<String> {
-    value.get(field).and_then(Value::as_str).map(str::to_string)
-}
-
-fn usize_field(value: &Value, field: &str) -> Result<usize, String> {
-    value
-        .get(field)
-        .and_then(Value::as_u64)
-        .and_then(|number| usize::try_from(number).ok())
-        .ok_or_else(|| format!("AST block field {field} must be a positive integer"))
-}
-
-fn call_refs_field(value: &Value, field: &str) -> Result<Vec<CallRef>, String> {
-    let calls = value
-        .get(field)
-        .and_then(Value::as_array)
-        .ok_or_else(|| format!("AST block field {field} must be an array"))?;
-    calls
-        .iter()
-        .map(|call| {
-            Ok(CallRef {
-                name: string_field(call, "name")?,
-                line: usize_field(call, "line")?,
-            })
+fn canonical_node(name: &str, fields: Vec<(&'static str, Value)>) -> Value {
+    let fields = fields
+        .into_iter()
+        .filter_map(|(field, value)| {
+            if matches!(
+                field,
+                "name"
+                    | "id"
+                    | "arg"
+                    | "attr"
+                    | "asname"
+                    | "lineno"
+                    | "col_offset"
+                    | "end_lineno"
+                    | "end_col_offset"
+                    | "ctx"
+                    | "type_comment"
+            ) {
+                None
+            } else if matches!(field, "returns" | "annotation") {
+                Some(json!([field, "TYPE"]))
+            } else {
+                Some(json!([field, value]))
+            }
         })
-        .collect()
+        .collect::<Vec<_>>();
+    json!([name, fields])
+}
+
+fn canonical_array<T>(items: &[T], canonicalize: impl Fn(&T) -> Value) -> Value {
+    Value::Array(items.iter().map(canonicalize).collect())
+}
+
+fn canonical_optional<T>(item: Option<&T>, canonicalize: impl Fn(&T) -> Value) -> Value {
+    item.map(canonicalize).unwrap_or(Value::Null)
+}
+
+fn canonical_string(_value: &str) -> Value {
+    json!("STR")
+}
+
+fn canonical_constant_value(value: &ast::Constant) -> Value {
+    match value {
+        ast::Constant::None => Value::Null,
+        ast::Constant::Bool(_) | ast::Constant::Int(_) | ast::Constant::Float(_) => json!("NUM"),
+        ast::Constant::Complex { .. } => json!("NUM"),
+        ast::Constant::Str(_) => json!("STR"),
+        ast::Constant::Bytes(_) => json!("BYTES"),
+        ast::Constant::Tuple(items) => canonical_array(items, canonical_constant_value),
+        ast::Constant::Ellipsis => json!("ellipsis"),
+    }
+}
+
+fn canonical_expr(expr: &ast::Expr) -> Value {
+    use ast::Expr as E;
+    match expr {
+        E::BoolOp(node) => canonical_node(
+            "BoolOp",
+            vec![
+                ("op", json!([format!("{:?}", node.op), []])),
+                ("values", canonical_array(&node.values, canonical_expr)),
+            ],
+        ),
+        E::NamedExpr(node) => canonical_node(
+            "NamedExpr",
+            vec![
+                ("target", canonical_expr(&node.target)),
+                ("value", canonical_expr(&node.value)),
+            ],
+        ),
+        E::BinOp(node) => canonical_node(
+            "BinOp",
+            vec![
+                ("left", canonical_expr(&node.left)),
+                ("op", json!([format!("{:?}", node.op), []])),
+                ("right", canonical_expr(&node.right)),
+            ],
+        ),
+        E::UnaryOp(node) => canonical_node(
+            "UnaryOp",
+            vec![
+                ("op", json!([format!("{:?}", node.op), []])),
+                ("operand", canonical_expr(&node.operand)),
+            ],
+        ),
+        E::Lambda(node) => canonical_node(
+            "Lambda",
+            vec![
+                ("args", canonical_arguments(&node.args)),
+                ("body", canonical_expr(&node.body)),
+            ],
+        ),
+        E::IfExp(node) => canonical_node(
+            "IfExp",
+            vec![
+                ("test", canonical_expr(&node.test)),
+                ("body", canonical_expr(&node.body)),
+                ("orelse", canonical_expr(&node.orelse)),
+            ],
+        ),
+        E::Dict(node) => canonical_node(
+            "Dict",
+            vec![
+                (
+                    "keys",
+                    Value::Array(
+                        node.keys
+                            .iter()
+                            .map(|key| canonical_optional(key.as_ref(), canonical_expr))
+                            .collect(),
+                    ),
+                ),
+                ("values", canonical_array(&node.values, canonical_expr)),
+            ],
+        ),
+        E::Set(node) => canonical_node(
+            "Set",
+            vec![("elts", canonical_array(&node.elts, canonical_expr))],
+        ),
+        E::ListComp(node) => canonical_node(
+            "ListComp",
+            vec![
+                ("elt", canonical_expr(&node.elt)),
+                (
+                    "generators",
+                    canonical_array(&node.generators, canonical_comprehension),
+                ),
+            ],
+        ),
+        E::SetComp(node) => canonical_node(
+            "SetComp",
+            vec![
+                ("elt", canonical_expr(&node.elt)),
+                (
+                    "generators",
+                    canonical_array(&node.generators, canonical_comprehension),
+                ),
+            ],
+        ),
+        E::DictComp(node) => canonical_node(
+            "DictComp",
+            vec![
+                ("key", canonical_expr(&node.key)),
+                ("value", canonical_expr(&node.value)),
+                (
+                    "generators",
+                    canonical_array(&node.generators, canonical_comprehension),
+                ),
+            ],
+        ),
+        E::GeneratorExp(node) => canonical_node(
+            "GeneratorExp",
+            vec![
+                ("elt", canonical_expr(&node.elt)),
+                (
+                    "generators",
+                    canonical_array(&node.generators, canonical_comprehension),
+                ),
+            ],
+        ),
+        E::Await(node) => canonical_node("Await", vec![("value", canonical_expr(&node.value))]),
+        E::Yield(node) => canonical_node(
+            "Yield",
+            vec![(
+                "value",
+                canonical_optional(node.value.as_deref(), canonical_expr),
+            )],
+        ),
+        E::YieldFrom(node) => {
+            canonical_node("YieldFrom", vec![("value", canonical_expr(&node.value))])
+        }
+        E::Compare(node) => canonical_node(
+            "Compare",
+            vec![
+                ("left", canonical_expr(&node.left)),
+                (
+                    "ops",
+                    Value::Array(
+                        node.ops
+                            .iter()
+                            .map(|op| json!([format!("{op:?}"), []]))
+                            .collect(),
+                    ),
+                ),
+                (
+                    "comparators",
+                    canonical_array(&node.comparators, canonical_expr),
+                ),
+            ],
+        ),
+        E::Call(node) => canonical_node(
+            "Call",
+            vec![
+                ("func", canonical_expr(&node.func)),
+                ("args", canonical_array(&node.args, canonical_expr)),
+                (
+                    "keywords",
+                    canonical_array(&node.keywords, canonical_keyword),
+                ),
+            ],
+        ),
+        E::FormattedValue(node) => canonical_node(
+            "FormattedValue",
+            vec![
+                ("value", canonical_expr(&node.value)),
+                ("conversion", json!("NUM")),
+                (
+                    "format_spec",
+                    canonical_optional(node.format_spec.as_deref(), canonical_expr),
+                ),
+            ],
+        ),
+        E::JoinedStr(node) => canonical_node(
+            "JoinedStr",
+            vec![("values", canonical_array(&node.values, canonical_expr))],
+        ),
+        E::Constant(node) => canonical_node(
+            "Constant",
+            vec![
+                ("value", canonical_constant_value(&node.value)),
+                (
+                    "kind",
+                    node.kind
+                        .as_deref()
+                        .map(canonical_string)
+                        .unwrap_or(Value::Null),
+                ),
+            ],
+        ),
+        E::Attribute(node) => canonical_node(
+            "Attribute",
+            vec![
+                ("value", canonical_expr(&node.value)),
+                ("attr", canonical_string(node.attr.as_str())),
+                ("ctx", Value::Null),
+            ],
+        ),
+        E::Subscript(node) => canonical_node(
+            "Subscript",
+            vec![
+                ("value", canonical_expr(&node.value)),
+                ("slice", canonical_expr(&node.slice)),
+                ("ctx", Value::Null),
+            ],
+        ),
+        E::Starred(node) => canonical_node(
+            "Starred",
+            vec![
+                ("value", canonical_expr(&node.value)),
+                ("ctx", Value::Null),
+            ],
+        ),
+        E::Name(node) => canonical_node(
+            "Name",
+            vec![("id", canonical_string(node.id.as_str())), ("ctx", Value::Null)],
+        ),
+        E::List(node) => canonical_node(
+            "List",
+            vec![
+                ("elts", canonical_array(&node.elts, canonical_expr)),
+                ("ctx", Value::Null),
+            ],
+        ),
+        E::Tuple(node) => canonical_node(
+            "Tuple",
+            vec![
+                ("elts", canonical_array(&node.elts, canonical_expr)),
+                ("ctx", Value::Null),
+            ],
+        ),
+        E::Slice(node) => canonical_node(
+            "Slice",
+            vec![
+                (
+                    "lower",
+                    canonical_optional(node.lower.as_deref(), canonical_expr),
+                ),
+                (
+                    "upper",
+                    canonical_optional(node.upper.as_deref(), canonical_expr),
+                ),
+                (
+                    "step",
+                    canonical_optional(node.step.as_deref(), canonical_expr),
+                ),
+            ],
+        ),
+    }
+}
+
+fn canonical_comprehension(node: &ast::Comprehension) -> Value {
+    canonical_node(
+        "comprehension",
+        vec![
+            ("target", canonical_expr(&node.target)),
+            ("iter", canonical_expr(&node.iter)),
+            ("ifs", canonical_array(&node.ifs, canonical_expr)),
+            ("is_async", json!("NUM")),
+        ],
+    )
+}
+
+fn canonical_keyword(node: &ast::Keyword) -> Value {
+    canonical_node(
+        "keyword",
+        vec![
+            (
+                "arg",
+                node.arg
+                    .as_ref()
+                    .map(|arg| canonical_string(arg.as_str()))
+                    .unwrap_or(Value::Null),
+            ),
+            ("value", canonical_expr(&node.value)),
+        ],
+    )
+}
+
+fn canonical_arg(node: &ast::Arg) -> Value {
+    canonical_node(
+        "arg",
+        vec![
+            ("arg", canonical_string(node.arg.as_str())),
+            (
+                "annotation",
+                node.annotation
+                    .as_deref()
+                    .map(canonical_expr)
+                    .unwrap_or(Value::Null),
+            ),
+            (
+                "type_comment",
+                node.type_comment
+                    .as_deref()
+                    .map(canonical_string)
+                    .unwrap_or(Value::Null),
+            ),
+        ],
+    )
+}
+
+fn canonical_arguments(node: &ast::Arguments) -> Value {
+    canonical_node(
+        "arguments",
+        vec![
+            (
+                "posonlyargs",
+                canonical_array(&node.posonlyargs, |arg| canonical_arg(&arg.def)),
+            ),
+            (
+                "args",
+                canonical_array(&node.args, |arg| canonical_arg(&arg.def)),
+            ),
+            (
+                "vararg",
+                canonical_optional(node.vararg.as_deref(), canonical_arg),
+            ),
+            (
+                "kwonlyargs",
+                canonical_array(&node.kwonlyargs, |arg| canonical_arg(&arg.def)),
+            ),
+            (
+                "kw_defaults",
+                Value::Array(
+                    node.kwonlyargs
+                        .iter()
+                        .map(|arg| {
+                            canonical_optional(arg.default.as_deref(), canonical_expr)
+                        })
+                        .collect(),
+                ),
+            ),
+            (
+                "kwarg",
+                canonical_optional(node.kwarg.as_deref(), canonical_arg),
+            ),
+            (
+                "defaults",
+                Value::Array(
+                    node.posonlyargs
+                        .iter()
+                        .chain(&node.args)
+                        .filter_map(|arg| arg.default.as_deref().map(canonical_expr))
+                        .collect(),
+                ),
+            ),
+        ],
+    )
+}
+
+fn canonical_stmt(stmt: &ast::Stmt) -> Value {
+    use ast::Stmt as S;
+    match stmt {
+        S::FunctionDef(node) => canonical_node(
+            "FunctionDef",
+            vec![
+                ("name", canonical_string(node.name.as_str())),
+                ("args", canonical_arguments(&node.args)),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+                (
+                    "decorator_list",
+                    canonical_array(&node.decorator_list, canonical_expr),
+                ),
+                (
+                    "returns",
+                    canonical_optional(node.returns.as_deref(), canonical_expr),
+                ),
+                (
+                    "type_comment",
+                    node.type_comment
+                        .as_deref()
+                        .map(canonical_string)
+                        .unwrap_or(Value::Null),
+                ),
+                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+            ],
+        ),
+        S::AsyncFunctionDef(node) => canonical_node(
+            "AsyncFunctionDef",
+            vec![
+                ("name", canonical_string(node.name.as_str())),
+                ("args", canonical_arguments(&node.args)),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+                (
+                    "decorator_list",
+                    canonical_array(&node.decorator_list, canonical_expr),
+                ),
+                (
+                    "returns",
+                    canonical_optional(node.returns.as_deref(), canonical_expr),
+                ),
+                (
+                    "type_comment",
+                    node.type_comment
+                        .as_deref()
+                        .map(canonical_string)
+                        .unwrap_or(Value::Null),
+                ),
+                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+            ],
+        ),
+        S::ClassDef(node) => canonical_node(
+            "ClassDef",
+            vec![
+                ("name", canonical_string(node.name.as_str())),
+                ("bases", canonical_array(&node.bases, canonical_expr)),
+                ("keywords", canonical_array(&node.keywords, canonical_keyword)),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+                (
+                    "decorator_list",
+                    canonical_array(&node.decorator_list, canonical_expr),
+                ),
+                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+            ],
+        ),
+        S::Return(node) => canonical_node(
+            "Return",
+            vec![(
+                "value",
+                canonical_optional(node.value.as_deref(), canonical_expr),
+            )],
+        ),
+        S::Delete(node) => canonical_node(
+            "Delete",
+            vec![("targets", canonical_array(&node.targets, canonical_expr))],
+        ),
+        S::Assign(node) => canonical_node(
+            "Assign",
+            vec![
+                ("targets", canonical_array(&node.targets, canonical_expr)),
+                ("value", canonical_expr(&node.value)),
+                (
+                    "type_comment",
+                    node.type_comment
+                        .as_deref()
+                        .map(canonical_string)
+                        .unwrap_or(Value::Null),
+                ),
+            ],
+        ),
+        S::TypeAlias(node) => canonical_node(
+            "TypeAlias",
+            vec![
+                ("name", canonical_expr(&node.name)),
+                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+                ("value", canonical_expr(&node.value)),
+            ],
+        ),
+        S::AugAssign(node) => canonical_node(
+            "AugAssign",
+            vec![
+                ("target", canonical_expr(&node.target)),
+                ("op", json!([format!("{:?}", node.op), []])),
+                ("value", canonical_expr(&node.value)),
+            ],
+        ),
+        S::AnnAssign(node) => canonical_node(
+            "AnnAssign",
+            vec![
+                ("target", canonical_expr(&node.target)),
+                ("annotation", canonical_expr(&node.annotation)),
+                (
+                    "value",
+                    canonical_optional(node.value.as_deref(), canonical_expr),
+                ),
+                ("simple", json!("NUM")),
+            ],
+        ),
+        S::For(node) => canonical_for(
+            "For",
+            &node.target,
+            &node.iter,
+            &node.body,
+            &node.orelse,
+            node.type_comment.as_deref(),
+        ),
+        S::AsyncFor(node) => canonical_for(
+            "AsyncFor",
+            &node.target,
+            &node.iter,
+            &node.body,
+            &node.orelse,
+            node.type_comment.as_deref(),
+        ),
+        S::While(node) => canonical_node(
+            "While",
+            vec![
+                ("test", canonical_expr(&node.test)),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+                ("orelse", canonical_array(&node.orelse, canonical_stmt)),
+            ],
+        ),
+        S::If(node) => canonical_node(
+            "If",
+            vec![
+                ("test", canonical_expr(&node.test)),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+                ("orelse", canonical_array(&node.orelse, canonical_stmt)),
+            ],
+        ),
+        S::With(node) => canonical_with(
+            "With",
+            &node.items,
+            &node.body,
+            node.type_comment.as_deref(),
+        ),
+        S::AsyncWith(node) => canonical_with(
+            "AsyncWith",
+            &node.items,
+            &node.body,
+            node.type_comment.as_deref(),
+        ),
+        S::Match(node) => canonical_node(
+            "Match",
+            vec![
+                ("subject", canonical_expr(&node.subject)),
+                ("cases", canonical_array(&node.cases, canonical_match_case)),
+            ],
+        ),
+        S::Raise(node) => canonical_node(
+            "Raise",
+            vec![
+                ("exc", canonical_optional(node.exc.as_deref(), canonical_expr)),
+                ("cause", canonical_optional(node.cause.as_deref(), canonical_expr)),
+            ],
+        ),
+        S::Try(node) => canonical_try(
+            "Try",
+            &node.body,
+            &node.handlers,
+            &node.orelse,
+            &node.finalbody,
+        ),
+        S::TryStar(node) => canonical_try(
+            "TryStar",
+            &node.body,
+            &node.handlers,
+            &node.orelse,
+            &node.finalbody,
+        ),
+        S::Assert(node) => canonical_node(
+            "Assert",
+            vec![
+                ("test", canonical_expr(&node.test)),
+                ("msg", canonical_optional(node.msg.as_deref(), canonical_expr)),
+            ],
+        ),
+        S::Import(node) => canonical_node(
+            "Import",
+            vec![("names", canonical_array(&node.names, canonical_alias))],
+        ),
+        S::ImportFrom(node) => canonical_node(
+            "ImportFrom",
+            vec![
+                (
+                    "module",
+                    node.module
+                        .as_ref()
+                        .map(|module| canonical_string(module.as_str()))
+                        .unwrap_or(Value::Null),
+                ),
+                ("names", canonical_array(&node.names, canonical_alias)),
+                // Python AST always has an integer level; RustPython uses None for absolute imports.
+                ("level", json!("NUM")),
+            ],
+        ),
+        S::Global(node) => canonical_node(
+            "Global",
+            vec![
+                (
+                    "names",
+                    Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
+                ),
+            ],
+        ),
+        S::Nonlocal(node) => canonical_node(
+            "Nonlocal",
+            vec![
+                (
+                    "names",
+                    Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
+                ),
+            ],
+        ),
+        S::Expr(node) => canonical_node(
+            "Expr",
+            vec![("value", canonical_expr(&node.value))],
+        ),
+        S::Pass(_) => canonical_node("Pass", vec![]),
+        S::Break(_) => canonical_node("Break", vec![]),
+        S::Continue(_) => canonical_node("Continue", vec![]),
+    }
+}
+
+fn canonical_for(
+    name: &str,
+    target: &ast::Expr,
+    iter: &ast::Expr,
+    body: &[ast::Stmt],
+    orelse: &[ast::Stmt],
+    type_comment: Option<&str>,
+) -> Value {
+    canonical_node(
+        name,
+        vec![
+            ("target", canonical_expr(target)),
+            ("iter", canonical_expr(iter)),
+            ("body", canonical_array(body, canonical_stmt)),
+            ("orelse", canonical_array(orelse, canonical_stmt)),
+            (
+                "type_comment",
+                type_comment
+                    .map(canonical_string)
+                    .unwrap_or(Value::Null),
+            ),
+        ],
+    )
+}
+
+fn canonical_with(
+    name: &str,
+    items: &[ast::WithItem],
+    body: &[ast::Stmt],
+    type_comment: Option<&str>,
+) -> Value {
+    canonical_node(
+        name,
+        vec![
+            ("items", canonical_array(items, canonical_with_item)),
+            ("body", canonical_array(body, canonical_stmt)),
+            (
+                "type_comment",
+                type_comment
+                    .map(canonical_string)
+                    .unwrap_or(Value::Null),
+            ),
+        ],
+    )
+}
+
+fn canonical_try(
+    name: &str,
+    body: &[ast::Stmt],
+    handlers: &[ast::ExceptHandler],
+    orelse: &[ast::Stmt],
+    finalbody: &[ast::Stmt],
+) -> Value {
+    canonical_node(
+        name,
+        vec![
+            ("body", canonical_array(body, canonical_stmt)),
+            ("handlers", canonical_array(handlers, canonical_except_handler)),
+            ("orelse", canonical_array(orelse, canonical_stmt)),
+            ("finalbody", canonical_array(finalbody, canonical_stmt)),
+        ],
+    )
+}
+
+fn canonical_alias(node: &ast::Alias) -> Value {
+    canonical_node(
+        "alias",
+        vec![
+            ("name", canonical_string(node.name.as_str())),
+            (
+                "asname",
+                node.asname
+                    .as_ref()
+                    .map(|name| canonical_string(name.as_str()))
+                    .unwrap_or(Value::Null),
+            ),
+        ],
+    )
+}
+
+fn canonical_with_item(node: &ast::WithItem) -> Value {
+    canonical_node(
+        "withitem",
+        vec![
+            ("context_expr", canonical_expr(&node.context_expr)),
+            (
+                "optional_vars",
+                canonical_optional(node.optional_vars.as_deref(), canonical_expr),
+            ),
+        ],
+    )
+}
+
+fn canonical_match_case(node: &ast::MatchCase) -> Value {
+    canonical_node(
+        "match_case",
+        vec![
+            ("pattern", canonical_pattern(&node.pattern)),
+            ("guard", canonical_optional(node.guard.as_deref(), canonical_expr)),
+            ("body", canonical_array(&node.body, canonical_stmt)),
+        ],
+    )
+}
+
+fn canonical_except_handler(node: &ast::ExceptHandler) -> Value {
+    match node {
+        ast::ExceptHandler::ExceptHandler(node) => canonical_node(
+            "ExceptHandler",
+            vec![
+                (
+                    "type",
+                    canonical_optional(node.type_.as_deref(), canonical_expr),
+                ),
+                (
+                    "name",
+                    node.name
+                        .as_ref()
+                        .map(|name| canonical_string(name.as_str()))
+                        .unwrap_or(Value::Null),
+                ),
+                ("body", canonical_array(&node.body, canonical_stmt)),
+            ],
+        ),
+    }
+}
+
+fn canonical_pattern(pattern: &ast::Pattern) -> Value {
+    use ast::Pattern as P;
+    match pattern {
+        P::MatchValue(node) => canonical_node(
+            "MatchValue",
+            vec![("value", canonical_expr(&node.value))],
+        ),
+        P::MatchSingleton(node) => canonical_node(
+            "MatchSingleton",
+            vec![("value", canonical_constant_value(&node.value))],
+        ),
+        P::MatchSequence(node) => canonical_node(
+            "MatchSequence",
+            vec![("patterns", canonical_array(&node.patterns, canonical_pattern))],
+        ),
+        P::MatchMapping(node) => canonical_node(
+            "MatchMapping",
+            vec![
+                ("keys", canonical_array(&node.keys, canonical_expr)),
+                ("patterns", canonical_array(&node.patterns, canonical_pattern)),
+                (
+                    "rest",
+                    node.rest
+                        .as_ref()
+                        .map(|rest| canonical_string(rest.as_str()))
+                        .unwrap_or(Value::Null),
+                ),
+            ],
+        ),
+        P::MatchClass(node) => canonical_node(
+            "MatchClass",
+            vec![
+                ("cls", canonical_expr(&node.cls)),
+                ("patterns", canonical_array(&node.patterns, canonical_pattern)),
+                (
+                    "kwd_attrs",
+                    Value::Array(node.kwd_attrs.iter().map(|_| json!("STR")).collect()),
+                ),
+                (
+                    "kwd_patterns",
+                    canonical_array(&node.kwd_patterns, canonical_pattern),
+                ),
+            ],
+        ),
+        P::MatchStar(node) => canonical_node(
+            "MatchStar",
+            vec![
+                (
+                    "name",
+                    node.name
+                        .as_ref()
+                        .map(|name| canonical_string(name.as_str()))
+                        .unwrap_or(Value::Null),
+                ),
+            ],
+        ),
+        P::MatchAs(node) => canonical_node(
+            "MatchAs",
+            vec![
+                (
+                    "pattern",
+                    canonical_optional(node.pattern.as_deref(), canonical_pattern),
+                ),
+                (
+                    "name",
+                    node.name
+                        .as_ref()
+                        .map(|name| canonical_string(name.as_str()))
+                        .unwrap_or(Value::Null),
+                ),
+            ],
+        ),
+        P::MatchOr(node) => canonical_node(
+            "MatchOr",
+            vec![("patterns", canonical_array(&node.patterns, canonical_pattern))],
+        ),
+    }
+}
+
+fn canonical_type_param(param: &ast::TypeParam) -> Value {
+    use ast::TypeParam as T;
+    match param {
+        T::TypeVar(node) => canonical_node(
+            "TypeVar",
+            vec![
+                ("name", canonical_string(node.name.as_str())),
+                (
+                    "bound",
+                    canonical_optional(node.bound.as_deref(), canonical_expr),
+                ),
+            ],
+        ),
+        T::ParamSpec(node) => canonical_node(
+            "ParamSpec",
+            vec![("name", canonical_string(node.name.as_str()))],
+        ),
+        T::TypeVarTuple(node) => canonical_node(
+            "TypeVarTuple",
+            vec![("name", canonical_string(node.name.as_str()))],
+        ),
+    }
+}
+
+fn expr_name(expr: &ast::Expr) -> Option<String> {
+    match expr {
+        ast::Expr::Name(name) => Some(name.id.to_string()),
+        _ => None,
+    }
+}
+
+fn ref_name(expr: &ast::Expr) -> String {
+    match expr {
+        ast::Expr::Name(name) => name.id.to_string(),
+        ast::Expr::Attribute(attribute) => {
+            let parent = ref_name(&attribute.value);
+            if parent.is_empty() {
+                attribute.attr.to_string()
+            } else {
+                format!("{parent}.{}", attribute.attr)
+            }
+        }
+        ast::Expr::Subscript(subscript) => ref_name(&subscript.value),
+        ast::Expr::Call(call) => ref_name(&call.func),
+        _ => ast_dump_expr(expr),
+    }
+}
+
+fn import_facts(suite: &ast::Suite) -> Vec<Value> {
+    let mut facts = Vec::<Vec<String>>::new();
+    for statement in suite {
+        match statement {
+            ast::Stmt::Import(import) => {
+                facts.extend(
+                    import
+                        .names
+                        .iter()
+                        .map(|alias| vec!["import".to_string(), alias.name.to_string()]),
+                );
+            }
+            ast::Stmt::ImportFrom(import) => {
+                let level = import
+                    .level
+                    .as_ref()
+                    .map(|value| value.to_usize())
+                    .unwrap_or(0);
+                let module = format!(
+                    "{}{}",
+                    ".".repeat(level),
+                    import.module.as_ref().map(ToString::to_string).unwrap_or_default()
+                );
+                facts.extend(import.names.iter().map(|alias| {
+                    vec!["from".to_string(), module.clone(), alias.name.to_string()]
+                }));
+            }
+            _ => {}
+        }
+    }
+    facts.sort();
+    facts.into_iter().map(|fact| json!(fact)).collect()
+}
+
+fn decorator_facts(node: &[ast::Expr]) -> Vec<String> {
+    let mut facts = node.iter().map(ref_name).collect::<Vec<_>>();
+    facts.sort();
+    facts
+}
+
+fn base_facts(node: &[ast::Expr]) -> Vec<String> {
+    let mut facts = node.iter().map(ref_name).collect::<Vec<_>>();
+    facts.sort();
+    facts
+}
+
+fn module_all_names(suite: &ast::Suite) -> Option<BTreeSet<String>> {
+    let mut names = BTreeSet::new();
+    let mut found = false;
+    for statement in suite {
+        let ast::Stmt::Assign(assign) = statement else {
+            continue;
+        };
+        if !assign
+            .targets
+            .iter()
+            .any(|target| expr_name(target).as_deref() == Some("__all__"))
+        {
+            continue;
+        }
+        found = true;
+        let values = match assign.value.as_ref() {
+            ast::Expr::List(list) => Some(&list.elts),
+            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+            ast::Expr::Set(set) => Some(&set.elts),
+            _ => None,
+        };
+        if let Some(values) = values {
+            for value in values {
+                if let ast::Expr::Constant(constant) = value {
+                    if let ast::Constant::Str(name) = &constant.value {
+                        names.insert(name.clone());
+                    }
+                }
+            }
+        }
+    }
+    found.then_some(names)
+}
+
+#[derive(Clone)]
+struct ClassInfo {
+    module: String,
+    qualname: String,
+    bases: Vec<String>,
+}
+
+struct ClassIndexVisitor<'a> {
+    module: &'a str,
+    stack: Vec<String>,
+    classes: Vec<ClassInfo>,
+}
+
+impl Visitor for ClassIndexVisitor<'_> {
+    fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
+        let name = node.name.to_string();
+        let qualname = self
+            .stack
+            .iter()
+            .chain(std::iter::once(&name))
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(".");
+        self.classes.push(ClassInfo {
+            module: self.module.to_string(),
+            qualname,
+            bases: base_facts(&node.bases),
+        });
+        self.stack.push(name);
+        self.generic_visit_stmt_class_def(node);
+        self.stack.pop();
+    }
+}
+
+fn class_identities(module: &str, qualname: &str) -> [String; 3] {
+    let simple = qualname.rsplit('.').next().unwrap_or(qualname);
+    [
+        simple.to_string(),
+        qualname.to_string(),
+        format!("{module}.{qualname}"),
+    ]
+}
+
+fn is_direct_protocol_base(base: &str) -> bool {
+    base == "Protocol" || base.ends_with(".Protocol")
+}
+
+fn base_matches_known_protocol(base: &str, protocol_names: &BTreeSet<String>) -> bool {
+    if is_direct_protocol_base(base) {
+        return true;
+    }
+    let base_tail = base.rsplit('.').next().unwrap_or(base);
+    protocol_names.contains(base) || protocol_names.contains(base_tail)
+}
+
+fn build_protocol_names(modules: &[ParsedModule]) -> BTreeSet<String> {
+    let mut classes = Vec::new();
+    for module in modules {
+        let mut visitor = ClassIndexVisitor {
+            module: &module.module,
+            stack: Vec::new(),
+            classes: Vec::new(),
+        };
+        for statement in &module.suite {
+            visitor.visit_stmt(statement.clone());
+        }
+        classes.extend(visitor.classes);
+    }
+
+    let mut protocol_names = BTreeSet::new();
+    loop {
+        let before = protocol_names.len();
+        for class in &classes {
+            if class
+                .bases
+                .iter()
+                .any(|base| base_matches_known_protocol(base, &protocol_names))
+            {
+                protocol_names.extend(class_identities(&class.module, &class.qualname));
+            }
+        }
+        if protocol_names.len() == before {
+            return protocol_names;
+        }
+    }
+}
+
+#[derive(Clone)]
+struct ParentEntry {
+    kind: String,
+    name: String,
+    inside_protocol: bool,
+    public_api: bool,
+}
+
+struct BlockCollector<'a> {
+    path: String,
+    module: String,
+    source: &'a str,
+    imports: &'a [Value],
+    module_all: &'a Option<BTreeSet<String>>,
+    protocol_names: &'a BTreeSet<String>,
+    stack: Vec<ParentEntry>,
+    blocks: Vec<ExtractedBlock>,
+}
+
+impl BlockCollector<'_> {
+    fn public_api(&self, name: &str) -> bool {
+        if let Some(parent) = self.stack.last() {
+            parent.kind == "Class" && parent.public_api && !name.starts_with('_')
+        } else if let Some(module_all) = self.module_all {
+            module_all.contains(name)
+        } else {
+            !name.starts_with('_')
+        }
+    }
+
+    fn add_block(
+        &mut self,
+        name: &str,
+        node: &impl Ranged,
+        kind: &str,
+        parameter_count: usize,
+        decorators: Vec<String>,
+        bases: Vec<String>,
+        canonical: Value,
+        calls: Vec<CallRef>,
+        references: Vec<CallRef>,
+        is_alias: bool,
+    ) -> ParentEntry {
+        let parent = self.stack.last();
+        let parent_kind = parent.map(|value| value.kind.clone());
+        let parent_name = parent.map(|value| value.name.clone());
+        let qualname = self
+            .stack
+            .iter()
+            .map(|value| value.name.as_str())
+            .chain(std::iter::once(name))
+            .collect::<Vec<_>>()
+            .join(".");
+        let class_is_protocol = kind == "Class"
+            && class_identities(&self.module, &qualname)
+                .iter()
+                .any(|identity| self.protocol_names.contains(identity));
+        let inside_protocol = class_is_protocol
+            || parent
+                .map(|value| value.inside_protocol)
+                .unwrap_or(false);
+        let role = if is_alias {
+            "alias"
+        } else if inside_protocol {
+            "protocol"
+        } else {
+            "implementation"
+        };
+        let public_api = if is_alias {
+            if let Some(module_all) = self.module_all {
+                module_all.contains(name)
+            } else {
+                parent.is_none() && !name.starts_with('_')
+            }
+        } else {
+            self.public_api(name)
+        };
+        let end_offset = node.end().to_usize();
+        self.blocks.push(ExtractedBlock {
+            path: self.path.clone(),
+            module: self.module.clone(),
+            line: node_line(self.source, node),
+            end_line: line_at_offset(self.source, end_offset.saturating_sub(1)),
+            kind: kind.to_string(),
+            name: name.to_string(),
+            qualname,
+            parent_kind,
+            parent_name,
+            role: role.to_string(),
+            public_api,
+            parameter_count,
+            decorators,
+            bases,
+            imports: self.imports.to_vec(),
+            calls,
+            references,
+            canonical,
+        });
+        ParentEntry {
+            kind: kind.to_string(),
+            name: name.to_string(),
+            inside_protocol,
+            public_api,
+        }
+    }
+
+    fn add_function(
+        &mut self,
+        name: &str,
+        node: &impl Ranged,
+        args: &ast::Arguments,
+        body: &[ast::Stmt],
+        decorators: &[ast::Expr],
+        returns: Option<&ast::Expr>,
+    ) -> ParentEntry {
+        let parameter_count = function_parameter_count(args);
+        let canonical = canonical_body(body);
+        let calls = block_calls(self.source, body);
+        let references = function_references(self.source, args, returns, body);
+        self.add_block(
+            name,
+            node,
+            "Function",
+            parameter_count,
+            decorator_facts(decorators),
+            Vec::new(),
+            canonical,
+            calls,
+            references,
+            false,
+        )
+    }
+
+    fn add_class(
+        &mut self,
+        name: &str,
+        node: &impl Ranged,
+        bases: &[ast::Expr],
+        decorators: &[ast::Expr],
+        body: &[ast::Stmt],
+    ) -> ParentEntry {
+        let canonical = canonical_body(body);
+        let calls = block_calls(self.source, body);
+        let references = class_references(self.source, bases, body);
+        self.add_block(
+            name,
+            node,
+            "Class",
+            bases.len(),
+            decorator_facts(decorators),
+            base_facts(bases),
+            canonical,
+            calls,
+            references,
+            false,
+        )
+    }
+
+    fn add_alias(
+        &mut self,
+        name: &str,
+        node: &impl Ranged,
+        canonical: &ast::Expr,
+    ) {
+        self.add_block(
+            name,
+            node,
+            "Alias",
+            0,
+            Vec::new(),
+            Vec::new(),
+            canonical_expr(canonical),
+            Vec::new(),
+            Vec::new(),
+            true,
+        );
+    }
+}
+
+impl Visitor for BlockCollector<'_> {
+    fn visit_stmt_function_def(&mut self, node: ast::StmtFunctionDef) {
+        let name = node.name.to_string();
+        let parent = self.add_function(
+            &name,
+            &node,
+            &node.args,
+            &node.body,
+            &node.decorator_list,
+            node.returns.as_deref(),
+        );
+        self.stack.push(parent);
+        self.generic_visit_stmt_function_def(node);
+        self.stack.pop();
+    }
+
+    fn visit_stmt_async_function_def(&mut self, node: ast::StmtAsyncFunctionDef) {
+        let name = node.name.to_string();
+        let parent = self.add_function(
+            &name,
+            &node,
+            &node.args,
+            &node.body,
+            &node.decorator_list,
+            node.returns.as_deref(),
+        );
+        self.stack.push(parent);
+        self.generic_visit_stmt_async_function_def(node);
+        self.stack.pop();
+    }
+
+    fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
+        let name = node.name.to_string();
+        let parent = self.add_class(
+            &name,
+            &node,
+            &node.bases,
+            &node.decorator_list,
+            &node.body,
+        );
+        self.stack.push(parent);
+        self.generic_visit_stmt_class_def(node);
+        self.stack.pop();
+    }
+
+    fn visit_stmt_ann_assign(&mut self, node: ast::StmtAnnAssign) {
+        if let Some(name) = expr_name(&node.target) {
+            let annotation = ref_name(&node.annotation);
+            if annotation == "TypeAlias" || annotation.ends_with(".TypeAlias") {
+                self.add_alias(
+                    &name,
+                    &node,
+                    node.value.as_deref().unwrap_or(&node.annotation),
+                );
+                return;
+            }
+        }
+        self.generic_visit_stmt_ann_assign(node);
+    }
+
+    fn visit_stmt_assign(&mut self, node: ast::StmtAssign) {
+        let value_name = if let ast::Expr::Subscript(value) = node.value.as_ref() {
+            ref_name(&value.value)
+        } else {
+            String::new()
+        };
+        if matches!(value_name.as_str(), "TypeAlias" | "typing.TypeAlias") {
+            for target in &node.targets {
+                if let Some(name) = expr_name(target) {
+                    self.add_alias(&name, &node, &node.value);
+                }
+            }
+            return;
+        }
+        self.generic_visit_stmt_assign(node);
+    }
+}
+
+fn function_parameter_count(args: &ast::Arguments) -> usize {
+    args.posonlyargs
+        .iter()
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+        .map(|argument| argument.def.arg.as_str())
+        .chain(args.vararg.iter().map(|argument| argument.arg.as_str()))
+        .chain(args.kwarg.iter().map(|argument| argument.arg.as_str()))
+        .filter(|name| !matches!(*name, "self" | "cls"))
+        .count()
+}
+
+fn body_without_docstring(body: &[ast::Stmt]) -> &[ast::Stmt] {
+    match body.first() {
+        Some(ast::Stmt::Expr(expr))
+            if matches!(&expr.value, ast::Expr::Constant(value) if matches!(value.value, ast::Constant::Str(_))) =>
+        {
+            &body[1..]
+        }
+        _ => body,
+    }
+}
+
+fn canonical_body(body: &[ast::Stmt]) -> Value {
+    canonical_array(body_without_docstring(body), canonical_stmt)
+}
+
+struct BlockCallVisitor<'a> {
+    source: &'a str,
+    calls: Vec<CallRef>,
+}
+
+impl Visitor for BlockCallVisitor<'_> {
+    fn visit_stmt_function_def(&mut self, _node: ast::StmtFunctionDef) {}
+    fn visit_stmt_async_function_def(&mut self, _node: ast::StmtAsyncFunctionDef) {}
+    fn visit_stmt_class_def(&mut self, _node: ast::StmtClassDef) {}
+
+    fn visit_expr_call(&mut self, node: ast::ExprCall) {
+        self.calls.push(CallRef {
+            name: ref_name(&node.func),
+            line: node_line(self.source, &node),
+        });
+        self.generic_visit_expr_call(node);
+    }
+}
+
+fn block_calls(source: &str, body: &[ast::Stmt]) -> Vec<CallRef> {
+    let mut visitor = BlockCallVisitor {
+        source,
+        calls: Vec::new(),
+    };
+    for statement in body_without_docstring(body) {
+        visitor.visit_stmt(statement.clone());
+    }
+    visitor
+        .calls
+        .sort_by(|left, right| (left.line, &left.name).cmp(&(right.line, &right.name)));
+    visitor.calls
+}
+
+struct AnnotationReferenceVisitor {
+    line: usize,
+    references: Vec<CallRef>,
+}
+
+impl AnnotationReferenceVisitor {
+    fn record(&mut self, name: String) {
+        if !name.is_empty() {
+            self.references.push(CallRef {
+                name,
+                line: self.line,
+            });
+        }
+    }
+}
+
+impl Visitor for AnnotationReferenceVisitor {
+    fn visit_expr_name(&mut self, node: ast::ExprName) {
+        self.record(ref_name(&ast::Expr::Name(node.clone())));
+        self.generic_visit_expr_name(node);
+    }
+
+    fn visit_expr_attribute(&mut self, node: ast::ExprAttribute) {
+        self.record(ref_name(&ast::Expr::Attribute(node.clone())));
+        self.generic_visit_expr_attribute(node);
+    }
+
+    fn visit_expr_subscript(&mut self, node: ast::ExprSubscript) {
+        self.record(ref_name(&ast::Expr::Subscript(node.clone())));
+        self.generic_visit_expr_subscript(node);
+    }
+
+    fn visit_expr_call(&mut self, node: ast::ExprCall) {
+        self.record(ref_name(&ast::Expr::Call(node.clone())));
+        self.generic_visit_expr_call(node);
+    }
+}
+
+struct BlockReferenceVisitor<'a> {
+    source: &'a str,
+    references: Vec<CallRef>,
+}
+
+impl BlockReferenceVisitor<'_> {
+    fn add_annotation(&mut self, annotation: &ast::Expr) {
+        let mut visitor = AnnotationReferenceVisitor {
+            line: node_line(self.source, annotation),
+            references: Vec::new(),
+        };
+        visitor.visit_expr(annotation.clone());
+        self.references.extend(visitor.references);
+    }
+}
+
+impl Visitor for BlockReferenceVisitor<'_> {
+    fn visit_stmt_function_def(&mut self, _node: ast::StmtFunctionDef) {}
+    fn visit_stmt_async_function_def(&mut self, _node: ast::StmtAsyncFunctionDef) {}
+    fn visit_stmt_class_def(&mut self, _node: ast::StmtClassDef) {}
+
+    fn visit_stmt_ann_assign(&mut self, node: ast::StmtAnnAssign) {
+        self.add_annotation(&node.annotation);
+        self.generic_visit_stmt_ann_assign(node);
+    }
+}
+
+fn sort_unique_references(references: Vec<CallRef>) -> Vec<CallRef> {
+    let mut references = references
+        .into_iter()
+        .map(|reference| ((reference.line, reference.name.clone()), reference))
+        .collect::<BTreeMap<_, _>>();
+    std::mem::take(&mut references).into_values().collect()
+}
+
+fn function_references(
+    source: &str,
+    args: &ast::Arguments,
+    returns: Option<&ast::Expr>,
+    body: &[ast::Stmt],
+) -> Vec<CallRef> {
+    let mut visitor = BlockReferenceVisitor {
+        source,
+        references: Vec::new(),
+    };
+    for argument in args
+        .posonlyargs
+        .iter()
+        .chain(&args.args)
+        .chain(&args.kwonlyargs)
+    {
+        if let Some(annotation) = argument.def.annotation.as_deref() {
+            visitor.add_annotation(annotation);
+        }
+    }
+    if let Some(argument) = args.vararg.as_deref() {
+        if let Some(annotation) = argument.annotation.as_deref() {
+            visitor.add_annotation(annotation);
+        }
+    }
+    if let Some(argument) = args.kwarg.as_deref() {
+        if let Some(annotation) = argument.annotation.as_deref() {
+            visitor.add_annotation(annotation);
+        }
+    }
+    if let Some(returns) = returns {
+        visitor.add_annotation(returns);
+    }
+    for statement in body_without_docstring(body) {
+        visitor.visit_stmt(statement.clone());
+    }
+    sort_unique_references(visitor.references)
+}
+
+fn class_references(source: &str, bases: &[ast::Expr], body: &[ast::Stmt]) -> Vec<CallRef> {
+    let mut visitor = BlockReferenceVisitor {
+        source,
+        references: Vec::new(),
+    };
+    for base in bases {
+        visitor.add_annotation(base);
+    }
+    for statement in body_without_docstring(body) {
+        visitor.visit_stmt(statement.clone());
+    }
+    sort_unique_references(visitor.references)
+}
+
+fn block_from_extracted(extracted: ExtractedBlock) -> Result<Block, String> {
+    let canonical_text = serde_json::to_string(&extracted.canonical)
+        .map_err(|error| format!("failed to serialize canonical AST: {error}"))?;
+    let imports_text = serde_json::to_string(&extracted.imports)
+        .map_err(|error| format!("failed to serialize import facts: {error}"))?;
+    let decorators_text = serde_json::to_string(&extracted.decorators)
+        .map_err(|error| format!("failed to serialize decorator facts: {error}"))?;
+    let bases_text = serde_json::to_string(&extracted.bases)
+        .map_err(|error| format!("failed to serialize base facts: {error}"))?;
+    let owner_text = format!(
+        "{}:{}",
+        extracted.parent_kind.as_deref().unwrap_or("<module>"),
+        extracted.parent_name.as_deref().unwrap_or("<module>")
+    );
+    let context_text = format!(
+        "{}:{imports_text}:{decorators_text}:{bases_text}:{owner_text}",
+        extracted.module
+    );
+    Ok(Block {
+        path: extracted.path,
+        module: extracted.module,
+        line: extracted.line,
+        end_line: extracted.end_line,
+        kind: extracted.kind.clone(),
+        role: extracted.role.clone(),
+        name: extracted.name,
+        qualname: extracted.qualname,
+        parent_kind: extracted.parent_kind,
+        parent_name: extracted.parent_name,
+        parameter_count: extracted.parameter_count,
+        decorators_hash: stable_hash(&decorators_text),
+        bases_hash: stable_hash(&bases_text),
+        import_hash: stable_hash(&imports_text),
+        structure_hash: stable_hash(&format!(
+            "{}:{}:{}:{canonical_text}",
+            extracted.role, extracted.kind, extracted.parameter_count
+        )),
+        context_hash: stable_hash(&context_text),
+        token_count: ast_token_count(&extracted.canonical),
+        public_api: extracted.public_api,
+        calls: extracted.calls,
+        references: extracted.references,
+    })
 }
 
 fn ast_token_count(value: &Value) -> usize {
@@ -1747,6 +2802,10 @@ fn render(analysis: Analysis, args: &Args) -> i32 {
         OutputFormat::Json => render_json(&analysis),
         OutputFormat::Text => render_text(&analysis),
     }
+    analysis_exit_status(&analysis)
+}
+
+fn analysis_exit_status(analysis: &Analysis) -> i32 {
     if analysis.groups.is_empty()
         && analysis.single_callers.is_empty()
         && analysis.single_callees.is_empty()
@@ -1758,6 +2817,13 @@ fn render(analysis: Analysis, args: &Args) -> i32 {
 }
 
 fn render_text(analysis: &Analysis) {
+    print!("{}", render_text_output(analysis));
+}
+
+fn render_text_output(analysis: &Analysis) -> String {
+    use std::fmt::Write as _;
+
+    let mut output = String::new();
     for group in &analysis.groups {
         let symbols = group
             .blocks
@@ -1776,7 +2842,8 @@ fn render_text(analysis: &Analysis) {
             })
             .collect::<Vec<_>>()
             .join(",");
-        println!(
+        writeln!(
+            output,
             "PY_STRUCTURE_HASH_FINDING=duplicate_structural_hash:role={}:{}:params={}:tokens={}:hash={}:count={}:module_scope={:?}:import_scope={:?}:decorator_scope={:?}:base_scope={:?}:{}",
             group.role,
             group.kind,
@@ -1789,11 +2856,13 @@ fn render_text(analysis: &Analysis) {
             group.decorator_scope,
             group.base_scope,
             symbols
-        );
+        )
+        .expect("writing to a String cannot fail");
     }
     for finding in &analysis.single_callers {
         let target = &finding.target;
-        println!(
+        writeln!(
+            output,
             "PY_STRUCTURE_HASH_FINDING=single_caller_structural_helper:role={}:{}:params={}:tokens={}:hash={}:count=1:caller_count=1:call_site_count={}:caller={}:similar_callers={}:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:{}",
             target.role,
             target.kind,
@@ -1804,11 +2873,13 @@ fn render_text(analysis: &Analysis) {
             caller_label(&finding.caller),
             similar_callers_label(&finding.similar_callers),
             instance_label(target)
-        );
+        )
+        .expect("writing to a String cannot fail");
     }
     for finding in &analysis.single_callees {
         let caller = &finding.caller;
-        println!(
+        writeln!(
+            output,
             "PY_STRUCTURE_HASH_FINDING=single_callee_structural_wrapper:role={}:{}:params={}:tokens={}:hash={}:count=1:callee_count=1:call_site_count={}:public_api=false:callee={}:module_scope=SameModule:import_scope=SameImports:decorator_scope=SameDecorators:base_scope=SameBases:{}",
             caller.role,
             caller.kind,
@@ -1818,32 +2889,45 @@ fn render_text(analysis: &Analysis) {
             finding.call_site_count,
             callee_label(&finding.callee),
             instance_label(caller)
-        );
+        )
+        .expect("writing to a String cannot fail");
     }
-    println!(
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH_ANALYZED_FILES={}",
         analysis.analyzed_files.len()
-    );
+    )
+    .expect("writing to a String cannot fail");
     for path in &analysis.analyzed_files {
-        println!("PY_STRUCTURE_HASH_ANALYZED_FILE={path}");
+        writeln!(output, "PY_STRUCTURE_HASH_ANALYZED_FILE={path}")
+            .expect("writing to a String cannot fail");
     }
-    println!(
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH_DUPLICATE_GROUPS={}",
         analysis.groups.len()
-    );
-    println!(
+    )
+    .expect("writing to a String cannot fail");
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH_SINGLE_CALLER_FINDINGS={}",
         analysis.single_callers.len()
-    );
-    println!(
+    )
+    .expect("writing to a String cannot fail");
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH_SINGLE_CALLEE_FINDINGS={}",
         analysis.single_callees.len()
-    );
-    println!(
+    )
+    .expect("writing to a String cannot fail");
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH_GROUPS={}",
         analysis.groups.len() + analysis.single_callers.len() + analysis.single_callees.len()
-    );
-    println!(
+    )
+    .expect("writing to a String cannot fail");
+    writeln!(
+        output,
         "PY_STRUCTURE_HASH={}",
         if analysis.groups.is_empty()
             && analysis.single_callers.is_empty()
@@ -1853,7 +2937,9 @@ fn render_text(analysis: &Analysis) {
         } else {
             "fail"
         }
-    );
+    )
+    .expect("writing to a String cannot fail");
+    output
 }
 
 fn similar_callers_label(similar_callers: &[SimilarCallerEvidence]) -> String {
@@ -1948,6 +3034,10 @@ fn compatibility_label(block: &Block) -> String {
 }
 
 fn render_json(analysis: &Analysis) {
+    println!("{}", render_json_output(analysis));
+}
+
+fn render_json_output(analysis: &Analysis) -> String {
     let duplicate_findings = analysis.groups.iter().map(|group| {
         json!({
             "kind": "duplicate_structural_hash",
@@ -2123,10 +3213,7 @@ fn render_json(analysis: &Analysis) {
         },
         "findings": duplicate_findings.chain(single_caller_findings).chain(single_callee_findings).collect::<Vec<_>>(),
     });
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&payload).expect("json payload serializes")
-    );
+    serde_json::to_string_pretty(&payload).expect("json payload serializes")
 }
 
 fn direct_integration_candidates_json(finding: &SingleCallerFinding) -> Vec<Value> {
@@ -2235,6 +3322,182 @@ fn direct_similarity_reason_weight(reason: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn frozen_fixture_root() -> PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock after Unix epoch")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "agent-canon-python-structure-hash-frozen-{}-{nonce}",
+            std::process::id()
+        ));
+        let fixtures: [(&str, &[u8]); 5] = [
+            (
+                "pkg/__init__.py",
+                include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/__init__.py.fixture"),
+            ),
+            (
+                "pkg/alpha.py",
+                include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/alpha.py.fixture"),
+            ),
+            (
+                "pkg/beta.py",
+                include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/beta.py.fixture"),
+            ),
+            (
+                "pkg/crlf.py",
+                include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/crlf.py.fixture"),
+            ),
+            (
+                "pkg/excluded/unwanted.py",
+                include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/excluded/unwanted.py.fixture"),
+            ),
+        ];
+        for (relative, bytes) in fixtures {
+            let path = root.join(relative);
+            fs::create_dir_all(path.parent().expect("fixture parent"))
+                .expect("create fixture parent");
+            fs::write(path, bytes).expect("write frozen Python fixture");
+        }
+        root
+    }
+
+    fn expected_duplicate_hash(report: &Value, names: &[&str], role: &str) -> String {
+        report["findings"]
+            .as_array()
+            .expect("findings array")
+            .iter()
+            .find(|finding| {
+                finding["kind"] == "duplicate_structural_hash"
+                    && finding["role"] == role
+                    && finding["instances"]
+                        .as_array()
+                        .is_some_and(|instances| {
+                            names.iter().all(|name| {
+                                instances.iter().any(|instance| instance["name"] == *name)
+                            })
+                        })
+            })
+            .and_then(|finding| finding["hash"].as_str())
+            .expect("duplicate pair in report")
+            .to_string()
+    }
+
+    #[test]
+    fn native_ast_records_match_frozen_cpython_extractor() {
+        let root = frozen_fixture_root();
+        let root = root.canonicalize().expect("canonical fixture root");
+        let initial = source_files(&root, &["pkg".to_string()], &["pkg/excluded".to_string()]);
+        let files = expand_with_repo_import_neighborhood(&root, initial, &["pkg/excluded".to_string()]);
+        let extraction = extract_ast_blocks(&root, &files).expect("native AST extraction");
+        let actual = serde_json::to_value(&extraction.blocks).expect("serialize native AST records");
+        let expected: Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/python_structure_hash/expected/extractor-output.json"
+        ))
+        .expect("frozen extractor JSON");
+
+        assert_eq!(extraction.parse_error_count, 0);
+        assert_eq!(
+            extraction.protocol_symbol_count as u64,
+            expected["summary"]["protocol_symbols"]
+                .as_u64()
+                .expect("protocol symbol count")
+        );
+        assert_eq!(actual, expected["blocks"]);
+        let crlf_bytes = fs::read(root.join("pkg/crlf.py")).expect("CRLF fixture bytes");
+        let frozen_crlf_bytes: &[u8] =
+            include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/crlf.py.fixture");
+        assert_eq!(crlf_bytes.as_slice(), frozen_crlf_bytes);
+        fs::remove_dir_all(root).expect("remove frozen fixture root");
+    }
+
+    #[test]
+    fn native_cli_outputs_and_hashes_match_frozen_baseline() {
+        let root = frozen_fixture_root();
+        let cli_args = [
+            "--root",
+            root.to_str().expect("fixture root UTF-8"),
+            "--exclude",
+            "pkg/excluded",
+            "--min-tokens",
+            "1",
+            "--max-findings",
+            "500",
+            "pkg",
+            "--format",
+            "json",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+        let args = Args::parse(&cli_args).expect("public CLI argument shape");
+        let analysis = analyze(&args).expect("native frozen fixture analysis");
+        let text_args = cli_args
+            .iter()
+            .cloned()
+            .map(|arg| if arg == "json" { "text".to_string() } else { arg })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            Args::parse(&text_args).expect("text output CLI arguments").format,
+            OutputFormat::Text
+        );
+        let report_text = render_json_output(&analysis);
+        let report: Value = serde_json::from_str(&report_text).expect("native report JSON");
+        let expected_json = include_str!(
+            "../../../../../tests/fixtures/python_structure_hash/expected/cli-json.stdout"
+        );
+        let expected_text = include_str!(
+            "../../../../../tests/fixtures/python_structure_hash/expected/cli-text.stdout"
+        );
+        let hashes: Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/python_structure_hash/expected/baseline-hashes.json"
+        ))
+        .expect("baseline hash manifest");
+
+        assert_eq!(format!("{report_text}\n"), expected_json);
+        assert_eq!(render_text_output(&analysis), expected_text);
+        assert_eq!(analysis_exit_status(&analysis), 1);
+        assert_eq!(report["summary"]["analyzed_file_count"], 4);
+        assert_eq!(report["summary"]["groups"], 13);
+        assert_eq!(
+            expected_duplicate_hash(&report, &["alpha", "beta"], "implementation"),
+            hashes["duplicate_pair_hashes"]["alpha_beta"]
+                .as_str()
+                .expect("alpha/beta baseline hash")
+        );
+        assert_eq!(
+            expected_duplicate_hash(&report, &["FirstRecord", "SecondRecord"], "implementation"),
+            hashes["duplicate_pair_hashes"]["first_second_record"]
+                .as_str()
+                .expect("record baseline hash")
+        );
+        assert_eq!(
+            expected_duplicate_hash(&report, &["Proto", "SecondProto"], "protocol"),
+            hashes["duplicate_pair_hashes"]["protocol_pair"]
+                .as_str()
+                .expect("protocol baseline hash")
+        );
+        assert_eq!(
+            expected_duplicate_hash(
+                &report,
+                &["Implementation", "ImplementationTwo"],
+                "implementation"
+            ),
+            hashes["duplicate_pair_hashes"]["implementation_pair"]
+                .as_str()
+                .expect("implementation baseline hash")
+        );
+        assert_eq!(
+            expected_duplicate_hash(&report, &["FirstAlias", "SecondAlias"], "alias"),
+            hashes["duplicate_pair_hashes"]["alias_pair"]
+                .as_str()
+                .expect("alias baseline hash")
+        );
+        fs::remove_dir_all(root).expect("remove frozen fixture root");
+    }
 
     #[test]
     fn stable_hash_ignores_names_when_canonical_payload_is_equal() {

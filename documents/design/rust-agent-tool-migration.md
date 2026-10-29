@@ -60,12 +60,15 @@ The planner also reports known Python delegation at these native owners when
 the corresponding source evidence is present:
 
 - `private_feedback.rs`: private feedback storage and sync Python adapter.
-- `python_structure_hash.rs`: embedded Python AST extraction implementation.
 
 This is a declared set of known gaps, not an exhaustive detector for arbitrary
 Python execution. An absent known marker does not establish completion. The
 plan always leaves overall completion unverified; a port needs the evidence
 below.
+
+`python_structure_hash.rs` now parses and normalizes Python ASTs natively with
+RustPython. Source presence alone does not establish parity with the frozen
+CPython extractor and CLI outputs.
 
 The `python-algorithm-contract-check` extractor is ported to the registry
 `rustpython-parser` and `rustpython-ast` 0.4.0 crates. The existing Rust file
