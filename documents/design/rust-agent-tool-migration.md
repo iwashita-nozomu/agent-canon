@@ -56,15 +56,9 @@ selectors. Report owned implementations without a catalog row. Multiple command
 IDs may refer to one source module; catalog rows are not module counts. Paths,
 not basenames, distinguish owners such as the several `readability.py` files.
 
-The planner also reports known Python delegation at these native owners when
-the corresponding source evidence is present:
-
-- `private_feedback.rs`: private feedback storage and sync Python adapter.
-
-This is a declared set of known gaps, not an exhaustive detector for arbitrary
-Python execution. An absent known marker does not establish completion. The
-plan always leaves overall completion unverified; a port needs the evidence
-below.
+The planner does not exhaustively detect arbitrary Python execution. An absent
+known marker does not establish completion. The plan always leaves overall
+completion unverified; a port needs the evidence below.
 
 `python_structure_hash.rs` now parses and normalizes Python ASTs natively with
 RustPython. Source presence alone does not establish parity with the frozen
@@ -76,6 +70,13 @@ selection, analyzer, CLI, and report schema remain the owner contract. Selected
 AST features provide source locations, arbitrary-size integer literals,
 expression unparse, and visitor traversal. Old/new fixture comparison remains
 the acceptance oracle for CPython AST behavior.
+
+Private feedback/knowledge storage now belongs to `private_feedback.rs`; its
+packaged Python adapter is retired. `workflow_monitor.py` remains an owned Python
+implementation pending its own port and invokes native capture through stdin.
+That remaining caller is not a feedback implementation fallback. The planner
+retains its adapter-marker observation so a future reintroduced delegation is
+still visible. Host archive Git/annex publication remains at its existing owner.
 
 ## Runtime and External Providers
 

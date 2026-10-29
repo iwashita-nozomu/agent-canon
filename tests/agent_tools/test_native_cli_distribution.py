@@ -38,17 +38,14 @@ def _source_fixture(root: Path) -> Path:
         "documents/contracts/template-bundle-manifest.toml": (
             'version = 1\nsource_index = "templates/README.md"\n\n'
             "[profiles.native-cli]\n"
-            'roots = ["LICENSE", "tools/runtime/archive/private_feedback.py"]\n'
+            'roots = ["LICENSE"]\n'
             "\n[profiles.native-cli.layout]\n"
             '"LICENSE" = "LICENSE"\n'
-            '"tools/runtime/archive/private_feedback.py" = '
-            '"share/agent-canon/private_feedback.py"\n'
         ),
         "tools/runtime/dispatch/agent-canon/Cargo.toml": (
             '[package]\nname = "agent-canon"\nversion = "0.1.0"\n'
         ),
         "LICENSE": "Fixture license\n",
-        "tools/runtime/archive/private_feedback.py": "print('adapter')\n",
     }
     for name, content in files.items():
         path = source / name
@@ -103,9 +100,7 @@ def test_native_packages_include_layout_provenance_and_archive_checksums(
                     archive.extractall(extracted, filter="data")
             package = extracted / "agent-canon-0.1.0-x86_64-unknown-linux-gnu"
             assert (package / "bin/agent-canon").read_bytes() == binary.read_bytes()
-            assert (package / "share/agent-canon/private_feedback.py").read_text(
-                encoding="utf-8"
-            ) == "print('adapter')\n"
+            assert not (package / "share/agent-canon/private_feedback.py").exists()
             provenance = json.loads(
                 (package / "share/agent-canon/provenance.json").read_text(
                     encoding="utf-8"
@@ -201,7 +196,10 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                     archive.extractall(temporary, filter="data")
             package = temporary / expected_root
             executable = package / "bin" / executable_name
-            adapter = package / "share/agent-canon/private_feedback.py"
+            if (package / "share/agent-canon/private_feedback.py").exists():
+                raise AssertionError(
+                    "retired feedback implementation remains in native package"
+                )
             license_path = package / "LICENSE"
             provenance_path = package / "share/agent-canon/provenance.json"
             sums_path = package / "share/agent-canon/SHA256SUMS"
@@ -209,7 +207,6 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 path.is_file()
                 for path in (
                     executable,
-                    adapter,
                     license_path,
                     provenance_path,
                     sums_path,
@@ -234,7 +231,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
             env["AGENT_CANON_SOURCE_ROOT"] = str(consumer)
             env["AGENT_CANON_RUNTIME_TOOLS_ROOT"] = str(consumer)
             env.pop("AGENT_CANON_NATIVE_BIN", None)
-            env.pop("AGENT_CANON_PYTHON", None)
+            env["AGENT_CANON_PYTHON"] = str(temporary / "python-must-not-run")
             version_result = subprocess.run(
                 [str(executable), "--version"],
                 cwd=consumer,
@@ -336,15 +333,13 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 or "private body" in feedback_result.stdout
             ):
                 raise AssertionError(
-                    f"packaged feedback adapter failed: {feedback_result.stderr}"
+                    f"packaged native feedback failed: {feedback_result.stderr}"
                 )
             if not (
                 runtime
                 / "spool/private-feedback/knowledge/topics/distribution-smoke/candidate.md"
             ).is_file():
-                raise AssertionError(
-                    "packaged feedback adapter wrote no private record"
-                )
+                raise AssertionError("packaged native feedback wrote no private record")
             for family, topic in (("k", "knowledge-alias"), ("f", "feedback-alias")):
                 alias_result = subprocess.run(
                     [
@@ -373,22 +368,33 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
 
             lock_ready = temporary / "lock-ready"
             lock_release = temporary / "lock-release"
+            # Independent OS oracle: the package no longer contains Python code.
             lock_script = (
-                "import runpy, sys, time\n"
+                "import os, sys, time\n"
                 "from pathlib import Path\n"
-                "adapter, runtime, ready, release = map(Path, sys.argv[1:])\n"
-                "module = runpy.run_path(str(adapter))\n"
-                "spool = module['_spool_root'](runtime)\n"
-                "with module['_private_feedback_spool_lock'](spool):\n"
+                "runtime, ready, release = map(Path, sys.argv[1:])\n"
+                "path = runtime / 'spool/.private-feedback.lock'\n"
+                "path.parent.mkdir(parents=True, exist_ok=True)\n"
+                "with path.open('a+b') as lock:\n"
+                " if path.stat().st_size == 0: lock.write(b'\\0'); lock.flush()\n"
+                " lock.seek(0)\n"
+                " if os.name == 'nt':\n"
+                "  import msvcrt\n"
+                "  msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)\n"
+                " else:\n"
+                "  import fcntl\n"
+                "  fcntl.flock(lock.fileno(), fcntl.LOCK_EX)\n"
                 " ready.write_text('ready', encoding='utf-8')\n"
                 " while not release.exists(): time.sleep(0.01)\n"
+                " lock.seek(0)\n"
+                " if os.name == 'nt': msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)\n"
+                " else: fcntl.flock(lock.fileno(), fcntl.LOCK_UN)\n"
             )
             lock_holder = subprocess.Popen(
                 [
                     sys.executable,
                     "-c",
                     lock_script,
-                    str(adapter),
                     str(runtime),
                     str(lock_ready),
                     str(lock_release),
@@ -410,7 +416,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 while not lock_ready.is_file() and lock_holder.poll() is None:
                     if time.monotonic() >= deadline:
                         raise AssertionError(
-                            "packaged adapter did not acquire its spool lock"
+                            "packaged native feedback did not acquire its spool lock"
                         )
                     time.sleep(0.01)
                 if not lock_ready.is_file():
@@ -446,7 +452,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                     locked_writer.communicate(timeout=10)
             if lock_holder.returncode != 0:
                 raise AssertionError(
-                    f"packaged adapter lock holder failed: {holder_error}"
+                    f"packaged native feedback lock holder failed: {holder_error}"
                 )
             if not writer_waited or locked_writer is None:
                 raise AssertionError(
@@ -454,7 +460,9 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 )
             writer_output, writer_error = locked_writer.communicate(timeout=10)
             if locked_writer.returncode != 0 or "locked body" in writer_output:
-                raise AssertionError(f"packaged adapter writer failed: {writer_error}")
+                raise AssertionError(
+                    f"packaged native feedback writer failed: {writer_error}"
+                )
             if not record.is_file():
                 raise AssertionError(
                     "locked feedback writer produced no private record"
@@ -465,7 +473,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
             shutil.copyfile(executable, bare)
             if os.name != "nt":
                 bare.chmod(0o755)
-            unavailable = subprocess.run(
+            bare_feedback = subprocess.run(
                 [
                     str(bare),
                     "knowledge",
@@ -481,13 +489,16 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 capture_output=True,
                 text=True,
             )
+            if bare_feedback.returncode != 0 or bare_feedback.stderr:
+                raise AssertionError(
+                    "bare native feedback still needs an implementation adapter"
+                )
             if (
-                unavailable.returncode != 2
-                or unavailable.stdout
-                or "adapter_unavailable" not in unavailable.stderr
+                json.loads(bare_feedback.stdout).get("schema")
+                != "agent-canon.private-feedback.v1"
             ):
                 raise AssertionError(
-                    "missing optional adapter did not return its explicit failure"
+                    "bare native feedback returned no metadata receipt"
                 )
 
 
