@@ -256,11 +256,14 @@ pub(crate) fn ast_dump_normalized_module_body(
     )
 }
 
+const OMIT_OPTIONAL_FIELD: &str = "\0";
+
 fn dump_node(name: &str, fields: impl IntoIterator<Item = (&'static str, String)>) -> String {
     format!(
         "{name}({})",
         fields
             .into_iter()
+            .filter(|(_, value)| value != OMIT_OPTIONAL_FIELD)
             .map(|(field, value)| format!("{field}={value}"))
             .collect::<Vec<_>>()
             .join(", ")
@@ -272,6 +275,15 @@ fn dump_list(values: impl IntoIterator<Item = String>) -> String {
 }
 
 fn dump_optional<T: ?Sized>(value: Option<&T>, render: impl FnOnce(&T) -> String) -> String {
+    value
+        .map(render)
+        .unwrap_or_else(|| OMIT_OPTIONAL_FIELD.into())
+}
+
+fn dump_optional_value<T: ?Sized>(
+    value: Option<&T>,
+    render: impl FnOnce(&T) -> String,
+) -> String {
     value.map(render).unwrap_or_else(|| "None".into())
 }
 
@@ -522,7 +534,7 @@ fn dump_arguments(node: &ast::Arguments, names: &BTreeMap<String, String>) -> St
             (
                 "kw_defaults",
                 dump_list(node.kwonlyargs.iter().map(|argument| {
-                    dump_optional(argument.default.as_deref(), |value| dump_expr(value, names))
+                    dump_optional_value(argument.default.as_deref(), |value| dump_expr(value, names))
                 })),
             ),
             ("kwarg", dump_optional(node.kwarg.as_deref(), |value| dump_arg(value, names))),
