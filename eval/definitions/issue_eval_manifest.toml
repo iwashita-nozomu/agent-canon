@@ -468,3 +468,49 @@ linked_rules = [
   "agents/skills/paper-writing.md",
   "agents/skills/structure-planning.md",
 ]
+
+[[eval]]
+id = "test-taxonomy-keeps-test-dimensions-orthogonal"
+category = "insufficient-evidence"
+source_issue = 1629
+oracle_type = "rubric"
+protects = [
+  "test purpose and oracle remain distinct from input and API dimensions",
+  "multiple applicable test dimensions can be recorded without collapsing their meaning",
+]
+expected_route = [
+  "classify the test's purpose and oracle independently from the exercised input and API surface",
+  "retain each applicable dimension when describing coverage",
+]
+forbidden_route = [
+  "treat test kinds as one mutually exclusive label",
+  "infer input, API, or oracle coverage from an unrelated test label",
+]
+linked_rules = [
+  "agents/skills/test-design.md",
+  "documents/conventions/coding-conventions-testing.md",
+]
+
+[[eval]]
+id = "native-file-inventory-cli-preserves-valid-inputs"
+category = "workflow-bypass"
+source_issue = 1630
+oracle_type = "machine"
+protects = [
+  "native inventory CLI preserves the established inventory behavior for valid Unix filenames containing backslashes",
+  "native inventory CLI accepts the supported --option=value form",
+]
+expected_route = [
+  "exercise the native CLI through the existing inventory and review-backlog fixtures",
+  "compare native output and behavior against the established inventory contract",
+]
+forbidden_route = [
+  "treat a valid Unix backslash as a path separator or reject it as invalid",
+  "reject --option=value or claim parity from source inspection alone",
+]
+linked_rules = [
+  "tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs",
+  "tools/runtime/dispatch/agent-canon/src/main.rs",
+  "tests/agent_tools/test_file_surface_inventory.py",
+  "tests/agent_tools/test_review_backlog_scan.py",
+]
