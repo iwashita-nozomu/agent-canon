@@ -1,1 +1,1 @@
-pkg/crlf.py.fixture -text
+pkg/crlf.py.fixture -text -diff
