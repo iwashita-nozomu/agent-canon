@@ -1870,12 +1870,7 @@ impl BlockCollector<'_> {
         }
     }
 
-    fn add_block(
-        &mut self,
-        name: &str,
-        node: &impl Ranged,
-        facts: BlockFacts,
-    ) -> ParentEntry {
+    fn add_block(&mut self, name: &str, node: &impl Ranged, facts: BlockFacts) -> ParentEntry {
         let BlockFacts {
             kind,
             parameter_count,
