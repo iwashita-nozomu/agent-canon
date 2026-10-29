@@ -1,0 +1,6 @@
+def excluded_one(value):
+    return value * 2
+
+
+def excluded_two(other):
+    return other * 3

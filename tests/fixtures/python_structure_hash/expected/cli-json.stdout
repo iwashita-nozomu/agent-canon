@@ -1,0 +1,1073 @@
+{
+  "findings": [
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "decorator_scope": "SameDecorators",
+      "hash": "93b82f0a76ef6e26",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 21,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 20,
+          "module": "pkg.alpha",
+          "name": "_consume",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_consume"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 25,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 24,
+          "module": "pkg.alpha",
+          "name": "_target",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_target"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 29,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 28,
+          "module": "pkg.alpha",
+          "name": "_inner",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_inner"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "token_count": 9
+    },
+    {
+      "base_scope": "MixedBases",
+      "block_kind": "Class",
+      "decorator_scope": "SameDecorators",
+      "hash": "b46c609fb35c00b0",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "7048fd2b17b848f6",
+          "context_hash": "bd5aa246849027f8",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 49,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 47,
+          "module": "pkg.alpha",
+          "name": "Implementation",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "Implementation"
+        },
+        {
+          "bases_hash": "1e2711cc5bc2107a",
+          "context_hash": "ab1ff19026441fa4",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 54,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 52,
+          "module": "pkg.alpha",
+          "name": "ImplementationTwo",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "ImplementationTwo"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "token_count": 68
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Class",
+      "decorator_scope": "SameDecorators",
+      "hash": "cf5d55784b8fd408",
+      "import_scope": "MixedImports",
+      "instances": [
+        {
+          "bases_hash": "0e3988e04e772fd8",
+          "context_hash": "7ecc308c22e5718c",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 44,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 42,
+          "module": "pkg.alpha",
+          "name": "Proto",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "Proto"
+        },
+        {
+          "bases_hash": "0e3988e04e772fd8",
+          "context_hash": "432bec73c95b4f7a",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 16,
+          "import_hash": "2281b889828baf2f",
+          "line": 14,
+          "module": "pkg.beta",
+          "name": "SecondProto",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/beta.py",
+          "public_api": true,
+          "qualname": "SecondProto"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "CrossModule",
+      "parameter_count": 1,
+      "role": "protocol",
+      "token_count": 68
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "decorator_scope": "MixedDecorators",
+      "hash": "56dbfad942f82da2",
+      "import_scope": "MixedImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 9,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 7,
+          "module": "pkg.alpha",
+          "name": "alpha",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "alpha"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "c0248616707d6255",
+          "decorators_hash": "ac74e108797fd4fa",
+          "end_line": 7,
+          "import_hash": "2281b889828baf2f",
+          "line": 5,
+          "module": "pkg.beta",
+          "name": "beta",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/beta.py",
+          "public_api": true,
+          "qualname": "beta"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "CrossModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "token_count": 30
+    },
+    {
+      "base_scope": "MixedBases",
+      "block_kind": "Class",
+      "decorator_scope": "SameDecorators",
+      "hash": "2977ecd86177a932",
+      "import_scope": "MixedImports",
+      "instances": [
+        {
+          "bases_hash": "7048fd2b17b848f6",
+          "context_hash": "bd5aa246849027f8",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 13,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 12,
+          "module": "pkg.alpha",
+          "name": "FirstRecord",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "FirstRecord"
+        },
+        {
+          "bases_hash": "6e2ab9f1d9ec128a",
+          "context_hash": "0b4855640fae61e5",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 11,
+          "import_hash": "2281b889828baf2f",
+          "line": 10,
+          "module": "pkg.beta",
+          "name": "SecondRecord",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/beta.py",
+          "public_api": true,
+          "qualname": "SecondRecord"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "CrossModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "token_count": 18
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "decorator_scope": "SameDecorators",
+      "hash": "a166eca7ec86e912",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "ed2020acdd02966b",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 49,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 48,
+          "module": "pkg.alpha",
+          "name": "run",
+          "parent_kind": "Class",
+          "parent_name": "Implementation",
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "Implementation.run"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "6390324a8e7de783",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 54,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 53,
+          "module": "pkg.alpha",
+          "name": "execute",
+          "parent_kind": "Class",
+          "parent_name": "ImplementationTwo",
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "ImplementationTwo.execute"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "token_count": 15
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "decorator_scope": "SameDecorators",
+      "hash": "fb425ee8f55aa701",
+      "import_scope": "MixedImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "b7035ef7631d7065",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 44,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 43,
+          "module": "pkg.alpha",
+          "name": "run",
+          "parent_kind": "Class",
+          "parent_name": "Proto",
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "Proto.run"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "4b344f44374b7674",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 16,
+          "import_hash": "2281b889828baf2f",
+          "line": 15,
+          "module": "pkg.beta",
+          "name": "execute",
+          "parent_kind": "Class",
+          "parent_name": "SecondProto",
+          "path": "pkg/beta.py",
+          "public_api": true,
+          "qualname": "SecondProto.execute"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "CrossModule",
+      "parameter_count": 1,
+      "role": "protocol",
+      "token_count": 15
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Alias",
+      "decorator_scope": "SameDecorators",
+      "hash": "9ddcba2239474ebf",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 3,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 3,
+          "module": "pkg.alpha",
+          "name": "FirstAlias",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "FirstAlias"
+        },
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 4,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 4,
+          "module": "pkg.alpha",
+          "name": "SecondAlias",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": true,
+          "qualname": "SecondAlias"
+        }
+      ],
+      "kind": "duplicate_structural_hash",
+      "module_scope": "SameModule",
+      "parameter_count": 0,
+      "role": "alias",
+      "token_count": 13
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "call_site_count": 1,
+      "caller": {
+        "call_lines": [
+          39
+        ],
+        "end_line": 39,
+        "line": 38,
+        "module": "pkg.alpha",
+        "path": "pkg/alpha.py",
+        "qualname": "_wrapper"
+      },
+      "caller_analysis": {
+        "call_site_count": 1,
+        "caller_count": 1,
+        "callers": [
+          {
+            "call_lines": [
+              39
+            ],
+            "end_line": 39,
+            "line": 38,
+            "module": "pkg.alpha",
+            "path": "pkg/alpha.py",
+            "qualname": "_wrapper"
+          }
+        ],
+        "enrichment_note": "python-structure-hash-report adds dependency-tree features to these AST/use-graph candidates",
+        "integration_candidates": [
+          {
+            "candidate_kind": "inline_target_into_owner",
+            "candidate_schema_scope": "ast_use_graph_only",
+            "destination_caller": {
+              "call_lines": [
+                39
+              ],
+              "end_line": 39,
+              "line": 38,
+              "module": "pkg.alpha",
+              "path": "pkg/alpha.py",
+              "qualname": "_wrapper"
+            },
+            "features": [
+              {
+                "code": "unique_owner",
+                "detail": "caller_count=1",
+                "weight": 40
+              },
+              {
+                "code": "module_local_ownership",
+                "detail": "module=pkg.alpha",
+                "weight": 20
+              },
+              {
+                "code": "usage_site_count",
+                "detail": "call_site_count=1",
+                "weight": 4
+              },
+              {
+                "code": "target_structure_size",
+                "detail": "block_kind=Function,token_count=9",
+                "weight": 9
+              },
+              {
+                "code": "ast_block_kind",
+                "detail": "Function",
+                "weight": 8
+              }
+            ],
+            "reason_codes": [
+              "unique_owner",
+              "module_local_ownership",
+              "usage_site_count",
+              "target_structure_size",
+              "ast_block_kind"
+            ],
+            "score": 81,
+            "target": {
+              "block_kind": "Function",
+              "end_line": 29,
+              "line": 28,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_inner",
+              "structure_hash": "93b82f0a76ef6e26",
+              "token_count": 9
+            }
+          }
+        ],
+        "similar_responsibility_callers": []
+      },
+      "caller_count": 1,
+      "decorator_scope": "SameDecorators",
+      "hash": "8979b51c730c4659",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 29,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 28,
+          "module": "pkg.alpha",
+          "name": "_inner",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_inner"
+        }
+      ],
+      "kind": "single_caller_structural_helper",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "similar_responsibility_callers": [],
+      "token_count": 9
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "call_site_count": 2,
+      "caller": {
+        "call_lines": [
+          33,
+          34
+        ],
+        "end_line": 35,
+        "line": 32,
+        "module": "pkg.alpha",
+        "path": "pkg/alpha.py",
+        "qualname": "_owner"
+      },
+      "caller_analysis": {
+        "call_site_count": 2,
+        "caller_count": 1,
+        "callers": [
+          {
+            "call_lines": [
+              33,
+              34
+            ],
+            "end_line": 35,
+            "line": 32,
+            "module": "pkg.alpha",
+            "path": "pkg/alpha.py",
+            "qualname": "_owner"
+          }
+        ],
+        "enrichment_note": "python-structure-hash-report adds dependency-tree features to these AST/use-graph candidates",
+        "integration_candidates": [
+          {
+            "candidate_kind": "inline_target_into_owner",
+            "candidate_schema_scope": "ast_use_graph_only",
+            "destination_caller": {
+              "call_lines": [
+                33,
+                34
+              ],
+              "end_line": 35,
+              "line": 32,
+              "module": "pkg.alpha",
+              "path": "pkg/alpha.py",
+              "qualname": "_owner"
+            },
+            "features": [
+              {
+                "code": "unique_owner",
+                "detail": "caller_count=1",
+                "weight": 40
+              },
+              {
+                "code": "module_local_ownership",
+                "detail": "module=pkg.alpha",
+                "weight": 20
+              },
+              {
+                "code": "usage_site_count",
+                "detail": "call_site_count=2",
+                "weight": 8
+              },
+              {
+                "code": "target_structure_size",
+                "detail": "block_kind=Function,token_count=9",
+                "weight": 9
+              },
+              {
+                "code": "ast_block_kind",
+                "detail": "Function",
+                "weight": 8
+              }
+            ],
+            "reason_codes": [
+              "unique_owner",
+              "module_local_ownership",
+              "usage_site_count",
+              "target_structure_size",
+              "ast_block_kind"
+            ],
+            "score": 85,
+            "target": {
+              "block_kind": "Function",
+              "end_line": 25,
+              "line": 24,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_target",
+              "structure_hash": "93b82f0a76ef6e26",
+              "token_count": 9
+            }
+          }
+        ],
+        "similar_responsibility_callers": []
+      },
+      "caller_count": 1,
+      "decorator_scope": "SameDecorators",
+      "hash": "e85c9122a58df70b",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 25,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 24,
+          "module": "pkg.alpha",
+          "name": "_target",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_target"
+        }
+      ],
+      "kind": "single_caller_structural_helper",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "role": "implementation",
+      "similar_responsibility_callers": [],
+      "token_count": 9
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Class",
+      "call_site_count": 1,
+      "caller": {
+        "call_lines": [
+          20
+        ],
+        "end_line": 21,
+        "line": 20,
+        "module": "pkg.alpha",
+        "path": "pkg/alpha.py",
+        "qualname": "_consume"
+      },
+      "caller_analysis": {
+        "call_site_count": 1,
+        "caller_count": 1,
+        "callers": [
+          {
+            "call_lines": [
+              20
+            ],
+            "end_line": 21,
+            "line": 20,
+            "module": "pkg.alpha",
+            "path": "pkg/alpha.py",
+            "qualname": "_consume"
+          }
+        ],
+        "enrichment_note": "python-structure-hash-report adds dependency-tree features to these AST/use-graph candidates",
+        "integration_candidates": [
+          {
+            "candidate_kind": "move_or_nest_single_owner_type",
+            "candidate_schema_scope": "ast_use_graph_only",
+            "destination_caller": {
+              "call_lines": [
+                20
+              ],
+              "end_line": 21,
+              "line": 20,
+              "module": "pkg.alpha",
+              "path": "pkg/alpha.py",
+              "qualname": "_consume"
+            },
+            "features": [
+              {
+                "code": "unique_owner",
+                "detail": "caller_count=1",
+                "weight": 40
+              },
+              {
+                "code": "module_local_ownership",
+                "detail": "module=pkg.alpha",
+                "weight": 20
+              },
+              {
+                "code": "usage_site_count",
+                "detail": "call_site_count=1",
+                "weight": 4
+              },
+              {
+                "code": "target_structure_size",
+                "detail": "block_kind=Class,token_count=4",
+                "weight": 4
+              },
+              {
+                "code": "ast_block_kind",
+                "detail": "Class",
+                "weight": 8
+              }
+            ],
+            "reason_codes": [
+              "unique_owner",
+              "module_local_ownership",
+              "usage_site_count",
+              "target_structure_size",
+              "ast_block_kind"
+            ],
+            "score": 76,
+            "target": {
+              "block_kind": "Class",
+              "end_line": 17,
+              "line": 16,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_Config",
+              "structure_hash": "a57b8892662696d1",
+              "token_count": 4
+            }
+          },
+          {
+            "candidate_kind": "consolidate_owner_with_similar_responsibility_caller",
+            "candidate_schema_scope": "ast_use_graph_only",
+            "destination_caller": {
+              "call_lines": [
+                20
+              ],
+              "end_line": 21,
+              "line": 20,
+              "module": "pkg.alpha",
+              "path": "pkg/alpha.py",
+              "qualname": "_consume"
+            },
+            "features": [
+              {
+                "code": "unique_owner",
+                "detail": "caller_count=1",
+                "weight": 40
+              },
+              {
+                "code": "similar_responsibility_caller",
+                "detail": "similar=_inner",
+                "weight": 30
+              },
+              {
+                "code": "shared_call_profile_count",
+                "detail": "shared_call_count=0",
+                "weight": 0
+              },
+              {
+                "code": "similarity_reason",
+                "detail": "same_caller_structure",
+                "weight": 20
+              },
+              {
+                "code": "similarity_reason",
+                "detail": "similar_token_band",
+                "weight": 4
+              }
+            ],
+            "reason_codes": [
+              "unique_owner",
+              "similar_responsibility_caller",
+              "shared_call_profile_count",
+              "similarity_reason",
+              "similarity_reason"
+            ],
+            "score": 94,
+            "similar_caller": {
+              "end_line": 29,
+              "line": 28,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_inner",
+              "reason_codes": [
+                "same_caller_structure",
+                "similar_token_band"
+              ],
+              "shared_profile": [],
+              "structure_hash": "93b82f0a76ef6e26",
+              "token_count": 9
+            },
+            "target": {
+              "block_kind": "Class",
+              "end_line": 17,
+              "line": 16,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_Config",
+              "structure_hash": "a57b8892662696d1",
+              "token_count": 4
+            }
+          },
+          {
+            "candidate_kind": "consolidate_owner_with_similar_responsibility_caller",
+            "candidate_schema_scope": "ast_use_graph_only",
+            "destination_caller": {
+              "call_lines": [
+                20
+              ],
+              "end_line": 21,
+              "line": 20,
+              "module": "pkg.alpha",
+              "path": "pkg/alpha.py",
+              "qualname": "_consume"
+            },
+            "features": [
+              {
+                "code": "unique_owner",
+                "detail": "caller_count=1",
+                "weight": 40
+              },
+              {
+                "code": "similar_responsibility_caller",
+                "detail": "similar=_target",
+                "weight": 30
+              },
+              {
+                "code": "shared_call_profile_count",
+                "detail": "shared_call_count=0",
+                "weight": 0
+              },
+              {
+                "code": "similarity_reason",
+                "detail": "same_caller_structure",
+                "weight": 20
+              },
+              {
+                "code": "similarity_reason",
+                "detail": "similar_token_band",
+                "weight": 4
+              }
+            ],
+            "reason_codes": [
+              "unique_owner",
+              "similar_responsibility_caller",
+              "shared_call_profile_count",
+              "similarity_reason",
+              "similarity_reason"
+            ],
+            "score": 94,
+            "similar_caller": {
+              "end_line": 25,
+              "line": 24,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_target",
+              "reason_codes": [
+                "same_caller_structure",
+                "similar_token_band"
+              ],
+              "shared_profile": [],
+              "structure_hash": "93b82f0a76ef6e26",
+              "token_count": 9
+            },
+            "target": {
+              "block_kind": "Class",
+              "end_line": 17,
+              "line": 16,
+              "module": "pkg.alpha",
+              "parent_scope": "<module>",
+              "path": "pkg/alpha.py",
+              "qualname": "_Config",
+              "structure_hash": "a57b8892662696d1",
+              "token_count": 4
+            }
+          }
+        ],
+        "similar_responsibility_callers": [
+          {
+            "end_line": 29,
+            "line": 28,
+            "module": "pkg.alpha",
+            "parent_scope": "<module>",
+            "path": "pkg/alpha.py",
+            "qualname": "_inner",
+            "reason_codes": [
+              "same_caller_structure",
+              "similar_token_band"
+            ],
+            "score": 11,
+            "shared_call_count": 0,
+            "shared_profile": [],
+            "structure_hash": "93b82f0a76ef6e26",
+            "token_count": 9
+          },
+          {
+            "end_line": 25,
+            "line": 24,
+            "module": "pkg.alpha",
+            "parent_scope": "<module>",
+            "path": "pkg/alpha.py",
+            "qualname": "_target",
+            "reason_codes": [
+              "same_caller_structure",
+              "similar_token_band"
+            ],
+            "score": 11,
+            "shared_call_count": 0,
+            "shared_profile": [],
+            "structure_hash": "93b82f0a76ef6e26",
+            "token_count": 9
+          }
+        ]
+      },
+      "caller_count": 1,
+      "decorator_scope": "SameDecorators",
+      "hash": "2da9ebc326ad505e",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 17,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 16,
+          "module": "pkg.alpha",
+          "name": "_Config",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_Config"
+        }
+      ],
+      "kind": "single_caller_structural_helper",
+      "module_scope": "SameModule",
+      "parameter_count": 0,
+      "role": "implementation",
+      "similar_responsibility_callers": [
+        {
+          "end_line": 29,
+          "line": 28,
+          "module": "pkg.alpha",
+          "parent_scope": "<module>",
+          "path": "pkg/alpha.py",
+          "qualname": "_inner",
+          "reason_codes": [
+            "same_caller_structure",
+            "similar_token_band"
+          ],
+          "score": 11,
+          "shared_call_count": 0,
+          "shared_profile": [],
+          "structure_hash": "93b82f0a76ef6e26",
+          "token_count": 9
+        },
+        {
+          "end_line": 25,
+          "line": 24,
+          "module": "pkg.alpha",
+          "parent_scope": "<module>",
+          "path": "pkg/alpha.py",
+          "qualname": "_target",
+          "reason_codes": [
+            "same_caller_structure",
+            "similar_token_band"
+          ],
+          "score": 11,
+          "shared_call_count": 0,
+          "shared_profile": [],
+          "structure_hash": "93b82f0a76ef6e26",
+          "token_count": 9
+        }
+      ],
+      "token_count": 4
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "call_site_count": 2,
+      "callee_analysis": {
+        "call_site_count": 2,
+        "callee_count": 1,
+        "callees": [
+          {
+            "call_lines": [
+              33,
+              34
+            ],
+            "end_line": 25,
+            "line": 24,
+            "module": "pkg.alpha",
+            "path": "pkg/alpha.py",
+            "qualname": "_target"
+          }
+        ],
+        "candidate_schema_scope": "ast_use_graph_only"
+      },
+      "callee_count": 1,
+      "decorator_scope": "SameDecorators",
+      "hash": "7aebd0c1aafb66d7",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 35,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 32,
+          "module": "pkg.alpha",
+          "name": "_owner",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_owner"
+        }
+      ],
+      "kind": "single_callee_structural_wrapper",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "public_api": false,
+      "role": "implementation",
+      "token_count": 74
+    },
+    {
+      "base_scope": "SameBases",
+      "block_kind": "Function",
+      "call_site_count": 1,
+      "callee_analysis": {
+        "call_site_count": 1,
+        "callee_count": 1,
+        "callees": [
+          {
+            "call_lines": [
+              39
+            ],
+            "end_line": 29,
+            "line": 28,
+            "module": "pkg.alpha",
+            "path": "pkg/alpha.py",
+            "qualname": "_inner"
+          }
+        ],
+        "candidate_schema_scope": "ast_use_graph_only"
+      },
+      "callee_count": 1,
+      "decorator_scope": "SameDecorators",
+      "hash": "80a3e257c3464c3f",
+      "import_scope": "SameImports",
+      "instances": [
+        {
+          "bases_hash": "4f53cda18c2baa0c",
+          "context_hash": "3e0e7e1925abcfad",
+          "decorators_hash": "4f53cda18c2baa0c",
+          "end_line": 39,
+          "import_hash": "7e13dfe76fc037db",
+          "line": 38,
+          "module": "pkg.alpha",
+          "name": "_wrapper",
+          "parent_kind": null,
+          "parent_name": null,
+          "path": "pkg/alpha.py",
+          "public_api": false,
+          "qualname": "_wrapper"
+        }
+      ],
+      "kind": "single_callee_structural_wrapper",
+      "module_scope": "SameModule",
+      "parameter_count": 1,
+      "public_api": false,
+      "role": "implementation",
+      "token_count": 23
+    }
+  ],
+  "summary": {
+    "analyzed_file_count": 4,
+    "analyzed_files": [
+      "pkg/__init__.py",
+      "pkg/alpha.py",
+      "pkg/beta.py",
+      "pkg/crlf.py"
+    ],
+    "duplicate_groups": 8,
+    "groups": 13,
+    "single_callee_findings": 2,
+    "single_caller_findings": 3,
+    "status": "fail"
+  }
+}
