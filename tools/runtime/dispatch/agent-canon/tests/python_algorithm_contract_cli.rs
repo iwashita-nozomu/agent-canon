@@ -117,9 +117,10 @@ fn unique_temp_dir(name: &str) -> PathBuf {
 }
 
 fn replace_fixture(source: &str, from: &str, to: &str) -> String {
-    let changed = source.replace(from, to);
+    let normalized = source.replace("\r\n", "\n");
+    let changed = normalized.replace(from, to);
     assert_ne!(
-        changed, source,
+        changed, normalized,
         "fixture replacement must match its source template"
     );
     changed
@@ -169,6 +170,35 @@ fn valid_fixture_has_canonical_json_projection() {
     assert!(text.find("\"summary\"").unwrap() < text.find("\"algorithm_modules\"").unwrap());
     assert!(text.find("\n  \"modules\"").unwrap() < text.find("\n  \"parse_errors\"").unwrap());
     assert!(text.find("\n  \"parse_errors\"").unwrap() < text.find("\n  \"findings\"").unwrap());
+}
+
+#[test]
+fn valid_fixture_runs_without_python_on_path() {
+    let root = materialize_fixture("valid.py");
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args([
+            "python-algorithm-contract-check",
+            "--root",
+            root.to_str().unwrap(),
+            "--format",
+            "json",
+            "valid.py",
+        ])
+        .env("PATH", "")
+        .env("PYTHON", "/unavailable/python")
+        .output()
+        .expect("absolute native CLI executable runs");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let payload = json(&output);
+    assert_eq!(payload["summary"]["files"], 1);
+    assert_eq!(payload["summary"]["algorithm_modules"], 1);
+    assert_eq!(payload["summary"]["findings"], 0);
+    assert_eq!(payload["summary"]["parse_errors"], 0);
+    assert_eq!(payload["summary"]["status"], "pass");
 }
 
 #[test]
@@ -271,6 +301,53 @@ fn nested_dependency_rows_preserve_local_config_exemption_and_parent_config_orac
         .unwrap()
         .iter()
         .any(|finding| finding["subject"] == "child.InitializeConfig"));
+}
+
+#[test]
+fn nested_contract_annotations_keep_big_integer_literals_and_ast_unparse_facts() {
+    let root = materialize_fixture("");
+    let source_path = root.join("nested").join("parent_config.py");
+    let source = fs::read_to_string(&source_path).expect("parent fixture reads");
+    let variant = replace_fixture(
+        &source,
+        "    child_solve: child.SolveConfig\n",
+        "    child_solve: _BigConfig\n\n_BigConfig = tuple[child.SolveConfig, Literal[0x10000000000000000000000000000000000000000000000000000000000000000]]\n",
+    );
+    let variant_path = root.join("nested").join("parent_config_bigint.py");
+    fs::write(&variant_path, variant).expect("variant fixture writes");
+
+    let output = run_cli(&[
+        "python-algorithm-contract-check",
+        "--root",
+        root.to_str().unwrap(),
+        "--format",
+        "json",
+        "nested/parent_config_bigint.py",
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let payload = json(&output);
+    assert_eq!(payload["summary"]["findings"], 0);
+    let dependencies = payload["modules"][0]["dependencies"].as_array().unwrap();
+    let solve = dependencies
+        .iter()
+        .find(|dependency| {
+            dependency["alias"] == "child"
+                && dependency["contract_classes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|class_name| class_name == "SolveConfig")
+        })
+        .expect("unparsed field annotation retains child SolveConfig dependency");
+    assert!(solve["sources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|source| source == "annotation"));
 }
 
 #[test]
@@ -562,4 +639,35 @@ fn legacy_stopping_policy_fixture_preserves_rust_finding() {
             "detail": "use imported stopping.SolveConfig so the nested algorithm contract is inferred"
         })
     );
+}
+
+#[test]
+fn fallback_call_subject_preserves_cpython_ast_dump_shape() {
+    let root = materialize_fixture("valid.py");
+    let source = fs::read_to_string(root.join("valid.py")).expect("valid fixture reads");
+    let variant = replace_fixture(
+        &source,
+        "        return Answer()\n",
+        "        (problem + state).residual_tolerance()\n        return Answer()\n",
+    );
+    let path = write_variant("ast-dump-call-subject", variant);
+    let output = run_cli(&[
+        "python-algorithm-contract-check",
+        "--root",
+        path.parent().unwrap().to_str().unwrap(),
+        "--format",
+        "json",
+        "variant.py",
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let payload = json(&output);
+    assert!(payload["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            finding["kind"] == "stopping_primitive_direct_call"
+            && finding["subject"]
+                == "BinOp(Name('problem', Load()), Add(), Name('state', Load())).residual_tolerance"
+        }));
 }
