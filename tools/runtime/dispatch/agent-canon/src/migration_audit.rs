@@ -14,7 +14,6 @@ const REQUIRED_PATHS: &[&str] = &[
     "agent-canon-environment.toml",
     "tools/runtime/dispatch/agent-canon/Cargo.toml",
     "tools/runtime/dispatch/agent-canon/src/main.rs",
-    "tools/runtime/dispatch/agent-canon/src/mcp_inventory.rs",
     "tools/runtime/dispatch/agent-canon/src/migration_audit.rs",
     "tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs",
     "tools/bin/agent-canon",
@@ -23,17 +22,23 @@ const REQUIRED_PATHS: &[&str] = &[
 const REQUIRED_BOOTSTRAP_PATHS: &[&str] = &[
     "bootstrap.sh",
     "bootstrap/host/manifest.toml",
+    "bootstrap/host/lifecycle/entrypoint.sh",
     "bootstrap/container/image/Dockerfile",
     "bootstrap/container/image/dependencies.toml",
     "bootstrap/container/lifecycle/entrypoint.sh",
-    "tools/runtime/container/bootstrap_runtime.py",
-    "tools/runtime/artifacts/runtime_artifacts.py",
-    "tools/runtime/dispatch/tool_dispatch.py",
 ];
 
 const REQUIRED_BOOTSTRAP_SNIPPETS: &[(&str, &str)] = &[
-    ("bootstrap.sh", "bootstrap_python_entrypoint"),
-    ("bootstrap/container/image/Dockerfile", "USER agentcanon"),
+    ("bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh"),
+    ("bootstrap.sh", "bootstrap_host_entrypoint"),
+    (
+        "bootstrap/host/lifecycle/entrypoint.sh",
+        "bootstrap_host_entrypoint()",
+    ),
+    (
+        "bootstrap/host/lifecycle/entrypoint.sh",
+        "--user \"$caller_user\"",
+    ),
     ("bootstrap/container/image/Dockerfile", "HEALTHCHECK"),
     ("bootstrap/container/image/Dockerfile", "image-install"),
     ("bootstrap/container/lifecycle/entrypoint.sh", "health"),
@@ -86,7 +91,9 @@ impl Args {
     }
 }
 
-fn findings(root: &Path) -> Vec<String> {
+/// Source foundation checks, shared with the planner. This is not a runtime
+/// admission check or evidence that all tool implementations are native.
+pub(crate) fn foundation_findings(root: &Path) -> Vec<String> {
     let mut result = Vec::new();
     result.extend(missing_required_paths(root));
     result.extend(missing_bootstrap_paths(root));
@@ -95,10 +102,14 @@ fn findings(root: &Path) -> Vec<String> {
     result
 }
 
+fn findings(root: &Path) -> Vec<String> {
+    foundation_findings(root)
+}
+
 fn missing_required_paths(root: &Path) -> Vec<String> {
     REQUIRED_PATHS
         .iter()
-        .filter(|relative| !root.join(relative).exists())
+        .filter(|relative| !root.join(relative).is_file())
         .map(|relative| format!("missing-path:{relative}"))
         .collect()
 }
@@ -106,7 +117,7 @@ fn missing_required_paths(root: &Path) -> Vec<String> {
 fn missing_bootstrap_paths(root: &Path) -> Vec<String> {
     REQUIRED_BOOTSTRAP_PATHS
         .iter()
-        .filter(|relative| !root.join(relative).exists())
+        .filter(|relative| !root.join(relative).is_file())
         .map(|relative| format!("missing-path:{relative}"))
         .collect()
 }
@@ -115,7 +126,14 @@ fn missing_bootstrap_snippets(root: &Path) -> Vec<String> {
     REQUIRED_BOOTSTRAP_SNIPPETS
         .iter()
         .filter_map(|(relative, snippet)| {
-            let text = read_optional(root.join(relative))?;
+            let path = root.join(relative);
+            if !path.is_file() {
+                return None;
+            }
+            let text = match fs::read_to_string(&path) {
+                Ok(text) => text,
+                Err(error) => return Some(format!("unreadable-path:{relative}:{error}")),
+            };
             (!text.contains(snippet)).then(|| format!("bootstrap-missing:{relative}:{snippet}"))
         })
         .collect()
@@ -180,6 +198,32 @@ mod tests {
     }
 
     #[test]
+    fn foundation_requires_the_current_shell_owner() {
+        let root = make_fixture_root();
+        write_fixture(&root);
+        write(&root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
+
+        assert!(foundation_findings(&root)
+            .contains(&"bootstrap-missing:bootstrap.sh:bootstrap_host_entrypoint".to_string()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn foundation_does_not_require_retired_or_python_implementation_files() {
+        let root = make_fixture_root();
+        write_fixture(&root);
+
+        assert!(!root
+            .join("tools/runtime/dispatch/agent-canon/src/mcp_inventory.rs")
+            .exists());
+        assert!(!root
+            .join("tools/runtime/container/bootstrap_runtime.py")
+            .exists());
+        assert!(foundation_findings(&root).is_empty());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn audit_rejects_dockerfile_cargo_test() {
         let root = make_fixture_root();
         write_fixture(&root);
@@ -208,11 +252,20 @@ mod tests {
         for path in REQUIRED_BOOTSTRAP_PATHS {
             write(root, path, "fixture\n");
         }
-        write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
+        write(
+            root,
+            "bootstrap.sh",
+            "source bootstrap/host/lifecycle/entrypoint.sh\nbootstrap_host_entrypoint\n",
+        );
+        write(
+            root,
+            "bootstrap/host/lifecycle/entrypoint.sh",
+            "bootstrap_host_entrypoint() { docker run --user \"$caller_user\"; }\n",
+        );
         write(
             root,
             "bootstrap/container/image/Dockerfile",
-            "USER agentcanon\nHEALTHCHECK\nimage-install\n",
+            "HEALTHCHECK\nimage-install\n",
         );
         write(
             root,
