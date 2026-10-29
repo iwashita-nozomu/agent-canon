@@ -783,16 +783,13 @@ mod tests {
     fn preserves_gitlink_and_tracked_modes() {
         let root = scratch();
         fs::write(root.join("run.sh"), "echo ok\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(root.join("run.sh"), fs::Permissions::from_mode(0o755)).unwrap();
-        }
         fs::write(root.join("link-target"), "ok").unwrap();
         #[cfg(unix)]
         std::os::unix::fs::symlink("link-target", root.join("link.md")).unwrap();
         git(&root, &["init", "-q"]);
         git(&root, &["add", "run.sh"]);
+        // The input contract is a Git index mode, independent of host permissions.
+        git(&root, &["update-index", "--chmod=+x", "--", "run.sh"]);
         #[cfg(unix)]
         git(&root, &["add", "link.md"]);
         git(
