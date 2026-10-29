@@ -2,7 +2,7 @@
 name: devcontainer-exec
 description: "Use only when an explicitly selected existing project Dev Container needs a targeted command through devcontainer exec; AgentCanon's shared tools and LSPs use agent-canon-bootstrap, and project tests use the project Docker/test runner."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"75ee717df36919f5f583c2b3eeb91b625c354ffcbf35f81e3afc412c51387598"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"085b3a2fcd566752c276af6e4ede3af47325b52c7e416d6165c9b9c394c69954"} -->
 
 <!--
 @dependency-start

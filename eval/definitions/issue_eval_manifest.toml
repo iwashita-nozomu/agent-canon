@@ -412,3 +412,24 @@ linked_rules = [
   "tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs",
   "tools/runtime/dispatch/agent-canon/src/migration_audit.rs",
 ]
+
+[[eval]]
+id = "devcontainer-closeout-preserves-tracking-scope"
+category = "wrong-artifact"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "completion reports use supplied execution facts and do not invent an Issue or PR",
+  "tracked work retains its actual identifier in the completion report",
+]
+expected_route = [
+  "report the selected config, command, result, and supplied tracking context",
+  "omit tracker fields when the completed command has no associated Issue or PR",
+]
+forbidden_route = [
+  "fabricate an Issue or PR or perform an unrequested live lookup",
+  "drop supplied tracking context from a tracked completion report",
+]
+linked_rules = [
+  "agents/skills/devcontainer-exec.md",
+]
