@@ -172,6 +172,35 @@ fn valid_fixture_has_canonical_json_projection() {
 }
 
 #[test]
+fn valid_fixture_runs_without_python_on_path() {
+    let root = materialize_fixture("valid.py");
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args([
+            "python-algorithm-contract-check",
+            "--root",
+            root.to_str().unwrap(),
+            "--format",
+            "json",
+            "valid.py",
+        ])
+        .env("PATH", "")
+        .env("PYTHON", "/unavailable/python")
+        .output()
+        .expect("absolute native CLI executable runs");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let payload = json(&output);
+    assert_eq!(payload["summary"]["files"], 1);
+    assert_eq!(payload["summary"]["algorithm_modules"], 1);
+    assert_eq!(payload["summary"]["findings"], 0);
+    assert_eq!(payload["summary"]["parse_errors"], 0);
+    assert_eq!(payload["summary"]["status"], "pass");
+}
+
+#[test]
 fn malformed_mixed_fixture_preserves_valid_module_and_typed_parse_error() {
     let root = materialize_fixture("mixed");
     let output = run_cli(&[
