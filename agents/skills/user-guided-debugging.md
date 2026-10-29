@@ -16,9 +16,7 @@ downstream implementation ../../.codex/personal/skills/user-guided-debugging/SKI
 
 ## Use When
 
-- user が「1 個ずつ」「一緒にデバッグ」「ユーザー主導リファクタ」「直す前に問題点を出して」などを明示した
-- finding、test failure、runtime failure、hook failure を順番に修正する
-- 修正方針にユーザーの設計判断が入る可能性が高い
+- user が「1 個ずつ」「一緒にデバッグ」「ユーザー主導リファクタ」「直す前に問題点を出して」など、1 件ずつ進める cadence を明示した
 
 ## Execution Ownership
 
