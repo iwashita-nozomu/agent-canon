@@ -12,8 +12,8 @@
 # upstream environment ../../tools/runtime/dispatch/agent-canon/Cargo.lock locks CLI build dependencies
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs is the compiled CLI entrypoint
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs embeds shared runtime sources
-# upstream implementation ../../tools/runtime/manifest/surface_manifest.py is embedded by the graph CLI
-# upstream implementation ../../tools/agent/skills/skill_projection_registry.py is embedded by the graph CLI
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/surface_manifest.rs owns the native surface snapshot
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_projection_registry.rs owns native generated view resolution
 # upstream implementation ../../documents/runtime/shared-runtime-surfaces.toml is embedded by the graph CLI
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream implementation ./test_live_projection_authority.py exercises the shared host Docker daemon
@@ -102,9 +102,6 @@ COPY tools/runtime/dispatch/agent-canon/Cargo.toml \
      tools/runtime/dispatch/agent-canon/Cargo.lock \
      /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/
 COPY tools/runtime/dispatch/agent-canon/src/ /opt/agent-canon/source/tools/runtime/dispatch/agent-canon/src/
-COPY tools/runtime/manifest/surface_manifest.py /opt/agent-canon/source/tools/runtime/manifest/surface_manifest.py
-COPY tools/agent/skills/skill_projection_registry.py \
-     /opt/agent-canon/source/tools/agent/skills/skill_projection_registry.py
 COPY documents/runtime/shared-runtime-surfaces.toml \
      /opt/agent-canon/source/documents/runtime/shared-runtime-surfaces.toml
 
