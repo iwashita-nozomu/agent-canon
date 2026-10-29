@@ -470,6 +470,28 @@ linked_rules = [
 ]
 
 [[eval]]
+id = "test-taxonomy-keeps-test-dimensions-orthogonal"
+category = "insufficient-evidence"
+source_issue = 1629
+oracle_type = "rubric"
+protects = [
+  "test purpose and oracle remain distinct from input and API dimensions",
+  "multiple applicable test dimensions can be recorded without collapsing their meaning",
+]
+expected_route = [
+  "classify the test's purpose and oracle independently from the exercised input and API surface",
+  "retain each applicable dimension when describing coverage",
+]
+forbidden_route = [
+  "treat test kinds as one mutually exclusive label",
+  "infer input, API, or oracle coverage from an unrelated test label",
+]
+linked_rules = [
+  "agents/skills/test-design.md",
+  "documents/conventions/coding-conventions-testing.md",
+]
+
+[[eval]]
 id = "guided-debugging-requires-explicit-trigger"
 category = "workflow-bypass"
 source_issue = 1627
