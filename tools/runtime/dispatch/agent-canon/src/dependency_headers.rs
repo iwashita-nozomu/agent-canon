@@ -2,9 +2,9 @@
 // contract implementation
 // responsibility Checks selected source files for dependency manifests, registered contract kinds, and typed edge syntax.
 // upstream design ../../../../../documents/design/dependency-manifest-design.md manifest grammar and selected analysis route
-// upstream design dependency_manifest.rs owns per-file dependency edge parsing and path diagnostics
+// upstream implementation dependency_manifest.rs owns per-file dependency edge parsing and path diagnostics
 // downstream implementation main.rs exposes the check-dependency-headers command
-// downstream test ../../../../../tests/agent_tools/test_check_dependency_headers.py verifies native CLI behavior
+// downstream implementation ../../../../../tests/agent_tools/test_check_dependency_headers.py verifies native CLI behavior
 // @dependency-end
 
 use crate::dependency_manifest::{has_dependency_markers, parse_dependency_header};

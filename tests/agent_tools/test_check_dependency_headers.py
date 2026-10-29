@@ -339,7 +339,9 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             root = Path(tmp_dir)
             write_contract_registry(root, 'header_surfaces = ["scoped.py"]\n')
             scoped = root / "scoped.py"
-            scoped.write_text(manifest(comment="hash"), encoding="utf-8")
+            scoped.write_text(
+                manifest(contract="tool", comment="hash"), encoding="utf-8"
+            )
             unrelated = root / "unrelated.py"
             unrelated.write_text("# intentionally not selected\n", encoding="utf-8")
             init_git(
