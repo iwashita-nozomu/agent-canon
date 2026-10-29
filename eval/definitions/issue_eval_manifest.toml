@@ -414,6 +414,62 @@ linked_rules = [
 ]
 
 [[eval]]
+id = "report-composition-decides-structure-and-figures-before-prose"
+category = "workflow-bypass"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "report prose follows a structure selected for the reader's purpose and question",
+  "figure need is decided before creating visualization assets",
+  "the report body is written by the selected writing owner after necessary assets are identified",
+]
+expected_route = [
+  "outline the reader-facing report from its purpose and required claims",
+  "decide whether a figure materially improves understanding and create only the necessary selected assets",
+  "draft the report body through the selected writing owner and revise structure if an asset exposes a gap",
+]
+forbidden_route = [
+  "create figures or supporting assets before the report's structure and figure need are decided",
+  "write the body before resolving necessary structure or route it to an artifact owner",
+  "require a figure when prose or a table already serves the purpose",
+]
+linked_rules = [
+  "agents/skills/structure-planning.md",
+  "agents/skills/code-visualization.md",
+  "agents/skills/result-artifact-writeout.md",
+  "agents/skills/report-writing.md",
+]
+
+[[eval]]
+id = "math-preliminary-minimizes-premises-before-verification-and-writing"
+category = "insufficient-evidence"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "a mathematical preliminary starts from its purpose and the claim it must support",
+  "only necessary abstract premises and project-model references are included",
+  "state is included when the claim depends on it, without requiring a full model or global registry",
+  "the relevant claim is verified before prose is drafted by the selected writing owner",
+]
+expected_route = [
+  "state the purpose and target claim",
+  "identify minimal premises and relevant project-model references, including state only when needed by the claim",
+  "verify the claim under those premises before writing the preliminary section",
+  "draft through the selected academic writing owner with assumptions and limits explicit",
+]
+forbidden_route = [
+  "import the full project model or global registry when only a bounded set of premises is needed",
+  "omit state required by the claim or add state unrelated to it",
+  "write prose before checking whether the claim follows from the stated premises",
+]
+linked_rules = [
+  "agents/skills/formal-proof-workflow.md",
+  "agents/skills/academic-writing.md",
+  "agents/skills/paper-writing.md",
+  "agents/skills/structure-planning.md",
+]
+
+[[eval]]
 id = "pr-operation-selects-required-checks"
 category = "scope-creep"
 source_issue = 1627
