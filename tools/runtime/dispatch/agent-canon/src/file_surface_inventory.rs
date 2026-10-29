@@ -3,7 +3,7 @@
 // responsibility Builds machine-readable file-surface inventories for repo review.
 // upstream implementation ../../../../analysis/code/file_surface_inventory.py frozen migration oracle
 // downstream implementation ../../../../repository/github/review_backlog_scan.sh includes inventory reports
-// downstream test ../../../../../../tests/agent_tools/test_file_surface_inventory.py exercises the inventory CLI
+// downstream implementation ../../../../../tests/agent_tools/test_file_surface_inventory.py exercises the inventory CLI
 // @dependency-end
 
 use serde_json::{json, Value};
