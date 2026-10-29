@@ -60,7 +60,6 @@ The planner also reports known Python delegation at these native owners when
 the corresponding source evidence is present:
 
 - `private_feedback.rs`: private feedback storage and sync Python adapter.
-- `dependency_manifest.rs`: Python surface-manifest snapshot producer.
 - `python_structure_hash.rs`: embedded Python AST extraction implementation.
 
 This is a declared set of known gaps, not an exhaustive detector for arbitrary
@@ -189,6 +188,29 @@ Document-canon inventory is already implemented by native
 remain derived from dependency declarations and upstream coverage rules.
 Preserve this owner rather than restoring a Python compatibility implementation.
 Other commands in the same crate may still have the delegation gaps above.
+
+## Native Surface Manifest and Producer Identity
+
+`agent-canon surface-manifest` owns the normalized snapshot, document check, and
+forbidden-root listing. The `runtime-surface-inventory` catalog ID and graph's
+default snapshot route select the Rust parser and native generated-projection
+helper. The former owned Python surface-manifest entrypoint is retired.
+
+The snapshot keeps schema `agent-canon.surface-manifest.v2`. Default producer
+identity v3 hashes the actual executing native binary and binds the selected
+source root and manifest. Only that current executable may use the native
+outside-source-root exception. Explicit external Python producer identity v2
+retains its original source-root containment, paired-path, hash, foreign-reader,
+and stale-evidence checks. The existing
+[runtime-surface owner](../runtime/SHARED_RUNTIME_SURFACES.md) defines this
+version transition and the retained external interface.
+
+The Python skill-projection library remains for `source_dependency_graph.py`
+and supplies an independent comparison oracle. Its implementation stays in the
+pending inventory until that Python consumer is ported. External Python
+execution selected by an explicit v2 identity is a retained provider capability;
+it does not mean the native default delegates to an owned Python tool. This
+port does not complete other migration families.
 
 ## Plan and Audit Interfaces
 
