@@ -231,6 +231,19 @@ class WorkflowMonitorTest(unittest.TestCase):
             request = runtime / "spool" / "private-feedback" / "sync-request.json"
             self.assertTrue(request.is_file())
             self.assertNotIn("prompt_repair", request.read_text(encoding="utf-8"))
+            records = list(
+                (runtime / "spool/private-feedback/feedback/runtime-feedback").glob(
+                    "*.md"
+                )
+            )
+            self.assertEqual(len(records), 1)
+            captured = records[0].read_text(encoding="utf-8")
+            self.assertIn("input_mode: structured-log", captured)
+            self.assertIn("run: env-runtime-run", captured)
+            self.assertIn(
+                "source=user target=skill action=prompt_repair evidence=env", captured
+            )
+            self.assertNotIn("prompt_repair", result.stdout + result.stderr)
 
     def test_monitor_appends_structured_tool_warning(self) -> None:
         """Tool warnings should be recorded as closeout-obligating ledger rows."""

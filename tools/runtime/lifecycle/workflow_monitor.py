@@ -6,6 +6,7 @@
 # upstream implementation ../archive/work_log.py owns canonical semantic-ledger append/read
 # upstream implementation ../archive/work_log.py appends canonical logical-ledger events
 # upstream implementation ./update_lifecycle_contract.py owns update states and evidence identity.
+# upstream implementation ../dispatch/agent-canon/src/private_feedback.rs owns native private capture.
 # downstream implementation ../../../tests/agent_tools/test_workflow_monitor.py tests it
 # @dependency-end
 """Append machine-readable workflow monitoring evidence to one run bundle."""
@@ -17,6 +18,7 @@ import fcntl
 import json
 import os
 import re
+import subprocess
 import sys
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -865,16 +867,28 @@ def main() -> int:
     # when private feedback is not configured, while the feedback body never
     # enters the monitoring receipt or dashboard.
     if args.runtime_feedback and effective_runtime_root:
-        try:
-            from tools.runtime.archive.private_feedback import capture_runtime_feedback
-        except ImportError:
-            from tools.runtime.archive.private_feedback import capture_runtime_feedback
+        # The monitor remains Python until its own port. Private feedback has one
+        # native owner; stdin preserves structured-log provenance without putting
+        # private bodies in command arguments or the monitoring receipt.
+        executable = os.environ.get("AGENT_CANON_NATIVE_BIN") or "agent-canon"
         for entry in args.runtime_feedback:
             try:
-                capture_runtime_feedback(
-                    entry,
-                    runtime_root=effective_runtime_root,
-                    run=path.parent.name,
+                subprocess.run(
+                    [
+                        executable,
+                        "f",
+                        "capture",
+                        "--structured-log",
+                        "--stdin",
+                        "--runtime-root",
+                        str(effective_runtime_root),
+                        "--run",
+                        path.parent.name,
+                    ],
+                    input=entry,
+                    text=True,
+                    capture_output=True,
+                    check=False,
                 )
             except Exception:
                 # The canonical monitoring artifact has already been written;

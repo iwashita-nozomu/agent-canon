@@ -1,0 +1,54 @@
+from typing import Protocol, TypeAlias
+
+FirstAlias: TypeAlias = list[int]
+SecondAlias: TypeAlias = list[str]
+
+
+def alpha(value: int) -> int:
+    """Alpha's docstring is omitted from the normalized body."""
+    return value + 17
+
+
+class FirstRecord(BaseA):
+    field: int
+
+
+class _Config:
+    pass
+
+
+def _consume(config: _Config) -> _Config:
+    return config
+
+
+def _target(value):
+    return value
+
+
+def _inner(value):
+    return value
+
+
+def _owner(value):
+    _target(value)
+    _target(value + 1)
+    return value
+
+
+def _wrapper(value):
+    return _inner(value)
+
+
+class Proto(Protocol):
+    def run(self, value: int) -> int:
+        ...
+
+
+class Implementation(BaseA):
+    def run(self, value: int) -> int:
+        ...
+
+
+class ImplementationTwo(BaseC):
+    def execute(self, thing: bytes) -> bytes:
+        ...

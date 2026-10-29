@@ -218,6 +218,311 @@ pub(crate) fn stable_source_key(source_root: &Path) -> String {
         .collect()
 }
 
+/// An explicitly selected runtime directory, used by the private feedback producer.
+/// Child operations stay relative to this handle; this is not parent/Git authority.
+pub(crate) struct RuntimeDirectory {
+    directory: cap_std::fs::Dir,
+}
+
+impl RuntimeDirectory {
+    pub(crate) fn open(path: &Path, create: bool) -> std::io::Result<Self> {
+        if !path.is_absolute() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "absolute runtime directory required",
+            ));
+        }
+        if create {
+            fs::create_dir_all(path)?;
+        }
+        let path = fs::canonicalize(path)?;
+        let directory = cap_std::fs::Dir::open_ambient_dir(&path, cap_std::ambient_authority())?;
+        Ok(Self { directory })
+    }
+
+    pub(crate) fn child(&self, relative: &Path, create: bool) -> std::io::Result<Self> {
+        use cap_fs_ext::DirExt;
+        use std::path::Component;
+        let mut directory = self.directory.try_clone()?;
+        for component in relative.components() {
+            let Component::Normal(name) = component else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "invalid runtime-relative directory",
+                ));
+            };
+            match directory.open_dir_nofollow(name) {
+                Ok(child) => directory = child,
+                Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
+                    match directory.create_dir(name) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                        Err(error) => return Err(error),
+                    }
+                    directory = directory.open_dir_nofollow(name)?;
+                    private_directory_mode(&directory)?;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(Self { directory })
+    }
+
+    pub(crate) fn make_private(&self) -> std::io::Result<()> {
+        private_directory_mode(&self.directory)
+    }
+
+    fn parent(&self, relative: &Path, create: bool) -> std::io::Result<(Self, std::ffi::OsString)> {
+        use std::path::Component;
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, Component::Normal(_)))
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid runtime-relative file",
+            ));
+        }
+        let name = relative.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "runtime file name required",
+            )
+        })?;
+        let parent = self.child(relative.parent().unwrap_or(Path::new("")), create)?;
+        Ok((parent, name.to_os_string()))
+    }
+
+    pub(crate) fn read(&self, relative: &Path) -> std::io::Result<Option<Vec<u8>>> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::io::Read;
+        let (parent, name) = match self.parent(relative, false) {
+            Ok(value) => value,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let mut options = cap_std::fs::OpenOptions::new();
+        options.read(true).follow(FollowSymlinks::No);
+        match parent.directory.symlink_metadata(&name) {
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "runtime target is not a regular file",
+                ))
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        }
+        #[cfg(unix)]
+        {
+            use cap_fs_ext::OpenOptionsSyncExt;
+            options.nonblock(true);
+        }
+        let mut file = match parent.directory.open_with(&name, &options) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
+        }
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(Some(bytes))
+    }
+
+    pub(crate) fn read_candidate(&self, relative: &Path) -> std::io::Result<Option<Vec<u8>>> {
+        let (parent, name) = match self.parent(relative, false) {
+            Ok(value) => value,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        match parent.directory.symlink_metadata(&name) {
+            Ok(metadata) if metadata.is_file() => parent.read(Path::new(&name)),
+            Ok(_) => Ok(None),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// The caller holds the stable spool lock through read, write and publication.
+    pub(crate) fn write_once(&self, relative: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::io::Write;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+        let (parent, name) = self.parent(relative, true)?;
+        parent.make_private()?;
+        if let Some(existing) = parent.read(Path::new(&name))? {
+            return identical_private_bytes(&existing, bytes);
+        }
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .write(true)
+            .create_new(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let (temporary, mut file) = loop {
+            let temporary = format!(
+                ".private-feedback-{}-{}.tmp",
+                std::process::id(),
+                NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+            );
+            match parent.directory.open_with(&temporary, &options) {
+                Ok(file) => break (temporary, file),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        };
+        let result = (|| {
+            file.write_all(bytes)?;
+            file.sync_all()?;
+            drop(file);
+            // Preserve a pre-existing/conflicting record even if another producer
+            // did not participate in the spool protocol. The protocol lock, not
+            // this preflight, serializes cooperating publication and host cleanup.
+            if let Some(existing) = parent.read(Path::new(&name))? {
+                return identical_private_bytes(&existing, bytes);
+            }
+            parent
+                .directory
+                .rename(&temporary, &parent.directory, &name)
+        })();
+        let cleanup = parent.directory.remove_file(&temporary);
+        match (result, cleanup) {
+            (Err(error), _) => Err(error),
+            (Ok(()), Err(error)) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+            _ => Ok(()),
+        }
+    }
+
+    pub(crate) fn append(&self, relative: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::io::Write;
+        let (parent, name) = self.parent(relative, true)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .read(true)
+            .append(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = parent.directory.open_with(&name, &options)?;
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
+        }
+        file.write_all(bytes)?;
+        file.sync_all()
+    }
+
+    pub(crate) fn lock(&self, relative: &Path) -> std::io::Result<RuntimeFileLock> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::io::Write;
+        let (parent, name) = self.parent(relative, true)?;
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .read(true)
+            .write(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = parent.directory.open_with(&name, &options)?.into_std();
+        if !file.metadata()?.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime lock is not a regular file",
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file.set_permissions(fs::Permissions::from_mode(0o600))?;
+        }
+        if file.metadata()?.len() == 0 {
+            file.write_all(&[0])?;
+        }
+        file.lock()?;
+        Ok(RuntimeFileLock { file })
+    }
+
+    pub(crate) fn files(&self, relative: &Path) -> std::io::Result<Vec<PathBuf>> {
+        let start = match self.child(relative, false) {
+            Ok(value) => value,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(error),
+        };
+        let mut stack = vec![(start, relative.to_path_buf())];
+        let mut files = Vec::new();
+        while let Some((directory, prefix)) = stack.pop() {
+            for entry in directory.directory.entries()? {
+                let entry = entry?;
+                let name = entry.file_name();
+                let kind = entry.file_type()?;
+                let path = prefix.join(&name);
+                if kind.is_dir() {
+                    stack.push((directory.child(Path::new(&name), false)?, path));
+                } else if kind.is_file() {
+                    files.push(path);
+                }
+            }
+        }
+        files.sort();
+        Ok(files)
+    }
+}
+
+fn identical_private_bytes(existing: &[u8], requested: &[u8]) -> std::io::Result<()> {
+    if existing == requested {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "existing private record differs",
+        ))
+    }
+}
+
+fn private_directory_mode(directory: &cap_std::fs::Dir) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use cap_std::fs::PermissionsExt;
+        directory.set_permissions(".", cap_std::fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(not(unix))]
+    let _ = directory;
+    Ok(())
+}
+
+pub(crate) struct RuntimeFileLock {
+    file: fs::File,
+}
+
+impl RuntimeFileLock {
+    pub(crate) fn finish(self) -> std::io::Result<()> {
+        self.file.unlock()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

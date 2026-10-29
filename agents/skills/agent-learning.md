@@ -6,7 +6,7 @@ contract skill
 responsibility Routes private knowledge and feedback to the external log owner and applies selected behavior-learning decisions.
 upstream design ../../documents/runtime/private-feedback-knowledge.md private log command and storage contract
 upstream design ../../documents/operations/notes-lifecycle.md public failed verification and topic reuse
-upstream implementation ../../tools/runtime/archive/private_feedback.py metadata-only private log adapter
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs native private knowledge and feedback commands
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime feedback evidence
 @dependency-end
 -->
@@ -48,7 +48,7 @@ Notes Lifecycle directly.
 
 - [Private log contract](../../documents/runtime/private-feedback-knowledge.md)
 - [Notes Lifecycle](../../documents/operations/notes-lifecycle.md)
-- `tools/runtime/archive/private_feedback.py`
+- `tools/runtime/dispatch/agent-canon/src/private_feedback.rs`
 - `tools/runtime/lifecycle/workflow_monitor.py`
 - `eval/definitions/agent_behavior_eval.toml`
 
