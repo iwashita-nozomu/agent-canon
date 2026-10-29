@@ -192,6 +192,10 @@ directory、branch、HEAD、依存 PR の revision、pin、local override / moun
 ## 4. コミット・プッシュ
 
 - commit は branch の責務に収まる差分だけを含めます。
+- 公開・統合が認可された作業は、小さく一貫した独立検証可能な単位ごとに、変更保証に
+  必要な検証、commit、push、既存の受入条件を満たす merge と readback を完了して次へ進みます。
+  必要な依存を含む atomic unit と既存の構造変更 merge 要件を保ち、無関係な並行単位の
+  完了を待たずに届けます。
 
 ### 範囲分割契約
 
