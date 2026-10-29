@@ -3,6 +3,8 @@
 contract workflow
 responsibility Documents Branch Scope と Git ワークフロー for this repository.
 upstream design README.md durable document index
+upstream design ../../agents/canonical/CODEX_COMPLETION.md selected completion route
+upstream design ../rule/repository-topic-clone.md checkout lifecycle and writer scope
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md consumes commit correctness closeout contract
 downstream design ../../agents/skills/agent-canon-update.md consumes branch, commit, and PR scope split contract
 downstream design ../../agents/skills/codex-task-workflow.md exposes commit correctness workflow guidance
@@ -17,7 +19,8 @@ downstream design ../rule/dependency-module-changes.md consumes workspace depend
 
 
 この文書は、branch 名、branch の責務、commit / push、merge / rebase の判断をまとめた正本です。
-worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-lifecycle.md) を参照します。
+checkout の作成・再利用は [repository-topic clone ルール](../rule/repository-topic-clone.md)、
+legacy scope / action log の carry-over は [worktree-lifecycle.md](worktree-lifecycle.md) を参照します。
 
 ## この文書の読み方
 
@@ -26,17 +29,20 @@ worktree の作成と carry-over の流れは [worktree-lifecycle.md](worktree-l
 - 主な順路は、基本方針、branch 名、Scope の固定、コミット・プッシュ、
   Conflict 解決と merge / rebase、削除前チェックです。
 - branch や PR の責務を固定する前、または merge 判断時に読みます。
-- 境界: worktree 作成と carry-over の詳細は [worktree-lifecycle.md](worktree-lifecycle.md) が扱います。
+- checkout lifecycle、legacy cleanup、task completion はそれぞれの正本に従い、
+  この文書では branch / commit / PR の責務と Git 状態保全を扱います。
 
 ## 1. 基本方針
 
 - 1 branch = 1 topic に固定します。
 - topic は独立した設計単位として扱い、branch と PR の scope もこの単位に揃えます。
-- branch の責務が広がったら、branch を分けるか `WORKTREE_SCOPE.md` を更新します。
+- branch の責務が広がったら、追加編集前に branch の分割または current handoff の
+  write scope 更新を判断します。writer packet の更新は既存 checkout lifecycle に従います。
 - 実装コードと長時間実験の生成物は、必要に応じて branch を分けます。
-- `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。再利用する
+- `main` は統合先であり、試行錯誤や途中生成物の置き場にはしません。実験 repository では、再利用する
   model/helper、共有 execution・regression infrastructure、完了済み `summary.md` と
   archive reference を保持し、topic-only / disposable diagnostic code は置きません。
+  この実験用の制限は通常の product code を `main` に置くことを禁じません。
 
 ### Experiment topic branch scope
 
@@ -99,7 +105,9 @@ Git 状態維持を理由に、無関係な製品修正・全 branch 掃除・�
 
 ## 2. branch 名
 
-- 通常の実装 branch は `work/<topic>-YYYYMMDD` を使います。
+- 通常の実装 branch の命名は `work/<topic>-YYYYMMDD` を基本とし、選択した owner の
+  命名条件を優先します。AgentCanon source 変更は
+  [agent-canon-update](../../agents/skills/agent-canon-update.md) の Issue-qualified topic branch を使います。
 - 結果保存 branch は `results/<topic>` を使います。
 - branch 名は目的が読める英語句で付けます。
 
@@ -111,12 +119,13 @@ private feedback の archive は、それぞれの owner 文書に従い、branc
 
 ## 3. Scope の固定
 
-- branch を切ったら、必要に応じて対応する worktree root に `WORKTREE_SCOPE.md` を置きます。
-  parent/same-repository branch の分離は `repository-topic-clone` の `linked-worktree`、
-  dependency repository は `independent-clone` を使い、配置は常に
-  `<anchor>/workspace/<topic>/<repo>` とします。
-- `WORKTREE_SCOPE.md` には editable directories、carry-over target、action log を明記します。
-- branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の `active_branch` と必要なら `scope_file` を更新します。
+- current handoff に branch の目的、dependency-expanded write scope、必要な carry-over 先を
+  固定します。分離が必要な場合の mode・配置・writer packet は
+  [checkout lifecycle](../rule/repository-topic-clone.md#clone-ライフサイクル) に従います。
+- `WORKTREE_SCOPE.md` は新しい task の権限源にしません。既存 file の扱いは
+  [legacy scope の確認](worktree-lifecycle.md#legacy-scope-の確認) に従います。
+- branch で experiment topic を継続的に触る場合は、`experiments/registry.toml` の
+  `active_branch` を更新します。既存の `scope_file` は legacy evidence として扱います。
 - branch の入口が必要な場合は `documents/notes/branches/<branch_topic>.md` に置き、scope と関連 note をそこから辿れるようにします。
 
 ### Workspace と依存 checkout の確認
@@ -267,33 +276,42 @@ selected_validation(T_i, E_i) = pass
   記録し、pass に読み替えません。無関係な既存障害は別責務のまま残し、
   検証不能なら `need verification` として、検証済み完了とは区別します。
 
-- commit は Git 上の runnable unit です。`git checkout <commit>` で得られる tracked tree と、明示された external runtime/source clone だけで、選択した validation route が再実行できる状態にします。
-- validation が読んだ source、config、schema、fixture、文書、tool entrypoint は、その commit の tracked tree に含めます。ignored / generated runtime output は artifact、cache、log、result のどれかに分類して evidence に残します。
+- validation が読む source、config、schema、fixture、文書、tool entrypoint は、宣言した
+  外部入力を除き、その commit の tracked tree に含めます。ignored / generated runtime
+  output は artifact、cache、log、result のどれかに分類して evidence に残します。
 - code 変更では、file-level の code dependency scan と、言語 tool が対応する関数 / public entrypoint 単位の call-site evidence を commit evidence に含めます。Python では `python3 tools/analysis/code/helper_function_inventory.py --changed --all-functions --format json` を関数単位 evidence に使います。
 - commit evidence には branch、commit SHA / tree、前提 commit と外部依存 identity、source clone SHA/PR readback（該当時）、validation command・対象 path・終了結果、残った dirty / untracked path の分類を含めます。
-- `WORKTREE_SCOPE.md` を更新した場合は、早い段階で commit します。
 - push 前に、その branch で必須の test / lint / document check を実行します。
 - 初回 push と PR 作成は `python3 tools/repository/github/github_publish.py publish-pr --user-task "<current user task>" --repo <owner/name> --title "<title>" --body-file <body.md>` を使います。branch push だけなら `github_publish.py push` を使います。
 - user-facing の完了報告は、今回の scope で選択した commit / push の判断と結果を既存の closeout evidence に反映してから行います。選択しなかった操作を無条件に作成・実行する完了条件にはしません。
-- さらに `verification.txt` が `status=pass`、`closeout_gate.md` が `auditor_status=resolved`、`review_convergence_complete=yes`、`diff_check_agent_complete=yes`、`user_completion_report=unlocked` になり、run-local diff-check artifact が現在 tracked diff ref の read-only independent approval を示すまで完了報告を出しません。
-- commit / push を選択しない task は、review-only、read-only、no-change、local-only / no-push、または user が明示的に停止した場合として、既存の closeout status を `not_applicable` にし、既存の work log / final status に判断理由を残します。選択した操作の status は `yes` になるまで完了扱いにしません。
+- task 全体の完了は、選択済みの
+  [completion route](../../agents/canonical/CODEX_COMPLETION.md#completion-readiness) で判断します。
+  bounded route に coordination artifact を要求せず、coordination run の判定は既存 closeout owner に委ねます。
+- commit / push を選択しない task は、review-only、read-only、no-change、local-only / no-push、
+  または user の明示的停止などの理由を既存 task record に残します。選択した操作の失敗は
+  未完了として扱い、coordination の status field は completion owner の定義に従います。
 - commit / push が sharing、handoff、remote backup、PR などの目的と既存権限・指定宛先から適切と判断できる task では、agent は追加の許可取りに戻らず実行します。
 - 選択した push に失敗した場合は、完了扱いにせず、commit を保持したまま branch、commit、`github_publish.py` の `NEXT_ACTION` と失敗理由を明記して報告します。literal URL push や remote 推測の alternate route は使いません。
 
 ## 5. Conflict 解決と merge / rebase
 
 - `main` 取り込みは、branch の目的に必要な最小限に留めます。
-- 履歴を読みやすく保つため、ローカル整理には `rebase` を使って構いません。
+- ローカル履歴整理の `rebase` は既存 owner が認可された route で判断します。
+  repository-topic writer は raw `git merge` / `git rebase` を実行せず、最新 main の取込みを
+  [merge-main / finalize-merge](../rule/repository-topic-clone.md#clone-ライフサイクル) の integration executor へ渡します。
 - 統合時の安全性と文脈保持を優先する場合は `merge` を選びます。
-- 別 branch と同じファイルを触っている場合は、先に `documents/notes/branches/` と `documents/notes/worktrees/` で衝突リスクを明示します。
+- 別 branch と同じファイルを触っている場合は、既存 handoff / 作業記録に衝突リスクを明示します。
+  過去の branch / worktree note は必要な場合だけ参照します。
 - file 追加、削除、rename、symlink 化、type 変更、ディレクトリ再編がある branch は、[agents/skills/integration.md](../../agents/skills/integration.md) の手順で統合します。
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
+- 以下は source branch を base へ統合する integration owner の手順です。
+  topic branch への最新 main 取込みとは区別し、writer の raw Git mutation 権限を追加しません。
 - 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/validation/ci/checks/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。
 
 ## 6. 削除前チェック
 
-- branch の目的が `documents/notes/branches/` から辿れる
-- `main` に持ち帰る note / final JSON が整理済み
-- raw 結果を残す場所が決まっている
-- `git worktree list` と `git branch -v` で後片付け対象が分かる
+作業用 checkout の利用終了時は [checkout cleanup](../rule/repository-topic-clone.md#クリーンアップ)、
+legacy branch / worktree の削除判断は [legacy cleanup](worktree-lifecycle.md#cleanup-前の確認) に従います。
+branch の目的、持ち帰る知見・結果と保存先を既存 task / Issue / note から辿れるようにし、
+削除対象の exact ref/path を確認します。checkout の回収と branch の削除は別の authority です。
