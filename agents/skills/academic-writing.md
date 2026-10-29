@@ -28,6 +28,22 @@ claim, evidence links, notation/assumptions, or section contract explicit to the
 extent the document needs them; reuse an existing note when it already captures
 that information.
 
+### Mathematical preliminary preparation
+
+For a mathematical preliminary study, or when another report needs unsettled
+mathematical premises selected, establish the purpose and intended conclusion,
+then select the most abstract premises and model facts that still support it.
+Reuse a project-supplied or existing canonical model page or contract when
+available, and reference only its relevant interface. If none is given, state
+only the assumptions needed for the conclusion and mark unresolved model facts
+as unknown. Include necessary hidden assumptions and provenance, and add state
+or algorithm conditions only when the conclusion depends on them. State the
+verification target and support status, distinguishing proof, counterexample,
+numerical evidence, and unverified claims. Carry these settled premises, model
+references, and conclusion boundary into structure planning and writing. This is
+conditional preparation, not a fixed packet or a requirement for every
+mathematical question.
+
 Before drafting, use [structure-planning](structure-planning.md#before-prose) to
 settle claim/section order and evidence. Draft in a reader-friendly order and
 keep observations,
