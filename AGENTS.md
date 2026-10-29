@@ -30,7 +30,7 @@ operation is selected; this is not a checklist for every task.
 | Report writing | Follow the report owner: outline → figure decision → necessary figure creation/reuse → body with the selected writing Skill. | [report-writing](agents/skills/report-writing.md) |
 | Test responsibility | Setup supplies inputs, the product API performs the action, and an independent oracle checks the result. Repair the owning failure; do not implement the product in tests, weaken the oracle, or infer defects from unrun tests. Changes to input assumptions, scope, required properties, or major approach need prior agreement. | [test-role contract](documents/conventions/coding-conventions-testing.md#3-unit-test-contract) |
 | AgentCanon tool migration | All AgentCanon-owned tool implementations, including orchestration, target Rust through the existing owner in bounded units. Preserve command/output contracts and retire replaced implementations. Consumer product and test code keep their own language choices. | [tool migration](documents/design/rust-agent-tool-migration.md) |
-| Unresolved source owner | Read the selected owner row only. | [source map](agents/canonical/SOURCE_ROUTING.md) |
+| unresolved source owner | Read the selected owner row only. | [source map](agents/canonical/SOURCE_ROUTING.md) |
 
 When a selected Skill's adapter or command context is unresolved, use
 [Skill Paths](agents/canonical/skills.md#skill-paths). For formatting AgentCanon
