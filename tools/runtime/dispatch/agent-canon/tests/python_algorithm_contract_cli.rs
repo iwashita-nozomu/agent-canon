@@ -342,7 +342,11 @@ fn nested_contract_annotations_keep_big_integer_literals_and_ast_unparse_facts()
                     .any(|class_name| class_name == "SolveConfig")
         })
         .expect("unparsed field annotation retains child SolveConfig dependency");
-    assert!(solve["sources"].as_array().unwrap().iter().any(|source| source == "annotation"));
+    assert!(solve["sources"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|source| source == "annotation"));
 }
 
 #[test]
@@ -656,9 +660,13 @@ fn fallback_call_subject_preserves_cpython_ast_dump_shape() {
     ]);
     assert_eq!(output.status.code(), Some(1));
     let payload = json(&output);
-    assert!(payload["findings"].as_array().unwrap().iter().any(|finding| {
-        finding["kind"] == "stopping_primitive_direct_call"
+    assert!(payload["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|finding| {
+            finding["kind"] == "stopping_primitive_direct_call"
             && finding["subject"]
                 == "BinOp(Name('problem', Load()), Add(), Name('state', Load())).residual_tolerance"
-    }));
+        }));
 }

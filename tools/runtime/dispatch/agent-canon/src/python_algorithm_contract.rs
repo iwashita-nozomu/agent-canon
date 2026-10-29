@@ -6,10 +6,10 @@
 // downstream implementation main.rs exposes python-algorithm-contract-check
 // @dependency-end
 
-use serde::Serialize;
-use serde_json::{json, Value};
 use rustpython_ast::{Expr, Ranged, Stmt, Visitor};
 use rustpython_parser::{ast, Parse};
+use serde::Serialize;
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -538,18 +538,29 @@ fn extract_module_json(
                 }
             }
             Stmt::ImportFrom(import) => {
-                let module = import.module.as_ref().map(ToString::to_string).unwrap_or_default();
+                let module = import
+                    .module
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_default();
                 if module.ends_with("algorithm_module_protocol")
-                    || import.names.iter().any(|alias| alias.name.as_str() == "algorithm_module_protocol")
+                    || import
+                        .names
+                        .iter()
+                        .any(|alias| alias.name.as_str() == "algorithm_module_protocol")
                 {
                     imports_amp = true;
                 }
-                let level = import.level.as_ref()
+                let level = import
+                    .level
+                    .as_ref()
                     .map(|value| value.to_usize())
                     .unwrap_or(0);
                 for alias in &import.names {
                     let name = alias.name.to_string();
-                    if module.ends_with("algorithm_module_protocol") || name == "algorithm_module_protocol" {
+                    if module.ends_with("algorithm_module_protocol")
+                        || name == "algorithm_module_protocol"
+                    {
                         continue;
                     }
                     let mut imported = ".".repeat(level);
@@ -680,7 +691,10 @@ fn ast_dump_expr(expr: &Expr) -> String {
     match expr {
         E::BoolOp(node) => ast_dump_node(
             "BoolOp",
-            [ast_dump_node(&format!("{:?}", node.op), []), ast_dump_expr_list(&node.values)],
+            [
+                ast_dump_node(&format!("{:?}", node.op), []),
+                ast_dump_expr_list(&node.values),
+            ],
         ),
         E::NamedExpr(node) => ast_dump_node(
             "NamedExpr",
@@ -717,7 +731,9 @@ fn ast_dump_expr(expr: &Expr) -> String {
             "Dict",
             [
                 ast_dump_list(node.keys.iter().map(|key| {
-                    key.as_ref().map(ast_dump_expr).unwrap_or_else(|| "None".into())
+                    key.as_ref()
+                        .map(ast_dump_expr)
+                        .unwrap_or_else(|| "None".into())
                 })),
                 ast_dump_expr_list(&node.values),
             ],
@@ -725,11 +741,17 @@ fn ast_dump_expr(expr: &Expr) -> String {
         E::Set(node) => ast_dump_node("Set", [ast_dump_expr_list(&node.elts)]),
         E::ListComp(node) => ast_dump_node(
             "ListComp",
-            [ast_dump_expr(&node.elt), ast_dump_comprehensions(&node.generators)],
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
         ),
         E::SetComp(node) => ast_dump_node(
             "SetComp",
-            [ast_dump_expr(&node.elt), ast_dump_comprehensions(&node.generators)],
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
         ),
         E::DictComp(node) => ast_dump_node(
             "DictComp",
@@ -741,19 +763,30 @@ fn ast_dump_expr(expr: &Expr) -> String {
         ),
         E::GeneratorExp(node) => ast_dump_node(
             "GeneratorExp",
-            [ast_dump_expr(&node.elt), ast_dump_comprehensions(&node.generators)],
+            [
+                ast_dump_expr(&node.elt),
+                ast_dump_comprehensions(&node.generators),
+            ],
         ),
         E::Await(node) => ast_dump_node("Await", [ast_dump_expr(&node.value)]),
         E::Yield(node) => ast_dump_node(
             "Yield",
-            [node.value.as_ref().map(|value| ast_dump_expr(value)).unwrap_or_else(|| "None".into())],
+            [node
+                .value
+                .as_ref()
+                .map(|value| ast_dump_expr(value))
+                .unwrap_or_else(|| "None".into())],
         ),
         E::YieldFrom(node) => ast_dump_node("YieldFrom", [ast_dump_expr(&node.value)]),
         E::Compare(node) => ast_dump_node(
             "Compare",
             [
                 ast_dump_expr(&node.left),
-                ast_dump_list(node.ops.iter().map(|op| ast_dump_node(&format!("{op:?}"), []))),
+                ast_dump_list(
+                    node.ops
+                        .iter()
+                        .map(|op| ast_dump_node(&format!("{op:?}"), [])),
+                ),
                 ast_dump_expr_list(&node.comparators),
             ],
         ),
@@ -809,7 +842,10 @@ fn ast_dump_expr(expr: &Expr) -> String {
         ),
         E::Name(node) => ast_dump_node(
             "Name",
-            [ast_dump_string(node.id.as_str()), ast_dump_context(&node.ctx)],
+            [
+                ast_dump_string(node.id.as_str()),
+                ast_dump_context(&node.ctx),
+            ],
         ),
         E::List(node) => ast_dump_node(
             "List",
@@ -822,9 +858,18 @@ fn ast_dump_expr(expr: &Expr) -> String {
         E::Slice(node) => ast_dump_node(
             "Slice",
             [
-                node.lower.as_ref().map(|value| ast_dump_expr(value)).unwrap_or_else(|| "None".into()),
-                node.upper.as_ref().map(|value| ast_dump_expr(value)).unwrap_or_else(|| "None".into()),
-                node.step.as_ref().map(|value| ast_dump_expr(value)).unwrap_or_else(|| "None".into()),
+                node.lower
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
+                node.upper
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
+                node.step
+                    .as_ref()
+                    .map(|value| ast_dump_expr(value))
+                    .unwrap_or_else(|| "None".into()),
             ],
         ),
     }
@@ -901,14 +946,29 @@ fn ast_dump_arguments(arguments: &ast::Arguments) -> String {
     ast_dump_node(
         "arguments",
         [
-            ast_dump_list(arguments.posonlyargs.iter().map(|argument| ast_dump_arg(&argument.def))),
-            ast_dump_list(arguments.args.iter().map(|argument| ast_dump_arg(&argument.def))),
+            ast_dump_list(
+                arguments
+                    .posonlyargs
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
+            ast_dump_list(
+                arguments
+                    .args
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
             arguments
                 .vararg
                 .as_ref()
                 .map(|argument| ast_dump_arg(argument))
                 .unwrap_or_else(|| "None".into()),
-            ast_dump_list(arguments.kwonlyargs.iter().map(|argument| ast_dump_arg(&argument.def))),
+            ast_dump_list(
+                arguments
+                    .kwonlyargs
+                    .iter()
+                    .map(|argument| ast_dump_arg(&argument.def)),
+            ),
             ast_dump_list(arguments.kwonlyargs.iter().map(|argument| {
                 argument
                     .default
@@ -921,9 +981,13 @@ fn ast_dump_arguments(arguments: &ast::Arguments) -> String {
                 .as_ref()
                 .map(|argument| ast_dump_arg(argument))
                 .unwrap_or_else(|| "None".into()),
-            ast_dump_list(arguments.posonlyargs.iter().chain(&arguments.args).filter_map(|argument| {
-                argument.default.as_deref().map(ast_dump_expr)
-            })),
+            ast_dump_list(
+                arguments
+                    .posonlyargs
+                    .iter()
+                    .chain(&arguments.args)
+                    .filter_map(|argument| argument.default.as_deref().map(ast_dump_expr)),
+            ),
         ],
     )
 }
@@ -953,10 +1017,13 @@ fn public_definitions(source: &str, suite: &ast::Suite) -> Vec<Value> {
         let line = node_line(source, statement);
         match statement {
             Stmt::ClassDef(class) if is_public_name(class.name.as_str()) => {
-                definitions.push(json!({"name": class.name.to_string(), "line": line, "kind": "class"}));
+                definitions
+                    .push(json!({"name": class.name.to_string(), "line": line, "kind": "class"}));
             }
             Stmt::FunctionDef(function) if is_public_name(function.name.as_str()) => {
-                definitions.push(json!({"name": function.name.to_string(), "line": line, "kind": "function"}));
+                definitions.push(
+                    json!({"name": function.name.to_string(), "line": line, "kind": "function"}),
+                );
             }
             Stmt::AsyncFunctionDef(function) if is_public_name(function.name.as_str()) => {
                 definitions.push(json!({"name": function.name.to_string(), "line": line, "kind": "async_function"}));
@@ -987,7 +1054,10 @@ fn all_state(source: &str, suite: &ast::Suite) -> (&'static str, Vec<String>, us
     for statement in suite {
         let value = match statement {
             Stmt::Assign(assign)
-                if assign.targets.iter().any(|target| expr_name(target).as_deref() == Some("__all__")) =>
+                if assign
+                    .targets
+                    .iter()
+                    .any(|target| expr_name(target).as_deref() == Some("__all__")) =>
             {
                 Some(assign.value.as_ref())
             }
@@ -1016,7 +1086,9 @@ fn top_level_aliases(suite: &ast::Suite) -> BTreeMap<String, String> {
     for statement in suite {
         match statement {
             Stmt::AnnAssign(assign) => {
-                if let (Some(name), Some(value)) = (expr_name(&assign.target), assign.value.as_deref()) {
+                if let (Some(name), Some(value)) =
+                    (expr_name(&assign.target), assign.value.as_deref())
+                {
                     aliases.insert(name, value.to_string());
                 }
             }
@@ -1169,7 +1241,12 @@ impl Visitor for ParentConfigVisitor {
 fn usage(source: &str, suite: &ast::Suite, imports: &[Value]) -> Value {
     let aliases = imports
         .iter()
-        .filter_map(|import| import.get("alias").and_then(Value::as_str).map(str::to_string))
+        .filter_map(|import| {
+            import
+                .get("alias")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
         .collect::<BTreeSet<_>>();
     let mut visitor = UsageCollector::new(source, aliases);
     for statement in suite.iter().cloned() {
