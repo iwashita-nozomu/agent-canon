@@ -2,7 +2,7 @@
 # contract reference
 # responsibility Defines AgentCanon-owned standalone runtime, tool, eval, and archive surfaces.
 # upstream design ./SHARED_RUNTIME_SURFACES.md bootstrap runtime surface policy
-# downstream implementation ../../tools/runtime/manifest/surface_manifest.py parses this inventory
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/surface_manifest.rs parses this inventory
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs uses normalized source classifications
 # @dependency-end
 

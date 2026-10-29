@@ -4,7 +4,7 @@
 # responsibility Resolves ignored generated skill views to catalog-owned source documents.
 # upstream design ../../../documents/design/skill-runtime-shim-materialization.md owns the materializer path contract
 # upstream implementation ../../../agents/skills/catalog.yaml owns public skill identity and owner paths
-# downstream implementation ../../runtime/manifest/surface_manifest.py publishes the Rust graph snapshot
+# downstream implementation ../../../tests/agent_tools/test_surface_manifest.py preserves an independent projection oracle during native migration
 # downstream implementation ../../analysis/dependencies/source_dependency_graph.py resolves source-only graph targets
 # @dependency-end
 """Read the materializer-owned mapping for generated skill projections."""
@@ -22,9 +22,7 @@ import yaml
 SKILL_CATALOG = Path("agents/skills/catalog.yaml")
 GENERATED_SKILL_PREFIX = ".codex/personal/skills/"
 GENERATED_SKILL_SUFFIX = "/SKILL.md"
-GENERATED_SKILL_REF_RE = re.compile(
-    r"\.codex/personal/skills/[^\s`)>]+/SKILL\.md"
-)
+GENERATED_SKILL_REF_RE = re.compile(r"\.codex/personal/skills/[^\s`)>]+/SKILL\.md")
 
 
 @dataclass(frozen=True)
@@ -58,7 +56,9 @@ def generated_skill_projections(root: Path) -> tuple[GeneratedProjection, ...]:
             raw: object = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError) as error:
             raise ValueError(f"skill catalog unavailable: {error}") from error
-        if not isinstance(raw, Mapping) or not isinstance(raw.get("skill_families"), list):
+        if not isinstance(raw, Mapping) or not isinstance(
+            raw.get("skill_families"), list
+        ):
             raise ValueError("skill catalog must contain a skill_families list")
         for index, item in enumerate(cast(list[object], raw["skill_families"])):
             if not isinstance(item, Mapping):
@@ -67,8 +67,7 @@ def generated_skill_projections(root: Path) -> tuple[GeneratedProjection, ...]:
             canonical = item.get("canonical_doc")
             shim = item.get("shim")
             if not all(
-                isinstance(value, str) and value
-                for value in (skill, canonical, shim)
+                isinstance(value, str) and value for value in (skill, canonical, shim)
             ):
                 raise ValueError(f"skill catalog entry {index} has incomplete identity")
             expected_canonical = f"agents/skills/{skill}.md"
