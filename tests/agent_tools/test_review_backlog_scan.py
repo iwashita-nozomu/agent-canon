@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests integrated review backlog scan reporting behavior.
 # upstream implementation ../../tools/repository/github/review_backlog_scan.sh runs scan wrapper
-# upstream implementation ../../tools/analysis/code/file_surface_inventory.py writes inventory reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs writes inventory reports
 # upstream design ../../tools/validation/code/static/common/README.md documents scan entrypoint
 # @dependency-end
 
@@ -12,14 +12,16 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-REVIEW_SCAN = PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
+REVIEW_SCAN = (
+    PROJECT_ROOT / "tools" / "repository" / "github" / "review_backlog_scan.sh"
+)
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class ReviewBacklogScanTest(unittest.TestCase):
@@ -30,13 +32,10 @@ class ReviewBacklogScanTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "parent"
             subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            fixture_tools = root / "tools" / "analysis" / "code"
-            fixture_tools.mkdir(parents=True)
-            for tool_name in ("file_surface_inventory.py",):
-                shutil.copy2(
-                    PROJECT_ROOT / "tools" / "analysis" / "code" / tool_name,
-                    fixture_tools / tool_name,
-                )
+            self.assertIsNotNone(
+                AGENT_CANON_CLI,
+                "AGENT_CANON_CLI must select the current native executable",
+            )
             runtime = root.parent / "runtime"
             report_dir = runtime / "reports"
             configured_target = runtime / "cargo-target"
@@ -61,6 +60,7 @@ class ReviewBacklogScanTest(unittest.TestCase):
                     "AGENT_CANON_RUNTIME_ROOT": str(runtime),
                     "AGENT_CANON_CONTROL_PARENT_ROOT": str(root.parent),
                     "AGENT_CANON_REVIEW_SCAN_TARGET_DIR": str(configured_target),
+                    "AGENT_CANON_CLI": str(AGENT_CANON_CLI),
                 },
             )
 
@@ -69,10 +69,14 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertTrue((report_dir / "file_surface_inventory.json").is_file())
             self.assertTrue((report_dir / "file_surface_inventory.md").is_file())
             self.assertFalse(configured_target.exists())
-            summary = (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8")
+            summary = (report_dir / "review_backlog_scan.md").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("| inventory | 0 |", summary)
 
-    def test_code_dependency_check_reports_unselected_index_without_failing(self) -> None:
+    def test_code_dependency_check_reports_unselected_index_without_failing(
+        self,
+    ) -> None:
         """The optional semantic check records missing SCIP input as a coverage gap."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "parent"
@@ -109,7 +113,10 @@ class ReviewBacklogScanTest(unittest.TestCase):
             )
             self.assertEqual(impact["status"], "not-selected")
             self.assertEqual(impact["capabilities"]["scip"], "not-selected")
-            self.assertIn("| code-dependencies:root | 0 |", (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8"))
+            self.assertIn(
+                "| code-dependencies:root | 0 |",
+                (report_dir / "review_backlog_scan.md").read_text(encoding="utf-8"),
+            )
 
     def test_stale_search_excludes_git_paths(self) -> None:
         """The stale search should not read .git object databases."""
@@ -209,24 +216,26 @@ class ReviewBacklogScanTest(unittest.TestCase):
             (docs / "one.md").write_text(repeated, encoding="utf-8")
             (docs / "two.md").write_text(repeated, encoding="utf-8")
             query = root / "query.txt"
-            query.write_text("semantic review responsibility candidate", encoding="utf-8")
+            query.write_text(
+                "semantic review responsibility candidate", encoding="utf-8"
+            )
             report_dir = runtime / "reports"
             fake_bin.mkdir(parents=True)
             stale_agent_canon = fake_bin / "agent-canon"
             stale_agent_canon.write_text(
                 "#!/usr/bin/env bash\n"
                 "set -eu\n"
-                "case \"$1 $2\" in\n"
+                'case "$1 $2" in\n'
                 "  'semantic-index build')\n"
-                "    while [ \"$#\" -gt 0 ]; do\n"
-                "      if [ \"$1\" = '--db' ]; then : >\"$2\"; exit 0; fi\n"
+                '    while [ "$#" -gt 0 ]; do\n'
+                '      if [ "$1" = \'--db\' ]; then : >"$2"; exit 0; fi\n'
                 "      shift\n"
                 "    done ;;\n"
                 "  'semantic-index merge-candidates') printf '%s\\n' '{\"semantic_index_pairs\":[],\"candidate_bucket\":[],\"responsibility_bucket\":[]}' ;;\n"
                 "  'semantic-index thin-docs') printf '%s\\n' '{\"thin_docs\":[]}' ;;\n"
                 "  'semantic-index search') printf '%s\\n' '{\"query_chars\":42}' ;;\n"
                 "  'semantic-index eval-output')\n"
-                "    while [ \"$#\" -gt 0 ]; do\n"
+                '    while [ "$#" -gt 0 ]; do\n'
                 "      if [ \"$1\" = '--report' ]; then printf '%s\\n' '{\"semantic_index_output_eval\":\"pass\"}' >\"$2\"; printf '%s\\n' 'SEMANTIC_INDEX_OUTPUT_EVAL=pass'; exit 0; fi\n"
                 "      shift\n"
                 "    done ;;\n"
@@ -288,15 +297,19 @@ class ReviewBacklogScanTest(unittest.TestCase):
             self.assertIn("semantic_index_pairs", merge_jsonl)
             self.assertIn("candidate_bucket", merge_jsonl)
             self.assertIn("responsibility_bucket", merge_jsonl)
-            self.assertTrue((report_dir / "semantic_index_thin_docs_root.jsonl").is_file())
+            self.assertTrue(
+                (report_dir / "semantic_index_thin_docs_root.jsonl").is_file()
+            )
             search_jsonl = (report_dir / "semantic_index_search_root.jsonl").read_text(
                 encoding="utf-8"
             )
             self.assertIn('"query_chars"', search_jsonl)
-            self.assertNotIn("semantic review responsibility candidate phrase", search_jsonl)
-            output_eval = (report_dir / "semantic_index_output_eval_root.json").read_text(
-                encoding="utf-8"
+            self.assertNotIn(
+                "semantic review responsibility candidate phrase", search_jsonl
             )
+            output_eval = (
+                report_dir / "semantic_index_output_eval_root.json"
+            ).read_text(encoding="utf-8")
             self.assertIn('"semantic_index_output_eval":"pass"', output_eval)
             output_eval_summary = (
                 report_dir / "semantic_index_output_eval_root.txt"
