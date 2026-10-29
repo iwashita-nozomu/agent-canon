@@ -227,7 +227,10 @@ pub(crate) struct RuntimeDirectory {
 impl RuntimeDirectory {
     pub(crate) fn open(path: &Path, create: bool) -> std::io::Result<Self> {
         if !path.is_absolute() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "absolute runtime directory required"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "absolute runtime directory required",
+            ));
         }
         if create {
             fs::create_dir_all(path)?;
@@ -243,14 +246,17 @@ impl RuntimeDirectory {
         let mut directory = self.directory.try_clone()?;
         for component in relative.components() {
             let Component::Normal(name) = component else {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid runtime-relative directory"));
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "invalid runtime-relative directory",
+                ));
             };
             match directory.open_dir_nofollow(name) {
                 Ok(child) => directory = child,
                 Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
                     match directory.create_dir(name) {
-                        Ok(()) => {},
-                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {},
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
                         Err(error) => return Err(error),
                     }
                     directory = directory.open_dir_nofollow(name)?;
@@ -268,10 +274,22 @@ impl RuntimeDirectory {
 
     fn parent(&self, relative: &Path, create: bool) -> std::io::Result<(Self, std::ffi::OsString)> {
         use std::path::Component;
-        if relative.as_os_str().is_empty() || relative.components().any(|part| !matches!(part, Component::Normal(_))) {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "invalid runtime-relative file"));
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, Component::Normal(_)))
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid runtime-relative file",
+            ));
         }
-        let name = relative.file_name().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "runtime file name required"))?;
+        let name = relative.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "runtime file name required",
+            )
+        })?;
         let parent = self.child(relative.parent().unwrap_or(Path::new("")), create)?;
         Ok((parent, name.to_os_string()))
     }
@@ -287,8 +305,13 @@ impl RuntimeDirectory {
         let mut options = cap_std::fs::OpenOptions::new();
         options.read(true).follow(FollowSymlinks::No);
         match parent.directory.symlink_metadata(&name) {
-            Ok(metadata) if metadata.is_file() => {},
-            Ok(_) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "runtime target is not a regular file")),
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "runtime target is not a regular file",
+                ))
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
         }
@@ -303,7 +326,10 @@ impl RuntimeDirectory {
             Err(error) => return Err(error),
         };
         if !file.metadata()?.is_file() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "runtime target is not a regular file"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
         }
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
@@ -336,14 +362,21 @@ impl RuntimeDirectory {
             return identical_private_bytes(&existing, bytes);
         }
         let mut options = cap_std::fs::OpenOptions::new();
-        options.write(true).create_new(true).follow(FollowSymlinks::No);
+        options
+            .write(true)
+            .create_new(true)
+            .follow(FollowSymlinks::No);
         #[cfg(unix)]
         {
             use cap_std::fs::OpenOptionsExt;
             options.mode(0o600);
         }
         let (temporary, mut file) = loop {
-            let temporary = format!(".private-feedback-{}-{}.tmp", std::process::id(), NEXT_TEMP.fetch_add(1, Ordering::Relaxed));
+            let temporary = format!(
+                ".private-feedback-{}-{}.tmp",
+                std::process::id(),
+                NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+            );
             match parent.directory.open_with(&temporary, &options) {
                 Ok(file) => break (temporary, file),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -360,7 +393,9 @@ impl RuntimeDirectory {
             if let Some(existing) = parent.read(Path::new(&name))? {
                 return identical_private_bytes(&existing, bytes);
             }
-            parent.directory.rename(&temporary, &parent.directory, &name)
+            parent
+                .directory
+                .rename(&temporary, &parent.directory, &name)
         })();
         let cleanup = parent.directory.remove_file(&temporary);
         match (result, cleanup) {
@@ -375,7 +410,11 @@ impl RuntimeDirectory {
         use std::io::Write;
         let (parent, name) = self.parent(relative, true)?;
         let mut options = cap_std::fs::OpenOptions::new();
-        options.read(true).append(true).create(true).follow(FollowSymlinks::No);
+        options
+            .read(true)
+            .append(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
         #[cfg(unix)]
         {
             use cap_std::fs::OpenOptionsExt;
@@ -383,7 +422,10 @@ impl RuntimeDirectory {
         }
         let mut file = parent.directory.open_with(&name, &options)?;
         if !file.metadata()?.is_file() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "runtime target is not a regular file"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime target is not a regular file",
+            ));
         }
         file.write_all(bytes)?;
         file.sync_all()
@@ -394,7 +436,11 @@ impl RuntimeDirectory {
         use std::io::Write;
         let (parent, name) = self.parent(relative, true)?;
         let mut options = cap_std::fs::OpenOptions::new();
-        options.read(true).write(true).create(true).follow(FollowSymlinks::No);
+        options
+            .read(true)
+            .write(true)
+            .create(true)
+            .follow(FollowSymlinks::No);
         #[cfg(unix)]
         {
             use cap_std::fs::OpenOptionsExt;
@@ -402,7 +448,10 @@ impl RuntimeDirectory {
         }
         let mut file = parent.directory.open_with(&name, &options)?.into_std();
         if !file.metadata()?.is_file() {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "runtime lock is not a regular file"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime lock is not a regular file",
+            ));
         }
         #[cfg(unix)]
         {
@@ -443,8 +492,13 @@ impl RuntimeDirectory {
 }
 
 fn identical_private_bytes(existing: &[u8], requested: &[u8]) -> std::io::Result<()> {
-    if existing == requested { Ok(()) } else {
-        Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, "existing private record differs"))
+    if existing == requested {
+        Ok(())
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "existing private record differs",
+        ))
     }
 }
 

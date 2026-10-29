@@ -822,7 +822,8 @@ mod tests {
         assert!(python_delegation(
             "tools/runtime/dispatch/agent-canon/src/private_feedback.rs",
             "// downstream implementation tests/agent_tools/test_private_feedback.py",
-        ).is_none());
+        )
+        .is_none());
         fs::remove_dir_all(root).unwrap();
     }
 

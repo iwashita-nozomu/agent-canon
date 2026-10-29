@@ -197,7 +197,9 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
             package = temporary / expected_root
             executable = package / "bin" / executable_name
             if (package / "share/agent-canon/private_feedback.py").exists():
-                raise AssertionError("retired feedback implementation remains in native package")
+                raise AssertionError(
+                    "retired feedback implementation remains in native package"
+                )
             license_path = package / "LICENSE"
             provenance_path = package / "share/agent-canon/provenance.json"
             sums_path = package / "share/agent-canon/SHA256SUMS"
@@ -337,9 +339,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 runtime
                 / "spool/private-feedback/knowledge/topics/distribution-smoke/candidate.md"
             ).is_file():
-                raise AssertionError(
-                    "packaged native feedback wrote no private record"
-                )
+                raise AssertionError("packaged native feedback wrote no private record")
             for family, topic in (("k", "knowledge-alias"), ("f", "feedback-alias")):
                 alias_result = subprocess.run(
                     [
@@ -460,7 +460,9 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 )
             writer_output, writer_error = locked_writer.communicate(timeout=10)
             if locked_writer.returncode != 0 or "locked body" in writer_output:
-                raise AssertionError(f"packaged native feedback writer failed: {writer_error}")
+                raise AssertionError(
+                    f"packaged native feedback writer failed: {writer_error}"
+                )
             if not record.is_file():
                 raise AssertionError(
                     "locked feedback writer produced no private record"
@@ -488,9 +490,16 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
                 text=True,
             )
             if bare_feedback.returncode != 0 or bare_feedback.stderr:
-                raise AssertionError("bare native feedback still needs an implementation adapter")
-            if json.loads(bare_feedback.stdout).get("schema") != "agent-canon.private-feedback.v1":
-                raise AssertionError("bare native feedback returned no metadata receipt")
+                raise AssertionError(
+                    "bare native feedback still needs an implementation adapter"
+                )
+            if (
+                json.loads(bare_feedback.stdout).get("schema")
+                != "agent-canon.private-feedback.v1"
+            ):
+                raise AssertionError(
+                    "bare native feedback returned no metadata receipt"
+                )
 
 
 def test_source_free_package_smoke_when_binary_package_is_supplied() -> None:

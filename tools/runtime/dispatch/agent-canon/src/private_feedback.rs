@@ -66,13 +66,20 @@ struct Args {
 
 fn looks_like_option(value: &str) -> bool {
     static NEGATIVE_NUMBER: OnceLock<Regex> = OnceLock::new();
-    value.starts_with('-') && value != "-" &&
-        !NEGATIVE_NUMBER.get_or_init(|| Regex::new(r"^-\d+$|^-\d*\.\d+$")
-            .expect("static argparse negative-number expression")).is_match(value)
+    value.starts_with('-')
+        && value != "-"
+        && !NEGATIVE_NUMBER
+            .get_or_init(|| {
+                Regex::new(r"^-\d+$|^-\d*\.\d+$")
+                    .expect("static argparse negative-number expression")
+            })
+            .is_match(value)
 }
 
 fn option_value(raw: &[String], index: usize) -> Result<String> {
-    let value = raw.get(index + 1).filter(|value| !looks_like_option(value))
+    let value = raw
+        .get(index + 1)
+        .filter(|value| !looks_like_option(value))
         .ok_or_else(|| fail("usage", "option value required"))?;
     Ok(value.clone())
 }
@@ -108,7 +115,10 @@ fn parse(raw: &[String]) -> Result<Option<Args>> {
             index += 1;
         }
     }
-    args.family = rest.first().ok_or_else(|| fail("usage", "family required"))?.clone();
+    args.family = rest
+        .first()
+        .ok_or_else(|| fail("usage", "family required"))?
+        .clone();
     if matches!(args.family.as_str(), "-h" | "--help") {
         return Ok(None);
     }
@@ -135,8 +145,10 @@ fn parse(raw: &[String]) -> Result<Option<Args>> {
             break;
         }
     }
-    if !(matches!(args.operation.as_str(), "add" | "capture" | "status" | "sync")
-        || knowledge && matches!(args.operation.as_str(), "read" | "search"))
+    if !(matches!(
+        args.operation.as_str(),
+        "add" | "capture" | "status" | "sync"
+    ) || knowledge && matches!(args.operation.as_str(), "read" | "search"))
     {
         return Err(fail("usage", "unknown private feedback operation"));
     }
@@ -197,7 +209,10 @@ fn parse(raw: &[String]) -> Result<Option<Args>> {
         return Err(fail("usage", "unsupported private feedback argument"));
     }
     if args.structured && (!args.stdin || !args.text.is_empty()) {
-        return Err(fail("input_required", "structured capture requires --stdin"));
+        return Err(fail(
+            "input_required",
+            "structured capture requires --stdin",
+        ));
     }
     Ok(Some(args))
 }
@@ -221,7 +236,10 @@ fn topic_slug(value: &str) -> Result<String> {
         }
     }
     if slug.is_empty() || slug.len() > 96 {
-        return Err(fail("topic_invalid", "topic must be lowercase ASCII and non-empty"));
+        return Err(fail(
+            "topic_invalid",
+            "topic must be lowercase ASCII and non-empty",
+        ));
     }
     Ok(slug)
 }
@@ -235,18 +253,26 @@ fn sensitive(body: &str) -> bool {
 
 fn body(args: &Args) -> Result<(String, &'static str)> {
     if args.stdin != args.text.is_empty() {
-        return Err(fail("input_required", "provide direct prose or --stdin, exactly once"));
+        return Err(fail(
+            "input_required",
+            "provide direct prose or --stdin, exactly once",
+        ));
     }
     let mut value = if args.stdin {
         let mut value = String::new();
-        io::stdin().read_to_string(&mut value).map_err(|_| fail("body_invalid", "body must be UTF-8 text"))?;
+        io::stdin()
+            .read_to_string(&mut value)
+            .map_err(|_| fail("body_invalid", "body must be UTF-8 text"))?;
         value
     } else {
         args.text.join(" ").trim().to_string()
     };
     if args.structured {
         if value.len() > CAPTURE_LIMIT || sensitive(&value) {
-            return Err(fail("private_data_rejected", "structured feedback is not a permitted private payload"));
+            return Err(fail(
+                "private_data_rejected",
+                "structured feedback is not a permitted private payload",
+            ));
         }
         return Ok((format!("{}\n", value.trim()), "structured-log"));
     }
@@ -254,7 +280,10 @@ fn body(args: &Args) -> Result<(String, &'static str)> {
         return Err(fail("body_invalid", "body must be non-empty UTF-8 text"));
     }
     if sensitive(&value) {
-        return Err(fail("private_data_rejected", "credential-shaped or private payload is not accepted"));
+        return Err(fail(
+            "private_data_rejected",
+            "credential-shaped or private payload is not accepted",
+        ));
     }
     if args.operation == "capture" {
         value = value.trim().to_string();
@@ -262,46 +291,63 @@ fn body(args: &Args) -> Result<(String, &'static str)> {
     value.truncate(value.trim_end().len());
     value.push('\n');
     if args.operation == "capture" && value.len() > CAPTURE_LIMIT {
-        return Err(fail("capture_too_large", "structured capture exceeds 16 KiB"));
+        return Err(fail(
+            "capture_too_large",
+            "structured capture exceeds 16 KiB",
+        ));
     }
     // Public capture historically normalizes through the text-add operation.
-    let mode = if args.stdin && args.operation != "capture" { "stdin" } else { "text" };
+    let mode = if args.stdin && args.operation != "capture" {
+        "stdin"
+    } else {
+        "text"
+    };
     Ok((value, mode))
 }
 
 fn now() -> Result<String> {
-    OffsetDateTime::now_utc().replace_nanosecond(0)
+    OffsetDateTime::now_utc()
+        .replace_nanosecond(0)
         .map_err(|_| fail("clock_failed", "UTC timestamp unavailable"))?
-        .format(&Rfc3339).map_err(|_| fail("clock_failed", "UTC timestamp unavailable"))
+        .format(&Rfc3339)
+        .map_err(|_| fail("clock_failed", "UTC timestamp unavailable"))
 }
 
 fn source_commit() -> String {
     let configured = env::var("AGENT_CANON_SOURCE_COMMIT").unwrap_or_default();
     let configured = configured.trim();
-    if (40..=64).contains(&configured.len()) && configured.bytes().all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value)) {
+    if (40..=64).contains(&configured.len())
+        && configured
+            .bytes()
+            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+    {
         return configured.to_string();
     }
-    Command::new("git").args(["rev-parse", "--verify", "HEAD"]).output().ok()
+    Command::new("git")
+        .args(["rev-parse", "--verify", "HEAD"])
+        .output()
+        .ok()
         .filter(|output| output.status.success())
         .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn expanded_absolute(value: &str, code: &'static str) -> Result<PathBuf> {
-    let value = if value == "~" || value.starts_with("~/") || (cfg!(windows) && value.starts_with("~\\")) {
-        #[cfg(windows)]
-        let home = env::var_os("USERPROFILE").or_else(|| {
-            let mut drive = env::var_os("HOMEDRIVE").unwrap_or_default();
-            drive.push(env::var_os("HOMEPATH")?);
-            Some(drive)
-        });
-        #[cfg(not(windows))]
-        let home = env::var_os("HOME");
-        let home = home.ok_or_else(|| fail(code, "home directory unavailable"))?;
-        PathBuf::from(home).join(value.get(2..).unwrap_or(""))
-    } else {
-        PathBuf::from(value)
-    };
+    let value =
+        if value == "~" || value.starts_with("~/") || (cfg!(windows) && value.starts_with("~\\")) {
+            #[cfg(windows)]
+            let home = env::var_os("USERPROFILE").or_else(|| {
+                let mut drive = env::var_os("HOMEDRIVE").unwrap_or_default();
+                drive.push(env::var_os("HOMEPATH")?);
+                Some(drive)
+            });
+            #[cfg(not(windows))]
+            let home = env::var_os("HOME");
+            let home = home.ok_or_else(|| fail(code, "home directory unavailable"))?;
+            PathBuf::from(home).join(value.get(2..).unwrap_or(""))
+        } else {
+            PathBuf::from(value)
+        };
     if !value.is_absolute() {
         return Err(fail(code, "configured root must be absolute"));
     }
@@ -309,25 +355,50 @@ fn expanded_absolute(value: &str, code: &'static str) -> Result<PathBuf> {
 }
 
 fn log_root(args: &Args) -> Result<PathBuf> {
-    let configured = args.log.clone().filter(|value| !value.is_empty())
-        .or_else(|| env::var("AGENT_CANON_LOG_ROOT").ok().filter(|value| !value.trim().is_empty()))
-        .or_else(|| env::var("AGENT_CANON_CONTROL_PARENT_ROOT").ok().filter(|value| !value.trim().is_empty())
-            .map(|parent| PathBuf::from(parent.trim()).join("agent-canon-log").to_string_lossy().into_owned()))
-        .ok_or_else(|| fail("log_root_required", "pass --log-root or set AGENT_CANON_LOG_ROOT/AGENT_CANON_CONTROL_PARENT_ROOT"))?;
+    let configured = args
+        .log
+        .clone()
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            env::var("AGENT_CANON_LOG_ROOT")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        })
+        .or_else(|| {
+            env::var("AGENT_CANON_CONTROL_PARENT_ROOT")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|parent| {
+                    PathBuf::from(parent.trim())
+                        .join("agent-canon-log")
+                        .to_string_lossy()
+                        .into_owned()
+                })
+        })
+        .ok_or_else(|| {
+            fail(
+                "log_root_required",
+                "pass --log-root or set AGENT_CANON_LOG_ROOT/AGENT_CANON_CONTROL_PARENT_ROOT",
+            )
+        })?;
     let path = expanded_absolute(configured.trim(), "log_root_invalid")?;
     // Preserve the configured missing-log case without creating its checkout.
     let mut normalized = PathBuf::new();
     for component in path.components() {
         match component {
-            Component::CurDir => {},
-            Component::ParentDir => { normalized.pop(); },
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
             value => normalized.push(value.as_os_str()),
         }
     }
     let mut ancestor = normalized.clone();
     let mut suffix = Vec::new();
     while !ancestor.exists() {
-        let name = ancestor.file_name().ok_or_else(|| fail("log_root_invalid", "private log root is unavailable"))?;
+        let name = ancestor
+            .file_name()
+            .ok_or_else(|| fail("log_root_invalid", "private log root is unavailable"))?;
         suffix.push(name.to_os_string());
         ancestor.pop();
     }
@@ -344,12 +415,26 @@ struct Store {
 }
 impl Store {
     fn open(args: &Args) -> Result<Self> {
-        let configured = args.runtime.clone().filter(|value| !value.is_empty())
-            .or_else(|| env::var("AGENT_CANON_RUNTIME_ROOT").ok().filter(|value| !value.trim().is_empty()))
-            .ok_or_else(|| fail("runtime_root_required", "pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT"))?;
+        let configured = args
+            .runtime
+            .clone()
+            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                env::var("AGENT_CANON_RUNTIME_ROOT")
+                    .ok()
+                    .filter(|value| !value.trim().is_empty())
+            })
+            .ok_or_else(|| {
+                fail(
+                    "runtime_root_required",
+                    "pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT",
+                )
+            })?;
         let path = expanded_absolute(configured.trim(), "runtime_root_invalid")?;
         let runtime = RuntimeDirectory::open(&path, true).map_err(storage)?;
-        let spool = runtime.child(Path::new("spool/private-feedback"), true).map_err(storage)?;
+        let spool = runtime
+            .child(Path::new("spool/private-feedback"), true)
+            .map_err(storage)?;
         spool.make_private().map_err(storage)?;
         Ok(Self { runtime, spool })
     }
@@ -360,21 +445,36 @@ impl Store {
         let unlocked = lock.finish().map_err(storage);
         match result {
             Err(error) => Err(error),
-            Ok(value) => { unlocked?; Ok(value) },
+            Ok(value) => {
+                unlocked?;
+                Ok(value)
+            }
         }
     }
 
     fn sync_request(&self) -> Result<bool> {
-        let existing = self.spool.read(Path::new(REQUEST))
-            .map_err(|_| fail("sync_request_invalid", "private feedback sync request is invalid"))?;
+        let existing = self.spool.read(Path::new(REQUEST)).map_err(|_| {
+            fail(
+                "sync_request_invalid",
+                "private feedback sync request is invalid",
+            )
+        })?;
         if let Some(bytes) = existing {
-            let request: Value = serde_json::from_slice(&bytes)
-                .map_err(|_| fail("sync_request_invalid", "private feedback sync request is invalid"))?;
+            let request: Value = serde_json::from_slice(&bytes).map_err(|_| {
+                fail(
+                    "sync_request_invalid",
+                    "private feedback sync request is invalid",
+                )
+            })?;
             if request.get("schema").and_then(Value::as_str) != Some(REQUEST_SCHEMA)
                 || request.get("operation").and_then(Value::as_str) != Some("sync")
-                || request.get("execution_plane").and_then(Value::as_str) != Some("agentcanon_tool_container")
+                || request.get("execution_plane").and_then(Value::as_str)
+                    != Some("agentcanon_tool_container")
             {
-                return Err(fail("sync_request_invalid", "private feedback sync request schema is invalid"));
+                return Err(fail(
+                    "sync_request_invalid",
+                    "private feedback sync request schema is invalid",
+                ));
             }
             return Ok(true);
         }
@@ -383,9 +483,16 @@ impl Store {
             "execution_plane": "agentcanon_tool_container",
             "requested_at": now()?, "source_commit": source_commit()
         });
-        let mut bytes = serde_json::to_vec(&request).map_err(|_| fail("serialization_failed", "private request serialization failed"))?;
+        let mut bytes = serde_json::to_vec(&request).map_err(|_| {
+            fail(
+                "serialization_failed",
+                "private request serialization failed",
+            )
+        })?;
         bytes.push(b'\n');
-        self.spool.write_once(Path::new(REQUEST), &bytes).map_err(write_error)?;
+        self.spool
+            .write_once(Path::new(REQUEST), &bytes)
+            .map_err(write_error)?;
         Ok(false)
     }
 }
@@ -394,19 +501,44 @@ fn scope(args: &Args) -> (String, String) {
     if args.structured {
         return (args.run.clone(), args.task.clone());
     }
-    let run = if args.run.is_empty() { env::var("AGENT_CANON_RUN_ID").unwrap_or_default() } else { args.run.clone() };
-    let task = if args.task.is_empty() { env::var("AGENT_CANON_TASK_ID").unwrap_or_default() } else { args.task.clone() };
+    let run = if args.run.is_empty() {
+        env::var("AGENT_CANON_RUN_ID").unwrap_or_default()
+    } else {
+        args.run.clone()
+    };
+    let task = if args.task.is_empty() {
+        env::var("AGENT_CANON_TASK_ID").unwrap_or_default()
+    } else {
+        args.task.clone()
+    };
     (run.trim().to_string(), task.trim().to_string())
 }
 
-fn metadata(kind: &str, topic: &str, locator: &str, content_digest: &str, scope: (&str, &str), input_mode: &str, status: &str) -> Metadata {
+fn metadata(
+    kind: &str,
+    topic: &str,
+    locator: &str,
+    content_digest: &str,
+    scope: (&str, &str),
+    input_mode: &str,
+    status: &str,
+) -> Metadata {
     let (run, task) = scope;
     [
-        ("schema", SCHEMA), ("kind", kind), ("topic", topic), ("locator", locator),
+        ("schema", SCHEMA),
+        ("kind", kind),
+        ("topic", topic),
+        ("locator", locator),
         ("content_digest", &format!("sha256:{content_digest}")),
-        ("source_commit", &source_commit()), ("run", run), ("task", task),
-        ("input_mode", input_mode), ("status", status),
-    ].into_iter().map(|(key, value)| (key.to_string(), value.to_string())).collect()
+        ("source_commit", &source_commit()),
+        ("run", run),
+        ("task", task),
+        ("input_mode", input_mode),
+        ("status", status),
+    ]
+    .into_iter()
+    .map(|(key, value)| (key.to_string(), value.to_string()))
+    .collect()
 }
 
 fn frontmatter(meta: &Metadata, body: &str) -> String {
@@ -419,28 +551,60 @@ fn frontmatter(meta: &Metadata, body: &str) -> String {
 
 fn emit(value: &impl serde::Serialize) -> Result<()> {
     let mut out = io::stdout().lock();
-    serde_json::to_writer(&mut out, value).map_err(|_| fail("output_failed", "metadata output failed"))?;
-    out.write_all(b"\n").map_err(|_| fail("output_failed", "metadata output failed"))
+    serde_json::to_writer(&mut out, value)
+        .map_err(|_| fail("output_failed", "metadata output failed"))?;
+    out.write_all(b"\n")
+        .map_err(|_| fail("output_failed", "metadata output failed"))
 }
 
 fn add(args: &Args) -> Result<()> {
     let (body, mode) = body(args)?;
     let capture = args.operation == "capture";
-    let kind = if !capture && matches!(args.family.as_str(), "knowledge" | "k") { "knowledge" } else { "feedback" };
-    let topic = if capture { "runtime-feedback".to_string() } else { topic_slug(&args.topic)? };
+    let kind = if !capture && matches!(args.family.as_str(), "knowledge" | "k") {
+        "knowledge"
+    } else {
+        "feedback"
+    };
+    let topic = if capture {
+        "runtime-feedback".to_string()
+    } else {
+        topic_slug(&args.topic)?
+    };
     let store = Store::open(args)?;
     let (run, task) = scope(args);
     let hash = digest(body.as_bytes());
-    let locator = if kind == "feedback" { format!("feedback/{topic}/{}.md", &hash[..16]) } else { format!("knowledge/topics/{topic}/candidate.md") };
-    let mut meta = metadata(kind, &topic, &locator, &hash, (&run, &task), mode, if kind == "feedback" { "observed" } else { "candidate" });
+    let locator = if kind == "feedback" {
+        format!("feedback/{topic}/{}.md", &hash[..16])
+    } else {
+        format!("knowledge/topics/{topic}/candidate.md")
+    };
+    let mut meta = metadata(
+        kind,
+        &topic,
+        &locator,
+        &hash,
+        (&run, &task),
+        mode,
+        if kind == "feedback" {
+            "observed"
+        } else {
+            "candidate"
+        },
+    );
     let reused = store.locked(|| {
-        store.spool.write_once(Path::new(&locator), frontmatter(&meta, &body).as_bytes()).map_err(write_error)?;
+        store
+            .spool
+            .write_once(Path::new(&locator), frontmatter(&meta, &body).as_bytes())
+            .map_err(write_error)?;
         store.sync_request()
     })?;
     if !args.structured {
         meta.insert("status".to_string(), "spooled".to_string());
     }
-    meta.insert("sync_request".to_string(), if reused { "reused" } else { "created" }.to_string());
+    meta.insert(
+        "sync_request".to_string(),
+        if reused { "reused" } else { "created" }.to_string(),
+    );
     emit(&meta)
 }
 
@@ -457,8 +621,11 @@ fn distinct_scopes(contents: &str) -> BTreeSet<String> {
         } else if let Some(value) = line.strip_prefix("task:") {
             task = value.trim().to_string();
         } else if line == "## Read receipt" {
-            if !task.is_empty() { scopes.insert(format!("task:{task}")); }
-            else if !run.is_empty() { scopes.insert(format!("run:{run}")); }
+            if !task.is_empty() {
+                scopes.insert(format!("task:{task}"));
+            } else if !run.is_empty() {
+                scopes.insert(format!("run:{run}"));
+            }
             run.clear();
             task.clear();
         }
@@ -523,8 +690,14 @@ fn read(args: &Args) -> Result<()> {
 }
 
 fn git_output(root: &Path, args: &[&str]) -> String {
-    Command::new("git").arg("-C").arg(root).args(args).output().ok()
-        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string()).unwrap_or_default()
+    Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .ok()
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .unwrap_or_default()
 }
 
 fn status(args: &Args) -> Result<()> {
@@ -536,13 +709,24 @@ fn status(args: &Args) -> Result<()> {
     }
     let mut meta: Metadata = [
         ("schema".to_string(), SCHEMA.to_string()),
-        ("status".to_string(), if count == 0 { "clean" } else { "pending" }.to_string()),
+        (
+            "status".to_string(),
+            if count == 0 { "clean" } else { "pending" }.to_string(),
+        ),
         ("pending".to_string(), count.to_string()),
         ("log_root".to_string(), log.to_string_lossy().into_owned()),
-    ].into_iter().collect();
+    ]
+    .into_iter()
+    .collect();
     if log.exists() {
-        meta.insert("branch".to_string(), git_output(&log, &["branch", "--show-current"]));
-        meta.insert("remote".to_string(), git_output(&log, &["remote", "get-url", "origin"]));
+        meta.insert(
+            "branch".to_string(),
+            git_output(&log, &["branch", "--show-current"]),
+        );
+        meta.insert(
+            "remote".to_string(),
+            git_output(&log, &["remote", "get-url", "origin"]),
+        );
     }
     emit(&meta)
 }
@@ -557,7 +741,10 @@ fn search(args: &Args) -> Result<()> {
             for path in root.files(Path::new(family)).map_err(storage)? {
                 let locator = path.to_string_lossy().replace('\\', "/");
                 if path.extension().and_then(|value| value.to_str()) != Some("md")
-                    || (!query.is_empty() && !locator.to_lowercase().contains(&query)) { continue; }
+                    || (!query.is_empty() && !locator.to_lowercase().contains(&query))
+                {
+                    continue;
+                }
                 if let Some(bytes) = root.read(&path).map_err(storage)? {
                     results.push(json!({"locator": locator, "content_digest": format!("sha256:{}", digest(&bytes)), "status": "spooled"}));
                 }
@@ -568,7 +755,7 @@ fn search(args: &Args) -> Result<()> {
     collect(&store.spool)?;
     match RuntimeDirectory::open(&log, false) {
         Ok(root) => collect(&root)?,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {},
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(storage(error)),
     }
     emit(&json!({"schema": SCHEMA, "status": "ok", "results": results}))
@@ -583,9 +770,14 @@ fn execute(args: &Args) -> Result<()> {
         "sync" => {
             let store = Store::open(args)?;
             let reused = store.locked(|| store.sync_request())?;
-            emit(&json!({"schema": SCHEMA, "status": "requested", "execution_plane": "agentcanon_tool_container", "request": "private-feedback-sync", "request_reused": if reused { "yes" } else { "no" }}))
+            emit(
+                &json!({"schema": SCHEMA, "status": "requested", "execution_plane": "agentcanon_tool_container", "request": "private-feedback-sync", "request_reused": if reused { "yes" } else { "no" }}),
+            )
         }
-        _ => Err(fail("operation_invalid", "private feedback operation is invalid")),
+        _ => Err(fail(
+            "operation_invalid",
+            "private feedback operation is invalid",
+        )),
     }
 }
 
@@ -601,7 +793,10 @@ pub fn run(args: &[String]) -> i32 {
     match outcome {
         Ok(()) => 0,
         Err(error) => {
-            eprintln!("{}", json!({"schema": SCHEMA, "status": "error", "code": error.code, "detail": error.detail}));
+            eprintln!(
+                "{}",
+                json!({"schema": SCHEMA, "status": "error", "code": error.code, "detail": error.detail})
+            );
             2
         }
     }

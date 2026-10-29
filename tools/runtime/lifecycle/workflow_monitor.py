@@ -875,9 +875,15 @@ def main() -> int:
             try:
                 subprocess.run(
                     [
-                        executable, "f", "capture", "--structured-log", "--stdin",
-                        "--runtime-root", str(effective_runtime_root),
-                        "--run", path.parent.name,
+                        executable,
+                        "f",
+                        "capture",
+                        "--structured-log",
+                        "--stdin",
+                        "--runtime-root",
+                        str(effective_runtime_root),
+                        "--run",
+                        path.parent.name,
                     ],
                     input=entry,
                     text=True,
