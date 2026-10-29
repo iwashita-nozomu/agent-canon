@@ -76,6 +76,7 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - runtime output は current checkout の run bundle または task 固有 output directory へ限定します。
 - 持ち帰る知見がある場合は [notes lifecycle](notes-lifecycle.md) に従って保存します。
   構成変更の統合と検証は [branch integration](BRANCH_SCOPE.md#5-conflict-解決と-merge--rebase) に従います。
+- file 構成変更を含む branch を閉じる前には、current checkout 上で `tools/bin/agent-canon check-merge-structure --source <branch> --target <base> --compare-commit <integration-commit>` を通します。
 - cleanup 前には digest-bound `authorize-cleanup` receipt、cleanup 後には exact command、result、
   ref/path readback、保存先 main/successor、関連 Issue/PR comment locator を同じ trace に残します。
 - local branch に linked worktree がある場合、worktree を独立 resource として先に処理し、再 inventory するまで branch を削除しません。

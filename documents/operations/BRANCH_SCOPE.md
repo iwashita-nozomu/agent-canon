@@ -326,7 +326,7 @@ selected_validation(T_i, E_i) = pass
 - 構成変更がある branch は、`main` 側で file 単位に拾い直して close してはいけません。
 - 以下は source branch を base へ統合する integration owner の手順です。
   topic branch への最新 main 取込みとは区別し、writer の raw Git mutation 権限を追加しません。
-- 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`python3 tools/validation/ci/checks/check_merge_structure.py --source <branch> --target origin/main --compare-commit HEAD` を通します。
+- 構成変更がある統合では、current checkout 上の integration branch で merge commit を作り、`tools/bin/agent-canon check-merge-structure --source <branch> --target origin/main --compare-commit HEAD` を通します。
 - integration branch が妥当なら、`main` へは `git merge --ff-only integrate/<topic>-YYYYMMDD` で持ち帰ります。
 
 ## 6. 削除前チェック

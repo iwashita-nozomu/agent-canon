@@ -245,6 +245,17 @@ The old planner read only a legacy log directory despite prose claiming mounted
 archive coverage. This planner uses observed source and registry evidence and
 does not claim to inspect those logs.
 
+## Local Structural Integration Check
+
+The native `agent-canon check-merge-structure` command replaces
+`tools/validation/ci/checks/check_merge_structure.py` for local integration
+readback. It retains the source, target, compare-commit, and repository-root
+arguments and compares each source-side structural path by its complete Git
+tree entry: mode, object type, and object ID. This is local integration evidence;
+it does not select or require a GitHub pull-request merge method. The integration
+Skill, branch-scope procedure, worktree lifecycle, and implementation-routing
+example use the native command.
+
 ## Port Acceptance and Validation
 
 A port is ready only after the native implementation preserves the selected

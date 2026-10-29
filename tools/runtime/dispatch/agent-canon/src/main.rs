@@ -6,6 +6,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
+// downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -17,6 +18,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
+mod check_merge_structure;
 mod config;
 mod dependency_manifest;
 mod docs;
@@ -52,6 +54,7 @@ Commands:
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -135,6 +138,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-merge-structure" {
+        std::process::exit(check_merge_structure::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "python-structure-hash" {
