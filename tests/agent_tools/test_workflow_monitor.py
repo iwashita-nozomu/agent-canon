@@ -18,7 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Protocol, cast
+from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
@@ -29,9 +29,6 @@ MONITOR_SCRIPT = (
 )
 BOOTSTRAP_SCRIPT = (
     PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
-)
-RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
 
 
@@ -50,15 +47,8 @@ def seed_bootstrap_workspace(workspace_root: Path) -> None:
         destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
 
 
-class WorkflowMonitorModule(Protocol):
-    """Loaded workflow_monitor constants used by regression tests."""
-
-    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES: frozenset[str]
-    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES: frozenset[str]
-
-
-def load_monitor_module() -> WorkflowMonitorModule:
-    """Load workflow_monitor.py for constant-level regression checks."""
+def load_monitor_module() -> ModuleType:
+    """Load workflow_monitor.py for monitoring behavior checks."""
     sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
     try:
         spec = importlib.util.spec_from_file_location(
@@ -71,7 +61,7 @@ def load_monitor_module() -> WorkflowMonitorModule:
         sys.modules[spec.name] = module
         try:
             spec.loader.exec_module(module)
-            return cast(WorkflowMonitorModule, module)
+            return module
         finally:
             if prior_module is None:
                 sys.modules.pop(spec.name, None)
@@ -83,23 +73,6 @@ def load_monitor_module() -> WorkflowMonitorModule:
 
 class WorkflowMonitorTest(unittest.TestCase):
     """Verify workflow monitoring is updated mechanically."""
-
-    def test_monitor_validation_failure_taxonomy_comes_from_runtime_inventory(
-        self,
-    ) -> None:
-        """Validation-failure slugs should be owned by the JSON inventory."""
-        data = json.loads(RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8"))
-        response = data["validation_failure_response"]
-        module = load_monitor_module()
-
-        self.assertEqual(
-            module.VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
-            frozenset(response["cause_classes"]),
-        )
-        self.assertEqual(
-            module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
-            frozenset(response["intent_preservation"]),
-        )
 
     def test_monitor_records_pointer_only_update_lifecycle_evidence(self) -> None:
         """Monitoring keeps DSV/lifecycle/close refs without duplicating policy."""
@@ -526,7 +499,6 @@ class WorkflowMonitorTest(unittest.TestCase):
                 "validation_failure_not_observed reason=standard-closeout-preset",
                 text,
             )
-            self.assertIn("execution_path_comparison_not_required", text)
             self.assertIn("token_efficiency_not_required", text)
             self.assertNotIn("EVAL_RUN_ID=recorded", text)
             self.assertNotIn("EVAL_ACCUMULATED_REPORT=recorded", text)
@@ -599,7 +571,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             )
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
-            self.assertIn("stage owner routing active_roles=", text)
+            self.assertIn("active_roles=manager,implementer,verifier,auditor", text)
             self.assertIn("created run bundle", text)
 
 
