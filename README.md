@@ -70,6 +70,12 @@ Clippy and Rust tests on all five supported host targets, followed by archive
 verification and source-free command smoke. The `native-cli` check summarizes
 that validation. Check output and built archives are retained for 14 days.
 
+Windows uses MSVC's `/Brepro` linker option to derive link timestamps and debug
+identifiers deterministically. CI repeats the release build in a fresh Cargo
+target directory, packages it through the same producer, and requires the
+executable, ZIP, tar.gz and checksum files to match byte for byte. This checks
+reproducibility for the same source and toolchain recorded in provenance.
+
 Every successful main update publishes a stable release, including documentation,
 Skill, test and CI-only changes. The existing five-host validation completes
 before publication. Pull requests build and test without publishing.
