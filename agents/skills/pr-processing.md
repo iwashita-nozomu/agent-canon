@@ -32,7 +32,7 @@ authority, and readback.
 ## Single-candidate fast path
 
 For one independent PR, read its current base and head, diff, selected
-validation and review state, required checks, and write authority. Do not
+validation and review state, and write authority. Do not
 inventory unrelated PRs or require queue closure.
 
 ## Dependency queue path
