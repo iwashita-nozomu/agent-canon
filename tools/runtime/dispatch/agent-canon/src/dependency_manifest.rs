@@ -20,7 +20,8 @@ pub const SNAPSHOT_SCHEMA_VERSION: &str = "source_snapshot.v1";
 const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v2";
 const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
 pub(crate) const PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v3";
-pub(crate) const EXTERNAL_PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v2";
+pub(crate) const EXTERNAL_PRODUCER_IDENTITY_VERSION: &str =
+    "agent-canon.surface-manifest-producer.v2";
 pub(crate) const PRODUCER_IDENTITY_CONTRACT: &str = "agent-canon.surface-manifest.v2";
 pub(crate) const SOURCE_DIAGNOSTIC_SCHEMA: &str = "agent-canon.source-diagnostic.v1";
 
@@ -287,26 +288,27 @@ fn validate_producer_identity_inner(
             "producer identity source root is not canonical".to_string(),
         ));
     }
-    let canonical_file = |value: &str, field: &str, require_source_root: bool| -> Result<PathBuf, ManifestError> {
-        let path = fs::canonicalize(value)
-            .map_err(|error| ManifestError::SurfaceManifest(format!("{field}: {error}")))?;
-        if path.to_string_lossy() != value
-            || !fs::symlink_metadata(&path)
-                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?
-                .file_type()
-                .is_file()
-        {
-            return Err(ManifestError::SurfaceManifest(format!(
-                "producer identity {field} is not canonical regular file"
-            )));
-        }
-        if require_source_root && path.strip_prefix(&source_root).is_err() {
-            return Err(ManifestError::SurfaceManifest(format!(
-                "producer identity {field} escapes source root"
-            )));
-        }
-        Ok(path)
-    };
+    let canonical_file =
+        |value: &str, field: &str, require_source_root: bool| -> Result<PathBuf, ManifestError> {
+            let path = fs::canonicalize(value)
+                .map_err(|error| ManifestError::SurfaceManifest(format!("{field}: {error}")))?;
+            if path.to_string_lossy() != value
+                || !fs::symlink_metadata(&path)
+                    .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?
+                    .file_type()
+                    .is_file()
+            {
+                return Err(ManifestError::SurfaceManifest(format!(
+                    "producer identity {field} is not canonical regular file"
+                )));
+            }
+            if require_source_root && path.strip_prefix(&source_root).is_err() {
+                return Err(ManifestError::SurfaceManifest(format!(
+                    "producer identity {field} escapes source root"
+                )));
+            }
+            Ok(path)
+        };
     let producer_path = canonical_file(&identity.producer_path, "producer_path", !native)?;
     let manifest_path = canonical_file(&identity.manifest_path, "manifest_path", true)?;
     // The native exception names only this running artifact, never an arbitrary
@@ -361,10 +363,12 @@ pub(crate) fn validate_persisted_producer_identity(
 }
 
 fn current_native_producer_path() -> Result<PathBuf, ManifestError> {
-    let executable = env::current_exe()
-        .map_err(|error| ManifestError::SurfaceManifest(format!("native producer unavailable: {error}")))?;
-    fs::canonicalize(executable)
-        .map_err(|error| ManifestError::SurfaceManifest(format!("native producer unavailable: {error}")))
+    let executable = env::current_exe().map_err(|error| {
+        ManifestError::SurfaceManifest(format!("native producer unavailable: {error}"))
+    })?;
+    fs::canonicalize(executable).map_err(|error| {
+        ManifestError::SurfaceManifest(format!("native producer unavailable: {error}"))
+    })
 }
 
 pub(crate) fn current_producer_identity(root: &Path) -> Result<ProducerIdentity, ManifestError> {
@@ -522,26 +526,33 @@ fn load_surface_manifest_snapshot(
             validate_producer_identity(identity, Some(producer))?;
             identity
         }
-        _ => return Err(ManifestError::SurfaceManifest(
-            "explicit surface manifest producer and identity must be paired".to_string(),
-        )),
+        _ => {
+            return Err(ManifestError::SurfaceManifest(
+                "explicit surface manifest producer and identity must be paired".to_string(),
+            ))
+        }
     };
     let manifest = manifest.unwrap_or_else(|| Path::new(DEFAULT_SURFACE_MANIFEST));
     let value = if identity.version == PRODUCER_IDENTITY_VERSION {
         let source_root = fs::canonicalize(root)
             .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
-        let manifest_path = fs::canonicalize(
-            crate::surface_manifest::selected_manifest_path(&source_root, ".", manifest),
-        ).map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+        let manifest_path = fs::canonicalize(crate::surface_manifest::selected_manifest_path(
+            &source_root,
+            ".",
+            manifest,
+        ))
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
         if source_root.to_string_lossy() != identity.source_root
             || manifest_path.to_string_lossy() != identity.manifest_path
         {
             return Err(ManifestError::SurfaceManifest(
-                "native producer identity is not bound to the selected root and manifest".to_string(),
+                "native producer identity is not bound to the selected root and manifest"
+                    .to_string(),
             ));
         }
-        let parsed = crate::surface_manifest::load_manifest(&source_root, ".", manifest)
-            .map_err(|error| ManifestError::SurfaceManifest(format!("surface_manifest_snapshot: {error}")))?;
+        let parsed = crate::surface_manifest::load_manifest(&source_root, ".", manifest).map_err(
+            |error| ManifestError::SurfaceManifest(format!("surface_manifest_snapshot: {error}")),
+        )?;
         crate::surface_manifest::normalized_snapshot(&parsed)
     } else {
         external_surface_snapshot(root, Path::new(&identity.producer_path), manifest)?
@@ -1774,19 +1785,30 @@ mod tests {
         fn new() -> Self {
             static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
             let count = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-                .expect("fixture clock").as_nanos();
-            let root = std::env::temp_dir().join(format!("agent-canon-native-identity-{}-{nanos}-{count}", std::process::id()));
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("fixture clock")
+                .as_nanos();
+            let root = std::env::temp_dir().join(format!(
+                "agent-canon-native-identity-{}-{nanos}-{count}",
+                std::process::id()
+            ));
             let manifest = root.join(super::DEFAULT_SURFACE_MANIFEST);
-            std::fs::create_dir_all(manifest.parent().expect("manifest parent")).expect("fixture parent");
-            std::fs::write(&manifest, include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"))
-                .expect("fixture manifest");
+            std::fs::create_dir_all(manifest.parent().expect("manifest parent"))
+                .expect("fixture parent");
+            std::fs::write(
+                &manifest,
+                include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
+            )
+            .expect("fixture manifest");
             Self(root.canonicalize().expect("canonical fixture"))
         }
     }
 
     impl Drop for NativeIdentityFixture {
-        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
     }
 
     #[test]
@@ -1796,7 +1818,10 @@ mod tests {
         let executable = std::env::current_exe().unwrap().canonicalize().unwrap();
         assert_eq!(identity.version, super::PRODUCER_IDENTITY_VERSION);
         assert_eq!(Path::new(&identity.producer_path), executable.as_path());
-        assert_eq!(identity.producer_sha256, super::hash_bytes(&std::fs::read(executable).unwrap()));
+        assert_eq!(
+            identity.producer_sha256,
+            super::hash_bytes(&std::fs::read(executable).unwrap())
+        );
         assert!(!fixture.0.join("tools").exists());
         let snapshot = super::load_surface_manifest_snapshot(&fixture.0, None, None, None)
             .expect("native snapshot without any Python implementation");
@@ -1811,18 +1836,24 @@ mod tests {
         assert!(!Path::new(&identity.producer_path).starts_with(&fixture.0));
         let mut external = identity.clone();
         external.version = super::EXTERNAL_PRODUCER_IDENTITY_VERSION.to_string();
-        assert!(super::validate_producer_identity(&external, None).unwrap_err().to_string()
+        assert!(super::validate_producer_identity(&external, None)
+            .unwrap_err()
+            .to_string()
             .contains("producer_path escapes source root"));
         let mut outside_manifest = identity.clone();
         outside_manifest.manifest_path = identity.producer_path.clone();
-        assert!(super::validate_producer_identity(&outside_manifest, None).unwrap_err().to_string()
+        assert!(super::validate_producer_identity(&outside_manifest, None)
+            .unwrap_err()
+            .to_string()
             .contains("manifest_path escapes source root"));
         let unrelated = fixture.0.join("unrelated-native");
         std::fs::write(&unrelated, b"unrelated artifact").unwrap();
         let mut changed = identity;
         changed.producer_path = unrelated.to_string_lossy().into_owned();
         changed.producer_sha256 = super::hash_bytes(b"unrelated artifact");
-        assert!(super::validate_producer_identity(&changed, None).unwrap_err().to_string()
+        assert!(super::validate_producer_identity(&changed, None)
+            .unwrap_err()
+            .to_string()
             .contains("does not bind the running executable"));
     }
 
@@ -1832,13 +1863,19 @@ mod tests {
         let identity = super::current_producer_identity(&fixture.0).unwrap();
         let mut stale = identity.clone();
         stale.producer_sha256 = "0".repeat(64);
-        assert!(super::validate_producer_identity(&stale, None).unwrap_err().to_string()
+        assert!(super::validate_producer_identity(&stale, None)
+            .unwrap_err()
+            .to_string()
             .contains("content hash mismatch"));
         let override_path = fixture.0.join("override.toml");
         std::fs::copy(&identity.manifest_path, &override_path).unwrap();
         let error = super::load_surface_manifest_snapshot(
-            &fixture.0, Some(Path::new(&identity.producer_path)), Some(&override_path), Some(&identity),
-        ).unwrap_err();
+            &fixture.0,
+            Some(Path::new(&identity.producer_path)),
+            Some(&override_path),
+            Some(&identity),
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("selected root and manifest"));
     }
 

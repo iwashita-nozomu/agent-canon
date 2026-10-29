@@ -83,9 +83,8 @@ fn catalog_projections(root: &Path) -> Result<Vec<GeneratedProjection>, Projecti
                 "skill catalog entry {index} must be a mapping"
             )));
         }
-        let identity = ["id", "canonical_doc", "shim"].map(|key| {
-            item[key].as_str().filter(|value| !value.is_empty())
-        });
+        let identity = ["id", "canonical_doc", "shim"]
+            .map(|key| item[key].as_str().filter(|value| !value.is_empty()));
         let [Some(skill), Some(canonical), Some(shim)] = identity else {
             return Err(ProjectionError::Invalid(format!(
                 "skill catalog entry {index} has incomplete identity"
@@ -103,25 +102,38 @@ fn catalog_projections(root: &Path) -> Result<Vec<GeneratedProjection>, Projecti
                 "duplicate generated skill projection: {shim}"
             )));
         }
-        projections.push(projection(shim.to_string(), canonical.to_string(), "skill_shim"));
+        projections.push(projection(
+            shim.to_string(),
+            canonical.to_string(),
+            "skill_shim",
+        ));
     }
     Ok(projections)
 }
 
 fn markdown_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), ProjectionError> {
     let entries = fs::read_dir(directory).map_err(|error| {
-        ProjectionError::Invalid(format!("internal routine unavailable: {}: {error}", directory.display()))
+        ProjectionError::Invalid(format!(
+            "internal routine unavailable: {}: {error}",
+            directory.display()
+        ))
     })?;
     for entry in entries {
         let entry = entry.map_err(|error| {
-            ProjectionError::Invalid(format!("internal routine unavailable: {}: {error}", directory.display()))
+            ProjectionError::Invalid(format!(
+                "internal routine unavailable: {}: {error}",
+                directory.display()
+            ))
         })?;
         let path = entry.path();
         if path.extension().is_some_and(|extension| extension == "md") {
             paths.push(path.clone());
         }
         let file_type = entry.file_type().map_err(|error| {
-            ProjectionError::Invalid(format!("internal routine unavailable: {}: {error}", path.display()))
+            ProjectionError::Invalid(format!(
+                "internal routine unavailable: {}: {error}",
+                path.display()
+            ))
         })?;
         // Match Path.rglob: read matching file views, but never recurse through
         // a directory symlink or require generated SKILL.md views to exist.
@@ -133,8 +145,7 @@ fn markdown_paths(directory: &Path, paths: &mut Vec<PathBuf>) -> Result<(), Proj
 }
 
 fn reference_delimiter(character: char) -> bool {
-    character.is_whitespace()
-        || matches!(character, '\u{1c}'..='\u{1f}' | '`' | ')' | '>')
+    character.is_whitespace() || matches!(character, '\u{1c}'..='\u{1f}' | '`' | ')' | '>')
 }
 
 fn private_skill_references(text: &str) -> BTreeSet<String> {
@@ -145,7 +156,10 @@ fn private_skill_references(text: &str) -> BTreeSet<String> {
         let body = &reference[GENERATED_SKILL_PREFIX.len()..];
         let end = body.find(reference_delimiter).unwrap_or(body.len());
         let token = &body[..end];
-        if let Some(suffix) = token.rfind(GENERATED_SKILL_SUFFIX).filter(|offset| *offset > 0) {
+        if let Some(suffix) = token
+            .rfind(GENERATED_SKILL_SUFFIX)
+            .filter(|offset| *offset > 0)
+        {
             let length = GENERATED_SKILL_PREFIX.len() + suffix + GENERATED_SKILL_SUFFIX.len();
             if body.starts_with('_') {
                 result.insert(reference[..length].to_string());
@@ -160,16 +174,27 @@ fn private_skill_references(text: &str) -> BTreeSet<String> {
 
 fn relative_posix_path(root: &Path, path: &Path) -> Result<String, ProjectionError> {
     let relative = path.strip_prefix(root).map_err(|error| {
-        ProjectionError::Invalid(format!("internal routine unavailable: {}: {error}", path.display()))
+        ProjectionError::Invalid(format!(
+            "internal routine unavailable: {}: {error}",
+            path.display()
+        ))
     })?;
     let text = relative.to_string_lossy();
-    Ok(if cfg!(windows) { text.replace('\\', "/") } else { text.into_owned() })
+    Ok(if cfg!(windows) {
+        text.replace('\\', "/")
+    } else {
+        text.into_owned()
+    })
 }
 
-pub(crate) fn generated_skill_projections(root: &Path) -> Result<Vec<GeneratedProjection>, ProjectionError> {
+pub(crate) fn generated_skill_projections(
+    root: &Path,
+) -> Result<Vec<GeneratedProjection>, ProjectionError> {
     let mut projections = catalog_projections(root)?;
-    let mut owners: BTreeMap<String, String> = projections.iter()
-        .map(|projection| (projection.path.clone(), projection.source.clone())).collect();
+    let mut owners: BTreeMap<String, String> = projections
+        .iter()
+        .map(|projection| (projection.path.clone(), projection.source.clone()))
+        .collect();
     let internal_root = root.join("agents/internal-routines");
     if internal_root.is_dir() {
         let mut sources = Vec::new();
@@ -211,9 +236,15 @@ mod tests {
 
     impl Fixture {
         fn new() -> Self {
-            let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
             let count = SEQUENCE.fetch_add(1, Ordering::Relaxed);
-            let root = std::env::temp_dir().join(format!("agent-canon-projections-{}-{nanos}-{count}", std::process::id()));
+            let root = std::env::temp_dir().join(format!(
+                "agent-canon-projections-{}-{nanos}-{count}",
+                std::process::id()
+            ));
             fs::create_dir_all(&root).unwrap();
             Self(root)
         }
@@ -226,7 +257,9 @@ mod tests {
     }
 
     impl Drop for Fixture {
-        fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
 
     #[test]
@@ -236,8 +269,22 @@ mod tests {
         fixture.write("agents/internal-routines/private.md", "[view](../../.codex/personal/skills/_private/SKILL.md)\n`../.codex/personal/skills/_private/SKILL.md`\n.codex/personal/skills/public-reference/SKILL.md\n");
         let projections = generated_skill_projections(&fixture.0).unwrap();
         assert_eq!(projections.len(), 2);
-        assert_eq!(projections[0], projection(".codex/personal/skills/_private/SKILL.md".into(), "agents/internal-routines/private.md".into(), "internal_skill_shim"));
-        assert_eq!(projections[1], projection(".codex/personal/skills/example/SKILL.md".into(), "agents/skills/example.md".into(), "skill_shim"));
+        assert_eq!(
+            projections[0],
+            projection(
+                ".codex/personal/skills/_private/SKILL.md".into(),
+                "agents/internal-routines/private.md".into(),
+                "internal_skill_shim"
+            )
+        );
+        assert_eq!(
+            projections[1],
+            projection(
+                ".codex/personal/skills/example/SKILL.md".into(),
+                "agents/skills/example.md".into(),
+                "skill_shim"
+            )
+        );
         assert!(!fixture.0.join(".codex").exists());
     }
 
@@ -245,13 +292,22 @@ mod tests {
     fn competing_private_owners_return_stable_ambiguity_fields() {
         let fixture = Fixture::new();
         for name in ["two.md", "one.md"] {
-            fixture.write(&format!("agents/internal-routines/{name}"), ".codex/personal/skills/_duplicate/SKILL.md\n");
+            fixture.write(
+                &format!("agents/internal-routines/{name}"),
+                ".codex/personal/skills/_duplicate/SKILL.md\n",
+            );
         }
         let error = generated_skill_projections(&fixture.0).unwrap_err();
-        assert_eq!(error, ProjectionError::Ambiguous {
-            path: ".codex/personal/skills/_duplicate/SKILL.md".into(),
-            owners: vec!["agents/internal-routines/one.md".into(), "agents/internal-routines/two.md".into()],
-        });
+        assert_eq!(
+            error,
+            ProjectionError::Ambiguous {
+                path: ".codex/personal/skills/_duplicate/SKILL.md".into(),
+                owners: vec![
+                    "agents/internal-routines/one.md".into(),
+                    "agents/internal-routines/two.md".into()
+                ],
+            }
+        );
         assert_eq!(error.to_string(), "generated_projection_ambiguous:.codex/personal/skills/_duplicate/SKILL.md:agents/internal-routines/one.md,agents/internal-routines/two.md");
     }
 
@@ -261,13 +317,34 @@ mod tests {
         let valid = "  - id: example\n    canonical_doc: agents/skills/example.md\n    shim: .codex/personal/skills/example/SKILL.md\n";
         for (text, expected) in [
             ("not: a catalog\n".to_string(), "skill_families list"),
-            ("skill_families: [false]\n".to_string(), "entry 0 must be a mapping"),
-            ("skill_families: [{id: example}]\n".to_string(), "incomplete identity"),
-            (format!("skill_families:\n{}", valid.replace("agents/skills/example.md", "wrong.md")), "non-canonical materializer paths"),
-            (format!("skill_families:\n{valid}{valid}"), "duplicate generated skill projection"),
+            (
+                "skill_families: [false]\n".to_string(),
+                "entry 0 must be a mapping",
+            ),
+            (
+                "skill_families: [{id: example}]\n".to_string(),
+                "incomplete identity",
+            ),
+            (
+                format!(
+                    "skill_families:\n{}",
+                    valid.replace("agents/skills/example.md", "wrong.md")
+                ),
+                "non-canonical materializer paths",
+            ),
+            (
+                format!("skill_families:\n{valid}{valid}"),
+                "duplicate generated skill projection",
+            ),
         ] {
             fixture.write(SKILL_CATALOG, &text);
-            assert!(generated_skill_projections(&fixture.0).unwrap_err().to_string().contains(expected), "{expected}");
+            assert!(
+                generated_skill_projections(&fixture.0)
+                    .unwrap_err()
+                    .to_string()
+                    .contains(expected),
+                "{expected}"
+            );
         }
     }
 

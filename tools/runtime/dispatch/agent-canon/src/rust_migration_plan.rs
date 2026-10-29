@@ -896,8 +896,14 @@ mod tests {
     #[test]
     fn explicit_external_producer_execution_is_not_an_owned_python_delegation() {
         let path = "tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs";
-        assert!(python_delegation(path, "Command::new(\"python3\").arg(external_producer)").is_none());
-        assert!(python_delegation(path, "root.join(\"tools/runtime/manifest/surface_manifest.py\")").is_some());
+        assert!(
+            python_delegation(path, "Command::new(\"python3\").arg(external_producer)").is_none()
+        );
+        assert!(python_delegation(
+            path,
+            "root.join(\"tools/runtime/manifest/surface_manifest.py\")"
+        )
+        .is_some());
     }
 
     #[test]

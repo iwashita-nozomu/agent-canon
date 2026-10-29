@@ -3686,12 +3686,10 @@ mod tests {
     }
 
     fn materialize_standalone_surface_manifest(root: &Path) {
-        let files: &[(&str, &[u8])] = &[
-            (
-                "documents/runtime/shared-runtime-surfaces.toml",
-                include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
-            ),
-        ];
+        let files: &[(&str, &[u8])] = &[(
+            "documents/runtime/shared-runtime-surfaces.toml",
+            include_bytes!("../../../../../documents/runtime/shared-runtime-surfaces.toml"),
+        )];
         let mut exclude = OpenOptions::new()
             .append(true)
             .open(root.join(".git/info/exclude"))
@@ -3723,8 +3721,10 @@ mod tests {
             });
             let literal = serde_json::to_string(&snapshot.to_string()).expect("response literal");
             fs::write(&producer, format!("print({literal})\n")).expect("external response fixture");
-            let mut exclude = OpenOptions::new().append(true)
-                .open(root.join(".git/info/exclude")).expect("external fixture exclusion");
+            let mut exclude = OpenOptions::new()
+                .append(true)
+                .open(root.join(".git/info/exclude"))
+                .expect("external fixture exclusion");
             writeln!(exclude, "/external_surface_producer.py").expect("exclude external fixture");
         }
         let manifest = root.join("documents/runtime/shared-runtime-surfaces.toml");
@@ -4658,20 +4658,16 @@ mod tests {
     fn producer_identity_is_bound_into_graph_fingerprint() {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
-        let first =
-            build_graph_with_failure(&external_graph_args(&fixture.root)).expect("first graph build");
+        let first = build_graph_with_failure(&external_graph_args(&fixture.root))
+            .expect("first graph build");
         OpenOptions::new()
             .append(true)
-            .open(
-                fixture
-                    .root
-                    .join("external_surface_producer.py"),
-            )
+            .open(fixture.root.join("external_surface_producer.py"))
             .expect("producer for mutation")
             .write_all(b"\n# producer semantic mutation\n")
             .expect("mutate producer");
-        let second =
-            build_graph_with_failure(&external_graph_args(&fixture.root)).expect("second graph build");
+        let second = build_graph_with_failure(&external_graph_args(&fixture.root))
+            .expect("second graph build");
         assert_ne!(first["graph_fingerprint"], second["graph_fingerprint"]);
         assert_ne!(first["input_fingerprint"], second["input_fingerprint"]);
     }
@@ -4748,8 +4744,7 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let producer_fixture = graph_fixture();
-        let producer_identity =
-            external_producer_identity(&producer_fixture.root);
+        let producer_identity = external_producer_identity(&producer_fixture.root);
         let mut explicit_args = graph_args(&fixture.root);
         explicit_args.surface_manifest_producer =
             Some(PathBuf::from(&producer_identity.producer_path));
@@ -4784,11 +4779,7 @@ mod tests {
 
         OpenOptions::new()
             .append(true)
-            .open(
-                producer_fixture
-                    .root
-                    .join("external_surface_producer.py"),
-            )
+            .open(producer_fixture.root.join("external_surface_producer.py"))
             .expect("external producer for mutation")
             .write_all(b"\n# concurrent producer replacement\n")
             .expect("mutate external producer");

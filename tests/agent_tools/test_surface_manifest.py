@@ -29,7 +29,9 @@ class SurfaceManifestTest(unittest.TestCase):
     """Verify source inventory behavior without parent synchronization."""
 
     def test_runtime_inventory_snapshot(self) -> None:
-        result = self.run_surface("--root", str(PROJECT_ROOT), "--prefix", ".", "normalized-snapshot")
+        result = self.run_surface(
+            "--root", str(PROJECT_ROOT), "--prefix", ".", "normalized-snapshot"
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["schema"], "agent-canon.surface-manifest.v2")
@@ -37,16 +39,30 @@ class SurfaceManifestTest(unittest.TestCase):
         self.assertTrue(payload["entries"])
         self.assertEqual(
             payload["generated_projections"],
-            [asdict(projection) for projection in generated_skill_projections(PROJECT_ROOT)],
+            [
+                asdict(projection)
+                for projection in generated_skill_projections(PROJECT_ROOT)
+            ],
         )
-        self.assertTrue(all(entry["mode"] in {"runtime", "tool", "eval"} for entry in payload["entries"]))
-        projections = {entry["path"]: entry for entry in payload["generated_projections"]}
+        self.assertTrue(
+            all(
+                entry["mode"] in {"runtime", "tool", "eval"}
+                for entry in payload["entries"]
+            )
+        )
+        projections = {
+            entry["path"]: entry for entry in payload["generated_projections"]
+        }
         self.assertEqual(
-            projections[".codex/personal/skills/agent-orchestration/SKILL.md"]["source"],
+            projections[".codex/personal/skills/agent-orchestration/SKILL.md"][
+                "source"
+            ],
             "agents/skills/agent-orchestration.md",
         )
         self.assertEqual(
-            projections[".codex/personal/skills/_chatgpt-codex-routing/SKILL.md"]["source"],
+            projections[".codex/personal/skills/_chatgpt-codex-routing/SKILL.md"][
+                "source"
+            ],
             "agents/internal-routines/chatgpt-codex-routing.md",
         )
 
@@ -81,7 +97,13 @@ class SurfaceManifestTest(unittest.TestCase):
                 'version = 1\nintegration_mode = "agent-canon-runtime"\nselection = "explicit-opt-in"\n',
                 encoding="utf-8",
             )
-            result = self.run_surface("--root", str(root), "--manifest", "manifest.toml", "normalized-snapshot")
+            result = self.run_surface(
+                "--root",
+                str(root),
+                "--manifest",
+                "manifest.toml",
+                "normalized-snapshot",
+            )
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(str(raised.exception), result.stderr)
 
@@ -95,24 +117,43 @@ class SurfaceManifestTest(unittest.TestCase):
                 'projection_producer = "legacy"\nprojection_kind = "runtime_surface"\n',
                 encoding="utf-8",
             )
-            result = self.run_surface("--root", str(root), "--prefix", ".", "--manifest", "manifest.toml", "normalized-snapshot")
+            result = self.run_surface(
+                "--root",
+                str(root),
+                "--prefix",
+                ".",
+                "--manifest",
+                "manifest.toml",
+                "normalized-snapshot",
+            )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unsupported runtime surface producer", result.stderr)
 
     def test_native_snapshot_does_not_require_python_on_path(self) -> None:
         """The selected native CLI needs only source data for the default snapshot."""
         result = self.run_surface(
-            "--root", str(PROJECT_ROOT), "normalized-snapshot",
+            "--root",
+            str(PROJECT_ROOT),
+            "normalized-snapshot",
             env={**os.environ, "PATH": ""},
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(json.loads(result.stdout)["schema"], "agent-canon.surface-manifest.v2")
+        self.assertEqual(
+            json.loads(result.stdout)["schema"], "agent-canon.surface-manifest.v2"
+        )
 
-    def run_surface(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    def run_surface(
+        self, *args: str, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         """Select the current built executable explicitly; never use a global stale CLI."""
-        self.assertIsNotNone(AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable")
+        self.assertIsNotNone(
+            AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+        )
         executable = Path(str(AGENT_CANON_CLI))
-        self.assertTrue(executable.is_absolute(), "AGENT_CANON_CLI must be an absolute executable path")
+        self.assertTrue(
+            executable.is_absolute(),
+            "AGENT_CANON_CLI must be an absolute executable path",
+        )
         return subprocess.run(
             [str(executable), "surface-manifest", *args],
             cwd=PROJECT_ROOT,
