@@ -558,9 +558,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             )
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)
-            self.assertIn(
-                "active_roles=manager,implementer,verifier,auditor", text
-            )
+            self.assertIn("active_roles=manager,implementer,verifier,auditor", text)
             self.assertIn("created run bundle", text)
 
 
