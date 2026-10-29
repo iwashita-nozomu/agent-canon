@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Projects owner-local closeout correspondence from validated owner receipts.
 # upstream implementation ./packets.py owns owner-receipt normalization and compatibility.
-# downstream test ../../../tests/agent_tools/test_distributed_guarantee.py exercises the owner-receipt projection.
+# downstream implementation ../../../tests/agent_tools/test_distributed_guarantee.py exercises the owner-receipt projection.
 # @dependency-end
 """Project owner-local closeout correspondence without central approval."""
 
