@@ -101,6 +101,66 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                         sentinel.read_text(encoding="utf-8"), "preserve this file\n"
                     )
 
+    def test_help_respects_argument_order_and_inline_path_values(self) -> None:
+        """Help is an action in argument order; inline output values remain paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / "product.md").write_text("# Product\n", encoding="utf-8")
+            self.init_git(root, "product.md")
+            output = root / "--help"
+            output.write_text("preserve this file\n", encoding="utf-8")
+            self.assertIsNotNone(
+                AGENT_CANON_CLI,
+                "AGENT_CANON_CLI must select the current native executable",
+            )
+
+            missing_value = subprocess.run(
+                [
+                    str(AGENT_CANON_CLI),
+                    "file-surface-inventory",
+                    "--root",
+                    str(root),
+                    "--json-out",
+                    "--help",
+                ],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                missing_value.returncode, 2, missing_value.stdout + missing_value.stderr
+            )
+            self.assertEqual(output.read_text(encoding="utf-8"), "preserve this file\n")
+
+            help_result = subprocess.run(
+                [str(AGENT_CANON_CLI), "file-surface-inventory", "--help"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(help_result.returncode, 0, help_result.stderr)
+            self.assertIn("usage:", help_result.stdout)
+
+            inline_path = subprocess.run(
+                [
+                    str(AGENT_CANON_CLI),
+                    "file-surface-inventory",
+                    "--root",
+                    str(root),
+                    "--json-out=--help",
+                ],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(inline_path.returncode, 0, inline_path.stdout + inline_path.stderr)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["status"], "pass"
+            )
+
     def test_git_inventory_skips_deleted_and_includes_untracked_files(self) -> None:
         """Inventory describes current worktree files, not deleted index entries."""
         with tempfile.TemporaryDirectory() as tmp_dir:

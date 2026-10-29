@@ -63,15 +63,12 @@ struct ScopeInventory {
 }
 
 pub fn run(args: &[String]) -> i32 {
-    if args
-        .iter()
-        .any(|argument| matches!(argument.as_str(), "-h" | "--help"))
-    {
-        println!("usage: agent-canon file-surface-inventory --root <path> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries <integer>]");
-        return 0;
-    }
     let parsed = match Args::parse(args) {
-        Ok(args) => args,
+        Ok(Some(args)) => args,
+        Ok(None) => {
+            println!("usage: agent-canon file-surface-inventory --root <path> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries <integer>]");
+            return 0;
+        }
         Err(message) => {
             eprintln!("agent-canon file-surface-inventory: {message}");
             eprintln!("usage: agent-canon file-surface-inventory --root <path> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries <integer>]");
@@ -128,13 +125,14 @@ pub fn run(args: &[String]) -> i32 {
 }
 
 impl Args {
-    fn parse(args: &[String]) -> Result<Self, String> {
+    fn parse(args: &[String]) -> Result<Option<Self>, String> {
         let mut root = PathBuf::from(".");
         let mut root_only = false;
         let mut agentcanon_only = false;
         let mut json_out = None;
         let mut markdown_out = None;
         let mut max_markdown_entries = 200;
+        let mut unknown = None;
         let mut index = 0;
         while index < args.len() {
             let raw_option = args[index].as_str();
@@ -142,6 +140,12 @@ impl Args {
                 .split_once('=')
                 .map_or((raw_option, None), |(option, value)| (option, Some(value)));
             match option {
+                "-h" | "--help" => {
+                    if inline_value.is_some() {
+                        return Err(format!("argument {option} does not take a value"));
+                    }
+                    return Ok(None);
+                }
                 "--root" | "--json-out" | "--markdown-out" | "--max-markdown-entries" => {
                     let (value, consumed) = match inline_value {
                         Some(value) => (value, 1),
@@ -186,8 +190,14 @@ impl Args {
                     agentcanon_only = true;
                     index += 1;
                 }
-                _ => return Err(format!("unrecognized argument: {raw_option}")),
+                _ => {
+                    unknown.get_or_insert_with(|| raw_option.to_string());
+                    index += 1;
+                }
             }
+        }
+        if let Some(unknown) = unknown {
+            return Err(format!("unrecognized argument: {unknown}"));
         }
         let mode = if agentcanon_only {
             "agentcanon-only"
@@ -195,13 +205,13 @@ impl Args {
             "root-only"
         }
         .to_string();
-        Ok(Self {
+        Ok(Some(Self {
             root,
             mode,
             json_out,
             markdown_out,
             max_markdown_entries,
-        })
+        }))
     }
 }
 
@@ -603,7 +613,7 @@ mod tests {
             "--max-markdown-entries".into(),
             "-3".into(),
         ];
-        let parsed = Args::parse(&args).unwrap();
+        let parsed = Args::parse(&args).unwrap().unwrap();
         assert_eq!(parsed.mode, "agentcanon-only");
         assert_eq!(parsed.max_markdown_entries, -3);
         assert!(Args::parse(&["--root-only".into(), "--agentcanon-only".into()]).is_err());
@@ -617,7 +627,7 @@ mod tests {
             "--markdown-out=reports/inventory.md".into(),
             "--max-markdown-entries=7".into(),
         ];
-        let parsed = Args::parse(&args).unwrap();
+        let parsed = Args::parse(&args).unwrap().unwrap();
         assert_eq!(parsed.root, PathBuf::from("/tmp/repo=fixture"));
         assert_eq!(
             parsed.json_out,
@@ -648,20 +658,54 @@ mod tests {
         assert_eq!(
             Args::parse(&["--json-out".into(), "-".into()])
                 .unwrap()
+                .unwrap()
                 .json_out,
             Some(PathBuf::from("-"))
         );
         assert_eq!(
-            Args::parse(&["--root".into(), "-3".into()]).unwrap().root,
+            Args::parse(&["--root".into(), "-3".into()])
+                .unwrap()
+                .unwrap()
+                .root,
             PathBuf::from("-3")
         );
         assert_eq!(
             Args::parse(&["--max-markdown-entries".into(), "-3".into()])
                 .unwrap()
+                .unwrap()
                 .max_markdown_entries,
             -3
         );
         assert!(Args::parse(&["--json-out".into(), "-report.json".into()]).is_err());
+    }
+
+    #[test]
+    fn help_is_ordered_after_preceding_parse_errors() {
+        assert!(Args::parse(&["--json-out".into(), "--help".into()]).is_err());
+        assert!(Args::parse(&[
+            "--root-only".into(),
+            "--agentcanon-only".into(),
+            "--help".into()
+        ])
+        .is_err());
+        assert!(Args::parse(&[
+            "--max-markdown-entries".into(),
+            "invalid".into(),
+            "--help".into()
+        ])
+        .is_err());
+        assert!(Args::parse(&["--unknown".into(), "--help".into()]).unwrap().is_none());
+        assert!(Args::parse(&["--help".into(), "--unknown".into()]).unwrap().is_none());
+        assert!(Args::parse(&["--root".into(), "/tmp/repo".into(), "--help".into()])
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            Args::parse(&["--json-out=--help".into()])
+                .unwrap()
+                .unwrap()
+                .json_out,
+            Some(PathBuf::from("--help"))
+        );
     }
 
     #[cfg(unix)]
