@@ -656,7 +656,6 @@ fn ref_name(expr: &Expr) -> String {
     }
 }
 
-
 fn literal_string_sequence(expr: &Expr) -> Option<Vec<String>> {
     let elements = match expr {
         Expr::List(list) => &list.elts,

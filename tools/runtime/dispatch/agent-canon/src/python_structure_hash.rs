@@ -683,7 +683,6 @@ fn excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
     })
 }
 
-
 fn extract_ast_blocks(root: &Path, files: &[PathBuf]) -> Result<AstExtraction, String> {
     let mut modules = Vec::new();
     let mut parse_error_count = 0;
@@ -991,14 +990,14 @@ fn canonical_expr(expr: &ast::Expr) -> Value {
         ),
         E::Starred(node) => canonical_node(
             "Starred",
-            vec![
-                ("value", canonical_expr(&node.value)),
-                ("ctx", Value::Null),
-            ],
+            vec![("value", canonical_expr(&node.value)), ("ctx", Value::Null)],
         ),
         E::Name(node) => canonical_node(
             "Name",
-            vec![("id", canonical_string(node.id.as_str())), ("ctx", Value::Null)],
+            vec![
+                ("id", canonical_string(node.id.as_str())),
+                ("ctx", Value::Null),
+            ],
         ),
         E::List(node) => canonical_node(
             "List",
@@ -1110,9 +1109,7 @@ fn canonical_arguments(node: &ast::Arguments) -> Value {
                 Value::Array(
                     node.kwonlyargs
                         .iter()
-                        .map(|arg| {
-                            canonical_optional(arg.default.as_deref(), canonical_expr)
-                        })
+                        .map(|arg| canonical_optional(arg.default.as_deref(), canonical_expr))
                         .collect(),
                 ),
             ),
@@ -1158,7 +1155,10 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
                         .map(canonical_string)
                         .unwrap_or(Value::Null),
                 ),
-                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+                (
+                    "type_params",
+                    canonical_array(&node.type_params, canonical_type_param),
+                ),
             ],
         ),
         S::AsyncFunctionDef(node) => canonical_node(
@@ -1182,7 +1182,10 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
                         .map(canonical_string)
                         .unwrap_or(Value::Null),
                 ),
-                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+                (
+                    "type_params",
+                    canonical_array(&node.type_params, canonical_type_param),
+                ),
             ],
         ),
         S::ClassDef(node) => canonical_node(
@@ -1190,13 +1193,19 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
             vec![
                 ("name", canonical_string(node.name.as_str())),
                 ("bases", canonical_array(&node.bases, canonical_expr)),
-                ("keywords", canonical_array(&node.keywords, canonical_keyword)),
+                (
+                    "keywords",
+                    canonical_array(&node.keywords, canonical_keyword),
+                ),
                 ("body", canonical_array(&node.body, canonical_stmt)),
                 (
                     "decorator_list",
                     canonical_array(&node.decorator_list, canonical_expr),
                 ),
-                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+                (
+                    "type_params",
+                    canonical_array(&node.type_params, canonical_type_param),
+                ),
             ],
         ),
         S::Return(node) => canonical_node(
@@ -1228,7 +1237,10 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
             "TypeAlias",
             vec![
                 ("name", canonical_expr(&node.name)),
-                ("type_params", canonical_array(&node.type_params, canonical_type_param)),
+                (
+                    "type_params",
+                    canonical_array(&node.type_params, canonical_type_param),
+                ),
                 ("value", canonical_expr(&node.value)),
             ],
         ),
@@ -1306,8 +1318,14 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
         S::Raise(node) => canonical_node(
             "Raise",
             vec![
-                ("exc", canonical_optional(node.exc.as_deref(), canonical_expr)),
-                ("cause", canonical_optional(node.cause.as_deref(), canonical_expr)),
+                (
+                    "exc",
+                    canonical_optional(node.exc.as_deref(), canonical_expr),
+                ),
+                (
+                    "cause",
+                    canonical_optional(node.cause.as_deref(), canonical_expr),
+                ),
             ],
         ),
         S::Try(node) => canonical_try(
@@ -1328,7 +1346,10 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
             "Assert",
             vec![
                 ("test", canonical_expr(&node.test)),
-                ("msg", canonical_optional(node.msg.as_deref(), canonical_expr)),
+                (
+                    "msg",
+                    canonical_optional(node.msg.as_deref(), canonical_expr),
+                ),
             ],
         ),
         S::Import(node) => canonical_node(
@@ -1352,26 +1373,19 @@ fn canonical_stmt(stmt: &ast::Stmt) -> Value {
         ),
         S::Global(node) => canonical_node(
             "Global",
-            vec![
-                (
-                    "names",
-                    Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
-                ),
-            ],
+            vec![(
+                "names",
+                Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
+            )],
         ),
         S::Nonlocal(node) => canonical_node(
             "Nonlocal",
-            vec![
-                (
-                    "names",
-                    Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
-                ),
-            ],
+            vec![(
+                "names",
+                Value::Array(node.names.iter().map(|_| json!("STR")).collect()),
+            )],
         ),
-        S::Expr(node) => canonical_node(
-            "Expr",
-            vec![("value", canonical_expr(&node.value))],
-        ),
+        S::Expr(node) => canonical_node("Expr", vec![("value", canonical_expr(&node.value))]),
         S::Pass(_) => canonical_node("Pass", vec![]),
         S::Break(_) => canonical_node("Break", vec![]),
         S::Continue(_) => canonical_node("Continue", vec![]),
@@ -1395,9 +1409,7 @@ fn canonical_for(
             ("orelse", canonical_array(orelse, canonical_stmt)),
             (
                 "type_comment",
-                type_comment
-                    .map(canonical_string)
-                    .unwrap_or(Value::Null),
+                type_comment.map(canonical_string).unwrap_or(Value::Null),
             ),
         ],
     )
@@ -1416,9 +1428,7 @@ fn canonical_with(
             ("body", canonical_array(body, canonical_stmt)),
             (
                 "type_comment",
-                type_comment
-                    .map(canonical_string)
-                    .unwrap_or(Value::Null),
+                type_comment.map(canonical_string).unwrap_or(Value::Null),
             ),
         ],
     )
@@ -1435,7 +1445,10 @@ fn canonical_try(
         name,
         vec![
             ("body", canonical_array(body, canonical_stmt)),
-            ("handlers", canonical_array(handlers, canonical_except_handler)),
+            (
+                "handlers",
+                canonical_array(handlers, canonical_except_handler),
+            ),
             ("orelse", canonical_array(orelse, canonical_stmt)),
             ("finalbody", canonical_array(finalbody, canonical_stmt)),
         ],
@@ -1476,7 +1489,10 @@ fn canonical_match_case(node: &ast::MatchCase) -> Value {
         "match_case",
         vec![
             ("pattern", canonical_pattern(&node.pattern)),
-            ("guard", canonical_optional(node.guard.as_deref(), canonical_expr)),
+            (
+                "guard",
+                canonical_optional(node.guard.as_deref(), canonical_expr),
+            ),
             ("body", canonical_array(&node.body, canonical_stmt)),
         ],
     )
@@ -1507,23 +1523,28 @@ fn canonical_except_handler(node: &ast::ExceptHandler) -> Value {
 fn canonical_pattern(pattern: &ast::Pattern) -> Value {
     use ast::Pattern as P;
     match pattern {
-        P::MatchValue(node) => canonical_node(
-            "MatchValue",
-            vec![("value", canonical_expr(&node.value))],
-        ),
+        P::MatchValue(node) => {
+            canonical_node("MatchValue", vec![("value", canonical_expr(&node.value))])
+        }
         P::MatchSingleton(node) => canonical_node(
             "MatchSingleton",
             vec![("value", canonical_constant_value(&node.value))],
         ),
         P::MatchSequence(node) => canonical_node(
             "MatchSequence",
-            vec![("patterns", canonical_array(&node.patterns, canonical_pattern))],
+            vec![(
+                "patterns",
+                canonical_array(&node.patterns, canonical_pattern),
+            )],
         ),
         P::MatchMapping(node) => canonical_node(
             "MatchMapping",
             vec![
                 ("keys", canonical_array(&node.keys, canonical_expr)),
-                ("patterns", canonical_array(&node.patterns, canonical_pattern)),
+                (
+                    "patterns",
+                    canonical_array(&node.patterns, canonical_pattern),
+                ),
                 (
                     "rest",
                     node.rest
@@ -1537,7 +1558,10 @@ fn canonical_pattern(pattern: &ast::Pattern) -> Value {
             "MatchClass",
             vec![
                 ("cls", canonical_expr(&node.cls)),
-                ("patterns", canonical_array(&node.patterns, canonical_pattern)),
+                (
+                    "patterns",
+                    canonical_array(&node.patterns, canonical_pattern),
+                ),
                 (
                     "kwd_attrs",
                     Value::Array(node.kwd_attrs.iter().map(|_| json!("STR")).collect()),
@@ -1550,15 +1574,13 @@ fn canonical_pattern(pattern: &ast::Pattern) -> Value {
         ),
         P::MatchStar(node) => canonical_node(
             "MatchStar",
-            vec![
-                (
-                    "name",
-                    node.name
-                        .as_ref()
-                        .map(|name| canonical_string(name.as_str()))
-                        .unwrap_or(Value::Null),
-                ),
-            ],
+            vec![(
+                "name",
+                node.name
+                    .as_ref()
+                    .map(|name| canonical_string(name.as_str()))
+                    .unwrap_or(Value::Null),
+            )],
         ),
         P::MatchAs(node) => canonical_node(
             "MatchAs",
@@ -1578,7 +1600,10 @@ fn canonical_pattern(pattern: &ast::Pattern) -> Value {
         ),
         P::MatchOr(node) => canonical_node(
             "MatchOr",
-            vec![("patterns", canonical_array(&node.patterns, canonical_pattern))],
+            vec![(
+                "patterns",
+                canonical_array(&node.patterns, canonical_pattern),
+            )],
         ),
     }
 }
@@ -1652,11 +1677,17 @@ fn import_facts(suite: &ast::Suite) -> Vec<Value> {
                 let module = format!(
                     "{}{}",
                     ".".repeat(level),
-                    import.module.as_ref().map(ToString::to_string).unwrap_or_default()
+                    import
+                        .module
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_default()
                 );
-                facts.extend(import.names.iter().map(|alias| {
-                    vec!["from".to_string(), module.clone(), alias.name.to_string()]
-                }));
+                facts.extend(
+                    import.names.iter().map(|alias| {
+                        vec!["from".to_string(), module.clone(), alias.name.to_string()]
+                    }),
+                );
             }
             _ => {}
         }
@@ -1806,6 +1837,17 @@ struct ParentEntry {
     public_api: bool,
 }
 
+struct BlockFacts {
+    kind: &'static str,
+    parameter_count: usize,
+    decorators: Vec<String>,
+    bases: Vec<String>,
+    canonical: Value,
+    calls: Vec<CallRef>,
+    references: Vec<CallRef>,
+    is_alias: bool,
+}
+
 struct BlockCollector<'a> {
     path: String,
     module: String,
@@ -1832,15 +1874,18 @@ impl BlockCollector<'_> {
         &mut self,
         name: &str,
         node: &impl Ranged,
-        kind: &str,
-        parameter_count: usize,
-        decorators: Vec<String>,
-        bases: Vec<String>,
-        canonical: Value,
-        calls: Vec<CallRef>,
-        references: Vec<CallRef>,
-        is_alias: bool,
+        facts: BlockFacts,
     ) -> ParentEntry {
+        let BlockFacts {
+            kind,
+            parameter_count,
+            decorators,
+            bases,
+            canonical,
+            calls,
+            references,
+            is_alias,
+        } = facts;
         let parent = self.stack.last();
         let parent_kind = parent.map(|value| value.kind.clone());
         let parent_name = parent.map(|value| value.name.clone());
@@ -1855,10 +1900,8 @@ impl BlockCollector<'_> {
             && class_identities(&self.module, &qualname)
                 .iter()
                 .any(|identity| self.protocol_names.contains(identity));
-        let inside_protocol = class_is_protocol
-            || parent
-                .map(|value| value.inside_protocol)
-                .unwrap_or(false);
+        let inside_protocol =
+            class_is_protocol || parent.map(|value| value.inside_protocol).unwrap_or(false);
         let role = if is_alias {
             "alias"
         } else if inside_protocol {
@@ -1920,14 +1963,16 @@ impl BlockCollector<'_> {
         self.add_block(
             name,
             node,
-            "Function",
-            parameter_count,
-            decorator_facts(decorators),
-            Vec::new(),
-            canonical,
-            calls,
-            references,
-            false,
+            BlockFacts {
+                kind: "Function",
+                parameter_count,
+                decorators: decorator_facts(decorators),
+                bases: Vec::new(),
+                canonical,
+                calls,
+                references,
+                is_alias: false,
+            },
         )
     }
 
@@ -1945,34 +1990,33 @@ impl BlockCollector<'_> {
         self.add_block(
             name,
             node,
-            "Class",
-            bases.len(),
-            decorator_facts(decorators),
-            base_facts(bases),
-            canonical,
-            calls,
-            references,
-            false,
+            BlockFacts {
+                kind: "Class",
+                parameter_count: bases.len(),
+                decorators: decorator_facts(decorators),
+                bases: base_facts(bases),
+                canonical,
+                calls,
+                references,
+                is_alias: false,
+            },
         )
     }
 
-    fn add_alias(
-        &mut self,
-        name: &str,
-        node: &impl Ranged,
-        canonical: &ast::Expr,
-    ) {
+    fn add_alias(&mut self, name: &str, node: &impl Ranged, canonical: &ast::Expr) {
         self.add_block(
             name,
             node,
-            "Alias",
-            0,
-            Vec::new(),
-            Vec::new(),
-            canonical_expr(canonical),
-            Vec::new(),
-            Vec::new(),
-            true,
+            BlockFacts {
+                kind: "Alias",
+                parameter_count: 0,
+                decorators: Vec::new(),
+                bases: Vec::new(),
+                canonical: canonical_expr(canonical),
+                calls: Vec::new(),
+                references: Vec::new(),
+                is_alias: true,
+            },
         );
     }
 }
@@ -2010,13 +2054,7 @@ impl Visitor for BlockCollector<'_> {
 
     fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
         let name = node.name.to_string();
-        let parent = self.add_class(
-            &name,
-            &node,
-            &node.bases,
-            &node.decorator_list,
-            &node.body,
-        );
+        let parent = self.add_class(&name, &node, &node.bases, &node.decorator_list, &node.body);
         self.stack.push(parent);
         self.generic_visit_stmt_class_def(node);
         self.stack.pop();
@@ -2069,9 +2107,7 @@ fn function_parameter_count(args: &ast::Arguments) -> usize {
 
 fn body_without_docstring(body: &[ast::Stmt]) -> &[ast::Stmt] {
     match body.first() {
-        Some(ast::Stmt::Expr(expr))
-            if matches!(&*expr.value, ast::Expr::Constant(value) if matches!(value.value, ast::Constant::Str(_))) =>
-        {
+        Some(ast::Stmt::Expr(expr)) if matches!(&*expr.value, ast::Expr::Constant(value) if matches!(value.value, ast::Constant::Str(_))) => {
             &body[1..]
         }
         _ => body,
@@ -3373,13 +3409,11 @@ mod tests {
             .find(|finding| {
                 finding["kind"] == "duplicate_structural_hash"
                     && finding["role"] == role
-                    && finding["instances"]
-                        .as_array()
-                        .is_some_and(|instances| {
-                            names.iter().all(|name| {
-                                instances.iter().any(|instance| instance["name"] == *name)
-                            })
-                        })
+                    && finding["instances"].as_array().is_some_and(|instances| {
+                        names
+                            .iter()
+                            .all(|name| instances.iter().any(|instance| instance["name"] == *name))
+                    })
             })
             .and_then(|finding| finding["hash"].as_str())
             .expect("duplicate pair in report")
@@ -3391,9 +3425,11 @@ mod tests {
         let root = frozen_fixture_root();
         let root = root.canonicalize().expect("canonical fixture root");
         let initial = source_files(&root, &["pkg".to_string()], &["pkg/excluded".to_string()]);
-        let files = expand_with_repo_import_neighborhood(&root, initial, &["pkg/excluded".to_string()]);
+        let files =
+            expand_with_repo_import_neighborhood(&root, initial, &["pkg/excluded".to_string()]);
         let extraction = extract_ast_blocks(&root, &files).expect("native AST extraction");
-        let actual = serde_json::to_value(&extraction.blocks).expect("serialize native AST records");
+        let actual =
+            serde_json::to_value(&extraction.blocks).expect("serialize native AST records");
         let expected: Value = serde_json::from_str(include_str!(
             "../../../../../tests/fixtures/python_structure_hash/expected/extractor-output.json"
         ))
@@ -3408,8 +3444,9 @@ mod tests {
         );
         assert_eq!(actual, expected["blocks"]);
         let crlf_bytes = fs::read(root.join("pkg/crlf.py")).expect("CRLF fixture bytes");
-        let frozen_crlf_bytes: &[u8] =
-            include_bytes!("../../../../../tests/fixtures/python_structure_hash/pkg/crlf.py.fixture");
+        let frozen_crlf_bytes: &[u8] = include_bytes!(
+            "../../../../../tests/fixtures/python_structure_hash/pkg/crlf.py.fixture"
+        );
         assert_eq!(crlf_bytes.as_slice(), frozen_crlf_bytes);
         fs::remove_dir_all(root).expect("remove frozen fixture root");
     }
@@ -3438,10 +3475,18 @@ mod tests {
         let text_args = cli_args
             .iter()
             .cloned()
-            .map(|arg| if arg == "json" { "text".to_string() } else { arg })
+            .map(|arg| {
+                if arg == "json" {
+                    "text".to_string()
+                } else {
+                    arg
+                }
+            })
             .collect::<Vec<_>>();
         assert_eq!(
-            Args::parse(&text_args).expect("text output CLI arguments").format,
+            Args::parse(&text_args)
+                .expect("text output CLI arguments")
+                .format,
             OutputFormat::Text
         );
         let report_text = render_json_output(&analysis);
