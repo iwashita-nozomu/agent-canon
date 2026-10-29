@@ -62,9 +62,16 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   just to pass. Distinguish observations, established causes, and unverified results.
 - **Transport:** use configured Git/GitHub transports. Do not discover, create,
   copy, link, or configure credentials/auth agents; return auth failures to the owner.
+- **Experiment context:** before work, record the origin base ref and exact commit,
+  purpose/research question, and intended delta in the existing branch README, plan,
+  or task record. Keep that origin immutable and later comparison bases separate.
+  Carry this context through progress, handoff, and resumption; compare actual
+  diff/evidence with the purpose. Ask only about genuinely unsettled major direction,
+  otherwise proceed from the known agreement without new manifests or paperwork.
 - **Experiment branches:** keep topic code/config on its experiment branch and
   active raw logs in ignored scratch. Preserve reproduction inputs, execution commit,
-  and selected archived evidence. Before completing a research experiment branch,
+  and selected archived evidence. Complete its manuscript and selected report
+  before closing the research experiment branch;
   retain a self-contained, arXiv-quality manuscript source at the project's existing
   manuscript owner/path, grounded in the actual question, related work, method,
   evidence/results, limitations, and reproduction. State missing evidence honestly;

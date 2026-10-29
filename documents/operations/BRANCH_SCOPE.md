@@ -46,11 +46,20 @@ legacy scope / action log の carry-over は [worktree-lifecycle.md](worktree-li
 
 ### Experiment topic branch scope
 
+作業前に、branch の起点（base ref と exact commit）、目的・研究課題、意図する差分を、
+既存の branch README / plan / task record に固定します。最初の起点は保持し、main 更新後の
+比較基準は別に記録します。進行・handoff・再開でもこの文脈を引き継ぎ、実際の diff と
+evidence を目的に照合します。既知の合意で進められる事項は再確認せず、未決の重大な方向変更
+だけを利用者へ確認します。このための新しい manifest、schema、専用台帳は作りません。
+
 実験 branch の code/config はその topic に限り、完了済み別 topic の code を持ち込みません。
-研究実験 branch の完了時には、project の既存 manuscript owner/path に、単独で読める
+論文と選択済み report の完成は研究実験 branch の完了に含めます。
+project の既存 manuscript owner/path に、単独で読める
 arXiv 水準の論文原稿 source を保持します。実際の研究課題、関連研究、方法、根拠・結果、
 限界、再現手順を揃え、未観測・未検証の内容はそのまま区別します。既存原稿を更新し、
 各 run ごとの新規論文や arXiv 投稿を要求しません。
+report の構成・図・執筆手順は [report-writing](../../agents/skills/report-writing.md)、
+論文の執筆は [paper-writing](../../agents/skills/paper-writing.md) の既存 owner に従います。
 
 `main` には簡潔な完了済み `summary.md` と、論文・結果・archive の安定した参照を残します。
 topic code や branch の削除前に、原稿 source と参照先が保持され、取得できることを確認します。
