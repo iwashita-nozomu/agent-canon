@@ -46,9 +46,16 @@ legacy scope / action log の carry-over は [worktree-lifecycle.md](worktree-li
 
 ### Experiment topic branch scope
 
-実験 branch には、その topic の code/config だけを置き、完了済み別 topic の code を
-持ち込みません。閉じた verification / diagnosis は active experiment と別の scope
-として扱います。raw log、archive、summary の扱いは
+実験 branch の code/config はその topic に限り、完了済み別 topic の code を持ち込みません。
+研究実験 branch の完了時には、project の既存 manuscript owner/path に、単独で読める
+arXiv 水準の論文原稿 source を保持します。実際の研究課題、関連研究、方法、根拠・結果、
+限界、再現手順を揃え、未観測・未検証の内容はそのまま区別します。既存原稿を更新し、
+各 run ごとの新規論文や arXiv 投稿を要求しません。
+
+`main` には簡潔な完了済み `summary.md` と、論文・結果・archive の安定した参照を残します。
+topic code や branch の削除前に、原稿 source と参照先が保持され、取得できることを確認します。
+閉じた verification / diagnosis は active experiment と別の scope として扱います。
+raw log、archive、summary の扱いは
 [Result Log Retention And Visualization](../experiments/result-log-retention-and-visualization.md#experiment-archive-and-summary-retention)
 に従います。
 
