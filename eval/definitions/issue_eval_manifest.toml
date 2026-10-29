@@ -412,3 +412,28 @@ linked_rules = [
   "tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs",
   "tools/runtime/dispatch/agent-canon/src/migration_audit.rs",
 ]
+
+[[eval]]
+id = "shared-refactor-orders-dependent-validation"
+category = "workflow-bypass"
+source_issue = 1627
+oracle_type = "rubric"
+protects = [
+  "a consumer that needs the published shared-source revision validates after that revision exists",
+  "an independent consumer with all inputs available may be validated independently",
+]
+expected_route = [
+  "identify which consumer depends on the published source revision and order only that validation after publication",
+  "validate independent consumers when their required inputs are available",
+  "state completion claims against each consumer's actual required evidence",
+]
+forbidden_route = [
+  "validate a revision-dependent consumer before its required revision is published",
+  "serialize unrelated consumer validation without a dependency",
+]
+linked_rules = [
+  "agents/skills/refactor-loop.md",
+  "agents/skills/dependency-analysis.md",
+  "agents/skills/structure-planning.md",
+  "documents/operations/BRANCH_SCOPE.md",
+]
