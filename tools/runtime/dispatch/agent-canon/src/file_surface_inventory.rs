@@ -346,7 +346,7 @@ fn render_markdown(mode: &str, root: &Path, scopes: &[ScopeInventory], limit: i6
     let mut lines = vec![
         "# File Surface Inventory".to_string(), "".into(), "<!--".into(), "@dependency-start".into(),
         "responsibility Records file surface inventory for review.".into(),
-        "upstream implementation ../../../../tools/analysis/code/file_surface_inventory.py generates this report".into(),
+        "upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs generates this report".into(),
         "@dependency-end".into(), "-->".into(), "".into(), format!("- mode: {mode}"),
         format!("- root: {}", posix_path(root)), format!("- files: {files}"), format!("- checkable_files: {checkable}"),
         "".into(), "## Scope Summary".into(), "".into(), "| Scope | Root | Files | Checkable | By Kind |".into(),
