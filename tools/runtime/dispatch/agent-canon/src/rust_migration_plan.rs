@@ -1,495 +1,697 @@
 // @dependency-start
 // contract implementation
-// responsibility Prints sequential Rust migration candidates for AgentCanon tools.
-// upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream design ../../../../../documents/runtime/runtime-log-archive.md hook and skill usage log archive policy
-// downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
+// responsibility Inventories owned implementations and orders Rust migration families.
+// upstream design ../../../../../documents/design/rust-agent-tool-migration.md all-own-tools migration contract
+// upstream design ../../../../catalog.yaml public command identities and external providers
+// upstream implementation migration_audit.rs shared source foundation checks
+// downstream implementation ../../../../bin/agent-canon exposes the read-only planning command
 // @dependency-end
 
-use std::collections::{BTreeMap, HashSet};
+use serde::Serialize;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use toml_edit::DocumentMut;
+use yaml_rust2::YamlLoader;
 
 const DEFAULT_LIMIT: usize = 12;
-
-const PORT_NOW_TARGETS: &[ToolTarget] = &[
-    ToolTarget {
-        name: "file_surface_inventory.py",
-        path: "tools/analysis/code/file_surface_inventory.py",
-        reason: "repo-wide filesystem classification with stable output schema",
-    },
-    ToolTarget {
-        name: "helper_function_inventory.py",
-        path: "tools/analysis/code/helper_function_inventory.py",
-        reason: "AST inventory with deterministic checker behavior",
-    },
-    ToolTarget {
-        name: "log_surface_inventory.py",
-        path: "tools/runtime/archive/log_surface_inventory.py",
-        reason: "static log schema inventory across hooks, skills, and tools",
-    },
-    ToolTarget {
-        name: "readability.py",
-        path: "tools/validation/code/oop/python/readability.py",
-        reason:
-            "hot hook-facing OOP checker that should reject bad edits before agent tokens are spent",
-    },
-    ToolTarget {
-        name: "check_dependency_graph.sh",
-        path: "tools/analysis/dependencies/check_dependency_graph.sh",
-        reason: "dependency graph traversal should become a single typed checker",
-    },
+const SCAN_ROOTS: &[&str] = &["tools", "eval", ".codex/hooks", "tests", "templates"];
+const SKIP_DIRS: &[&str] = &[
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "target",
+    "build",
+    "dist",
 ];
-
-const KEEP_PYTHON_TARGETS: &[ToolTarget] = &[
-    ToolTarget {
-        name: "bootstrap_agent_run.py",
-        path: "tools/runtime/lifecycle/bootstrap_agent_run.py",
-        reason: "workflow orchestration changes frequently and writes run bundles",
-    },
-    ToolTarget {
-        name: "task_close.py",
-        path: "tools/runtime/lifecycle/task_close.py",
-        reason: "closeout policy is agent-facing and changes with workflow gates",
-    },
-    ToolTarget {
-        name: "evaluate_agent_run.py",
-        path: "eval/producers/evaluate_agent_run.py",
-        reason: "evaluation rubric remains easier to tune in Python",
-    },
-    ToolTarget {
-        name: "agent_canon_update_todos.py",
-        path: "tools/agent/orchestration/agent_canon_update_todos.py",
-        reason: "parent-repo TODO protocol is still actively evolving",
-    },
-];
-
-const COMPLETED_RUST_TARGETS: &[ToolTarget] = &[ToolTarget {
-    name: "structured-analysis document-inventory",
-    path: "tools/bin/agent-canon",
-    reason: "document-canon inventory is owned by the Rust structured-analysis command; the old Python entrypoint is retired",
-}];
 
 #[derive(Debug, PartialEq, Eq)]
 struct Args {
     root: PathBuf,
     limit: usize,
+    json: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ToolTarget {
-    name: &'static str,
-    path: &'static str,
-    reason: &'static str,
+#[derive(Debug, Serialize)]
+struct Family {
+    id: &'static str,
+    order: usize,
+    prerequisites: &'static [&'static str],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Candidate {
-    name: String,
+// These are responsibility prerequisites from the design, not an inferred
+// complete import graph. They deliberately keep shared authority before writers.
+const FAMILIES: &[Family] = &[
+    Family {
+        id: "independent-inventory",
+        order: 0,
+        prerequisites: &[],
+    },
+    Family {
+        id: "catalog-foundation",
+        order: 10,
+        prerequisites: &[],
+    },
+    Family {
+        id: "authority-foundation",
+        order: 20,
+        prerequisites: &[],
+    },
+    Family {
+        id: "source-analysis",
+        order: 30,
+        prerequisites: &["catalog-foundation"],
+    },
+    Family {
+        id: "ast-analysis",
+        order: 30,
+        prerequisites: &["authority-foundation"],
+    },
+    Family {
+        id: "runtime-execution",
+        order: 40,
+        prerequisites: &["catalog-foundation", "authority-foundation"],
+    },
+    Family {
+        id: "archive-lifecycle",
+        order: 50,
+        prerequisites: &["authority-foundation", "runtime-execution"],
+    },
+    Family {
+        id: "agent-workflow",
+        order: 60,
+        prerequisites: &[
+            "catalog-foundation",
+            "authority-foundation",
+            "archive-lifecycle",
+        ],
+    },
+    Family {
+        id: "repository-operations",
+        order: 60,
+        prerequisites: &["authority-foundation", "archive-lifecycle"],
+    },
+    Family {
+        id: "experiment-proof",
+        order: 60,
+        prerequisites: &["authority-foundation", "runtime-execution"],
+    },
+    Family {
+        id: "validation-eval-hooks",
+        order: 70,
+        prerequisites: &[
+            "agent-workflow",
+            "source-analysis",
+            "ast-analysis",
+            "archive-lifecycle",
+        ],
+    },
+];
+
+#[derive(Debug, Serialize)]
+struct InventoryRecord {
     path: String,
-    class: &'static str,
-    score: usize,
-    reason: String,
+    classification: &'static str,
+    responsibility: String,
+    catalog_ids: Vec<String>,
+    family: Option<&'static str>,
+    python_delegation: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+struct ExternalRuntime {
+    owner: String,
     source: String,
+    contract: String,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Serialize)]
+struct Candidate {
+    path: String,
+    family: &'static str,
+    order: usize,
+    class: &'static str,
+    remaining_prerequisites: Vec<&'static str>,
+    contract_work: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
 struct Plan {
-    foundation: FoundationStatus,
+    schema: &'static str,
+    foundation_findings: Vec<String>,
+    inventory: Vec<InventoryRecord>,
+    counts: BTreeMap<&'static str, usize>,
+    owned_python_by_scope: BTreeMap<&'static str, usize>,
+    external_runtimes: Vec<ExternalRuntime>,
+    families: &'static [Family],
     candidates: Vec<Candidate>,
-    keep_python: Vec<Candidate>,
-    completed: Vec<Candidate>,
-    hook_log_count: usize,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct FoundationStatus {
-    present: bool,
-    missing: Vec<String>,
+    candidate_total: usize,
+    catalogued_implementations: usize,
+    uncatalogued_implementations: usize,
+    findings: Vec<String>,
 }
 
 pub fn run(args: &[String]) -> i32 {
-    match Args::parse(args) {
-        Ok(parsed) => render(build_plan(&parsed.root, parsed.limit), &parsed.root),
+    let parsed = match Args::parse(args) {
+        Ok(parsed) => parsed,
         Err(message) => {
             eprintln!("RUST_MIGRATION_PLAN=fail");
             eprintln!("RUST_MIGRATION_PLAN_FINDING=invalid-arguments:{message}");
-            2
+            return 2;
+        }
+    };
+    match build_plan(&parsed.root, parsed.limit) {
+        Ok(plan) => render(&plan, &parsed),
+        Err(message) => {
+            eprintln!("RUST_MIGRATION_PLAN=fail");
+            eprintln!("RUST_MIGRATION_PLAN_FINDING={message}");
+            1
         }
     }
 }
 
 impl Args {
     fn parse(args: &[String]) -> Result<Self, String> {
-        let mut root = PathBuf::from(".");
-        let mut limit = DEFAULT_LIMIT;
+        let mut result = Self {
+            root: PathBuf::from("."),
+            limit: DEFAULT_LIMIT,
+            json: false,
+        };
         let mut index = 0;
-
         while index < args.len() {
-            match args[index].as_str() {
-                "--root" => {
-                    let value = args
-                        .get(index + 1)
-                        .ok_or_else(|| "--root requires a value".to_string())?;
-                    root = PathBuf::from(value);
-                    index += 2;
-                }
+            let name = args[index].as_str();
+            if !matches!(name, "--root" | "--limit" | "--format") {
+                return Err(format!("unknown argument {name}"));
+            }
+            let value = args
+                .get(index + 1)
+                .ok_or_else(|| format!("{name} requires a value"))?;
+            match name {
+                "--root" => result.root = PathBuf::from(value),
                 "--limit" => {
-                    let value = args
-                        .get(index + 1)
-                        .ok_or_else(|| "--limit requires a value".to_string())?;
-                    limit = value
-                        .parse::<usize>()
-                        .map_err(|_| format!("--limit must be a positive integer, got {value}"))?;
-                    if limit == 0 {
+                    result.limit = value
+                        .parse()
+                        .map_err(|_| "--limit must be a positive integer".to_string())?;
+                    if result.limit == 0 {
                         return Err("--limit must be greater than zero".to_string());
                     }
-                    index += 2;
                 }
-                unknown => return Err(format!("unknown argument {unknown}")),
+                "--format" => match value.as_str() {
+                    "text" => result.json = false,
+                    "json" => result.json = true,
+                    _ => return Err("--format must be text or json".to_string()),
+                },
+                _ => unreachable!(),
             }
+            index += 2;
         }
-
-        Ok(Self { root, limit })
+        Ok(result)
     }
 }
 
-fn build_plan(root: &Path, limit: usize) -> Plan {
-    let foundation = inspect_foundation(root);
-    let (log_counts, hook_log_count) = collect_hook_tool_counts(root);
-    let keep_names = target_names(KEEP_PYTHON_TARGETS);
-    let port_names = target_names(PORT_NOW_TARGETS);
-    let completed_names = target_names(COMPLETED_RUST_TARGETS);
-
-    let mut candidates = Vec::new();
-    for (index, target) in PORT_NOW_TARGETS.iter().enumerate() {
-        let log_count = *log_counts.get(target.name).unwrap_or(&0);
-        candidates.push(Candidate {
-            name: target.name.to_string(),
-            path: target.path.to_string(),
-            class: "port-now",
-            score: 1_000 - (index * 20) + (log_count * 10),
-            reason: target.reason.to_string(),
-            source: if log_count > 0 {
-                "policy+hook-log".to_string()
-            } else {
-                "policy".to_string()
-            },
+fn collect_sources(root: &Path, relative: &Path, paths: &mut Vec<String>) -> Result<(), String> {
+    let path = root.join(relative);
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|error| format!("inventory-read:{}:{error}", relative.display()))?;
+    if metadata.is_dir() && !metadata.is_symlink() {
+        for entry in fs::read_dir(&path)
+            .map_err(|error| format!("inventory-read:{}:{error}", relative.display()))?
+        {
+            let entry =
+                entry.map_err(|error| format!("inventory-read:{}:{error}", relative.display()))?;
+            if SKIP_DIRS.iter().any(|name| entry.file_name() == *name) {
+                continue;
+            }
+            collect_sources(root, &relative.join(entry.file_name()), paths)?;
+        }
+    } else if metadata.is_symlink()
+        || matches!(
+            relative.extension().and_then(|value| value.to_str()),
+            Some("py" | "rs")
+        )
+    {
+        let text = relative.to_string_lossy();
+        paths.push(if cfg!(windows) {
+            text.replace('\\', "/")
+        } else {
+            text.into_owned()
         });
     }
+    Ok(())
+}
 
-    for (name, count) in log_counts {
-        if port_names.contains(name.as_str())
-            || keep_names.contains(name.as_str())
-            || completed_names.contains(name.as_str())
-        {
+fn responsibility(text: &str) -> String {
+    text.lines()
+        .find_map(|line| {
+            line.trim()
+                .trim_start_matches('#')
+                .trim_start_matches('/')
+                .trim()
+                .strip_prefix("responsibility ")
+                .map(str::to_string)
+        })
+        .unwrap_or_default()
+}
+
+fn package_marker(text: &str) -> bool {
+    let mut rest = text;
+    let mut docstring_seen = false;
+    loop {
+        rest = rest.trim_start();
+        if rest.is_empty() {
+            return true;
+        }
+        if rest.starts_with('#') {
+            rest = rest.split_once('\n').map_or("", |(_, tail)| tail);
             continue;
         }
-        candidates.push(Candidate {
-            path: infer_tool_path(root, &name),
-            class: "observe-before-port",
-            score: count * 10,
-            reason: "observed in hook or skill feedback logs; gather more stability evidence before porting"
-                .to_string(),
-            source: "hook-log".to_string(),
-            name,
-        });
-    }
-
-    candidates.sort_by(|left, right| {
-        right
-            .score
-            .cmp(&left.score)
-            .then_with(|| left.name.cmp(&right.name))
-    });
-    candidates.truncate(limit);
-
-    let keep_python = KEEP_PYTHON_TARGETS
-        .iter()
-        .map(|target| Candidate {
-            name: target.name.to_string(),
-            path: target.path.to_string(),
-            class: "keep-python",
-            score: 0,
-            reason: target.reason.to_string(),
-            source: "policy".to_string(),
-        })
-        .collect();
-    let completed = COMPLETED_RUST_TARGETS
-        .iter()
-        .map(|target| Candidate {
-            name: target.name.to_string(),
-            path: target.path.to_string(),
-            class: "completed",
-            score: 0,
-            reason: target.reason.to_string(),
-            source: "policy".to_string(),
-        })
-        .collect();
-
-    Plan {
-        foundation,
-        candidates,
-        keep_python,
-        completed,
-        hook_log_count,
-    }
-}
-
-fn inspect_foundation(root: &Path) -> FoundationStatus {
-    let mut missing = Vec::new();
-    for relative in [
-        "documents/design/rust-agent-tool-migration.md",
-        "tools/runtime/dispatch/agent-canon/Cargo.toml",
-        "tools/bin/agent-canon",
-        "bootstrap.sh",
-        "bootstrap/host/manifest.toml",
-        "bootstrap/container/image/Dockerfile",
-        "bootstrap/container/image/dependencies.toml",
-        "bootstrap/container/lifecycle/entrypoint.sh",
-        "tools/runtime/container/bootstrap_runtime.py",
-        "tools/runtime/artifacts/runtime_artifacts.py",
-        "tools/runtime/dispatch/tool_dispatch.py",
-    ] {
-        if !root.join(relative).exists() {
-            missing.push(format!("missing-path:{relative}"));
-        }
-    }
-
-    for (relative, snippet) in [
-        ("bootstrap.sh", "bootstrap_python_entrypoint"),
-        ("bootstrap/container/image/Dockerfile", "USER agentcanon"),
-        ("bootstrap/container/image/Dockerfile", "HEALTHCHECK"),
-        ("bootstrap/container/image/Dockerfile", "image-install"),
-        ("bootstrap/container/lifecycle/entrypoint.sh", "health"),
-        ("bootstrap/container/lifecycle/entrypoint.sh", "resident"),
-    ] {
-        if let Ok(text) = fs::read_to_string(root.join(relative)) {
-            if !text.contains(snippet) {
-                missing.push(format!("bootstrap-missing:{relative}:{snippet}"));
+        if !docstring_seen && (rest.starts_with("\"\"\"") || rest.starts_with("'''")) {
+            let delimiter = &rest[..3];
+            if let Some(end) = rest[3..].find(delimiter) {
+                rest = &rest[3 + end + 3..];
+                docstring_seen = true;
+                continue;
             }
         }
-    }
-    FoundationStatus {
-        present: missing.is_empty(),
-        missing,
+        return false;
     }
 }
 
-fn collect_hook_tool_counts(root: &Path) -> (BTreeMap<String, usize>, usize) {
+fn classification(path: &str, text: &str, symlink: bool) -> &'static str {
+    if symlink {
+        return "source-view";
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts
+        .iter()
+        .any(|part| matches!(*part, "vendor" | "third_party" | "third-party"))
+    {
+        return "third-party-source";
+    }
+    if parts
+        .iter()
+        .any(|part| matches!(*part, "templates" | "fixtures" | "fixture"))
+    {
+        return "template-or-fixture";
+    }
+    if parts.contains(&"tests") || path.ends_with("/tests.rs") {
+        return "test";
+    }
+    if path.ends_with(".rs") {
+        return "native-source-unverified";
+    }
+    if path.ends_with("/__init__.py") && package_marker(text) {
+        return "package-marker";
+    }
+    if path.starts_with("tools/") || path.starts_with("eval/") || path.starts_with(".codex/hooks/")
+    {
+        return "owned-python-implementation";
+    }
+    "unclassified-source"
+}
+
+fn family_for(path: &str) -> &'static str {
+    if path.ends_with("/file_surface_inventory.py") {
+        return "independent-inventory";
+    }
+    if path == "tools/runtime/manifest/manifest_rendering.py" {
+        return "agent-workflow";
+    }
+    if path.starts_with("tools/runtime/manifest/")
+        || path.ends_with("/skill_projection_registry.py")
+        || path.ends_with("/skill_route_catalog.py")
+        || path.ends_with("/tool_path_policy.py")
+        || path.ends_with("/dependency_manifest.rs")
+    {
+        return "catalog-foundation";
+    }
+    if path.starts_with("tools/runtime/artifacts/")
+        || path.starts_with("tools/runtime/authority/")
+        || path.starts_with("tools/runtime/source/")
+        || path.starts_with("tools/support/")
+        || path == "tools/runtime/values.py"
+        || path.ends_with("/workspace_scope.py")
+        || path.ends_with("/parent_root_side_effects.py")
+    {
+        return "authority-foundation";
+    }
+    if path.ends_with("/helper_function_inventory.py")
+        || path.ends_with("/log_surface_inventory.py")
+        || path.starts_with("tools/validation/code/oop/")
+        || path.ends_with("/python_structure_hash.rs")
+        || path.ends_with("/python_algorithm_contract.rs")
+    {
+        return "ast-analysis";
+    }
+    if path.starts_with("tools/analysis/proof/")
+        || path.starts_with("tools/analysis/hlo/")
+        || path.starts_with("tools/analysis/numerical/")
+        || path.starts_with("tools/experiments/")
+        || path.ends_with("/check_jax_export_stack.py")
+    {
+        return "experiment-proof";
+    }
+    if path.starts_with("tools/analysis/") {
+        return "source-analysis";
+    }
+    if path.starts_with("tools/runtime/container/")
+        || path.ends_with("/tool_dispatch.py")
+        || path.starts_with("tools/validation/ci/runners/")
+    {
+        return "runtime-execution";
+    }
+    if path.starts_with("tools/runtime/archive/")
+        || path.starts_with("tools/runtime/lifecycle/")
+        || path.starts_with("tools/audit/")
+        || path.ends_with("/private_feedback.rs")
+    {
+        return "archive-lifecycle";
+    }
+    if path.starts_with("tools/agent/") {
+        return "agent-workflow";
+    }
+    if path.starts_with("tools/repository/") {
+        return "repository-operations";
+    }
+    "validation-eval-hooks"
+}
+
+fn python_delegation(path: &str, text: &str) -> Option<&'static str> {
+    let (suffix, marker, detail) = if path.ends_with("/private_feedback.rs") {
+        (
+            ".rs",
+            "private_feedback.py",
+            "private-feedback Python implementation adapter",
+        )
+    } else if path.ends_with("/dependency_manifest.rs") {
+        (
+            ".rs",
+            "Command::new(\"python3\")",
+            "surface-manifest Python snapshot producer",
+        )
+    } else if path.ends_with("/python_structure_hash.rs")
+        || path.ends_with("/python_algorithm_contract.rs")
+    {
+        (
+            ".rs",
+            "Command::new(\"python3\")",
+            "embedded Python AST implementation",
+        )
+    } else {
+        return None;
+    };
+    (path.ends_with(suffix) && text.contains(marker)).then_some(detail)
+}
+
+fn contract_work(path: &str, family: &str) -> Option<&'static str> {
+    if path.ends_with("/jit_canonical_ir.py") || path.ends_with("/check_jax_export_stack.py") {
+        Some("preserve dynamic CPython/JAX API through a reviewed native provider connection")
+    } else if family == "ast-analysis" {
+        Some(
+            "select native parser and preserve Python AST/output semantics without embedded Python",
+        )
+    } else if path.ends_with("/parent_root_side_effects.py")
+        || path.ends_with("/runtime_artifacts.py")
+    {
+        Some("preserve descriptor-relative writes, identities, locks and root capabilities with safe APIs")
+    } else {
+        None
+    }
+}
+
+type CatalogPaths = BTreeMap<String, BTreeSet<String>>;
+
+fn catalog(root: &Path, external: &mut Vec<ExternalRuntime>) -> Result<CatalogPaths, String> {
+    let text = fs::read_to_string(root.join("tools/catalog.yaml"))
+        .map_err(|error| format!("catalog-read:{error}"))?;
+    let documents =
+        YamlLoader::load_from_str(&text).map_err(|error| format!("catalog-parse:{error}"))?;
+    let document = documents.first().ok_or("catalog-empty")?;
+    let entries = document["entries"]
+        .as_vec()
+        .ok_or("catalog-entries-missing")?;
+    let mut result = CatalogPaths::new();
+    for entry in entries {
+        let id = entry["id"].as_str().ok_or("catalog-id-invalid")?;
+        let path = entry["path"].as_str().ok_or("catalog-path-invalid")?;
+        result
+            .entry(path.to_string())
+            .or_default()
+            .insert(id.to_string());
+        if entry["dispatch"]["runtime"].as_str() == Some("native") {
+            external.push(ExternalRuntime {
+                owner: id.to_string(),
+                source: "tools/catalog.yaml".to_string(),
+                contract: "external executable; the catalog dispatcher remains AgentCanon-owned"
+                    .to_string(),
+            });
+        }
+    }
+    if let Some(commands) = document["runtime_schema"]["rust_public_commands"].as_vec() {
+        for command in commands {
+            let id = command["id"].as_str().ok_or("catalog-rust-id-invalid")?;
+            let path = command["path"]
+                .as_str()
+                .ok_or("catalog-rust-path-invalid")?;
+            result
+                .entry(path.to_string())
+                .or_default()
+                .insert(id.to_string());
+        }
+    }
+    Ok(result)
+}
+
+fn external_providers(root: &Path, external: &mut Vec<ExternalRuntime>) -> Result<(), String> {
+    let text = fs::read_to_string(root.join("agent-canon-environment.toml"))
+        .map_err(|error| format!("environment-read:{error}"))?;
+    let document = text
+        .parse::<DocumentMut>()
+        .map_err(|error| format!("environment-parse:{error}"))?;
+    if let Some(providers) = document
+        .get("external_provider")
+        .and_then(|item| item.as_table_like())
+    {
+        for (name, provider) in providers.iter() {
+            external.push(ExternalRuntime {
+                owner: name.to_string(),
+                source: "agent-canon-environment.toml".to_string(),
+                contract: provider
+                    .get("invocation")
+                    .and_then(|item| item.as_str())
+                    .unwrap_or("declared external provider")
+                    .to_string(),
+            });
+        }
+    }
+    for path in [
+        "tools/analysis/proof/jit_canonical_ir.py",
+        "tools/validation/ci/checks/check_jax_export_stack.py",
+    ] {
+        if root.join(path).is_file() {
+            external.push(ExternalRuntime {
+                owner: path.to_string(), source: path.to_string(),
+                contract: "dynamic CPython/JAX runtime; AgentCanon implementation remains in migration scope".to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn build_plan(root: &Path, limit: usize) -> Result<Plan, String> {
+    if !root.is_dir() {
+        return Err(format!("source-root-missing:{}", root.display()));
+    }
+    let mut external_runtimes = Vec::new();
+    let catalog = catalog(root, &mut external_runtimes)?;
+    external_providers(root, &mut external_runtimes)?;
+    let mut paths = Vec::new();
+    let mut findings = Vec::new();
+    for relative in SCAN_ROOTS {
+        if root.join(relative).exists() {
+            collect_sources(root, Path::new(relative), &mut paths)?;
+        } else {
+            findings.push(format!("inventory-root-missing:{relative}"));
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    let mut inventory = Vec::new();
     let mut counts = BTreeMap::new();
-    let mut log_count = 0;
-
-    for path in collect_jsonl_files(&root.join("agents/evals/results/hook-runs")) {
-        log_count += 1;
-        let Ok(text) = fs::read_to_string(path) else {
+    let mut owned_python_by_scope = BTreeMap::new();
+    let mut remaining_families = BTreeSet::new();
+    let mut catalogued_implementations = 0;
+    let mut uncatalogued_implementations = 0;
+    for path in paths {
+        let source = root.join(&path);
+        let symlink = source.is_symlink();
+        let text = if symlink {
+            String::new()
+        } else {
+            fs::read_to_string(&source).map_err(|error| format!("inventory-read:{path}:{error}"))?
+        };
+        let class = classification(&path, &text, symlink);
+        let delegation = (class == "native-source-unverified")
+            .then(|| python_delegation(&path, &text))
+            .flatten();
+        let owned = class == "owned-python-implementation";
+        let family = (owned || delegation.is_some()).then(|| family_for(&path));
+        if let Some(family) = family {
+            remaining_families.insert(family);
+        }
+        let catalog_ids: Vec<String> = catalog
+            .get(&path)
+            .map(|ids| ids.iter().cloned().collect())
+            .unwrap_or_default();
+        if owned {
+            let scope = if path.starts_with("tools/") {
+                "tools"
+            } else if path.starts_with("eval/") {
+                "eval"
+            } else {
+                ".codex/hooks"
+            };
+            *owned_python_by_scope.entry(scope).or_insert(0) += 1;
+            if catalog_ids.is_empty() {
+                uncatalogued_implementations += 1;
+            } else {
+                catalogued_implementations += 1;
+            }
+        }
+        *counts.entry(class).or_insert(0) += 1;
+        inventory.push(InventoryRecord {
+            responsibility: responsibility(&text),
+            path,
+            classification: class,
+            catalog_ids,
+            family,
+            python_delegation: delegation,
+        });
+    }
+    for path in catalog.keys() {
+        if !root.join(path).is_file() {
+            findings.push(format!("catalog-source-missing:{path}"));
+        }
+    }
+    let mut candidates = Vec::new();
+    for item in &inventory {
+        let Some(family_id) = item.family else {
             continue;
         };
-        for line in text.lines() {
-            for tool in extract_string_array_field(line, "candidate_tools") {
-                increment_tool_count(&mut counts, &tool);
-            }
-            for target in extract_string_array_field(line, "feedback_targets") {
-                if let Some(tool) = target.strip_prefix("tool:") {
-                    increment_tool_count(&mut counts, tool);
-                }
-            }
-            if let Some(tool_name) = extract_string_field(line, "tool_name") {
-                increment_tool_count(&mut counts, &tool_name);
-            }
-            for command_part in extract_string_array_field(line, "command") {
-                if command_part.contains("/tools/") || command_part.starts_with("tools/") {
-                    increment_tool_count(&mut counts, &command_part);
-                }
-            }
-        }
-    }
-
-    (counts, log_count)
-}
-
-fn collect_jsonl_files(root: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    collect_jsonl_files_into(root, &mut files);
-    files
-}
-
-fn collect_jsonl_files_into(root: &Path, files: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_jsonl_files_into(&path, files);
-        } else if path
-            .extension()
-            .is_some_and(|extension| extension == "jsonl")
-        {
-            files.push(path);
-        }
-    }
-}
-
-fn increment_tool_count(counts: &mut BTreeMap<String, usize>, value: &str) {
-    let Some(name) = normalize_tool_name(value) else {
-        return;
-    };
-    *counts.entry(name).or_default() += 1;
-}
-
-fn normalize_tool_name(value: &str) -> Option<String> {
-    let mut name = value.trim();
-    if name.is_empty() {
-        return None;
-    }
-    if let Some(stripped) = name.strip_prefix("tool:") {
-        name = stripped;
-    }
-    if let Some((_, suffix)) = name.rsplit_once("/tools/") {
-        name = suffix;
-    }
-    if let Some(stripped) = name.strip_prefix("tools/") {
-        name = stripped;
-    }
-    if !name.ends_with(".py") && !name.ends_with(".sh") && !name.ends_with("agent-canon") {
-        return None;
-    }
-    Some(
-        name.rsplit('/')
-            .next()
-            .expect("split always returns a final component")
-            .to_string(),
-    )
-}
-
-fn extract_string_field(line: &str, field: &str) -> Option<String> {
-    let marker = format!("\"{field}\":");
-    let start = line.find(&marker)? + marker.len();
-    let tail = &line[start..];
-    let quote_index = tail.find('"')?;
-    parse_json_string_at(tail, quote_index).map(|(value, _)| value)
-}
-
-fn extract_string_array_field(line: &str, field: &str) -> Vec<String> {
-    let marker = format!("\"{field}\":");
-    let Some(start) = line.find(&marker) else {
-        return Vec::new();
-    };
-    let tail = &line[start + marker.len()..];
-    let Some(array_start) = tail.find('[') else {
-        return Vec::new();
-    };
-    let array_tail = &tail[array_start + 1..];
-    let Some(array_end) = array_tail.find(']') else {
-        return Vec::new();
-    };
-    let array = &array_tail[..array_end];
-
-    let mut values = Vec::new();
-    let mut index = 0;
-    while index < array.len() {
-        let Some(next_quote) = array[index..].find('"') else {
-            break;
+        let family = FAMILIES
+            .iter()
+            .find(|family| family.id == family_id)
+            .expect("registered family");
+        let remaining_prerequisites: Vec<&str> = family
+            .prerequisites
+            .iter()
+            .copied()
+            .filter(|id| remaining_families.contains(id))
+            .collect();
+        let contract_work = contract_work(&item.path, family_id);
+        let class = if !remaining_prerequisites.is_empty() {
+            "dependency-first"
+        } else if contract_work.is_some() {
+            "contract-first"
+        } else {
+            "port-now"
         };
-        let string_start = index + next_quote;
-        if let Some((value, next_index)) = parse_json_string_at(array, string_start) {
-            values.push(value);
-            index = next_index;
-        } else {
-            break;
-        }
+        candidates.push(Candidate {
+            path: item.path.clone(),
+            family: family_id,
+            order: family.order,
+            class,
+            remaining_prerequisites,
+            contract_work,
+        });
     }
-
-    values
+    candidates.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.path.cmp(&b.path)));
+    let candidate_total = candidates.len();
+    candidates.truncate(limit);
+    Ok(Plan {
+        schema: "agent-canon.rust-migration-plan.v2",
+        foundation_findings: crate::migration_audit::foundation_findings(root),
+        inventory,
+        counts,
+        owned_python_by_scope,
+        external_runtimes,
+        families: FAMILIES,
+        candidates,
+        candidate_total,
+        catalogued_implementations,
+        uncatalogued_implementations,
+        findings,
+    })
 }
 
-fn parse_json_string_at(text: &str, start: usize) -> Option<(String, usize)> {
-    let bytes = text.as_bytes();
-    if *bytes.get(start)? != b'"' {
-        return None;
-    }
-
-    let mut index = start + 1;
-    let mut value = String::new();
-    while index < bytes.len() {
-        match bytes[index] {
-            b'\\' => {
-                let escaped = *bytes.get(index + 1)?;
-                value.push(escaped as char);
-                index += 2;
+fn render(plan: &Plan, args: &Args) -> i32 {
+    let status = if plan.findings.is_empty() {
+        "pass"
+    } else {
+        "fail"
+    };
+    if args.json {
+        match serde_json::to_string_pretty(plan) {
+            Ok(text) => println!("{text}"),
+            Err(error) => {
+                eprintln!("RUST_MIGRATION_PLAN_FINDING=serialize:{error}");
+                return 1;
             }
-            b'"' => return Some((value, index + 1)),
-            byte => {
-                value.push(byte as char);
-                index += 1;
+        }
+    } else {
+        println!("RUST_MIGRATION_PLAN={status}");
+        println!("RUST_MIGRATION_SOURCE_ROOT={}", args.root.display());
+        println!(
+            "RUST_MIGRATION_FOUNDATION={}",
+            if plan.foundation_findings.is_empty() {
+                "present"
+            } else {
+                "missing"
+            }
+        );
+        for finding in &plan.foundation_findings {
+            println!("RUST_MIGRATION_FOUNDATION_FINDING={finding}");
+        }
+        for (class, count) in &plan.counts {
+            println!("RUST_MIGRATION_INVENTORY_COUNT=class={class} count={count}");
+        }
+        for (scope, count) in &plan.owned_python_by_scope {
+            println!("RUST_MIGRATION_OWNED_PYTHON_COUNT=scope={scope} count={count}");
+        }
+        println!("RUST_MIGRATION_CATALOG_COVERAGE=catalogued_owned_python={} uncatalogued_owned_python={}", plan.catalogued_implementations, plan.uncatalogued_implementations);
+        println!(
+            "RUST_MIGRATION_COMPLETION=unverified native_source_presence_is_not_port_evidence"
+        );
+        for record in &plan.inventory {
+            if let Some(reason) = record.python_delegation {
+                println!(
+                    "RUST_MIGRATION_PYTHON_DELEGATION=path={} reason={reason}",
+                    record.path
+                );
             }
         }
-    }
-
-    None
-}
-
-fn infer_tool_path(root: &Path, name: &str) -> String {
-    for prefix in [
-        "tools/agent",
-        "tools/validation/ci",
-        "tools/analysis/documents",
-        "tools/validation/code/oop/python",
-    ] {
-        let path = format!("{prefix}/{name}");
-        if root.join(&path).exists() {
-            return path;
+        for runtime in &plan.external_runtimes {
+            println!(
+                "RUST_MIGRATION_EXTERNAL_RUNTIME=owner={} source={} contract={}",
+                runtime.owner, runtime.source, runtime.contract
+            );
+        }
+        println!("RUST_MIGRATION_CANDIDATE_TOTAL={}", plan.candidate_total);
+        println!("RUST_MIGRATION_CANDIDATE_COUNT={}", plan.candidates.len());
+        for (index, candidate) in plan.candidates.iter().enumerate() {
+            println!("RUST_MIGRATION_CANDIDATE=rank={} class={} order={} family={} path={} prerequisites={} contract={}",
+                index + 1, candidate.class, candidate.order, candidate.family, candidate.path,
+                candidate.remaining_prerequisites.join(","), candidate.contract_work.unwrap_or("preserve owning CLI/API and side-effect contract"));
+        }
+        for finding in &plan.findings {
+            println!("RUST_MIGRATION_PLAN_FINDING={finding}");
         }
     }
-    format!("tools/<unknown>/{name}")
-}
-
-fn target_names(targets: &[ToolTarget]) -> HashSet<&'static str> {
-    targets.iter().map(|target| target.name).collect()
-}
-
-fn render(plan: Plan, root: &Path) -> i32 {
-    println!("RUST_MIGRATION_PLAN=pass");
-    println!("RUST_MIGRATION_SOURCE_ROOT={}", root.display());
-    println!(
-        "RUST_MIGRATION_FOUNDATION={}",
-        if plan.foundation.present {
-            "present"
-        } else {
-            "missing"
-        }
-    );
-    for finding in plan.foundation.missing {
-        println!("RUST_MIGRATION_FOUNDATION_FINDING={finding}");
-    }
-    println!("RUST_MIGRATION_HOOK_LOG_FILES={}", plan.hook_log_count);
-    println!("RUST_MIGRATION_CANDIDATE_COUNT={}", plan.candidates.len());
-    for (index, candidate) in plan.candidates.iter().enumerate() {
-        println!(
-            "RUST_MIGRATION_CANDIDATE=rank={} class={} score={} name={} path={} source={} reason={}",
-            index + 1,
-            candidate.class,
-            candidate.score,
-            candidate.name,
-            candidate.path,
-            candidate.source,
-            candidate.reason
-        );
-    }
-    for candidate in plan.keep_python {
-        println!(
-            "RUST_MIGRATION_KEEP_PYTHON=name={} path={} reason={}",
-            candidate.name, candidate.path, candidate.reason
-        );
-    }
-    for candidate in plan.completed {
-        println!(
-            "RUST_MIGRATION_COMPLETED=name={} path={} reason={}",
-            candidate.name, candidate.path, candidate.reason
-        );
-    }
-    0
+    i32::from(!plan.findings.is_empty())
 }
 
 #[cfg(test)]
@@ -498,147 +700,228 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn parse_defaults() {
-        let parsed = Args::parse(&[]).expect("defaults should parse");
-        assert_eq!(parsed.root, PathBuf::from("."));
-        assert_eq!(parsed.limit, DEFAULT_LIMIT);
-    }
-
-    #[test]
-    fn plan_includes_first_remaining_policy_target() {
-        let root = make_fixture_root();
-        write_foundation(&root);
-
-        let plan = build_plan(&root, 3);
-
-        assert_eq!(plan.candidates[0].name, "file_surface_inventory.py");
-        assert_eq!(plan.candidates[0].class, "port-now");
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn plan_counts_hook_candidate_tools() {
-        let root = make_fixture_root();
-        write_foundation(&root);
-        write(
-            &root,
-            "agents/evals/results/hook-runs/example/skill_usage.jsonl",
-            r#"{"candidate_tools":["skill_usage_logger.py","file_surface_inventory.py"],"feedback_targets":["tool:skill_usage_logger.py"],"tool_name":"workflow_monitor.py"}"#,
+    fn parses_plan_options_and_rejects_zero_limit() {
+        assert_eq!(Args::parse(&[]).unwrap().limit, DEFAULT_LIMIT);
+        assert!(Args::parse(&["--limit".into(), "0".into()]).is_err());
+        assert!(
+            Args::parse(&["--format".into(), "json".into()])
+                .unwrap()
+                .json
         );
+    }
 
-        let plan = build_plan(&root, 10);
+    #[test]
+    fn classifies_responsibilities_without_exempting_executable_initializers() {
+        assert_eq!(
+            classification(
+                "tools/pkg/__init__.py",
+                "# package\n\"\"\"Marker.\"\"\"\n",
+                false
+            ),
+            "package-marker"
+        );
+        assert_eq!(
+            classification("tools/pkg/__init__.py", "from .owner import run\n", false),
+            "owned-python-implementation"
+        );
+        assert_eq!(
+            classification("tools/pkg/fixtures/example.py", "", false),
+            "template-or-fixture"
+        );
+        assert_eq!(
+            classification("templates/experiments/run.py", "", false),
+            "template-or-fixture"
+        );
+        assert_eq!(
+            classification("tools/vendor/external.py", "", false),
+            "third-party-source"
+        );
+        assert_eq!(classification("tests/test_owner.py", "", false), "test");
+        assert_eq!(
+            classification("eval/checkers/smoke_test_example.py", "", false),
+            "owned-python-implementation"
+        );
+        assert_eq!(
+            classification(".codex/hooks/hook_dispatcher.py", "", false),
+            "owned-python-implementation"
+        );
+        assert_eq!(classification("tools/view.py", "", true), "source-view");
+    }
 
-        let skill_logger = plan
+    #[test]
+    fn inventories_uncatalogued_hooks_and_orders_foundations_before_writers() {
+        let root = fixture();
+        for path in [
+            "tools/runtime/authority/task_authority.py",
+            "tools/runtime/lifecycle/task_close.py",
+            "eval/producers/evaluate_agent_run.py",
+            ".codex/hooks/hook_dispatcher.py",
+            ".codex/hooks/hook_event_log.py",
+        ] {
+            write(
+                &root,
+                path,
+                "# responsibility Owns fixture behavior.\nVALUE = 1\n",
+            );
+        }
+        write(&root, "tools/pkg/__init__.py", "\"\"\"Package.\"\"\"\n");
+        write(&root, "tests/test_fixture.py", "pass\n");
+        write(&root, "templates/run.py", "pass\n");
+        let plan = build_plan(&root, 20).unwrap();
+        assert_eq!(plan.counts["owned-python-implementation"], 5);
+        assert_eq!(plan.counts["package-marker"], 1);
+        assert_eq!(plan.owned_python_by_scope[".codex/hooks"], 2);
+        assert_eq!(plan.uncatalogued_implementations, 5);
+        assert_eq!(plan.candidates[0].family, "authority-foundation");
+        let close = plan
             .candidates
             .iter()
-            .find(|candidate| candidate.name == "skill_usage_logger.py")
-            .expect("hook candidate should be included");
-        assert_eq!(skill_logger.class, "observe-before-port");
-        assert_eq!(skill_logger.score, 20);
-        assert_eq!(plan.hook_log_count, 1);
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn plan_keeps_orchestration_python() {
-        let root = make_fixture_root();
-        write_foundation(&root);
-
-        let plan = build_plan(&root, 10);
-
+            .find(|item| item.path.ends_with("task_close.py"))
+            .unwrap();
+        assert_eq!(close.class, "dependency-first");
+        assert!(close
+            .remaining_prerequisites
+            .contains(&"authority-foundation"));
         assert!(plan
-            .keep_python
+            .candidates
             .iter()
-            .any(|candidate| candidate.name == "task_close.py"));
-        let _ = fs::remove_dir_all(root);
+            .any(|item| item.path.ends_with("evaluate_agent_run.py")));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn plan_marks_document_inventory_completed() {
-        let root = make_fixture_root();
-        write_foundation(&root);
-
-        let plan = build_plan(&root, 10);
-
-        assert!(plan
-            .completed
-            .iter()
-            .any(|candidate| candidate.name == "structured-analysis document-inventory"));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn foundation_reports_missing_post_create() {
-        let root = make_fixture_root();
+    fn catalog_presence_does_not_complete_python_or_native_delegations() {
+        let root = fixture();
         write(
             &root,
-            "documents/design/rust-agent-tool-migration.md",
-            "fixture\n",
+            "tools/catalog.yaml",
+            "entries:\n  - id: authority\n    path: tools/runtime/authority/task_authority.py\n",
         );
         write(
             &root,
-            "tools/runtime/dispatch/agent-canon/Cargo.toml",
-            "fixture\n",
+            "tools/runtime/authority/task_authority.py",
+            "VALUE = 1\n",
         );
-        write(&root, "tools/bin/agent-canon", "fixture\n");
-
-        let foundation = inspect_foundation(&root);
-
-        assert!(!foundation.present);
-        assert!(foundation
-            .missing
-            .contains(&"missing-path:bootstrap.sh".to_string()));
-        let _ = fs::remove_dir_all(root);
+        write(
+            &root,
+            "tools/runtime/dispatch/agent-canon/src/private_feedback.rs",
+            "const ADAPTER: &str = \"private_feedback.py\";\n",
+        );
+        let plan = build_plan(&root, 20).unwrap();
+        assert_eq!(plan.catalogued_implementations, 1);
+        assert_eq!(plan.candidate_total, 2);
+        assert!(plan
+            .inventory
+            .iter()
+            .any(|item| item.python_delegation.is_some()));
+        let limited = build_plan(&root, 1).unwrap();
+        assert_eq!(limited.candidates.len(), 1);
+        assert_eq!(limited.candidate_total, 2);
+        assert_eq!(limited.inventory.len(), plan.inventory.len());
+        fs::remove_dir_all(root).unwrap();
     }
 
-    fn make_fixture_root() -> PathBuf {
+    #[cfg(unix)]
+    #[test]
+    fn inventories_literal_backslash_names_without_changing_source_identity() {
+        let root = fixture();
+        let relative = r"tools/analysis/code/literal\name.py";
+        write(
+            &root,
+            relative,
+            "# responsibility Preserves literal filename identity.\nVALUE = 1\n",
+        );
+
+        let plan = build_plan(&root, 12).expect("literal backslash source must remain readable");
+        let record = plan
+            .inventory
+            .iter()
+            .find(|item| item.path == relative)
+            .expect("inventory must preserve the Unix basename");
+        assert_eq!(
+            record.responsibility,
+            "Preserves literal filename identity."
+        );
+        assert_eq!(plan.counts["owned-python-implementation"], 1);
+        assert_eq!(plan.candidates[0].path, relative);
+        assert!(!root.join("tools/analysis/code/literal/name.py").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn standalone_foundation_keeps_file_inventory_as_a_python_port_candidate() {
+        let root = fixture();
+        let path = "tools/analysis/code/file_surface_inventory.py";
+        write(&root, path, "VALUE = 1\n");
+        write(
+            &root,
+            "tools/catalog.yaml",
+            "entries:\n  - id: file-surface-inventory\n    path: tools/analysis/code/file_surface_inventory.py\n",
+        );
+
+        let plan = build_plan(&root, 12).unwrap();
+        assert_eq!(plan.catalogued_implementations, 1);
+        assert_eq!(plan.counts["owned-python-implementation"], 1);
+        assert_eq!(plan.candidates[0].path, path);
+        assert_eq!(plan.candidates[0].family, "independent-inventory");
+        assert_eq!(plan.candidates[0].class, "port-now");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn manifest_rendering_waits_for_workflow_prerequisites() {
+        let root = fixture();
+        let path = "tools/runtime/manifest/manifest_rendering.py";
+        write(&root, path, "VALUE = 1\n");
+        write(
+            &root,
+            "tools/runtime/lifecycle/task_close.py",
+            "VALUE = 1\n",
+        );
+
+        let plan = build_plan(&root, 12).unwrap();
+        let rendering = plan
+            .candidates
+            .iter()
+            .find(|item| item.path == path)
+            .unwrap();
+        assert_eq!(rendering.family, "agent-workflow");
+        assert_eq!(rendering.class, "dependency-first");
+        assert!(rendering
+            .remaining_prerequisites
+            .contains(&"archive-lifecycle"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn missing_source_and_invalid_catalog_are_not_empty_success() {
+        let root = fixture();
+        write(&root, "tools/catalog.yaml", "entries: invalid\n");
+        assert!(build_plan(&root, 12).is_err());
+        fs::remove_dir_all(&root).unwrap();
+        assert!(build_plan(&root, 12).is_err());
+    }
+
+    fn fixture() -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("clock should be after epoch")
+            .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("agent-canon-rust-plan-{suffix}"))
-    }
-
-    fn write_foundation(root: &Path) {
-        write(
-            root,
-            "documents/design/rust-agent-tool-migration.md",
-            "fixture\n",
-        );
-        write(
-            root,
-            "tools/runtime/dispatch/agent-canon/Cargo.toml",
-            "fixture\n",
-        );
-        write(root, "tools/bin/agent-canon", "fixture\n");
-        for relative in [
-            "bootstrap.sh",
-            "bootstrap/host/manifest.toml",
-            "bootstrap/container/image/Dockerfile",
-            "bootstrap/container/image/dependencies.toml",
-            "bootstrap/container/lifecycle/entrypoint.sh",
-            "tools/runtime/container/bootstrap_runtime.py",
-            "tools/runtime/artifacts/runtime_artifacts.py",
-            "tools/runtime/dispatch/tool_dispatch.py",
-        ] {
-            write(root, relative, "fixture\n");
+        let root = std::env::temp_dir().join(format!(
+            "agent-canon-rust-plan-{}-{suffix}",
+            std::process::id()
+        ));
+        for directory in SCAN_ROOTS {
+            fs::create_dir_all(root.join(directory)).unwrap();
         }
-        write(root, "bootstrap.sh", "bootstrap_python_entrypoint\n");
-        write(
-            root,
-            "bootstrap/container/image/Dockerfile",
-            "USER agentcanon\nHEALTHCHECK\nimage-install\n",
-        );
-        write(
-            root,
-            "bootstrap/container/lifecycle/entrypoint.sh",
-            "health\nresident\n",
-        );
+        write(&root, "tools/catalog.yaml", "entries: []\n");
+        write(&root, "agent-canon-environment.toml", "version = 1\n");
+        root
     }
 
     fn write(root: &Path, relative: &str, text: &str) {
         let path = root.join(relative);
-        fs::create_dir_all(path.parent().expect("fixture path has parent")).expect("mkdir");
-        fs::write(path, text).expect("write fixture");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
     }
 }
