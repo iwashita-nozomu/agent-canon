@@ -68,7 +68,12 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
     let root = resolve_non_strict(&parsed.root);
-    let scopes = match inventory_scope(&parsed.mode, &root) {
+    let scope_name = if parsed.mode == "agentcanon-only" {
+        "agentcanon"
+    } else {
+        "root"
+    };
+    let scopes = match inventory_scope(scope_name, &root) {
         Ok(scope) => vec![scope],
         Err(message) => {
             println!("FILE_SURFACE_INVENTORY_ERROR={message}");

@@ -35,7 +35,10 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(json_out.read_text(encoding="utf-8"))
+            self.assertEqual(payload["scopes"][0]["name"], "root")
             self.assertEqual(payload["scopes"][0]["entries"][0]["path"], "product.md")
+            self.assertEqual(payload["scopes"][0]["entries"][0]["scope"], "root")
+            self.assertEqual(payload["scopes"][0]["entries"][0]["kind"], "product_file")
             self.assertNotIn("projection_producer", payload["scopes"][0]["entries"][0])
             self.assertIn("## Scope Summary", markdown_out.read_text(encoding="utf-8"))
 
@@ -45,10 +48,16 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             root = Path(tmp_dir)
             (root / "README.md").write_text("# Canon\n", encoding="utf-8")
             self.init_git(root, "README.md")
-            result = self.run_inventory(root, "--agentcanon-only")
+            json_out = root / "inventory.json"
+            result = self.run_inventory(root, "--agentcanon-only", "--json-out", str(json_out))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("FILE_SURFACE_INVENTORY_MODE=agentcanon-only", result.stdout)
             self.assertIn("FILE_SURFACE_INVENTORY_FILES=1", result.stdout)
+            scope = json.loads(json_out.read_text(encoding="utf-8"))["scopes"][0]
+            self.assertEqual(scope["name"], "agentcanon")
+            self.assertEqual(scope["entries"][0]["scope"], "agentcanon")
+            self.assertEqual(scope["entries"][0]["kind"], "canon_source")
+            self.assertEqual(scope["by_kind"], {"canon_source": 1})
 
     def test_git_inventory_skips_deleted_and_includes_untracked_files(self) -> None:
         """Inventory describes current worktree files, not deleted index entries."""
