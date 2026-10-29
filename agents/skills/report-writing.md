@@ -7,6 +7,7 @@ upstream design ../../documents/design/responsibility-rationale.md report semant
 upstream design ../internal-routines/verification-result-structuring.md reader reconstruction, pre-write structuring, and finding coverage
 upstream design structure-planning.md pre-write outline and structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
+upstream design result-visualize.md reusable result visualization contract
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../.codex/personal/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
@@ -21,16 +22,47 @@ raw artifact は `result-artifact-writeout` が所有し、report は第二の p
 
 ## Procedure
 
-1. [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction) で source、audience/decision、requested next action、
-   findings、counterevidence、corrections、limitations を読み直す。settled check の再実行や別の環境調査は、答えを変える具体的 gap がある場合だけ行う。
-   タスク完了報告には [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports) を適用し、重要な試行と採否の根拠も本文へ含める。
-2. 外部 reference が material claim を支える場合は、URL/DOI、access date、source identity、採否を持つ既存 source note/packet を使う。
-   evaluation/experiment report では denominator、metric direction、valid/invalid comparison、次 action を明記する。
-3. 読者の問いに沿う結果・根拠の順序は [structure-planning](structure-planning.md#before-prose) に委譲する。数値計算の結果は [Numerical and runtime results](#numerical-and-runtime-results) の順序で構成する。
-4. その構成からreader orderでdraftし、`Results/Observations`、`Interpretation`、`Limitations` を混同しない。各material claimをevidenceまたは明示したinferenceに結ぶ。
-5. 図が理解を大きく改善する場合だけ `code-visualization`、HTML/PPTが明示された場合だけ `html-output`/`slides` を追加する。描画やlayoutで構成の欠落が見つかったら、該当構成を直して本文へ戻る。
-6. material factual error、unsupported claim、broken mapping、missing context、omitted counterevidence を close してから finalize する。
-   advisory/style、out-of-scope、accepted risk は理由を短く残せる。変更した claim/section に関係する review だけ再実行する。
+Use [reader reconstruction](../internal-routines/verification-result-structuring.md#reader-reconstruction)
+to identify the source evidence, audience and decision, requested next action,
+findings, counterevidence, corrections, and limitations. Reuse settled checks and
+source notes; repeat a check or investigate the environment only to resolve a
+specific gap that could change the answer. For branch-based experiment reports,
+establish each branch's origin or baseline, purpose, and delta before synthesizing
+the final paper-level report. Preserve material external references with their
+URL/DOI, access date, source identity, and adoption status.
+
+Follow this writing sequence:
+
+1. **Outline.** Settle the reader-facing order of results and supporting evidence
+   with [structure-planning](structure-planning.md#before-prose). Reuse a
+   sufficient existing structure, especially for a short completion report; do
+   not create a separate outline artifact when the task and existing material
+   already establish the order. Include denominator, metric direction, and valid
+   or invalid comparison where relevant to evaluation or experiment results.
+2. **Decide figures.** Before producing an asset, decide whether a figure is
+   needed and specify its message, supporting evidence, and placement in the
+   outline. A short report may need no figure.
+3. **Create or reuse figures as needed.** Reuse existing result assets where they
+   answer the planned message. For a necessary plot or diagram, use the existing
+   [result-visualize](result-visualize.md) and
+   [code-visualization](code-visualization.md) owners and their selected
+   providers. Preserve the source data and provenance; do not invent data to fill
+   a visual. Update the outline if asset review exposes a material gap.
+4. **Draft the body with the selected writing owner.** Explicitly read and use
+   [paper-writing](paper-writing.md) for a scholarly manuscript or
+   [long-form-writing](long-form-writing.md) for other reader-facing reports.
+   Pass the settled outline, figure plan, and created or reused assets so the
+   writing stage can proceed without restarting those decisions. Keep
+   `Results/Observations`, `Interpretation`, and `Limitations` distinct, and tie
+   each material claim to evidence or identify it as an inference. In numerical
+   reports, follow [Numerical and runtime results](#numerical-and-runtime-results).
+
+Before finalizing, close material factual errors, unsupported claims, broken
+evidence mappings, missing context, and omitted counterevidence. Advisory/style,
+out-of-scope, and accepted-risk findings may remain with a brief reason. For task
+completion reports, apply [Completion reports](../internal-routines/verification-result-structuring.md#completion-reports)
+and include important attempts and grounds for acceptance or rejection. Re-run
+only reviews tied to changed claims or sections.
 
 ## Numerical and runtime results
 
