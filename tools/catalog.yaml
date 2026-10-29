@@ -2009,13 +2009,15 @@ entries:
       - tests/agent_tools/test_review_backlog_scan.py
 
   - id: file-surface-inventory
-    summary: Classifies root, submodule, and AgentCanon source file surfaces.
-    path: tools/analysis/code/file_surface_inventory.py
+    summary: Classifies root and selected AgentCanon source file surfaces, including gitlinks.
+    path: tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/analysis/code/file_surface_inventory.py
-    dispatch: {argv: ["python3", "tools/analysis/code/file_surface_inventory.py"]}
+    command: tools/bin/agent-canon file-surface-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "file-surface-inventory"]}
+    # Preserve stdout-only admission; optional report capability selection
+    # remains a dispatcher-owned gap documented in rust-agent-tool-migration.md.
     writes: false
     default_wiring:
       ci: false

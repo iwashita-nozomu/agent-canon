@@ -8,7 +8,7 @@ upstream design ../../tools/catalog.yaml public commands and external provider i
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs native command registration
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/migration_audit.rs shared source foundation checks
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs discovered implementation inventory and family ordering
-downstream implementation ../../tools/analysis/code/file_surface_inventory.py selected next port and current behavior owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs native file-surface inventory owner
 downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 @dependency-end
 -->
@@ -145,15 +145,15 @@ a selected native parser/provider/capability design produces `contract-first`.
 Other candidates are `port-now`, subject to their existing authority and
 behavior contracts. No `keep-python` class remains.
 
-## Next Native Port and Caller Closure
+## Native File-Surface Port and Caller Closure
 
-File-surface inventory is the selected next independent port. Its current
-implementation and catalog route remain
-`tools/analysis/code/file_surface_inventory.py`; this foundation does not provide
-a native file-surface command. The port must introduce
-`agent-canon file-surface-inventory` while preserving default `root-only`,
-mutually exclusive `--root-only`/`--agentcanon-only`, explicit `--json-out` and
-`--markdown-out`, and `--max-markdown-entries`.
+File-surface inventory is implemented by
+`agent-canon file-surface-inventory`; its former Python implementation is
+retired. The CLI and catalog route select the Rust owner. The command retains
+default `root-only`, mutually exclusive `--root-only`/`--agentcanon-only`,
+explicit `--json-out` and `--markdown-out`, and `--max-markdown-entries`.
+The full owned-tool migration remains open; this port does not establish
+completion of other implementations or native Python delegations.
 
 Inventory indexed and untracked nonignored Git paths, preserving gitlinks,
 executable and symlink modes, deleted-index exclusion, dangling symlink
@@ -163,20 +163,20 @@ success/inventory-failure/argument-error exits 0/1/2. Markdown truncation must
 not truncate JSON. Reports remain explicit; stdout-only inspection creates no
 report or implicit cache.
 
-Caller closure includes `review_backlog_scan.sh`, the existing catalog ID,
-`agents/COMMUNICATION_PROTOCOL.md`, and the direct CLI and backlog-scan fixture
-tests. The current protocol example uses unsupported `--submodule-aware`; the
-port must correct it to the existing `--root-only` mode rather than inventing
-that functionality.
+The callers use the native command: `review_backlog_scan.sh`, the retained
+`file-surface-inventory` catalog ID, `agents/COMMUNICATION_PROTOCOL.md`, and the
+direct CLI and backlog-scan fixture tests. The protocol example uses the
+existing `--root-only` mode; its unsupported `--submodule-aware` flag has been
+removed.
 
 The catalog's current fixed `ToolSpec` cannot express optional report-output
 capabilities: changing `writes` to true requires an output root even for
 stdout-only use, and `explicit-target-write` asks for source-target authority.
 Keep stdout-only admission free of report or source-write requirements.
 Argument-sensitive artifact admission belongs to the dispatcher Rust port; a
-report destination is not a source mutation capability. The native port must
-retain explicit report destinations. This unresolved catalog limitation is not proof
-that report-producing calls are read-only.
+report destination is not a source mutation capability. The native command
+retains explicit report destinations. This pre-existing catalog limitation is
+not proof that report-producing calls are read-only.
 
 Document-canon inventory is already implemented by native
 `structured-analysis document-inventory`. Its generic responsibility findings

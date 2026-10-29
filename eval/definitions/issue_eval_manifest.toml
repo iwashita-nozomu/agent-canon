@@ -490,3 +490,27 @@ linked_rules = [
   "agents/skills/test-design.md",
   "documents/conventions/coding-conventions-testing.md",
 ]
+
+[[eval]]
+id = "native-file-inventory-cli-preserves-valid-inputs"
+category = "workflow-bypass"
+source_issue = 1630
+oracle_type = "machine"
+protects = [
+  "native inventory CLI preserves the established inventory behavior for valid Unix filenames containing backslashes",
+  "native inventory CLI accepts the supported --option=value form",
+]
+expected_route = [
+  "exercise the native CLI through the existing inventory and review-backlog fixtures",
+  "compare native output and behavior against the established inventory contract",
+]
+forbidden_route = [
+  "treat a valid Unix backslash as a path separator or reject it as invalid",
+  "reject --option=value or claim parity from source inspection alone",
+]
+linked_rules = [
+  "tools/runtime/dispatch/agent-canon/src/file_surface_inventory.rs",
+  "tools/runtime/dispatch/agent-canon/src/main.rs",
+  "tests/agent_tools/test_file_surface_inventory.py",
+  "tests/agent_tools/test_review_backlog_scan.py",
+]

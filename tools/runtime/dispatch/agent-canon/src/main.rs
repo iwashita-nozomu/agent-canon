@@ -11,6 +11,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
@@ -20,6 +21,7 @@ mod check_merge_structure;
 mod config;
 mod dependency_manifest;
 mod docs;
+mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
 mod migration_audit;
@@ -52,7 +54,8 @@ Commands:
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   rust-migration-audit --root <repo-root>
-  rust-migration-plan --root <repo-root> [--limit N]
+  rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
+  file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
   semantic-index <operation>
   structured-analysis <operation>
   python-structure-hash --root <repo-root> [paths...]
@@ -89,6 +92,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {
         std::process::exit(rust_migration_plan::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "file-surface-inventory" {
+        std::process::exit(file_surface_inventory::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "docs" {
