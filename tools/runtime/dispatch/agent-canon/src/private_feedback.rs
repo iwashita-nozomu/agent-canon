@@ -135,8 +135,8 @@ fn parse(raw: &[String]) -> Result<Option<Args>> {
             break;
         }
     }
-    if !matches!(args.operation.as_str(), "add" | "capture" | "status" | "sync")
-        && !(knowledge && matches!(args.operation.as_str(), "read" | "search"))
+    if !(matches!(args.operation.as_str(), "add" | "capture" | "status" | "sync")
+        || knowledge && matches!(args.operation.as_str(), "read" | "search"))
     {
         return Err(fail("usage", "unknown private feedback operation"));
     }
