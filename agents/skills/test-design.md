@@ -25,7 +25,9 @@ Use `test-design` after the owning contract and implementation mechanism are kno
    required observable property using the
    [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract).
    Trace the actual setup-to-API-to-observable path; fixtures and mocks must
-   reach the owning logic rather than replace it.
+   reach the owning logic rather than replace it. When useful, classify the case
+   with the [test classification axes](../../documents/conventions/coding-conventions-testing.md#test-classification-axes);
+   the axes are optional labels, not a checklist or a reason to duplicate cases.
 3. Keep the existing test oracle and wiring when they are correct. Do not change
    expected values, include/import paths, configuration, fixture data, or skips just
    to make a test pass. Update a test only for an established API/layout/spec
