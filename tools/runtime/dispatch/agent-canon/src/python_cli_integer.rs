@@ -62,11 +62,11 @@ pub(crate) fn parse(value: &str) -> Option<BigInt> {
     while let Some(character) = digits.next() {
         if character == '_' {
             if !previous_was_digit
-                || !digits
+                || digits
                     .peek()
                     .copied()
                     .and_then(decimal_digit_value)
-                    .is_some()
+                    .is_none()
             {
                 return None;
             }
