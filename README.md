@@ -57,11 +57,9 @@ directory. Set AGENT_CANON_NATIVE_BIN to select a binary stored elsewhere.
 The generic agent-canon tool run catalog route is still transitional and
 continues to use its registered shared runtime.
 
-The archive also carries the stdlib Python adapter for the optional
-knowledge and feedback commands. Those commands require a host Python 3.10 or
-newer interpreter. The standalone adapter can write and inspect the private
-spool; the existing host/container sync publication lifecycle remains owned by
-the shared runtime.
+Knowledge and feedback commands use the native executable to write and inspect
+the private spool. The existing host/container sync publication lifecycle
+remains owned by the shared runtime.
 
 ### Native CLI CI/CD
 
