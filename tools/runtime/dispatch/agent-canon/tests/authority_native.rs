@@ -1006,7 +1006,7 @@ fn test_read_parent_owned_file_reads_exact_large_payload() {
     git_repo(temp.path(), "https://example.invalid/parent.git");
     let attested = native_attested_root(temp.path(), "large-read-test");
     let payload =
-        (b"0123456789abcdef".repeat((16 * 1024 * 1024) / 16 + 1))[..16 * 1024 * 1024 + 17].to_vec();
+        (b"0123456789abcdef".repeat((16 * 1024 * 1024) / 16 + 2))[..16 * 1024 * 1024 + 17].to_vec();
     let receipt = attested
         .write_parent_owned_file(
             Path::new("reports/large.bin"),
