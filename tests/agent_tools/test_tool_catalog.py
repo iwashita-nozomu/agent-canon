@@ -183,6 +183,47 @@ class CheckToolCatalogTest(unittest.TestCase):
                 [finding.render() for finding in findings],
             )
 
+    def test_native_selectors_share_one_documented_implementation(self) -> None:
+        """Distinct native commands share code while retaining separate public docs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            tool = "tools/native/rule_inventory.rs"
+            self.write_file(root, tool, "// inventory owner\n")
+            rows = []
+            docs = []
+            for language in ("python", "cpp"):
+                selector = f"oop-{language}-rule-inventory"
+                doc = f"documents/{language}/rule_inventory.md"
+                self.write_file(root, doc, "# Inventory\n")
+                rows.append(
+                    {
+                        "id": selector,
+                        "path": tool,
+                        "public": True,
+                        "docs": [doc],
+                        "dispatch": {"argv": ["tools/bin/agent-canon", selector]},
+                    }
+                )
+                docs.append(
+                    f'[[tool]]\nid = "{selector}"\nclassification = "public"\ntool = "{tool}"\ndoc = "{doc}"\n'
+                )
+            self.write_file(
+                root,
+                "documents/tools/tool-docs.toml",
+                'catalog_kind = "agent_canon_tool_docs"\nclassification_values = ["public", "internal", "compat", "retired", "example"]\n'
+                + "\n".join(docs),
+            )
+            self.assertEqual(check_tool_docs_manifest(root, rows), [])
+            rows[1]["dispatch"] = rows[0]["dispatch"]
+            findings = check_tool_docs_manifest(root, rows)
+            # A repeated native selector has no distinct documented command identity.
+            self.assertTrue(
+                any(
+                    finding.check == "tool_docs" and finding.detail == "duplicate-tool"
+                    for finding in findings
+                )
+            )
+
     def test_missing_non_default_public_catalog_entry_is_reported(self) -> None:
         """A public declaration fails even when it is absent from default wiring."""
         with tempfile.TemporaryDirectory() as tmp_dir:

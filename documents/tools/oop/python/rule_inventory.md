@@ -3,14 +3,14 @@
 @dependency-start
 contract reference
 responsibility Documents Python OOP rule inventory behavior in Japanese.
-upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs Python OOP inventory implementation
+upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs Python OOP inventory implementation
 upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
 
 この文書は `oop-python-rule-inventory` selector と一対一で対応します。実装は
-[`oop_rule_inventory.rs`](../../../../tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs)
+[`oop_rule_inventory.rs`](../../../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs)
 にあり、Python と C++ の inventory を共通の Rust module から提供します。
 
 ## 何をチェックするか
@@ -21,7 +21,7 @@ AgentCanon-owned shared docs は standalone AgentCanon source checkout の正本
 - [documents/conventions/object-oriented-design.md](../../../conventions/object-oriented-design.md) が存在すること。
 - [documents/conventions/coding-conventions-python.md](../../../conventions/coding-conventions-python.md) が存在すること。
 - `tools/validation/code/oop/python/readability.py` が存在すること。
-- `tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs` が存在すること。
+- `tools/runtime/dispatch/agent-canon/src/rule_inventory.rs` が存在すること。
 - [documents/tools/oop/python/readability.md](readability.md) が存在すること。
 - [documents/tools/oop/python/rule_inventory.md](rule_inventory.md) が存在すること。
 - `.codex/agents/oop_readability_reviewer.toml` が存在すること。

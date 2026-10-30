@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Inventories Python and C++ OOP policy, tool, document, and test surfaces.
 // upstream design ../../../../../documents/conventions/object-oriented-design.md OOP policy and inventory contract
-// downstream test ../../../../../tests/agent_tools/test_oop_rule_inventory.py preserves CLI behavior
+// downstream implementation ../../../../../tests/agent_tools/test_oop_rule_inventory.py preserves CLI behavior
 // @dependency-end
 
 use serde::Serialize;
@@ -13,7 +13,7 @@ use std::path::{Component, Path, PathBuf};
 pub const PYTHON_SELECTOR: &str = "oop-python-rule-inventory";
 pub const CPP_SELECTOR: &str = "oop-cpp-rule-inventory";
 
-const NATIVE_OWNER_PATH: &str = "tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs";
+const NATIVE_OWNER_PATH: &str = "tools/runtime/dispatch/agent-canon/src/rule_inventory.rs";
 
 #[derive(Clone, Copy)]
 struct InventoryEntry {

@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests language-specific OOP rule inventory tooling.
-# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs Python and C++ inventory CLI
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs Python and C++ inventory CLI
 # upstream design ../../documents/conventions/object-oriented-design.md OOP policy source
 # @dependency-end
 
@@ -61,14 +61,14 @@ class OopRuleInventoryTest(unittest.TestCase):
         )
         self.assertIn("documents/tools/oop/python/readability.md", python_result.stdout)
         self.assertIn(
-            "tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs",
+            "tools/runtime/dispatch/agent-canon/src/rule_inventory.rs",
             python_result.stdout,
         )
         self.assertIn("OOP_CPP_RULE_INVENTORY=pass", cpp_result.stdout)
         self.assertIn("tools/validation/code/oop/cpp/readability.py", cpp_result.stdout)
         self.assertIn("documents/tools/oop/cpp/readability.md", cpp_result.stdout)
         self.assertIn(
-            "tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs",
+            "tools/runtime/dispatch/agent-canon/src/rule_inventory.rs",
             cpp_result.stdout,
         )
         self.assertIn("resolved=", cpp_result.stdout)
@@ -92,7 +92,7 @@ class OopRuleInventoryTest(unittest.TestCase):
         paths = {entry["path"] for entry in payload["entries"]}
         self.assertIn("documents/conventions/coding-conventions-cpp.md", paths)
         self.assertIn(
-            "tools/runtime/dispatch/agent-canon/src/oop_rule_inventory.rs", paths
+            "tools/runtime/dispatch/agent-canon/src/rule_inventory.rs", paths
         )
         resolved_paths = {
             entry["path"]: entry["resolved_path"] for entry in payload["entries"]

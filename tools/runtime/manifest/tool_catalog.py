@@ -489,11 +489,18 @@ def check_tool_docs_manifest(
         elif classification == "public":
             documented_public_ids.add(entry_id)
             documented_public_tools[entry_id] = tool
-        if tool in seen_tools:
+        catalog_entry = catalog_by_id.get(entry_id)
+        tool_identity = tool
+        if Path(tool).suffix == ".rs" and catalog_entry is not None:
+            dispatch = as_mapping(catalog_entry.get("dispatch")) or {}
+            argv = string_list(dispatch.get("argv"))
+            if len(argv) >= 2 and argv[0] == "tools/bin/agent-canon":
+                tool_identity = f"{tool}::{argv[1]}"
+        if tool_identity in seen_tools:
             findings.append(Finding("tool_docs", tool, "duplicate-tool"))
         if doc in seen_docs:
             findings.append(Finding("tool_docs", doc, "duplicate-doc"))
-        seen_tools.add(tool)
+        seen_tools.add(tool_identity)
         seen_docs.add(doc)
         catalog_entry = catalog_by_id.get(entry_id)
         if catalog_entry is None:
