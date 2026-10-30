@@ -7,6 +7,7 @@ responsibility Routes readers to standalone AgentCanon tools without recreating 
 upstream design ../runtime/bootstrap-runtime.md shared tool runtime and Host adapter boundary
 upstream implementation ../../bootstrap.sh sole Host lifecycle entrypoint
 upstream implementation ../../tools/catalog.yaml machine-readable tool inventory
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog documentation
 downstream design ../../agents/canonical/CLI_ENTRYPOINTS.md typed command examples
 @dependency-end
 -->
@@ -67,7 +68,7 @@ promote an internal tool, require a check, or revalidate a historical record.
 | Select a task route or inspect the CLI | [Task routing](route.md), [AgentCanon CLI and docs formatting](agent-canon.md) |
 | Search and inspect source | [Repository search](search-coordination.md), [LSP analysis](lsp_code_analysis.md), [Semantic index](semantic_index.md), [Provider comparison reports](semantic_provider_html_report.md) |
 | Plan dependency or repository changes | [SCIP code impact](scip_index.md), [Dependency diff summary](git_dependency_diff_summary.md), [Dependency module changes](dependency_module_change.md), [Repository topic checkouts](repository_topic_clone.md) |
-| Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Semantic responsibility contracts](check_semantic_responsibility_contract.md) |
+| Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Semantic responsibility contracts](semantic_responsibility.md) |
 | Review object contracts and test design | [Python readability](oop/python/readability.md), [Python rule inventory](oop/python/rule_inventory.md), [C++ readability](oop/cpp/readability.md), [C++ rule inventory](oop/cpp/rule_inventory.md), [Test design](test_design.md) |
 | Extract, analyze, or visualize documents | [DOCX extraction](extract_docx.md), [Prose reasoning graph](prose_reasoning_graph.md), [Dependency graph rendering](render_dependency_manifest_graph.md) |
 | Plan and check formal proofs | [Formal proof](formal_proof.md), [Lean capabilities](lean_capability_matrix.md), [Lean proof environment](lean_proof_env.md), [Recursive proof search](lean_recursive_proof_search.md), [Tool proof coverage](tool_proof_coverage.md) |
@@ -93,7 +94,7 @@ Keep guide additions, moves, and removals connected through the existing
 Validate the selected owner rather than every tool family:
 
 ```bash
-python3 tools/runtime/manifest/tool_catalog.py
+tools/bin/agent-canon tool-catalog
 python3 tools/validation/semantic/convention/check_convention_compliance.py
 python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
 ```

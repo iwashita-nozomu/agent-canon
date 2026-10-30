@@ -10,6 +10,7 @@ upstream implementation runtime/container/bootstrap_runtime.py lifecycle impleme
 upstream implementation runtime/dispatch/tool_dispatch.py typed dispatch implementation
 upstream implementation runtime/artifacts/runtime_artifacts.py external artifact boundary
 upstream design catalog.yaml public tool registry
+downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog documentation
 @dependency-end
 -->
 
@@ -119,7 +120,7 @@ catalog/checker owners rather than adding a second README registry.
 
 | Need | Owner command |
 | --- | --- |
-| catalog shape and docs wiring | `python3 tools/runtime/manifest/tool_catalog.py` |
+| catalog shape and docs wiring | `tools/bin/agent-canon tool-catalog` |
 | tool/workflow drift | `python3 tools/validation/semantic/tools/tool_drift.py` |
 | responsibility scope | `python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .` |
 | runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
@@ -128,6 +129,7 @@ catalog/checker owners rather than adding a second README registry.
 | path-risk/profile selection | `python3 tools/validation/semantic/path/classify_path_risk.py` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
+| notebook quality | `tools/bin/agent-canon notebook-quality [--changed|--all] [paths...]` |
 | bounded Skill read and EOF admission | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` (shared tool container) |
 
 ## Artifact and archive route

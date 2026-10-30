@@ -5,7 +5,7 @@ responsibility Defines the semantic responsibility contract for implementation d
 upstream design ../rule/README.md document filename, placement, and language rules
 upstream design codex-spark-implementation-routing.md implementation owner and validation route
 downstream implementation ../../templates/documents/semantic-responsibility-contract.template.toml reusable empty task instance
-downstream implementation ../../tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py schema, identity, and reference validator
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs schema, identity, and reference validator
 downstream design ../../agents/COMMUNICATION_PROTOCOL.md active design packet reference
 @dependency-end
 -->
@@ -30,7 +30,7 @@ obligation と一次検証 owner を実装前に割り当てるための設計�
   再利用可能な task instance の形です。
 - 値を埋めた instance は active design packet が参照する run-local artifact として
   `reports/agents/<run-id>/` にだけ置きます。template や `documents/` に実値を戻しません。
-- `check_semantic_responsibility_contract.py` は schema、identity、reference の
+- `check-semantic-responsibility-contract` は Rust-native な schema、identity、reference の
   fail-closed validator です。設計の妥当性、実装の正しさ、レビューの合否はこの checker
   の責務ではありません。
 

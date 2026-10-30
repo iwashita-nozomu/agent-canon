@@ -4,6 +4,8 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
+// downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -12,6 +14,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
@@ -20,6 +23,7 @@
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
+// downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
@@ -32,8 +36,8 @@ mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
 mod migration_audit;
+mod notebook_quality;
 mod numeric_performance;
-mod private_feedback;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -45,15 +49,19 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod result_logs;
 mod rule_inventory;
-mod runtime_boundary;
+mod run_log_contract;
 mod rust_migration_plan;
 mod semantic_index;
+mod semantic_responsibility;
 pub mod skill_document_reader;
 mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
+#[cfg(not(test))]
+use agent_canon::runtime_boundary;
+use agent_canon::{catalog, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -68,13 +76,18 @@ Commands:
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   numeric-performance [--input <path|->] [--format json]
+  tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -114,6 +127,18 @@ fn main() {
         std::process::exit(numeric_performance::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "tool-catalog" {
+        std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool-proof-coverage" {
+        std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-run-log-contract" {
+        std::process::exit(run_log_contract::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
     }
@@ -125,6 +150,10 @@ fn main() {
         )
     {
         std::process::exit(rule_inventory::run(&args[1], &args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
+        std::process::exit(semantic_responsibility::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
@@ -158,7 +187,7 @@ fn main() {
     }
 
     if args.len() >= 2 && matches!(args[1].as_str(), "knowledge" | "k" | "feedback" | "f") {
-        std::process::exit(private_feedback::run(&args[1..]));
+        std::process::exit(agent_canon::private_feedback::run(&args[1..]));
     }
 
     if args.len() >= 2 && args[1] == "graph" {
@@ -187,6 +216,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "notebook-quality" {
+        std::process::exit(notebook_quality::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-merge-structure" {
@@ -224,4 +257,38 @@ fn main() {
     eprintln!("agent-canon: unknown or missing command");
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod runtime_boundary {
+    use std::path::{Path, PathBuf};
+
+    pub(crate) use agent_canon::runtime_boundary::{
+        runtime_root_is_explicit, stable_source_key, test_runtime_root_path,
+        validate_external_target, RUNTIME_ROOT_ENV,
+    };
+
+    // Cargo builds the library as a normal dependency of the binary test target, without `cfg(test)`.
+    // Preserve only the binary test fixture selection and delegate all resolution to the library.
+    pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
+        resolve_runtime_root_at(source_root, None)
+    }
+
+    pub(crate) fn resolve_runtime_root_at(
+        source_root: &Path,
+        requested: Option<&Path>,
+    ) -> Result<PathBuf, String> {
+        match requested {
+            Some(requested) => {
+                agent_canon::runtime_boundary::resolve_runtime_root_at(source_root, Some(requested))
+            }
+            None => {
+                let test_root = test_runtime_root_path(source_root)?;
+                agent_canon::runtime_boundary::resolve_runtime_root_at(
+                    source_root,
+                    Some(&test_root),
+                )
+            }
+        }
+    }
 }

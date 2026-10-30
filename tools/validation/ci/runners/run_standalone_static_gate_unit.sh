@@ -170,6 +170,9 @@ run_contracts() {
     tests.agent_tools.test_paper_writing_citeproc \
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
+    tests.tools.test_notebook_quality \
+    tests.agent_tools.test_check_semantic_responsibility_contract \
+    tests.agent_tools.test_check_run_log_contract \
     tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
@@ -178,8 +181,8 @@ run_contracts() {
     tests/agent_tools/test_dependency_*.py
   python3 -m pytest -p no:cacheprovider \
     tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
-  python3 "${TOOLS_ROOT}/runtime/manifest/tool_catalog.py"
-  python3 "${TOOLS_ROOT}/analysis/proof/tool_proof_coverage.py"
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
   python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
   PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"

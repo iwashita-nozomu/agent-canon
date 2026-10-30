@@ -11,7 +11,7 @@
 # upstream design ../../../../documents/conventions/REVIEW_PROCESS.md closeout validation policy
 # upstream design ../../../catalog.yaml structured tool catalog
 # upstream design ../../../../documents/tools/tool-docs.toml one-to-one tool documentation map
-# upstream implementation ../../../runtime/manifest/tool_catalog.py validates catalog structure
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog structure
 # upstream implementation ../convention/check_convention_compliance.py verifies skill-routing markers
 # upstream implementation ../../../analysis/dependencies/graph_client.py provides verified manifest dependency facts
 # upstream implementation ../../../runtime/authority/tool_path_policy.py defines retired legacy path policy
@@ -119,7 +119,7 @@ CONTRACTS = (
     ),
     ToolContract(
         name="tool_catalog",
-        tool="tools/runtime/manifest/tool_catalog.py",
+        tool="tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs",
         links=(
             LinkCheck("tools/catalog.yaml", reverse_required=True),
             LinkCheck("tools/README.md"),

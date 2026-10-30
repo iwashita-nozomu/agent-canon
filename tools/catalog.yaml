@@ -3,7 +3,7 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
-# downstream implementation runtime/manifest/tool_catalog.py validates this catalog
+# downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
@@ -296,12 +296,12 @@ entries:
 
   - id: tool-catalog
     summary: Validates the structured tool catalog and renders the tool crosswalk.
-    path: tools/runtime/manifest/tool_catalog.py
+    path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
     family: agent_tools
     role: catalog
     status: canonical
-    command: python3 tools/runtime/manifest/tool_catalog.py
-    dispatch: {argv: ["python3", "tools/runtime/manifest/tool_catalog.py"]}
+    command: tools/bin/agent-canon tool-catalog
+    dispatch: {argv: ["tools/bin/agent-canon", "tool-catalog"]}
     writes: false
     default_wiring:
       ci: true
@@ -520,14 +520,14 @@ entries:
   - id: tool-proof-coverage
     public: true
     summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
-    path: tools/analysis/proof/tool_proof_coverage.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_proof_coverage.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: maintainer
     placement: validation_checker
-    command: python3 tools/analysis/proof/tool_proof_coverage.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/tool_proof_coverage.py"]}
+    command: tools/bin/agent-canon tool-proof-coverage
+    dispatch: {argv: ["tools/bin/agent-canon", "tool-proof-coverage"]}
     writes: false
     default_wiring:
       ci: true
@@ -1324,12 +1324,12 @@ entries:
   - id: check-semantic-responsibility-contract
     public: true
     summary: Validates semantic responsibility contract schema, identity, and references.
-    path: tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"]}
+    command: tools/bin/agent-canon check-semantic-responsibility-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-semantic-responsibility-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -1337,7 +1337,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/check_semantic_responsibility_contract.md
+      - documents/tools/semantic_responsibility.md
       - documents/design/semantic-responsibility-contract.md
     tests:
       - tests/agent_tools/test_check_semantic_responsibility_contract.py
@@ -1895,12 +1895,12 @@ entries:
 
   - id: check-run-log-contract
     summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.
-    path: tools/validation/semantic/logging/check_run_log_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/run_log_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/logging/check_run_log_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_run_log_contract.py"]}
+    command: tools/bin/agent-canon check-run-log-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-run-log-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -2478,12 +2478,12 @@ entries:
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
-    path: tools/validation/notebooks/notebook_quality.py
+    path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
     family: validation
     role: checker
     status: canonical
-    command: python3 tools/validation/notebooks/notebook_quality.py --all
-    dispatch: {argv: ["python3", "tools/validation/notebooks/notebook_quality.py", "--all"]}
+    command: tools/bin/agent-canon notebook-quality --all
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "notebook-quality", "--all"]}
     writes: false
     default_wiring:
       ci: true
@@ -2491,6 +2491,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/notebook_quality.md
     tests:
       - tests/tools/test_notebook_quality.py
 

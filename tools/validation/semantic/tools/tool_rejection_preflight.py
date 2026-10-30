@@ -104,6 +104,9 @@ AGENT_PROTOCOL_PATHS = frozenset(
     }
 )
 TOOL_CATALOG_PATHS = frozenset({"tools/catalog.yaml"})
+NOTEBOOK_QUALITY_SOURCE_PATH = (
+    "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+)
 EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
     {
         ".codex/personal/skills/experiment-lifecycle/SKILL.md",
@@ -300,9 +303,19 @@ AGENT_PROTOCOL_GATE_TEMPLATES = (
 TOOL_CATALOG_GATE_TEMPLATES = (
     GateTemplate(
         gate="tool_catalog",
-        command_template="python3 tools/runtime/manifest/tool_catalog.py",
+        command_template="tools/bin/agent-canon tool-catalog",
         handoff=(
             "include catalog/docs/tests wiring for changed canonical tool surfaces"
+        ),
+    ),
+)
+NOTEBOOK_QUALITY_GATE_TEMPLATES = (
+    GateTemplate(
+        gate="notebook_quality_contract",
+        command_template="python3 -m pytest -q tests/tools/test_notebook_quality.py",
+        handoff=(
+            "preserve the notebook-quality CLI contract and run its existing "
+            "Rust-backed path, content, metric, warning, output, and exit oracles"
         ),
     ),
 )
@@ -440,6 +453,8 @@ def path_gates(
         templates.extend(EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES)
     if path in TOOL_CATALOG_PATHS or path.startswith(TOOL_SURFACE_PREFIXES):
         templates.extend(TOOL_CATALOG_GATE_TEMPLATES)
+    if path == NOTEBOOK_QUALITY_SOURCE_PATH:
+        templates.extend(NOTEBOOK_QUALITY_GATE_TEMPLATES)
     if library_surface_path(path):
         templates.extend(LIBRARY_GATE_TEMPLATES)
     gates.extend(template.for_path(path) for template in templates)

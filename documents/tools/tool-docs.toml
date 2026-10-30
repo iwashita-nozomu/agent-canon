@@ -3,7 +3,7 @@
 # responsibility Maps canonical tools to same-named explanatory documents and owns their public/internal/compat/retired/example classification.
 # upstream design README.md tool documentation placement policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
-# downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates one-to-one tool docs
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates one-to-one tool docs
 # downstream implementation ../../tests/agent_tools/test_tool_catalog.py validates visualization tool-doc registration
 # @dependency-end
 
@@ -111,6 +111,14 @@ language = "rust"
 summary = "Rust test design resilience diagnostics."
 
 [[tool]]
+id = "notebook-quality"
+classification = "internal"
+tool = "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+doc = "documents/tools/notebook_quality.md"
+language = "rust"
+summary = "Rust-native notebook quality checker for readable runnable demos."
+
+[[tool]]
 id = "github-publish"
 classification = "public"
 tool = "tools/repository/github/github_publish.py"
@@ -145,9 +153,9 @@ summary = "Git diff, optional SCIP impact, and dependency-header expansion summa
 [[tool]]
 id = "check-semantic-responsibility-contract"
 classification = "public"
-tool = "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"
-doc = "documents/tools/check_semantic_responsibility_contract.md"
-language = "python"
+tool = "tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs"
+doc = "documents/tools/semantic_responsibility.md"
+language = "rust"
 summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
 
 [[tool]]
@@ -209,9 +217,9 @@ summary = "Lean Mathlib/Aesop proof environment setup and checker routing docume
 [[tool]]
 id = "tool-proof-coverage"
 classification = "public"
-tool = "tools/analysis/proof/tool_proof_coverage.py"
+tool = "tools/runtime/dispatch/agent-canon/src/tool_proof_coverage.rs"
 doc = "documents/tools/tool_proof_coverage.md"
-language = "python"
+language = "rust"
 summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
 
 [[tool]]
