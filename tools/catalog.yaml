@@ -1877,12 +1877,12 @@ entries:
 
   - id: check-run-log-contract
     summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.
-    path: tools/validation/semantic/logging/check_run_log_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/run_log_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/logging/check_run_log_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_run_log_contract.py"]}
+    command: tools/bin/agent-canon check-run-log-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-run-log-contract"]}
     writes: false
     default_wiring:
       ci: false
