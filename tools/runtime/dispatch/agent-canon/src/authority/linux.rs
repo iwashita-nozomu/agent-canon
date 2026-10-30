@@ -761,7 +761,7 @@ pub(crate) fn atomic_replace_parent_owned_file(
         receipt,
         bytes,
         mode,
-        |file, bytes| write_all_progress(file, bytes),
+        write_all_progress,
         |directory, name| directory.remove_file(name),
     )
 }
@@ -3044,7 +3044,7 @@ mod parent_file_tests {
             &receipt,
             b"published-before-cleanup-error",
             FileMode::Private0600,
-            |file, bytes| write_all_progress(file, bytes),
+            write_all_progress,
             |_directory, _name| {
                 Err(io::Error::new(
                     io::ErrorKind::PermissionDenied,
