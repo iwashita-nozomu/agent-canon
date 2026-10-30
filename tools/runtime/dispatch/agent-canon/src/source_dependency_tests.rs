@@ -1,3 +1,4 @@
+use crate::graph_client::GraphClient;
 use crate::source_dependency_graph;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -89,6 +90,32 @@ fn fixture() -> Fixture {
         "<!--\n@dependency-start\nupstream design architecture.md architecture context\ndownstream reference user_guide.md reader documentation\ndownstream implementation ../.codex/personal/skills/*/SKILL.md canonical skill owner\n@dependency-end\n-->\nConsumer source.\n",
     );
     fixture.track_all();
+    fixture
+}
+
+fn graph_client_fixture() -> Fixture {
+    let fixture = Fixture::new();
+    fixture.write(
+        "agents/skills/catalog.yaml",
+        "skill_families:\n  - id: example\n    canonical_doc: agents/skills/example.md\n    shim: .codex/personal/skills/example/SKILL.md\n",
+    );
+    fixture.write("agents/skills/example.md", "Canonical skill owner.\n");
+    fixture.write(
+        "documents/design/parent.md",
+        "<!--\n@dependency-start\ncontract design\nresponsibility Defines the parent contract.\ndownstream design feature.md specializes the parent\n@dependency-end\n-->\n# Parent\n",
+    );
+    fixture.write(
+        "documents/design/feature.md",
+        "<!--\n@dependency-start\ncontract design\nresponsibility Defines the feature contract.\nupstream design parent.md inherits the parent contract\nupstream reference ../notes/source-evidence.md records non-authoritative context\ndownstream implementation ../../tools/feature.py implements the feature\n@dependency-end\n-->\n# Feature\n",
+    );
+    fixture.write(
+        "documents/notes/source-evidence.md",
+        "# Source evidence\n\nThis note is supporting context, not a design owner.\n",
+    );
+    fixture.write(
+        "tools/feature.py",
+        "# @dependency-start\n# contract tool\n# responsibility Implements the feature contract.\n# upstream design ../documents/design/feature.md feature design\n# @dependency-end\ndef feature() -> None:\n    pass\n",
+    );
     fixture
 }
 
@@ -316,4 +343,193 @@ fn source_selection_and_header_failures_match_the_review_contract() {
             .unwrap();
     assert!(!document.manifest_present);
     assert!(document.edges.is_empty());
+}
+
+#[test]
+fn graph_client_dependency_query_and_context_use_source_without_runtime_state() {
+    let fixture = graph_client_fixture();
+    let missing_provider = fixture.0.join("missing-agent-canon");
+    let client = GraphClient::with_executable(&fixture.0, &missing_provider).unwrap();
+
+    let response = client.query(None, "dependency", "both", 0, true).unwrap();
+    assert_eq!(response.status, "fresh");
+    assert_eq!(response.payload["projection"], "tracked-source");
+    let facts = response.dependency_facts().unwrap();
+    assert!(facts.len() >= 4);
+    assert!(!fixture.0.join(".agent-canon").exists());
+
+    let context = client.context("documents/design/feature.md", None).unwrap();
+    let identity = context.source_identity().unwrap().unwrap();
+    assert_eq!(identity.source_path, "documents/design/feature.md");
+    assert_eq!(identity.content_sha256.len(), 64);
+    assert_eq!(
+        context.payload["parent_paths"],
+        json!(["documents/design/parent.md"])
+    );
+    assert_eq!(
+        context.payload["evidence_paths"],
+        json!([
+            "documents/design/feature.md",
+            "documents/design/parent.md",
+            "documents/notes/source-evidence.md",
+            "tools/feature.py"
+        ])
+    );
+    assert!(!fixture.0.join(".agent-canon").exists());
+}
+
+#[test]
+fn graph_client_persisted_operations_keep_the_explicit_executable_provider() {
+    let fixture = graph_client_fixture();
+    let missing_provider = fixture.0.join("missing-agent-canon");
+    let client = GraphClient::with_executable(&fixture.0, &missing_provider).unwrap();
+
+    assert!(client
+        .build()
+        .unwrap_err()
+        .to_string()
+        .contains("process launch failed"));
+    assert!(client
+        .status()
+        .unwrap_err()
+        .to_string()
+        .contains("process launch failed"));
+    assert!(client
+        .query(None, "owner", "both", 0, true)
+        .unwrap_err()
+        .to_string()
+        .contains("process launch failed"));
+    assert!(client
+        .query(
+            Some("documents/design/feature.md"),
+            "dependency",
+            "outgoing",
+            1,
+            false
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("process launch failed"));
+    assert!(client
+        .context("documents/design/feature.md", Some("claim-token"))
+        .unwrap_err()
+        .to_string()
+        .contains("process launch failed"));
+}
+
+#[test]
+fn graph_client_source_query_fails_closed_on_escape_and_relation_errors() {
+    let fixture = graph_client_fixture();
+    fixture.write(
+        "tools/escape.py",
+        "# @dependency-start\n# contract tool\n# responsibility Tests source containment.\n# upstream design ../../outside.md escapes the root\n# @dependency-end\n",
+    );
+    let client = GraphClient::new(&fixture.0).unwrap();
+    let error = client
+        .query(None, "dependency", "both", 0, true)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("source dependency projection failed"));
+    assert!(error.contains("escapes repository root"));
+    assert!(client
+        .query(None, "citation", "both", 0, true)
+        .unwrap_err()
+        .to_string()
+        .contains("unsupported graph relation: citation"));
+}
+
+#[test]
+fn graph_client_generated_skill_views_resolve_to_catalog_owners() {
+    let fixture = graph_client_fixture();
+    fixture.write(
+        "agents/skills/catalog.yaml",
+        "skill_families:\n  - id: alpha\n    canonical_doc: agents/skills/alpha.md\n    shim: .codex/personal/skills/alpha/SKILL.md\n  - id: beta\n    canonical_doc: agents/skills/beta.md\n    shim: .codex/personal/skills/beta/SKILL.md\n",
+    );
+    fixture.write("agents/skills/alpha.md", "Canonical alpha skill.\n");
+    fixture.write("agents/skills/beta.md", "Canonical beta skill.\n");
+    fixture.write(
+        "tools/consumer.py",
+        "# @dependency-start\n# contract tool\n# responsibility References generated skill views.\n# downstream implementation ../.codex/personal/skills/alpha/SKILL.md exact owner view\n# downstream reference ../.codex/personal/skills/*/SKILL.md all catalog owner views\n# @dependency-end\n",
+    );
+    let client = GraphClient::new(&fixture.0).unwrap();
+    let response = client.query(None, "dependency", "both", 0, true).unwrap();
+    let facts = response.dependency_facts().unwrap();
+    let consumer_facts: Vec<_> = facts
+        .iter()
+        .filter(|fact| fact.source == "tools/consumer.py")
+        .collect();
+    assert_eq!(consumer_facts.len(), 3);
+    assert_eq!(
+        consumer_facts
+            .iter()
+            .map(|fact| fact.target.as_str())
+            .collect::<std::collections::BTreeSet<_>>(),
+        std::collections::BTreeSet::from(["agents/skills/alpha.md", "agents/skills/beta.md"])
+    );
+    let context = client
+        .context(".codex/personal/skills/alpha/SKILL.md", None)
+        .unwrap();
+    assert_eq!(
+        context.source_identity().unwrap().unwrap().source_path,
+        "agents/skills/alpha.md"
+    );
+    assert!(!fixture.0.join(".codex").exists());
+}
+
+#[test]
+fn graph_client_rejects_unknown_and_unmatched_generated_skill_views() {
+    for (target, expected) in [
+        (
+            "../.codex/personal/skills/removed/SKILL.md",
+            "unknown generated skill view",
+        ),
+        (
+            "../.codex/personal/skills/missing-*/SKILL.md",
+            "unknown generated skill view",
+        ),
+    ] {
+        let fixture = graph_client_fixture();
+        fixture.write(
+            "tools/consumer.py",
+            &format!(
+                "# @dependency-start\n# contract tool\n# responsibility References a generated view.\n# downstream implementation {target} stale generated view\n# @dependency-end\n"
+            ),
+        );
+        let error = GraphClient::new(&fixture.0)
+            .unwrap()
+            .query(None, "dependency", "both", 0, true)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("source dependency projection failed"));
+        assert!(error.contains(expected));
+    }
+}
+
+#[test]
+fn graph_client_source_query_preserves_cycle_edges_without_persisted_state() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "a.md",
+        "<!--\n@dependency-start\ndownstream design b.md forms first edge\n@dependency-end\n-->\n",
+    );
+    fixture.write(
+        "b.md",
+        "<!--\n@dependency-start\ndownstream design a.md forms return edge\n@dependency-end\n-->\n",
+    );
+    let client = GraphClient::new(&fixture.0).unwrap();
+    let response = client.query(None, "dependency", "both", 0, true).unwrap();
+    let edges = response
+        .dependency_facts()
+        .unwrap()
+        .into_iter()
+        .map(|fact| (fact.source, fact.target))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        edges,
+        std::collections::BTreeSet::from([
+            ("a.md".to_string(), "b.md".to_string()),
+            ("b.md".to_string(), "a.md".to_string()),
+        ])
+    );
+    assert!(!fixture.0.join(".agent-canon").exists());
 }

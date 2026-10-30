@@ -9,6 +9,7 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
+// downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
@@ -28,6 +29,7 @@ mod dependency_manifest;
 mod docs;
 mod file_surface_inventory;
 mod graph;
+pub mod graph_client;
 mod jit_ir_to_lean;
 mod migration_audit;
 mod private_feedback;

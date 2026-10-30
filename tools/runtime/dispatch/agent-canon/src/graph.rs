@@ -5,6 +5,7 @@
 // upstream implementation skill_projection_registry.rs provides native generated skill-view owner mapping
 // upstream implementation structured_analysis.rs provides the graph storage schema
 // downstream implementation main.rs dispatches the public graph command
+// downstream implementation graph_client.rs invokes existing graph commands in-process
 // downstream implementation ../../../../analysis/dependencies/graph_client.py consumes typed graph responses
 // @dependency-end
 
@@ -147,7 +148,7 @@ impl GraphIntegrationRecord {
 }
 
 #[derive(Debug)]
-enum GraphError {
+pub(crate) enum GraphError {
     Usage(String),
     Unavailable(String),
     Validation(String),
@@ -3501,6 +3502,39 @@ fn emit(value: &Value, format: &str) -> i32 {
         );
     }
     value.get("exit_code").and_then(Value::as_i64).unwrap_or(1) as i32
+}
+
+pub(crate) fn invoke(root: &Path, command: &str, options: &[String]) -> Result<Value, GraphError> {
+    if !matches!(command, "build" | "status" | "query" | "context") {
+        return Err(GraphError::Usage(format!(
+            "unknown graph command {command}"
+        )));
+    }
+    let mut invocation_args = vec![
+        "--root".to_string(),
+        root.to_string_lossy().into_owned(),
+        "--format".to_string(),
+        "json".to_string(),
+    ];
+    invocation_args.extend_from_slice(options);
+    let parsed = parse_args(&invocation_args)?;
+    let result = match command {
+        "build" => build_graph_with_failure(&parsed),
+        "status" => read_graph_status(&parsed),
+        "query" => query_graph(&parsed),
+        "context" => context_graph(&parsed),
+        _ => unreachable!("graph command was checked above"),
+    };
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) => Ok(json!({
+            "schema": format!("agent-canon.graph.{command}.v1"),
+            "command": command,
+            "status": "unavailable",
+            "reason": error.to_string(),
+            "exit_code": 1
+        })),
+    }
 }
 
 pub(crate) fn run(args: &[String]) -> i32 {
