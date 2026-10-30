@@ -692,9 +692,8 @@ pub(crate) struct RuntimeFileSnapshot {
 
 impl RuntimeFileSnapshot {
     fn from_metadata(metadata: &cap_std::fs::Metadata) -> Self {
-        use cap_std::fs::MetadataExt;
         #[cfg(unix)]
-        use cap_std::fs::PermissionsExt;
+        use cap_std::fs::{MetadataExt, PermissionsExt};
         #[cfg(unix)]
         let (device, inode, mode, mtime_ns) = (
             metadata.dev(),

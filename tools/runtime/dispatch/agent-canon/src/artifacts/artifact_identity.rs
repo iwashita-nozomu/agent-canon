@@ -165,10 +165,10 @@ pub fn git_blob_oid(data: &[u8]) -> String {
         0x10325476,
         0xc3d2e1f0,
     ];
-    for chunk in message.chunks_exact(64) {
+    for chunk in message.as_chunks::<64>().0 {
         let mut words = [0_u32; 80];
-        for (index, bytes) in chunk.chunks_exact(4).enumerate() {
-            words[index] = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        for (index, bytes) in chunk.as_chunks::<4>().0.iter().enumerate() {
+            words[index] = u32::from_be_bytes(*bytes);
         }
         for index in 16..80 {
             words[index] =
