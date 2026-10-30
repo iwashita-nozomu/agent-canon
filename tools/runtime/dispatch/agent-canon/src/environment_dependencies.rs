@@ -3046,7 +3046,7 @@ fn verify_npm_package(
         probe,
         &argv_refs,
         workspace,
-        Some(trusted_path),
+        Some(&trusted_path),
         "verify-npm-package",
         &record.id,
     )?;
@@ -3090,7 +3090,7 @@ fn verify_npm_package(
         probe,
         &argv_refs,
         workspace,
-        Some(trusted_path),
+        Some(&trusted_path),
         "verify-declared-executable",
         &record.id,
     )?;
