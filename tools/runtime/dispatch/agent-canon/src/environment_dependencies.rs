@@ -2510,14 +2510,14 @@ struct CommandInvocation {
     record_id: String,
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[derive(Debug, Default)]
 struct FakeCommandRunner {
     responses: std::cell::RefCell<BTreeMap<Vec<String>, VecDeque<CommandOutput>>>,
     invocations: std::cell::RefCell<Vec<CommandInvocation>>,
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 impl FakeCommandRunner {
     fn with_responses(responses: impl IntoIterator<Item = (Vec<String>, CommandOutput)>) -> Self {
         let mut response_map = BTreeMap::<Vec<String>, VecDeque<CommandOutput>>::new();
@@ -2533,7 +2533,7 @@ impl FakeCommandRunner {
 
 enum CommandRunner {
     System,
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     Fake(FakeCommandRunner),
 }
 
@@ -2700,7 +2700,7 @@ impl ProbeEnvironment {
                 })?;
                 command_output(output, &invocation.record_id, &invocation.operation)
             }
-            #[cfg(test)]
+            #[cfg(all(test, unix))]
             CommandRunner::Fake(runner) => {
                 runner.invocations.borrow_mut().push(invocation.clone());
                 runner
@@ -3784,6 +3784,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn expected_record_payload(
         id: &str,
         package: &str,
@@ -3837,6 +3838,7 @@ mod tests {
 
     // These hashes use test-owned normalized payload values; they never call
     // DependencyRecord::fingerprint or build_plan to construct receipt identity.
+    #[cfg(unix)]
     fn expected_identity(record_id: &str, record_payload: &Value) -> (String, String) {
         let record_fingerprint = sha256_hex(
             &canonical_bytes(record_payload).expect("independent record payload encodes"),
@@ -3852,6 +3854,7 @@ mod tests {
         (record_fingerprint, plan_fingerprint)
     }
 
+    #[cfg(unix)]
     fn receipt_binding(name: &str, path: &str, output: &str) -> Value {
         json!({
             "provided": name,
@@ -3861,6 +3864,7 @@ mod tests {
         })
     }
 
+    #[cfg(unix)]
     fn receipt_payload(
         record_id: &str,
         version: &str,
@@ -3884,6 +3888,7 @@ mod tests {
         })
     }
 
+    #[cfg(unix)]
     fn fake_probe(
         root: &TempRoot,
         responses: impl IntoIterator<Item = (Vec<String>, CommandOutput)>,
@@ -3930,6 +3935,7 @@ mod tests {
             .expect("fixture executable is executable");
     }
 
+    #[cfg(unix)]
     fn command_output_fixture(stdout: &str) -> CommandOutput {
         CommandOutput {
             stdout: stdout.to_string(),
@@ -3937,6 +3943,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn fixture_invocations(probe: &ProbeEnvironment) -> Vec<CommandInvocation> {
         let CommandRunner::Fake(runner) = &probe.command_runner else {
             panic!("test resolver uses only the per-test fake command runner")
@@ -3944,6 +3951,7 @@ mod tests {
         runner.invocations.borrow().clone()
     }
 
+    #[cfg(unix)]
     fn assert_fake_responses_consumed(probe: &ProbeEnvironment) {
         let CommandRunner::Fake(runner) = &probe.command_runner else {
             panic!("test resolver uses only the per-test fake command runner")
@@ -3968,11 +3976,13 @@ mod tests {
         let metadata = fs::metadata(&path).expect("access fixture metadata is available");
         assert!(metadata.is_file());
         assert_eq!(metadata.permissions().mode() & 0o777, 0o001);
-        let os_access = Command::new("/usr/bin/test")
-            .arg("-x")
+        let os_access = Command::new("/bin/sh")
+            .arg("-c")
+            .arg("test -x \"$1\"")
+            .arg("agent-canon-executable-access-oracle")
             .arg(&path)
             .status()
-            .expect("POSIX test command is available")
+            .expect("POSIX shell access oracle is available")
             .success();
         assert_eq!(
             ProbeEnvironment::system().is_regular_executable(&path),
@@ -3992,10 +4002,12 @@ mod tests {
         assert!(ProbeEnvironment::system().is_regular_executable(&path));
     }
 
+    #[cfg(unix)]
     fn write_success_manifest(root: &TempRoot, text: &str) -> PathBuf {
         root.write_manifest("workspace/dependencies.toml", text)
     }
 
+    #[cfg(unix)]
     fn write_success_receipt(root: &TempRoot, record_id: &str, receipt: &Value) -> PathBuf {
         root.write_manifest(
             &format!("receipts/{record_id}.json"),
