@@ -105,7 +105,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "notebook_quality": (
-        "tools/validation/notebooks/notebook_quality.py",
+        "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "oop_readability": (

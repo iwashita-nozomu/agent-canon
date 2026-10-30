@@ -3,6 +3,7 @@
 // responsibility Parses Python-compatible signed decimal CLI integers using Unicode 15.0 decimal digits.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md native CLI compatibility
 // downstream implementation skill_document_reader.rs parses bounded reader options
+// downstream implementation notebook_quality.rs parses Python-compatible notebook thresholds
 // downstream implementation result_logs/mod.rs parses summary top limits
 // @dependency-end
 
