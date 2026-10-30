@@ -176,6 +176,7 @@ run_contracts() {
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_dependency_headers \
+    tests.agent_tools.test_check_algorithm_config_partition \
     tests.agent_tools.test_tool_drift \
     tests/agent_tools/test_dependency_*.py
   python3 -m pytest -p no:cacheprovider \

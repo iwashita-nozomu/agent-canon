@@ -5,6 +5,7 @@
 // upstream implementation python_ast.rs shares native Python source, span, and expression-dump helpers
 // upstream implementation python_structure_hash.rs provides the Python-AST-to-Rust analysis pattern
 // downstream implementation main.rs exposes python-algorithm-contract-check
+// downstream implementation check_algorithm_config_partition.rs reuses the selector with its legacy path policy
 // @dependency-end
 
 use crate::python_ast::{
@@ -357,6 +358,55 @@ fn resolve_like_cwd(path: &Path) -> PathBuf {
 }
 
 fn source_files(root: &Path, raw_paths: &[String], excludes: &[String]) -> Vec<PathBuf> {
+    source_files_with_policy(root, raw_paths, excludes, SourceSelectionPolicy::default())
+}
+
+#[derive(Clone, Copy)]
+struct SourceSelectionPolicy {
+    explicit_files_bypass_excludes: bool,
+    prune_excluded_directories: bool,
+    follow_directory_symlinks: bool,
+}
+
+impl SourceSelectionPolicy {
+    const fn config_partition_checker() -> Self {
+        Self {
+            explicit_files_bypass_excludes: true,
+            prune_excluded_directories: true,
+            follow_directory_symlinks: false,
+        }
+    }
+}
+
+impl Default for SourceSelectionPolicy {
+    fn default() -> Self {
+        Self {
+            explicit_files_bypass_excludes: false,
+            prune_excluded_directories: false,
+            follow_directory_symlinks: true,
+        }
+    }
+}
+
+pub(crate) fn source_files_for_config_checker(
+    root: &Path,
+    raw_paths: &[String],
+    excludes: &[String],
+) -> Vec<PathBuf> {
+    source_files_with_policy(
+        root,
+        raw_paths,
+        excludes,
+        SourceSelectionPolicy::config_partition_checker(),
+    )
+}
+
+fn source_files_with_policy(
+    root: &Path,
+    raw_paths: &[String],
+    excludes: &[String],
+    policy: SourceSelectionPolicy,
+) -> Vec<PathBuf> {
     let targets = if raw_paths.is_empty() {
         vec![root.to_path_buf()]
     } else {
@@ -364,7 +414,7 @@ fn source_files(root: &Path, raw_paths: &[String], excludes: &[String]) -> Vec<P
     };
     let mut files = BTreeSet::new();
     for target in targets {
-        collect_python_files(root, &target, excludes, &mut files);
+        collect_python_files(root, &target, excludes, policy, true, &mut files);
     }
     files.into_iter().collect()
 }
@@ -373,25 +423,53 @@ fn collect_python_files(
     root: &Path,
     target: &Path,
     excludes: &[String],
+    policy: SourceSelectionPolicy,
+    explicit_target: bool,
     files: &mut BTreeSet<PathBuf>,
 ) {
     if target.is_file() {
         if target.extension().and_then(|value| value.to_str()) == Some("py")
-            && !excluded(root, target, excludes)
+            && ((explicit_target && policy.explicit_files_bypass_excludes)
+                || !excluded(root, target, excludes))
         {
             files.insert(fs::canonicalize(target).unwrap_or_else(|_| target.to_path_buf()));
         }
+        return;
+    }
+    if policy.prune_excluded_directories
+        && target.is_dir()
+        && excluded_directory(root, target, excludes)
+    {
+        return;
+    }
+    if !explicit_target
+        && !policy.follow_directory_symlinks
+        && fs::symlink_metadata(target).is_ok_and(|metadata| metadata.file_type().is_symlink())
+    {
         return;
     }
     let Ok(entries) = fs::read_dir(target) else {
         return;
     };
     for entry in entries.flatten() {
-        collect_python_files(root, &entry.path(), excludes, files);
+        collect_python_files(root, &entry.path(), excludes, policy, false, files);
     }
 }
 
 fn excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
+    excluded_with_globs(root, path, excludes, true)
+}
+
+fn excluded_directory(root: &Path, path: &Path, excludes: &[String]) -> bool {
+    excluded_with_globs(root, path, excludes, false)
+}
+
+fn excluded_with_globs(
+    root: &Path,
+    path: &Path,
+    excludes: &[String],
+    match_globs: bool,
+) -> bool {
     let relative = path.strip_prefix(root).unwrap_or(path);
     if relative
         .components()
@@ -406,7 +484,7 @@ fn excluded(root: &Path, path: &Path, excludes: &[String]) -> bool {
             return false;
         }
         if pattern.chars().any(|character| "*?[]".contains(character)) {
-            return fnmatchcase(&relative_text, pattern);
+            return match_globs && fnmatchcase(&relative_text, pattern);
         }
         relative_text == pattern
             || relative_text.starts_with(&format!("{pattern}/"))

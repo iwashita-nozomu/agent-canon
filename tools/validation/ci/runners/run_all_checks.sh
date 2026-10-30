@@ -389,6 +389,12 @@ if [ -d python ]; then
     echo "❌ Python algorithm contract checks 失敗"
     EXIT_CODE=1
   fi
+  if run_agent_canon check-algorithm-config-partition --root "$WORKSPACE_ROOT" python 2>&1; then
+    echo "✅ Algorithm config partition checks 成功"
+  else
+    echo "❌ Algorithm config partition checks 失敗"
+    EXIT_CODE=1
+  fi
 fi
 if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" 2>&1; then
   echo "✅ convention compliance wiring checks 成功"
