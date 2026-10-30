@@ -415,9 +415,10 @@ mod tests {
             purpose: "OOP policy",
         };
 
+        let entries = [entry];
         let resolved = resolve_surface_path(&root, entry.path);
-        let payload = inventory_payload(&root, &[entry]);
-        let missing = missing_entries(&root, &[entry]);
+        let payload = inventory_payload(&root, &entries);
+        let missing = missing_entries(&root, &entries);
 
         assert_eq!(resolved, source_doc);
         assert!(missing.is_empty());
