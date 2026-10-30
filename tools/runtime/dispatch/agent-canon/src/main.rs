@@ -4,6 +4,8 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
+// downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -33,7 +35,6 @@ mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
 mod migration_audit;
-mod private_feedback;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -45,7 +46,6 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod result_logs;
 mod rule_inventory;
-mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
 pub mod skill_document_reader;
@@ -54,6 +54,8 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
+#[cfg(not(test))]
+use agent_canon::runtime_boundary;
 use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
 use std::env;
 
@@ -169,7 +171,7 @@ fn main() {
     }
 
     if args.len() >= 2 && matches!(args[1].as_str(), "knowledge" | "k" | "feedback" | "f") {
-        std::process::exit(private_feedback::run(&args[1..]));
+        std::process::exit(agent_canon::private_feedback::run(&args[1..]));
     }
 
     if args.len() >= 2 && args[1] == "graph" {
@@ -235,4 +237,38 @@ fn main() {
     eprintln!("agent-canon: unknown or missing command");
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod runtime_boundary {
+    use std::path::{Path, PathBuf};
+
+    pub(crate) use agent_canon::runtime_boundary::{
+        runtime_root_is_explicit, stable_source_key, test_runtime_root_path,
+        validate_external_target, RUNTIME_ROOT_ENV,
+    };
+
+    // Cargo builds the library as a normal dependency of the binary test target, without `cfg(test)`.
+    // Preserve only the binary test fixture selection and delegate all resolution to the library.
+    pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
+        resolve_runtime_root_at(source_root, None)
+    }
+
+    pub(crate) fn resolve_runtime_root_at(
+        source_root: &Path,
+        requested: Option<&Path>,
+    ) -> Result<PathBuf, String> {
+        match requested {
+            Some(requested) => {
+                agent_canon::runtime_boundary::resolve_runtime_root_at(source_root, Some(requested))
+            }
+            None => {
+                let test_root = test_runtime_root_path(source_root)?;
+                agent_canon::runtime_boundary::resolve_runtime_root_at(
+                    source_root,
+                    Some(&test_root),
+                )
+            }
+        }
+    }
 }
