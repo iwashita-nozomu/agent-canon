@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Preserves JSONL result conversion and HLO summary behavior in native Rust.
 // upstream design ../../../../../../documents/experiments/result-log-retention-and-visualization.md owns summary and report policy
-// downstream implementation ../../../../../../../tests/tools/test_result_log_tools.py exercises both public commands
+// downstream implementation ../../../../../../tests/tools/test_result_log_tools.py exercises both public commands
 // @dependency-end
 
 use rustpython_ast::bigint::BigInt;
