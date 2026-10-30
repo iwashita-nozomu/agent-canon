@@ -145,9 +145,9 @@ summary = "Git diff, optional SCIP impact, and dependency-header expansion summa
 [[tool]]
 id = "check-semantic-responsibility-contract"
 classification = "public"
-tool = "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"
+tool = "tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs"
 doc = "documents/tools/check_semantic_responsibility_contract.md"
-language = "python"
+language = "rust"
 summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
 
 [[tool]]
