@@ -14,6 +14,10 @@ use std::path::{Component, Path, PathBuf};
 
 pub const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
 
+// Win32 FILE_FLAG_BACKUP_SEMANTICS, required when opening a directory handle.
+#[cfg(windows)]
+const WINDOWS_FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
 fn current_home_directory() -> Result<PathBuf, String> {
     #[cfg(windows)]
     let home = env::var_os("USERPROFILE").or_else(|| {
@@ -429,15 +433,36 @@ impl RuntimeDirectory {
         // Dir handles are opened for capability-relative traversal and may be O_PATH.
         // Reopen `.` relative to that handle to obtain an fsync-capable descriptor.
         let mut options = cap_std::fs::OpenOptions::new();
-        options.read(true).follow(FollowSymlinks::No);
-        let directory = self.directory.open_with(Path::new("."), &options)?;
-        if !directory.metadata()?.is_dir() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "runtime directory handle is not a directory",
+        #[cfg(windows)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options
+                .read(true)
+                .write(true)
+                .custom_flags(WINDOWS_FILE_FLAG_BACKUP_SEMANTICS);
+        }
+        #[cfg(not(windows))]
+        options.read(true);
+        options.follow(FollowSymlinks::No);
+        let directory = self
+            .directory
+            .open_with(Path::new("."), &options)
+            .map_err(|error| atomic_write_stage("parent_directory_open", error))?;
+        let metadata = directory
+            .metadata()
+            .map_err(|error| atomic_write_stage("parent_directory_metadata", error))?;
+        if !metadata.is_dir() {
+            return Err(atomic_write_stage(
+                "parent_directory_type_check",
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "runtime directory handle is not a directory",
+                ),
             ));
         }
-        directory.sync_all()
+        directory
+            .sync_all()
+            .map_err(|error| atomic_write_stage("parent_directory_flush", error))
     }
 
     fn parent(&self, relative: &Path, create: bool) -> std::io::Result<(Self, std::ffi::OsString)> {
@@ -609,18 +634,25 @@ impl RuntimeDirectory {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
-        let (parent, name) = self.parent(relative, true)?;
-        parent.make_private()?;
+        let (parent, name) = self
+            .parent(relative, true)
+            .map_err(|error| atomic_write_stage("parent_directory_open", error))?;
+        parent
+            .make_private()
+            .map_err(|error| atomic_write_stage("parent_directory_permissions", error))?;
         match parent.directory.symlink_metadata(&name) {
             Ok(metadata) if metadata.is_file() => {}
             Ok(_) => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "runtime target is not a regular file",
+                return Err(atomic_write_stage(
+                    "target_type_check",
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "runtime target is not a regular file",
+                    ),
                 ))
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
+            Err(error) => return Err(atomic_write_stage("target_inspect", error)),
         }
         let mut options = cap_std::fs::OpenOptions::new();
         options
@@ -641,27 +673,33 @@ impl RuntimeDirectory {
             match parent.directory.open_with(&temporary, &options) {
                 Ok(file) => break (temporary, file),
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                Err(error) => return Err(error),
+                Err(error) => return Err(atomic_write_stage("temporary_file_open", error)),
             }
         };
         let result = (|| {
             #[cfg(unix)]
             {
                 use cap_std::fs::PermissionsExt;
-                file.set_permissions(cap_std::fs::Permissions::from_mode(mode))?;
+                file.set_permissions(cap_std::fs::Permissions::from_mode(mode))
+                    .map_err(|error| atomic_write_stage("temporary_file_permissions", error))?;
             }
-            file.write_all(bytes)?;
-            file.sync_all()?;
+            file.write_all(bytes)
+                .map_err(|error| atomic_write_stage("temporary_file_write", error))?;
+            file.sync_all()
+                .map_err(|error| atomic_write_stage("temporary_file_sync", error))?;
             drop(file);
             parent
                 .directory
-                .rename(&temporary, &parent.directory, &name)?;
+                .rename(&temporary, &parent.directory, &name)
+                .map_err(|error| atomic_write_stage("target_rename", error))?;
             parent.sync_directory()
         })();
         let cleanup = parent.directory.remove_file(&temporary);
         match (result, cleanup) {
             (Err(error), _) => Err(error),
-            (Ok(()), Err(error)) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+            (Ok(()), Err(error)) if error.kind() != std::io::ErrorKind::NotFound => {
+                Err(atomic_write_stage("temporary_file_cleanup", error))
+            }
             _ => Ok(()),
         }
     }
@@ -759,6 +797,34 @@ pub(crate) struct RuntimeFileSnapshot {
     pub(crate) mode: u32,
     pub(crate) size: u64,
     pub(crate) mtime_ns: i128,
+}
+
+#[derive(Debug)]
+struct RuntimeAtomicWriteStageError {
+    stage: &'static str,
+    source: std::io::Error,
+}
+
+impl std::fmt::Display for RuntimeAtomicWriteStageError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "atomic write stage {}: {}",
+            self.stage, self.source
+        )
+    }
+}
+
+impl std::error::Error for RuntimeAtomicWriteStageError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+fn atomic_write_stage(stage: &'static str, source: std::io::Error) -> std::io::Error {
+    // Keep the original category and source while making the failing filesystem stage visible.
+    let kind = source.kind();
+    std::io::Error::new(kind, RuntimeAtomicWriteStageError { stage, source })
 }
 
 impl RuntimeFileSnapshot {

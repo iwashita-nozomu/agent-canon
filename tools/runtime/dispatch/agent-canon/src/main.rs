@@ -57,7 +57,7 @@ mod test_design;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, native_release, private_feedback, template_bundle,
+    catalog, entrypoint_composer, native_release, template_bundle,
     tool_proof_coverage,
 };
 use std::env;
@@ -184,7 +184,7 @@ fn main() {
     }
 
     if args.len() >= 2 && matches!(args[1].as_str(), "knowledge" | "k" | "feedback" | "f") {
-        std::process::exit(private_feedback::run(&args[1..]));
+        std::process::exit(agent_canon::private_feedback::run(&args[1..]));
     }
 
     if args.len() >= 2 && args[1] == "graph" {
