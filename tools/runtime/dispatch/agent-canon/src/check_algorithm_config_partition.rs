@@ -76,7 +76,7 @@ struct Finding {
 impl Finding {
     fn render(&self) -> String {
         format!(
-            "ALGORITHM_CONFIG_PARTITION_FINDING={}:{}.{}:expected={}:reason={}",
+            "ALGORITHM_CONFIG_PARTITION_FINDING={}:{}:{}.{}:expected={}:reason={}",
             self.path, self.line, self.class_name, self.field, self.expected_owner, self.reason
         )
     }
