@@ -14,7 +14,8 @@
 use crate::eval_manifest_paths::{eval_manifest_path, resolve_eval_manifest};
 use crate::report_artifact_checks::{
     check_final_review_artifact, check_schedule_artifact, check_work_log_artifact,
-    has_approve_decision, markdown_without_adjudicated_rejected_hypotheses, section_has_content,
+    has_approve_decision, markdown_without_adjudicated_rejected_hypotheses,
+    markdown_without_comments, section_has_content,
 };
 use crate::runtime_boundary::{RuntimeArtifactBoundary, RuntimeDirectory, RUNTIME_ROOT_ENV};
 use regex::Regex;
@@ -1125,6 +1126,7 @@ pub fn read_run_evidence(report_dir: &Path) -> Result<RunEvidence, RunEvaluation
         markdown_section_text_raw(&monitoring_text, "## Behavior Events");
     let tool_warnings_text = markdown_section_text_raw(&monitoring_text, "## Tool Warnings");
     let child_execution_receipts_valid = child_execution_receipts_valid(&reader);
+    let normalized_bundle = normalized_bundle(&reader, &selection)?;
     Ok(RunEvidence {
         report_dir: reader.root.clone(),
         selection,
@@ -1146,7 +1148,7 @@ pub fn read_run_evidence(report_dir: &Path) -> Result<RunEvidence, RunEvaluation
         final_decision: markdown_decision(&reader, FINAL_REVIEW_NAME)?,
         change_review_text: read_artifact_text(&reader, CHANGE_REVIEW_NAME)?,
         final_review_text: read_artifact_text(&reader, FINAL_REVIEW_NAME)?,
-        normalized_bundle: normalized_bundle(&reader, &selection)?,
+        normalized_bundle,
         signals_text: markdown_section_text(&monitoring_text, "## Signals"),
         behavior_events_text: markdown_section_text(&monitoring_text, "## Behavior Events"),
         behavior_events_raw_text,
