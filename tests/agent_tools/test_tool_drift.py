@@ -336,6 +336,26 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_catalog_additional_yaml_document_is_rejected(self) -> None:
+        """The catalog loader rejects extra YAML documents instead of ignoring them."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+            catalog = root / "tools" / "catalog.yaml"
+            catalog.write_text(
+                catalog.read_text(encoding="utf-8")
+                + "\n---\nversion: 1\nentries: []\n",
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(
+                root, "--contract", "tool_catalog", "--format", "json"
+            )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("expected a single YAML document", result.stderr)
+
     def test_catalog_retired_legacy_fails(self) -> None:
         """Legacy provenance entries and directories are rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:

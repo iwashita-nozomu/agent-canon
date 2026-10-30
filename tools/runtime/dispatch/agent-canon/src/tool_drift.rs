@@ -762,6 +762,12 @@ fn check_catalog_entries(root: &Path) -> Result<Vec<Finding>, ToolDriftError> {
         .map_err(|error| ToolDriftError::Io(format!("{}: {error}", catalog_path.display())))?;
     let documents = YamlLoader::load_from_str(&catalog_text)
         .map_err(|error| ToolDriftError::Io(format!("{}: {error}", catalog_path.display())))?;
+    if documents.len() > 1 {
+        return Err(ToolDriftError::Io(format!(
+            "{}: expected a single YAML document",
+            catalog_path.display()
+        )));
+    }
     let Some(document) = documents.first() else {
         return Ok(vec![Finding::new(
             "invalid-catalog",
