@@ -40,6 +40,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod rule_inventory;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
@@ -67,6 +68,7 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -108,6 +110,15 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2
+        && matches!(
+            args[1].as_str(),
+            rule_inventory::PYTHON_SELECTOR | rule_inventory::CPP_SELECTOR
+        )
+    {
+        std::process::exit(rule_inventory::run(&args[1], &args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
