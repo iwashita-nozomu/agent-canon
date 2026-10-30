@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check and format.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs implements docs check-entrypoints.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/config.rs implements the lifecycle-only TOML context projection
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
 @dependency-end
@@ -43,6 +44,7 @@ examples in a compact text block.
 tools/bin/agent-canon docs -h
 tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
+tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon test-design check <test-paths...>
 agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
@@ -73,6 +75,11 @@ broad skill-selection prose or subagent fan-out.
 `format` normalizes line endings, trailing whitespace, and repeated blank lines,
 then runs the same adjacent `check` path. Math and Mermaid content is not
 rewritten by the checker; edit source deliberately and validate it with `check`.
+
+`check-entrypoints` validates the finite root entrypoint owner-map grammar,
+required owner rows and destinations, and marker ownership. It uses the same
+`--root` and `--format text|json` shape as the retired checker while keeping
+entrypoint grammar in its dedicated native owner.
 
 ## Compatibility Entrypoints
 

@@ -22,6 +22,7 @@
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
+// downstream implementation entrypoint_owner_map.rs checks root entrypoint owner-map contracts within docs
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
@@ -31,6 +32,7 @@ mod config;
 mod dependency_headers;
 mod dependency_manifest;
 mod docs;
+mod entrypoint_owner_map;
 mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
@@ -69,7 +71,7 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
-  docs <check|format> [paths...]
+  docs <check|format|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]

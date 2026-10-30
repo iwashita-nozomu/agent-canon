@@ -2,19 +2,33 @@
 # contract test
 # responsibility Verifies root entrypoint grammar, the common-base directive, and actual required owner destinations.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural contract
-# upstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py verifier under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs verifier under test
 # @dependency-end
 """Tests for the root entrypoint owner-map checker."""
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-
-from tools.validation.semantic.entrypoint import check_entrypoint_owner_map as checker
+from typing import Any
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+MARKER_MANIFEST_PATH = (
+    "tools/validation/semantic/convention/convention_compliance_contracts.toml"
+)
+ENTRYPOINT_INPUTS = (
+    "AGENTS.md",
+    "ROOT_AGENTS.md",
+    "agents/canonical/SOURCE_ROUTING.md",
+    MARKER_MANIFEST_PATH,
+    "agents/skills/agent-canon-update.md",
+    "documents/design/entrypoint-owner-map.md",
+)
 
 
 class EntrypointOwnerMapTest(unittest.TestCase):
@@ -24,26 +38,65 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
-        paths = {contract.path for contract in checker.CONTRACTS}
-        paths.add(checker.MARKER_MANIFEST_PATH)
-        paths.update(
-            marker
-            for contract in checker.CONTRACTS
-            for markers in contract.owner_rows
-            for marker in markers
-            if marker.endswith(".md")
-        )
-        for path in paths:
+        for path in ENTRYPOINT_INPUTS:
             target = root / path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes((REPOSITORY_ROOT / path).read_bytes())
         return root
 
+    def _run(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        if AGENT_CANON_CLI is None:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
+        return subprocess.run(
+            [
+                AGENT_CANON_CLI,
+                "docs",
+                "check-entrypoints",
+                "--root",
+                str(root),
+                *args,
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def _report(
+        self, root: Path
+    ) -> tuple[subprocess.CompletedProcess[str], dict[str, Any]]:
+        result = self._run(root, "--format", "json")
+        payload = json.loads(result.stdout)
+        expected_status = "fail" if payload["findings"] else "pass"
+        self.assertEqual(payload["status"], expected_status)
+        expected_exit = 1 if expected_status == "fail" else 0
+        self.assertEqual(
+            result.returncode, expected_exit, result.stdout + result.stderr
+        )
+        return result, payload
+
     def _rules(self, root: Path) -> set[str]:
-        return {finding.rule for finding in checker.run_checks(root)}
+        _result, payload = self._report(root)
+        return {finding["rule"] for finding in payload["findings"]}
 
     def test_repository_entrypoints_satisfy_contract(self) -> None:
-        self.assertEqual(checker.run_checks(REPOSITORY_ROOT), [])
+        result, payload = self._report(REPOSITORY_ROOT)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(
+            payload["checked"],
+            ["AGENTS.md", "agents/canonical/SOURCE_ROUTING.md", "ROOT_AGENTS.md"],
+        )
+
+    def test_text_format_preserves_status_markers(self) -> None:
+        result = self._run(REPOSITORY_ROOT, "--format", "text")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ENTRYPOINT_OWNER_MAP_FINDINGS=0", result.stdout)
+        self.assertIn("ENTRYPOINT_OWNER_MAP=pass", result.stdout)
 
     def test_accepts_source_overlay_without_common_or_phase_sections(self) -> None:
         root = self._fixture()
@@ -59,7 +112,7 @@ class EntrypointOwnerMapTest(unittest.TestCase):
             "[source map](agents/canonical/SOURCE_ROUTING.md) | selected row only |\n",
             encoding="utf-8",
         )
-        self.assertEqual(checker.run_checks(root), [])
+        self.assertEqual(self._rules(root), set())
 
     def test_rejects_shared_or_phase_sections_in_source_overlay(self) -> None:
         for heading in (
@@ -134,11 +187,14 @@ class EntrypointOwnerMapTest(unittest.TestCase):
     def test_rejects_missing_owner_row(self) -> None:
         root = self._fixture()
         target = root / "agents/canonical/SOURCE_ROUTING.md"
-        text = "\n".join(
-            line
-            for line in target.read_text(encoding="utf-8").splitlines()
-            if "public skill registry" not in line
-        ) + "\n"
+        text = (
+            "\n".join(
+                line
+                for line in target.read_text(encoding="utf-8").splitlines()
+                if "public skill registry" not in line
+            )
+            + "\n"
+        )
         target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
 
@@ -150,11 +206,14 @@ class EntrypointOwnerMapTest(unittest.TestCase):
     def test_rejects_missing_route_to_optional_map(self) -> None:
         root = self._fixture()
         target = root / "AGENTS.md"
-        text = "\n".join(
-            line
-            for line in target.read_text(encoding="utf-8").splitlines()
-            if "| unresolved source owner |" not in line
-        ) + "\n"
+        text = (
+            "\n".join(
+                line
+                for line in target.read_text(encoding="utf-8").splitlines()
+                if "| unresolved source owner |" not in line
+            )
+            + "\n"
+        )
         target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
 
@@ -163,12 +222,13 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         optional = "agents/canonical/SOURCE_ROUTING.md"
         self.assertIn(f"]({optional})", entry)
         self.assertNotIn("public skill registry", entry)
-        self.assertNotIn(optional, checker.ROOT_ENTRYPOINT_PATHS)
+        _result, payload = self._report(REPOSITORY_ROOT)
+        self.assertNotIn(optional, payload["checked"])
         self.assertTrue((REPOSITORY_ROOT / optional).is_file())
 
     def test_rejects_operational_marker_surface(self) -> None:
         root = self._fixture()
-        target = root / checker.MARKER_MANIFEST_PATH
+        target = root / MARKER_MANIFEST_PATH
         target.write_text(
             target.read_text(encoding="utf-8")
             + '\n[[contracts]]\nid = "regression"\n'
@@ -231,7 +291,7 @@ class EntrypointOwnerMapTest(unittest.TestCase):
             text.replace(original, "](../../agents/skills/agent-canon-update.md)"),
             encoding="utf-8",
         )
-        self.assertEqual(checker.run_checks(root), [])
+        self.assertEqual(self._rules(root), set())
 
 
 if __name__ == "__main__":

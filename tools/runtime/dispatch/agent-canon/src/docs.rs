@@ -4,6 +4,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
+// downstream implementation entrypoint_owner_map.rs owns the root entrypoint grammar subcommand
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // @dependency-end
@@ -91,6 +92,12 @@ struct WriteSummary {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| argument.as_str() == "check-entrypoints")
+    {
+        return crate::entrypoint_owner_map::run(&args[1..]);
+    }
     match Args::parse(args) {
         Ok(parsed) => run_parsed(parsed),
         Err(message) => {
@@ -168,6 +175,7 @@ fn usage_text() -> &'static str {
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
+  check-entrypoints       check the finite root entrypoint owner-map contract\n\
   render-runtime-profile  render the runtime profile inventory\n\
   help, -h, --help        show this command contract\n\
 \n\
@@ -177,6 +185,7 @@ options:\n\
 examples:\n\
   tools/bin/agent-canon docs -h\n\
   tools/bin/agent-canon docs check documents/tools/agent-canon.md\n\
+  tools/bin/agent-canon docs check-entrypoints --root . --format json\n\
   tools/bin/agent-canon docs format README.md"
 }
 
@@ -1178,6 +1187,7 @@ mod tests {
 
         assert!(usage.contains("docs check"));
         assert!(usage.contains("docs format"));
+        assert!(usage.contains("docs check-entrypoints"));
     }
 
     #[test]
