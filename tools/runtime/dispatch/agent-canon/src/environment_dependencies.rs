@@ -343,7 +343,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn object(value: &Value, field: &str) -> Result<&Map<String, Value>> {
+fn object<'a>(value: &'a Value, field: &str) -> Result<&'a Map<String, Value>> {
     value
         .as_object()
         .ok_or_else(|| DependencyError::new(format!("{field} must be a table")))
@@ -2205,6 +2205,7 @@ impl ExecutableBinding {
             return Err(DependencyError::new("executable receipt binding is stale"));
         }
         Ok(Self {
+            provided: provided.to_string(),
             lexical_path: lexical_path.to_string(),
             absolute_path: absolute_path.to_string(),
             verification_output: verification_output.to_string(),
@@ -2256,6 +2257,7 @@ fn executable_binding_names(record: &DependencyRecord, image_owned: bool) -> Vec
 }
 
 fn configured_executable_path(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     executable: &str,
     image_owned: bool,
@@ -2270,10 +2272,10 @@ fn configured_executable_path(
         )));
     }
     match record.method {
-        Method::NpmGlobal => Ok(Path::new(NPM_PREFIX).join("bin").join(executable)),
-        Method::Pipx if image_owned => Ok(Path::new("/usr/local/bin").join(executable)),
-        Method::AptPackage | Method::AptRepository => Ok(Path::new("/usr/bin").join(executable)),
-        Method::RustToolchain => Ok(cargo_home()?.join("bin").join(executable)),
+        Method::NpmGlobal => Ok(probe.npm_prefix.join("bin").join(executable)),
+        Method::Pipx if image_owned => Ok(probe.npm_prefix.join("bin").join(executable)),
+        Method::AptPackage | Method::AptRepository => Ok(probe.apt_bin_dir.join(executable)),
+        Method::RustToolchain => Ok(probe.cargo_home()?.join("bin").join(executable)),
         _ => Err(DependencyError::new(format!(
             "{}: executable binding method is unsupported",
             record.id
@@ -2297,64 +2299,24 @@ fn home_directory() -> Result<PathBuf> {
     Ok(home)
 }
 
-fn cargo_home() -> Result<PathBuf> {
-    let path = env::var_os("CARGO_HOME")
-        .map(PathBuf::from)
-        .unwrap_or(home_directory()?.join(".cargo"));
-    let path_text = path.to_string_lossy();
-    if !path.is_absolute() || posix_normalize(path_text.as_ref()) != path_text.as_ref() {
-        return Err(DependencyError::new(
-            "CARGO_HOME must be an absolute normalized path",
-        ));
-    }
-    Ok(path)
-}
-
-fn is_regular_executable(path: &Path) -> bool {
-    let Ok(metadata) = fs::metadata(path) else {
-        return false;
-    };
-    if !metadata.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(windows)]
-    {
-        path.extension()
-            .and_then(|value| value.to_str())
-            .is_some_and(|value| {
-                matches!(
-                    value.to_ascii_lowercase().as_str(),
-                    "exe" | "com" | "bat" | "cmd"
-                )
-            })
-    }
-    #[cfg(not(any(unix, windows)))]
-    {
-        false
-    }
-}
-
 fn normalize_existing_executable(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     executable: &str,
+    workspace: &Path,
 ) -> Result<(PathBuf, PathBuf)> {
     if matches!(record.method, Method::AptPackage | Method::AptRepository) {
-        return resolve_apt_executable(record, executable, Path::new("."));
+        return resolve_apt_executable(probe, record, executable, workspace);
     }
-    let lexical = configured_executable_path(record, executable, false)?;
-    let resolved = fs::canonicalize(&lexical).map_err(|_| {
+    let lexical = configured_executable_path(probe, record, executable, false)?;
+    let resolved = probe.canonicalize(&lexical).map_err(|_| {
         DependencyError::new(format!(
             "{}: executable is missing: {}",
             record.id,
             lexical.display()
         ))
     })?;
-    if !is_regular_executable(&resolved) {
+    if !probe.is_regular_executable(&resolved) {
         return Err(DependencyError::new(format!(
             "{}: executable is not executable: {}",
             record.id,
@@ -2362,13 +2324,9 @@ fn normalize_existing_executable(
         )));
     }
     let root = match record.method {
-        Method::NpmGlobal => {
-            fs::canonicalize(NPM_PREFIX).map_err(|error| DependencyError::new(error.to_string()))?
-        }
-        Method::Pipx => fs::canonicalize("/usr/local/bin")
-            .map_err(|error| DependencyError::new(error.to_string()))?,
-        Method::RustToolchain => fs::canonicalize(cargo_home()?)
-            .map_err(|error| DependencyError::new(error.to_string()))?,
+        Method::NpmGlobal => probe.canonicalize(&probe.npm_prefix)?,
+        Method::Pipx => probe.canonicalize(&probe.npm_prefix.join("bin"))?,
+        Method::RustToolchain => probe.canonicalize(&probe.cargo_home()?)?,
         _ => {
             return Err(DependencyError::new(format!(
                 "{}: executable binding method is unsupported",
@@ -2387,15 +2345,21 @@ fn normalize_existing_executable(
 }
 
 fn resolve_apt_executable(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     executable: &str,
     workspace: &Path,
 ) -> Result<(PathBuf, PathBuf)> {
-    let lexical = configured_executable_path(record, executable, false)?;
+    let lexical = configured_executable_path(probe, record, executable, false)?;
+    let dpkg_query = probe
+        .dpkg_query
+        .to_str()
+        .ok_or_else(|| DependencyError::new("dpkg-query executable path is not valid Unicode"))?;
     let mut owned = BTreeSet::new();
     for owner in &record.executable_owner_packages {
         let output = run_command(
-            &["/usr/bin/dpkg-query", "--listfiles", owner],
+            probe,
+            &[dpkg_query, "--listfiles", owner],
             workspace,
             None,
             "verify-apt-executable-owner",
@@ -2416,7 +2380,7 @@ fn resolve_apt_executable(
             record.id
         )));
     }
-    let resolved = fs::canonicalize(&lexical).map_err(|_| {
+    let resolved = probe.canonicalize(&lexical).map_err(|_| {
         DependencyError::new(format!(
             "{}: lexical executable target is missing: {}",
             record.id,
@@ -2430,7 +2394,7 @@ fn resolve_apt_executable(
             record.id
         )));
     }
-    if !is_regular_executable(&resolved) {
+    if !probe.is_regular_executable(&resolved) {
         return Err(DependencyError::new(format!(
             "{}: resolved executable is not a regular executable: {}",
             record.id,
@@ -2464,6 +2428,7 @@ fn parse_dpkg_owned_paths(output: &str, record_id: &str) -> Result<BTreeSet<Stri
 }
 
 fn run_command(
+    probe: &ProbeEnvironment,
     argv: &[&str],
     workspace: &Path,
     path_override: Option<&str>,
@@ -2488,17 +2453,15 @@ fn run_command(
             "{record_id}: shell execution is forbidden in {operation}"
         )));
     }
-    let mut process = Command::new(argv[0]);
-    process.args(&argv[1..]).current_dir(workspace);
-    if let Some(path) = path_override {
-        process.env("PATH", path);
-    }
-    let output = process.output().map_err(|error| {
-        DependencyError::new(format!(
-            "{record_id}: {operation} command failed to start: {error}"
-        ))
-    })?;
-    command_output(output, record_id, operation)
+    probe.execute(
+        argv,
+        workspace,
+        path_override,
+        None,
+        false,
+        operation,
+        record_id,
+    )
 }
 
 fn command_output(output: Output, record_id: &str, operation: &str) -> Result<CommandOutput> {
@@ -2522,10 +2485,231 @@ fn command_output(output: Output, record_id: &str, operation: &str) -> Result<Co
     Ok(CommandOutput { stdout, stderr })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CommandOutput {
     stdout: String,
     stderr: String,
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CommandInvocation {
+    argv: Vec<String>,
+    path: Option<String>,
+    cargo_home: Option<String>,
+    clear_rustup_overrides: bool,
+    operation: String,
+}
+
+#[cfg(test)]
+#[derive(Debug, Default)]
+struct FakeCommandRunner {
+    responses: std::cell::RefCell<BTreeMap<Vec<String>, VecDeque<CommandOutput>>>,
+    invocations: std::cell::RefCell<Vec<CommandInvocation>>,
+}
+
+#[cfg(test)]
+impl FakeCommandRunner {
+    fn with_responses(responses: impl IntoIterator<Item = (Vec<String>, CommandOutput)>) -> Self {
+        let mut response_map = BTreeMap::<Vec<String>, VecDeque<CommandOutput>>::new();
+        for (argv, output) in responses {
+            response_map.entry(argv).or_default().push_back(output);
+        }
+        Self {
+            responses: std::cell::RefCell::new(response_map),
+            invocations: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+}
+
+enum CommandRunner {
+    System,
+    #[cfg(test)]
+    Fake(FakeCommandRunner),
+}
+
+struct ProbeEnvironment {
+    npm_prefix: PathBuf,
+    npm_system_path: String,
+    npm_trusted_dirs: Vec<PathBuf>,
+    npm_env_launcher: PathBuf,
+    apt_bin_dir: PathBuf,
+    dpkg_query: PathBuf,
+    home: Option<PathBuf>,
+    cargo_home: Option<PathBuf>,
+    inherited_path: Option<String>,
+    filesystem_roots: Vec<(PathBuf, PathBuf)>,
+    command_runner: CommandRunner,
+}
+
+impl ProbeEnvironment {
+    fn system() -> Self {
+        Self {
+            npm_prefix: PathBuf::from(NPM_PREFIX),
+            npm_system_path: NPM_SYSTEM_PATH.to_string(),
+            npm_trusted_dirs: NPM_TRUSTED_DIRS.iter().map(PathBuf::from).collect(),
+            npm_env_launcher: PathBuf::from("/usr/bin/env"),
+            apt_bin_dir: PathBuf::from("/usr/bin"),
+            dpkg_query: PathBuf::from("/usr/bin/dpkg-query"),
+            home: None,
+            cargo_home: None,
+            inherited_path: None,
+            filesystem_roots: Vec::new(),
+            command_runner: CommandRunner::System,
+        }
+    }
+
+    fn home_directory(&self) -> Result<PathBuf> {
+        self.home.clone().map_or_else(home_directory, Ok)
+    }
+
+    fn cargo_home(&self) -> Result<PathBuf> {
+        let path = if let Some(path) = &self.cargo_home {
+            path.clone()
+        } else {
+            env::var_os("CARGO_HOME")
+                .map(PathBuf::from)
+                .unwrap_or(self.home_directory()?.join(".cargo"))
+        };
+        let path_text = path.to_string_lossy();
+        if !path.is_absolute() || posix_normalize(path_text.as_ref()) != path_text.as_ref() {
+            return Err(DependencyError::new(
+                "CARGO_HOME must be an absolute normalized path",
+            ));
+        }
+        Ok(path)
+    }
+
+    fn inherited_path(&self) -> String {
+        self.inherited_path
+            .clone()
+            .or_else(|| env::var("PATH").ok())
+            .unwrap_or_default()
+    }
+
+    fn filesystem_path(&self, logical: &Path) -> PathBuf {
+        self.filesystem_roots
+            .iter()
+            .filter_map(|(logical_root, physical_root)| {
+                logical
+                    .strip_prefix(logical_root)
+                    .ok()
+                    .map(|relative| (logical_root.components().count(), physical_root, relative))
+            })
+            .max_by_key(|(length, _, _)| *length)
+            .map(|(_, physical_root, relative)| physical_root.join(relative))
+            .unwrap_or_else(|| logical.to_path_buf())
+    }
+
+    fn logical_path(&self, physical: &Path) -> PathBuf {
+        self.filesystem_roots
+            .iter()
+            .filter_map(|(logical_root, physical_root)| {
+                physical
+                    .strip_prefix(physical_root)
+                    .ok()
+                    .map(|relative| (physical_root.components().count(), logical_root, relative))
+            })
+            .max_by_key(|(length, _, _)| *length)
+            .map(|(_, logical_root, relative)| logical_root.join(relative))
+            .unwrap_or_else(|| physical.to_path_buf())
+    }
+
+    fn canonicalize(&self, path: &Path) -> Result<PathBuf> {
+        let physical = self.filesystem_path(path);
+        let canonical = fs::canonicalize(&physical).map_err(|error| {
+            DependencyError::new(format!("cannot resolve {}: {error}", path.display()))
+        })?;
+        Ok(self.logical_path(&canonical))
+    }
+
+    fn is_regular_executable(&self, path: &Path) -> bool {
+        let physical = self.filesystem_path(path);
+        let Ok(metadata) = fs::metadata(physical) else {
+            return false;
+        };
+        if !metadata.is_file() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o111 != 0
+        }
+        #[cfg(windows)]
+        {
+            path.extension()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| {
+                    matches!(
+                        value.to_ascii_lowercase().as_str(),
+                        "exe" | "com" | "bat" | "cmd"
+                    )
+                })
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            false
+        }
+    }
+
+    fn execute(
+        &self,
+        argv: &[&str],
+        workspace: &Path,
+        path_override: Option<&str>,
+        cargo_home_override: Option<&str>,
+        clear_rustup_overrides: bool,
+        operation: &str,
+        record_id: &str,
+    ) -> Result<CommandOutput> {
+        match &self.command_runner {
+            CommandRunner::System => {
+                let mut process = Command::new(argv[0]);
+                process.args(&argv[1..]).current_dir(workspace);
+                if let Some(path) = path_override {
+                    process.env("PATH", path);
+                }
+                if let Some(cargo_home) = cargo_home_override {
+                    process.env("CARGO_HOME", cargo_home);
+                }
+                if clear_rustup_overrides {
+                    process.env_remove("RUSTUP_TOOLCHAIN");
+                    process.env_remove("ELAN_TOOLCHAIN");
+                }
+                let output = process.output().map_err(|error| {
+                    DependencyError::new(format!(
+                        "{record_id}: {operation} command failed to start: {error}"
+                    ))
+                })?;
+                command_output(output, record_id, operation)
+            }
+            #[cfg(test)]
+            CommandRunner::Fake(runner) => {
+                let owned_argv = argv
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>();
+                runner.invocations.borrow_mut().push(CommandInvocation {
+                    argv: owned_argv.clone(),
+                    path: path_override.map(str::to_string),
+                    cargo_home: cargo_home_override.map(str::to_string),
+                    clear_rustup_overrides,
+                    operation: operation.to_string(),
+                });
+                runner
+                    .responses
+                    .borrow_mut()
+                    .get_mut(&owned_argv)
+                    .and_then(VecDeque::pop_front)
+                    .ok_or_else(|| {
+                        DependencyError::new(format!(
+                            "{record_id}: unexpected test provider command for {operation}"
+                        ))
+                    })
+            }
+        }
+    }
 }
 
 fn require_output(output: &CommandOutput, token: &str, record_id: &str) -> Result<()> {
@@ -2651,7 +2835,11 @@ fn reject_known_network_or_shell_probe(
     Ok(())
 }
 
-fn verify_absolute_executable(record: &DependencyRecord, workspace: &Path) -> Result<String> {
+fn verify_absolute_executable(
+    probe: &ProbeEnvironment,
+    record: &DependencyRecord,
+    workspace: &Path,
+) -> Result<String> {
     let spec = &record.verification;
     let path = spec.path.as_deref().ok_or_else(|| {
         DependencyError::new(format!("{}: executable path is missing", record.id))
@@ -2663,7 +2851,7 @@ fn verify_absolute_executable(record: &DependencyRecord, workspace: &Path) -> Re
         ))
     })?;
     let executable = Path::new(path);
-    if !is_regular_executable(executable) {
+    if !probe.is_regular_executable(executable) {
         return Err(DependencyError::new(format!(
             "{}: executable is missing or not executable: {path}",
             record.id
@@ -2674,6 +2862,7 @@ fn verify_absolute_executable(record: &DependencyRecord, workspace: &Path) -> Re
         .chain(spec.args.iter().map(String::as_str))
         .collect::<Vec<_>>();
     let output = run_command(
+        probe,
         &argv,
         workspace,
         None,
@@ -2685,14 +2874,20 @@ fn verify_absolute_executable(record: &DependencyRecord, workspace: &Path) -> Re
 }
 
 fn apt_package_version(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     expected_resolved_version: Option<&str>,
     workspace: &Path,
     verify_executable: bool,
 ) -> Result<String> {
+    let dpkg_query = probe
+        .dpkg_query
+        .to_str()
+        .ok_or_else(|| DependencyError::new("dpkg-query executable path is not valid Unicode"))?;
     let output = run_command(
+        probe,
         &[
-            "/usr/bin/dpkg-query",
+            dpkg_query,
             "--show",
             "--showformat=${Status}\\t${Version}\\t${Package}\\n",
             &record.package,
@@ -2731,13 +2926,14 @@ fn apt_package_version(
             &record.verification.output_contains,
         ) {
             reject_known_network_or_shell_probe(record, executable, &record.verification.args)?;
-            let (lexical, resolved) = resolve_apt_executable(record, executable, workspace)?;
-            let _ = lexical;
+            let (_lexical, resolved) =
+                resolve_apt_executable(probe, record, executable, workspace)?;
             let argv = std::iter::once(resolved.to_string_lossy().to_string())
                 .chain(record.verification.args.iter().cloned())
                 .collect::<Vec<_>>();
             let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
             let output = run_command(
+                probe,
                 &argv_refs,
                 workspace,
                 None,
@@ -2751,22 +2947,23 @@ fn apt_package_version(
 }
 
 fn resolve_npm_toolchain(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     workspace: &Path,
-) -> Result<(PathBuf, &'static str)> {
-    let launcher = Path::new("/usr/bin/env");
-    if !is_regular_executable(launcher) {
-        return Err(DependencyError::new(
-            "npm-global requires executable launcher: /usr/bin/env",
-        ));
+) -> Result<(PathBuf, String)> {
+    if !probe.is_regular_executable(&probe.npm_env_launcher) {
+        return Err(DependencyError::new(format!(
+            "npm-global requires executable launcher: {}",
+            probe.npm_env_launcher.display()
+        )));
     }
     let workspace =
         fs::canonicalize(workspace).map_err(|error| DependencyError::new(error.to_string()))?;
     for executable in ["node", "npm"] {
         let mut selected = None;
-        for directory in NPM_TRUSTED_DIRS {
-            let candidate = Path::new(directory).join(executable);
-            if is_regular_executable(&candidate) {
+        for directory in &probe.npm_trusted_dirs {
+            let candidate = directory.join(executable);
+            if probe.is_regular_executable(&candidate) {
                 selected = Some(candidate);
                 break;
             }
@@ -2776,7 +2973,7 @@ fn resolve_npm_toolchain(
                 "npm-global requires a trusted {executable} executable"
             ))
         })?;
-        let resolved = fs::canonicalize(&candidate).map_err(|error| {
+        let resolved = probe.canonicalize(&candidate).map_err(|error| {
             DependencyError::new(format!(
                 "npm-global {executable} executable cannot be resolved: {error}"
             ))
@@ -2791,53 +2988,62 @@ fn resolve_npm_toolchain(
             .parent()
             .and_then(Path::to_str)
             .unwrap_or_default();
-        if !NPM_TRUSTED_DIRS.contains(&parent) {
+        if !probe
+            .npm_trusted_dirs
+            .iter()
+            .any(|directory| directory.to_str() == Some(parent))
+        {
             return Err(DependencyError::new(format!(
                 "npm-global {executable} executable is outside trusted Node/system directories"
             )));
         }
-        let allowed_root = if parent.starts_with("/usr/local/") {
-            Path::new("/usr/local")
+        let allowed_root = if Path::new(parent).starts_with(&probe.npm_prefix) {
+            probe.npm_prefix.clone()
         } else {
-            Path::new("/usr")
+            PathBuf::from("/usr")
         };
-        let allowed_root = fs::canonicalize(allowed_root)
-            .map_err(|error| DependencyError::new(error.to_string()))?;
-        if !resolved.starts_with(allowed_root) {
+        let allowed_root = probe.canonicalize(&allowed_root)?;
+        if !resolved.starts_with(&allowed_root) {
             return Err(DependencyError::new(format!(
                 "npm-global {executable} resolved path escapes trusted system root: {}",
                 resolved.display()
             )));
         }
     }
-    let npm = NPM_TRUSTED_DIRS
+    let npm = probe
+        .npm_trusted_dirs
         .iter()
-        .map(|directory| Path::new(directory).join("npm"))
-        .find(|candidate| is_regular_executable(candidate))
+        .map(|directory| directory.join("npm"))
+        .find(|candidate| probe.is_regular_executable(candidate))
         .ok_or_else(|| {
             DependencyError::new(format!("{}: npm executable is unavailable", record.id))
         })?;
-    Ok((npm, NPM_SYSTEM_PATH))
+    Ok((npm, probe.npm_system_path.clone()))
 }
 
-fn verify_npm_package(record: &DependencyRecord, workspace: &Path) -> Result<()> {
+fn verify_npm_package(
+    probe: &ProbeEnvironment,
+    record: &DependencyRecord,
+    workspace: &Path,
+) -> Result<()> {
     let version = record
         .version
         .as_deref()
         .ok_or_else(|| DependencyError::new(format!("{}: npm version is required", record.id)))?;
-    let (npm, trusted_path) = resolve_npm_toolchain(record, workspace)?;
+    let (npm, trusted_path) = resolve_npm_toolchain(probe, record, workspace)?;
     let argv = [
         npm.to_string_lossy().to_string(),
         "ls".to_string(),
         "--global".to_string(),
         "--prefix".to_string(),
-        NPM_PREFIX.to_string(),
+        probe.npm_prefix.to_string_lossy().to_string(),
         "--json".to_string(),
         "--depth=0".to_string(),
         record.package.clone(),
     ];
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
     let output = run_command(
+        probe,
         &argv_refs,
         workspace,
         Some(trusted_path),
@@ -2874,13 +3080,14 @@ fn verify_npm_package(record: &DependencyRecord, workspace: &Path) -> Result<()>
                 record.id
             ))
         })?;
-    let (_, resolved) = normalize_existing_executable(record, executable)?;
+    let (_, resolved) = normalize_existing_executable(probe, record, executable, workspace)?;
     reject_known_network_or_shell_probe(record, executable, &record.verification.args)?;
     let argv = std::iter::once(resolved.to_string_lossy().to_string())
         .chain(record.verification.args.iter().cloned())
         .collect::<Vec<_>>();
     let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
     let output = run_command(
+        probe,
         &argv_refs,
         workspace,
         Some(trusted_path),
@@ -2890,10 +3097,10 @@ fn verify_npm_package(record: &DependencyRecord, workspace: &Path) -> Result<()>
     require_output(&output, output_contains, &record.id)
 }
 
-fn rust_path_environment() -> Result<(String, String)> {
-    let home = home_directory()?;
-    let cargo_home = cargo_home()?;
-    let inherited = env::var("PATH").unwrap_or_default();
+fn rust_path_environment(probe: &ProbeEnvironment) -> Result<(String, String)> {
+    let home = probe.home_directory()?;
+    let cargo_home = probe.cargo_home()?;
+    let inherited = probe.inherited_path();
     let mut entries = vec![
         cargo_home.join("bin").to_string_lossy().to_string(),
         home.join(".elan/bin").to_string_lossy().to_string(),
@@ -2908,13 +3115,25 @@ fn rust_path_environment() -> Result<(String, String)> {
     Ok((entries.join(":"), cargo_home.to_string_lossy().to_string()))
 }
 
-fn verify_rust_toolchain(record: &DependencyRecord, workspace: &Path) -> Result<()> {
+fn verify_rust_toolchain(
+    probe: &ProbeEnvironment,
+    record: &DependencyRecord,
+    workspace: &Path,
+) -> Result<()> {
     let version = record.version.as_deref().ok_or_else(|| {
         DependencyError::new(format!("{}: Rust toolchain version is missing", record.id))
     })?;
-    let (path, cargo_home) = rust_path_environment()?;
+    let (path, cargo_home) = rust_path_environment(probe)?;
     let run = |argv: &[&str], operation: &str| {
-        run_rust_command(argv, workspace, &path, &cargo_home, operation, &record.id)
+        run_rust_command(
+            probe,
+            argv,
+            workspace,
+            &path,
+            &cargo_home,
+            operation,
+            &record.id,
+        )
     };
     let active = run(
         &["rustup", "show", "active-toolchain"],
@@ -2979,6 +3198,7 @@ fn verify_rust_toolchain(record: &DependencyRecord, workspace: &Path) -> Result<
 }
 
 fn run_rust_command(
+    probe: &ProbeEnvironment,
     argv: &[&str],
     workspace: &Path,
     path: &str,
@@ -2995,23 +3215,19 @@ fn run_rust_command(
             "command argv contains an empty or control-character token",
         ));
     }
-    let mut command = Command::new(argv[0]);
-    command
-        .args(&argv[1..])
-        .current_dir(workspace)
-        .env("PATH", path)
-        .env("CARGO_HOME", cargo_home)
-        .env_remove("RUSTUP_TOOLCHAIN")
-        .env_remove("ELAN_TOOLCHAIN");
-    let output = command.output().map_err(|error| {
-        DependencyError::new(format!(
-            "{record_id}: {operation} command failed to start: {error}"
-        ))
-    })?;
-    command_output(output, record_id, operation)
+    probe.execute(
+        argv,
+        workspace,
+        Some(path),
+        Some(cargo_home),
+        true,
+        operation,
+        record_id,
+    )
 }
 
 fn executable_bindings(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     image_owned: bool,
     workspace: &Path,
@@ -3020,9 +3236,9 @@ fn executable_bindings(
     for executable in executable_binding_names(record, image_owned) {
         let (lexical, absolute) =
             if matches!(record.method, Method::AptPackage | Method::AptRepository) {
-                resolve_apt_executable(record, &executable, workspace)?
+                resolve_apt_executable(probe, record, &executable, workspace)?
             } else {
-                normalize_existing_executable(record, &executable)?
+                normalize_existing_executable(probe, record, &executable, workspace)?
             };
         let output = if record.verification.executable.as_deref() == Some(executable.as_str()) {
             reject_known_network_or_shell_probe(record, &executable, &record.verification.args)?;
@@ -3041,9 +3257,10 @@ fn executable_bindings(
                 .collect::<Vec<_>>();
             let argv_refs = argv.iter().map(String::as_str).collect::<Vec<_>>();
             let output = run_command(
+                probe,
                 &argv_refs,
                 workspace,
-                Some(NPM_SYSTEM_PATH),
+                Some(&probe.npm_system_path),
                 "verify-declared-executable",
                 &record.id,
             )?;
@@ -3058,6 +3275,7 @@ fn executable_bindings(
         bindings.insert(
             executable.clone(),
             ExecutableBinding {
+                provided: executable.clone(),
                 lexical_path: lexical.to_string_lossy().to_string(),
                 absolute_path: absolute.to_string_lossy().to_string(),
                 verification_output: output,
@@ -3068,6 +3286,7 @@ fn executable_bindings(
 }
 
 fn verify_installed_receipt(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     payload: &Value,
     bindings: &BTreeMap<String, ExecutableBinding>,
@@ -3091,6 +3310,7 @@ fn verify_installed_receipt(
         };
     if expected_resolved_version.is_some() {
         apt_package_version(
+            probe,
             record,
             expected_resolved_version.as_deref(),
             workspace,
@@ -3104,7 +3324,7 @@ fn verify_installed_receipt(
                 record.id
             ))
         })?;
-        let expected = configured_executable_path(record, &name, true)?;
+        let expected = configured_executable_path(probe, record, &name, true)?;
         let expected = expected.to_string_lossy().to_string();
         if binding.lexical_path != expected || binding.absolute_path != expected {
             return Err(DependencyError::new(format!(
@@ -3112,7 +3332,7 @@ fn verify_installed_receipt(
                 record.id
             )));
         }
-        if !is_regular_executable(Path::new(&expected)) {
+        if !probe.is_regular_executable(Path::new(&expected)) {
             return Err(DependencyError::new(format!(
                 "{}: installed executable is missing or not executable: {name}",
                 record.id
@@ -3120,7 +3340,7 @@ fn verify_installed_receipt(
         }
     }
     if record.verification.kind == VerificationKind::AbsoluteExecutable {
-        return verify_absolute_executable(record, workspace).map(Some);
+        return verify_absolute_executable(probe, record, workspace).map(Some);
     }
     if record.verification.kind == VerificationKind::CargoBinary {
         return Err(DependencyError::new(format!("{}: cargo-source-build receipt verification is not supported by the native executable resolver", record.id)));
@@ -3135,11 +3355,12 @@ fn verify_installed_receipt(
         ))
     })?;
     let output = run_command(
+        probe,
         &std::iter::once(binding.absolute_path.as_str())
             .chain(record.verification.args.iter().map(String::as_str))
             .collect::<Vec<_>>(),
         workspace,
-        Some(NPM_SYSTEM_PATH),
+        Some(&probe.npm_system_path),
         "verify-declared-executable",
         &record.id,
     )?;
@@ -3150,6 +3371,7 @@ fn verify_installed_receipt(
 }
 
 fn verify_pass_receipt(
+    probe: &ProbeEnvironment,
     record: &DependencyRecord,
     expected_bindings: &BTreeMap<String, ExecutableBinding>,
     executable: &str,
@@ -3157,13 +3379,13 @@ fn verify_pass_receipt(
     workspace: &Path,
 ) -> Result<()> {
     match record.method {
-        Method::NpmGlobal => verify_npm_package(record, workspace)?,
+        Method::NpmGlobal => verify_npm_package(probe, record, workspace)?,
         Method::AptPackage => {
-            apt_package_version(record, expected_resolved_version, workspace, true)?;
+            apt_package_version(probe, record, expected_resolved_version, workspace, true)?;
         }
-        Method::RustToolchain => verify_rust_toolchain(record, workspace)?,
+        Method::RustToolchain => verify_rust_toolchain(probe, record, workspace)?,
         Method::ReleaseAsset => {
-            verify_absolute_executable(record, workspace)?;
+            verify_absolute_executable(probe, record, workspace)?;
             return Ok(());
         }
         _ => {
@@ -3174,7 +3396,7 @@ fn verify_pass_receipt(
             )))
         }
     }
-    let live_bindings = executable_bindings(record, false, workspace)?;
+    let live_bindings = executable_bindings(probe, record, false, workspace)?;
     let live = live_bindings.get(executable).ok_or_else(|| {
         DependencyError::new(format!(
             "{}: executable binding is unavailable: {executable}",
@@ -3188,6 +3410,7 @@ fn verify_pass_receipt(
         ))
     })?;
     if live.lexical_path != expected.lexical_path
+        || live.provided != expected.provided
         || live.absolute_path != expected.absolute_path
         || live.verification_output != expected.verification_output
     {
@@ -3275,6 +3498,22 @@ fn runtime_architecture() -> Result<String> {
 /// receipts. Live checks are the record-declared verifier and local metadata
 /// queries used by the existing read-only owner.
 pub fn resolve_verified_executable(
+    workspace: &Path,
+    receipts: &Path,
+    record_id: &str,
+    executable: &str,
+    manifest: Option<&Path>,
+) -> Result<VerifiedExecutable> {
+    let probe = ProbeEnvironment::system();
+    resolve_verified_executable_with_provider(
+        &probe, workspace, receipts, record_id, executable, manifest,
+    )
+}
+
+// Public resolution delegates here. Tests substitute only the external command
+// and fixed-root provider; manifest, receipt, and binding validation stay real.
+fn resolve_verified_executable_with_provider(
+    probe: &ProbeEnvironment,
     workspace: &Path,
     receipts: &Path,
     record_id: &str,
@@ -3441,7 +3680,7 @@ pub fn resolve_verified_executable(
     }
     let manifest_version = manifest_version.expect("validated manifest or resolved version");
     if let Some(path) = release_asset_path {
-        let output = verify_absolute_executable(record, workspace)?;
+        let output = verify_absolute_executable(probe, record, workspace)?;
         return Ok(VerifiedExecutable {
             record_id: record.id.clone(),
             manifest_version,
@@ -3453,7 +3692,7 @@ pub fn resolve_verified_executable(
         });
     }
     if image_owned {
-        let output = verify_installed_receipt(record, &payload, &bindings, workspace)?;
+        let output = verify_installed_receipt(probe, record, &payload, &bindings, workspace)?;
         let binding = bindings
             .get(executable)
             .expect("validated requested binding");
@@ -3472,6 +3711,7 @@ pub fn resolve_verified_executable(
         });
     }
     verify_pass_receipt(
+        probe,
         record,
         &bindings,
         executable,
@@ -3537,6 +3777,188 @@ mod tests {
         }
     }
 
+    fn expected_record_payload(
+        id: &str,
+        package: &str,
+        method: &str,
+        version: &str,
+        source: &str,
+        verification: Value,
+        provides: &[&str],
+    ) -> Value {
+        json!({
+            "id": id,
+            "package": package,
+            "method": method,
+            "version": version,
+            "source": source,
+            "verification": verification,
+            "deps": [],
+            "provides": provides,
+            "failure_policy": "fail",
+            "platform": null,
+            "platforms": [],
+            "key_fingerprint": null,
+            "key_url": null,
+            "repository_suite": null,
+            "repository_components": [],
+            "repository_packages_sha256": null,
+            "repository_package_url": null,
+            "repository_package_sha256": null,
+            "repository_packages_sha256s": [],
+            "repository_package_urls": [],
+            "repository_package_sha256s": [],
+            "checksum": null,
+            "checksums": [],
+            "asset": null,
+            "assets": [],
+            "archive_format": null,
+            "extract": null,
+            "destination": null,
+            "executable_owner_packages": [],
+            "repo": null,
+            "commit": null,
+            "source_identity": null,
+            "source_tree_sha256": null,
+            "cargo_lock_sha256": null,
+            "locked": null,
+            "browser": null,
+            "browser_cache_path": null,
+            "components": [],
+        })
+    }
+
+    // These hashes use test-owned normalized payload values; they never call
+    // DependencyRecord::fingerprint or build_plan to construct receipt identity.
+    fn expected_identity(record_id: &str, record_payload: &Value) -> (String, String) {
+        let record_fingerprint = sha256_hex(
+            &canonical_bytes(record_payload).expect("independent record payload encodes"),
+        );
+        let plan_payload = json!({
+            "source_roles": ["canonical"],
+            "records": [record_payload],
+            "order": [record_id],
+            "dependency_providers": [[record_id, []]],
+        });
+        let plan_fingerprint =
+            sha256_hex(&canonical_bytes(&plan_payload).expect("independent plan payload encodes"));
+        (record_fingerprint, plan_fingerprint)
+    }
+
+    fn receipt_binding(name: &str, path: &str, output: &str) -> Value {
+        json!({
+            "provided": name,
+            "lexical_path": path,
+            "absolute_path": path,
+            "verification_output": output,
+        })
+    }
+
+    fn receipt_payload(
+        record_id: &str,
+        version: &str,
+        status: &str,
+        verification: Value,
+        record_fingerprint: &str,
+        plan_fingerprint: &str,
+        executable_bindings: Value,
+    ) -> Value {
+        json!({
+            "schema": RECEIPT_SCHEMA,
+            "status": status,
+            "record_id": record_id,
+            "manifest_version": version,
+            "record_fingerprint": record_fingerprint,
+            "plan_fingerprint": plan_fingerprint,
+            "verification": verification,
+            "repository_packages": null,
+            "repository_package": null,
+            "executable_bindings": executable_bindings,
+        })
+    }
+
+    fn fake_probe(
+        root: &TempRoot,
+        responses: impl IntoIterator<Item = (Vec<String>, CommandOutput)>,
+    ) -> ProbeEnvironment {
+        let fake_root = root.0.join("fake-filesystem");
+        fs::create_dir_all(&fake_root).expect("fake filesystem root is created");
+        let physical_root = fake_root
+            .canonicalize()
+            .expect("fake provider filesystem root is canonical");
+        let filesystem_roots = ["/usr/local", "/usr/bin", "/home/fixture"]
+            .into_iter()
+            .map(|logical| {
+                let logical = PathBuf::from(logical);
+                let physical = physical_root.join(logical.strip_prefix("/").unwrap());
+                fs::create_dir_all(&physical).expect("fake provider root is created");
+                (logical, physical)
+            })
+            .collect();
+        ProbeEnvironment {
+            npm_prefix: PathBuf::from(NPM_PREFIX),
+            npm_system_path: NPM_SYSTEM_PATH.to_string(),
+            npm_trusted_dirs: NPM_TRUSTED_DIRS.iter().map(PathBuf::from).collect(),
+            npm_env_launcher: PathBuf::from("/usr/bin/env"),
+            apt_bin_dir: PathBuf::from("/usr/bin"),
+            dpkg_query: PathBuf::from("/usr/bin/dpkg-query"),
+            home: Some(PathBuf::from("/home/fixture")),
+            cargo_home: Some(PathBuf::from("/home/fixture/.cargo")),
+            inherited_path: Some("/usr/bin:/bin".to_string()),
+            filesystem_roots,
+            command_runner: CommandRunner::Fake(FakeCommandRunner::with_responses(responses)),
+        }
+    }
+
+    #[cfg(unix)]
+    fn create_executable(probe: &ProbeEnvironment, logical_path: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        let path = probe.filesystem_path(Path::new(logical_path));
+        fs::create_dir_all(path.parent().expect("fixture executable has a parent"))
+            .expect("fixture executable parent is created");
+        fs::write(&path, b"task-owned fake executable")
+            .expect("fixture executable file is written");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755))
+            .expect("fixture executable is executable");
+    }
+
+    fn command_output_fixture(stdout: &str) -> CommandOutput {
+        CommandOutput {
+            stdout: stdout.to_string(),
+            stderr: String::new(),
+        }
+    }
+
+    fn fixture_invocations(probe: &ProbeEnvironment) -> Vec<CommandInvocation> {
+        let CommandRunner::Fake(runner) = &probe.command_runner else {
+            panic!("test resolver uses only the per-test fake command runner")
+        };
+        runner.invocations.borrow().clone()
+    }
+
+    fn assert_fake_responses_consumed(probe: &ProbeEnvironment) {
+        let CommandRunner::Fake(runner) = &probe.command_runner else {
+            panic!("test resolver uses only the per-test fake command runner")
+        };
+        assert!(runner
+            .responses
+            .borrow()
+            .values()
+            .all(|responses| responses.is_empty()));
+    }
+
+    fn write_success_manifest(root: &TempRoot, text: &str) -> PathBuf {
+        root.write_manifest("workspace/dependencies.toml", text)
+    }
+
+    fn write_success_receipt(root: &TempRoot, record_id: &str, receipt: &Value) -> PathBuf {
+        root.write_manifest(
+            &format!("receipts/{record_id}.json"),
+            &serde_json::to_string(receipt).expect("receipt serializes"),
+        )
+    }
+
     const FIXTURE: &str = r#"
 schema = "agent-canon.tool-dependencies"
 schema_version = 2
@@ -3564,22 +3986,100 @@ output_contains = "1.2.3"
             .join("../../../../")
             .canonicalize()
             .expect("repository root exists");
-        let plan = load_plan(&root, None).expect("canonical dependency plan parses");
-        assert!(
-            plan.records.len() >= 60,
-            "{} selected records",
-            plan.records.len()
-        );
-        assert!(plan.by_id("pyright-language-server").is_some());
-        assert!(plan.by_id("bash-language-server").is_some());
-        assert!(plan.by_id("clangd-language-server").is_some());
-        assert!(plan.by_id("rust-toolchain").is_some());
-        assert!(plan.by_id("scip-python").is_some());
+        // Frozen independently from the pre-migration Python build_plan owner.
+        let manifest = root.join("bootstrap/container/image/dependencies.toml");
+        let manifest_bytes = fs::read(&manifest).expect("canonical manifest bytes are readable");
         assert_eq!(
-            plan.by_id("scip-clang").is_some(),
-            runtime_platform() == "linux/amd64"
+            sha256_hex(&manifest_bytes),
+            "2ad12d007239bc2fff90ba3c8c81ca9270610c69ba38b588980459f4b6b9c52a"
         );
-        assert!(plan.by_id("scip-cli").is_some());
+        let plan = load_plan(&root, None).expect("canonical dependency plan parses");
+        let mut expected = [
+            "pipx",
+            "check-jsonschema",
+            "yamllint",
+            "ruff",
+            "basedpyright",
+            "pyright-language-server",
+            "scip-python",
+            "bash-language-server",
+            "markdownlint-cli2",
+            "officecli",
+            "gnupg",
+            "node",
+            "puppeteer-fonts-liberation",
+            "puppeteer-libasound2t64",
+            "puppeteer-libatk-bridge2.0-0t64",
+            "puppeteer-libatk1.0-0t64",
+            "puppeteer-libcairo2",
+            "puppeteer-libcups2t64",
+            "puppeteer-libdbus-1-3",
+            "puppeteer-libexpat1",
+            "puppeteer-libfontconfig1",
+            "puppeteer-libgbm1",
+            "puppeteer-libglib2.0-0t64",
+            "puppeteer-libgtk-3-0t64",
+            "puppeteer-libnspr4",
+            "puppeteer-libnss3",
+            "puppeteer-libpango-1.0-0",
+            "puppeteer-libpangocairo-1.0-0",
+            "puppeteer-libx11-6",
+            "puppeteer-libx11-xcb1",
+            "puppeteer-libxcb1",
+            "puppeteer-libxcomposite1",
+            "puppeteer-libxcursor1",
+            "puppeteer-libxdamage1",
+            "puppeteer-libxext6",
+            "puppeteer-libxfixes3",
+            "puppeteer-libxi6",
+            "puppeteer-libxkbcommon0",
+            "puppeteer-libxrandr2",
+            "puppeteer-libxrender1",
+            "puppeteer-libxss1",
+            "puppeteer-libxtst6",
+            "puppeteer-lsb-release",
+            "puppeteer-wget",
+            "puppeteer-xdg-utils",
+            "puppeteer-unzip",
+            "jq",
+            "tree",
+            "clangd-language-server",
+            "scip-clang",
+            "scip-cli",
+            "rust-toolchain",
+            "shellcheck",
+            "actionlint",
+            "zizmor",
+            "quarto",
+            "vl-convert",
+            "lychee",
+            "puppeteer",
+            "mermaid-cli",
+            "python3-pytest",
+            "python3-pylsp-jsonrpc",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+        if runtime_platform() != "linux/amd64" {
+            expected.remove("scip-clang");
+        }
+        let actual = plan
+            .records
+            .iter()
+            .map(|record| record.id.clone())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(actual, expected);
+        let expected_fingerprint = match env::consts::ARCH {
+            "x86_64" | "amd64" => {
+                "69f80ebba0abca46cfd219a4174a8dc3a6a534fb336e2d71da5a7e4fa4ba0d85"
+            }
+            "aarch64" | "arm64" => {
+                "9eba38a548d37d212b7c5d03fc90a9aac6d073a62a1701a7469a0506dd4b89de"
+            }
+            other => panic!("unsupported plan-golden architecture: {other}"),
+        };
+        assert_eq!(plan.fingerprint, expected_fingerprint);
         assert_eq!(plan.sources.len(), plan.source_roles.len());
         assert_eq!(plan.source_roles, vec!["canonical".to_string()]);
     }
@@ -3677,6 +4177,695 @@ output_contains = "1.2.3"
         expected_plan_bytes.extend_from_slice(expected_bytes);
         expected_plan_bytes.extend_from_slice(br#"],"source_roles":["canonical"]}"#);
         assert_eq!(plan.fingerprint, sha256_hex(&expected_plan_bytes));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_npm_pass_resolves_secondary_binding_without_probing_or_writing() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let record_id = "pyright-language-server";
+        let manifest = write_success_manifest(
+            &root,
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "pyright-language-server"
+package = "pyright"
+method = "npm-global"
+version = "1.2.3"
+source = "https://registry.npmjs.org/pyright"
+deps = []
+provides = ["pyright", "pyright-langserver"]
+failure_policy = "fail"
+[records.verification]
+kind = "npm-package"
+executable = "pyright"
+args = ["--version"]
+output_contains = "1.2.3"
+"#,
+        );
+        let verification = json!({
+            "kind": "npm-package",
+            "executable": "pyright",
+            "path": null,
+            "args": ["--version"],
+            "output_contains": "1.2.3",
+            "executable_globs": [],
+        });
+        let record_payload = expected_record_payload(
+            record_id,
+            "pyright",
+            "npm-global",
+            "1.2.3",
+            "https://registry.npmjs.org/pyright",
+            verification.clone(),
+            &["pyright", "pyright-langserver"],
+        );
+        let (record_fingerprint, plan_fingerprint) = expected_identity(record_id, &record_payload);
+        let primary_output = "pyright 1.2.3";
+        let structural_output =
+            "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver";
+        let receipt = receipt_payload(
+            record_id,
+            "1.2.3",
+            "pass",
+            verification,
+            &record_fingerprint,
+            &plan_fingerprint,
+            json!({
+                "pyright": receipt_binding("pyright", "/usr/local/bin/pyright", primary_output),
+                "pyright-langserver": receipt_binding(
+                    "pyright-langserver",
+                    "/usr/local/bin/pyright-langserver",
+                    structural_output
+                ),
+            }),
+        );
+        let receipt_path = write_success_receipt(&root, record_id, &receipt);
+        let receipt_before = fs::read(&receipt_path).expect("receipt bytes are captured");
+        let npm_ls = vec![
+            "/usr/local/bin/npm".to_string(),
+            "ls".to_string(),
+            "--global".to_string(),
+            "--prefix".to_string(),
+            "/usr/local".to_string(),
+            "--json".to_string(),
+            "--depth=0".to_string(),
+            "pyright".to_string(),
+        ];
+        let primary_probe = vec![
+            "/usr/local/bin/pyright".to_string(),
+            "--version".to_string(),
+        ];
+        let probe = fake_probe(
+            &root,
+            [
+                (
+                    npm_ls,
+                    command_output_fixture(r#"{"dependencies":{"pyright":{"version":"1.2.3"}}}"#),
+                ),
+                (
+                    primary_probe.clone(),
+                    command_output_fixture(primary_output),
+                ),
+                (primary_probe, command_output_fixture(primary_output)),
+            ],
+        );
+        for path in [
+            "/usr/bin/env",
+            "/usr/local/bin/node",
+            "/usr/local/bin/npm",
+            "/usr/local/bin/pyright",
+            "/usr/local/bin/pyright-langserver",
+        ] {
+            create_executable(&probe, path);
+        }
+        let verified = resolve_verified_executable_with_provider(
+            &probe,
+            &workspace,
+            receipt_path.parent().expect("receipt directory exists"),
+            record_id,
+            "pyright-langserver",
+            Some(&manifest),
+        )
+        .expect("secondary language server is resolved from its receipt binding");
+        assert_eq!(verified.record_id, record_id);
+        assert_eq!(verified.manifest_version, "1.2.3");
+        assert_eq!(verified.executable, "pyright-langserver");
+        assert_eq!(
+            verified.absolute_path,
+            PathBuf::from("/usr/local/bin/pyright-langserver")
+        );
+        assert_eq!(verified.record_fingerprint, record_fingerprint);
+        assert_eq!(verified.plan_fingerprint, plan_fingerprint);
+        assert_eq!(verified.verification_output, structural_output);
+        assert_eq!(fs::read(receipt_path).unwrap(), receipt_before);
+        let calls = fixture_invocations(&probe);
+        assert_eq!(calls.len(), 3);
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.operation == "verify-npm-package")
+                .count(),
+            1
+        );
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.operation == "verify-declared-executable")
+                .count(),
+            2
+        );
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call
+                    .argv
+                    .first()
+                    .is_some_and(|argv| argv == "/usr/local/bin/pyright-langserver"))
+                .count(),
+            0
+        );
+        assert_fake_responses_consumed(&probe);
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.argv.iter().any(|argv| argv == "--help"))
+                .count(),
+            0
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_npm_pass_rejects_receipt_path_and_output_drift() {
+        for drift in ["path", "output"] {
+            let root = TempRoot::new();
+            let workspace = root.0.join("workspace");
+            fs::create_dir_all(&workspace).expect("workspace is created");
+            let record_id = "pyright-language-server";
+            let manifest = write_success_manifest(
+                &root,
+                r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "pyright-language-server"
+package = "pyright"
+method = "npm-global"
+version = "1.2.3"
+source = "https://registry.npmjs.org/pyright"
+deps = []
+provides = ["pyright", "pyright-langserver"]
+failure_policy = "fail"
+[records.verification]
+kind = "npm-package"
+executable = "pyright"
+args = ["--version"]
+output_contains = "1.2.3"
+"#,
+            );
+            let verification = json!({
+                "kind": "npm-package",
+                "executable": "pyright",
+                "path": null,
+                "args": ["--version"],
+                "output_contains": "1.2.3",
+                "executable_globs": [],
+            });
+            let payload = expected_record_payload(
+                record_id,
+                "pyright",
+                "npm-global",
+                "1.2.3",
+                "https://registry.npmjs.org/pyright",
+                verification.clone(),
+                &["pyright", "pyright-langserver"],
+            );
+            let (record_fingerprint, plan_fingerprint) = expected_identity(record_id, &payload);
+            let primary_output = "pyright 1.2.3";
+            let structural_output =
+                "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver";
+            let primary_path = if drift == "path" {
+                "/usr/local/bin/stale-pyright"
+            } else {
+                "/usr/local/bin/pyright"
+            };
+            let receipt_primary_output = if drift == "output" {
+                "pyright 1.0.0"
+            } else {
+                primary_output
+            };
+            let receipt = receipt_payload(
+                record_id,
+                "1.2.3",
+                "pass",
+                verification,
+                &record_fingerprint,
+                &plan_fingerprint,
+                json!({
+                    "pyright": receipt_binding("pyright", primary_path, receipt_primary_output),
+                    "pyright-langserver": receipt_binding(
+                        "pyright-langserver",
+                        "/usr/local/bin/pyright-langserver",
+                        structural_output
+                    ),
+                }),
+            );
+            let receipt_path = write_success_receipt(&root, record_id, &receipt);
+            let npm_ls = vec![
+                "/usr/local/bin/npm".to_string(),
+                "ls".to_string(),
+                "--global".to_string(),
+                "--prefix".to_string(),
+                "/usr/local".to_string(),
+                "--json".to_string(),
+                "--depth=0".to_string(),
+                "pyright".to_string(),
+            ];
+            let pyright_version = vec![
+                "/usr/local/bin/pyright".to_string(),
+                "--version".to_string(),
+            ];
+            let probe = fake_probe(
+                &root,
+                [
+                    (
+                        npm_ls,
+                        command_output_fixture(
+                            r#"{"dependencies":{"pyright":{"version":"1.2.3"}}}"#,
+                        ),
+                    ),
+                    (
+                        pyright_version.clone(),
+                        command_output_fixture(primary_output),
+                    ),
+                    (pyright_version, command_output_fixture(primary_output)),
+                ],
+            );
+            for path in [
+                "/usr/bin/env",
+                "/usr/local/bin/node",
+                "/usr/local/bin/npm",
+                "/usr/local/bin/pyright",
+                "/usr/local/bin/pyright-langserver",
+            ] {
+                create_executable(&probe, path);
+            }
+            let error = resolve_verified_executable_with_provider(
+                &probe,
+                &workspace,
+                receipt_path.parent().expect("receipt directory exists"),
+                record_id,
+                "pyright",
+                Some(&manifest),
+            )
+            .expect_err("receipt binding drift is rejected");
+            assert!(error
+                .to_string()
+                .contains("executable receipt path or output drift"));
+            assert_eq!(fixture_invocations(&probe).len(), 3);
+            assert_fake_responses_consumed(&probe);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_apt_pass_checks_dpkg_ownership_and_compares_live_binding() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let record_id = "clangd-language-server";
+        let manifest = write_success_manifest(
+            &root,
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "clangd-language-server"
+package = "clangd-18"
+method = "apt-package"
+version = "1.2.3"
+source = "ubuntu:24.04"
+deps = []
+provides = ["clangd-18"]
+failure_policy = "fail"
+[records.verification]
+kind = "apt-package"
+executable = "clangd-18"
+args = ["--version"]
+output_contains = "1.2.3"
+"#,
+        );
+        let verification = json!({
+            "kind": "apt-package",
+            "executable": "clangd-18",
+            "path": null,
+            "args": ["--version"],
+            "output_contains": "1.2.3",
+            "executable_globs": [],
+        });
+        let mut record_payload = expected_record_payload(
+            record_id,
+            "clangd-18",
+            "apt-package",
+            "1.2.3",
+            "ubuntu:24.04",
+            verification.clone(),
+            &["clangd-18"],
+        );
+        record_payload["executable_owner_packages"] = json!(["clangd-18"]);
+        let (record_fingerprint, plan_fingerprint) = expected_identity(record_id, &record_payload);
+        let live_output = "clangd version 1.2.3";
+        let receipt = receipt_payload(
+            record_id,
+            "1.2.3",
+            "pass",
+            verification,
+            &record_fingerprint,
+            &plan_fingerprint,
+            json!({
+                "clangd-18": receipt_binding("clangd-18", "/usr/bin/clangd-18", live_output),
+            }),
+        );
+        let receipt_path = write_success_receipt(&root, record_id, &receipt);
+        let package_query = vec![
+            "/usr/bin/dpkg-query".to_string(),
+            "--show".to_string(),
+            "--showformat=${Status}\\t${Version}\\t${Package}\\n".to_string(),
+            "clangd-18".to_string(),
+        ];
+        let owner_query = vec![
+            "/usr/bin/dpkg-query".to_string(),
+            "--listfiles".to_string(),
+            "clangd-18".to_string(),
+        ];
+        let executable_probe = vec!["/usr/bin/clangd-18".to_string(), "--version".to_string()];
+        let probe = fake_probe(
+            &root,
+            [
+                (
+                    package_query.clone(),
+                    command_output_fixture("install ok installed\t1.2.3\tclangd-18\n"),
+                ),
+                (
+                    owner_query.clone(),
+                    command_output_fixture("/usr/bin/clangd-18\n"),
+                ),
+                (
+                    executable_probe.clone(),
+                    command_output_fixture(live_output),
+                ),
+                (owner_query, command_output_fixture("/usr/bin/clangd-18\n")),
+                (executable_probe, command_output_fixture(live_output)),
+            ],
+        );
+        create_executable(&probe, "/usr/bin/clangd-18");
+        let verified = resolve_verified_executable_with_provider(
+            &probe,
+            &workspace,
+            receipt_path.parent().expect("receipt directory exists"),
+            record_id,
+            "clangd-18",
+            Some(&manifest),
+        )
+        .expect("apt executable resolves after package and ownership probes");
+        assert_eq!(verified.record_id, record_id);
+        assert_eq!(verified.manifest_version, "1.2.3");
+        assert_eq!(verified.executable, "clangd-18");
+        assert_eq!(verified.absolute_path, PathBuf::from("/usr/bin/clangd-18"));
+        assert_eq!(verified.record_fingerprint, record_fingerprint);
+        assert_eq!(verified.plan_fingerprint, plan_fingerprint);
+        assert_eq!(verified.verification_output, live_output);
+        let calls = fixture_invocations(&probe);
+        assert_eq!(calls.len(), 5);
+        assert_eq!(calls[0].argv, package_query);
+        assert_eq!(calls[0].operation, "verify-apt-package");
+        assert_eq!(calls[1].argv[1], "--listfiles");
+        assert_eq!(calls[1].operation, "verify-apt-executable-owner");
+        assert_eq!(calls[2].argv, vec!["/usr/bin/clangd-18", "--version"]);
+        assert_eq!(calls[3].argv[1], "--listfiles");
+        assert_eq!(calls[4].argv, vec!["/usr/bin/clangd-18", "--version"]);
+        assert_fake_responses_consumed(&probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_rust_pass_resolves_rust_analyzer_from_configured_cargo_home() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let record_id = "rust-toolchain";
+        let manifest = write_success_manifest(
+            &root,
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "rust-toolchain"
+package = "rust"
+method = "rust-toolchain"
+version = "1.89.0"
+source = "https://static.rust-lang.org"
+deps = []
+provides = ["cargo", "rust-analyzer"]
+failure_policy = "fail"
+components = ["rust-analyzer"]
+[records.verification]
+kind = "rust-toolchain"
+"#,
+        );
+        let verification = json!({
+            "kind": "rust-toolchain",
+            "executable": null,
+            "path": null,
+            "args": [],
+            "output_contains": null,
+            "executable_globs": [],
+        });
+        let mut record_payload = expected_record_payload(
+            record_id,
+            "rust",
+            "rust-toolchain",
+            "1.89.0",
+            "https://static.rust-lang.org",
+            verification.clone(),
+            &["cargo", "rust-analyzer"],
+        );
+        record_payload["components"] = json!(["rust-analyzer"]);
+        let (record_fingerprint, plan_fingerprint) = expected_identity(record_id, &record_payload);
+        let structural_output =
+            "agent-canon.executable-binding.structural.v1:rust-toolchain:rust-analyzer";
+        let receipt = receipt_payload(
+            record_id,
+            "1.89.0",
+            "pass",
+            verification,
+            &record_fingerprint,
+            &plan_fingerprint,
+            json!({
+                "rust-analyzer": receipt_binding(
+                    "rust-analyzer",
+                    "/home/fixture/.cargo/bin/rust-analyzer",
+                    structural_output
+                ),
+            }),
+        );
+        let receipt_path = write_success_receipt(&root, record_id, &receipt);
+        let rustup = |args: &[&str]| {
+            std::iter::once("rustup".to_string())
+                .chain(args.iter().map(|value| value.to_string()))
+                .collect::<Vec<_>>()
+        };
+        let probe = fake_probe(
+            &root,
+            [
+                (
+                    rustup(&["show", "active-toolchain"]),
+                    command_output_fixture("1.89.0-x86_64-unknown-linux-gnu (default)"),
+                ),
+                (
+                    rustup(&["toolchain", "list"]),
+                    command_output_fixture("1.89.0-x86_64-unknown-linux-gnu"),
+                ),
+                (
+                    rustup(&["component", "list", "--toolchain", "1.89.0"]),
+                    command_output_fixture("rust-analyzer-x86_64-unknown-linux-gnu (installed)"),
+                ),
+                (
+                    rustup(&["run", "1.89.0", "rustc", "--version"]),
+                    command_output_fixture("rustc 1.89.0"),
+                ),
+                (
+                    rustup(&["run", "1.89.0", "cargo", "--version"]),
+                    command_output_fixture("cargo 1.89.0"),
+                ),
+                (
+                    rustup(&["run", "1.89.0", "rust-analyzer", "--version"]),
+                    command_output_fixture("rust-analyzer 1.89.0"),
+                ),
+            ],
+        );
+        create_executable(&probe, "/home/fixture/.cargo/bin/rust-analyzer");
+        let verified = resolve_verified_executable_with_provider(
+            &probe,
+            &workspace,
+            receipt_path.parent().expect("receipt directory exists"),
+            record_id,
+            "rust-analyzer",
+            Some(&manifest),
+        )
+        .expect("rust-analyzer resolves from CARGO_HOME");
+        assert_eq!(verified.record_id, record_id);
+        assert_eq!(verified.manifest_version, "1.89.0");
+        assert_eq!(verified.executable, "rust-analyzer");
+        assert_eq!(
+            verified.absolute_path,
+            PathBuf::from("/home/fixture/.cargo/bin/rust-analyzer")
+        );
+        assert_eq!(verified.record_fingerprint, record_fingerprint);
+        assert_eq!(verified.plan_fingerprint, plan_fingerprint);
+        assert_eq!(verified.verification_output, structural_output);
+        let calls = fixture_invocations(&probe);
+        assert_eq!(calls.len(), 6);
+        assert!(calls.iter().all(|call| {
+            call.path.as_deref()
+                == Some("/home/fixture/.cargo/bin:/home/fixture/.elan/bin:/home/fixture/.local/bin:/usr/bin:/bin")
+                && call.cargo_home.as_deref() == Some("/home/fixture/.cargo")
+                && call.clear_rustup_overrides
+        }));
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|call| call.argv.iter().any(|arg| arg == "rust-analyzer"))
+                .count(),
+            1,
+            "only rustup's declared version probe reaches rust-analyzer"
+        );
+        assert!(calls
+            .iter()
+            .all(|call| call.operation.starts_with("verify-rust-")));
+        assert_fake_responses_consumed(&probe);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_release_asset_installed_receipt_runs_only_declared_absolute_probe() {
+        let root = TempRoot::new();
+        let workspace = root.0.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace is created");
+        let record_id = "scip-clang";
+        let manifest = write_success_manifest(
+            &root,
+            r#"
+schema = "agent-canon.tool-dependencies"
+schema_version = 2
+
+[[records]]
+id = "scip-clang"
+package = "scip-clang"
+method = "release-asset"
+version = "0.4.0"
+source = "https://example.invalid/scip-clang"
+checksum = "0000000000000000000000000000000000000000000000000000000000000000"
+asset = "scip-clang"
+archive_format = "binary"
+extract = "none"
+destination = "/usr/local/bin/scip-clang"
+deps = []
+provides = ["scip-clang"]
+failure_policy = "fail"
+[records.verification]
+kind = "absolute-executable"
+path = "/usr/local/bin/scip-clang"
+args = ["--version"]
+output_contains = "0.4.0"
+"#,
+        );
+        let verification = json!({
+            "kind": "absolute-executable",
+            "executable": null,
+            "path": "/usr/local/bin/scip-clang",
+            "args": ["--version"],
+            "output_contains": "0.4.0",
+            "executable_globs": [],
+        });
+        let mut record_payload = expected_record_payload(
+            record_id,
+            "scip-clang",
+            "release-asset",
+            "0.4.0",
+            "https://example.invalid/scip-clang",
+            verification.clone(),
+            &["scip-clang"],
+        );
+        record_payload["checksum"] =
+            json!("0000000000000000000000000000000000000000000000000000000000000000");
+        record_payload["asset"] = json!("scip-clang");
+        record_payload["archive_format"] = json!("binary");
+        record_payload["extract"] = json!("none");
+        record_payload["destination"] = json!("/usr/local/bin/scip-clang");
+        let (record_fingerprint, plan_fingerprint) = expected_identity(record_id, &record_payload);
+        let live_output = "scip-clang 0.4.0";
+        let receipt = receipt_payload(
+            record_id,
+            "0.4.0",
+            "installed",
+            verification,
+            &record_fingerprint,
+            &plan_fingerprint,
+            json!({}),
+        );
+        let receipt_path = write_success_receipt(&root, record_id, &receipt);
+        let probe = fake_probe(
+            &root,
+            [(
+                vec![
+                    "/usr/local/bin/scip-clang".to_string(),
+                    "--version".to_string(),
+                ],
+                command_output_fixture(live_output),
+            )],
+        );
+        create_executable(&probe, "/usr/local/bin/scip-clang");
+        let verified = resolve_verified_executable_with_provider(
+            &probe,
+            &workspace,
+            receipt_path.parent().expect("receipt directory exists"),
+            record_id,
+            "scip-clang",
+            Some(&manifest),
+        )
+        .expect("release asset resolves at its declared absolute path");
+        assert_eq!(verified.record_id, record_id);
+        assert_eq!(verified.manifest_version, "0.4.0");
+        assert_eq!(verified.executable, "scip-clang");
+        assert_eq!(
+            verified.absolute_path,
+            PathBuf::from("/usr/local/bin/scip-clang")
+        );
+        assert_eq!(verified.record_fingerprint, record_fingerprint);
+        assert_eq!(verified.plan_fingerprint, plan_fingerprint);
+        assert_eq!(verified.verification_output, live_output);
+        let calls = fixture_invocations(&probe);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0].argv,
+            vec!["/usr/local/bin/scip-clang", "--version"]
+        );
+        assert_eq!(calls[0].operation, "verify-declared-executable");
+        assert_fake_responses_consumed(&probe);
+
+        let wrong_output_probe = fake_probe(
+            &root,
+            [(
+                vec![
+                    "/usr/local/bin/scip-clang".to_string(),
+                    "--version".to_string(),
+                ],
+                command_output_fixture("scip-clang 0.3.0"),
+            )],
+        );
+        let error = resolve_verified_executable_with_provider(
+            &wrong_output_probe,
+            &workspace,
+            receipt_path.parent().expect("receipt directory exists"),
+            record_id,
+            "scip-clang",
+            Some(&manifest),
+        )
+        .expect_err("declared output token is mandatory");
+        assert!(error
+            .to_string()
+            .contains("verification output lacks required token"));
+        assert_fake_responses_consumed(&wrong_output_probe);
     }
 
     #[test]
