@@ -2289,12 +2289,12 @@ entries:
 
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
-    path: tools/analysis/documents/formatting/jsonl_to_md.py
+    path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
     family: data
     role: helper
     status: canonical
-    command: python3 tools/analysis/documents/formatting/jsonl_to_md.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/formatting/jsonl_to_md.py"]}
+    command: tools/bin/agent-canon jsonl-to-md
+    dispatch: {argv: ["tools/bin/agent-canon", "jsonl-to-md"]}
     writes: true
     default_wiring:
       ci: false
@@ -2308,12 +2308,12 @@ entries:
 
   - id: summarize-hlo-jsonl
     summary: Summarizes HLO JSONL dialect, tag, and operation counts.
-    path: tools/analysis/hlo/summarization/summarize_hlo_jsonl.py
+    path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
     family: hlo
     role: helper
     status: canonical
-    command: python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py
-    dispatch: {argv: ["python3", "tools/analysis/hlo/summarization/summarize_hlo_jsonl.py"]}
+    command: tools/bin/agent-canon summarize-hlo-jsonl
+    dispatch: {argv: ["tools/bin/agent-canon", "summarize-hlo-jsonl"]}
     writes: false
     default_wiring:
       ci: false
