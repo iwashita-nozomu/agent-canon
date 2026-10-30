@@ -91,7 +91,7 @@ writer contract.
 結果ログと可視化 helper:
 
 ```bash
-python3 tools/analysis/documents/formatting/jsonl_to_md.py <input.jsonl> <output.md>
-python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+tools/bin/agent-canon jsonl-to-md <input.jsonl> <output.md>
+tools/bin/agent-canon summarize-hlo-jsonl <hlo.jsonl> > summary.json
 dot -V
 ```

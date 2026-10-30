@@ -292,9 +292,10 @@ fn classification(path: &str, text: &str, symlink: bool) -> &'static str {
     {
         return "third-party-source";
     }
-    if parts
-        .iter()
-        .any(|part| matches!(*part, "templates" | "fixtures" | "fixture"))
+    if path.starts_with("templates/")
+        || parts
+            .iter()
+            .any(|part| matches!(*part, "fixtures" | "fixture"))
     {
         return "template-or-fixture";
     }
@@ -731,6 +732,24 @@ mod tests {
         assert_eq!(
             classification("templates/experiments/run.py", "", false),
             "template-or-fixture"
+        );
+        for tool in [
+            "tools/agent/templates/code_template_rendering.py",
+            "tools/agent/templates/entrypoint_composer.py",
+            "tools/agent/templates/template_bundle.py",
+        ] {
+            assert_eq!(
+                classification(tool, "def run(): pass\n", false),
+                "owned-python-implementation"
+            );
+        }
+        assert_eq!(
+            classification(
+                "tools/agent/templates/__init__.py",
+                "# package marker\n",
+                false
+            ),
+            "package-marker"
         );
         assert_eq!(
             classification("tools/vendor/external.py", "", false),

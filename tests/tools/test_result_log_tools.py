@@ -2,8 +2,7 @@
 # contract test
 # responsibility Tests result-log conversion and summary tools.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
-# upstream implementation ../../tools/analysis/documents/formatting/jsonl_to_md.py converter under test
-# upstream implementation ../../tools/analysis/hlo/summarization/summarize_hlo_jsonl.py HLO summary under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs native transforms under test
 # @dependency-end
 
 """Tests for result-log conversion and summary helpers."""
@@ -11,13 +10,22 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-JSONL_TO_MD = PROJECT_ROOT / "tools" / "analysis" / "documents" / "formatting" / "jsonl_to_md.py"
-HLO_SUMMARY = PROJECT_ROOT / "tools" / "analysis" / "hlo" / "summarization" / "summarize_hlo_jsonl.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+
+def _run_native(*args: str) -> subprocess.CompletedProcess[str]:
+    if AGENT_CANON_CLI is None:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return subprocess.run(
+        [AGENT_CANON_CLI, *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
@@ -27,7 +35,9 @@ def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
     source.write_text(
         "\n".join(
             [
-                json.dumps({"case": "demo", "iter": 1, "metric": 2.5}, ensure_ascii=True),
+                json.dumps(
+                    {"case": "demo", "iter": 1, "metric": 2.5}, ensure_ascii=True
+                ),
                 "not-json",
                 json.dumps({"event": "done", "status": "ok"}, ensure_ascii=True),
             ]
@@ -36,12 +46,7 @@ def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        [sys.executable, str(JSONL_TO_MD), str(source), str(output)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_native("jsonl-to-md", str(source), str(output))
 
     assert result.returncode == 0, result.stderr
     text = output.read_text(encoding="utf-8")
@@ -65,22 +70,24 @@ def test_hlo_summary_counts_ops(tmp_path: Path) -> None:
         "\n".join(
             [
                 json.dumps(
-                    {"case": "hlo", "tag": "demo", "dialect": "stablehlo", "hlo": hlo_text},
+                    {
+                        "case": "hlo",
+                        "tag": "demo",
+                        "dialect": "stablehlo",
+                        "hlo": hlo_text,
+                    },
                     ensure_ascii=True,
                 ),
-                json.dumps({"case": "other", "hlo": "%x = ignored()"}, ensure_ascii=True),
+                json.dumps(
+                    {"case": "other", "hlo": "%x = ignored()"}, ensure_ascii=True
+                ),
             ]
         )
         + "\n",
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        [sys.executable, str(HLO_SUMMARY), str(source)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_native("summarize-hlo-jsonl", str(source))
 
     assert result.returncode == 0, result.stderr
     summary = json.loads(result.stdout)
@@ -90,3 +97,131 @@ def test_hlo_summary_counts_ops(tmp_path: Path) -> None:
     assert ["stablehlo", 1] in summary["dialects"]
     assert ["stablehlo.add", 1] in summary["top_ops"]
     assert ["stablehlo.multiply", 1] in summary["top_ops"]
+
+
+def test_hlo_summary_preserves_python_nested_tag_repr(tmp_path: Path) -> None:
+    """Nested tag strings keep Python repr escapes, including lone surrogates."""
+    source = tmp_path / "unicode-hlo.jsonl"
+    tag = {"nested": "separator:\u2028nbsp:\u00a0surrogate:\ud800control:\x01"}
+    hlo_text = "\ud800\x01\n"
+    source.write_text(
+        json.dumps(
+            {"case": "hlo", "tag": tag, "hlo": hlo_text},
+            ensure_ascii=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["tags"] == [[str(tag), 1]]
+    assert summary["hlo_text"]["total_chars"] == len(hlo_text)
+    assert summary["hlo_text"]["total_lines"] == sum(
+        bool(line.strip()) for line in hlo_text.splitlines()
+    )
+
+
+def test_hlo_summary_top_accepts_arbitrary_python_integers(tmp_path: Path) -> None:
+    """`--top` follows Python int semantics for unbounded and underscored values."""
+    source = tmp_path / "many-ops.jsonl"
+    operations = ["op-a", "op-b", "op-c"]
+    hlo_text = "\n".join(
+        f"%{index} = {operation}()" for index, operation in enumerate(operations)
+    )
+    source.write_text(
+        json.dumps({"case": "hlo", "hlo": hlo_text}, ensure_ascii=True) + "\n",
+        encoding="utf-8",
+    )
+
+    all_ops = [[operation, 1] for operation in operations]
+    positive = _run_native("summarize-hlo-jsonl", "--top", str(10**100), str(source))
+    negative = _run_native("summarize-hlo-jsonl", "--top", str(-(10**100)), str(source))
+    underscored = _run_native("summarize-hlo-jsonl", "--top", " 1_00 ", str(source))
+
+    assert positive.returncode == 0, positive.stderr
+    assert json.loads(positive.stdout)["top_ops"] == all_ops
+    assert negative.returncode == 0, negative.stderr
+    assert json.loads(negative.stdout)["top_ops"] == []
+    assert underscored.returncode == 0, underscored.stderr
+    assert json.loads(underscored.stdout)["top_ops"] == all_ops
+
+
+def test_hlo_summary_reads_universal_newlines(tmp_path: Path) -> None:
+    """JSONL records may be separated by bare CR, LF, or CRLF."""
+    source = tmp_path / "universal-newlines.jsonl"
+    selected = json.dumps(
+        {"case": "hlo", "hlo": "%0 = stablehlo.add()"},
+        ensure_ascii=True,
+    )
+    ignored = json.dumps(
+        {"case": "other", "hlo": "%x = ignored()"},
+        ensure_ascii=True,
+    )
+    source.write_bytes(f"{selected}\r{ignored}\r\n".encode("utf-8"))
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["total_records"] == 2
+    assert summary["total_selected"] == 1
+    assert ["stablehlo.add", 1] in summary["top_ops"]
+
+
+def test_hlo_summary_matches_python_nesting_boundary(tmp_path: Path) -> None:
+    """The iterative reader accepts Python's measured limit and rejects the next level."""
+    source = tmp_path / "deep-record.jsonl"
+    prefix = b'{"case":"hlo","payload":'
+    suffix = b"}\n"
+
+    source.write_bytes(prefix + b"[" * 9994 + b"0" + b"]" * 9994 + suffix)
+    accepted = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert accepted.returncode == 0, accepted.stderr
+    summary = json.loads(accepted.stdout)
+    assert summary["total_records"] == 1
+    assert summary["total_selected"] == 1
+
+    source.write_bytes(prefix + b"[" * 9995 + b"0" + b"]" * 9995 + suffix)
+    rejected = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert rejected.returncode != 0
+
+
+def test_hlo_summary_renders_deep_selected_tag_and_hlo_newlines(tmp_path: Path) -> None:
+    """Nested tag repr and CRLF HLO splitting remain stack safe and Python compatible."""
+    source = tmp_path / "deep-tag.jsonl"
+    tag: object = 0
+    for _ in range(500):
+        tag = [tag]
+    hlo_text = "%0 = op()\r\n%1 = op2()"
+    source.write_text(
+        json.dumps({"case": "hlo", "tag": tag, "hlo": hlo_text}, ensure_ascii=True)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["tags"] == [[str(tag), 1]]
+    assert summary["hlo_text"]["total_chars"] == len(hlo_text)
+    assert summary["hlo_text"]["total_lines"] == 2
+
+
+def test_hlo_summary_reuses_python_unicode_integer_arguments(tmp_path: Path) -> None:
+    """The shared integer owner accepts Python's decimal digit spellings."""
+    source = tmp_path / "unicode-top.jsonl"
+    source.write_text(
+        json.dumps({"case": "hlo", "hlo": "%0 = op-a()\n%1 = op-b()"}) + "\n",
+        encoding="utf-8",
+    )
+    operations = [["op-a", 1], ["op-b", 1]]
+    for spelling in ("١", "１", "𝟙", " ١_٠ "):
+        result = _run_native("summarize-hlo-jsonl", "--top", spelling, str(source))
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["top_ops"] == operations[: int(spelling)]

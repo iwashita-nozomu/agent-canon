@@ -8,7 +8,7 @@ upstream design ../../CONTAINER_OPERATIONS.md devcontainer and Docker ownership 
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream environment ../../agent-canon-environment.toml machine-readable environment and compiled tool contract
 upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml AgentCanon Rust CLI crate license and dependency manifest
-downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates catalog and docs consistency
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog and docs consistency
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates tool and documentation trace links
 downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py validates shared convention wiring
 @dependency-end
