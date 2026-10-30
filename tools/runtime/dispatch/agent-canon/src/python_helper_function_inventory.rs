@@ -361,16 +361,17 @@ impl Options {
                         PathBuf::from(option_value(args, &mut index, inline.as_deref(), key)?)
                 }
                 "--format" => {
-                    options.format = match option_value(args, &mut index, inline.as_deref(), key)?
-                        .as_str()
-                    {
-                        "text" => OutputFormat::Text,
-                        "json" => OutputFormat::Json,
-                        "markdown" => OutputFormat::Markdown,
-                        value => return Err(format!(
+                    options.format =
+                        match option_value(args, &mut index, inline.as_deref(), key)?.as_str() {
+                            "text" => OutputFormat::Text,
+                            "json" => OutputFormat::Json,
+                            "markdown" => OutputFormat::Markdown,
+                            value => {
+                                return Err(format!(
                             "invalid choice: {value:?} (choose from 'text', 'json', 'markdown')"
-                        )),
-                    }
+                        ))
+                            }
+                        }
                 }
                 "--all-functions" if inline.is_none() => options.all_functions = true,
                 "--only-auto-helpers" if inline.is_none() => options.only_auto_helpers = true,
@@ -2112,7 +2113,8 @@ fn nested_candidate_rule(record: &FunctionRecord) -> String {
     let function_helper = record.kind == "function"
         && PUBLIC_LOCAL_HELPER_ROLES.contains(&record.role.as_str())
         && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str());
-    let class_helper = record.kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str());
+    let class_helper =
+        record.kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str());
     if function_helper || class_helper {
         format!("{}:nested-{}", record.domain, record.role)
     } else {
