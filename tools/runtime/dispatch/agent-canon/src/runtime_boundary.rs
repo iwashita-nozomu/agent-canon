@@ -784,7 +784,7 @@ impl RuntimeArtifactBoundary {
             })?;
         let root = resolve_explicit_root(&source, &requested, create)?;
         let directory = RuntimeDirectory::open_nofollow(&root, false)
-            .map_err(|error| format!("runtime root is unavailable: {root}: {error}"))?;
+            .map_err(|error| format!("runtime root is unavailable: {}: {error}", root.display()))?;
         Ok(Self {
             source_root: source,
             root,
@@ -834,7 +834,10 @@ impl RuntimeArtifactBoundary {
             reject_symlink_components(&requested, Path::new("/"))?;
             if create {
                 RuntimeDirectory::open_nofollow(&requested, true).map_err(|error| {
-                    format!("runtime root is unavailable: {requested}: {error}")
+                    format!(
+                        "runtime root is unavailable: {}: {error}",
+                        requested.display()
+                    )
                 })?;
             } else if !requested.is_dir() {
                 return Err(format!(
@@ -847,7 +850,7 @@ impl RuntimeArtifactBoundary {
             resolve_explicit_root(&source, &requested, create)?
         };
         let directory = RuntimeDirectory::open_nofollow(&root, false)
-            .map_err(|error| format!("runtime root is unavailable: {root}: {error}"))?;
+            .map_err(|error| format!("runtime root is unavailable: {}: {error}", root.display()))?;
         Ok(Self {
             source_root: source,
             root,

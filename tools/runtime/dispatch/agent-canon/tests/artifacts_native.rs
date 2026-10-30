@@ -342,8 +342,8 @@ fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
         .expect("parse parent root identity metadata");
     assert_eq!(parent["kind"], "parent-root");
     let root = parent["root"].as_str().expect("canonical home root string");
-    assert_eq!(child["AGENT_CANON_PARENT_ROOT"].as_str(), Some(root));
-    assert_eq!(child["AGENT_CANON_TARGET_ROOT"].as_str(), Some(root));
+    assert_eq!(child["AGENT_CANON_PARENT_ROOT"].as_str(), root);
+    assert_eq!(child["AGENT_CANON_TARGET_ROOT"].as_str(), root);
     assert!(Path::new(root).is_absolute());
     assert!(parent["dev"].as_str().is_some());
     assert!(parent["ino"].as_str().is_some());
