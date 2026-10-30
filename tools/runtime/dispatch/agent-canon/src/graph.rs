@@ -3804,7 +3804,10 @@ mod tests {
         let root = unique_graph_fixture_root();
         let mut setup_guard = GraphFixtureSetupGuard::new(root.clone());
         fs::create_dir(root.join("src")).expect("fixture root");
-        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+        let runtime_root =
+            resolve_runtime_root_at(&root, Some(&test_runtime_root)).expect("test runtime root");
         setup_guard.runtime_root = Some(runtime_root.clone());
         fixture_git(&root, &["init", "-q"]);
         materialize_standalone_surface_manifest(&root);
@@ -4008,10 +4011,14 @@ mod tests {
 
     fn graph_args(root: &Path) -> GraphArgs {
         let producer_identity = current_producer_identity(root).expect("fixture producer identity");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(root).expect("test runtime path");
         GraphArgs {
             root: root.to_path_buf(),
             // Keep fixture writes isolated from a resident runner's ambient runtime root.
-            runtime_root: Some(resolve_runtime_root_at(root, None).expect("test runtime root")),
+            runtime_root: Some(
+                resolve_runtime_root_at(root, Some(&test_runtime_root)).expect("test runtime root"),
+            ),
             profile: "default".to_string(),
             format: "json".to_string(),
             surface_manifest_producer: Some(PathBuf::from(&producer_identity.producer_path)),
@@ -4028,7 +4035,9 @@ mod tests {
 
     fn test_graph_root(root: &Path) -> PathBuf {
         let root = root.canonicalize().expect("canonical test source root");
-        resolve_runtime_root_at(&root, None)
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+        resolve_runtime_root_at(&root, Some(&test_runtime_root))
             .expect("test runtime root")
             .join("graph")
             .join(stable_source_key(&root))
