@@ -3518,13 +3518,7 @@ pub(crate) fn invoke(root: &Path, command: &str, options: &[String]) -> Result<V
     ];
     invocation_args.extend_from_slice(options);
     let parsed = parse_args(&invocation_args)?;
-    let result = match command {
-        "build" => build_graph_with_failure(&parsed),
-        "status" => read_graph_status(&parsed),
-        "query" => query_graph(&parsed),
-        "context" => context_graph(&parsed),
-        _ => unreachable!("graph command was checked above"),
-    };
+    let result = dispatch_command(command, &parsed);
     match result {
         Ok(value) => Ok(value),
         Err(error) => Ok(json!({
@@ -3534,6 +3528,18 @@ pub(crate) fn invoke(root: &Path, command: &str, options: &[String]) -> Result<V
             "reason": error.to_string(),
             "exit_code": 1
         })),
+    }
+}
+
+fn dispatch_command(command: &str, args: &GraphArgs) -> Result<Value, GraphError> {
+    match command {
+        "build" => build_graph_with_failure(args),
+        "status" => read_graph_status(args),
+        "query" => query_graph(args),
+        "context" => context_graph(args),
+        _ => Err(GraphError::Usage(format!(
+            "unknown graph command {command}"
+        ))),
     }
 }
 
@@ -3549,19 +3555,11 @@ pub(crate) fn run(args: &[String]) -> i32 {
             return 2;
         }
     };
-    let result = match command.as_str() {
-        "build" => build_graph_with_failure(&parsed),
-        "status" => read_graph_status(&parsed),
-        "query" => query_graph(&parsed),
-        "context" => context_graph(&parsed),
-        "help" | "--help" | "-h" => {
-            eprintln!("graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json]");
-            return 2;
-        }
-        _ => Err(GraphError::Usage(format!(
-            "unknown graph command {command}"
-        ))),
-    };
+    if matches!(command.as_str(), "help" | "--help" | "-h") {
+        eprintln!("graph <build|status|query|context> [--root PATH] [--runtime-root PATH] [--format json]");
+        return 2;
+    }
+    let result = dispatch_command(command, &parsed);
     match result {
         Ok(value) => emit(&value, &parsed.format),
         Err(error) => {
