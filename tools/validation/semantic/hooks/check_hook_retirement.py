@@ -36,10 +36,18 @@ EXECUTABLE_SCAN_PATHS = (
     "agents/skills/worktree-health.md", ".codex/personal/skills/worktree-health/SKILL.md",
     "documents/experiments/gpu-admission-r5-source-packet.md", "AGENTS.md", "ROOT_AGENTS.md", "README.md",
     "documents/runtime/runtime-log-archive.md", "tools/README.md", "tools/experiments/execution/execution_resource_plan.py",
-    "tools/validation/notebooks/notebook_quality.py",
+    "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs",
 )
 METADATA_ALLOWLIST = {"tools/runtime/authority/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
-_COMMAND_RE = re.compile(r"^(?:import-only:tools\.[A-Za-z0-9_.]+:[A-Za-z0-9_]+|command-only:python3 tools/[A-Za-z0-9_./-]+\.py(?: [^\n]*)?|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*|docs-only:tools/bin/agent-canon docs check)$")
+_COMMAND_RE = re.compile(
+    r"^(?:"
+    r"import-only:tools\.[A-Za-z0-9_.]+:[A-Za-z0-9_]+"
+    r"|command-only:python3 tools/[A-Za-z0-9_./-]+\.py(?: [^\n]*)?"
+    r"|command-only:tools/bin/agent-canon (?:[a-z0-9][a-z0-9-]*|--[a-z][a-z0-9-]*)"
+    r"|skill-only:\$[A-Za-z0-9][A-Za-z0-9_-]*"
+    r"|docs-only:tools/bin/agent-canon docs check"
+    r")$"
+)
 
 
 def _files(root: Path, relative: str) -> list[Path]:

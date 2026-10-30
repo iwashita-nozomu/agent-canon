@@ -145,6 +145,7 @@ catalog/checker owners rather than adding a second README registry.
 | path-risk/profile selection | `python3 tools/validation/semantic/path/classify_path_risk.py` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
+| notebook quality | `tools/bin/agent-canon notebook-quality [--changed|--all] [paths...]` |
 | bounded Skill read and EOF admission | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` (shared tool container) |
 
 ## Artifact and archive route
