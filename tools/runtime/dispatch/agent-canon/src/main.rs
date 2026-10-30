@@ -13,6 +13,7 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation python_ast.rs shares native Python AST helper behavior
+// downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
 // downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
@@ -34,6 +35,7 @@ mod migration_audit;
 mod private_feedback;
 mod python_algorithm_contract;
 mod python_ast;
+mod python_cli_integer;
 mod python_helper_function_inventory;
 mod python_module_groups;
 mod python_structure_hash;
@@ -45,6 +47,7 @@ mod rule_inventory;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
+pub mod skill_document_reader;
 mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
@@ -69,6 +72,7 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
@@ -113,6 +117,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "skill-document-reader" {
+        std::process::exit(skill_document_reader::run(&args[2..]));
     }
 
     if args.len() >= 2
