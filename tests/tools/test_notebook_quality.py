@@ -242,6 +242,102 @@ class NotebookQualityTest(unittest.TestCase):
             ],
         )
 
+    def test_arbitrary_thresholds_match_python_integer_oracle(self) -> None:
+        """Very large signed thresholds compare and render without narrowing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            markdown = "# Demo\n\nshort narrative"
+            code = "\n".join("value = 1" for _ in range(81))
+            positive = "9" * 100
+            path = self.write_notebook(
+                root,
+                "jupyter/large.ipynb",
+                [markdown_cell(markdown), code_cell(code)],
+            )
+
+            positive_result = self.run_checker(
+                root,
+                "--format",
+                "json",
+                "--max-code-cell-lines",
+                positive,
+                "--min-markdown-chars",
+                positive,
+                str(path.relative_to(root)),
+            )
+
+            negative = "-" + "٩" * 100
+            negative_result = self.run_checker(
+                root,
+                "--format",
+                "json",
+                "--max-code-cell-lines",
+                negative,
+                "--min-markdown-chars",
+                negative,
+                str(path.relative_to(root)),
+            )
+
+        positive_payload = json.loads(positive_result.stdout)
+        positive_findings = positive_payload["findings"]
+        self.assertEqual(positive_result.returncode, 1, positive_result.stderr)
+        self.assertNotIn(
+            "oversized-code-cell", {item["check"] for item in positive_findings}
+        )
+        thin = next(
+            item for item in positive_findings if item["check"] == "thin-narrative"
+        )
+        self.assertEqual(
+            thin["detail"],
+            f"{len(markdown.strip())} Markdown chars is below {int(positive)}",
+        )
+
+        negative_payload = json.loads(negative_result.stdout)
+        negative_findings = negative_payload["findings"]
+        oversized = next(
+            item for item in negative_findings if item["check"] == "oversized-code-cell"
+        )
+        self.assertEqual(negative_result.returncode, 1, negative_result.stderr)
+        self.assertEqual(oversized["line"], int(negative) + 1)
+        self.assertEqual(oversized["detail"], f"81 lines exceeds {int(negative)}")
+        self.assertNotIn(
+            "thin-narrative", {item["check"] for item in negative_findings}
+        )
+
+    def test_unicode_integer_threshold_uses_python_int_semantics(self) -> None:
+        """Unicode decimal digits parse like Python's int for CLI thresholds."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            markdown = "#" + "a" * 119
+            path = self.write_notebook(
+                root,
+                "jupyter/unicode.ipynb",
+                [
+                    markdown_cell(markdown),
+                    code_cell("import matplotlib.pyplot as plt\nplt.plot([0], [1])"),
+                ],
+            )
+
+            threshold = "١٢١"
+            result = self.run_checker(
+                root,
+                "--format",
+                "json",
+                "--min-markdown-chars",
+                threshold,
+                str(path.relative_to(root)),
+            )
+
+        payload = json.loads(result.stdout)
+        thin = next(
+            item for item in payload["findings"] if item["check"] == "thin-narrative"
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(
+            thin["detail"],
+            f"{len(markdown.strip())} Markdown chars is below {int(threshold)}",
+        )
+
     def test_changed_mode_discovers_modified_notebook(self) -> None:
         """Changed mode should inspect tracked notebook edits."""
         with tempfile.TemporaryDirectory() as temp_dir:

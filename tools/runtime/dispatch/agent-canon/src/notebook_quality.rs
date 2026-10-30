@@ -3,6 +3,7 @@
 // responsibility Validates notebooks as readable runnable demos instead of fine-grained tests.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md owns native tool migration and caller closure
 // upstream implementation ../../../../../tools/catalog.yaml registers the notebook-quality selector
+// upstream implementation python_cli_integer.rs parses Python-compatible integer thresholds
 // downstream implementation main.rs exposes the notebook-quality selector
 // downstream implementation ../../../../../tools/validation/ci/runners/run_all_checks.sh runs default notebook validation
 // downstream implementation ../../../../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts the notebook quality contract check
@@ -10,7 +11,9 @@
 // downstream design ../../../../../documents/tools/notebook_quality.md documents the command contract
 // @dependency-end
 
+use crate::python_cli_integer::{is_argparse_negative_number, parse as parse_python_cli_integer};
 use regex::Regex;
+use rustpython_ast::bigint::BigInt;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -28,22 +31,28 @@ const MAX_CODE_CELL_LINES: i64 = 80;
 const MIN_MARKDOWN_CHARS: i64 = 120;
 const GIT_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 struct Finding {
     cell: usize,
     check: String,
     detail: String,
-    line: i64,
+    line: BigInt,
     path: String,
 }
 
 impl Finding {
-    fn new(path: &str, cell: usize, line: i64, check: &str, detail: impl Into<String>) -> Self {
+    fn new(
+        path: &str,
+        cell: usize,
+        line: impl Into<BigInt>,
+        check: &str,
+        detail: impl Into<String>,
+    ) -> Self {
         Self {
             cell,
             check: check.to_owned(),
             detail: detail.into(),
-            line,
+            line: line.into(),
             path: path.to_owned(),
         }
     }
@@ -101,14 +110,6 @@ struct NotebookReport {
     metrics: Vec<NotebookMetrics>,
 }
 
-#[derive(Serialize)]
-struct JsonReport<'a> {
-    findings: &'a [Finding],
-    metrics: &'a [NotebookMetrics],
-    status: &'static str,
-    warnings: &'a [Warning],
-}
-
 #[derive(Default)]
 struct NotebookScanState {
     findings: Vec<Finding>,
@@ -140,8 +141,8 @@ struct Options {
     root: String,
     changed: bool,
     all: bool,
-    max_code_cell_lines: i64,
-    min_markdown_chars: i64,
+    max_code_cell_lines: BigInt,
+    min_markdown_chars: BigInt,
     format: OutputFormat,
 }
 
@@ -182,8 +183,8 @@ pub fn run(args: &[String]) -> i32 {
     let report = validate_paths(
         &root,
         &paths,
-        options.max_code_cell_lines,
-        options.min_markdown_chars,
+        &options.max_code_cell_lines,
+        &options.min_markdown_chars,
     );
     match options.format {
         OutputFormat::Text => println!("{}", render_text(&report)),
@@ -202,8 +203,8 @@ fn parse_args(raw: &[String]) -> Result<ParseResult, String> {
         root: ".".to_owned(),
         changed: false,
         all: false,
-        max_code_cell_lines: MAX_CODE_CELL_LINES,
-        min_markdown_chars: MIN_MARKDOWN_CHARS,
+        max_code_cell_lines: BigInt::from(MAX_CODE_CELL_LINES),
+        min_markdown_chars: BigInt::from(MIN_MARKDOWN_CHARS),
         format: OutputFormat::Text,
     };
     let mut index = 0;
@@ -233,24 +234,23 @@ fn parse_args(raw: &[String]) -> Result<ParseResult, String> {
             options.root = required_value(raw, index, token)?.to_owned();
             index += 1;
         } else if let Some(value) = token.strip_prefix("--max-code-cell-lines=") {
-            options.max_code_cell_lines = parse_integer(value, "--max-code-cell-lines")?;
+            options.max_code_cell_lines = parse_threshold(value, "--max-code-cell-lines")?;
         } else if token == "--max-code-cell-lines" {
             options.max_code_cell_lines =
-                parse_integer(required_value(raw, index, token)?, "--max-code-cell-lines")?;
+                parse_threshold(required_value(raw, index, token)?, "--max-code-cell-lines")?;
             index += 1;
         } else if let Some(value) = token.strip_prefix("--min-markdown-chars=") {
-            options.min_markdown_chars = parse_integer(value, "--min-markdown-chars")?;
+            options.min_markdown_chars = parse_threshold(value, "--min-markdown-chars")?;
         } else if token == "--min-markdown-chars" {
             options.min_markdown_chars =
-                parse_integer(required_value(raw, index, token)?, "--min-markdown-chars")?;
+                parse_threshold(required_value(raw, index, token)?, "--min-markdown-chars")?;
             index += 1;
         } else if let Some(value) = token.strip_prefix("--format=") {
             options.format = parse_format(value)?;
         } else if token == "--format" {
             options.format = parse_format(required_value(raw, index, token)?)?;
             index += 1;
-        } else if token.starts_with('-') && token != "-" && parse_negative_integer(token).is_none()
-        {
+        } else if token.starts_with('-') && token != "-" && !is_argparse_negative_number(token) {
             return Err(format!("unrecognized arguments: {token}"));
         } else {
             options.paths.push(token.clone());
@@ -264,54 +264,15 @@ fn required_value<'a>(raw: &'a [String], index: usize, option: &str) -> Result<&
     let value = raw
         .get(index + 1)
         .filter(|value| {
-            !value.starts_with('-') || *value == "-" || parse_negative_integer(value).is_some()
+            !value.starts_with('-') || *value == "-" || is_argparse_negative_number(value)
         })
         .ok_or_else(|| format!("argument {option}: expected one argument"))?;
     Ok(value)
 }
 
-fn parse_integer(raw: &str, option: &str) -> Result<i64, String> {
-    let trimmed = raw.trim();
-    let (sign, digits) = match trimmed.strip_prefix('-') {
-        Some(digits) => ("-", digits),
-        None => match trimmed.strip_prefix('+') {
-            Some(digits) => ("+", digits),
-            None => ("", trimmed),
-        },
-    };
-    let mut normalized = String::with_capacity(trimmed.len());
-    normalized.push_str(sign);
-    let mut previous_was_digit = false;
-    let mut digit_count = 0;
-    for (index, character) in digits.char_indices() {
-        if character.is_ascii_digit() {
-            normalized.push(character);
-            previous_was_digit = true;
-            digit_count += 1;
-        } else if character == '_' {
-            let next_is_digit = digits[index + 1..]
-                .chars()
-                .next()
-                .is_some_and(|next| next.is_ascii_digit());
-            if !previous_was_digit || !next_is_digit {
-                return Err(format!("argument {option}: invalid int value: {raw:?}"));
-            }
-            previous_was_digit = false;
-        } else {
-            return Err(format!("argument {option}: invalid int value: {raw:?}"));
-        }
-    }
-    if digit_count == 0 {
-        return Err(format!("argument {option}: invalid int value: {raw:?}"));
-    }
-    match normalized.parse::<i64>() {
-        Ok(value) => Ok(value),
-        Err(_) => Err(format!("argument {option}: invalid int value: {raw:?}")),
-    }
-}
-
-fn parse_negative_integer(raw: &str) -> Option<i64> {
-    raw.parse::<i64>().ok().filter(|value| *value < 0)
+fn parse_threshold(raw: &str, option: &str) -> Result<BigInt, String> {
+    parse_python_cli_integer(raw)
+        .ok_or_else(|| format!("argument {option}: invalid int value: {raw:?}"))
 }
 
 fn parse_format(raw: &str) -> Result<OutputFormat, String> {
@@ -571,8 +532,8 @@ fn display_path(root: &Path, path: &Path) -> String {
 fn validate_paths(
     root: &Path,
     paths: &[PathBuf],
-    max_code_cell_lines: i64,
-    min_markdown_chars: i64,
+    max_code_cell_lines: &BigInt,
+    min_markdown_chars: &BigInt,
 ) -> NotebookReport {
     let mut report = NotebookReport {
         findings: Vec::new(),
@@ -595,8 +556,8 @@ fn validate_paths(
 fn validate_notebook(
     path: &Path,
     display_path: &str,
-    max_code_cell_lines: i64,
-    min_markdown_chars: i64,
+    max_code_cell_lines: &BigInt,
+    min_markdown_chars: &BigInt,
 ) -> (Vec<Finding>, Vec<Warning>, Option<NotebookMetrics>) {
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
@@ -690,7 +651,7 @@ fn record_cell(
     index: usize,
     value: &Value,
     display_path: &str,
-    max_code_cell_lines: i64,
+    max_code_cell_lines: &BigInt,
 ) {
     let Some(cell) = value.as_object() else {
         state.findings.push(Finding::new(
@@ -744,7 +705,7 @@ fn record_code_cell(
     cell: &serde_json::Map<String, Value>,
     source: &str,
     display_path: &str,
-    max_code_cell_lines: i64,
+    max_code_cell_lines: &BigInt,
 ) {
     state.code_cells += 1;
     if state.previous_was_code {
@@ -757,11 +718,11 @@ fn record_code_cell(
         ));
     }
     let line_count = python_splitlines_count(source);
-    if (line_count as i128) > (max_code_cell_lines as i128) {
+    if &BigInt::from(line_count) > max_code_cell_lines {
         state.findings.push(Finding::new(
             display_path,
             index,
-            max_code_cell_lines.saturating_add(1),
+            max_code_cell_lines.clone() + BigInt::from(1),
             "oversized-code-cell",
             format!("{line_count} lines exceeds {max_code_cell_lines}"),
         ));
@@ -791,7 +752,7 @@ fn record_code_cell(
             state.findings.push(Finding::new(
                 display_path,
                 index,
-                line as i64,
+                BigInt::from(line),
                 check,
                 *detail,
             ));
@@ -802,7 +763,7 @@ fn record_code_cell(
 fn final_notebook_findings(
     state: &NotebookScanState,
     display_path: &str,
-    min_markdown_chars: i64,
+    min_markdown_chars: &BigInt,
 ) -> Vec<Finding> {
     let mut findings = Vec::new();
     if state.first_non_empty_type != "markdown" {
@@ -832,7 +793,7 @@ fn final_notebook_findings(
             "notebooks need runnable code cells",
         ));
     }
-    if (state.markdown_chars as i128) < (min_markdown_chars as i128) {
+    if &BigInt::from(state.markdown_chars) < min_markdown_chars {
         findings.push(Finding::new(
             display_path,
             0,
@@ -1015,17 +976,44 @@ fn render_text(report: &NotebookReport) -> String {
 }
 
 fn render_json(report: &NotebookReport) -> String {
-    let payload = JsonReport {
-        findings: &report.findings,
-        metrics: &report.metrics,
-        status: if report.findings.is_empty() {
-            "pass"
-        } else {
-            "fail"
-        },
-        warnings: &report.warnings,
+    let findings = render_findings_json(&report.findings);
+    let metrics = serde_json::to_string(&report.metrics).expect("metrics are JSON serializable");
+    let status = if report.findings.is_empty() {
+        "pass"
+    } else {
+        "fail"
     };
-    serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_owned())
+    let status = serde_json::to_string(status).expect("status is JSON serializable");
+    let warnings = serde_json::to_string(&report.warnings).expect("warnings are JSON serializable");
+    format!(
+        "{{\"findings\":{findings},\"metrics\":{metrics},\"status\":{status},\"warnings\":{warnings}}}"
+    )
+}
+
+fn render_findings_json(findings: &[Finding]) -> String {
+    let mut rendered = String::from("[");
+    for (index, finding) in findings.iter().enumerate() {
+        if index > 0 {
+            rendered.push(',');
+        }
+        rendered.push_str("{\"cell\":");
+        rendered.push_str(&finding.cell.to_string());
+        rendered.push_str(",\"check\":");
+        append_json_string(&mut rendered, &finding.check);
+        rendered.push_str(",\"detail\":");
+        append_json_string(&mut rendered, &finding.detail);
+        rendered.push_str(",\"line\":");
+        rendered.push_str(&finding.line.to_string());
+        rendered.push_str(",\"path\":");
+        append_json_string(&mut rendered, &finding.path);
+        rendered.push('}');
+    }
+    rendered.push(']');
+    rendered
+}
+
+fn append_json_string(output: &mut String, value: &str) {
+    output.push_str(&serde_json::to_string(value).expect("string is JSON serializable"));
 }
 
 #[cfg(test)]
