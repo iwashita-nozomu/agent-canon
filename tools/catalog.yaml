@@ -2463,12 +2463,12 @@ entries:
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
-    path: tools/validation/notebooks/notebook_quality.py
+    path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
     family: validation
     role: checker
     status: canonical
-    command: python3 tools/validation/notebooks/notebook_quality.py --all
-    dispatch: {argv: ["python3", "tools/validation/notebooks/notebook_quality.py", "--all"]}
+    command: tools/bin/agent-canon notebook-quality --all
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "notebook-quality", "--all"]}
     writes: false
     default_wiring:
       ci: true
@@ -2476,6 +2476,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/notebook_quality.md
     tests:
       - tests/tools/test_notebook_quality.py
 

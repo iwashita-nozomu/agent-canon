@@ -23,6 +23,7 @@
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
+// downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
@@ -35,6 +36,7 @@ mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
 mod migration_audit;
+mod notebook_quality;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -72,6 +74,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
+  notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
@@ -200,6 +203,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "notebook-quality" {
+        std::process::exit(notebook_quality::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-merge-structure" {
