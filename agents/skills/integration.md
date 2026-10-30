@@ -79,7 +79,7 @@ it does not prove behavior or replace the changed owner validation.
    the existing targeted owner check may provide this comparison:
 
    ```bash
-   python3 tools/validation/ci/checks/check_merge_structure.py \
+   tools/bin/agent-canon check-merge-structure \
      --source <source-ref> \
      --target <base-ref> \
      --compare-commit <integration-commit> \

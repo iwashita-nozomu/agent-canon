@@ -1,7 +1,8 @@
 # @dependency-start
 # contract test
 # responsibility Tests test check merge structure behavior.
-# upstream design ../../tools/README.md validated automation surface
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_merge_structure.rs native structural integration CLI
+# upstream implementation ../../tests/agent_tools/rust_cli_fixture.py external-target native CLI fixture
 # @dependency-end
 
 """Tests for branch integration structure checks."""
@@ -10,21 +11,11 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
-import unittest
 from pathlib import Path
 
+from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
 
-def resolve_script() -> Path:
-    """Return the nearest available check_merge_structure.py script."""
-    for candidate in Path(__file__).resolve().parents:
-        script = candidate / "tools" / "validation" / "ci" / "checks" / "check_merge_structure.py"
-        if script.exists():
-            return script
-    raise unittest.SkipTest("check_merge_structure.py is not available in this tree")
-
-
-SCRIPT = resolve_script()
+AGENT_CANON = standalone_agent_canon()
 
 
 def git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -57,6 +48,37 @@ def commit_all(repo: Path, message: str) -> None:
     assert commit.returncode == 0, commit.stderr
 
 
+def commit_all_with_index_mode(repo: Path, message: str, path: str, mode: str) -> None:
+    """Commit all changes with a portable Git index executable-bit choice."""
+    add = git(repo, "add", ".")
+    assert add.returncode == 0, add.stderr
+    set_mode = git(
+        repo,
+        "update-index",
+        f"--chmod={mode}",
+        path,
+    )
+    assert set_mode.returncode == 0, set_mode.stderr
+    commit = git(repo, "commit", "-m", message)
+    assert commit.returncode == 0, commit.stderr
+
+
+def run_checker(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run the native local structural integration checker."""
+    return subprocess.run(
+        [
+            str(AGENT_CANON),
+            "check-merge-structure",
+            "--repo-root",
+            str(repo),
+            *args,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 def init_repo(repo: Path) -> None:
     """Initialize a test repository with a main branch."""
     init = git(repo, "init", "-b", "main")
@@ -64,6 +86,15 @@ def init_repo(repo: Path) -> None:
     write(repo / "alpha.txt", "alpha\n")
     write(repo / "docs" / "guide.md", "guide\n")
     commit_all(repo, "initial")
+
+
+def tree_mode_and_blob(repo: Path, revision: str, path: str) -> tuple[str, str]:
+    """Read one tree entry's Git mode and object id."""
+    result = git(repo, "ls-tree", revision, "--", path)
+    assert result.returncode == 0, result.stderr
+    fields = result.stdout.split("\t", 1)[0].split()
+    assert len(fields) == 3, result.stdout
+    return fields[0], fields[2]
 
 
 def test_check_merge_structure_passes_for_merged_structural_changes(tmp_path: Path) -> None:
@@ -85,22 +116,14 @@ def test_check_merge_structure_passes_for_merged_structural_changes(tmp_path: Pa
     merge = git(repo, "merge", "--no-ff", "work/shape-20260408", "-m", "merge branch")
     assert merge.returncode == 0, merge.stderr
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--repo-root",
-            str(repo),
-            "--source",
-            "work/shape-20260408",
-            "--target",
-            "main^1",
-            "--compare-commit",
-            "HEAD",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
+    result = run_checker(
+        repo,
+        "--source",
+        "work/shape-20260408",
+        "--target",
+        "main^1",
+        "--compare-commit",
+        "HEAD",
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "MERGE_STRUCTURE_CHECK=pass" in result.stdout
@@ -122,22 +145,14 @@ def test_check_merge_structure_fails_when_old_layout_survives(tmp_path: Path) ->
     write(repo / "beta.txt", "manual copy\n")
     commit_all(repo, "bad manual pickup")
 
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--repo-root",
-            str(repo),
-            "--source",
-            "work/shape-20260408",
-            "--target",
-            "main",
-            "--compare-commit",
-            "HEAD",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
+    result = run_checker(
+        repo,
+        "--source",
+        "work/shape-20260408",
+        "--target",
+        "main",
+        "--compare-commit",
+        "HEAD",
     )
     assert result.returncode != 0
     assert "MERGE_STRUCTURE_CHECK=fail" in result.stdout
@@ -146,3 +161,53 @@ def test_check_merge_structure_fails_when_old_layout_survives(tmp_path: Path) ->
         or "latest.txt" in result.stdout
         or "docs/guide.md" in result.stdout
     )
+
+
+def test_check_merge_structure_fails_when_structural_file_mode_differs(tmp_path: Path) -> None:
+    """The check must distinguish equal blobs with different Git tree modes."""
+    repo = tmp_path / "repo-mode-mismatch"
+    repo.mkdir()
+    init_repo(repo)
+    assert git(repo, "config", "core.filemode", "false").returncode == 0
+
+    assert git(repo, "checkout", "-b", "work/shape-mode-20260408").returncode == 0
+    assert git(repo, "mv", "alpha.txt", "beta.txt").returncode == 0
+    assert git(repo, "rm", "docs/guide.md").returncode == 0
+    os.symlink("beta.txt", repo / "latest.txt")
+    commit_all_with_index_mode(repo, "reshape files", "beta.txt", "+x")
+
+    assert git(repo, "checkout", "main").returncode == 0
+    assert git(repo, "rm", "alpha.txt").returncode == 0
+    assert git(repo, "rm", "docs/guide.md").returncode == 0
+    write(repo / "beta.txt", "alpha\n")
+    os.symlink("beta.txt", repo / "latest.txt")
+    commit_all_with_index_mode(
+        repo,
+        "manually preserve paths with non-executable mode",
+        "beta.txt",
+        "-x",
+    )
+
+    source_mode, source_blob = tree_mode_and_blob(
+        repo, "work/shape-mode-20260408", "beta.txt"
+    )
+    compare_mode, compare_blob = tree_mode_and_blob(repo, "HEAD", "beta.txt")
+    assert source_mode == "100755"
+    assert compare_mode == "100644"
+    assert source_blob == compare_blob
+
+    result = run_checker(
+        repo,
+        "--source",
+        "work/shape-mode-20260408",
+        "--target",
+        "main",
+        "--compare-commit",
+        "HEAD",
+    )
+
+    assert result.returncode == 1
+    assert "MERGE_STRUCTURE_CHECK=fail" in result.stdout
+    assert "beta.txt" in result.stdout
+    assert "100755:blob:" in result.stdout
+    assert "100644:blob:" in result.stdout
