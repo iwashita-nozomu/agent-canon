@@ -1504,8 +1504,8 @@ fn verify_handoff(
         ));
     }
     for (label, token_path, request_path) in [
-        ("source_root", token_source.as_deref(), source),
-        ("clone_root", token_clone.as_deref(), clone),
+        ("source_root", token_source.as_ref(), source),
+        ("clone_root", token_clone.as_ref(), clone),
     ] {
         match (token_path, request_path) {
             (None, None) => {}
