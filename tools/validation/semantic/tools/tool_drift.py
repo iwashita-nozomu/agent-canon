@@ -154,7 +154,7 @@ CONTRACTS = (
     ),
     ToolContract(
         name="responsibility_scope",
-        tool="tools/validation/semantic/responsibility/responsibility_scope.py",
+        tool="tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
         links=(
             LinkCheck("responsibility-scope.toml"),
             LinkCheck("templates/documents/responsibility-scope.template.toml"),
@@ -172,9 +172,7 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck(
-                "tools/validation/semantic/responsibility/responsibility_scope.py"
-            ),
+            LinkCheck("tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
             LinkCheck("tests/agent_tools/test_tool_rejection_preflight.py"),

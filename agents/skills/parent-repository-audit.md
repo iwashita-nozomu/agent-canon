@@ -73,7 +73,7 @@ python3 -m tools.analysis.code.parent_repository_audit list \
 
 unknown surface、invalid unit、source/root path escape、missing evidence scope、parent Git missing
 は typed failure です。path coverage/overlap はこの tool では計算せず、親の
-`responsibility_scope.py` が canonical tracked-path relation を一度だけ検証します。
+`tools/bin/agent-canon responsibility-scope` が canonical tracked-path relation を一度だけ検証します。
 
 check packet は unit receipt の全体状態を集約します。
 

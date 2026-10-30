@@ -8,7 +8,7 @@ upstream design ../structure/repo-structure-contract.toml separate path existenc
 upstream design ../../responsibility-scope.toml machine-readable repo-local ownership manifest
 downstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 upstream design ../../tools/catalog.yaml structured tool ownership
-downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates total single ownership
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs validates total single ownership
 downstream implementation ../../tools/runtime/authority/task_authority.py owns protected external dependency authority
 downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates scope/tool trace links
 @dependency-end
@@ -80,7 +80,7 @@ Each scope declares:
 
 ## Tool Contract
 
-`tools/validation/semantic/responsibility/responsibility_scope.py` validates the manifest. It scans the
+`tools/bin/agent-canon responsibility-scope` validates the manifest. It scans the
 tracked path set once and fails when a tracked path has no owning scope or more
 than one owning scope after exclusions, a scope names a missing or uncataloged
 protecting tool, or a GitHub Issue identity is malformed. It does not require
@@ -90,8 +90,13 @@ Use it before adding a new checker, hook, skill, workflow, issue family, or
 tracked top-level path:
 
 ```bash
-python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
+tools/bin/agent-canon responsibility-scope --root .
 ```
+
+Planned-path callers may repeat `--path <path>`; JSON then adds a `path_owners`
+array with the matching scope IDs for each requested path, and text output emits
+`RESPONSIBILITY_SCOPE_PATH_OWNER=<path>:<scope-ids>`. Omitting `--path` keeps
+the canonical validation report unchanged.
 
 Ruff owns unused and wildcard-import diagnostics in the selected Python quality
 route. The responsibility-scope manifest remains a path-ownership relation and

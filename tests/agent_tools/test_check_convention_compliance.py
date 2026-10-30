@@ -114,10 +114,10 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "*_FORWARDER=deprecated *_FORWARDER_SEVERITY=fix-now "
         "caller chain canonical command\n"
     ),
-    "documents/design/responsibility-scope-management.md": "responsibility_scope.py\n",
+    "documents/design/responsibility-scope-management.md": "agent-canon responsibility-scope\n",
     "documents/tools/README.md": (
         "tool_catalog.rs tool_drift.py notebook-quality "
-        "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
+        "tool_rejection_preflight.py agent-canon responsibility-scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
@@ -125,7 +125,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "tool_catalog.rs tool_drift.py notebook-quality "
         "agent-canon docs render-runtime-profile agent-canon docs check "
         "tool_rejection_preflight.py "
-        "responsibility_scope responsibility-scope.toml protecting tools\n"
+        "agent-canon responsibility-scope responsibility-scope.toml protecting tools\n"
     ),
     "tools/validation/semantic/tools/tool_rejection_preflight.py": "preflight owner\n",
     "agents/COMMUNICATION_PROTOCOL.md": "communication protocol\n",
@@ -273,7 +273,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.rs tool_drift.py notebook-quality "
-        "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check\n"
+        "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check "
+        "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
         'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'

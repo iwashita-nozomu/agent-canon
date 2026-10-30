@@ -12,7 +12,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates structured tool catalog
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
-# upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
@@ -424,7 +424,7 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/responsibility/responsibility_scope.py" 2>&1; then
+if run_agent_canon responsibility-scope --root "$WORKSPACE_ROOT" 2>&1; then
   echo "✅ responsibility scope checks 成功"
 else
   echo "❌ responsibility scope checks 失敗"
