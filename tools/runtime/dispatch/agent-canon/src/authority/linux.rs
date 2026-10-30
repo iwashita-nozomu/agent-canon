@@ -1453,12 +1453,7 @@ where
                 "cannot atomically replace parent-owned file",
             )
         })?;
-        rustix::fs::fsync(&parent).map_err(|_| {
-            error(
-                ParentRootReject::RootRaceDetected,
-                "cannot sync parent-owned destination directory",
-            )
-        })?;
+        sync_directory(&parent)?;
 
         attested.verify_live_identity()?;
         verify_component_identities(root, parent_parts, &parent_components)?;
@@ -1524,6 +1519,38 @@ where
 
 fn write_all_progress<W: Write>(writer: &mut W, bytes: &[u8]) -> std::io::Result<()> {
     writer.write_all(bytes)
+}
+
+fn sync_directory(directory: &Dir) -> Result<(), AuthorityError> {
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    let file = directory.open_with(".", &options).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot reopen parent-owned destination directory for sync",
+        )
+    })?;
+    if !file
+        .metadata()
+        .map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot inspect parent-owned destination directory for sync",
+            )
+        })?
+        .is_dir()
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned sync target is not a directory",
+        ));
+    }
+    file.sync_all().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot sync parent-owned destination directory",
+        )
+    })
 }
 
 fn create_private_directory(parent: &Dir, name: &OsStr) -> Result<(), AuthorityError> {
