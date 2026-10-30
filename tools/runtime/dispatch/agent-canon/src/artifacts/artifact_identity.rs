@@ -149,59 +149,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 /// Return the SHA-1 object ID Git assigns to a blob containing these exact bytes.
 pub fn git_blob_oid(data: &[u8]) -> String {
-    let mut message = format!("blob {}\0", data.len()).into_bytes();
-    message.extend_from_slice(data);
-    let bit_length = (message.len() as u64).wrapping_mul(8);
-    message.push(0x80);
-    while message.len() % 64 != 56 {
-        message.push(0);
-    }
-    message.extend_from_slice(&bit_length.to_be_bytes());
-
-    let mut state = [
-        0x67452301_u32,
-        0xefcdab89,
-        0x98badcfe,
-        0x10325476,
-        0xc3d2e1f0,
-    ];
-    for chunk in message.as_chunks::<64>().0 {
-        let mut words = [0_u32; 80];
-        for (index, bytes) in chunk.as_chunks::<4>().0.iter().enumerate() {
-            words[index] = u32::from_be_bytes(*bytes);
-        }
-        for index in 16..80 {
-            words[index] =
-                (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16])
-                    .rotate_left(1);
-        }
-        let [mut a, mut b, mut c, mut d, mut e] = state;
-        for (index, word) in words.iter().enumerate() {
-            let (function, constant) = match index {
-                0..=19 => ((b & c) | ((!b) & d), 0x5a827999_u32),
-                20..=39 => (b ^ c ^ d, 0x6ed9eba1_u32),
-                40..=59 => ((b & c) | (b & d) | (c & d), 0x8f1bbcdc_u32),
-                _ => (b ^ c ^ d, 0xca62c1d6_u32),
-            };
-            let next = a
-                .rotate_left(5)
-                .wrapping_add(function)
-                .wrapping_add(e)
-                .wrapping_add(constant)
-                .wrapping_add(*word);
-            e = d;
-            d = c;
-            c = b.rotate_left(30);
-            b = a;
-            a = next;
-        }
-        state[0] = state[0].wrapping_add(a);
-        state[1] = state[1].wrapping_add(b);
-        state[2] = state[2].wrapping_add(c);
-        state[3] = state[3].wrapping_add(d);
-        state[4] = state[4].wrapping_add(e);
-    }
-    state.iter().map(|word| format!("{word:08x}")).collect()
+    let mut hash = sha1::Sha1::new();
+    hash.update(format!("blob {}\0", data.len()).as_bytes());
+    hash.update(data);
+    format!("{:x}", hash.finalize())
 }
 
 fn run_git(workspace: &Path, args: &[&str]) -> Result<Vec<u8>> {
