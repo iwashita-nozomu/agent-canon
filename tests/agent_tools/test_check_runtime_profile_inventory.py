@@ -3,47 +3,34 @@
 # @dependency-start
 # contract test
 # responsibility Tests runtime profile inventory drift detection.
-# upstream implementation ../../tools/validation/semantic/runtime/check_runtime_profile_inventory.py checks runtime profile inventory drift
-# upstream implementation ../../tools/validation/documentation/formatting/render_runtime_profile_inventory.py renders runtime profile doc from inventory
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs owns native runtime profile rendering and drift checks
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from tools.validation.semantic.runtime import (
-    check_runtime_profile_inventory as profile_checker,
-)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECK_SCRIPT = (
-    PROJECT_ROOT
-    / "tools"
-    / "validation"
-    / "semantic"
-    / "runtime"
-    / "check_runtime_profile_inventory.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+INVENTORY_RELATIVE_PATH = Path(
+    "documents/runtime/runtime-profiles-and-check-matrix.json"
 )
-RENDER_SCRIPT = (
-    PROJECT_ROOT
-    / "tools"
-    / "validation"
-    / "documentation"
-    / "formatting"
-    / "render_runtime_profile_inventory.py"
-)
+DOC_RELATIVE_PATH = Path("documents/runtime/runtime-profiles-and-check-matrix.md")
+DEFAULT_TITLE = "Runtime Profiles And Check Matrix"
 
 
-def write_minimal_inventory(path: Path) -> None:
+def write_minimal_inventory(path: Path, *, title: str = DEFAULT_TITLE) -> None:
     """Write one small valid runtime profile inventory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "version": 1,
-        "title": "Runtime Profiles And Check Matrix",
+        "title": title,
         "summary": ["summary line 1", "summary line 2"],
         "profile_classes": [
             {
@@ -101,108 +88,91 @@ def write_minimal_inventory(path: Path) -> None:
 
 
 class RuntimeProfileInventoryCheckTest(unittest.TestCase):
-    """Exercise runtime profile inventory drift detection end-to-end."""
+    """Exercise the native docs owner's runtime profile behavior."""
 
-    def render_doc(self, inventory_path: Path, doc_path: Path) -> str:
-        """Render a fixture document from a fixture inventory."""
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(RENDER_SCRIPT),
-                "--inventory",
-                str(inventory_path),
-                "--doc",
-                str(doc_path),
-            ],
+    def prepare_root(
+        self, root: Path, *, title: str = DEFAULT_TITLE
+    ) -> tuple[Path, Path]:
+        """Install the canonical profile fixture and docs tool configs in a root."""
+        inventory = root / INVENTORY_RELATIVE_PATH
+        doc = root / DOC_RELATIVE_PATH
+        write_minimal_inventory(inventory, title=title)
+        for relative in (
+            Path(".markdownlint-cli2.jsonc"),
+            Path("tools/validation/documentation/config/lychee.toml"),
+        ):
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(PROJECT_ROOT / relative, destination)
+        return inventory, doc
+
+    def run_native_docs(
+        self, root: Path, command: str, *args: str
+    ) -> subprocess.CompletedProcess[str]:
+        """Invoke the selected native docs command against an explicit root."""
+        self.assertIsNotNone(
+            AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+        )
+        executable = Path(str(AGENT_CANON_CLI))
+        self.assertTrue(
+            executable.is_absolute(),
+            "AGENT_CANON_CLI must be an absolute executable path",
+        )
+        return subprocess.run(
+            [str(executable), "docs", command, "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        return result.stdout
 
-    def test_passes_when_doc_matches_rendered(self) -> None:
-        """Pass when the checked document matches renderer output."""
+    def test_passes_when_doc_matches_native_renderer(self) -> None:
+        """Pass when the checked document matches the native renderer output."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            inventory = root / "inventory.json"
-            doc = root / "doc.md"
-            write_minimal_inventory(inventory)
-            rendered = self.render_doc(inventory, doc)
-            doc.write_text(rendered, encoding="utf-8")
+            _, doc = self.prepare_root(root)
+            rendered = self.run_native_docs(root, "render-runtime-profile")
+            self.assertEqual(rendered.returncode, 0, rendered.stdout + rendered.stderr)
+            doc.write_text(rendered.stdout, encoding="utf-8")
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(CHECK_SCRIPT),
-                    "--inventory",
-                    str(inventory),
-                    "--doc",
-                    str(doc),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = self.run_native_docs(root, "check", DOC_RELATIVE_PATH.as_posix())
 
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=pass", result.stdout)
-        self.assertIn("## Validation Failure Response", rendered)
-        self.assertIn("`intent_preservation`", rendered)
-        self.assertIn("`stale_generated_artifact`", rendered)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("## Validation Failure Response", rendered.stdout)
+        self.assertIn("`intent_preservation`", rendered.stdout)
+        self.assertIn("`stale_generated_artifact`", rendered.stdout)
         self.assertIn(
             "repair_same_intent: repair implementation while preserving approved intent",
-            rendered,
+            rendered.stdout,
         )
 
-    def test_default_paths_resolve_from_script_source_root(self) -> None:
-        """Default inputs remain anchored to the installed source tree.
-
-        The generated reader document is checked separately; this test only
-        verifies path resolution and does not turn a pending generated-doc
-        refresh into a source-runtime side effect or an unrelated failure.
-        """
-        self.assertEqual(
-            profile_checker.DEFAULT_INVENTORY,
-            PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.json",
-        )
-        self.assertEqual(
-            profile_checker.DEFAULT_DOC,
-            PROJECT_ROOT / "documents/runtime/runtime-profiles-and-check-matrix.md",
-        )
-        self.assertEqual(
-            profile_checker.RENDER_SCRIPT,
-            PROJECT_ROOT
-            / "tools/validation/documentation/formatting/render_runtime_profile_inventory.py",
-        )
-
-    def test_fails_when_doc_drifts(self) -> None:
-        """Fail with a diff when the checked document drifts."""
+    def test_native_docs_paths_resolve_from_selected_root(self) -> None:
+        """The native renderer reads the canonical paths under its selected root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            inventory = root / "inventory.json"
-            doc = root / "doc.md"
-            write_minimal_inventory(inventory)
+            title = "Selected Temporary Runtime Profile Inventory"
+            self.prepare_root(root, title=title)
+            result = self.run_native_docs(root, "render-runtime-profile")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"# {title}", result.stdout)
+
+    def test_fails_when_doc_drifts(self) -> None:
+        """Fail with the native drift finding when the checked document differs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            _, doc = self.prepare_root(root)
             doc.write_text("# different\n", encoding="utf-8")
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(CHECK_SCRIPT),
-                    "--inventory",
-                    str(inventory),
-                    "--doc",
-                    str(doc),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = self.run_native_docs(root, "check", DOC_RELATIVE_PATH.as_posix())
 
-        self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertIn("RUNTIME_PROFILE_INVENTORY_DRIFT=fail", result.stdout)
-        self.assertIn("---", result.stdout)
-        self.assertIn("+++", result.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(
+            "runtime profile inventory markdown drifts from documents/runtime/runtime-profiles-and-check-matrix.json",
+            result.stderr,
+        )
+        self.assertIn(DOC_RELATIVE_PATH.as_posix(), result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
