@@ -1,6 +1,6 @@
 use super::{
-    AttestationRequest, AttestedParent, AuthorityError, ChildHandoffReceipt,
-    ChildHandoffRequest, ParentRootReject,
+    AttestationRequest, AttestedParent, AuthorityError, ChildHandoffReceipt, ChildHandoffRequest,
+    ParentRootReject,
 };
 
 pub(crate) fn attest(_: &AttestationRequest) -> Result<AttestedParent, AuthorityError> {

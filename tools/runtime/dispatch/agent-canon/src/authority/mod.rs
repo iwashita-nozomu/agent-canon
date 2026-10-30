@@ -585,13 +585,13 @@ impl ParentRootAttestor {
         ));
         #[cfg(target_os = "linux")]
         {
-        if request.child_handoff_token.is_none() {
-            return Err(AuthorityError::new(
-                ParentRootReject::HandoffInvalid,
-                "child handoff token was dropped",
-            ));
-        }
-        self.attest(request)
+            if request.child_handoff_token.is_none() {
+                return Err(AuthorityError::new(
+                    ParentRootReject::HandoffInvalid,
+                    "child handoff token was dropped",
+                ));
+            }
+            self.attest(request)
         }
     }
 }

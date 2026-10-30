@@ -1,8 +1,8 @@
 use super::{
     digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
     ChildHandoffReceipt, ChildHandoffRequest, FileIdentity, HandoffMode, HandoffStorage,
-    HandoffTransport, NonEmptyTrimmedString, Nonce128, ParentRootReject, PhysicalRoot,
-    RootKind, RootPrecedence, Sha256Digest, SecretToken, VerifiedChildHandoff, HANDOFF_SCHEMA,
+    HandoffTransport, NonEmptyTrimmedString, Nonce128, ParentRootReject, PhysicalRoot, RootKind,
+    RootPrecedence, SecretToken, Sha256Digest, VerifiedChildHandoff, HANDOFF_SCHEMA,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -187,9 +187,12 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
         )?);
     }
 
-    if let (Some(clone), Some(marker), Some(module), Some(owner)) =
-        (clone.as_ref(), marker.as_ref(), module.as_ref(), owner.as_ref())
-    {
+    if let (Some(clone), Some(marker), Some(module), Some(owner)) = (
+        clone.as_ref(),
+        marker.as_ref(),
+        module.as_ref(),
+        owner.as_ref(),
+    ) {
         let source = source.as_ref().ok_or_else(|| {
             error(
                 ParentRootReject::RootMismatch,
@@ -197,10 +200,8 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
             )
         })?;
         let _ = git_identity(&clone.path, ParentRootReject::MarkerInvalid)?;
-        let (source_commit, source_tree) = git_identity(
-            &source.path,
-            ParentRootReject::ModuleInvalid,
-        )?;
+        let (source_commit, source_tree) =
+            git_identity(&source.path, ParentRootReject::ModuleInvalid)?;
         let clone_branch = git_value(
             &clone.path,
             &["symbolic-ref", "--short", "HEAD"],
@@ -232,10 +233,16 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
                 "module URL does not match source Git origin",
             ));
         }
-        if value_string(&actual_module, "observed_commit", ParentRootReject::ModuleInvalid)?
-            != source_commit
-            || value_string(&actual_module, "observed_tree", ParentRootReject::ModuleInvalid)?
-                != source_tree
+        if value_string(
+            &actual_module,
+            "observed_commit",
+            ParentRootReject::ModuleInvalid,
+        )? != source_commit
+            || value_string(
+                &actual_module,
+                "observed_tree",
+                ParentRootReject::ModuleInvalid,
+            )? != source_tree
         {
             return Err(error(
                 ParentRootReject::ModuleInvalid,
@@ -288,15 +295,22 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
             owner_path,
             ParentRootReject::OwnerEvidenceInvalid,
         )?);
-        if value_string(marker, "owner_evidence_sha256", ParentRootReject::MarkerInvalid)?
-            != owner_raw_digest
+        if value_string(
+            marker,
+            "owner_evidence_sha256",
+            ParentRootReject::MarkerInvalid,
+        )? != owner_raw_digest
         {
             return Err(error(
                 ParentRootReject::OwnerEvidenceInvalid,
                 "marker owner evidence digest does not match raw evidence",
             ));
         }
-        let module_path = value_string(&actual_module, "module_path", ParentRootReject::ModuleInvalid)?;
+        let module_path = value_string(
+            &actual_module,
+            "module_path",
+            ParentRootReject::ModuleInvalid,
+        )?;
         let parent_remote = git_origin(&root.path)?;
         let owner_checks = [
             ("parent_repo_id", parent_repo_id.as_str()),
@@ -330,7 +344,9 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
                     "owner evidence digest is missing",
                 )
             })?;
-        if !is_digest(&claimed) || claimed != digest_hex(&canonical_json(&Value::Object(evidence_body))) {
+        if !is_digest(&claimed)
+            || claimed != digest_hex(&canonical_json(&Value::Object(evidence_body)))
+        {
             return Err(error(
                 ParentRootReject::OwnerEvidenceInvalid,
                 "owner evidence digest does not match canonical body",
@@ -400,7 +416,10 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
         precedence,
         purpose: request.purpose.clone(),
         handoff,
-        token_digest: request.child_handoff_token.as_ref().map(SecretToken::digest),
+        token_digest: request
+            .child_handoff_token
+            .as_ref()
+            .map(SecretToken::digest),
     };
     verify_live_identity(&attested)?;
     Ok(attested)
@@ -450,7 +469,10 @@ pub(crate) fn issue_child_handoff(
             ));
         }
         verify_physical_identity(child, &child.identity).map_err(|_| {
-            error(ParentRootReject::RootRaceDetected, "handoff root binding changed")
+            error(
+                ParentRootReject::RootRaceDetected,
+                "handoff root binding changed",
+            )
         })?;
     }
 
@@ -469,8 +491,14 @@ pub(crate) fn issue_child_handoff(
     };
     let mut payload = Map::new();
     payload.insert("token_version".into(), Value::String(HANDOFF_SCHEMA.into()));
-    payload.insert("audience".into(), Value::String(request.audience.as_str().into()));
-    payload.insert("parent_root".into(), Value::String(path_string(&root.path)?));
+    payload.insert(
+        "audience".into(),
+        Value::String(request.audience.as_str().into()),
+    );
+    payload.insert(
+        "parent_root".into(),
+        Value::String(path_string(&root.path)?),
+    );
     payload.insert(
         "source_root".into(),
         source
@@ -493,7 +521,10 @@ pub(crate) fn issue_child_handoff(
     payload.insert("storage".into(), Value::String(storage.as_str().into()));
     payload.insert("mode".into(), Value::String(mode.as_str().into()));
     payload.insert("validation".into(), Value::String("hmac-single-use".into()));
-    payload.insert("transport".into(), Value::String(request.transport.as_str().into()));
+    payload.insert(
+        "transport".into(),
+        Value::String(request.transport.as_str().into()),
+    );
     let payload_digest = digest_bytes(&canonical_json(&Value::Object(payload.clone())));
     payload.insert(
         "payload_sha256".into(),
@@ -588,13 +619,19 @@ fn verify_physical_identity(
     root: &PhysicalRoot,
     expected: &FileIdentity,
 ) -> Result<(), AuthorityError> {
-    let handle = root
-        .directory
-        .metadata(".")
-        .map_err(|_| error(ParentRootReject::RootRaceDetected, "opened root identity is unavailable"))?;
+    let handle = root.directory.metadata(".").map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "opened root identity is unavailable",
+        )
+    })?;
     let current = identity_from_cap_metadata(&handle);
-    let path_metadata = fs::metadata(&root.path)
-        .map_err(|_| error(ParentRootReject::RootRaceDetected, "physical root path changed"))?;
+    let path_metadata = fs::metadata(&root.path).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "physical root path changed",
+        )
+    })?;
     let path_identity = FileIdentity {
         device: path_metadata.dev(),
         inode: path_metadata.ino(),
@@ -608,7 +645,10 @@ fn verify_physical_identity(
     Ok(())
 }
 
-fn open_physical_root(path: &Path, missing_reject: ParentRootReject) -> Result<PhysicalRoot, AuthorityError> {
+fn open_physical_root(
+    path: &Path,
+    missing_reject: ParentRootReject,
+) -> Result<PhysicalRoot, AuthorityError> {
     let canonical = fs::canonicalize(path).map_err(|_| {
         error(
             missing_reject,
@@ -661,7 +701,11 @@ fn identity_from_cap_metadata(metadata: &cap_std::fs::Metadata) -> FileIdentity 
 }
 
 fn git_toplevel(path: &Path) -> Result<PathBuf, AuthorityError> {
-    let value = git_value(path, &["rev-parse", "--show-toplevel"], ParentRootReject::RootMissing)?;
+    let value = git_value(
+        path,
+        &["rev-parse", "--show-toplevel"],
+        ParentRootReject::RootMissing,
+    )?;
     fs::canonicalize(Path::new(&value)).map_err(|_| {
         error(
             ParentRootReject::RootMissing,
@@ -671,7 +715,11 @@ fn git_toplevel(path: &Path) -> Result<PathBuf, AuthorityError> {
 }
 
 fn git_common_dir(path: &Path) -> Result<PathBuf, AuthorityError> {
-    let value = git_value(path, &["rev-parse", "--git-common-dir"], ParentRootReject::RootMismatch)?;
+    let value = git_value(
+        path,
+        &["rev-parse", "--git-common-dir"],
+        ParentRootReject::RootMismatch,
+    )?;
     let candidate = PathBuf::from(value);
     let candidate = if candidate.is_absolute() {
         candidate
@@ -679,7 +727,10 @@ fn git_common_dir(path: &Path) -> Result<PathBuf, AuthorityError> {
         path.join(candidate)
     };
     let common = fs::canonicalize(&candidate).map_err(|_| {
-        error(ParentRootReject::RootMismatch, "Git common directory is unavailable")
+        error(
+            ParentRootReject::RootMismatch,
+            "Git common directory is unavailable",
+        )
     })?;
     if !fs::metadata(&common).is_ok_and(|metadata| metadata.is_dir()) {
         return Err(error(
@@ -691,10 +742,18 @@ fn git_common_dir(path: &Path) -> Result<PathBuf, AuthorityError> {
 }
 
 fn git_origin(path: &Path) -> Result<String, AuthorityError> {
-    git_value(path, &["remote", "get-url", "origin"], ParentRootReject::RootMismatch)
+    git_value(
+        path,
+        &["remote", "get-url", "origin"],
+        ParentRootReject::RootMismatch,
+    )
 }
 
-fn git_value(path: &Path, args: &[&str], reject: ParentRootReject) -> Result<String, AuthorityError> {
+fn git_value(
+    path: &Path,
+    args: &[&str],
+    reject: ParentRootReject,
+) -> Result<String, AuthorityError> {
     let output = git_output(path, args)?;
     if !output.status.success() {
         return Err(error(
@@ -733,9 +792,12 @@ fn git_output(path: &Path, args: &[&str]) -> Result<Output, AuthorityError> {
     ] {
         command.env_remove(name);
     }
-    command
-        .output()
-        .map_err(|_| error(ParentRootReject::RootMissing, "cannot execute Git identity query"))
+    command.output().map_err(|_| {
+        error(
+            ParentRootReject::RootMissing,
+            "cannot execute Git identity query",
+        )
+    })
 }
 
 fn git_identity(path: &Path, reject: ParentRootReject) -> Result<(String, String), AuthorityError> {
@@ -818,7 +880,11 @@ fn read_bound_file(
     Ok(Some(Value::Object(value)))
 }
 
-fn canonical_bound_path(root: &Path, requested: &Path, reject: ParentRootReject) -> Result<PathBuf, AuthorityError> {
+fn canonical_bound_path(
+    root: &Path,
+    requested: &Path,
+    reject: ParentRootReject,
+) -> Result<PathBuf, AuthorityError> {
     let candidate = if requested.is_absolute() {
         requested.to_path_buf()
     } else {
@@ -833,7 +899,10 @@ fn canonical_bound_path(root: &Path, requested: &Path, reject: ParentRootReject)
     if !physical.starts_with(root) {
         return Err(error(
             ParentRootReject::SymlinkEscape,
-            format!("bound file escapes its parent root: {}", requested.display()),
+            format!(
+                "bound file escapes its parent root: {}",
+                requested.display()
+            ),
         ));
     }
     if !fs::metadata(&physical).is_ok_and(|metadata| metadata.is_file()) {
@@ -855,11 +924,13 @@ fn read_stable_bound_file(
 }
 
 fn read_stable_file(path: &Path, reject: ParentRootReject) -> Result<Vec<u8>, AuthorityError> {
-    let mut file = fs::File::open(path).map_err(|_| {
-        error(reject, format!("cannot read bound file {}", path.display()))
-    })?;
+    let mut file = fs::File::open(path)
+        .map_err(|_| error(reject, format!("cannot read bound file {}", path.display())))?;
     let before = file.metadata().map_err(|_| {
-        error(reject, format!("cannot inspect bound file {}", path.display()))
+        error(
+            reject,
+            format!("cannot inspect bound file {}", path.display()),
+        )
     })?;
     if !before.is_file() {
         return Err(error(
@@ -867,15 +938,31 @@ fn read_stable_file(path: &Path, reject: ParentRootReject) -> Result<Vec<u8>, Au
             format!("bound path is not a regular file: {}", path.display()),
         ));
     }
-    let identity = (before.dev(), before.ino(), before.len(), before.mtime(), before.mtime_nsec());
+    let identity = (
+        before.dev(),
+        before.ino(),
+        before.len(),
+        before.mtime(),
+        before.mtime_nsec(),
+    );
     let mut raw = Vec::new();
-    file.read_to_end(&mut raw).map_err(|_| {
-        error(reject, format!("cannot read bound file {}", path.display()))
-    })?;
+    file.read_to_end(&mut raw)
+        .map_err(|_| error(reject, format!("cannot read bound file {}", path.display())))?;
     let after = file.metadata().map_err(|_| {
-        error(reject, format!("cannot recheck bound file {}", path.display()))
+        error(
+            reject,
+            format!("cannot recheck bound file {}", path.display()),
+        )
     })?;
-    if identity != (after.dev(), after.ino(), after.len(), after.mtime(), after.mtime_nsec()) {
+    if identity
+        != (
+            after.dev(),
+            after.ino(),
+            after.len(),
+            after.mtime(),
+            after.mtime_nsec(),
+        )
+    {
         return Err(error(
             ParentRootReject::RootRaceDetected,
             "bound file changed while being read",
@@ -891,16 +978,16 @@ fn read_exact_schema(
     schema: &str,
 ) -> Result<Value, AuthorityError> {
     let value = strict_json(raw, reject)?;
-    let object = value.as_object().ok_or_else(|| {
-        error(reject, "bound file must be a JSON object")
-    })?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| error(reject, "bound file must be a JSON object"))?;
     let actual = object.keys().map(String::as_str).collect::<BTreeSet<_>>();
     let expected = required.iter().copied().collect::<BTreeSet<_>>();
     if actual != expected
         || object.get("schema").and_then(Value::as_str) != Some(schema)
-        || object.values().any(|value| {
-            value.as_str().is_none_or(|item| item.is_empty())
-        })
+        || object
+            .values()
+            .any(|value| value.as_str().is_none_or(|item| item.is_empty()))
     {
         return Err(error(reject, "bound file schema mismatch"));
     }
@@ -1010,23 +1097,33 @@ fn module_binding(
     let manifest_path = path_string(&manifest)?;
     let output = git_output(
         root,
-        &["config", "--file", manifest_path.as_str(), "--null", "--list"],
+        &[
+            "config",
+            "--file",
+            manifest_path.as_str(),
+            "--null",
+            "--list",
+        ],
     )?;
     if !output.status.success() {
         return Err(error(reject, "cannot parse module manifest"));
     }
     let config = std::str::from_utf8(&output.stdout)
         .map_err(|_| error(reject, "module manifest output is not UTF-8"))?;
-    let relative = source.strip_prefix(root).map_err(|_| {
-        error(reject, "module source is outside the parent root")
-    })?;
+    let relative = source
+        .strip_prefix(root)
+        .map_err(|_| error(reject, "module source is outside the parent root"))?;
     let relative = relative
         .components()
         .map(|component| match component {
-            Component::Normal(value) => value.to_str().map(str::to_owned).ok_or_else(|| {
-                error(reject, "module path is not UTF-8")
-            }),
-            _ => Err(error(reject, "module path is not a normalized relative path")),
+            Component::Normal(value) => value
+                .to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| error(reject, "module path is not UTF-8")),
+            _ => Err(error(
+                reject,
+                "module path is not a normalized relative path",
+            )),
         })
         .collect::<Result<Vec<_>, _>>()?
         .join("/");
@@ -1054,7 +1151,10 @@ fn module_binding(
     let gitlink = git_value(root, &["ls-tree", "HEAD", "--", &relative], reject)?;
     let fields = gitlink.split_whitespace().collect::<Vec<_>>();
     if fields.len() < 3 || fields[0] != "160000" || fields[1] != "commit" || fields[2] != commit {
-        return Err(error(reject, "module path is not an exact gitlink to source HEAD"));
+        return Err(error(
+            reject,
+            "module path is not an exact gitlink to source HEAD",
+        ));
     }
     let raw = read_stable_file(&manifest, reject)?;
     let mut result = Map::new();
@@ -1156,7 +1256,10 @@ fn python_float_repr(value: f64, shortest: &str) -> String {
         .split_once('e')
         .or_else(|| unsigned.split_once('E'))
         .map_or((unsigned, 0_i32), |(mantissa, exponent)| {
-            (mantissa, exponent.parse::<i32>().expect("finite f64 exponent"))
+            (
+                mantissa,
+                exponent.parse::<i32>().expect("finite f64 exponent"),
+            )
         });
     let (integer, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
     let mut digits = format!("{integer}{fraction}");
@@ -1213,14 +1316,20 @@ fn monotonic_now() -> f64 {
 }
 
 fn number_from_f64(value: f64) -> Result<Value, AuthorityError> {
-    Number::from_f64(value)
-        .map(Value::Number)
-        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff timestamp"))
+    Number::from_f64(value).map(Value::Number).ok_or_else(|| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff timestamp",
+        )
+    })
 }
 
 fn nonce_from_hex(value: &str) -> Result<Nonce128, AuthorityError> {
     if value.len() != 32 {
-        return Err(error(ParentRootReject::HandoffInvalid, "invalid handoff nonce"));
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff nonce",
+        ));
     }
     let mut bytes = [0_u8; 16];
     let decoded = decode_hex(value)
@@ -1241,11 +1350,17 @@ fn verify_handoff(
         .decode(token.expose_for_transport())
         .map_err(|_| error(ParentRootReject::HandoffInvalid, "malformed handoff token"))?;
     let envelope = strict_json(&raw, ParentRootReject::HandoffInvalid)?;
-    let envelope = envelope.as_object().ok_or_else(|| {
-        error(ParentRootReject::HandoffInvalid, "invalid handoff envelope")
-    })?;
-    if envelope.len() != 2 || !envelope.contains_key("payload") || !envelope.contains_key("signature") {
-        return Err(error(ParentRootReject::HandoffInvalid, "invalid handoff envelope"));
+    let envelope = envelope
+        .as_object()
+        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff envelope"))?;
+    if envelope.len() != 2
+        || !envelope.contains_key("payload")
+        || !envelope.contains_key("signature")
+    {
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff envelope",
+        ));
     }
     let payload = envelope
         .get("payload")
@@ -1254,7 +1369,12 @@ fn verify_handoff(
     let signature = envelope
         .get("signature")
         .and_then(Value::as_str)
-        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff signature"))?;
+        .ok_or_else(|| {
+            error(
+                ParentRootReject::HandoffInvalid,
+                "invalid handoff signature",
+            )
+        })?;
     let required = [
         "token_version",
         "audience",
@@ -1273,21 +1393,40 @@ fn verify_handoff(
     .into_iter()
     .collect::<BTreeSet<_>>();
     let actual = payload.keys().map(String::as_str).collect::<BTreeSet<_>>();
-    if actual != required || payload.get("token_version").and_then(Value::as_str) != Some(HANDOFF_SCHEMA) {
-        return Err(error(ParentRootReject::HandoffInvalid, "handoff fields are incomplete"));
+    if actual != required
+        || payload.get("token_version").and_then(Value::as_str) != Some(HANDOFF_SCHEMA)
+    {
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "handoff fields are incomplete",
+        ));
     }
     let transport_value = required_string(payload, "transport")?;
-    let transport = HandoffTransport::from_str(transport_value)
-        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff transport"))?;
+    let transport = HandoffTransport::from_str(transport_value).ok_or_else(|| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff transport",
+        )
+    })?;
     let storage = match required_string(payload, "storage")? {
         "parent-local-file" => HandoffStorage::ParentLocalFile,
         "pipe" => HandoffStorage::Pipe,
-        _ => return Err(error(ParentRootReject::HandoffInvalid, "invalid handoff storage")),
+        _ => {
+            return Err(error(
+                ParentRootReject::HandoffInvalid,
+                "invalid handoff storage",
+            ))
+        }
     };
     let mode = match required_string(payload, "mode")? {
         "0600" => HandoffMode::PrivateFile0600,
         "pipe" => HandoffMode::Pipe,
-        _ => return Err(error(ParentRootReject::HandoffInvalid, "invalid handoff mode")),
+        _ => {
+            return Err(error(
+                ParentRootReject::HandoffInvalid,
+                "invalid handoff mode",
+            ))
+        }
     };
     let expected_storage = if transport == HandoffTransport::ParentLocalFile {
         HandoffStorage::ParentLocalFile
@@ -1309,7 +1448,7 @@ fn verify_handoff(
         ));
     }
     let audience = NonEmptyTrimmedString::new(required_string(payload, "audience")?)
-    .map_err(|_| error(ParentRootReject::HandoffInvalid, "invalid handoff audience"))?;
+        .map_err(|_| error(ParentRootReject::HandoffInvalid, "invalid handoff audience"))?;
     let token_root = required_string(payload, "parent_root")?;
     let token_source = optional_string(payload, "source_root")?;
     let token_clone = optional_string(payload, "clone_root")?;
@@ -1321,8 +1460,12 @@ fn verify_handoff(
         .map_err(|_| error(ParentRootReject::HandoffInvalid, "invalid payload digest"))?;
 
     let secret = session_secret_path(root)?;
-    let mut signed = HmacSha256::new_from_slice(&secret)
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "handoff authentication failed"))?;
+    let mut signed = HmacSha256::new_from_slice(&secret).map_err(|_| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "handoff authentication failed",
+        )
+    })?;
     let mut signed_payload = payload.clone();
     signed_payload.remove("payload_sha256");
     // Check payload digest over the body first, then authenticate the complete
@@ -1334,11 +1477,18 @@ fn verify_handoff(
         ));
     }
     signed.update(&canonical_json(&Value::Object(payload.clone())));
-    let signature_bytes = decode_hex(signature)
-        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff signature"))?;
-    signed
-        .verify_slice(&signature_bytes)
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "handoff signature mismatch"))?;
+    let signature_bytes = decode_hex(signature).ok_or_else(|| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff signature",
+        )
+    })?;
+    signed.verify_slice(&signature_bytes).map_err(|_| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "handoff signature mismatch",
+        )
+    })?;
 
     let now = monotonic_now();
     if !(issued_at <= now && now <= expires_at) {
@@ -1385,7 +1535,10 @@ fn verify_handoff(
             )
         })?;
         if expiry < now {
-            return Err(error(ParentRootReject::HandoffInvalid, "handoff nonce expired"));
+            return Err(error(
+                ParentRootReject::HandoffInvalid,
+                "handoff nonce expired",
+            ));
         }
         state.remove(&key).ok_or_else(|| {
             error(
@@ -1430,24 +1583,33 @@ fn optional_string<'a>(
     match payload.get(key) {
         Some(Value::Null) => Ok(None),
         Some(Value::String(value)) if !value.is_empty() => Ok(Some(value)),
-        _ => Err(error(ParentRootReject::HandoffInvalid, "invalid handoff path value")),
+        _ => Err(error(
+            ParentRootReject::HandoffInvalid,
+            "invalid handoff path value",
+        )),
     }
 }
 
-fn required_finite_number(
-    payload: &Map<String, Value>,
-    key: &str,
-) -> Result<f64, AuthorityError> {
+fn required_finite_number(payload: &Map<String, Value>, key: &str) -> Result<f64, AuthorityError> {
     payload
         .get(key)
         .and_then(Value::as_f64)
         .filter(|value| value.is_finite())
-        .ok_or_else(|| error(ParentRootReject::HandoffInvalid, "invalid handoff timestamp"))
+        .ok_or_else(|| {
+            error(
+                ParentRootReject::HandoffInvalid,
+                "invalid handoff timestamp",
+            )
+        })
 }
 
 fn canonical_existing(path: &str) -> Result<PathBuf, AuthorityError> {
-    fs::canonicalize(path)
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "handoff path is unavailable"))
+    fs::canonicalize(path).map_err(|_| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "handoff path is unavailable",
+        )
+    })
 }
 
 fn decode_hex(value: &str) -> Option<Vec<u8>> {
@@ -1475,8 +1637,12 @@ fn hex(value: u8) -> Option<u8> {
 }
 
 fn sign_payload(payload: &Map<String, Value>, secret: &[u8]) -> Result<String, AuthorityError> {
-    let mut signer = HmacSha256::new_from_slice(secret)
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "cannot initialize handoff signer"))?;
+    let mut signer = HmacSha256::new_from_slice(secret).map_err(|_| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot initialize handoff signer",
+        )
+    })?;
     signer.update(&canonical_json(&Value::Object(payload.clone())));
     Ok(encode_hex(&signer.finalize().into_bytes()))
 }
@@ -1496,8 +1662,12 @@ fn session_secret(root: &PhysicalRoot, create: bool) -> Result<Vec<u8>, Authorit
             "Linux boot identity is empty",
         ));
     }
-    let mut signer = HmacSha256::new_from_slice(&key)
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "cannot initialize session key"))?;
+    let mut signer = HmacSha256::new_from_slice(&key).map_err(|_| {
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot initialize session key",
+        )
+    })?;
     signer.update(boot_id.as_bytes());
     Ok(signer.finalize().into_bytes().to_vec())
 }
@@ -1522,27 +1692,45 @@ fn load_secret(root: &PhysicalRoot, create: bool) -> Result<Vec<u8>, AuthorityEr
     let mut options = OpenOptions::new();
     options.read(true).follow(FollowSymlinks::No);
     let file = directory.open_with("secret", &options).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "parent-local handoff secret is missing or unsafe")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "parent-local handoff secret is missing or unsafe",
+        )
     })?;
     let metadata = file.metadata().map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot inspect handoff secret")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot inspect handoff secret",
+        )
     })?;
     if !metadata.file_type().is_file() || metadata.mode() & 0o077 != 0 {
-        return Err(error(ParentRootReject::HandoffInvalid, "handoff secret is not private"));
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "handoff secret is not private",
+        ));
     }
     let mut raw = Vec::new();
     file.take(4096).read_to_end(&mut raw).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot read handoff secret")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot read handoff secret",
+        )
     })?;
     if raw.len() < 32 {
-        return Err(error(ParentRootReject::HandoffInvalid, "handoff secret is too short"));
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "handoff secret is too short",
+        ));
     }
     Ok(raw)
 }
 
 fn open_handoff_dir(root: &PhysicalRoot, create: bool) -> Result<Dir, AuthorityError> {
     let mut directory = root.directory.try_clone().map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot clone parent directory capability")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot clone parent directory capability",
+        )
     })?;
     for component in [".agent-canon", "handoff"] {
         match directory.open_dir_nofollow(component) {
@@ -1552,7 +1740,8 @@ fn open_handoff_dir(root: &PhysicalRoot, create: bool) -> Result<Dir, AuthorityE
                 builder.mode(0o700);
                 match directory.create_dir_with(component, &builder) {
                     Ok(()) => {}
-                    Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => {}
+                    Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => {
+                    }
                     Err(_) => {
                         return Err(error(
                             ParentRootReject::RootRaceDetected,
@@ -1586,17 +1775,31 @@ fn open_handoff_dir(root: &PhysicalRoot, create: bool) -> Result<Dir, AuthorityE
 
 fn create_private_file(directory: &Dir, name: &str, bytes: &[u8]) -> Result<(), AuthorityError> {
     let mut options = OpenOptions::new();
-    options.write(true).create_new(true).mode(0o600).follow(FollowSymlinks::No);
+    options
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .follow(FollowSymlinks::No);
     match directory.open_with(name, &options) {
         Ok(mut file) => {
-            file.set_permissions(Permissions::from_mode(0o600)).map_err(|_| {
-                error(ParentRootReject::HandoffInvalid, "cannot secure handoff state file")
-            })?;
+            file.set_permissions(Permissions::from_mode(0o600))
+                .map_err(|_| {
+                    error(
+                        ParentRootReject::HandoffInvalid,
+                        "cannot secure handoff state file",
+                    )
+                })?;
             file.write_all(bytes).map_err(|_| {
-                error(ParentRootReject::HandoffInvalid, "cannot write handoff state file")
+                error(
+                    ParentRootReject::HandoffInvalid,
+                    "cannot write handoff state file",
+                )
             })?;
             file.sync_all().map_err(|_| {
-                error(ParentRootReject::HandoffInvalid, "cannot sync handoff state file")
+                error(
+                    ParentRootReject::HandoffInvalid,
+                    "cannot sync handoff state file",
+                )
             })?;
             Ok(())
         }
@@ -1611,7 +1814,10 @@ fn create_private_file(directory: &Dir, name: &str, bytes: &[u8]) -> Result<(), 
 fn with_locked_state<R>(
     root: &PhysicalRoot,
     create: bool,
-    operation: impl FnOnce(&mut BTreeMap<String, f64>, &mut cap_std::fs::File) -> Result<R, AuthorityError>,
+    operation: impl FnOnce(
+        &mut BTreeMap<String, f64>,
+        &mut cap_std::fs::File,
+    ) -> Result<R, AuthorityError>,
 ) -> Result<R, AuthorityError> {
     let directory = open_handoff_dir(root, create)?;
     if create {
@@ -1623,7 +1829,10 @@ fn with_locked_state<R>(
 fn with_locked_state_path<R>(
     root: &Path,
     create: bool,
-    operation: impl FnOnce(&mut BTreeMap<String, f64>, &mut cap_std::fs::File) -> Result<R, AuthorityError>,
+    operation: impl FnOnce(
+        &mut BTreeMap<String, f64>,
+        &mut cap_std::fs::File,
+    ) -> Result<R, AuthorityError>,
 ) -> Result<R, AuthorityError> {
     let physical = open_physical_root(root, ParentRootReject::HandoffInvalid)?;
     with_locked_state(&physical, create, operation)
@@ -1631,45 +1840,84 @@ fn with_locked_state_path<R>(
 
 fn with_locked_state_file<R>(
     directory: &Dir,
-    operation: impl FnOnce(&mut BTreeMap<String, f64>, &mut cap_std::fs::File) -> Result<R, AuthorityError>,
+    operation: impl FnOnce(
+        &mut BTreeMap<String, f64>,
+        &mut cap_std::fs::File,
+    ) -> Result<R, AuthorityError>,
 ) -> Result<R, AuthorityError> {
     let mut options = OpenOptions::new();
     options.read(true).write(true).follow(FollowSymlinks::No);
     let mut file = directory.open_with("nonces.json", &options).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot open nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot open nonce receipt",
+        )
     })?;
     if !file
         .metadata()
-        .map_err(|_| error(ParentRootReject::HandoffInvalid, "cannot inspect nonce receipt"))?
+        .map_err(|_| {
+            error(
+                ParentRootReject::HandoffInvalid,
+                "cannot inspect nonce receipt",
+            )
+        })?
         .file_type()
         .is_file()
     {
-        return Err(error(ParentRootReject::HandoffInvalid, "nonce receipt is not a regular file"));
+        return Err(error(
+            ParentRootReject::HandoffInvalid,
+            "nonce receipt is not a regular file",
+        ));
     }
-    file.set_permissions(Permissions::from_mode(0o600)).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot secure nonce receipt")
-    })?;
+    file.set_permissions(Permissions::from_mode(0o600))
+        .map_err(|_| {
+            error(
+                ParentRootReject::HandoffInvalid,
+                "cannot secure nonce receipt",
+            )
+        })?;
     rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot lock nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot lock nonce receipt",
+        )
     })?;
 
     let operation_result = (|| {
         file.seek(SeekFrom::Start(0)).map_err(|_| {
-            error(ParentRootReject::HandoffInvalid, "cannot seek nonce receipt")
+            error(
+                ParentRootReject::HandoffInvalid,
+                "cannot seek nonce receipt",
+            )
         })?;
         let mut raw = Vec::new();
-        (&mut file).take(1 << 20).read_to_end(&mut raw).map_err(|_| {
-            error(ParentRootReject::HandoffInvalid, "cannot read nonce receipt")
-        })?;
+        (&mut file)
+            .take(1 << 20)
+            .read_to_end(&mut raw)
+            .map_err(|_| {
+                error(
+                    ParentRootReject::HandoffInvalid,
+                    "cannot read nonce receipt",
+                )
+            })?;
         let parsed = strict_json(&raw, ParentRootReject::HandoffInvalid)?;
         let object = parsed.as_object().ok_or_else(|| {
-            error(ParentRootReject::HandoffInvalid, "invalid nonce receipt state")
+            error(
+                ParentRootReject::HandoffInvalid,
+                "invalid nonce receipt state",
+            )
         })?;
         let mut state = BTreeMap::new();
         for (nonce, expiration) in object {
-            let expiration = expiration.as_f64().filter(|value| value.is_finite()).ok_or_else(|| {
-                error(ParentRootReject::HandoffInvalid, "invalid nonce receipt timestamp")
-            })?;
+            let expiration = expiration
+                .as_f64()
+                .filter(|value| value.is_finite())
+                .ok_or_else(|| {
+                    error(
+                        ParentRootReject::HandoffInvalid,
+                        "invalid nonce receipt timestamp",
+                    )
+                })?;
             state.insert(nonce.clone(), expiration);
         }
         let result = operation(&mut state, &mut file)?;
@@ -1697,16 +1945,28 @@ fn write_locked_state(
     }
     let bytes = canonical_json(&Value::Object(value));
     file.seek(SeekFrom::Start(0)).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot seek nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot seek nonce receipt",
+        )
     })?;
     file.set_len(0).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot truncate nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot truncate nonce receipt",
+        )
     })?;
     file.write_all(&bytes).map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot write nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot write nonce receipt",
+        )
     })?;
     file.sync_all().map_err(|_| {
-        error(ParentRootReject::HandoffInvalid, "cannot sync nonce receipt")
+        error(
+            ParentRootReject::HandoffInvalid,
+            "cannot sync nonce receipt",
+        )
     })?;
     Ok(())
 }

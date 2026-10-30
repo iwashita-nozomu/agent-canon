@@ -1,8 +1,8 @@
 #![cfg(target_os = "linux")]
 
 use agent_canon::authority::{
-    AttestationRequest, AuthorityError, ChildHandoffRequest, NonEmptyTrimmedString,
-    Nonce128, ParentRootAttestor, ParentRootReject, Sha256Digest, SecretToken,
+    AttestationRequest, AuthorityError, ChildHandoffRequest, NonEmptyTrimmedString, Nonce128,
+    ParentRootAttestor, ParentRootReject, SecretToken, Sha256Digest,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -12,11 +12,11 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 static NEXT_TEMP: AtomicUsize = AtomicUsize::new(0);
 type HmacSha256 = Hmac<Sha256>;
@@ -109,7 +109,11 @@ fn git_repo(path: &Path, remote: &str) {
         .arg(path)
         .output()
         .expect("initialize fixture repository");
-    assert!(output.status.success(), "git init: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "git init: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     git_ok(path, &["remote", "add", "origin", remote]);
     let output = Command::new("git")
         .arg("-C")
@@ -126,7 +130,11 @@ fn git_repo(path: &Path, remote: &str) {
         ])
         .output()
         .expect("create fixture commit");
-    assert!(output.status.success(), "git commit: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "git commit: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn sha256_hex(value: &[u8]) -> String {
@@ -201,10 +209,7 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
     ]
     .into_iter()
     .collect::<BTreeSet<_>>();
-    assert_eq!(
-        payload_keys,
-        expected_payload_keys
-    );
+    assert_eq!(payload_keys, expected_payload_keys);
     let signature = envelope["signature"].as_str().expect("signature string");
     let mut body = payload.clone();
     let claimed_digest = body
@@ -221,13 +226,15 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
     assert_eq!(secret_metadata.permissions().mode() & 0o077, 0);
     let secret = fs::read(secret_path).expect("read persisted fixture secret");
     assert!(secret.len() >= 32);
-    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")
-        .expect("read Linux boot identity");
+    let boot_id =
+        fs::read_to_string("/proc/sys/kernel/random/boot_id").expect("read Linux boot identity");
     let mut derive = HmacSha256::new_from_slice(&secret).expect("initialize session-key oracle");
     derive.update(boot_id.trim().as_bytes());
     let session_key = derive.finalize().into_bytes();
     let mut verify = HmacSha256::new_from_slice(&session_key).expect("initialize HMAC oracle");
-    verify.update(&python_canonical_json_oracle(&Value::Object(payload.clone())));
+    verify.update(&python_canonical_json_oracle(&Value::Object(
+        payload.clone(),
+    )));
     verify
         .verify_slice(&decode_hex(signature))
         .expect("standard HMAC-SHA256 verifies the issued token");
@@ -237,7 +244,10 @@ fn verify_handoff_independently(token: &str, root: &Path) -> Value {
         serde_json::from_slice(&fs::read(state_path).expect("read pending nonce receipt"))
             .expect("parse pending nonce state");
     let nonce = payload["nonce"].as_str().expect("nonce string");
-    assert!(state.contains_key(nonce), "issued nonce is durable before consumption");
+    assert!(
+        state.contains_key(nonce),
+        "issued nonce is durable before consumption"
+    );
     assert_eq!(nonce.len(), 32, "handoff nonce has 128 bits");
     envelope
 }
@@ -346,7 +356,12 @@ fn topic_fixture(temp: &TempDir) -> TopicFixture {
     let source_commit = git_stdout(&source, &["rev-parse", "HEAD"]);
     let source_tree = git_stdout(&source, &["rev-parse", "HEAD^{tree}"]);
     let parent_repo_id = sha256_hex(
-        format!("{}\0{}", root.display(), parent_remote.trim_end_matches('/')).as_bytes(),
+        format!(
+            "{}\0{}",
+            root.display(),
+            parent_remote.trim_end_matches('/')
+        )
+        .as_bytes(),
     );
     let gitlink = format!("160000,{source_commit},vendor/agent-canon");
     git_ok(
@@ -367,7 +382,11 @@ fn topic_fixture(temp: &TempDir) -> TopicFixture {
         ])
         .output()
         .expect("commit actual gitlink fixture");
-    assert!(output.status.success(), "gitlink commit: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "gitlink commit: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let module_path = "vendor/agent-canon";
     let owner_body = fixture_canonical_owner_body(
@@ -440,10 +459,15 @@ impl TopicFixture {
     }
 }
 
-fn assert_reject<T: std::fmt::Debug>(result: Result<T, AuthorityError>, expected: ParentRootReject) {
+fn assert_reject<T: std::fmt::Debug>(
+    result: Result<T, AuthorityError>,
+    expected: ParentRootReject,
+) {
     let error = result.expect_err("authority request must reject");
     assert_eq!(error.reject, expected, "typed authority rejection");
-    assert!(error.to_string().starts_with(&format!("{}: ", expected.as_str())));
+    assert!(error
+        .to_string()
+        .starts_with(&format!("{}: ", expected.as_str())));
 }
 
 #[test]
@@ -475,16 +499,22 @@ fn test_attestation_binds_parent_source_and_clone_identities() {
         .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
         .expect("read topic marker independently");
     marker["branch"] = json!("tampered");
-    fs::write(&fixture.marker, serde_json::to_vec(&marker).expect("serialize marker"))
-        .expect("tamper marker branch");
+    fs::write(
+        &fixture.marker,
+        serde_json::to_vec(&marker).expect("serialize marker"),
+    )
+    .expect("tamper marker branch");
     assert_reject(
         ParentRootAttestor::new().attest(&fixture.request("topic-test")),
         ParentRootReject::MarkerInvalid,
     );
 
     marker["branch"] = json!("main");
-    fs::write(&fixture.marker, serde_json::to_vec(&marker).expect("serialize restored marker"))
-        .expect("restore marker branch");
+    fs::write(
+        &fixture.marker,
+        serde_json::to_vec(&marker).expect("serialize restored marker"),
+    )
+    .expect("restore marker branch");
     fs::write(
         &fixture.gitmodules,
         "[submodule \"vendor/agent-canon\"]\n\tpath = vendor/agent-canon\n\turl = https://example.invalid/tampered.git\n",
@@ -546,8 +576,7 @@ fn test_missing_module_digest_and_exact_bound_schema_are_rejected() {
     let temp = TempDir::new();
     git_repo(temp.path(), "https://example.invalid/parent.git");
     let module = temp.path().join(".gitmodules");
-    fs::write(&module, "[submodule \"vendor/agent-canon\"]\n")
-        .expect("write module fixture");
+    fs::write(&module, "[submodule \"vendor/agent-canon\"]\n").expect("write module fixture");
     let digest = Sha256Digest::from_bytes(
         Sha256::digest(fs::read(&module).expect("read module bytes")).into(),
     );
@@ -614,10 +643,8 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
         ))
         .expect("issue signed handoff");
     assert!(!format!("{:?}", handoff.token()).contains(handoff.token().expose_for_transport()));
-    let envelope = verify_handoff_independently(
-        handoff.token().expose_for_transport(),
-        temp.path(),
-    );
+    let envelope =
+        verify_handoff_independently(handoff.token().expose_for_transport(), temp.path());
     assert_eq!(envelope["payload"]["audience"], "handoff-test-é");
     let python_verification = python_owner_verify(
         handoff.token().expose_for_transport(),
@@ -631,7 +658,11 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
     );
     let mut request = attestation_request(temp.path(), "handoff-test-é");
     request.child_handoff_token = Some(handoff.token().clone());
-    assert!(attestor.attest(&request).expect("consume valid handoff").handoff().is_some());
+    assert!(attestor
+        .attest(&request)
+        .expect("consume valid handoff")
+        .handoff()
+        .is_some());
     assert!(pending_handoff_nonces(temp.path()).is_empty());
     assert_reject(
         ParentRootAttestor::new().attest(&request),
@@ -639,7 +670,10 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
     );
 
     let python_temp = TempDir::new();
-    git_repo(python_temp.path(), "https://example.invalid/python-issued.git");
+    git_repo(
+        python_temp.path(),
+        "https://example.invalid/python-issued.git",
+    );
     let python_token = python_owner_issue(python_temp.path(), "python-issued-test");
     let mut python_request = attestation_request(python_temp.path(), "python-issued-test");
     python_request.child_handoff_token = Some(SecretToken::from_untrusted(python_token));
@@ -649,7 +683,11 @@ fn test_handoff_forgery_and_cross_instance_replay_are_rejected() {
 
     let mut forged = handoff.token().expose_for_transport().to_owned();
     let index = forged.len().saturating_sub(3);
-    let replacement = if forged.as_bytes().get(index) == Some(&b'A') { 'B' } else { 'A' };
+    let replacement = if forged.as_bytes().get(index) == Some(&b'A') {
+        'B'
+    } else {
+        'A'
+    };
     forged.replace_range(index..index + 1, &replacement.to_string());
     request.child_handoff_token = Some(SecretToken::from_untrusted(forged));
     assert_reject(
@@ -699,9 +737,16 @@ fn test_handoff_nonce_receipt_survives_a_new_process() {
             .expect("start fresh native test process")
     };
     let first = run_child();
-    assert!(first.status.success(), "first process did not consume handoff: {}", String::from_utf8_lossy(&first.stderr));
+    assert!(
+        first.status.success(),
+        "first process did not consume handoff: {}",
+        String::from_utf8_lossy(&first.stderr)
+    );
     let replay = run_child();
-    assert!(!replay.status.success(), "fresh process accepted replayed nonce");
+    assert!(
+        !replay.status.success(),
+        "fresh process accepted replayed nonce"
+    );
 }
 
 #[test]
@@ -767,7 +812,11 @@ fn test_handoff_is_single_use_and_rejects_mutation_or_expiry() {
         .expect("issue short-lived handoff");
     let mut request = attestation_request(temp.path(), "single-use-test");
     request.child_handoff_token = Some(token.token().clone());
-    assert!(attestor.attest(&request).expect("consume handoff").handoff().is_some());
+    assert!(attestor
+        .attest(&request)
+        .expect("consume handoff")
+        .handoff()
+        .is_some());
     assert_reject(attestor.attest(&request), ParentRootReject::HandoffInvalid);
 
     let mut expiring = ChildHandoffRequest::new(temp.path(), nonempty("expiry-test"));
@@ -790,7 +839,9 @@ fn test_child_reattest_requires_handoff_even_when_root_env_is_present() {
     git_repo(temp.path(), "https://example.invalid/parent.git");
     let attestor = ParentRootAttestor::new();
     let request = attestation_request(temp.path(), "reattest-test");
-    let initial = attestor.attest(&request).expect("parent root initially attests");
+    let initial = attestor
+        .attest(&request)
+        .expect("parent root initially attests");
     assert_eq!(initial.parent_root().path(), temp.path());
 
     let token = attestor
