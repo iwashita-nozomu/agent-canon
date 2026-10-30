@@ -187,7 +187,7 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
         )?);
     }
 
-    if let (Some(clone), Some(marker), Some(module), Some(owner)) = (
+    if let (Some(clone), Some(marker), Some(_), Some(owner)) = (
         clone.as_ref(),
         marker.as_ref(),
         module.as_ref(),
@@ -1516,7 +1516,13 @@ fn verify_handoff(
                 ));
             }
             (Some(token_path), Some(request_path)) => {
-                if canonical_existing(token_path)? != canonical_existing(request_path)? {
+                let request_path = fs::canonicalize(request_path).map_err(|_| {
+                    error(
+                        ParentRootReject::HandoffInvalid,
+                        "handoff path is unavailable",
+                    )
+                })?;
+                if canonical_existing(token_path)? != request_path {
                     return Err(error(
                         ParentRootReject::HandoffInvalid,
                         format!("handoff {label} binding mismatch"),
