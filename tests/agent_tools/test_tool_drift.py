@@ -3,188 +3,86 @@
 # @dependency-start
 # contract test
 # responsibility Tests tool/convention drift checker behavior.
-# upstream implementation ../../tools/validation/semantic/tools/tool_drift.py checker
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_drift.rs native checker
 # upstream design ../../documents/design/dependency-manifest-design.md manifest trace map
 # @dependency-end
 
 from __future__ import annotations
 
-import contextlib
-import io
+import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
-
-from tools.validation.semantic.tools import tool_drift as drift_checker
-from tools.analysis.dependencies.graph_client import GraphDependencyFact, GraphResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "tools" / "tool_drift.py"
-
-
-class FakeToolGraphClient:
-    """Provide graph-owned dependency facts for isolated checker fixtures."""
-
-    last_query: dict[str, object] = {}
-
-    def __init__(self, root: Path, _executable: Path | None = None) -> None:
-        """Create a fixture graph client for the given root."""
-        self._root = root.resolve()
-
-    def query(
-        self,
-        *,
-        path: str | None = None,
-        relation: str = "dependency",
-        direction: str = "both",
-        depth: int = 0,
-        all_nodes: bool = False,
-    ) -> GraphResponse:
-        """Project fixture manifests into the graph query response shape."""
-        type(self).last_query = {
-            "path": path,
-            "relation": relation,
-            "direction": direction,
-            "depth": depth,
-            "all_nodes": all_nodes,
-        }
-        nodes: dict[str, str] = {}
-        facts: list[dict[str, object]] = []
-        for manifest_path in sorted(self._root.rglob("*")):
-            relative = manifest_path.relative_to(self._root)
-            if not manifest_path.is_file() or any(
-                part.startswith(".") for part in relative.parts
-            ):
-                continue
-            source = relative.as_posix()
-            in_manifest = False
-            try:
-                lines = manifest_path.read_text(encoding="utf-8").splitlines()[:80]
-            except UnicodeDecodeError:
-                continue
-            for line_number, raw_line in enumerate(lines, start=1):
-                line = raw_line.strip()
-                for prefix in ("<!--", "#", "//", "*"):
-                    if line.startswith(prefix):
-                        line = line[len(prefix) :].strip()
-                if line.endswith("-->"):
-                    line = line[:-3].strip()
-                if line == "@dependency-start":
-                    in_manifest = True
-                    continue
-                if line == "@dependency-end":
-                    in_manifest = False
-                    continue
-                if not in_manifest:
-                    continue
-                fields = line.split(maxsplit=3)
-                if len(fields) < 4 or fields[0] not in {"upstream", "downstream"}:
-                    continue
-                dependency_direction, kind, target, reason = fields
-                target_path = (manifest_path.parent / target).resolve()
-                try:
-                    target_name = target_path.relative_to(self._root).as_posix()
-                except ValueError:
-                    target_name = target_path.as_posix()
-                source_id = f"node:{source}"
-                target_id = f"node:{target_name}"
-                nodes[source_id] = source
-                nodes[target_id] = target_name
-                fact_id = f"fact:{len(facts)}"
-                facts.append(
-                    {
-                        "id": fact_id,
-                        "kind": "dependency",
-                        "inferred": False,
-                        "from": source_id,
-                        "to": target_id,
-                        "producer": "test-fixture-projection",
-                        "source_path": source,
-                        "source_span": None,
-                        "evidence_ref": f"{source}:{line_number}",
-                        "authority": "test-fixture-projection",
-                        "dependency_detail": {
-                            "direction": dependency_direction,
-                            "kind": kind,
-                            "reason": reason,
-                        },
-                    }
-                )
-        return GraphResponse(
-            schema="agent-canon.graph.query.v1",
-            command="query",
-            status="fresh",
-            payload={
-                "nodes": [
-                    {"id": node_id, "path": path}
-                    for node_id, path in sorted(nodes.items())
-                ],
-                "facts": facts,
-            },
-            exit_code=0,
-        )
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class CheckToolConventionDriftTest(unittest.TestCase):
     """Exercise the tool/convention drift checker."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker against a root."""
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        argv = [str(CHECKER), "--root", str(root), *args]
-        FakeToolGraphClient.last_query = {}
-        with (
-            patch.object(sys, "argv", argv),
-            patch.object(drift_checker, "GraphClient", FakeToolGraphClient),
-            contextlib.redirect_stdout(stdout),
-            contextlib.redirect_stderr(stderr),
-        ):
-            return_code = drift_checker.main()
-        return subprocess.CompletedProcess(
-            args=argv,
-            returncode=return_code,
-            stdout=stdout.getvalue(),
-            stderr=stderr.getvalue(),
+        """Run the actual native checker against a fixture root."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+        return subprocess.run(
+            [AGENT_CANON_CLI, "tool-drift", "--root", str(root), *args],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
         )
 
     def test_checker_queries_all_nodes_for_bounded_fixture(self) -> None:
-        """The graph-owned drift check always requests the complete fixture graph."""
+        """The native checker completes its all-source query without graph state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_tool_catalog_contract(root)
 
-            result = self.run_checker(root, "--contract", "tool_catalog")
+            result = self.run_checker(
+                root, "--contract", "tool_catalog", "--format", "json"
+            )
+            self.assertFalse((root / ".agent-canon").exists())
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(FakeToolGraphClient.last_query["all_nodes"])
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["findings"], [])
 
     def test_projected_graph_paths_match_logical_contract_paths(self) -> None:
-        """Graph facts from parent projections use standalone contract paths."""
-        fact = GraphDependencyFact(
-            id="fact:projection",
-            direction="upstream",
-            kind="design",
-            source="tools/agent-canon/validation/semantic/tools/tool_drift.py",
-            target="vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md",
-            reason="projection fixture",
-            producer="test-fixture-projection",
-            source_path="tools/agent-canon/validation/semantic/tools/tool_drift.py",
-            source_span=None,
-            evidence_ref="projection:1",
-            authority="test-fixture-projection",
-        )
+        """Source and target paths from projected roots match logical contracts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            tool_path = (
+                "tools/agent-canon/validation/semantic/convention/"
+                "check_convention_compliance.py"
+            )
+            self.write_file(
+                root,
+                tool_path,
+                "# @dependency-start\n"
+                "# contract tool\n"
+                "# responsibility Exercises projected path identity.\n"
+                "# upstream design ../../../../../vendor/agent-canon/agents/canonical/"
+                "CODEX_COMPLETION.md projected target\n"
+                "# @dependency-end\n",
+            )
+            self.write_file(
+                root,
+                "vendor/agent-canon/agents/canonical/CODEX_COMPLETION.md",
+                "# Projected completion contract\n",
+            )
 
-        self.assertEqual(
-            drift_checker.matching_direct_edges(
-                (fact,),
-                "tools/validation/semantic/tools/tool_drift.py",
-                "agents/canonical/CODEX_SUBAGENTS.md",
-            ),
-            (fact,),
+            result = self.run_checker(root, "--contract", "convention_compliance")
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn(
+            "missing-manifest-link:convention_compliance:"
+            "tools/validation/semantic/convention/check_convention_compliance.py:"
+            "agents/canonical/CODEX_COMPLETION.md",
+            result.stdout,
         )
 
     def test_missing_manifest_link_fails(self) -> None:
@@ -568,7 +466,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./convention_compliance_contracts.toml marker contracts",
                     "# upstream implementation ../skills/check_skill_frontmatter.py skill frontmatter",
                     "# downstream implementation ../../ci/runners/run_all_checks.sh ci",
-                    "# downstream implementation ../tools/tool_drift.py drift gate",
+                    "# downstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs drift gate",
                     "# downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests",
                     "# @dependency-end",
                     "",
@@ -585,7 +483,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/validation/semantic/convention/convention_compliance_contracts.toml",
             "tools/validation/semantic/skills/check_skill_frontmatter.py",
             "tools/validation/ci/runners/run_all_checks.sh",
-            "tools/validation/semantic/tools/tool_drift.py",
+            "tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
             "tests/agent_tools/test_check_convention_compliance.py",
         ]:
             self.write_plain_manifest(root, relative)

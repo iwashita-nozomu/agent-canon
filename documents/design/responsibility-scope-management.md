@@ -10,7 +10,7 @@ downstream design ../../templates/documents/responsibility-scope.template.toml s
 upstream design ../../tools/catalog.yaml structured tool ownership
 downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py validates total single ownership
 downstream implementation ../../tools/runtime/authority/task_authority.py owns protected external dependency authority
-downstream implementation ../../tools/validation/semantic/tools/tool_drift.py validates scope/tool trace links
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_drift.rs validates scope/tool trace links
 @dependency-end
 -->
 
