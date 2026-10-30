@@ -231,6 +231,16 @@ pub fn load_catalog_entries(root: &Path) -> (Vec<Yaml>, Vec<Finding>) {
         }
     };
     let document = match YamlLoader::load_from_str(&text) {
+        Ok(documents) if documents.len() > 1 => {
+            return (
+                Vec::new(),
+                vec![Finding::new(
+                    "catalog",
+                    tool_catalog::CATALOG_PATH,
+                    "yaml-parse-failed",
+                )],
+            )
+        }
         Ok(mut documents) => documents.pop().unwrap_or(Yaml::Null),
         Err(_) => {
             return (

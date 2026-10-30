@@ -250,6 +250,10 @@ fn load_catalog(path: &Path) -> (Option<Yaml>, Vec<Finding>) {
         }
     };
     match YamlLoader::load_from_str(&text) {
+        Ok(documents) if documents.len() > 1 => (
+            None,
+            vec![Finding::new("catalog", CATALOG_PATH, "yaml-parse-failed")],
+        ),
         Ok(mut documents) => {
             let data = documents.pop().unwrap_or(Yaml::Null);
             if map_entries(&data).is_none() {
@@ -430,17 +434,16 @@ fn valid_id(value: &str) -> bool {
     ID_RE.is_match(value)
 }
 
-fn read_existing_text(root: &Path, paths: &[&str]) -> String {
+fn read_existing_text(root: &Path, paths: &[&str]) -> Result<String, String> {
     let mut chunks = Vec::new();
     for path in paths {
         let target = resolve_repo_path(root, path, None);
         if target.is_file() {
-            if let Ok(text) = fs::read_to_string(target) {
-                chunks.push(text);
-            }
+            let text = fs::read_to_string(target).map_err(|_| (*path).to_owned())?;
+            chunks.push(text);
         }
     }
-    chunks.join("\n")
+    Ok(chunks.join("\n"))
 }
 
 pub fn referenced_tool_paths_from_text(text: &str) -> BTreeSet<String> {
@@ -450,15 +453,25 @@ pub fn referenced_tool_paths_from_text(text: &str) -> BTreeSet<String> {
         .collect()
 }
 
-pub fn referenced_tool_paths(root: &Path) -> BTreeSet<String> {
-    referenced_tool_paths_from_text(&read_existing_text(root, &DEFAULT_COMMAND_SOURCES))
+pub fn referenced_tool_paths(root: &Path) -> Result<BTreeSet<String>, String> {
+    let text = read_existing_text(root, &DEFAULT_COMMAND_SOURCES)?;
+    Ok(referenced_tool_paths_from_text(&text))
 }
 
 fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
     let catalog_paths: BTreeSet<String> = entries.iter().map(|entry| entry_path(entry)).collect();
-    let default_text = read_existing_text(root, &ENTRY_WIRING_SOURCES);
     let mut findings = Vec::new();
-    for path in referenced_tool_paths(root) {
+    let referenced = match referenced_tool_paths(root) {
+        Ok(paths) => paths,
+        Err(path) => {
+            return vec![Finding::new("default_wiring", path, "read-failed")];
+        }
+    };
+    let default_text = match read_existing_text(root, &ENTRY_WIRING_SOURCES) {
+        Ok(text) => text,
+        Err(path) => return vec![Finding::new("default_wiring", path, "read-failed")],
+    };
+    for path in referenced {
         if !catalog_paths.contains(&path) {
             findings.push(Finding::new(
                 "default_wiring",
@@ -496,16 +509,19 @@ fn check_catalog_docs(root: &Path) -> Vec<Finding> {
             findings.push(Finding::new("catalog_docs", path, "missing-file"));
             continue;
         }
-        if let Ok(text) = fs::read_to_string(target) {
-            for snippet in ["tools/catalog.yaml", "tool_catalog.rs"] {
-                if !text.contains(snippet) {
-                    findings.push(Finding::new(
-                        "catalog_docs",
-                        path,
-                        format!("missing:{snippet}"),
-                    ));
+        match fs::read_to_string(target) {
+            Ok(text) => {
+                for snippet in ["tools/catalog.yaml", "tool_catalog.rs"] {
+                    if !text.contains(snippet) {
+                        findings.push(Finding::new(
+                            "catalog_docs",
+                            path,
+                            format!("missing:{snippet}"),
+                        ));
+                    }
                 }
             }
+            Err(_) => findings.push(Finding::new("catalog_docs", path, "read-failed")),
         }
     }
     findings
@@ -1144,6 +1160,7 @@ struct MappingFrame {
 struct IdMarkReceiver {
     mappings: Vec<MappingFrame>,
     spans: Vec<(String, Marker, TScalarStyle)>,
+    document_count: usize,
 }
 
 impl IdMarkReceiver {
@@ -1171,6 +1188,7 @@ impl IdMarkReceiver {
 impl MarkedEventReceiver for IdMarkReceiver {
     fn on_event(&mut self, event: Event, marker: Marker) {
         match event {
+            Event::DocumentStart => self.document_count += 1,
             Event::MappingStart(..) => {
                 self.begin_child();
                 self.mappings.push(MappingFrame::default());
@@ -1193,6 +1211,9 @@ pub fn yaml_id_spans(path: &str, text: &str) -> Result<Vec<(String, PublicSource
     parser
         .load(&mut receiver, true)
         .map_err(|error| error.to_string())?;
+    if receiver.document_count > 1 {
+        return Err("expected a single YAML document".to_owned());
+    }
     let mut spans = Vec::new();
     let mut seen = HashSet::new();
     for (value, marker, style) in receiver.spans {
@@ -1339,9 +1360,11 @@ fn indexed_spans(path: &str, text: &str) -> Result<Vec<(String, PublicSourceSpan
 }
 
 fn yaml_document(text: &str) -> Result<Yaml, String> {
-    YamlLoader::load_from_str(text)
-        .map_err(|error| error.to_string())
-        .map(|mut documents| documents.pop().unwrap_or(Yaml::Null))
+    let mut documents = YamlLoader::load_from_str(text).map_err(|error| error.to_string())?;
+    if documents.len() > 1 {
+        return Err("expected a single YAML document".to_owned());
+    }
+    Ok(documents.pop().unwrap_or(Yaml::Null))
 }
 
 fn yaml_sequence(value: Option<&Yaml>) -> &[Yaml] {

@@ -6,12 +6,14 @@
 
 #[path = "../src/catalog/mod.rs"]
 mod catalog;
+#[path = "../src/tool_proof_coverage.rs"]
+mod tool_proof_coverage;
 
 use catalog::path_policy::{self, LEGACY_TOKEN_RE};
 use catalog::skill_routes::{
     build_capability_index, capability_routes, derive_skill_invocation_order, load_skill_catalog,
-    load_skill_route_rules, load_skill_route_rules_from_root, related_skill_candidates,
-    CAPABILITY_ID_RE, SKILL_DEPENDENCY_MAP_PATH,
+    load_skill_dependency_map, load_skill_route_rules, load_skill_route_rules_from_root,
+    related_skill_candidates, CAPABILITY_ID_RE, SKILL_DEPENDENCY_MAP_PATH,
 };
 use catalog::tool_catalog::{
     as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface,
@@ -174,6 +176,10 @@ fn yaml_id_spans_preserve_plain_quoted_utf8_and_duplicate_first_mark() {
         (6, 9, 6, 13)
     );
     assert_eq!(spans.iter().filter(|(id, _)| id == "plain").count(), 1);
+    assert_eq!(
+        yaml_id_spans("tools/catalog.yaml", "id: first\n---\nid: second\n").unwrap_err(),
+        "expected a single YAML document"
+    );
 }
 
 fn valid_tool_catalog_root() -> TempRoot {
@@ -243,6 +249,105 @@ fn catalog_validation_and_report_rendering_match_native_records() {
     let json = render_json(&report, None);
     assert!(json.contains("agent_canon.catalog_bundle.v1"));
     assert!(json.contains("demo-tool"));
+}
+
+#[test]
+fn catalog_and_route_loaders_reject_multiple_documents_and_type_empty_input() {
+    let catalog_root = valid_tool_catalog_root();
+    let catalog_path = catalog_root.path().join("tools/catalog.yaml");
+    let catalog_text = fs::read_to_string(&catalog_path).unwrap();
+    catalog_root.write(
+        "tools/catalog.yaml",
+        &format!("{catalog_text}---\nversion: 1\n"),
+    );
+    let catalog_report = validate_catalog(catalog_root.path());
+    assert!(catalog_report.findings.iter().any(|finding| {
+        finding.check == "catalog"
+            && finding.path == "tools/catalog.yaml"
+            && finding.detail == "yaml-parse-failed"
+    }));
+    let (_, proof_findings) = tool_proof_coverage::load_catalog_entries(catalog_root.path());
+    assert!(proof_findings.iter().any(|finding| {
+        finding.check == "catalog"
+            && finding.tool_id == "tools/catalog.yaml"
+            && finding.detail == "yaml-parse-failed"
+    }));
+
+    catalog_root.write("tools/catalog.yaml", "");
+    let empty_report = validate_catalog(catalog_root.path());
+    assert!(empty_report.findings.iter().any(|finding| {
+        finding.path == "tools/catalog.yaml" && finding.detail == "must-parse-as-mapping"
+    }));
+
+    let skill_root = valid_skill_root();
+    let skill_catalog =
+        fs::read_to_string(skill_root.path().join("agents/skills/catalog.yaml")).unwrap();
+    skill_root.write(
+        "agents/skills/catalog.yaml",
+        &format!("{skill_catalog}---\nskill_families: []\n"),
+    );
+    assert!(load_skill_catalog(skill_root.path())
+        .unwrap_err()
+        .contains("expected a single YAML document"));
+    assert_eq!(
+        load_skill_route_rules_from_root(skill_root.path())
+            .unwrap_err()
+            .code,
+        "capability-root-catalog-invalid"
+    );
+
+    let dependency_root = valid_skill_root();
+    let dependencies = fs::read_to_string(
+        dependency_root
+            .path()
+            .join("agents/skills/skill-dependencies.yaml"),
+    )
+    .unwrap();
+    dependency_root.write(
+        "agents/skills/skill-dependencies.yaml",
+        &format!("{dependencies}---\nskill_dependencies: {{}}\n"),
+    );
+    let skill_ids = ["alpha".to_owned(), "beta".to_owned()];
+    assert_eq!(
+        load_skill_dependency_map(dependency_root.path(), Some(&skill_ids)).unwrap_err(),
+        "skill-dependency-map-unavailable"
+    );
+
+    let empty_dependency_root = valid_skill_root();
+    empty_dependency_root.write("agents/skills/skill-dependencies.yaml", "");
+    assert_eq!(
+        load_skill_dependency_map(empty_dependency_root.path(), Some(&skill_ids)).unwrap_err(),
+        "skill-dependency-map-unavailable"
+    );
+
+    let empty_skill_root = TempRoot::new("empty-skill-catalog");
+    empty_skill_root.write("agents/skills/catalog.yaml", "");
+    assert!(load_skill_catalog(empty_skill_root.path())
+        .unwrap_err()
+        .contains("must parse as a mapping"));
+}
+
+#[test]
+fn existing_invalid_utf8_wiring_and_catalog_docs_fail_validation() {
+    let root = valid_tool_catalog_root();
+    let wiring_path = root
+        .path()
+        .join("tools/validation/ci/runners/run_all_checks.sh");
+    fs::create_dir_all(wiring_path.parent().unwrap()).unwrap();
+    fs::write(&wiring_path, &[0xff_u8]).unwrap();
+    fs::write(root.path().join("tools/README.md"), &[0xff_u8]).unwrap();
+
+    let report = validate_catalog(root.path());
+    assert!(report.findings.iter().any(|finding| {
+        finding.check == "default_wiring"
+            && finding.path == "tools/validation/ci/runners/run_all_checks.sh"
+            && finding.detail == "read-failed"
+    }));
+    assert!(report.findings.iter().any(|finding| {
+        finding.check == "catalog_docs"
+            && finding.path == "tools/README.md"
+            && finding.detail == "read-failed"
+    }));
 }
 
 #[test]
@@ -644,4 +749,13 @@ fn main() {
     );
     let json = render_json(&validate_catalog(root.path()), Some(&report));
     assert!(json.contains("public-surface.v1"));
+
+    root.write(
+        "tools/catalog.yaml",
+        "entries:\n  - id: demo-tool\n    public: true\n---\nentries: []\n",
+    );
+    let multi_document = extract_public_surface(root.path());
+    assert!(multi_document.findings.iter().any(|finding| {
+        finding.path == "tools/catalog.yaml" && finding.detail.starts_with("yaml-parse-failed:")
+    }));
 }

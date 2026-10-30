@@ -238,9 +238,18 @@ fn yaml_string_sequence(value: Option<&Yaml>, field: &str) -> Result<Vec<String>
 pub fn load_skill_catalog(root: &Path) -> Result<Yaml, String> {
     let path = root.join(SKILL_CATALOG_PATH);
     let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    YamlLoader::load_from_str(&text)
-        .map_err(|error| format!("{SKILL_CATALOG_PATH} YAML parse failed: {error}"))
-        .map(|mut documents| documents.pop().unwrap_or(Yaml::Null))
+    let mut documents = YamlLoader::load_from_str(&text)
+        .map_err(|error| format!("{SKILL_CATALOG_PATH} YAML parse failed: {error}"))?;
+    if documents.len() > 1 {
+        return Err(format!(
+            "{SKILL_CATALOG_PATH} YAML parse failed: expected a single YAML document"
+        ));
+    }
+    let document = documents.pop().unwrap_or(Yaml::Null);
+    if document.as_hash().is_none() {
+        return Err(format!("{SKILL_CATALOG_PATH} must parse as a mapping"));
+    }
+    Ok(document)
 }
 
 fn skill_ids_from_catalog(data: &Yaml) -> Result<Vec<String>, String> {
@@ -435,11 +444,15 @@ pub fn load_skill_dependency_map(
     let path = root.join(SKILL_DEPENDENCY_MAP_PATH);
     let text =
         std::fs::read_to_string(path).map_err(|_| "skill-dependency-map-unavailable".to_owned())?;
-    let raw = YamlLoader::load_from_str(&text)
-        .map_err(|_| "skill-dependency-map-unavailable".to_owned())?
-        .into_iter()
-        .next()
-        .unwrap_or(Yaml::Null);
+    let mut documents = YamlLoader::load_from_str(&text)
+        .map_err(|_| "skill-dependency-map-unavailable".to_owned())?;
+    if documents.len() > 1 {
+        return Err("skill-dependency-map-unavailable".to_owned());
+    }
+    let raw = documents.pop().unwrap_or(Yaml::Null);
+    if raw.as_hash().is_none() {
+        return Err("skill-dependency-map-unavailable".to_owned());
+    }
     let data = yaml_mapping(&raw, SKILL_DEPENDENCY_MAP_PATH)?;
     let dependency_data = yaml_get(&raw, "skill_dependencies")
         .ok_or_else(|| "skill_dependencies must be a mapping".to_owned())?;
