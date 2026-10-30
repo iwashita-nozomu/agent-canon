@@ -8,8 +8,9 @@
 // @dependency-end
 
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::env;
+use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -193,7 +194,10 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
 
-    let root = resolve_non_strict(&parsed.root);
+    let root = match resolve_non_strict(&parsed.root) {
+        Ok(root) => root,
+        Err(error) => return path_resolution_failure(&parsed.root, &error),
+    };
     let mut templates = parsed.templates;
     let mut instances = parsed.instances;
     for path in parsed.paths {
@@ -222,7 +226,18 @@ pub fn run(args: &[String]) -> i32 {
         return 2;
     }
 
-    let artifact_root = parsed.artifact_root.as_deref().map(resolve_non_strict);
+    let artifact_root = match parsed
+        .artifact_root
+        .as_deref()
+        .map(resolve_non_strict)
+        .transpose()
+    {
+        Ok(root) => root,
+        Err(error) => {
+            let path = parsed.artifact_root.as_deref().expect("failed root exists");
+            return path_resolution_failure(path, &error);
+        }
+    };
     let mut results = Vec::new();
     let mut failures = Vec::new();
     for (raw_path, is_template) in documents {
@@ -231,7 +246,16 @@ pub fn run(args: &[String]) -> i32 {
         } else {
             env::current_dir().unwrap_or_default().join(raw_path)
         };
-        let path = resolve_non_strict(&selected_path);
+        let path = match resolve_non_strict(&selected_path) {
+            Ok(path) => path,
+            Err(error) => {
+                failures.push(format!(
+                    "{}:path_resolution_failed:{error}",
+                    selected_path.display()
+                ));
+                continue;
+            }
+        };
         let context = ReferenceContext {
             root: &root,
             instance_path: &path,
@@ -388,6 +412,15 @@ fn print_text(report: &ValidationReport) {
             eprintln!("SEMANTIC_RESPONSIBILITY_CONTRACT_ERROR={error}");
         }
     }
+}
+
+fn path_resolution_failure(path: &Path, error: &str) -> i32 {
+    eprintln!("SEMANTIC_RESPONSIBILITY_CONTRACT=fail");
+    eprintln!(
+        "SEMANTIC_RESPONSIBILITY_CONTRACT_ERROR={}:path_resolution_failed:{error}",
+        path.display()
+    );
+    1
 }
 
 fn parse_document(path: &Path) -> Result<ContractValue, ContractError> {
@@ -651,7 +684,7 @@ fn check_delta(
             return Err(ContractError(format!("{obligation_field}.id:duplicate")));
         }
     }
-    Ok(Some(identifier))
+    Ok(Some(identifier.to_owned()))
 }
 
 fn check_obligation(
@@ -738,7 +771,7 @@ fn check_obligation(
         claim,
         owner,
     )?;
-    Ok(Some(identifier))
+    Ok(Some(identifier.to_owned()))
 }
 
 fn check_supporting_evidence(
@@ -855,8 +888,10 @@ fn check_reference_path<'a>(
     if is_symlink(&unresolved) {
         return Err(ContractError(format!("{field}:symlink_reference")));
     }
-    let candidate = resolve_non_strict(&unresolved);
-    let resolved_base = resolve_non_strict(base);
+    let candidate = resolve_non_strict(&unresolved)
+        .map_err(|error| ContractError(format!("{field}:reference_resolution_failed:{error}")))?;
+    let resolved_base = resolve_non_strict(base)
+        .map_err(|error| ContractError(format!("{field}:reference_resolution_failed:{error}")))?;
     if !candidate.starts_with(&resolved_base) {
         return Err(ContractError(format!("{field}:outside_reference_root")));
     }
@@ -943,73 +978,117 @@ fn empty_or_missing(value: Option<&ContractValue>) -> bool {
     value.is_none_or(ContractValue::is_empty_string)
 }
 
-fn resolve_non_strict(path: &Path) -> PathBuf {
-    resolve_non_strict_depth(path, 0)
+#[derive(Clone)]
+enum ResolutionComponent {
+    RootDir(OsString),
+    CurDir,
+    ParentDir,
+    Normal(OsString),
+    #[cfg(windows)]
+    Prefix(OsString),
 }
 
-fn resolve_non_strict_depth(path: &Path, depth: usize) -> PathBuf {
+struct ResolutionFrame {
+    components: Vec<ResolutionComponent>,
+    next: usize,
+    resolving_symlink: Option<PathBuf>,
+}
+
+impl ResolutionFrame {
+    fn new(path: &Path, resolving_symlink: Option<PathBuf>) -> Self {
+        let components = path
+            .components()
+            .map(|component| match component {
+                root @ Component::RootDir => {
+                    ResolutionComponent::RootDir(root.as_os_str().to_os_string())
+                }
+                Component::CurDir => ResolutionComponent::CurDir,
+                Component::ParentDir => ResolutionComponent::ParentDir,
+                Component::Normal(name) => ResolutionComponent::Normal(name.to_os_string()),
+                #[cfg(windows)]
+                Component::Prefix(prefix) => {
+                    ResolutionComponent::Prefix(prefix.as_os_str().to_os_string())
+                }
+            })
+            .collect();
+        Self {
+            components,
+            next: 0,
+            resolving_symlink,
+        }
+    }
+}
+
+fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        env::current_dir().unwrap_or_default().join(path)
+        env::current_dir()
+            .map_err(|error| format!("current directory: {error}"))?
+            .join(path)
     };
-    if depth >= 40 {
-        return normalize_path(absolute);
-    }
-
     let mut resolved = PathBuf::new();
-    let mut components = absolute.components().peekable();
-    while let Some(component) = components.next() {
+    let mut frames = vec![ResolutionFrame::new(&absolute, None)];
+    let mut active_symlinks = HashSet::new();
+
+    while !frames.is_empty() {
+        let frame_finished = frames
+            .last()
+            .is_some_and(|frame| frame.next == frame.components.len());
+        if frame_finished {
+            let frame = frames.pop().expect("finished frame exists");
+            if let Some(symlink) = frame.resolving_symlink {
+                active_symlinks.remove(&symlink);
+            }
+            continue;
+        }
+        let component = {
+            let frame = frames.last_mut().expect("active frame exists");
+            let component = frame.components[frame.next].clone();
+            frame.next += 1;
+            component
+        };
         match component {
-            Component::CurDir => {}
-            parent @ Component::ParentDir => {
+            ResolutionComponent::RootDir(root) => resolved.push(root),
+            ResolutionComponent::CurDir => {}
+            ResolutionComponent::ParentDir => {
                 if !resolved.pop() && !resolved.has_root() {
-                    resolved.push(parent.as_os_str());
+                    resolved.push("..");
                 }
             }
-            normal @ Component::Normal(_) => {
-                resolved.push(normal.as_os_str());
-                if is_symlink(&resolved) {
-                    if let Ok(target) = fs::read_link(&resolved) {
-                        let mut linked = if target.is_absolute() {
+            ResolutionComponent::Normal(name) => {
+                let candidate = resolved.join(&name);
+                match fs::symlink_metadata(&candidate) {
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        if !active_symlinks.insert(candidate.clone()) {
+                            return Err(format!("symbolic link loop at {}", candidate.display()));
+                        }
+                        let target = fs::read_link(&candidate).map_err(|error| {
+                            format!("read symbolic link {}: {error}", candidate.display())
+                        })?;
+                        let target = if target.is_absolute() {
                             target
                         } else {
-                            resolved
-                                .parent()
-                                .unwrap_or_else(|| Path::new("."))
-                                .join(target)
+                            resolved.join(target)
                         };
-                        for remaining in components {
-                            linked.push(remaining.as_os_str());
-                        }
-                        return resolve_non_strict_depth(&linked, depth + 1);
+                        frames.push(ResolutionFrame::new(&target, Some(candidate)));
+                    }
+                    Ok(_) => {
+                        resolved = fs::canonicalize(&candidate).map_err(|error| {
+                            format!("canonicalize {}: {error}", candidate.display())
+                        })?;
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        resolved.push(name);
+                    }
+                    Err(error) => {
+                        return Err(format!("inspect {}: {error}", candidate.display()));
                     }
                 }
             }
-            other => resolved.push(other.as_os_str()),
+            #[cfg(windows)]
+            ResolutionComponent::Prefix(prefix) => resolved.push(prefix),
         }
     }
-    normalize_path(resolved)
-}
-
-fn normalize_path(path: PathBuf) -> PathBuf {
-    let mut normalized = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::CurDir => {}
-            parent @ Component::ParentDir => {
-                let has_normal_component = normalized
-                    .components()
-                    .next_back()
-                    .is_some_and(|part| matches!(part, Component::Normal(_)));
-                if has_normal_component {
-                    normalized.pop();
-                } else if !normalized.has_root() {
-                    normalized.push(parent.as_os_str());
-                }
-            }
-            other => normalized.push(other.as_os_str()),
-        }
-    }
-    normalized
+    Ok(resolved)
 }

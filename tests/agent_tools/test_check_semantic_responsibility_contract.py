@@ -14,6 +14,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 SELECTOR = "check-semantic-responsibility-contract"
@@ -123,6 +125,67 @@ def test_rejects_invalid_reference(tmp_path: Path) -> None:
 
     assert result.returncode != 0
     assert "unsafe_reference" in result.stderr
+
+
+def test_rejects_reference_escaping_after_long_symlink_chain(tmp_path: Path) -> None:
+    """Resolve long in-root chains fully before checking a reference's root."""
+    repo_root = tmp_path / "repo"
+    policy = repo_root / "documents" / "design" / "semantic-responsibility-contract.md"
+    policy.parent.mkdir(parents=True)
+    policy.write_text("# Contract\n", encoding="utf-8")
+
+    links = repo_root / "links"
+    links.mkdir(parents=True)
+    in_root = repo_root / "in-root"
+    in_root.mkdir()
+    in_root_target = in_root / "target.md"
+    in_root_target.write_text("# Target\n", encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    outside_target = outside / "target.md"
+    outside_target.write_text("# Target\n", encoding="utf-8")
+
+    hop_count = 48
+    try:
+        for index in range(hop_count):
+            link = links / f"link{index:02}"
+            target = links / f"link{index + 1:02}" if index + 1 < hop_count else in_root
+            link.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        pytest.skip(f"filesystem symlinks are unavailable: {error}")
+
+    instance, artifact_root = materialize_task_instance(tmp_path)
+    text = instance.read_text(encoding="utf-8")
+    native_reference = (
+        "repo:tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs"
+        "#symbol:validate_document"
+    )
+    chain_reference = "repo:links/link00/target.md#section:Target"
+    assert native_reference in text
+    instance.write_text(
+        text.replace(native_reference, chain_reference, 1), encoding="utf-8"
+    )
+
+    arguments = (
+        "--template",
+        str(TEMPLATE),
+        "--instance",
+        str(instance),
+        "--artifact-root",
+        str(artifact_root),
+        "--root",
+        str(repo_root),
+    )
+    valid = run_checker(*arguments)
+    assert valid.returncode == 0, valid.stdout + valid.stderr
+    assert "SEMANTIC_RESPONSIBILITY_CONTRACT=pass" in valid.stdout
+
+    final_link = links / f"link{hop_count - 1:02}"
+    final_link.unlink()
+    final_link.symlink_to(outside, target_is_directory=True)
+    escaping = run_checker(*arguments)
+    assert escaping.returncode == 1, escaping.stdout + escaping.stderr
+    assert "outside_reference_root" in escaping.stderr
 
 
 def test_rejects_existing_test_without_removal_witness(tmp_path: Path) -> None:
