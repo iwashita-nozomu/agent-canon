@@ -85,7 +85,7 @@ roots = ["templates/agents"]
 roots = ["templates/documents"]
 
 [profiles.codex-user]
-roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "references", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
+roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
 
 [profiles.native-cli]
 roots = ["LICENSE"]
@@ -346,9 +346,12 @@ fn composer_preserves_arbitrary_source_bytes_and_exact_marker_order() {
     assert_eq!(parsed.base, refreshed.base);
     assert_eq!(parsed.specific, refreshed.specific);
 
-    let portable_source = repository_root();
+    let portable_source = source.clone();
     let portable_base = portable_source.join("ROOT_AGENTS.md");
-    let portable_bytes = fs::read(&portable_base).unwrap();
+    let portable_bytes = fs::read(repository_root().join("ROOT_AGENTS.md")).unwrap();
+    fs::write(&portable_base, &portable_bytes).unwrap();
+    git(&portable_source, &["add", "ROOT_AGENTS.md"]);
+    git(&portable_source, &["commit", "-qm", "actual portable base"]);
     let standalone_specific = temporary.path().join("portable-specific.md");
     let standalone_output = temporary.path().join("standalone-AGENTS.md");
     fs::write(&standalone_specific, b"## Standalone consumer\n").unwrap();
