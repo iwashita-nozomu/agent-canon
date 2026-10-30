@@ -42,6 +42,7 @@ mod python_structure_hash_scope_plan;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
+pub mod skill_document_reader;
 mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
@@ -63,6 +64,7 @@ Commands:
   test-design <check> [paths...]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  skill-document-reader <index|chunk|admit> [options]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -96,6 +98,10 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "skill-document-reader" {
+        std::process::exit(skill_document_reader::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
