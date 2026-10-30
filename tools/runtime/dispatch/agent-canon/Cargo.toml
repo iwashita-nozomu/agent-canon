@@ -32,3 +32,5 @@ regex = "=1.12.2"
 time = { version = "=0.3.47", features = ["formatting"] }
 rustpython-ast = { version = "0.4.0", default-features = false, features = ["location", "num-bigint", "unparse", "visitor"] }
 rustpython-parser = { version = "0.4.0", default-features = false, features = ["location", "num-bigint"] }
+
+lsp-server = "=0.10.0"
