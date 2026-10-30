@@ -107,7 +107,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         )
         self.assertTrue(
             any(
-                "tools/runtime/manifest/tool_catalog.py" in command
+                "tools/bin/agent-canon tool-catalog" in command
                 for command in commands_by_gate["tool_catalog"]
             )
         )

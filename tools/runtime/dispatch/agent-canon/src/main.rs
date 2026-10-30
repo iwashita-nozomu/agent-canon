@@ -21,6 +21,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
+pub mod catalog;
 mod check_merge_structure;
 mod config;
 mod dependency_headers;
@@ -46,6 +47,7 @@ mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+pub mod tool_proof_coverage;
 
 use std::env;
 
@@ -63,6 +65,8 @@ Commands:
   test-design <check> [paths...]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -96,6 +100,14 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "tool-catalog" {
+        std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool-proof-coverage" {
+        std::process::exit(tool_proof_coverage::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {

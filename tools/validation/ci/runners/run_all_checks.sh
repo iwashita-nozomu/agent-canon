@@ -9,7 +9,7 @@
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
-# upstream implementation ../../../runtime/manifest/tool_catalog.py validates structured tool catalog
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates structured tool catalog
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
 # upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
@@ -401,13 +401,13 @@ else
   echo "❌ runtime skill frontmatter checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/runtime/manifest/tool_catalog.py" 2>&1; then
+if run_agent_canon tool-catalog 2>&1; then
   echo "✅ tool catalog checks 成功"
 else
   echo "❌ tool catalog checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/analysis/proof/tool_proof_coverage.py" 2>&1; then
+if run_agent_canon tool-proof-coverage 2>&1; then
   echo "✅ tool proof coverage checks 成功"
 else
   echo "❌ tool proof coverage checks 失敗"

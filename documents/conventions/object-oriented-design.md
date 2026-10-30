@@ -14,7 +14,7 @@ downstream implementation ../../tools/validation/code/oop/cpp/readability.py C++
 downstream implementation ../../tools/validation/code/oop/python/rule_inventory.py inventories Python OOP rule surfaces
 downstream implementation ../../tools/validation/code/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
 downstream implementation ../../tools/catalog.yaml records OOP tool catalog status
-downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates OOP catalog entries
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates OOP catalog entries
 upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 @dependency-end
 -->

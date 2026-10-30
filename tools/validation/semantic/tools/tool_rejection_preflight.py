@@ -300,7 +300,7 @@ AGENT_PROTOCOL_GATE_TEMPLATES = (
 TOOL_CATALOG_GATE_TEMPLATES = (
     GateTemplate(
         gate="tool_catalog",
-        command_template="python3 tools/runtime/manifest/tool_catalog.py",
+        command_template="tools/bin/agent-canon tool-catalog",
         handoff=(
             "include catalog/docs/tests wiring for changed canonical tool surfaces"
         ),
