@@ -1137,14 +1137,16 @@ fn print_argument_error(error: &str) {
 
 fn read_input(path: Option<&str>) -> Result<Value, String> {
     let mut text = String::new();
-    if path.is_none() || path == Some("-") {
-        io::stdin()
-            .lock()
-            .read_to_string(&mut text)
-            .map_err(|error| error.to_string())?;
-    } else {
-        text = fs::read_to_string(path.expect("path is present"))
-            .map_err(|error| error.to_string())?;
+    match path {
+        None | Some("-") => {
+            io::stdin()
+                .lock()
+                .read_to_string(&mut text)
+                .map_err(|error| error.to_string())?;
+        }
+        Some(path) => {
+            text = fs::read_to_string(path).map_err(|error| error.to_string())?;
+        }
     }
     serde_json::from_str(&text).map_err(|error| error.to_string())
 }
