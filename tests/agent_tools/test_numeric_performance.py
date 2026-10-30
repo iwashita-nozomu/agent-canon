@@ -165,6 +165,23 @@ def test_context_mismatch_is_unresolved_and_forbids_jit() -> None:
     assert "JIT" in result["forbidden_writes"]
 
 
+def test_large_integer_context_mismatch_is_not_rounded() -> None:
+    """Distinct Python-valid integer identities remain distinct above u64."""
+    packet = _observation()
+    before = packet["before"]
+    after = packet["after"]
+    assert isinstance(before, dict)
+    assert isinstance(after, dict)
+    before["workload"] = 18446744073709551616
+    after["workload"] = 18446744073709551617
+
+    result = _result(packet)
+    assert result["category"] == "evidence_missing"
+    assert result["owner_route"] == "computational-optimization"
+    assert result["evidence"]["context_mismatches"] == ["workload"]
+    assert "JIT" in result["forbidden_writes"]
+
+
 def test_kkt_or_finite_event_change_routes_to_math() -> None:
     """KKT or finite/non-finite behavior is numerical evidence, not JIT evidence."""
     for changes in (

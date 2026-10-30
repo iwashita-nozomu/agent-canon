@@ -678,7 +678,9 @@ fn number(value: &Value, field: &str) -> Result<f64, ObservationError> {
         return Err(ObservationError::new(format!("{field}:number_required")));
     };
     let Some(number) = number.as_f64() else {
-        return Err(ObservationError::new(format!("{field}:number_required")));
+        return Err(ObservationError::new(format!(
+            "{field}:finite_nonnegative_required"
+        )));
     };
     if !number.is_finite() || number < 0.0 {
         return Err(ObservationError::new(format!(
@@ -689,8 +691,13 @@ fn number(value: &Value, field: &str) -> Result<f64, ObservationError> {
 }
 
 fn scalar(value: &Value, field: &str) -> Result<Value, ObservationError> {
-    let Some(number) = value.as_number().and_then(Number::as_f64) else {
+    let Some(number) = value.as_number() else {
         return Err(ObservationError::new(format!("{field}:number_required")));
+    };
+    let Some(number) = number.as_f64() else {
+        return Err(ObservationError::new(format!(
+            "{field}:finite_number_required"
+        )));
     };
     if !number.is_finite() {
         return Err(ObservationError::new(format!(
@@ -746,7 +753,7 @@ fn nonnegative_integer(value: &Value, field: &str) -> Result<Value, ObservationE
             "{field}:nonnegative_integer_required"
         )));
     };
-    if number.as_i64().is_some_and(|value| value >= 0) || number.as_u64().is_some() {
+    if nonnegative_integer_number(number) {
         Ok(value.clone())
     } else {
         Err(ObservationError::new(format!(
@@ -900,22 +907,96 @@ fn python_equal(left: &Value, right: &Value) -> bool {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// `serde_json`'s arbitrary-precision Number retains large integer tokens.
+// Keep context identity in canonical decimal form instead of rounding it through f64.
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Integer {
-    Negative(i64),
-    NonNegative(u64),
+    Negative(String),
+    NonNegative(String),
+}
+
+impl Integer {
+    fn from_decimal(text: &str) -> Option<Self> {
+        let (negative, digits) = text
+            .strip_prefix('-')
+            .map_or((false, text), |digits| (true, digits));
+        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        let digits = digits.trim_start_matches('0');
+        let digits = if digits.is_empty() { "0" } else { digits };
+        if negative && digits != "0" {
+            Some(Self::Negative(digits.to_string()))
+        } else {
+            Some(Self::NonNegative(digits.to_string()))
+        }
+    }
 }
 
 fn integer_value(number: &Number) -> Option<Integer> {
-    if let Some(value) = number.as_i64() {
-        if value < 0 {
-            Some(Integer::Negative(value))
-        } else {
-            Some(Integer::NonNegative(value as u64))
-        }
-    } else {
-        number.as_u64().map(Integer::NonNegative)
+    let representation = number.as_str();
+    if representation.contains('.') || representation.contains('e') || representation.contains('E')
+    {
+        return None;
     }
+    Integer::from_decimal(representation)
+}
+
+// Convert an integral IEEE-754 value to its exact decimal integer without a
+// bounded machine integer, preserving Python's int/float equality behavior.
+fn float_integer_value(value: f64) -> Option<Integer> {
+    if !value.is_finite() || value.fract() != 0.0 {
+        return None;
+    }
+    let bits = value.to_bits();
+    let negative = bits >> 63 != 0;
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    let (significand, shift) = if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    };
+    if significand == 0 {
+        return Some(Integer::NonNegative("0".to_string()));
+    }
+    let mut integer = significand;
+    if shift < 0 {
+        let right_shift = (-shift) as u32;
+        if right_shift >= u64::BITS || integer & ((1_u64 << right_shift) - 1) != 0 {
+            return None;
+        }
+        integer >>= right_shift;
+        return Some(if negative {
+            Integer::Negative(integer.to_string())
+        } else {
+            Integer::NonNegative(integer.to_string())
+        });
+    }
+    let mut digits = integer.to_string();
+    for _ in 0..shift {
+        double_decimal_integer(&mut digits);
+    }
+    Some(if negative {
+        Integer::Negative(digits)
+    } else {
+        Integer::NonNegative(digits)
+    })
+}
+
+fn double_decimal_integer(digits: &mut String) {
+    let mut doubled = Vec::with_capacity(digits.len() + 1);
+    let mut carry = 0_u8;
+    for digit in digits.bytes().rev() {
+        let value = (digit - b'0') * 2 + carry;
+        doubled.push(b'0' + value % 10);
+        carry = value / 10;
+    }
+    if carry != 0 {
+        doubled.push(b'0' + carry);
+    }
+    doubled.reverse();
+    *digits = String::from_utf8(doubled).expect("decimal digits remain valid UTF-8");
 }
 
 fn numbers_equal(left: &Number, right: &Number) -> bool {
@@ -923,36 +1004,34 @@ fn numbers_equal(left: &Number, right: &Number) -> bool {
         (Some(left), Some(right)) => left == right,
         (Some(integer), None) => right
             .as_f64()
-            .is_some_and(|float| integer_equals_float(integer, float)),
+            .and_then(float_integer_value)
+            .is_some_and(|float_integer| integer == float_integer),
         (None, Some(integer)) => left
             .as_f64()
-            .is_some_and(|float| integer_equals_float(integer, float)),
+            .and_then(float_integer_value)
+            .is_some_and(|float_integer| integer == float_integer),
         (None, None) => left.as_f64() == right.as_f64(),
     }
 }
 
 fn number_equals_bool(number: &Number, boolean: bool) -> bool {
     match integer_value(number) {
-        Some(Integer::Negative(value)) => value == 0 && !boolean,
-        Some(Integer::NonNegative(value)) => value == u64::from(boolean),
+        Some(integer) => {
+            integer
+                == Integer::NonNegative(if boolean {
+                    "1".to_string()
+                } else {
+                    "0".to_string()
+                })
+        }
         None => number
             .as_f64()
             .is_some_and(|value| value == if boolean { 1.0 } else { 0.0 }),
     }
 }
 
-fn integer_equals_float(integer: Integer, float: f64) -> bool {
-    if !float.is_finite() || float.fract() != 0.0 {
-        return false;
-    }
-    match integer {
-        Integer::Negative(integer) => {
-            float >= i64::MIN as f64 && float < 0.0 && float as i64 == integer
-        }
-        Integer::NonNegative(integer) => {
-            float >= 0.0 && float < 18_446_744_073_709_551_616.0 && float as u64 == integer
-        }
-    }
+fn nonnegative_integer_number(number: &Number) -> bool {
+    matches!(integer_value(number), Some(Integer::NonNegative(_)))
 }
 
 /// Run the `numeric-performance` command with command arguments (excluding the
