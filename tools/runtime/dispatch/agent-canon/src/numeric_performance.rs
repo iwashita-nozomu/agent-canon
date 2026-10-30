@@ -12,6 +12,7 @@
 // downstream implementation main.rs registers the numeric-performance CLI command
 // @dependency-end
 
+use rustpython_ast::bigint::BigInt;
 use serde::Serialize;
 use serde_json::{json, Map, Number, Value};
 use std::error::Error;
@@ -908,43 +909,19 @@ fn python_equal(left: &Value, right: &Value) -> bool {
 }
 
 // `serde_json`'s arbitrary-precision Number retains large integer tokens.
-// Keep context identity in canonical decimal form instead of rounding it through f64.
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Integer {
-    Negative(String),
-    NonNegative(String),
-}
-
-impl Integer {
-    fn from_decimal(text: &str) -> Option<Self> {
-        let (negative, digits) = text
-            .strip_prefix('-')
-            .map_or((false, text), |digits| (true, digits));
-        if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-            return None;
-        }
-        let digits = digits.trim_start_matches('0');
-        let digits = if digits.is_empty() { "0" } else { digits };
-        if negative && digits != "0" {
-            Some(Self::Negative(digits.to_string()))
-        } else {
-            Some(Self::NonNegative(digits.to_string()))
-        }
-    }
-}
-
-fn integer_value(number: &Number) -> Option<Integer> {
+// Keep context identity in BigInt form instead of rounding it through f64.
+fn integer_value(number: &Number) -> Option<BigInt> {
     let representation = number.as_str();
     if representation.contains('.') || representation.contains('e') || representation.contains('E')
     {
         return None;
     }
-    Integer::from_decimal(representation)
+    representation.parse().ok()
 }
 
-// Convert an integral IEEE-754 value to its exact decimal integer without a
-// bounded machine integer, preserving Python's int/float equality behavior.
-fn float_integer_value(value: f64) -> Option<Integer> {
+// Convert an integral IEEE-754 value to its exact integer value while retaining
+// Python's int/float equality behavior across the full finite f64 range.
+fn float_integer_value(value: f64) -> Option<BigInt> {
     if !value.is_finite() || value.fract() != 0.0 {
         return None;
     }
@@ -958,45 +935,19 @@ fn float_integer_value(value: f64) -> Option<Integer> {
         ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
     };
     if significand == 0 {
-        return Some(Integer::NonNegative("0".to_string()));
+        return Some(BigInt::from(0_u8));
     }
-    let mut integer = significand;
+    let mut integer = BigInt::from(significand);
     if shift < 0 {
         let right_shift = (-shift) as u32;
-        if right_shift >= u64::BITS || integer & ((1_u64 << right_shift) - 1) != 0 {
+        if right_shift >= u64::BITS || significand & ((1_u64 << right_shift) - 1) != 0 {
             return None;
         }
-        integer >>= right_shift;
-        return Some(if negative {
-            Integer::Negative(integer.to_string())
-        } else {
-            Integer::NonNegative(integer.to_string())
-        });
+        integer = BigInt::from(significand >> right_shift);
+    } else if shift > 0 {
+        integer = integer << shift as usize;
     }
-    let mut digits = integer.to_string();
-    for _ in 0..shift {
-        double_decimal_integer(&mut digits);
-    }
-    Some(if negative {
-        Integer::Negative(digits)
-    } else {
-        Integer::NonNegative(digits)
-    })
-}
-
-fn double_decimal_integer(digits: &mut String) {
-    let mut doubled = Vec::with_capacity(digits.len() + 1);
-    let mut carry = 0_u8;
-    for digit in digits.bytes().rev() {
-        let value = (digit - b'0') * 2 + carry;
-        doubled.push(b'0' + value % 10);
-        carry = value / 10;
-    }
-    if carry != 0 {
-        doubled.push(b'0' + carry);
-    }
-    doubled.reverse();
-    *digits = String::from_utf8(doubled).expect("decimal digits remain valid UTF-8");
+    Some(if negative { -integer } else { integer })
 }
 
 fn numbers_equal(left: &Number, right: &Number) -> bool {
@@ -1016,14 +967,7 @@ fn numbers_equal(left: &Number, right: &Number) -> bool {
 
 fn number_equals_bool(number: &Number, boolean: bool) -> bool {
     match integer_value(number) {
-        Some(integer) => {
-            integer
-                == Integer::NonNegative(if boolean {
-                    "1".to_string()
-                } else {
-                    "0".to_string()
-                })
-        }
+        Some(integer) => integer == BigInt::from(u8::from(boolean)),
         None => number
             .as_f64()
             .is_some_and(|value| value == if boolean { 1.0 } else { 0.0 }),
@@ -1031,7 +975,7 @@ fn number_equals_bool(number: &Number, boolean: bool) -> bool {
 }
 
 fn nonnegative_integer_number(number: &Number) -> bool {
-    matches!(integer_value(number), Some(Integer::NonNegative(_)))
+    matches!(integer_value(number), Some(integer) if integer >= BigInt::from(0_u8))
 }
 
 /// Run the `numeric-performance` command with command arguments (excluding the

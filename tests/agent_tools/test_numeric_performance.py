@@ -182,6 +182,29 @@ def test_large_integer_context_mismatch_is_not_rounded() -> None:
     assert "JIT" in result["forbidden_writes"]
 
 
+def test_context_integer_float_equality_matches_python() -> None:
+    """Large integer and float context equality follows Python's numeric oracle."""
+    large_integer = 2**128
+    pairs = (
+        (large_integer, float(large_integer)),
+        (large_integer + 1, float(large_integer)),
+        (-large_integer, float(-large_integer)),
+        (-large_integer - 1, float(-large_integer)),
+    )
+    for before_identity, after_identity in pairs:
+        packet = _observation()
+        before = packet["before"]
+        after = packet["after"]
+        assert isinstance(before, dict)
+        assert isinstance(after, dict)
+        before["workload"] = before_identity
+        after["workload"] = after_identity
+
+        result = _result(packet)
+        mismatches = result["evidence"]["context_mismatches"]
+        assert ("workload" in mismatches) is (before_identity != after_identity)
+
+
 def test_kkt_or_finite_event_change_routes_to_math() -> None:
     """KKT or finite/non-finite behavior is numerical evidence, not JIT evidence."""
     for changes in (
