@@ -47,40 +47,6 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
-#[cfg(test)]
-mod runtime_boundary {
-    use std::path::{Path, PathBuf};
-
-    pub(crate) use agent_canon::runtime_boundary::{
-        runtime_root_is_explicit, stable_source_key, test_runtime_root_path,
-        validate_external_target, RUNTIME_ROOT_ENV,
-    };
-
-    // Cargo builds the library as a normal dependency of the binary test target, without `cfg(test)`.
-    // Preserve only the binary test fixture selection and delegate all resolution to the library.
-    pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
-        resolve_runtime_root_at(source_root, None)
-    }
-
-    pub(crate) fn resolve_runtime_root_at(
-        source_root: &Path,
-        requested: Option<&Path>,
-    ) -> Result<PathBuf, String> {
-        match requested {
-            Some(requested) => {
-                agent_canon::runtime_boundary::resolve_runtime_root_at(source_root, Some(requested))
-            }
-            None => {
-                let test_root = test_runtime_root_path(source_root)?;
-                agent_canon::runtime_boundary::resolve_runtime_root_at(
-                    source_root,
-                    Some(&test_root),
-                )
-            }
-        }
-    }
-}
-
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use std::env;
@@ -223,4 +189,38 @@ fn main() {
     eprintln!("agent-canon: unknown or missing command");
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod runtime_boundary {
+    use std::path::{Path, PathBuf};
+
+    pub(crate) use agent_canon::runtime_boundary::{
+        runtime_root_is_explicit, stable_source_key, test_runtime_root_path,
+        validate_external_target, RUNTIME_ROOT_ENV,
+    };
+
+    // Cargo builds the library as a normal dependency of the binary test target, without `cfg(test)`.
+    // Preserve only the binary test fixture selection and delegate all resolution to the library.
+    pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
+        resolve_runtime_root_at(source_root, None)
+    }
+
+    pub(crate) fn resolve_runtime_root_at(
+        source_root: &Path,
+        requested: Option<&Path>,
+    ) -> Result<PathBuf, String> {
+        match requested {
+            Some(requested) => {
+                agent_canon::runtime_boundary::resolve_runtime_root_at(source_root, Some(requested))
+            }
+            None => {
+                let test_root = test_runtime_root_path(source_root)?;
+                agent_canon::runtime_boundary::resolve_runtime_root_at(
+                    source_root,
+                    Some(&test_root),
+                )
+            }
+        }
+    }
 }
