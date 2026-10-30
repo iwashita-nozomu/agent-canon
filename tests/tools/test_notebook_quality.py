@@ -3,20 +3,20 @@
 # @dependency-start
 # contract test
 # responsibility Tests notebook quality validation for readable runnable demo notebooks.
-# upstream implementation ../../tools/validation/notebooks/notebook_quality.py validates notebook structure and content
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/notebook_quality.rs validates notebook structure and content
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "notebooks" / "notebook_quality.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 def notebook(cells: list[dict[str, object]]) -> str:
@@ -76,15 +76,27 @@ class NotebookQualityTest(unittest.TestCase):
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a fixture root."""
+        if AGENT_CANON_CLI is None:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            [
+                AGENT_CANON_CLI,
+                "notebook-quality",
+                "--root",
+                str(root),
+                *args,
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
 
-    def write_notebook(self, root: Path, relative: str, cells: list[dict[str, object]]) -> Path:
+    def write_notebook(
+        self, root: Path, relative: str, cells: list[dict[str, object]]
+    ) -> Path:
         """Write one fixture notebook."""
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -104,7 +116,9 @@ class NotebookQualityTest(unittest.TestCase):
                         "This notebook explains the workflow, keeps tests in tests/, "
                         "and shows a compact visualization-oriented example for users."
                     ),
-                    code_cell("import matplotlib.pyplot as plt\nplt.plot([0, 1], [0, 1])\nplt.show()"),
+                    code_cell(
+                        "import matplotlib.pyplot as plt\nplt.plot([0, 1], [0, 1])\nplt.show()"
+                    ),
                 ],
             )
 
@@ -126,7 +140,9 @@ class NotebookQualityTest(unittest.TestCase):
                         "This has narrative text, but it still embeds detailed tests "
                         "that should live under tests/ instead."
                     ),
-                    code_cell("import pytest\nassert 1 + 1 == 2\nplt.plot([0, 1], [0, 1])"),
+                    code_cell(
+                        "import pytest\nassert 1 + 1 == 2\nplt.plot([0, 1], [0, 1])"
+                    ),
                 ],
             )
 
@@ -171,7 +187,9 @@ class NotebookQualityTest(unittest.TestCase):
                         "This notebook has enough explanation and a plot call, "
                         "but the stored output records a failed execution."
                     ),
-                    error_code_cell("import matplotlib.pyplot as plt\nplt.plot([0], [0])\nplt.show()"),
+                    error_code_cell(
+                        "import matplotlib.pyplot as plt\nplt.plot([0], [0])\nplt.show()"
+                    ),
                 ],
             )
 
@@ -182,27 +200,86 @@ class NotebookQualityTest(unittest.TestCase):
         self.assertIn("error-output", result.stdout)
         self.assertIn("NOTEBOOK_QUALITY=pass", result.stdout)
 
+    def test_json_output_preserves_metrics_and_codepoint_counts(self) -> None:
+        """JSON reports retain their fields and count Markdown code points."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            markdown = "# Demo\n\n" + "あ😀" * 60
+            path = self.write_notebook(
+                root,
+                "jupyter/demo.ipynb",
+                [
+                    markdown_cell(markdown),
+                    code_cell("import matplotlib.pyplot as plt\nplt.plot([0], [1])"),
+                ],
+            )
+
+            result = self.run_checker(
+                root,
+                "--format",
+                "json",
+                str(path.relative_to(root)),
+            )
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            set(payload),
+            {"status", "findings", "warnings", "metrics"},
+        )
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(
+            payload["metrics"],
+            [
+                {
+                    "path": "jupyter/demo.ipynb",
+                    "markdown_cells": 1,
+                    "code_cells": 1,
+                    "visualization_cells": 1,
+                    "error_outputs": 0,
+                    "markdown_chars": len(markdown.strip()),
+                }
+            ],
+        )
+
     def test_changed_mode_discovers_modified_notebook(self) -> None:
         """Changed mode should inspect tracked notebook edits."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=root, check=True
+            )
             path = self.write_notebook(
                 root,
                 "jupyter/demo.ipynb",
                 [
-                    markdown_cell("# Demo\n\nReadable notebook narrative with visualization."),
+                    markdown_cell(
+                        "# Demo\n\nReadable notebook narrative with visualization."
+                    ),
                     code_cell("import matplotlib.pyplot as plt\nplt.plot([0], [0])"),
                 ],
             )
-            subprocess.run(["git", "add", "."], cwd=root, check=True, capture_output=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "add", "."], cwd=root, check=True, capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
             path.write_text(
                 notebook(
                     [
-                        markdown_cell("# Demo\n\nReadable notebook narrative with visualization."),
+                        markdown_cell(
+                            "# Demo\n\nReadable notebook narrative with visualization."
+                        ),
                         code_cell("assert True\nplt.plot([0], [0])"),
                     ]
                 ),
