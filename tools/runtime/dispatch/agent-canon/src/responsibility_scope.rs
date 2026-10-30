@@ -14,7 +14,7 @@
 // @dependency-end
 
 use crate::dependency_headers::fnmatch_case;
-use agent_canon::tool_catalog::as_sequence as yaml_sequence;
+use agent_canon::catalog::tool_catalog::as_sequence as yaml_sequence;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeSet, HashSet};
