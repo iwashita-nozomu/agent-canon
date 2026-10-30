@@ -96,6 +96,24 @@ pub struct GraphResponse {
 }
 
 impl GraphResponse {
+    fn from_source_projection(command: &str, payload: Value) -> Result<Self, GraphClientError> {
+        if !matches!(command, "query" | "context") || !payload.is_object() {
+            return Err(GraphClientError::new(
+                "source projection response identity is invalid",
+            ));
+        }
+        if payload.get("exit_code").and_then(Value::as_i64) != Some(0) {
+            return Err(GraphClientError::new("graph response exit status mismatch"));
+        }
+        Ok(Self {
+            schema: format!("agent-canon.graph.{command}.v1"),
+            command: command.to_string(),
+            status: "fresh".to_string(),
+            payload,
+            exit_code: 0,
+        })
+    }
+
     fn from_payload(
         command: &str,
         payload: Value,
@@ -409,7 +427,7 @@ impl GraphClient {
                     GraphClientError::new("source dependency payload must be an object")
                 })?
                 .insert("exit_code".to_string(), json!(0));
-            return GraphResponse::from_payload("query", payload, Some(0));
+            return GraphResponse::from_source_projection("query", payload);
         }
         let mut options = vec![
             "--relation".to_string(),
@@ -451,7 +469,7 @@ impl GraphClient {
             .as_object_mut()
             .ok_or_else(|| GraphClientError::new("source context payload must be an object"))?
             .insert("exit_code".to_string(), json!(0));
-        GraphResponse::from_payload("context", payload, Some(0))
+        GraphResponse::from_source_projection("context", payload)
     }
 
     fn invoke_external(
