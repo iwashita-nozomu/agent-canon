@@ -39,7 +39,7 @@ impl TempTree {
         ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("create temporary fixture root");
-        Self(path)
+        Self(fs::canonicalize(path).expect("resolve physical temporary fixture root"))
     }
 }
 
