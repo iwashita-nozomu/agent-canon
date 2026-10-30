@@ -9,14 +9,14 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 def notebook(cells: list[dict[str, object]]) -> str:
@@ -76,9 +76,13 @@ class NotebookQualityTest(unittest.TestCase):
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the checker against a fixture root."""
+        if AGENT_CANON_CLI is None:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
             [
-                str(standalone_agent_canon()),
+                AGENT_CANON_CLI,
                 "notebook-quality",
                 "--root",
                 str(root),

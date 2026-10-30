@@ -1,3 +1,14 @@
+<!--
+@dependency-start
+contract design
+responsibility Documents the native notebook-quality command and its behavior contract.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/notebook_quality.rs implements notebook quality validation
+upstream implementation ../../tools/catalog.yaml registers the notebook-quality command and typed runtime
+downstream implementation ../../tests/tools/test_notebook_quality.py preserves CLI behavior oracles
+downstream design ./tool-docs.toml registers this tool documentation
+@dependency-end
+-->
+
 # Notebook Quality
 
 `tools/bin/agent-canon notebook-quality` checks that notebooks work as readable
