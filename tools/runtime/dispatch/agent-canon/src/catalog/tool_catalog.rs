@@ -335,16 +335,17 @@ fn catalog_row(entry: &Yaml, family_defaults: &Yaml) -> CatalogRow {
     }
 }
 
-fn check_entry(
-    root: &Path,
-    entry: &Yaml,
-    families: &BTreeSet<String>,
-    statuses: &BTreeSet<String>,
-    roles: &BTreeSet<String>,
-    audiences: &BTreeSet<String>,
-    placements: &BTreeSet<String>,
-    family_defaults: &Yaml,
-) -> Vec<Finding> {
+struct EntryValidationContext<'a> {
+    root: &'a Path,
+    families: &'a BTreeSet<String>,
+    statuses: &'a BTreeSet<String>,
+    roles: &'a BTreeSet<String>,
+    audiences: &'a BTreeSet<String>,
+    placements: &'a BTreeSet<String>,
+    family_defaults: &'a Yaml,
+}
+
+fn check_entry(context: &EntryValidationContext<'_>, entry: &Yaml) -> Vec<Finding> {
     let mut findings = Vec::new();
     let path = entry_path(entry);
     let id = mapping_value(entry, "id").and_then(Yaml::as_str);
@@ -352,11 +353,11 @@ fn check_entry(
     let status = mapping_value(entry, "status").and_then(Yaml::as_str);
     let role = mapping_value(entry, "role").and_then(Yaml::as_str);
     let defaults = family
-        .and_then(|name| family_default(family_defaults, name))
+        .and_then(|name| family_default(context.family_defaults, name))
         .unwrap_or(&Yaml::Null);
     let audience = inherited_string(entry, defaults, "audience");
     let placement = inherited_string(entry, defaults, "placement");
-    let target = resolve_repo_path(root, &path, None);
+    let target = resolve_repo_path(context.root, &path, None);
 
     if id.is_none_or(|value| !valid_id(value)) {
         findings.push(Finding::new("entry", &path, "invalid-id"));
@@ -364,27 +365,33 @@ fn check_entry(
     if mapping_value(entry, "public").is_some_and(|value| value.as_bool().is_none()) {
         findings.push(Finding::new("entry", &path, "invalid-public"));
     }
-    if family.is_none_or(|value| !families.contains(value)) {
+    if family.is_none_or(|value| !context.families.contains(value)) {
         findings.push(Finding::new("entry", &path, "invalid-family"));
     }
-    if status.is_none_or(|value| !statuses.contains(value)) {
+    if status.is_none_or(|value| !context.statuses.contains(value)) {
         findings.push(Finding::new("entry", &path, "invalid-status"));
     }
-    if role.is_none_or(|value| !roles.contains(value)) {
+    if role.is_none_or(|value| !context.roles.contains(value)) {
         findings.push(Finding::new("entry", &path, "invalid-role"));
     }
     if has_non_string_key(entry, "audience") {
         findings.push(Finding::new("entry", &path, "invalid-audience"));
     } else if audience.is_none() {
         findings.push(Finding::new("entry", &path, "missing-audience"));
-    } else if !audiences.contains(audience.as_deref().unwrap_or_default()) {
+    } else if !context
+        .audiences
+        .contains(audience.as_deref().unwrap_or_default())
+    {
         findings.push(Finding::new("entry", &path, "invalid-audience"));
     }
     if has_non_string_key(entry, "placement") {
         findings.push(Finding::new("entry", &path, "invalid-placement"));
     } else if placement.is_none() {
         findings.push(Finding::new("entry", &path, "missing-placement"));
-    } else if !placements.contains(placement.as_deref().unwrap_or_default()) {
+    } else if !context
+        .placements
+        .contains(placement.as_deref().unwrap_or_default())
+    {
         findings.push(Finding::new("entry", &path, "invalid-placement"));
     }
     if status == Some("compatibility_wrapper")
@@ -410,7 +417,7 @@ fn check_entry(
         findings.push(Finding::new("entry", &path, "missing-docs"));
     }
     for doc in docs {
-        if !resolve_repo_path(root, &doc, None).is_file() {
+        if !resolve_repo_path(context.root, &doc, None).is_file() {
             findings.push(Finding::new("entry", &path, format!("missing-doc:{doc}")));
         }
     }
@@ -423,7 +430,7 @@ fn check_entry(
         findings.push(Finding::new("entry", &path, "missing-tests-or-exemption"));
     }
     for test in tests {
-        if !resolve_repo_path(root, &test, None).is_file() {
+        if !resolve_repo_path(context.root, &test, None).is_file() {
             findings.push(Finding::new("entry", &path, format!("missing-test:{test}")));
         }
     }
@@ -893,6 +900,15 @@ pub fn validate_catalog(root: &Path) -> CatalogReport {
             findings.push(Finding::new("family", family_name, "invalid-placement"));
         }
     }
+    let entry_context = EntryValidationContext {
+        root: &root,
+        families: &families,
+        statuses: &statuses,
+        roles: &roles,
+        audiences: &audiences,
+        placements: &placements,
+        family_defaults: &family_defaults,
+    };
     let Some(raw_entries) = mapping_value(&data, "entries").and_then(Yaml::as_vec) else {
         findings.push(Finding::new(
             "catalog",
@@ -931,16 +947,7 @@ pub fn validate_catalog(root: &Path) -> CatalogReport {
                 ));
             }
         }
-        findings.extend(check_entry(
-            &root,
-            raw_entry,
-            &families,
-            &statuses,
-            &roles,
-            &audiences,
-            &placements,
-            &family_defaults,
-        ));
+        findings.extend(check_entry(&entry_context, raw_entry));
     }
     findings.extend(check_default_wiring(&root, &entries));
     findings.extend(check_catalog_docs(&root));
@@ -1053,13 +1060,7 @@ pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
             let compound = ["::", "..", ">=", "&&", "||", "==", "=>"]
                 .into_iter()
                 .find(|operator| starts_with(&characters, index, operator));
-            value = compound
-                .unwrap_or_else(|| {
-                    // A one-character fallback is kept as a static slice only for
-                    // the branch selection; the actual token is built below.
-                    ""
-                })
-                .to_owned();
+            value = compound.unwrap_or("").to_owned();
             if value.is_empty() {
                 end = index + 1;
                 value.push(character);
