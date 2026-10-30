@@ -8,6 +8,7 @@
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
+// downstream implementation run_evaluation.rs scores and reports one agent run bundle
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -53,7 +54,7 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
-use agent_canon::{catalog, tool_proof_coverage};
+use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -68,6 +69,7 @@ Commands:
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  run-evaluation (--run-id ID|--report-dir PATH) [options]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
@@ -109,6 +111,10 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "run-evaluation" {
+        std::process::exit(run_evaluation::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {

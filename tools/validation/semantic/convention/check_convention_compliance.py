@@ -117,7 +117,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "behavior_eval": (
-        "eval/producers/evaluate_agent_run.py",
+        "tools/runtime/dispatch/agent-canon/src/run_evaluation.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "skill_frontmatter": (

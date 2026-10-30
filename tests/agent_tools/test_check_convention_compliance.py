@@ -43,7 +43,7 @@ path: tools/analysis/dependencies/run_repo_dependency_review.sh
 path: tools/validation/notebooks/notebook_quality.py
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
-path: eval/producers/evaluate_agent_run.py
+path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
 path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
@@ -229,7 +229,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "Implementation design uses the four-entry active design packet.\n"
     ),
     "templates/agents/test_plan.md": "validation route behavior-owned cases\n",
-    "eval/definitions/agent_behavior_eval.toml": "behavior evaluate_agent_run.py\n",
+    "eval/definitions/agent_behavior_eval.toml": "behavior run_evaluation.rs\n",
     "agents/USER_GUIDE_JA.md": "user guide owner route\n",
     "templates/agents/closeout_gate.md": "selected closeout inputs\n",
     "templates/agents/workflow_monitoring.md": (
