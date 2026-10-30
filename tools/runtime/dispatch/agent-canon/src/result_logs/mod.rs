@@ -5,6 +5,7 @@
 // downstream implementation ../../../../../../../tests/tools/test_result_log_tools.py exercises both public commands
 // @dependency-end
 
+use rustpython_ast::bigint::BigInt;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
@@ -600,15 +601,22 @@ impl Counter {
         }
     }
 
-    fn pairs(&self, limit: Option<i64>) -> Vec<(JsonString, usize)> {
-        if limit.is_some_and(|limit| limit <= 0) {
+    fn pairs(&self, limit: Option<&BigInt>) -> Vec<(JsonString, usize)> {
+        if limit.is_some_and(|limit| limit <= &BigInt::from(0)) {
             return Vec::new();
         }
         let mut sorted = self.0.clone();
         // Stable sorting preserves Counter.most_common's first-seen tie order.
         sorted.sort_by(|left, right| right.1.cmp(&left.1));
         if let Some(limit) = limit {
-            sorted.truncate(limit as usize);
+            let entry_count = BigInt::from(sorted.len());
+            if limit < &entry_count {
+                let limit = limit
+                    .to_string()
+                    .parse::<usize>()
+                    .expect("positive limit below entry count fits usize");
+                sorted.truncate(limit);
+            }
         }
         sorted
     }
@@ -720,7 +728,7 @@ pub fn run_summary(args: &[String]) -> i32 {
         }
     }
 
-    let top_ops = ops_total.pairs(Some(parsed.top));
+    let top_ops = ops_total.pairs(Some(&parsed.top));
     let summary_parts = (
         json_string(&JsonString::from_text(&parsed.path_text)),
         json_string(&JsonString::from_text(&parsed.only_case)),
@@ -827,14 +835,14 @@ pub fn run_jsonl_to_md(args: &[String]) -> i32 {
 struct SummaryArgs {
     path: PathBuf,
     path_text: String,
-    top: i64,
+    top: BigInt,
     only_case: String,
 }
 
 impl SummaryArgs {
     fn parse(args: &[String]) -> Result<Option<Self>, String> {
         let mut path: Option<String> = None;
-        let mut top = 30i64;
+        let mut top = BigInt::from(30);
         let mut only_case = "hlo".to_owned();
         let mut index = 0;
         let mut positional_only = false;
@@ -857,8 +865,7 @@ impl SummaryArgs {
                 } else {
                     raw.split_once('=').expect("starts with --top=").1
                 };
-                top = value
-                    .parse::<i64>()
+                top = parse_python_int(value)
                     .map_err(|_| format!("argument --top: invalid int value: '{value}'"))?;
                 index += 1;
                 continue;
@@ -897,6 +904,45 @@ impl SummaryArgs {
             only_case,
         }))
     }
+}
+
+fn parse_python_int(raw: &str) -> Result<BigInt, ()> {
+    let value = raw.trim_matches(is_python_whitespace);
+    let (negative, digits) = if let Some(digits) = value.strip_prefix('-') {
+        (true, digits)
+    } else if let Some(digits) = value.strip_prefix('+') {
+        (false, digits)
+    } else {
+        (false, value)
+    };
+    let bytes = digits.as_bytes();
+    if bytes.is_empty() {
+        return Err(());
+    }
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        if byte.is_ascii_digit() {
+            continue;
+        }
+        if byte == b'_'
+            && index > 0
+            && index + 1 < bytes.len()
+            && bytes[index - 1].is_ascii_digit()
+            && bytes[index + 1].is_ascii_digit()
+        {
+            continue;
+        }
+        return Err(());
+    }
+    let digits: String = digits
+        .chars()
+        .filter(|character| *character != '_')
+        .collect();
+    let value = if negative {
+        format!("-{digits}")
+    } else {
+        digits
+    };
+    value.parse::<BigInt>().map_err(|_| ())
 }
 
 struct MarkdownArgs {

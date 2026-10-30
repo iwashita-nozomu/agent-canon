@@ -113,3 +113,29 @@ def test_hlo_summary_preserves_python_nested_tag_repr(tmp_path: Path) -> None:
     assert summary["hlo_text"]["total_lines"] == sum(
         bool(line.strip()) for line in hlo_text.splitlines()
     )
+
+
+def test_hlo_summary_top_accepts_arbitrary_python_integers(tmp_path: Path) -> None:
+    """`--top` follows Python int semantics for unbounded and underscored values."""
+    source = tmp_path / "many-ops.jsonl"
+    operations = ["op-a", "op-b", "op-c"]
+    hlo_text = "\n".join(
+        f"%{index} = {operation}()" for index, operation in enumerate(operations)
+    )
+    source.write_text(
+        json.dumps({"case": "hlo", "hlo": hlo_text}, ensure_ascii=True)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    all_ops = [[operation, 1] for operation in operations]
+    positive = _run_native("summarize-hlo-jsonl", "--top", str(10**100), str(source))
+    negative = _run_native("summarize-hlo-jsonl", "--top", str(-(10**100)), str(source))
+    underscored = _run_native("summarize-hlo-jsonl", "--top", " 1_00 ", str(source))
+
+    assert positive.returncode == 0, positive.stderr
+    assert json.loads(positive.stdout)["top_ops"] == all_ops
+    assert negative.returncode == 0, negative.stderr
+    assert json.loads(negative.stdout)["top_ops"] == []
+    assert underscored.returncode == 0, underscored.stderr
+    assert json.loads(underscored.stdout)["top_ops"] == all_ops
