@@ -5,8 +5,11 @@
 
 use cap_std::fs::Dir;
 use sha2::{Digest, Sha256};
-use std::ffi::OsString;
+use std::collections::BTreeMap;
+use std::env;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -400,6 +403,112 @@ pub struct AttestationRequest {
     pub nonce: Nonce128,
 }
 
+impl AttestationRequest {
+    /// Capture established parent and child inputs without replacing typed bindings.
+    ///
+    /// The inherited runtime source root is deliberately not copied into `source_root`:
+    /// that variable may differ from the source identity bound into a child handoff.
+    fn capture_environment(
+        &mut self,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<(), AuthorityError> {
+        if self.explicit_root.is_none() {
+            if let Some(value) = environment.get(OsStr::new("AGENT_CANON_PARENT_ROOT")) {
+                if let Some(text) = value.to_str() {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        self.explicit_root = Some(PathBuf::from(trimmed));
+                    }
+                } else if !value.is_empty() {
+                    self.explicit_root = Some(PathBuf::from(value.as_os_str()));
+                }
+            }
+        }
+
+        let child_purpose = environment_text(environment, "AGENT_CANON_CHILD_PURPOSE")?;
+        let audience = environment_text(environment, "AGENT_CANON_HANDOFF_AUDIENCE")?;
+        let token_in_environment = environment_text(environment, "AGENT_CANON_CHILD_HANDOFF")?;
+        let child_markers = [
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+            "AGENT_CANON_PARENT_ROOT_DEV",
+            "AGENT_CANON_PARENT_ROOT_INO",
+            "AGENT_CANON_CHILD_PURPOSE",
+            "AGENT_CANON_HANDOFF_AUDIENCE",
+            "AGENT_CANON_CHILD_HANDOFF",
+        ];
+        let child_context = child_markers
+            .iter()
+            .any(|name| environment.contains_key(OsStr::new(name)));
+
+        if let Some(token) = token_in_environment {
+            if token.is_empty() {
+                return Err(AuthorityError::new(
+                    ParentRootReject::HandoffInvalid,
+                    "inherited child handoff token is empty",
+                ));
+            }
+            let token = SecretToken::from_untrusted(token);
+            if self
+                .child_handoff_token
+                .as_ref()
+                .is_some_and(|existing| existing != &token)
+            {
+                return Err(AuthorityError::new(
+                    ParentRootReject::HandoffInvalid,
+                    "inherited child handoff token conflicts with the request",
+                ));
+            }
+            self.child_handoff_token = Some(token);
+        }
+
+        if child_context && self.child_handoff_token.is_none() {
+            return Err(AuthorityError::new(
+                ParentRootReject::HandoffInvalid,
+                "child environment is missing its handoff token",
+            ));
+        }
+
+        if self.child_handoff_token.is_some() {
+            let inherited_purpose = audience.or(child_purpose);
+            if let Some(purpose) = inherited_purpose {
+                self.purpose = NonEmptyTrimmedString::new(purpose).map_err(|_| {
+                    AuthorityError::new(
+                        ParentRootReject::HandoffInvalid,
+                        "inherited child handoff purpose is invalid",
+                    )
+                })?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn environment_text(
+    environment: &BTreeMap<OsString, OsString>,
+    name: &str,
+) -> Result<Option<String>, AuthorityError> {
+    environment
+        .get(OsStr::new(name))
+        .map(|value| {
+            value.to_str().map(str::to_owned).ok_or_else(|| {
+                AuthorityError::new(
+                    ParentRootReject::HandoffInvalid,
+                    "inherited child environment value is not UTF-8",
+                )
+            })
+        })
+        .transpose()
+}
+
+fn environment_path(environment: &BTreeMap<OsString, OsString>, name: &str) -> Option<PathBuf> {
+    environment
+        .get(OsStr::new(name))
+        .and_then(|value| value.to_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
 /// Input for issuing one purpose-bound child token.
 #[derive(Clone, Debug)]
 pub struct ChildHandoffRequest {
@@ -674,6 +783,80 @@ impl ParentRootAttestor {
         platform::attest(request)
     }
 
+    /// Attest a request after capturing the established process environment.
+    ///
+    /// Child markers are treated as a handoff context and cannot fall back to an
+    /// ordinary parent-root attestation when their single-use token is absent.
+    pub fn attest_from_process_environment(
+        &self,
+        request: &AttestationRequest,
+    ) -> Result<AttestedParent, AuthorityError> {
+        let environment = env::vars_os().collect::<BTreeMap<_, _>>();
+        self.attest_with_environment(request, &environment)
+    }
+
+    /// Attest the explicit parent selected by the established parent-root environment.
+    ///
+    /// This convenience path models the legacy parent-owned writer request. Call
+    /// [`Self::attest_from_process_environment`] with a fully populated request when
+    /// source, clone, marker, or expected-identity bindings are required; handoffs with
+    /// omitted bindings fail validation rather than dropping those token bindings.
+    pub fn attest_parent_from_process_environment(
+        &self,
+        purpose: NonEmptyTrimmedString,
+        nonce: Nonce128,
+    ) -> Result<AttestedParent, AuthorityError> {
+        let environment = env::vars_os().collect::<BTreeMap<_, _>>();
+        self.attest_parent_with_environment(purpose, nonce, &environment)
+    }
+
+    fn attest_parent_with_environment(
+        &self,
+        purpose: NonEmptyTrimmedString,
+        nonce: Nonce128,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<AttestedParent, AuthorityError> {
+        let configured_root = environment_path(&environment, "AGENT_CANON_PARENT_ROOT")
+            .ok_or_else(|| {
+                AuthorityError::new(
+                    ParentRootReject::HandoffInvalid,
+                    "explicit parent root is required",
+                )
+            })?;
+        let parent_root = fs::canonicalize(configured_root).map_err(|_| {
+            AuthorityError::new(
+                ParentRootReject::RootMissing,
+                "explicit parent root cannot be resolved",
+            )
+        })?;
+        let request = AttestationRequest {
+            cwd: parent_root.clone(),
+            explicit_root: Some(parent_root),
+            source_root: None,
+            clone_root: None,
+            topic_marker: None,
+            gitmodules: None,
+            owner_evidence: None,
+            expected_remote: None,
+            expected_module_digest: None,
+            child_handoff_token: None,
+            purpose,
+            nonce,
+        };
+        self.attest_with_environment(&request, environment)
+    }
+
+    fn attest_with_environment(
+        &self,
+        request: &AttestationRequest,
+        environment: &BTreeMap<OsString, OsString>,
+    ) -> Result<AttestedParent, AuthorityError> {
+        let mut request = request.clone();
+        request.capture_environment(environment)?;
+        let active_root = environment_path(environment, "AGENT_CANON_ACTIVE_REPOSITORY_ROOT");
+        platform::attest_with_active_repository_root(&request, active_root.as_deref())
+    }
+
     pub fn issue_child_handoff(
         &self,
         request: &ChildHandoffRequest,
@@ -706,16 +889,18 @@ impl ParentRootAttestor {
 #[cfg(target_os = "linux")]
 mod platform {
     pub(crate) use super::linux::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        atomic_replace_parent_owned_file, attest, attest_with_active_repository_root,
+        issue_child_handoff, read_parent_owned_file, resolve_parent_owned_path,
+        verify_live_identity, write_parent_owned_file,
     };
 }
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
     pub(crate) use super::unsupported::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        atomic_replace_parent_owned_file, attest, attest_with_active_repository_root,
+        issue_child_handoff, read_parent_owned_file, resolve_parent_owned_path,
+        verify_live_identity, write_parent_owned_file,
     };
 }
 
@@ -743,5 +928,119 @@ fn hex_nibble(value: u8) -> Option<u8> {
         b'a'..=b'f' => Some(value - b'a' + 10),
         b'A'..=b'F' => Some(value - b'A' + 10),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod environment_capture_tests {
+    use super::*;
+
+    fn environment(entries: &[(&str, &str)]) -> BTreeMap<OsString, OsString> {
+        entries
+            .iter()
+            .map(|(key, value)| (OsString::from(key), OsString::from(value)))
+            .collect()
+    }
+
+    fn request() -> AttestationRequest {
+        AttestationRequest {
+            cwd: PathBuf::from("/cwd"),
+            explicit_root: None,
+            source_root: Some(PathBuf::from("/source-binding")),
+            clone_root: Some(PathBuf::from("/clone-binding")),
+            topic_marker: Some(PathBuf::from("/marker.json")),
+            gitmodules: Some(PathBuf::from("/.gitmodules")),
+            owner_evidence: Some(PathBuf::from("/owner.json")),
+            expected_remote: Some("https://example.invalid/repository.git".into()),
+            expected_module_digest: Some(Sha256Digest::from_bytes([7; 32])),
+            child_handoff_token: None,
+            purpose: NonEmptyTrimmedString::new("inventory-parent").unwrap(),
+            nonce: Nonce128::from_bytes([1; 16]),
+        }
+    }
+
+    #[test]
+    fn parent_root_precedence_and_existing_bindings_survive_capture() {
+        let mut request = request();
+        request.explicit_root = Some(PathBuf::from("/explicit-root"));
+        let environment = environment(&[
+            ("AGENT_CANON_PARENT_ROOT", "/environment-root"),
+            ("AGENT_CANON_SOURCE_ROOT", "/runtime-source"),
+        ]);
+
+        request
+            .capture_environment(&environment)
+            .expect("capture parent-only environment");
+
+        assert_eq!(request.explicit_root, Some(PathBuf::from("/explicit-root")));
+        assert_eq!(request.source_root, Some(PathBuf::from("/source-binding")));
+        assert_eq!(request.clone_root, Some(PathBuf::from("/clone-binding")));
+        assert_eq!(request.topic_marker, Some(PathBuf::from("/marker.json")));
+        assert_eq!(request.gitmodules, Some(PathBuf::from("/.gitmodules")));
+        assert_eq!(request.owner_evidence, Some(PathBuf::from("/owner.json")));
+        assert_eq!(
+            request.expected_remote.as_deref(),
+            Some("https://example.invalid/repository.git")
+        );
+        assert_eq!(
+            request.expected_module_digest,
+            Some(Sha256Digest::from_bytes([7; 32]))
+        );
+        assert_eq!(request.purpose.as_str(), "inventory-parent");
+    }
+
+    #[test]
+    fn parent_root_environment_fills_only_an_unset_explicit_root() {
+        let mut request = request();
+        let environment = environment(&[("AGENT_CANON_PARENT_ROOT", "/environment-root")]);
+
+        request
+            .capture_environment(&environment)
+            .expect("capture parent root from process environment");
+
+        assert_eq!(
+            request.explicit_root,
+            Some(PathBuf::from("/environment-root"))
+        );
+    }
+
+    #[test]
+    fn child_markers_require_a_token_even_when_parent_root_is_set() {
+        let mut request = request();
+        let environment = environment(&[
+            ("AGENT_CANON_PARENT_ROOT", "/parent"),
+            ("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", "/parent"),
+            ("AGENT_CANON_CHILD_PURPOSE", "log-surface-inventory"),
+            ("AGENT_CANON_HANDOFF_AUDIENCE", "inventory-parent"),
+        ]);
+
+        let rejected = request
+            .capture_environment(&environment)
+            .expect_err("child environment cannot fall back to parent-root attestation");
+
+        assert_eq!(rejected.reject, ParentRootReject::HandoffInvalid);
+    }
+
+    #[test]
+    fn handoff_audience_is_captured_without_replacing_source_bindings() {
+        let mut request = request();
+        let environment = environment(&[
+            ("AGENT_CANON_CHILD_HANDOFF", "opaque-token"),
+            ("AGENT_CANON_HANDOFF_AUDIENCE", "inventory-parent"),
+            ("AGENT_CANON_CHILD_PURPOSE", "log-surface-inventory"),
+            ("AGENT_CANON_SOURCE_ROOT", "/runtime-source"),
+        ]);
+
+        request
+            .capture_environment(&environment)
+            .expect("capture authenticated child context");
+
+        assert_eq!(request.purpose.as_str(), "inventory-parent");
+        assert_eq!(request.source_root, Some(PathBuf::from("/source-binding")));
+        assert_eq!(request.clone_root, Some(PathBuf::from("/clone-binding")));
+        assert_eq!(
+            request.child_handoff_token.unwrap().expose_for_transport(),
+            "opaque-token"
+        );
     }
 }

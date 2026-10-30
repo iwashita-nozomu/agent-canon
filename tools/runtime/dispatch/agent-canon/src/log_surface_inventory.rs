@@ -3,6 +3,7 @@
 // responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 // upstream implementation ../../../archive/log_surface_inventory.py frozen scanner and output contract
 // upstream implementation python_ast.rs Python source normalization and source positions
+// upstream implementation authority/mod.rs captures and verifies inherited child authority context
 // downstream implementation main.rs exposes the stable log-surface-inventory command
 // downstream implementation ../../../../../tests/agent_tools/test_log_surface_inventory.py verifies extraction and baseline behavior
 // @dependency-end
@@ -11,7 +12,7 @@
 
 use crate::python_ast::{line_at_offset, normalize_python_newlines};
 use agent_canon::authority::{
-    AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor, ParentRootReject,
+    NonEmptyTrimmedString, Nonce128, ParentRootAttestor, ParentRootReject,
 };
 use regex::Regex;
 use rustpython_ast::{Ranged, Visitor};
@@ -1433,32 +1434,12 @@ fn write_unicode_escape(codepoint: u32, output: &mut String) {
 }
 
 fn write_parent_output(path: &Path, bytes: &[u8]) -> Result<(), ParentRootReject> {
-    let configured = env::var("AGENT_CANON_PARENT_ROOT")
-        .unwrap_or_default()
-        .trim()
-        .to_owned();
-    if configured.is_empty() {
-        return Err(ParentRootReject::HandoffInvalid);
-    }
-    let parent_root =
-        fs::canonicalize(Path::new(&configured)).map_err(|_| ParentRootReject::RootMissing)?;
     let purpose = NonEmptyTrimmedString::new(PURPOSE).map_err(|error| error.reject)?;
-    let request = AttestationRequest {
-        cwd: parent_root.clone(),
-        explicit_root: Some(parent_root),
-        source_root: None,
-        clone_root: None,
-        topic_marker: None,
-        gitmodules: None,
-        owner_evidence: None,
-        expected_remote: None,
-        expected_module_digest: None,
-        child_handoff_token: None,
-        purpose: purpose.clone(),
-        nonce: Nonce128::generate().map_err(|error| error.reject)?,
-    };
     let attested = ParentRootAttestor::new()
-        .attest(&request)
+        .attest_parent_from_process_environment(
+            purpose.clone(),
+            Nonce128::generate().map_err(|error| error.reject)?,
+        )
         .map_err(|error| error.reject)?;
     attested
         .write_parent_owned_file(path, bytes, purpose)

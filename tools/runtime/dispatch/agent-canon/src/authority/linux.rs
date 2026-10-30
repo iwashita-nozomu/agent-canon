@@ -58,6 +58,18 @@ const ALLOWED_OWNER_FIELDS: &[&str] = &[
 ];
 
 pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, AuthorityError> {
+    let ambient_root = env::var("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
+    let ambient_root = (!ambient_root.is_empty()).then(|| PathBuf::from(ambient_root));
+    attest_with_active_repository_root(request, ambient_root.as_deref())
+}
+
+pub(crate) fn attest_with_active_repository_root(
+    request: &AttestationRequest,
+    active_repository_root: Option<&Path>,
+) -> Result<AttestedParent, AuthorityError> {
     let cwd = open_physical_root(&request.cwd, ParentRootReject::RootMissing)?;
     let (root, precedence) = match request.explicit_root.as_deref() {
         Some(explicit_path) => {
@@ -102,12 +114,8 @@ pub(crate) fn attest(request: &AttestationRequest) -> Result<AttestedParent, Aut
         }
     };
 
-    let ambient_root = env::var("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
-        .unwrap_or_default()
-        .trim()
-        .to_owned();
-    if !ambient_root.is_empty() {
-        let ambient = open_physical_root(Path::new(&ambient_root), ParentRootReject::RootMissing)?;
+    if let Some(active_repository_root) = active_repository_root {
+        let ambient = open_physical_root(active_repository_root, ParentRootReject::RootMissing)?;
         if ambient.path != root.path {
             return Err(error(
                 ParentRootReject::RootMismatch,
@@ -2959,6 +2967,112 @@ mod parent_file_tests {
             .attest(&request)
             .expect("attest temporary Git root");
         (root, attested)
+    }
+
+    fn environment(entries: &[(&str, &str)]) -> BTreeMap<OsString, OsString> {
+        entries
+            .iter()
+            .map(|(key, value)| (OsString::from(key), OsString::from(value)))
+            .collect()
+    }
+
+    #[test]
+    fn parent_only_and_child_environment_writes_use_the_attested_purpose() {
+        let root = GitTempRoot::new();
+        let attestor = ParentRootAttestor::new();
+        let parent_environment =
+            environment(&[("AGENT_CANON_PARENT_ROOT", root.path().to_str().unwrap())]);
+        let parent = attestor
+            .attest_parent_with_environment(
+                NonEmptyTrimmedString::new("log-surface-inventory").unwrap(),
+                Nonce128::generate().unwrap(),
+                &parent_environment,
+            )
+            .expect("parent-only environment remains supported");
+        let write_purpose = NonEmptyTrimmedString::new("log-surface-inventory").unwrap();
+        let parent_receipt = parent
+            .write_parent_owned_file(
+                Path::new("reports/parent-inventory.json"),
+                b"parent-only\n",
+                write_purpose.clone(),
+            )
+            .expect("publish through parent-only authority");
+        assert_eq!(
+            parent.read_parent_owned_file(&parent_receipt).unwrap(),
+            b"parent-only\n"
+        );
+
+        let child_markers = [
+            ("AGENT_CANON_PARENT_ROOT", root.path().to_str().unwrap()),
+            (
+                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+                root.path().to_str().unwrap(),
+            ),
+            ("AGENT_CANON_PARENT_ROOT_DEV", "1"),
+            ("AGENT_CANON_PARENT_ROOT_INO", "1"),
+            ("AGENT_CANON_CHILD_PURPOSE", "inventory-child"),
+            ("AGENT_CANON_HANDOFF_AUDIENCE", "inventory-parent"),
+            ("AGENT_CANON_SOURCE_ROOT", "/runtime-source"),
+        ];
+        let missing = attestor
+            .attest_parent_with_environment(
+                NonEmptyTrimmedString::new("log-surface-inventory").unwrap(),
+                Nonce128::generate().unwrap(),
+                &environment(&child_markers),
+            )
+            .expect_err("child markers cannot fall back to a parent-only attestation");
+        assert_eq!(missing.reject, ParentRootReject::HandoffInvalid);
+
+        let mut forged_environment = child_markers
+            .iter()
+            .map(|(key, value)| (OsString::from(key), OsString::from(value)))
+            .collect::<BTreeMap<_, _>>();
+        forged_environment.insert(
+            OsString::from("AGENT_CANON_CHILD_HANDOFF"),
+            OsString::from("forged-token"),
+        );
+        let forged = attestor
+            .attest_parent_with_environment(
+                NonEmptyTrimmedString::new("log-surface-inventory").unwrap(),
+                Nonce128::generate().unwrap(),
+                &forged_environment,
+            )
+            .expect_err("forged child token must be rejected");
+        assert_eq!(forged.reject, ParentRootReject::HandoffInvalid);
+
+        let handoff_request = ChildHandoffRequest::new(
+            root.path(),
+            NonEmptyTrimmedString::new("inventory-parent").unwrap(),
+        );
+        let handoff = attestor
+            .issue_child_handoff(&handoff_request)
+            .expect("issue signed child handoff");
+        forged_environment.insert(
+            OsString::from("AGENT_CANON_CHILD_HANDOFF"),
+            OsString::from(handoff.token().expose_for_transport()),
+        );
+        let child = attestor
+            .attest_parent_with_environment(
+                NonEmptyTrimmedString::new("log-surface-inventory").unwrap(),
+                Nonce128::generate().unwrap(),
+                &forged_environment,
+            )
+            .expect("verify signed child environment");
+        assert_eq!(
+            child.handoff().unwrap().audience.as_str(),
+            "inventory-parent"
+        );
+        let child_receipt = child
+            .write_parent_owned_file(
+                Path::new("reports/child-inventory.json"),
+                b"child-authorized\n",
+                write_purpose,
+            )
+            .expect("publish through the signed child capability");
+        assert_eq!(
+            child.read_parent_owned_file(&child_receipt).unwrap(),
+            b"child-authorized\n"
+        );
     }
 
     struct ShortFileWriter<'a> {

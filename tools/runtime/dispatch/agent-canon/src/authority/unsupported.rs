@@ -8,6 +8,13 @@ pub(crate) fn attest(_: &AttestationRequest) -> Result<AttestedParent, Authority
     Err(unsupported())
 }
 
+pub(crate) fn attest_with_active_repository_root(
+    _: &AttestationRequest,
+    _: Option<&Path>,
+) -> Result<AttestedParent, AuthorityError> {
+    Err(unsupported())
+}
+
 pub(crate) fn issue_child_handoff(
     _: &ChildHandoffRequest,
 ) -> Result<ChildHandoffReceipt, AuthorityError> {

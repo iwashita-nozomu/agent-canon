@@ -32,6 +32,15 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             text=True,
         )
         environment = dict(os.environ)
+        for name in (
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+            "AGENT_CANON_PARENT_ROOT_DEV",
+            "AGENT_CANON_PARENT_ROOT_INO",
+            "AGENT_CANON_CHILD_HANDOFF",
+            "AGENT_CANON_CHILD_PURPOSE",
+            "AGENT_CANON_HANDOFF_AUDIENCE",
+        ):
+            environment.pop(name, None)
         environment["AGENT_CANON_PARENT_ROOT"] = str(root)
         return environment
 
