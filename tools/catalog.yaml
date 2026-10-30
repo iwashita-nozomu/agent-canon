@@ -1306,12 +1306,12 @@ entries:
   - id: check-semantic-responsibility-contract
     public: true
     summary: Validates semantic responsibility contract schema, identity, and references.
-    path: tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"]}
+    command: tools/bin/agent-canon check-semantic-responsibility-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-semantic-responsibility-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -1319,7 +1319,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/check_semantic_responsibility_contract.md
+      - documents/tools/semantic_responsibility.md
       - documents/design/semantic-responsibility-contract.md
     tests:
       - tests/agent_tools/test_check_semantic_responsibility_contract.py
