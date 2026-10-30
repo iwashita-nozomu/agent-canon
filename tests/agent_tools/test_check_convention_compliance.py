@@ -123,7 +123,8 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
         "tool_catalog.rs tool_drift.py notebook_quality.py "
-        "check_runtime_profile_inventory.py tool_rejection_preflight.py "
+        "agent-canon docs render-runtime-profile agent-canon docs check "
+        "tool_rejection_preflight.py "
         "responsibility_scope responsibility-scope.toml protecting tools\n"
     ),
     "tools/validation/semantic/tools/tool_rejection_preflight.py": "preflight owner\n",
@@ -272,7 +273,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.rs tool_drift.py notebook_quality.py "
-        "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
+        "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
         'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
