@@ -267,6 +267,10 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     bundle_digest_before_collision = hashlib.sha256(
         bundle_manifest.read_bytes()
     ).hexdigest()
+    bundle_agents = bundle / "AGENTS.md"
+    bundle_agents_before_collision = (
+        bundle_agents.read_bytes() if bundle_agents.exists() else None
+    )
     for invalid_codex_home in (bundle, bundle / "nested-codex-home"):
         collision = subprocess.run(
             [*bundle_common, "codex", "bundle-install"],
@@ -278,7 +282,9 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         )
         assert collision.returncode == 2
         assert "codex_install_path_invalid" in collision.stderr
-        assert not (bundle / "AGENTS.md").exists()
+        assert (
+            bundle_agents.read_bytes() if bundle_agents.exists() else None
+        ) == bundle_agents_before_collision
         if invalid_codex_home != bundle:
             assert not invalid_codex_home.exists()
         assert not list(runtime_root.glob(".bootstrap.stdout.*"))
