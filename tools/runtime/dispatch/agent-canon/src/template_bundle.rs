@@ -1904,11 +1904,7 @@ fn native_layout(
         .iter()
         .map(|entry| entry.path.as_str())
         .collect::<BTreeSet<_>>();
-    if layout.len() != declared.len()
-        || layout
-            .iter()
-            .any(|(path, _)| !declared.contains(path.as_str()))
-    {
+    if layout.len() != declared.len() || layout.iter().any(|(path, _)| !declared.contains(path)) {
         return Err(bundle_error(
             "native CLI package layout must cover its declared resources",
         ));
@@ -2202,7 +2198,12 @@ fn native_archive_payload(path: &Path, prefix: &str) -> BundleResult<Payload> {
             if file_type != 0o100000 {
                 return Err(bundle_error("native archive member is not regular"));
             }
-            let name = member.name().to_owned();
+            let name = member
+                .name()
+                .map_err(|_| {
+                    bundle_error(format!("native archive is unreadable: {}", path.display()))
+                })?
+                .into_owned();
             let mut content = Vec::new();
             member.read_to_end(&mut content).map_err(|_| {
                 bundle_error(format!("native archive is unreadable: {}", path.display()))

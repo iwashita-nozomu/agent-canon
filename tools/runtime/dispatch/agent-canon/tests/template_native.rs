@@ -452,7 +452,7 @@ fn native_package_roundtrips_with_reproducible_metadata_and_source_receipts() {
         assert_eq!((member.external_attributes() >> 16) & 0o170000, 0o100000);
         let mut content = Vec::new();
         member.read_to_end(&mut content).unwrap();
-        let name = member.name().to_owned();
+        let name = member.name().expect("valid ZIP member name").into_owned();
         if name.ends_with("/bin/agent-canon") {
             assert_eq!((member.external_attributes() >> 16) & 0o777, 0o755);
             assert_eq!(content, b"fixture native executable\n");
