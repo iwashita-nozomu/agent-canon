@@ -1017,8 +1017,7 @@ mod tests {
             .collect::<Vec<_>>();
         let projection = result.as_json();
 
-        let expected = Value::Array(expected);
-        assert_eq!(projection["owner_sections"], expected);
+        assert_eq!(projection["owner_sections"].as_array().unwrap(), &expected);
         assert_eq!(projection["implementation_read"], "ready");
         assert_eq!(
             projection
