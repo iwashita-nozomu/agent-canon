@@ -44,6 +44,7 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod result_logs;
 mod rule_inventory;
+mod run_log_contract;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
@@ -72,6 +73,7 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
@@ -117,6 +119,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-run-log-contract" {
+        std::process::exit(run_log_contract::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {

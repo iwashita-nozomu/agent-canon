@@ -1,30 +1,42 @@
 # @dependency-start
 # contract test
 # responsibility Tests run-log contract checker behavior.
-# upstream implementation ../../tools/validation/semantic/logging/check_run_log_contract.py checker under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_log_contract.rs checker under test
 # @dependency-end
-"""Tests for ``check_run_log_contract.py``."""
+"""Tests for the native run-log contract checker."""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "logging" / "check_run_log_contract.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class CheckRunLogContractTest(unittest.TestCase):
     """Verify run-log contract findings."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker against a temporary root."""
+        """Run the selected native CLI against a temporary root."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
-            [sys.executable, str(TOOL), "--root", str(root), "--format", "json", *args],
+            [
+                AGENT_CANON_CLI,
+                "check-run-log-contract",
+                "--root",
+                str(root),
+                "--format",
+                "json",
+                *args,
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -117,7 +129,9 @@ class CheckRunLogContractTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["findings"], 1)
-            self.assertEqual(payload["findings"][0]["code"], "iteration-log-without-info")
+            self.assertEqual(
+                payload["findings"][0]["code"], "iteration-log-without-info"
+            )
 
     def test_iteration_submit_info_passes(self) -> None:
         """submit_info can emit iteration records from the same Info type."""
@@ -171,7 +185,9 @@ class CheckRunLogContractTest(unittest.TestCase):
             result = self.run_checker(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            codes = {finding["code"] for finding in json.loads(result.stdout)["findings"]}
+            codes = {
+                finding["code"] for finding in json.loads(result.stdout)["findings"]
+            }
             self.assertIn("direct-run-log-writer-import", codes)
             self.assertIn("direct-run-log-writer-call", codes)
 
@@ -180,14 +196,18 @@ class CheckRunLogContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "solver.py"
-            source.write_text("_KKT_INFO_FIELD_NAMES = {'res_norm': 'res_norm'}\n", encoding="utf-8")
+            source.write_text(
+                "_KKT_INFO_FIELD_NAMES = {'res_norm': 'res_norm'}\n", encoding="utf-8"
+            )
 
             result = self.run_checker(root, str(source))
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["findings"], 1)
-            self.assertEqual(payload["findings"][0]["code"], "summary-field-list-constant")
+            self.assertEqual(
+                payload["findings"][0]["code"], "summary-field-list-constant"
+            )
 
     def test_run_log_internal_module_is_allowed(self) -> None:
         """The base run-log implementation can define low-level helpers."""
