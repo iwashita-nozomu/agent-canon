@@ -21,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 
@@ -1307,7 +1307,7 @@ fn resolve_baseline_path(root: &Path, baseline: &Path) -> PathBuf {
 fn render_check_failure(diff: &BaselineDiff, baseline_path: &Path) -> String {
     let mut lines = vec![
         "LOG_SURFACE_INVENTORY=fail".to_owned(),
-        format!("LOG_SURFACE_BASELINE={baseline_path}"),
+        format!("LOG_SURFACE_BASELINE={}", baseline_path.display()),
         format!("LOG_SURFACE_ADDED={}", diff.added.len()),
         format!("LOG_SURFACE_REMOVED={}", diff.removed.len()),
     ];
@@ -1462,6 +1462,7 @@ fn write_parent_output(path: &Path, bytes: &[u8]) -> Result<(), ParentRootReject
         .map_err(|error| error.reject)?;
     attested
         .write_parent_owned_file(path, bytes, purpose)
+        .map(|_| ())
         .map_err(|error| error.reject)
 }
 
