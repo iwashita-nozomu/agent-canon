@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::LazyLock;
 
+use regex::Regex;
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value as JsonValue};
@@ -10,13 +12,13 @@ use yaml_rust2::{Yaml, YamlLoader};
 
 pub type CapabilityId = String;
 
-const SKILL_CATALOG_PATH: &str = "agents/skills/catalog.yaml";
-const SKILL_DEPENDENCY_MAP_PATH: &str = "agents/skills/skill-dependencies.yaml";
-const TOOL_CATALOG_PATH: &str = "tools/catalog.yaml";
-const CATALOG_SCHEMA_ROOT: &str = "schemas/agent-canon";
-const PRIVATE_SKILL_PREFIX: &str = "_";
+pub const SKILL_CATALOG_PATH: &str = "agents/skills/catalog.yaml";
+pub const SKILL_DEPENDENCY_MAP_PATH: &str = "agents/skills/skill-dependencies.yaml";
+pub const TOOL_CATALOG_PATH: &str = "tools/catalog.yaml";
+pub const CATALOG_SCHEMA_ROOT: &str = "schemas/agent-canon";
+pub const PRIVATE_SKILL_PREFIX: &str = "_";
 
-const CATALOG_SCHEMA_PATHS: [(&str, &str); 3] = [
+pub const CATALOG_SCHEMA_PATHS: [(&str, &str); 3] = [
     (
         SKILL_CATALOG_PATH,
         "schemas/agent-canon/skill-catalog.schema.json",
@@ -30,6 +32,10 @@ const CATALOG_SCHEMA_PATHS: [(&str, &str); 3] = [
         "schemas/agent-canon/tool-catalog.schema.json",
     ),
 ];
+
+/// Capability identifiers contain lowercase ASCII letters, digits, and underscores.
+pub static CAPABILITY_ID_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\A[a-z0-9_]+\z").expect("static capability id regex"));
 
 /// An insertion-ordered map with no public mutation operations.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -229,7 +235,7 @@ fn yaml_string_sequence(value: Option<&Yaml>, field: &str) -> Result<Vec<String>
         .collect()
 }
 
-fn load_skill_catalog(root: &Path) -> Result<Yaml, String> {
+pub fn load_skill_catalog(root: &Path) -> Result<Yaml, String> {
     let path = root.join(SKILL_CATALOG_PATH);
     let text = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
     YamlLoader::load_from_str(&text)
@@ -680,11 +686,7 @@ pub fn derive_skill_invocation_order(
 /// Normalizes and validates one explicit capability identifier.
 pub fn capability_id_from_raw(value: &str) -> Result<CapabilityId, String> {
     let raw = value.trim();
-    if raw.is_empty()
-        || !raw
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-    {
+    if raw.is_empty() || !CAPABILITY_ID_RE.is_match(raw) {
         return Err(format!("invalid-capability-id:{value}"));
     }
     Ok(raw.to_owned())

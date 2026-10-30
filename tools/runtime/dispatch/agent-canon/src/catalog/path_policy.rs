@@ -1,5 +1,12 @@
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
+
+use regex::Regex;
+
+/// Token splitting pattern retained for callers of the legacy path policy.
+pub static LEGACY_TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[^0-9A-Za-z]+|_").expect("static legacy token regex"));
 
 /// Returns true when any POSIX path component has `legacy` in its stem.
 ///

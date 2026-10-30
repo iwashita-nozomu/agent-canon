@@ -7,10 +7,11 @@
 #[path = "../src/catalog/mod.rs"]
 mod catalog;
 
-use catalog::path_policy;
+use catalog::path_policy::{self, LEGACY_TOKEN_RE};
 use catalog::skill_routes::{
-    build_capability_index, capability_routes, derive_skill_invocation_order,
+    build_capability_index, capability_routes, derive_skill_invocation_order, load_skill_catalog,
     load_skill_route_rules, load_skill_route_rules_from_root, related_skill_candidates,
+    CAPABILITY_ID_RE, SKILL_DEPENDENCY_MAP_PATH,
 };
 use catalog::tool_catalog::{
     as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface,
@@ -61,6 +62,13 @@ impl Drop for TempRoot {
 
 #[test]
 fn retired_path_policy_keeps_legacy_lexical_rules() {
+    assert_eq!(
+        LEGACY_TOKEN_RE
+            .split("legacy_runner")
+            .filter(|token| !token.is_empty())
+            .collect::<Vec<_>>(),
+        vec!["legacy", "runner"]
+    );
     for path in [
         "./tools/old/Legacy.py",
         r".\tools\old\legacy_runner.sh",
@@ -396,6 +404,13 @@ fn valid_skill_root() -> TempRoot {
 #[test]
 fn skill_routes_preserve_capabilities_dependencies_and_candidate_only_semantics() {
     let root = valid_skill_root();
+    assert!(load_skill_catalog(root.path()).unwrap().as_hash().is_some());
+    assert_eq!(
+        SKILL_DEPENDENCY_MAP_PATH,
+        "agents/skills/skill-dependencies.yaml"
+    );
+    assert!(CAPABILITY_ID_RE.is_match("route_test"));
+    assert!(!CAPABILITY_ID_RE.is_match("route-test"));
     let rules = load_skill_route_rules(root.path()).unwrap();
     assert_eq!(rules.len(), 2);
     assert_eq!(

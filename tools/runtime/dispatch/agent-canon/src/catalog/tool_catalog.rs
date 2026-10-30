@@ -20,11 +20,11 @@ pub const TOOL_DOCS_PATH: &str = "documents/tools/tool-docs.toml";
 pub const PUBLIC_SURFACE_PRODUCER_VERSION: &str = "public-surface.v1";
 pub const TOOL_CLASSIFICATIONS: [&str; 5] = ["public", "internal", "compat", "retired", "example"];
 
-const DEFAULT_COMMAND_SOURCES: [&str; 2] = [
+pub const DEFAULT_COMMAND_SOURCES: [&str; 2] = [
     "tools/validation/ci/runners/run_all_checks.sh",
     "tools/validation/ci/checks/check_agent_canon_pr.sh",
 ];
-const ENTRY_WIRING_SOURCES: [&str; 6] = [
+pub const ENTRY_WIRING_SOURCES: [&str; 6] = [
     "tools/validation/ci/runners/run_all_checks.sh",
     "tools/validation/ci/checks/check_agent_canon_pr.sh",
     "eval/producers/run_accumulated_agent_evals.py",
@@ -32,7 +32,7 @@ const ENTRY_WIRING_SOURCES: [&str; 6] = [
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
 ];
-const CATALOG_DOCS: [&str; 4] = [
+pub const CATALOG_DOCS: [&str; 4] = [
     "tools/README.md",
     "documents/tools/README.md",
     TOOL_DOCS_PATH,
@@ -40,6 +40,10 @@ const CATALOG_DOCS: [&str; 4] = [
 ];
 const PUBLIC_TOOL_REFERENCE_PATTERN: &str =
     r"(?:^|[^A-Za-z0-9_./-])(tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b)";
+
+/// Catalog tool identifiers use lowercase kebab-case values.
+pub static ID_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").expect("static catalog id regex"));
 
 /// Regex matching default-wiring tool paths, with the path in capture group 1.
 pub static TOOL_REFERENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
@@ -423,15 +427,7 @@ fn check_entry(
 }
 
 fn valid_id(value: &str) -> bool {
-    if value.is_empty() || value.starts_with('-') || value.ends_with('-') {
-        return false;
-    }
-    value.split('-').all(|part| {
-        !part.is_empty()
-            && part
-                .bytes()
-                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
-    })
+    ID_RE.is_match(value)
 }
 
 fn read_existing_text(root: &Path, paths: &[&str]) -> String {
