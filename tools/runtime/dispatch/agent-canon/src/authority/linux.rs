@@ -13,8 +13,9 @@ use cap_std::fs::{
     PermissionsExt,
 };
 use hmac::{Hmac, Mac};
-use serde::de::{MapAccess, SeqAccess, Visitor};
+use serde::de::{MapAccess, Visitor};
 use serde::{Deserialize, Deserializer};
+use serde_json::value::RawValue;
 use serde_json::{Map, Number, Value};
 use sha2::Sha256;
 use std::collections::{BTreeMap, BTreeSet};
@@ -1011,66 +1012,45 @@ impl<'de> Deserialize<'de> for StrictValue {
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_any(StrictValueVisitor)
+        let raw = Box::<RawValue>::deserialize(deserializer)?;
+        let token = raw.get();
+        match token.trim_start().as_bytes().first().copied() {
+            Some(b'{') => {
+                let mut nested = serde_json::Deserializer::from_str(token);
+                let value = nested
+                    .deserialize_map(StrictObjectVisitor)
+                    .map_err(<D::Error as serde::de::Error>::custom)?;
+                nested
+                    .end()
+                    .map_err(<D::Error as serde::de::Error>::custom)?;
+                Ok(StrictValue(Value::Object(value)))
+            }
+            Some(b'[') => {
+                let values = serde_json::from_str::<Vec<StrictValue>>(token)
+                    .map_err(<D::Error as serde::de::Error>::custom)?;
+                Ok(StrictValue(Value::Array(
+                    values.into_iter().map(|value| value.0).collect(),
+                )))
+            }
+            Some(_) => {
+                let value = serde_json::from_str::<Value>(token)
+                    .map_err(<D::Error as serde::de::Error>::custom)?;
+                Ok(StrictValue(value))
+            }
+            None => Err(<D::Error as serde::de::Error>::custom(
+                "empty raw JSON value",
+            )),
+        }
     }
 }
 
-struct StrictValueVisitor;
+struct StrictObjectVisitor;
 
-impl<'de> Visitor<'de> for StrictValueVisitor {
-    type Value = StrictValue;
+impl<'de> Visitor<'de> for StrictObjectVisitor {
+    type Value = Map<String, Value>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a JSON value without duplicate object keys")
-    }
-
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::Bool(value)))
-    }
-
-    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::Number(Number::from(value))))
-    }
-
-    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::Number(Number::from(value))))
-    }
-
-    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Number::from_f64(value)
-            .map(Value::Number)
-            .map(StrictValue)
-            .ok_or_else(|| E::custom("non-finite JSON number"))
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::String(value.to_owned())))
-    }
-
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::String(value)))
-    }
-
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::Null))
-    }
-
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
-        Ok(StrictValue(Value::Null))
-    }
-
-    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let mut values = Vec::new();
-        while let Some(value) = sequence.next_element::<StrictValue>()? {
-            values.push(value.0);
-        }
-        Ok(StrictValue(Value::Array(values)))
+        formatter.write_str("a JSON object without duplicate keys")
     }
 
     fn visit_map<A>(self, mut mapping: A) -> Result<Self::Value, A::Error>
@@ -1083,7 +1063,7 @@ impl<'de> Visitor<'de> for StrictValueVisitor {
                 return Err(serde::de::Error::custom("duplicate JSON object key"));
             }
         }
-        Ok(StrictValue(Value::Object(values)))
+        Ok(values)
     }
 }
 
@@ -1204,7 +1184,11 @@ fn write_canonical_value(value: &Value, output: &mut Vec<u8>) {
             let number = value
                 .as_f64()
                 .expect("serde_json guarantees f64 for an f64 Number");
-            output.extend_from_slice(python_float_repr(number, &value.to_string()).as_bytes());
+            output.extend_from_slice(
+                rustpython_ast::Constant::Float(number)
+                    .to_string()
+                    .as_bytes(),
+            );
         }
         Value::Number(value) => output.extend_from_slice(value.to_string().as_bytes()),
         Value::String(value) => write_json_string(value, output),
@@ -1238,76 +1222,6 @@ fn write_canonical_value(value: &Value, output: &mut Vec<u8>) {
 fn write_json_string(value: &str, output: &mut Vec<u8>) {
     serde_json::to_writer(output, value)
         .expect("serializing a string into an in-memory byte vector is infallible");
-}
-
-fn python_float_repr(value: f64, shortest: &str) -> String {
-    if value == 0.0 {
-        return if value.is_sign_negative() {
-            "-0.0".into()
-        } else {
-            "0.0".into()
-        };
-    }
-
-    let (sign, unsigned) = shortest
-        .strip_prefix('-')
-        .map_or(("", shortest), |rest| ("-", rest));
-    let (mantissa, exponent) = unsigned
-        .split_once('e')
-        .or_else(|| unsigned.split_once('E'))
-        .map_or((unsigned, 0_i32), |(mantissa, exponent)| {
-            (
-                mantissa,
-                exponent.parse::<i32>().expect("finite f64 exponent"),
-            )
-        });
-    let (integer, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
-    let mut digits = format!("{integer}{fraction}");
-    let mut decimal_position = integer.len() as i32 + exponent;
-    while digits.starts_with('0') && digits.len() > 1 {
-        digits.remove(0);
-        decimal_position -= 1;
-    }
-    while digits.ends_with('0') && digits.len() > 1 {
-        digits.pop();
-    }
-
-    let mut result = String::with_capacity(shortest.len() + 20);
-    result.push_str(sign);
-    if (-3..=16).contains(&decimal_position) {
-        if decimal_position <= 0 {
-            result.push_str("0.");
-            result.extend(std::iter::repeat_n('0', (-decimal_position) as usize));
-            result.push_str(&digits);
-        } else if decimal_position as usize >= digits.len() {
-            result.push_str(&digits);
-            result.extend(std::iter::repeat_n(
-                '0',
-                decimal_position as usize - digits.len(),
-            ));
-            result.push_str(".0");
-        } else {
-            let split = decimal_position as usize;
-            result.push_str(&digits[..split]);
-            result.push('.');
-            result.push_str(&digits[split..]);
-        }
-    } else {
-        result.push(digits.as_bytes()[0] as char);
-        if digits.len() > 1 {
-            result.push('.');
-            result.push_str(&digits[1..]);
-        }
-        let scientific_exponent = decimal_position - 1;
-        result.push('e');
-        result.push(if scientific_exponent >= 0 { '+' } else { '-' });
-        let magnitude = scientific_exponent.unsigned_abs().to_string();
-        if magnitude.len() < 2 {
-            result.push('0');
-        }
-        result.push_str(&magnitude);
-    }
-    result
 }
 
 fn monotonic_now() -> f64 {
@@ -1979,4 +1893,35 @@ fn write_locked_state(
 
 fn error(reject: ParentRootReject, detail: impl Into<String>) -> AuthorityError {
     AuthorityError::new(reject, detail)
+}
+
+#[cfg(test)]
+mod strict_json_tests {
+    use super::*;
+
+    #[test]
+    fn raw_number_tokens_and_private_number_looking_objects_keep_their_json_kinds() {
+        let numeric = strict_json(br#"{"issued_at":1.25}"#, ParentRootReject::HandoffInvalid)
+            .expect("parse numeric timestamp");
+        assert_eq!(numeric["issued_at"].as_f64(), Some(1.25));
+
+        let literal_object = strict_json(
+            br#"{"$serde_json::private::Number":"1"}"#,
+            ParentRootReject::HandoffInvalid,
+        )
+        .expect("preserve literal private-number-looking object");
+        assert_eq!(
+            literal_object,
+            serde_json::json!({"$serde_json::private::Number": "1"})
+        );
+    }
+
+    #[test]
+    fn raw_object_parser_rejects_nested_duplicate_keys() {
+        assert!(strict_json(
+            br#"{"outer":{"value":1,"value":2}}"#,
+            ParentRootReject::HandoffInvalid,
+        )
+        .is_err());
+    }
 }
