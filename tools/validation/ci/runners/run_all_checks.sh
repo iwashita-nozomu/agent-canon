@@ -10,6 +10,7 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates structured tool catalog
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports catalog proof obligations
 # upstream implementation ../../semantic/tools/tool_drift.py validates tool/convention trace contracts
 # upstream implementation ../../semantic/responsibility/responsibility_scope.py validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation

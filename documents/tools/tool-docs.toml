@@ -211,7 +211,7 @@ id = "tool-proof-coverage"
 classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/tool_proof_coverage.rs"
 doc = "documents/tools/tool_proof_coverage.md"
-language = "python"
+language = "rust"
 summary = "Tool behavior and performance Lean proof-obligation coverage checker documentation."
 
 [[tool]]
