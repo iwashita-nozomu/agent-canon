@@ -2279,24 +2279,10 @@ fn nearest_existing_directory(path: &Path) -> Result<PathBuf, String> {
     fs::canonicalize(current).map_err(|error| format!("cannot resolve report root: {error}"))
 }
 
-fn is_filesystem_root(path: &Path) -> bool {
-    #[cfg(windows)]
-    {
-        let mut components = path.components();
-        matches!(components.next(), Some(Component::Prefix(_)))
-            && matches!(components.next(), Some(Component::RootDir))
-            && components.next().is_none()
-    }
-    #[cfg(not(windows))]
-    {
-        path == Path::new("/")
-    }
-}
-
 fn report_root_avoids_source(source: &Path, report_root: &Path) -> Result<(), String> {
-    if is_filesystem_root(report_root) || source.starts_with(report_root) {
+    if source.starts_with(report_root) {
         return Err(format!(
-            "runtime report root must not be a filesystem root or contain AgentCanon source: {}",
+            "runtime report root must not contain AgentCanon source: {}",
             report_root.display()
         ));
     }
@@ -2332,12 +2318,6 @@ fn runtime_boundary_for_report_root(
                 return Ok((boundary, resolved));
             }
             let parent = nearest_existing_directory(&normalized)?;
-            if is_filesystem_root(&parent) {
-                return Err(format!(
-                    "no narrow existing external boundary for report root {}",
-                    normalized.display()
-                ));
-            }
             let boundary = RuntimeArtifactBoundary::for_source(source, Some(&parent), false)?;
             let resolved = boundary.resolve(&normalized)?;
             report_root_avoids_source(source, &resolved)?;
