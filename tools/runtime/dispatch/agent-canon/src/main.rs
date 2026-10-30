@@ -14,6 +14,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
@@ -47,8 +48,10 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod result_logs;
 mod rule_inventory;
+mod run_log_contract;
 mod rust_migration_plan;
 mod semantic_index;
+mod semantic_responsibility;
 pub mod skill_document_reader;
 mod skill_projection_registry;
 mod structured_analysis;
@@ -77,10 +80,12 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -124,6 +129,10 @@ fn main() {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "check-run-log-contract" {
+        std::process::exit(run_log_contract::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
     }
@@ -135,6 +144,10 @@ fn main() {
         )
     {
         std::process::exit(rule_inventory::run(&args[1], &args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
+        std::process::exit(semantic_responsibility::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
