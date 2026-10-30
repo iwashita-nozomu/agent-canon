@@ -12,6 +12,7 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
+// downstream implementation native_release.rs owns source-bound native releases
 // downstream implementation template_bundle.rs owns native template package operations
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -25,6 +26,7 @@ pub mod artifacts;
 pub mod catalog;
 pub mod code_template_rendering;
 pub mod entrypoint_composer;
+pub mod native_release;
 pub mod private_feedback;
 pub mod runtime_boundary;
 pub mod template_bundle;

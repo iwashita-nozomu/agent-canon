@@ -94,7 +94,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     control = tmp_path / "control"
     repository = tmp_path / "agent-canon"
     source_worktree = tmp_path / "agent-canon-worktree"
-    bundle = tmp_path / "codex-plugin"
+    bundle = control / ".runtime" / "codex-plugin"
     codex_home = tmp_path / "codex-home"
     trusted = tmp_path / "trusted-project"
     untrusted = tmp_path / "untrusted-project"
@@ -109,6 +109,9 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         ["git", "-C", str(repository), "remote", "set-url", "origin", str(repository)],
         check=True,
     )
+    runtime_root = control / ".runtime"
+    native_target_dir = runtime_root / "tasks" / "bootstrap-native-cargo"
+    native_binary = native_target_dir / "debug" / "agent-canon"
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
     environment = {
@@ -119,6 +122,8 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(state_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
+        "FAKE_DOCKER_NATIVE_BIN": str(native_binary),
+        "AGENT_CANON_RUNTIME_ROOT": str(control / ".runtime"),
     }
     source_common = [
         str(repository / "bootstrap.sh"),
@@ -137,6 +142,31 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         timeout=120,
     )
     assert installed.returncode == 0, installed.stderr
+    cargo_home = Path(
+        os.environ.get("CARGO_HOME", str(runtime_root / "cache" / "cargo-home"))
+    )
+    cargo_home.mkdir(parents=True, exist_ok=True)
+    native_build = subprocess.run(
+        [
+            "cargo",
+            "build",
+            "--locked",
+            "--manifest-path",
+            str(repository / "tools/runtime/dispatch/agent-canon/Cargo.toml"),
+            "--target-dir",
+            str(native_target_dir),
+        ],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "CARGO_HOME": str(cargo_home),
+            "CARGO_TARGET_DIR": str(native_target_dir),
+        },
+    )
+    assert native_build.returncode == 0, native_build.stdout + native_build.stderr
     subprocess.run(
         [
             "git",
@@ -169,9 +199,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     source_hooks = json.loads(
         (source_worktree / ".codex/hooks.json").read_text(encoding="utf-8")
     )
-    source_command = source_hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0][
-        "command"
-    ]
+    source_command = source_hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
     source_roots = (repository, source_worktree)
     source_bytecode_before = {
         (str(root), path.relative_to(root).as_posix())
@@ -208,7 +236,6 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         for path in root.rglob("__pycache__")
     }
     assert source_bytecode_after == source_bytecode_before
-    runtime_root = control / ".runtime"
     assert not list(runtime_root.glob(".bootstrap.stdout.*"))
     assert not list(runtime_root.glob(".bootstrap.stderr.*"))
     assert not list(runtime_root.glob(".manifest-projection.*"))
@@ -237,8 +264,8 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
 
     exported = subprocess.run(
         [
-            sys.executable,
-            str(repository / "tools/agent/templates/template_bundle.py"),
+            str(native_binary),
+            "template-bundle",
             "export",
             "--source-root",
             str(repository),
@@ -256,7 +283,11 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     )
     assert exported.returncode == 0, exported.stderr
 
-    bundle_common = [str(bundle / "bootstrap.sh"), "--control-parent-root", str(control)]
+    bundle_common = [
+        str(bundle / "bootstrap.sh"),
+        "--control-parent-root",
+        str(control),
+    ]
     bundle_manifest = bundle / "codex-user-bundle.json"
     bundle_digest_before_collision = hashlib.sha256(
         bundle_manifest.read_bytes()
@@ -284,8 +315,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
 
     global_links = control / ".runtime" / "container-state" / "global-links.tsv"
     link_record = (
-        f"link\t{home / '.agents/skills'}\t"
-        f"{repository / '.codex/personal/skills'}\n"
+        f"link\t{home / '.agents/skills'}\t{repository / '.codex/personal/skills'}\n"
     )
     config_record = (
         f"config\t{codex_home / 'config.toml'}\t"
@@ -316,15 +346,21 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     assert link_record.rstrip("\n") in manifest_lines
     assert config_record.rstrip("\n") in manifest_lines
     bundle_records = [
-        line for line in global_links.read_text(encoding="utf-8").splitlines()
+        line
+        for line in global_links.read_text(encoding="utf-8").splitlines()
         if line.startswith("bundle-file\t")
     ]
     assert len(bundle_records) == install_receipt["files"]
     assert all(line.split("\t")[3] == "644" for line in bundle_records)
     installed_guidance = codex_home / "AGENTS.md"
     installed_agent = codex_home / "agents" / "agent-canon-worker.toml"
-    assert installed_guidance.read_bytes() == (bundle / "guidance/AGENTS.md").read_bytes()
-    assert installed_agent.read_bytes() == (bundle / "agents/agent-canon-worker.toml").read_bytes()
+    assert (
+        installed_guidance.read_bytes() == (bundle / "guidance/AGENTS.md").read_bytes()
+    )
+    assert (
+        installed_agent.read_bytes()
+        == (bundle / "agents/agent-canon-worker.toml").read_bytes()
+    )
 
     repeated_install = subprocess.run(
         [*bundle_common, "codex", "bundle-install"],
@@ -335,12 +371,16 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         timeout=120,
     )
     assert repeated_install.returncode == 0, repeated_install.stderr
-    assert len(
-        [
-            line for line in global_links.read_text(encoding="utf-8").splitlines()
-            if line.startswith("bundle-file\t")
-        ]
-    ) == install_receipt["files"]
+    assert (
+        len(
+            [
+                line
+                for line in global_links.read_text(encoding="utf-8").splitlines()
+                if line.startswith("bundle-file\t")
+            ]
+        )
+        == install_receipt["files"]
+    )
 
     def run_hook(project: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -6273,9 +6313,7 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
                 "AGENT_CANON_RUNTIME_DESTINATION",
             }:
                 shell_destinations[key] = value
-        codex_container_home = shell_destinations[
-            "AGENT_CANON_CODEX_HOME_DESTINATION"
-        ]
+        codex_container_home = shell_destinations["AGENT_CANON_CODEX_HOME_DESTINATION"]
         container_runtime_root = shell_destinations["AGENT_CANON_RUNTIME_DESTINATION"]
         for entry in managed:
             target = codex_home / Path(entry["target"]).relative_to(
@@ -6390,9 +6428,7 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         active_snapshot = active_image.read_bytes()
         mounts_after_rollback = (
             effective_runtime / "container-state" / "mounts.tsv"
-        ).read_text(
-            encoding="utf-8"
-        )
+        ).read_text(encoding="utf-8")
         target_a_digest = hashlib.sha256(
             str(target_a.resolve()).encode("utf-8")
         ).hexdigest()
@@ -6411,9 +6447,7 @@ def test_real_resident_codex_projection_is_host_readable(tmp_path: Path) -> None
         assert toggled.returncode == 0, toggled.stderr
         mounts_after_toggle = (
             effective_runtime / "container-state" / "mounts.tsv"
-        ).read_text(
-            encoding="utf-8"
-        )
+        ).read_text(encoding="utf-8")
         assert f"target\t{target_a_digest}\t" in mounts_after_toggle
         assert f"target\t{target_b_digest}\t" in mounts_after_toggle
         active_snapshot = active_image.read_bytes()

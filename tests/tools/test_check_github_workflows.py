@@ -88,15 +88,13 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
                 ["git", "-C", str(root), *args], check=True, capture_output=True
             )
 
-        commands = root / "bin"
-        commands.mkdir()
-        (commands / "python").symlink_to(sys.executable)
         for name, event, ref, requested, tag_input, published, tag in cases:
             output = root / (name + ".output")
             env = {
                 **os.environ,
-                "PATH": str(commands) + os.pathsep + os.environ["PATH"],
-                "PYTHONPATH": str(ROOT),
+                "CARGO_HOME": os.environ.get("CARGO_HOME", str(root / "cargo-home")),
+                "CARGO_TARGET_DIR": str(root / "native-cargo-target"),
+                "GITHUB_WORKSPACE": str(root),
                 "GITHUB_EVENT_NAME": event,
                 "GITHUB_REF": ref,
                 "GITHUB_REF_NAME": ref.rsplit("/", 1)[-1],
@@ -107,7 +105,7 @@ def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
             }
             result = subprocess.run(
                 ["bash", "-c", step["run"]],
-                cwd=root,
+                cwd=ROOT,
                 env=env,
                 check=False,
                 capture_output=True,
@@ -135,40 +133,34 @@ def test_windows_rebuild_comparison_rejects_changed_or_missing_output() -> None:
         for value in workflow["jobs"]["build"]["steps"]
         if value["name"] == "Rebuild Windows archives and require byte equality"
     )
-    comparison = (
-        step["run"]
-        .split("python - <<'PY'", 1)[1]
-        .split("\n", 1)[1]
-        .rsplit("\nPY", 1)[0]
-    )
-    for changed in (
-        None,
-        "agent-canon.exe",
-        "release.zip",
-        "release.zip.sha256",
-        "missing",
-    ):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            original = root / "original build"
-            rebuilt = root / "rebuilt build"
+    assert "native-release compare-reproducible" in step["run"]
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        cargo_target = root / "cargo-target"
+        for changed in (
+            None,
+            "agent-canon.exe",
+            "release.zip",
+            "release.zip.sha256",
+            "missing",
+        ):
+            original = root / "original-build"
+            rebuilt = root / "rebuilt-build"
             packages = root / "packages"
-            rebuilt_packages = root / "rebuilt packages"
+            rebuilt_packages = root / "rebuilt-packages"
             pairs = [
+                (original / "agent-canon.exe", rebuilt / "agent-canon.exe"),
+                (packages / "release.zip", rebuilt_packages / "release.zip"),
+                (packages / "release.tar.gz", rebuilt_packages / "release.tar.gz"),
                 (
-                    original / "release/agent-canon.exe",
-                    rebuilt / "release/agent-canon.exe",
-                )
+                    packages / "release.zip.sha256",
+                    rebuilt_packages / "release.zip.sha256",
+                ),
+                (
+                    packages / "release.tar.gz.sha256",
+                    rebuilt_packages / "release.tar.gz.sha256",
+                ),
             ]
-            pairs.extend(
-                (packages / name, rebuilt_packages / name)
-                for name in (
-                    "release.zip",
-                    "release.tar.gz",
-                    "release.zip.sha256",
-                    "release.tar.gz.sha256",
-                )
-            )
             for first, second in pairs:
                 first.parent.mkdir(parents=True, exist_ok=True)
                 second.parent.mkdir(parents=True, exist_ok=True)
@@ -179,14 +171,32 @@ def test_windows_rebuild_comparison_rejects_changed_or_missing_output() -> None:
             if changed == "missing":
                 (rebuilt_packages / "release.tar.gz").unlink()
             result = subprocess.run(
-                [sys.executable, "-c", comparison],
+                [
+                    "cargo",
+                    "run",
+                    "--locked",
+                    "--manifest-path",
+                    str(ROOT / "tools/runtime/dispatch/agent-canon/Cargo.toml"),
+                    "--target-dir",
+                    str(cargo_target),
+                    "--",
+                    "native-release",
+                    "compare-reproducible",
+                    "--binary",
+                    str(original / "agent-canon.exe"),
+                    "--rebuilt-binary",
+                    str(rebuilt / "agent-canon.exe"),
+                    "--packages",
+                    str(packages),
+                    "--rebuilt-packages",
+                    str(rebuilt_packages),
+                ],
+                cwd=ROOT,
                 env={
                     **os.environ,
-                    "EXECUTABLE": "agent-canon.exe",
-                    "CARGO_TARGET_DIR": str(original),
-                    "REBUILD_TARGET_DIR": str(rebuilt),
-                    "PACKAGE_DIR": str(packages),
-                    "REBUILD_PACKAGE_DIR": str(rebuilt_packages),
+                    "CARGO_HOME": os.environ.get(
+                        "CARGO_HOME", str(root / "cargo-home")
+                    ),
                 },
                 capture_output=True,
                 text=True,
@@ -197,7 +207,9 @@ def test_windows_rebuild_comparison_rejects_changed_or_missing_output() -> None:
                 assert len(result.stdout.splitlines()) == 5
             else:
                 assert result.returncode != 0, changed
-                expected = "file set differs" if changed == "missing" else changed
+                expected = (
+                    "package file set differs" if changed == "missing" else changed
+                )
                 assert expected in result.stderr
 
 

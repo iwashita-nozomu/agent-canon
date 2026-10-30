@@ -74,6 +74,7 @@ promote an internal tool, require a check, or revalidate a historical record.
 | Plan and check formal proofs | [Formal proof](formal_proof.md), [Lean capabilities](lean_capability_matrix.md), [Lean proof environment](lean_proof_env.md), [Recursive proof search](lean_recursive_proof_search.md), [Tool proof coverage](tool_proof_coverage.md) |
 | Trace source and intermediate representations into proofs | [C++ source IR](cpp_source_canonical_ir.md), [C++ templates to Lean](cpp_template_to_lean.md), [JIT canonical IR](jit_canonical_ir.md), [StableHLO value closure](stablehlo_value_closure.md), [Operational IR to Lean](operational_ir_to_lean.md), [JIT IR to Lean](jit_ir_to_lean.md), [Proof trace alignment](check_proof_trace_alignment.md) |
 | Publish changes and share artifacts | [GitHub publication](github_publish.md), [Wiki publication](wiki_publish.md), [HTML artifact access](html_artifact_access.md) |
+| Maintain the native CLI release workflow | [Native CLI release workflow](../../tools/README.md#native-cli-release-workflow) |
 | Compose or export consumer instructions | [Entrypoint composition](entrypoint_composer.md), [Static seed export](export_static_seed.md) |
 | Maintain tool dependencies and imports | [Dependency and license inventory](dependency-tools-and-licenses.md), [Repository-local imports](repo-local-tool-imports.md) |
 

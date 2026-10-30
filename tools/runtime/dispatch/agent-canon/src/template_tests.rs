@@ -1,6 +1,16 @@
+// @dependency-start
+// contract test
+// responsibility Verifies native template rendering, composition, source-bound profile export, native packaging and external artifact boundaries.
+// upstream implementation code_template_rendering.rs explicit-root code renderer
+// upstream implementation entrypoint_composer.rs consumer root composer
+// upstream implementation template_bundle.rs profile and archive owner
+// downstream implementation lib.rs library-owned Template test module
+// @dependency-end
+
 use crate::{code_template_rendering, entrypoint_composer, template_bundle};
 
 use flate2::read::GzDecoder;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
@@ -71,8 +81,11 @@ fn source_fixture(parent: &Path) -> PathBuf {
 [profiles.agent-artifacts]
 roots = ["templates/agents"]
 
+[profiles.document-artifacts]
+roots = ["templates/documents"]
+
 [profiles.codex-user]
-roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "references"]
+roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "references", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
 
 [profiles.native-cli]
 roots = ["LICENSE"]
@@ -85,6 +98,16 @@ roots = ["templates/experiments"]
 "#,
     );
     write(&source, "ROOT_AGENTS.md", b"# Common guidance\n");
+    write(
+        &source,
+        "AGENTS.md",
+        b"# Source-only AgentCanon instructions\n",
+    );
+    write(
+        &source,
+        "documents/runtime/runtime-profiles-and-check-matrix.json",
+        b"{\"schema\":\"fixture\"}\n",
+    );
     write(&source, "LICENSE", b"Fixture license\n");
     write(
         &source,
@@ -97,6 +120,11 @@ roots = ["templates/experiments"]
         b"[package]\nname = \"agent-canon\"\nversion = \"0.1.0\"\n",
     );
     write(&source, "templates/agents/example.txt", b"Agent template\n");
+    write(
+        &source,
+        "templates/documents/example.md",
+        b"Document template\n",
+    );
     write(
         &source,
         "templates/experiments/example/README.md",
@@ -130,10 +158,61 @@ roots = ["templates/experiments"]
     );
     write(
         &source,
-        "agents/skills/agent-canon-bootstrap.md",
-        b"# Bootstrap\n<!--\n@dependency-start\ncontract skill\n@dependency-end\n-->\n[Guide](../../references/guide.md#read)\n",
+        ".codex/personal/skills/demo/SKILL.md",
+        b"---\nname: demo\ndescription: Demonstrate a source-free workflow.\n---\n",
     );
-    write(&source, "references/guide.md", b"# Guide\n");
+    write(
+        &source,
+        "agents/skills/agent-canon-bootstrap.md",
+        b"# Bootstrap\n",
+    );
+    write(
+        &source,
+        "agents/skills/demo.md",
+        b"# Demo\n<!--\n@dependency-start\ncontract skill\nresponsibility Source maintenance metadata.\n@dependency-end\n-->\n[guide](../../references/guide.md#read)\n[peer](peer.md)\n![icon](../../assets/icon.svg)\n[external](https://example.com/guide)\n[section](#demo)\n`[literal](not-a-resource.md)`\n```markdown\n[example](not-a-resource-either.md)\n```\n[named][nested]\n[nested]: ../../references/nested.md#nested\n",
+    );
+    write(
+        &source,
+        "agents/skills/peer.md",
+        b"# Peer\n[shared](../../references/guide.md)\n",
+    );
+    write(
+        &source,
+        "references/guide.md",
+        b"# Guide\n[child](nested.md)\n[template](../templates/experiments/example)\n",
+    );
+    write(&source, "references/nested.md", b"# Nested\n");
+    write(
+        &source,
+        "references/unrelated.md",
+        b"# Unreferenced document\n",
+    );
+    write(
+        &source,
+        "templates/experiments/example/README.md",
+        b"# Instance\n[future](../../consumer-doc.md)\n",
+    );
+    write(
+        &source,
+        "templates/experiments/example/input.json",
+        b"{\"value\":1}\n",
+    );
+    write(
+        &source,
+        "assets/icon.svg",
+        b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n",
+    );
+    write(
+        &source,
+        "tests/unrelated.py",
+        b"# Not a profile resource.\n",
+    );
+    write(&source, "tools/agent/templates/__init__.py", b"");
+    write(
+        &source,
+        "tools/agent/templates/entrypoint_composer.py",
+        b"Composition = None\n",
+    );
 
     let initialized = Command::new("git")
         .args(["init", "--quiet"])
@@ -147,12 +226,26 @@ roots = ["templates/experiments"]
         &["config", "user.email", "template@example.invalid"],
     );
     git(&source, &["add", "--all"]);
+    git(&source, &["update-index", "--chmod=+x", "bootstrap.sh"]);
+    git(
+        &source,
+        &[
+            "update-index",
+            "--chmod=+x",
+            "bootstrap/host/lifecycle/entrypoint.sh",
+        ],
+    );
     git(&source, &["commit", "-qm", "template fixture"]);
     source
 }
 
 fn source_commit(root: &Path) -> String {
     git(root, &["rev-parse", "HEAD"]).trim().to_owned()
+}
+
+fn repository_root() -> PathBuf {
+    fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../"))
+        .expect("resolve AgentCanon source root")
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -197,6 +290,7 @@ fn code_template_reader_uses_explicit_root_and_rejects_escape() {
 fn composer_preserves_arbitrary_source_bytes_and_exact_marker_order() {
     let temporary = TemporaryDirectory::new("compose");
     let source = source_fixture(temporary.path());
+    let source_agents = fs::read(source.join("AGENTS.md")).unwrap();
     let base = temporary.path().join("ROOT_AGENTS.md");
     let specific = temporary.path().join("consumer.md");
     let output = temporary.path().join("AGENTS.md");
@@ -227,6 +321,8 @@ fn composer_preserves_arbitrary_source_bytes_and_exact_marker_order() {
     assert!(start(base_start) < start(base_end));
     assert!(start(base_end) < start(specific_start));
     assert!(start(specific_start) < start(specific_end));
+    assert!(!output.parent().unwrap().join("AGENT.md").exists());
+    assert_eq!(fs::read(source.join("AGENTS.md")).unwrap(), source_agents);
     let expected = format!(
         "{}<!-- agent-canon:source-commit={} -->\n<!-- agent-canon:base-sha256={} -->\n<!-- agent-canon:base-bytes={} -->\n<!-- agent-canon:specific-sha256={} -->\n<!-- agent-canon:specific-bytes={} -->\n",
         String::from_utf8_lossy(marker),
@@ -240,6 +336,45 @@ fn composer_preserves_arbitrary_source_bytes_and_exact_marker_order() {
     let parsed = entrypoint_composer::parse_marked(&rendered).unwrap();
     assert_eq!(parsed.base, base_bytes);
     assert_eq!(parsed.specific, specific_bytes);
+
+    fs::write(&base, b"# Portable\nnew common input\n").unwrap();
+    fs::write(&specific, b"consumer-owned\nnew consumer input\n").unwrap();
+    let (status, refreshed) = entrypoint_composer::compose(&base, &specific, &output, &source)
+        .expect("refresh a valid managed output from current sources");
+    assert_eq!(status, "updated");
+    let parsed = entrypoint_composer::parse_marked(&fs::read(&output).unwrap()).unwrap();
+    assert_eq!(parsed.base, refreshed.base);
+    assert_eq!(parsed.specific, refreshed.specific);
+
+    let portable_source = repository_root();
+    let portable_base = portable_source.join("ROOT_AGENTS.md");
+    let portable_bytes = fs::read(&portable_base).unwrap();
+    let standalone_specific = temporary.path().join("portable-specific.md");
+    let standalone_output = temporary.path().join("standalone-AGENTS.md");
+    fs::write(&standalone_specific, b"## Standalone consumer\n").unwrap();
+    entrypoint_composer::compose(
+        &portable_base,
+        &standalone_specific,
+        &standalone_output,
+        &portable_source,
+    )
+    .expect("compose the actual portable base");
+    fs::remove_file(&standalone_specific).unwrap();
+    let parsed = entrypoint_composer::parse_marked(&fs::read(&standalone_output).unwrap()).unwrap();
+    assert_eq!(parsed.base, portable_bytes);
+    assert_eq!(parsed.specific, b"## Standalone consumer\n");
+    let portable_text = String::from_utf8(parsed.base).unwrap();
+    let comments = regex::Regex::new(r"(?s)<!--.*?-->").unwrap();
+    let links = regex::Regex::new(r"\[[^\]]+\]\(([^)]+)\)").unwrap();
+    let body = comments.replace_all(&portable_text, "");
+    let destinations = links
+        .captures_iter(&body)
+        .map(|capture| capture[1].to_owned())
+        .collect::<Vec<_>>();
+    assert!(!destinations.is_empty());
+    assert!(destinations.iter().all(|target| {
+        target.starts_with('#') || target.split('#').next() == Some("AGENTS.md")
+    }));
 
     fs::write(&output, b"consumer data\n").unwrap();
     let failure = entrypoint_composer::compose(&base, &specific, &output, &source)
@@ -257,6 +392,17 @@ fn composer_preserves_arbitrary_source_bytes_and_exact_marker_order() {
         std::os::unix::fs::symlink(&base, &linked_base).unwrap();
         let failure = entrypoint_composer::compose(&linked_base, &specific, &output, &source)
             .expect_err("reject a symlink input");
+        assert_eq!(failure.code, "symlink");
+        fs::remove_file(&linked_base).unwrap();
+        std::os::unix::fs::symlink(&specific, &linked_base).unwrap();
+        let failure = entrypoint_composer::compose(&base, &linked_base, &output, &source)
+            .expect_err("reject a symlink consumer input");
+        assert_eq!(failure.code, "symlink");
+        fs::remove_file(&linked_base).unwrap();
+        let linked_output = temporary.path().join("output-link.md");
+        std::os::unix::fs::symlink(&output, &linked_output).unwrap();
+        let failure = entrypoint_composer::compose(&base, &specific, &linked_output, &source)
+            .expect_err("reject a symlink output");
         assert_eq!(failure.code, "symlink");
     }
 }
@@ -293,9 +439,55 @@ fn profile_and_codex_exports_are_commit_bound_source_free_and_verifiable() {
         .expect("repeat Codex user projection");
     assert_eq!(one["bundle_digest"], two["bundle_digest"]);
     assert!(!first.join(".git").exists());
-    let skill = fs::read_to_string(first.join("skills/agent-canon-bootstrap/SKILL.md")).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(first.join("bootstrap.sh"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o755
+        );
+    }
+    let skill = fs::read_to_string(first.join("skills/demo/SKILL.md")).unwrap();
     assert!(!skill.contains("@dependency-start"));
-    assert!(skill.contains("[Guide](../../references/guide.md#read)"));
+    assert!(skill.contains("[guide](../../references/guide.md#read)"));
+    assert!(skill.contains("[peer](../../agents/skills/peer.md)"));
+    assert!(skill.contains("![icon](../../assets/icon.svg)"));
+    assert!(skill.contains("[external](https://example.com/guide)"));
+    assert!(skill.contains("[section](#demo)"));
+    assert!(skill.contains("`[literal](not-a-resource.md)`"));
+    assert!(skill.contains("[example](not-a-resource-either.md)"));
+    assert!(skill.contains("[nested]: ../../references/nested.md#nested"));
+    assert!(first.join("agents/skills/demo.md").is_file());
+    for relative in [
+        "references/guide.md",
+        "references/nested.md",
+        "assets/icon.svg",
+        "templates/experiments/example/README.md",
+        "templates/experiments/example/input.json",
+    ] {
+        assert!(first.join(relative).is_file(), "missing {relative}");
+    }
+    let manifest: Value =
+        serde_json::from_slice(&fs::read(first.join("codex-user-bundle.json")).unwrap()).unwrap();
+    let paths = manifest["files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["path"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        paths
+            .iter()
+            .filter(|path| **path == "references/guide.md")
+            .count(),
+        1
+    );
+    assert!(!paths.contains(&"references/unrelated.md"));
+    assert!(!paths.contains(&"tests/unrelated.py"));
     let hook: serde_json::Value =
         serde_json::from_slice(&fs::read(first.join("hooks/hooks.json")).unwrap()).unwrap();
     for event in ["UserPromptSubmit", "PreToolUse", "PostToolUse"] {
@@ -311,6 +503,216 @@ fn profile_and_codex_exports_are_commit_bound_source_free_and_verifiable() {
         .unwrap_err()
         .to_string()
         .contains("digest differs"));
+}
+
+#[test]
+fn profile_identity_binds_profile_and_manifest_inputs() {
+    let temporary = TemporaryDirectory::new("identity");
+    let source = source_fixture(temporary.path());
+    let agents = template_bundle::bundle_identity(&source, "HEAD", "agent-artifacts").unwrap();
+    let documents =
+        template_bundle::bundle_identity(&source, "HEAD", "document-artifacts").unwrap();
+    assert_eq!(agents["source_commit"], documents["source_commit"]);
+    assert_eq!(agents["manifest_digest"], documents["manifest_digest"]);
+    assert_ne!(agents["bundle_digest"], documents["bundle_digest"]);
+}
+
+#[test]
+fn codex_export_uses_the_native_composer_independent_of_source_modules() {
+    let temporary = TemporaryDirectory::new("own-composer");
+    let source = source_fixture(temporary.path());
+    assert_eq!(
+        fs::read(source.join("tools/agent/templates/entrypoint_composer.py")).unwrap(),
+        b"Composition = None\n"
+    );
+    let runtime = temporary.path().join("runtime");
+    fs::create_dir_all(&runtime).unwrap();
+    let output = runtime.join("codex-user");
+    template_bundle::export_bundle_at(&source, "HEAD", "codex-user", &output, &runtime)
+        .expect("export without importing source composer");
+    assert!(output.join("guidance/AGENTS.md").is_file());
+    let composition =
+        entrypoint_composer::parse_marked(&fs::read(output.join("guidance/AGENTS.md")).unwrap())
+            .unwrap();
+    assert_eq!(composition.base, b"# Common guidance\n");
+    assert!(composition.specific.is_empty());
+}
+
+#[test]
+fn codex_resources_follow_the_requested_commit_snapshot() {
+    let temporary = TemporaryDirectory::new("requested-commit");
+    let source = source_fixture(temporary.path());
+    let runtime = temporary.path().join("runtime");
+    fs::create_dir_all(&runtime).unwrap();
+    let first = runtime.join("first");
+    let unchanged = runtime.join("unchanged");
+    let changed = runtime.join("changed");
+    let identity =
+        template_bundle::export_bundle_at(&source, "HEAD", "codex-user", &first, &runtime).unwrap();
+    write(
+        &source,
+        "references/nested.md",
+        b"# Nested\nUncommitted change.\n",
+    );
+    let still_first =
+        template_bundle::export_bundle_at(&source, "HEAD", "codex-user", &unchanged, &runtime)
+            .unwrap();
+    assert_eq!(still_first["bundle_digest"], identity["bundle_digest"]);
+    git(&source, &["add", "references/nested.md"]);
+    git(&source, &["commit", "-qm", "resource change"]);
+    let second =
+        template_bundle::export_bundle_at(&source, "HEAD", "codex-user", &changed, &runtime)
+            .unwrap();
+    assert_ne!(second["bundle_digest"], identity["bundle_digest"]);
+    assert_eq!(
+        fs::read(changed.join("references/nested.md")).unwrap(),
+        b"# Nested\nUncommitted change.\n"
+    );
+    assert_eq!(
+        fs::read(first.join("references/nested.md")).unwrap(),
+        b"# Nested\n"
+    );
+}
+
+#[test]
+fn codex_export_rejects_unresolvable_local_resources() {
+    for target in ["../../missing.md", "../../../escape.md"] {
+        let temporary = TemporaryDirectory::new("missing-resource");
+        let source = source_fixture(temporary.path());
+        write(
+            &source,
+            "agents/skills/demo.md",
+            format!("# Demo\n[resource]({target})\n").as_bytes(),
+        );
+        git(&source, &["add", "agents/skills/demo.md"]);
+        git(&source, &["commit", "-qm", "unresolvable resource"]);
+        let runtime = temporary.path().join("runtime");
+        fs::create_dir_all(&runtime).unwrap();
+        let error = template_bundle::export_bundle_at(
+            &source,
+            "HEAD",
+            "codex-user",
+            &runtime.join("bundle"),
+            &runtime,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("Markdown resource"));
+    }
+}
+
+#[test]
+fn codex_export_rejects_resources_at_each_generated_path() {
+    for relative in [
+        "skills/demo/SKILL.md",
+        "guidance/AGENTS.md",
+        "hooks/hooks.json",
+        "plugin.json",
+        ".agents/plugins/marketplace.json",
+        "codex-user-bundle.json",
+    ] {
+        let temporary = TemporaryDirectory::new("generated-collision");
+        let source = source_fixture(temporary.path());
+        write(
+            &source,
+            "agents/skills/demo.md",
+            format!("# Demo\n[resource](../../{relative})\n").as_bytes(),
+        );
+        write(&source, relative, b"Source resource.\n");
+        git(&source, &["add", "--all"]);
+        git(&source, &["commit", "-qm", "generated path collision"]);
+        let runtime = temporary.path().join("runtime");
+        fs::create_dir_all(&runtime).unwrap();
+        let error = template_bundle::export_bundle_at(
+            &source,
+            "HEAD",
+            "codex-user",
+            &runtime.join("bundle"),
+            &runtime,
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains("collides with source"),
+            "{relative}: {error}"
+        );
+    }
+}
+
+#[test]
+fn bundle_destinations_reject_nonportable_paths_without_output() {
+    let temporary = TemporaryDirectory::new("portable-path");
+    for relative in [
+        "folder\\file.md",
+        "C:note.md",
+        "../note.md",
+        "/note.md",
+        "CON.txt",
+    ] {
+        let error = template_bundle::bundle_destination(temporary.path(), relative)
+            .expect_err("reject a nonportable bundle destination");
+        assert!(error.to_string().contains("bundle file"));
+        assert_eq!(fs::read_dir(temporary.path()).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn exports_accept_prepared_empty_roots_and_preserve_occupied_or_symlinked_roots() {
+    let temporary = TemporaryDirectory::new("output-boundary");
+    let source = source_fixture(temporary.path());
+    let runtime = temporary.path().join("runtime");
+    fs::create_dir_all(&runtime).unwrap();
+    let prepared = runtime.join("prepared");
+    fs::create_dir(&prepared).unwrap();
+    let result =
+        template_bundle::export_bundle_at(&source, "HEAD", "agent-artifacts", &prepared, &runtime)
+            .expect("accept a dispatcher-prepared empty directory");
+    assert_eq!(result["output"], prepared.to_string_lossy().as_ref());
+    assert!(prepared.join("template-bundle-provenance.json").is_file());
+
+    let occupied = runtime.join("occupied");
+    fs::create_dir(&occupied).unwrap();
+    fs::write(occupied.join("user.txt"), b"keep").unwrap();
+    let target = runtime.join("target");
+    fs::create_dir(&target).unwrap();
+    #[cfg(unix)]
+    {
+        let link = runtime.join("link");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        for output in [&occupied, &link] {
+            let error = template_bundle::export_bundle_at(
+                &source,
+                "HEAD",
+                "agent-artifacts",
+                output,
+                &runtime,
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains("fresh"));
+        }
+        assert!(fs::read_dir(&target).unwrap().next().is_none());
+    }
+    assert_eq!(fs::read(occupied.join("user.txt")).unwrap(), b"keep");
+    let inside_source = source.join("workspace/template-output");
+    let error = template_bundle::export_bundle_at(
+        &source,
+        "HEAD",
+        "agent-artifacts",
+        &inside_source,
+        &runtime,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("outside"));
+    assert!(!inside_source.exists());
+}
+
+#[test]
+fn output_file_creation_preserves_a_concurrent_existing_file() {
+    let temporary = TemporaryDirectory::new("write-once");
+    let target = temporary.path().join("bundle/file.txt");
+    fs::create_dir_all(target.parent().unwrap()).unwrap();
+    fs::write(&target, b"concurrent user data").unwrap();
+    let error = template_bundle::write_output_file(&target, b"native output", 0o644).unwrap_err();
+    assert!(error.to_string().contains("write output file"));
+    assert_eq!(fs::read(target).unwrap(), b"concurrent user data");
 }
 
 #[test]

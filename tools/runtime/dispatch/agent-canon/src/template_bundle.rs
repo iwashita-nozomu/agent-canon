@@ -1,4 +1,15 @@
 //! Git-bound template profile export, source-free Codex projection, and native packages.
+// @dependency-start
+// contract implementation
+// responsibility Exports source-commit-bound template profiles and produces/verifies deterministic native CLI packages.
+// upstream design ../../../../../documents/contracts/template-bundle-manifest.toml profile roots and native package layout
+// upstream implementation entrypoint_composer.rs canonical guidance composition
+// downstream implementation lib.rs shared native Template library
+// downstream implementation main.rs template-bundle CLI route
+// downstream implementation native_release.rs source-bound release package verifier
+// downstream test template_tests.rs profile, Codex and native package oracles
+// downstream test ../tests/native_release_native.rs source-bound native release oracles
+// @dependency-end
 
 use crate::entrypoint_composer::Composition;
 use flate2::read::GzDecoder;
@@ -326,7 +337,7 @@ fn canonicalize_allow_missing(path: &Path) -> io::Result<PathBuf> {
     }
 }
 
-fn bundle_destination(root: &Path, relative: &str) -> BundleResult<PathBuf> {
+pub(crate) fn bundle_destination(root: &Path, relative: &str) -> BundleResult<PathBuf> {
     let parts = portable_relative(relative)?;
     let destination = parts
         .iter()
@@ -1327,7 +1338,7 @@ fn prepare_runtime_output(runtime_root: &Path, output: &Path, label: &str) -> Bu
     Ok(())
 }
 
-fn write_output_file(path: &Path, bytes: &[u8], mode: u32) -> BundleResult<()> {
+pub(crate) fn write_output_file(path: &Path, bytes: &[u8], mode: u32) -> BundleResult<()> {
     let parent = path
         .parent()
         .ok_or_else(|| bundle_error(format!("output file has no parent: {}", path.display())))?;

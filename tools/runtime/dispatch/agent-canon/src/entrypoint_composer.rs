@@ -1,4 +1,13 @@
 //! Deterministic composition of the portable and consumer-owned root guidance.
+// @dependency-start
+// contract implementation
+// responsibility Composes a source-free consumer root AGENTS.md from the portable base and consumer-owned instructions.
+// upstream design ../../../../../documents/design/entrypoint-owner-map.md consumer root composition contract
+// downstream design ../../../../../ROOT_AGENTS.md common consumer base
+// downstream implementation lib.rs shared native Template library
+// downstream implementation main.rs compose-consumer-entrypoint CLI route
+// downstream test template_tests.rs native composition oracles
+// @dependency-end
 
 use sha2::{Digest, Sha256};
 use std::fmt;

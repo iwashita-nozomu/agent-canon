@@ -1,4 +1,11 @@
 //! Read one canonical code-template source file without writing its source tree.
+// @dependency-start
+// contract implementation
+// responsibility Renders a canonical materializable code template from an explicit source-root capability.
+// upstream design ../../../../../templates/code/README.md code-template readback contract
+// downstream implementation ../../../manifest/manifest_rendering.py native renderer caller
+// downstream test ../../../../../tests/agent_tools/test_agent_team_templates.py source and consumer graph oracles
+// @dependency-end
 
 use std::fmt;
 use std::fs;

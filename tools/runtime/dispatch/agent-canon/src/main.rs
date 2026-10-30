@@ -6,6 +6,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
+// downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -56,7 +57,8 @@ mod test_design;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, private_feedback, template_bundle, tool_proof_coverage,
+    catalog, entrypoint_composer, native_release, private_feedback, template_bundle,
+    tool_proof_coverage,
 };
 use std::env;
 
@@ -95,6 +97,7 @@ Commands:
   python-module-groups-check --root <repo-root> [--contract path]
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
   template-bundle <export|verify|native-package|native-verify|native-version> [options]
+  native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
 
 Options:
   -h, --help     Print help
@@ -123,6 +126,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "template-bundle" {
         std::process::exit(template_bundle::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "native-release" {
+        std::process::exit(native_release::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {

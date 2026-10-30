@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies native CLI archive layout, checksums, source-free behavior, and wrapper handoff.
-# upstream implementation ../../tools/agent/templates/template_bundle.py native package producer
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs native package producer
 # upstream implementation ../../tools/bin/agent-canon source checkout entrypoint
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs native CLI entrypoint
 # @dependency-end
@@ -28,97 +28,6 @@ except ImportError:
     pytest = None  # type: ignore[assignment]
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-from tools.agent.templates.template_bundle import package_native_cli  # noqa: E402
-
-
-def _source_fixture(root: Path) -> Path:
-    source = root / "source"
-    files = {
-        "documents/contracts/template-bundle-manifest.toml": (
-            'version = 1\nsource_index = "templates/README.md"\n\n'
-            "[profiles.native-cli]\n"
-            'roots = ["LICENSE"]\n'
-            "\n[profiles.native-cli.layout]\n"
-            '"LICENSE" = "LICENSE"\n'
-        ),
-        "tools/runtime/dispatch/agent-canon/Cargo.toml": (
-            '[package]\nname = "agent-canon"\nversion = "0.1.0"\n'
-        ),
-        "LICENSE": "Fixture license\n",
-    }
-    for name, content in files.items():
-        path = source / name
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    subprocess.run(["git", "init", "-q", str(source)], check=True)
-    subprocess.run(
-        ["git", "-C", str(source), "config", "user.name", "Native fixture"],
-        check=True,
-    )
-    subprocess.run(
-        ["git", "-C", str(source), "config", "user.email", "native@example.invalid"],
-        check=True,
-    )
-    subprocess.run(["git", "-C", str(source), "add", "--all"], check=True)
-    subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
-    return source
-
-
-def test_native_packages_include_layout_provenance_and_archive_checksums(
-    tmp_path: Path,
-) -> None:
-    source = _source_fixture(tmp_path)
-    binary = tmp_path / "agent-canon"
-    binary.write_bytes(b"fixture native executable")
-    result = package_native_cli(
-        source_root=source,
-        source_ref="HEAD",
-        binary=binary,
-        target="x86_64-unknown-linux-gnu",
-        output=tmp_path / "packages",
-        toolchain="rustc fixture",
-    )
-    assert result["schema"] == "agent-canon.native-cli-package.v1"
-    assert result["version"] == "0.1.0"
-    assert len(result["archives"]) == 2
-
-    for item in result["archives"]:
-        archive_path = Path(item["path"])
-        assert hashlib.sha256(archive_path.read_bytes()).hexdigest() == item["sha256"]
-        checksum = archive_path.with_name(f"{archive_path.name}.sha256")
-        assert checksum.read_text(encoding="ascii") == (
-            f"{item['sha256']}  {archive_path.name}\n"
-        )
-        with tempfile.TemporaryDirectory() as extracted_name:
-            extracted = Path(extracted_name)
-            if archive_path.name.endswith(".zip"):
-                with zipfile.ZipFile(archive_path) as archive:
-                    archive.extractall(extracted)
-            else:
-                with tarfile.open(archive_path, "r:gz") as archive:
-                    archive.extractall(extracted, filter="data")
-            package = extracted / "agent-canon-0.1.0-x86_64-unknown-linux-gnu"
-            assert (package / "bin/agent-canon").read_bytes() == binary.read_bytes()
-            assert not (package / "share/agent-canon/private_feedback.py").exists()
-            provenance = json.loads(
-                (package / "share/agent-canon/provenance.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-            assert provenance["source_commit"] == result["source_commit"]
-            assert provenance["target"] == "x86_64-unknown-linux-gnu"
-            checksum_rows = (
-                (package / "share/agent-canon/SHA256SUMS")
-                .read_text(encoding="ascii")
-                .splitlines()
-            )
-            for row in checksum_rows:
-                digest, relative = row.split("  ", 1)
-                assert (
-                    hashlib.sha256((package / relative).read_bytes()).hexdigest()
-                    == digest
-                )
 
 
 def test_source_wrapper_execs_native_candidate_and_preserves_exit_status(
