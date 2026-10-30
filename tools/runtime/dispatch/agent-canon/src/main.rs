@@ -47,6 +47,7 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
+use agent_canon::{entrypoint_composer, template_bundle};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -76,6 +77,8 @@ Commands:
   python-algorithm-contract-check --root <repo-root> [paths...]
   helper-function-inventory [paths...] [--root <repo-root>] [--format text|json|markdown]
   python-module-groups-check --root <repo-root> [--contract path]
+  compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
+  template-bundle <export|verify|native-package|native-verify|native-version> [options]
 
 Options:
   -h, --help     Print help
@@ -96,6 +99,14 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "compose-consumer-entrypoint" {
+        std::process::exit(entrypoint_composer::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "template-bundle" {
+        std::process::exit(template_bundle::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {

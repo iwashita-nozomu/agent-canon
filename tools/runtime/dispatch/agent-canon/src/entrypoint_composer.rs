@@ -403,7 +403,7 @@ pub(crate) fn compose(
 }
 
 /// Native implementation for the existing `compose-consumer-entrypoint` route.
-pub(crate) fn run(args: &[String]) -> i32 {
+pub fn run(args: &[String]) -> i32 {
     let mut base = None;
     let mut specific = None;
     let mut output = None;

@@ -6,7 +6,7 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug)]
-pub(crate) enum CodeTemplateError {
+pub enum CodeTemplateError {
     Escape(String),
     NotFound(String),
     Read { path: PathBuf, source: io::Error },
@@ -90,7 +90,7 @@ fn canonicalize_allow_missing(path: &Path) -> io::Result<PathBuf> {
 ///
 /// The caller supplies the canonical source root capability once. This helper
 /// has no working-directory lookup, command entrypoint, or compatibility layer.
-pub(crate) fn render_code_template(
+pub fn render_code_template(
     canonical_source_root: &Path,
     template_name: &str,
 ) -> Result<String, CodeTemplateError> {

@@ -90,6 +90,15 @@ struct TreeEntry {
     mode: String,
 }
 
+struct BundleIdentityWork {
+    identity: Value,
+    commit: String,
+    entries: Vec<TreeEntry>,
+    payload: Payload,
+    payload_modes: PayloadModes,
+    install_files: Vec<Value>,
+}
+
 struct GitSource {
     root: PathBuf,
 }
@@ -1118,15 +1127,7 @@ fn bundle_identity_for(
     source: &GitSource,
     source_ref: &str,
     profile: &str,
-) -> BundleResult<(
-    Value,
-    String,
-    DocumentMut,
-    Vec<TreeEntry>,
-    Payload,
-    PayloadModes,
-    Vec<Value>,
-)> {
+) -> BundleResult<BundleIdentityWork> {
     let commit = source.commit(source_ref)?;
     let (manifest, manifest_digest) = source.resolve_profile(&commit)?;
     let roots = GitSource::roots(&manifest, profile)?;
@@ -1200,15 +1201,14 @@ fn bundle_identity_for(
     if !identity.is_object() {
         identity = object();
     }
-    Ok((
+    Ok(BundleIdentityWork {
         identity,
         commit,
-        manifest,
         entries,
         payload,
         payload_modes,
         install_files,
-    ))
+    })
 }
 
 pub(crate) fn bundle_identity(
@@ -1217,8 +1217,8 @@ pub(crate) fn bundle_identity(
     profile: &str,
 ) -> BundleResult<Value> {
     let source = GitSource::open(source_root)?;
-    let (identity, _, _, _, _, _, _) = bundle_identity_for(&source, source_ref, profile)?;
-    Ok(identity)
+    let work = bundle_identity_for(&source, source_ref, profile)?;
+    Ok(work.identity)
 }
 
 fn json_identity_with_output(identity: &Value, output: &Path) -> BundleResult<Value> {
@@ -1363,13 +1363,7 @@ fn write_output_file(path: &Path, bytes: &[u8], mode: u32) -> BundleResult<()> {
 fn write_profile_export(
     source: &GitSource,
     output: &Path,
-    identity: &Value,
-    commit: &str,
-    manifest: &DocumentMut,
-    entries: &[TreeEntry],
-    payload: &Payload,
-    payload_modes: &PayloadModes,
-    install_files: &[Value],
+    work: &BundleIdentityWork,
 ) -> BundleResult<()> {
     fs::create_dir_all(output).map_err(|error| {
         bundle_error(format!(
@@ -1377,30 +1371,32 @@ fn write_profile_export(
             output.display()
         ))
     })?;
-    if identity.get("profile").and_then(Value::as_str) == Some(CODEX_USER_PROFILE) {
-        for (path, content) in payload {
+    if work.identity.get("profile").and_then(Value::as_str) == Some(CODEX_USER_PROFILE) {
+        for (path, content) in &work.payload {
             let destination = bundle_destination(output, path)?;
-            let mode = payload_modes
+            let mode = work
+                .payload_modes
                 .get(path)
                 .map(String::as_str)
                 .unwrap_or("100644");
             write_output_file(&destination, content, mode_number(mode))?;
         }
-        let files = payload
+        let files = work
+            .payload
             .iter()
             .map(|(path, content)| json!({"path": path, "sha256": digest(content)}))
             .collect::<Vec<_>>();
         let manifest = json!({
             "schema": CODEX_USER_SCHEMA,
             "version": 1,
-            "source_commit": identity["source_commit"],
-            "source_tree": identity["source_tree"],
+            "source_commit": work.identity["source_commit"],
+            "source_tree": work.identity["source_tree"],
             "profile": CODEX_USER_PROFILE,
-            "manifest_digest": identity["manifest_digest"],
-            "source_bundle_digest": identity["source_bundle_digest"],
-            "bundle_digest": identity["bundle_digest"],
+            "manifest_digest": work.identity["manifest_digest"],
+            "source_bundle_digest": work.identity["source_bundle_digest"],
+            "bundle_digest": work.identity["bundle_digest"],
             "files": files,
-            "install_files": install_files,
+            "install_files": work.install_files,
         });
         write_output_file(
             &output.join(CODEX_USER_MANIFEST),
@@ -1408,18 +1404,21 @@ fn write_profile_export(
             0o644,
         )?;
     } else {
-        for entry in entries {
+        for entry in &work.entries {
             let destination = bundle_destination(output, &entry.path)?;
-            write_output_file(&destination, &source.blob(commit, &entry.path)?, 0o644)?;
+            write_output_file(
+                &destination,
+                &source.blob(&work.commit, &entry.path)?,
+                0o644,
+            )?;
         }
-        let provenance = json_identity_with_output(identity, output)?;
+        let provenance = json_identity_with_output(&work.identity, output)?;
         write_output_file(
             &output.join("template-bundle-provenance.json"),
             &json_bytes(&provenance)?,
             0o644,
         )?;
     }
-    let _ = manifest;
     Ok(())
 }
 
@@ -1436,21 +1435,10 @@ pub(crate) fn export_bundle_at(
         return Err(bundle_error("static-seed uses export_static_seed.py"));
     }
     authorize_runtime_output(&source.root, runtime_root, &output, "output")?;
-    let (identity, commit, manifest, entries, payload, payload_modes, install_files) =
-        bundle_identity_for(&source, source_ref, profile)?;
+    let work = bundle_identity_for(&source, source_ref, profile)?;
     prepare_runtime_output(runtime_root, &output, "output")?;
-    write_profile_export(
-        &source,
-        &output,
-        &identity,
-        &commit,
-        &manifest,
-        &entries,
-        &payload,
-        &payload_modes,
-        &install_files,
-    )?;
-    json_identity_with_output(&identity, &output)
+    write_profile_export(&source, &output, &work)?;
+    json_identity_with_output(&work.identity, &output)
 }
 
 pub(crate) fn export_bundle(
@@ -1902,7 +1890,7 @@ fn native_layout(
         })?;
     let declared = entries
         .iter()
-        .map(|entry| entry.path.as_str())
+        .map(|entry| entry.path.clone())
         .collect::<BTreeSet<_>>();
     if layout.len() != declared.len() || layout.iter().any(|(path, _)| !declared.contains(path)) {
         return Err(bundle_error(
@@ -1978,7 +1966,7 @@ fn native_zip_bytes(
             .compression_level(Some(9))
             .last_modified_time(DateTime::default())
             .system(ZipSystem::Unix)
-            .external_attributes(((0o100000 | *mode) << 16) as u32);
+            .external_attributes((0o100000 | *mode) << 16);
         archive
             .start_file(format!("{root_name}/{relative}"), options)
             .map_err(|error| bundle_error(format!("write native ZIP archive: {error}")))?;
@@ -2481,7 +2469,7 @@ fn print_json(value: &Value) -> BundleResult<()> {
 }
 
 /// Native implementation for the existing `template-bundle` command selector.
-pub(crate) fn run(args: &[String]) -> i32 {
+pub fn run(args: &[String]) -> i32 {
     let result = (|| -> BundleResult<(Value, Option<String>)> {
         let operation = args
             .first()

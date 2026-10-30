@@ -1,11 +1,4 @@
-#[path = "../src/code_template_rendering.rs"]
-mod code_template_rendering;
-#[path = "../src/entrypoint_composer.rs"]
-mod entrypoint_composer;
-#[path = "../src/runtime_boundary.rs"]
-mod runtime_boundary;
-#[path = "../src/template_bundle.rs"]
-mod template_bundle;
+use crate::{code_template_rendering, entrypoint_composer, template_bundle};
 
 use flate2::read::GzDecoder;
 use sha2::{Digest, Sha256};
@@ -416,10 +409,10 @@ fn native_package_roundtrips_with_reproducible_metadata_and_source_receipts() {
 
     let gzip = GzDecoder::new(first_tar.as_slice());
     let mut tar = TarArchive::new(gzip);
-    let mut tar_entries = tar.entries().unwrap();
+    let tar_entries = tar.entries().unwrap();
     let mut tar_names = Vec::new();
     let mut tar_payload = BTreeMap::new();
-    while let Some(entry) = tar_entries.next() {
+    for entry in tar_entries {
         let mut entry = entry.unwrap();
         let name = entry.path().unwrap().to_string_lossy().into_owned();
         assert_eq!(entry.header().uid().unwrap(), 0);
