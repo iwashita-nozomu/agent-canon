@@ -1,8 +1,8 @@
 #![cfg(target_os = "linux")]
 
 use agent_canon::authority::{
-    AttestationRequest, AuthorityError, ChildHandoffRequest, NonEmptyTrimmedString, Nonce128,
-    ParentRootAttestor, ParentRootReject, SecretToken, Sha256Digest,
+    AttestationRequest, AuthorityError, ChildHandoffRequest, FileMode, NonEmptyTrimmedString,
+    Nonce128, ParentRootAttestor, ParentRootReject, SecretToken, Sha256Digest,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -74,6 +74,12 @@ fn attestation_request(root: &Path, purpose: &str) -> AttestationRequest {
         purpose: nonempty(purpose),
         nonce: Nonce128::generate().expect("OS CSPRNG supplies a request nonce"),
     }
+}
+
+fn native_attested_root(root: &Path, purpose: &str) -> agent_canon::authority::AttestedParent {
+    ParentRootAttestor::new()
+        .attest(&attestation_request(root, purpose))
+        .expect("fixture Git root attests")
 }
 
 fn git(path: &Path, args: &[&str]) -> Output {
@@ -877,4 +883,247 @@ fn test_verify_child_rejects_forged_purpose_without_handoff() {
         ParentRootAttestor::new().reattest_child(&request),
         ParentRootReject::HandoffInvalid,
     );
+}
+
+#[test]
+fn test_path_capability_accepts_in_root_symlink_and_rejects_escape() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "symlink-test");
+    let target = temp.path().join("inside.txt");
+    fs::write(&target, b"inside").expect("write in-root symlink target");
+    let link = temp.path().join("link.txt");
+    symlink(&target, &link).expect("create in-root symlink");
+
+    let receipt = attested
+        .resolve_parent_owned_path(Path::new("link.txt"), nonempty("symlink-test"))
+        .expect("resolve in-root symlink to its physical target");
+    assert_eq!(receipt.physical_path(), target.as_path());
+    assert_eq!(
+        attested
+            .read_parent_owned_file(&receipt)
+            .expect("read through in-root symlink receipt"),
+        b"inside"
+    );
+
+    let outside = TempDir::new();
+    let external = outside.path().join("outside.txt");
+    fs::write(&external, b"sentinel").expect("write external symlink target");
+    let escaping = temp.path().join("escape.txt");
+    symlink(&external, &escaping).expect("create escaping symlink");
+    assert_reject(
+        attested.resolve_parent_owned_path(Path::new("escape.txt"), nonempty("symlink-test")),
+        ParentRootReject::SymlinkEscape,
+    );
+}
+
+#[test]
+fn test_receipt_rejects_replaced_intermediate_real_directory() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "component-test");
+    let nested = temp.path().join("nested");
+    fs::create_dir(&nested).expect("create intermediate directory");
+    let receipt = attested
+        .resolve_parent_owned_path(Path::new("nested/result.txt"), nonempty("component-test"))
+        .expect("capture existing intermediate identity");
+
+    let old = temp.path().join("nested-old");
+    let replacement = temp.path().join("replacement");
+    fs::rename(&nested, &old).expect("move attested intermediate directory");
+    fs::create_dir(&replacement).expect("create replacement directory");
+    fs::rename(&replacement, &nested).expect("install replacement intermediate");
+    assert_reject(
+        attested.atomic_replace_parent_owned_file(
+            &receipt,
+            b"must-not-publish",
+            FileMode::Private0600,
+        ),
+        ParentRootReject::RootRaceDetected,
+    );
+    assert!(!nested.join("result.txt").exists());
+}
+
+#[test]
+fn test_atomic_publish_and_readback_keep_exact_bytes_and_private_mode() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "atomic-test");
+    let home_before = std::env::var_os("HOME");
+    let payload = b"authenticated parent payload\0\xff\n";
+    let receipt = attested
+        .write_parent_owned_file(
+            Path::new("reports/result.bin"),
+            payload,
+            nonempty("atomic-test"),
+        )
+        .expect("atomically publish parent-owned bytes");
+    assert_eq!(std::env::var_os("HOME"), home_before);
+    assert_eq!(attested.read_parent_owned_file(&receipt).unwrap(), payload);
+    let output = temp.path().join("reports/result.bin");
+    assert_eq!(
+        fs::metadata(output.parent().unwrap())
+            .expect("stat newly created parent directory")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
+    assert_eq!(
+        fs::metadata(&output)
+            .expect("stat published output")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    assert_eq!(
+        fs::read_dir(output.parent().unwrap())
+            .expect("list output directory")
+            .count(),
+        1,
+        "successful publication leaves no temporary entry"
+    );
+
+    let git_admin_receipt = attested
+        .write_parent_owned_file(
+            Path::new(".git/agent-canon-authority-output.bin"),
+            b"git-common-owned\0bytes",
+            nonempty("git-common-test"),
+        )
+        .expect("publish beneath the attested Git common directory");
+    assert_eq!(
+        attested.read_parent_owned_file(&git_admin_receipt).unwrap(),
+        b"git-common-owned\0bytes"
+    );
+}
+
+#[test]
+fn test_read_parent_owned_file_reads_exact_large_payload() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "large-read-test");
+    let payload =
+        (b"0123456789abcdef".repeat((16 * 1024 * 1024) / 16 + 1))[..16 * 1024 * 1024 + 17].to_vec();
+    let receipt = attested
+        .write_parent_owned_file(
+            Path::new("reports/large.bin"),
+            &payload,
+            nonempty("large-read-test"),
+        )
+        .expect("publish large byte payload");
+    assert_eq!(
+        attested
+            .read_parent_owned_file(&receipt)
+            .expect("read large parent-owned payload"),
+        payload
+    );
+}
+
+#[test]
+fn test_read_parent_owned_file_rejects_in_root_inode_replacement() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "inode-race-test");
+    let receipt = attested
+        .write_parent_owned_file(
+            Path::new("reports/result.txt"),
+            b"original\n",
+            nonempty("inode-race-test"),
+        )
+        .expect("publish original file");
+    let target = temp.path().join("reports/result.txt");
+    let replacement = temp.path().join("reports/replacement.txt");
+    fs::write(&replacement, b"replacement\n").expect("write replacement file");
+    fs::remove_file(&target).expect("remove original file");
+    fs::rename(&replacement, &target).expect("replace original inode");
+    assert_reject(
+        attested.read_parent_owned_file(&receipt),
+        ParentRootReject::RootRaceDetected,
+    );
+}
+
+#[test]
+fn test_read_parent_owned_file_rejects_intermediate_and_root_replacement() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "root-race-test");
+    let receipt = attested
+        .write_parent_owned_file(
+            Path::new("reports/nested/result.txt"),
+            b"original\n",
+            nonempty("root-race-test"),
+        )
+        .expect("publish nested file");
+    let reports = temp.path().join("reports");
+    let moved = temp.path().join("reports-moved");
+    fs::rename(&reports, &moved).expect("move attested intermediate");
+    fs::create_dir(&reports).expect("create replacement intermediate");
+    assert_reject(
+        attested.read_parent_owned_file(&receipt),
+        ParentRootReject::RootRaceDetected,
+    );
+    fs::remove_dir_all(&reports).expect("remove replacement intermediate");
+    fs::rename(&moved, &reports).expect("restore attested intermediate");
+    assert_eq!(
+        attested.read_parent_owned_file(&receipt).unwrap(),
+        b"original\n"
+    );
+
+    let root = temp.path().to_path_buf();
+    let replaced = root.with_file_name(format!(
+        "{}-replaced",
+        root.file_name().unwrap().to_string_lossy()
+    ));
+    fs::rename(&root, &replaced).expect("move attested root");
+    fs::create_dir(&root).expect("create replacement root");
+    let root_replacement_result = attested.read_parent_owned_file(&receipt);
+    fs::remove_dir_all(&root).expect("remove replacement root");
+    fs::rename(&replaced, &root).expect("restore attested root");
+    assert_reject(root_replacement_result, ParentRootReject::RootRaceDetected);
+}
+
+#[test]
+fn test_read_parent_owned_file_rejects_nonregular_replacement_without_blocking() {
+    use std::time::Instant;
+
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "nonregular-race-test");
+    for replacement_kind in ["fifo", "directory"] {
+        let relative = format!("reports/{replacement_kind}.target");
+        let receipt = attested
+            .write_parent_owned_file(
+                Path::new(&relative),
+                b"original\n",
+                nonempty("nonregular-race-test"),
+            )
+            .expect("publish regular file before replacement");
+        let target = temp.path().join(&relative);
+        fs::remove_file(&target).expect("remove original regular file");
+        if replacement_kind == "fifo" {
+            let parent = fs::File::open(target.parent().unwrap()).expect("open FIFO parent");
+            rustix::fs::mkfifoat(
+                &parent,
+                target.file_name().unwrap(),
+                rustix::fs::Mode::from_raw_mode(0o600),
+            )
+            .expect("create FIFO replacement");
+        } else {
+            fs::create_dir(&target).expect("create directory replacement");
+        }
+        let started = Instant::now();
+        assert_reject(
+            attested.read_parent_owned_file(&receipt),
+            ParentRootReject::RootRaceDetected,
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        if replacement_kind == "fifo" {
+            fs::remove_file(&target).expect("remove FIFO replacement");
+        } else {
+            fs::remove_dir(&target).expect("remove directory replacement");
+        }
+    }
 }

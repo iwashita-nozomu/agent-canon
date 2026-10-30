@@ -1,8 +1,10 @@
 use super::{
     digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
-    ChildHandoffReceipt, ChildHandoffRequest, FileIdentity, HandoffMode, HandoffStorage,
-    HandoffTransport, NonEmptyTrimmedString, Nonce128, ParentRootReject, PhysicalRoot, RootKind,
-    RootPrecedence, SecretToken, Sha256Digest, VerifiedChildHandoff, HANDOFF_SCHEMA,
+    ChildHandoffReceipt, ChildHandoffRequest, ComponentIdentity, EntryKind, FileIdentity, FileMode,
+    HandoffMode, HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot,
+    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedPathReceipt, ParentRootReject,
+    PhysicalRoot, RootKind, RootPrecedence, SecretToken, Sha256Digest, TargetIdentity,
+    VerifiedChildHandoff, HANDOFF_SCHEMA,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -18,9 +20,9 @@ use serde::{Deserialize, Deserializer};
 use serde_json::value::RawValue;
 use serde_json::{Map, Number, Value};
 use sha2::Sha256;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::env;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -591,6 +593,950 @@ pub(crate) fn verify_live_identity(attested: &AttestedParent) -> Result<(), Auth
         }
     }
     Ok(())
+}
+
+pub(crate) fn resolve_parent_owned_path(
+    attested: &AttestedParent,
+    candidate: &Path,
+    purpose: NonEmptyTrimmedString,
+) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+    attested.verify_live_identity()?;
+    let lexical_path = lexical_candidate(&attested.parent_root.path, candidate)?;
+    let mut selected = None;
+    for (owner, root) in [
+        (OwnerRoot::GitCommon, &attested.git_common_dir),
+        (OwnerRoot::Parent, &attested.parent_root),
+    ] {
+        if lexical_path.starts_with(&root.path) {
+            let physical_path = resolve_physical_allow_missing(root, &lexical_path)?;
+            if !physical_path.starts_with(&root.path) {
+                return Err(error(
+                    ParentRootReject::SymlinkEscape,
+                    "path resolves outside its attested owner root",
+                ));
+            }
+            selected = Some((owner, root, physical_path));
+            break;
+        }
+    }
+    let (owner, root, physical_path) = selected.ok_or_else(|| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned file is outside repository and Git admin roots",
+        )
+    })?;
+    if physical_path == root.path {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            "owner root is not a file target",
+        ));
+    }
+    let physical_parts = relative_components(&root.path, &physical_path)?;
+    let physical_parent_parts = &physical_parts[..physical_parts.len() - 1];
+    let (physical_parent, parent_components, parent_complete) =
+        open_existing_component_prefix(root, physical_parent_parts)?;
+    let leaf = physical_path.file_name().ok_or_else(|| {
+        error(
+            ParentRootReject::RootMismatch,
+            "parent-owned file name is unavailable",
+        )
+    })?;
+    let target = if parent_complete {
+        target_identity(&physical_parent, leaf)?
+    } else {
+        None
+    };
+    let lexical_snapshot = capture_lexical_snapshot(root, &lexical_path)?;
+    let receipt = ParentOwnedPathReceipt {
+        lexical_path,
+        physical_path,
+        owner,
+        owner_path: root.path.clone(),
+        owner_identity: root.identity,
+        purpose,
+        token_digest: attested.token_digest,
+        parent_components,
+        target,
+        lexical_snapshot,
+    };
+    verify_lexical_snapshot(root, &receipt, false, false)?;
+    attested.verify_live_identity()?;
+    Ok(receipt)
+}
+
+pub(crate) fn read_parent_owned_file(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<Vec<u8>, AuthorityError> {
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let target = receipt.target.ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned read receipt has no target identity",
+        )
+    })?;
+    if target.kind != EntryKind::File {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent-owned read target is not a regular file",
+        ));
+    }
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, opened_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, false)?;
+    if opened_components != receipt.parent_components {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent directory identity changed before read",
+        ));
+    }
+
+    let mut options = OpenOptions::new();
+    options.read(true).follow(FollowSymlinks::No);
+    #[cfg(unix)]
+    {
+        use cap_fs_ext::OpenOptionsSyncExt;
+        options.nonblock(true);
+    }
+    let mut file = parent.open_with(leaf, &options).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot open parent-owned file through its capability",
+        )
+    })?;
+    let metadata = file.metadata().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect parent-owned file through its capability",
+        )
+    })?;
+    if entry_kind(&metadata) != EntryKind::File
+        || identity_from_cap_metadata(&metadata) != target.identity
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "file identity changed before read",
+        ));
+    }
+    verify_lexical_snapshot(root, receipt, true, false)?;
+
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot read parent-owned file",
+        )
+    })?;
+    let after_read = file.metadata().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot recheck parent-owned file after read",
+        )
+    })?;
+    if identity_from_cap_metadata(&after_read) != target.identity
+        || entry_kind(&after_read) != EntryKind::File
+    {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "file identity changed during read",
+        ));
+    }
+    verify_component_identities(root, parent_parts, &receipt.parent_components)?;
+    verify_target_identity(parent, leaf, Some(target))?;
+    verify_lexical_snapshot(root, receipt, true, false)?;
+    attested.verify_live_identity()?;
+    Ok(bytes)
+}
+
+pub(crate) fn atomic_replace_parent_owned_file(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+    bytes: &[u8],
+    mode: FileMode,
+) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+    atomic_replace_with_hooks(
+        attested,
+        receipt,
+        bytes,
+        mode,
+        |file, bytes| write_all_progress(file, bytes),
+        |directory, name| directory.remove_file(name),
+    )
+}
+
+pub(crate) fn write_parent_owned_file(
+    attested: &AttestedParent,
+    candidate: &Path,
+    bytes: &[u8],
+    purpose: NonEmptyTrimmedString,
+) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+    let receipt = resolve_parent_owned_path(attested, candidate, purpose)?;
+    atomic_replace_parent_owned_file(attested, &receipt, bytes, FileMode::Private0600)
+}
+
+fn lexical_candidate(root: &Path, candidate: &Path) -> Result<PathBuf, AuthorityError> {
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(error(
+            ParentRootReject::SymlinkEscape,
+            "lexical parent escape in parent-owned path",
+        ));
+    }
+    Ok(if candidate.is_absolute() {
+        candidate.to_path_buf()
+    } else {
+        root.join(candidate)
+    })
+}
+
+fn resolve_physical_allow_missing(
+    root: &PhysicalRoot,
+    path: &Path,
+) -> Result<PathBuf, AuthorityError> {
+    let parts = resolvable_components(root.path(), path)?;
+    let mut remaining = VecDeque::from(parts);
+    let mut resolved_parts = Vec::<OsString>::new();
+    let mut directories = vec![root.directory.try_clone().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot clone attested directory capability",
+        )
+    })?];
+    let mut symlink_count = 0_usize;
+
+    while let Some(component) = remaining.pop_front() {
+        if component == OsStr::new(".") {
+            continue;
+        }
+        if component == OsStr::new("..") {
+            if resolved_parts.pop().is_none() {
+                return Err(error(
+                    ParentRootReject::SymlinkEscape,
+                    "symbolic link target escapes its attested owner root",
+                ));
+            }
+            while directories.len() > resolved_parts.len() + 1 {
+                directories.pop();
+            }
+            continue;
+        }
+        validate_component(&component)?;
+
+        // Components below a missing prefix cannot exist yet. Keep resolving
+        // lexical `..` components, but never use an ambient lookup for them.
+        if resolved_parts.len() >= directories.len() {
+            resolved_parts.push(component);
+            continue;
+        }
+
+        let parent = directories.last().expect("root capability is retained");
+        let metadata = match parent.symlink_metadata(&component) {
+            Ok(metadata) => metadata,
+            Err(error_value) if error_value.kind() == std::io::ErrorKind::NotFound => {
+                resolved_parts.push(component);
+                continue;
+            }
+            Err(_) => {
+                return Err(error(
+                    ParentRootReject::SymlinkEscape,
+                    "cannot inspect parent-owned path component",
+                ));
+            }
+        };
+        if entry_kind(&metadata) == EntryKind::Symlink {
+            symlink_count += 1;
+            if symlink_count > 40 {
+                return Err(error(
+                    ParentRootReject::SymlinkEscape,
+                    "parent-owned path contains too many symbolic links",
+                ));
+            }
+            let target = parent.read_link(&component).map_err(|_| {
+                error(
+                    ParentRootReject::SymlinkEscape,
+                    "cannot read parent-owned symbolic link",
+                )
+            })?;
+            if target.is_absolute() {
+                let target_parts = symlink_target_components(root, &target)?;
+                resolved_parts.clear();
+                directories.truncate(1);
+                for part in target_parts.into_iter().rev() {
+                    remaining.push_front(part);
+                }
+            } else {
+                let target_parts = target
+                    .components()
+                    .filter_map(|part| match part {
+                        Component::Normal(name) => Some(name.to_os_string()),
+                        Component::ParentDir => Some(OsString::from("..")),
+                        Component::CurDir => None,
+                        Component::RootDir | Component::Prefix(_) => None,
+                    })
+                    .collect::<Vec<_>>();
+                for part in target_parts.into_iter().rev() {
+                    remaining.push_front(part);
+                }
+            }
+            continue;
+        }
+
+        resolved_parts.push(component.clone());
+        if entry_kind(&metadata) == EntryKind::Directory {
+            let child = parent.open_dir_nofollow(&component).map_err(|_| {
+                error(
+                    ParentRootReject::RootRaceDetected,
+                    "directory changed while resolving parent-owned path",
+                )
+            })?;
+            directories.push(child);
+        }
+    }
+
+    let mut physical = root.path.clone();
+    for component in resolved_parts {
+        physical.push(component);
+    }
+    Ok(physical)
+}
+
+fn symlink_target_components(
+    root: &PhysicalRoot,
+    target: &Path,
+) -> Result<Vec<OsString>, AuthorityError> {
+    let relative = target.strip_prefix(root.path()).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned symbolic link escapes its owner root",
+        )
+    })?;
+    relative
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(name) => Some(Ok(name.to_os_string())),
+            Component::ParentDir => Some(Ok(OsString::from(".."))),
+            Component::CurDir => None,
+            Component::RootDir | Component::Prefix(_) => Some(Err(error(
+                ParentRootReject::SymlinkEscape,
+                "parent-owned symbolic link has an invalid target component",
+            ))),
+        })
+        .collect()
+}
+
+fn relative_components(root: &Path, path: &Path) -> Result<Vec<OsString>, AuthorityError> {
+    let relative = path.strip_prefix(root).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned path is outside its attested owner root",
+        )
+    })?;
+    relative
+        .components()
+        .map(|component| match component {
+            Component::Normal(name) if name != OsStr::new("") => Ok(name.to_os_string()),
+            _ => Err(error(
+                ParentRootReject::SymlinkEscape,
+                "parent-owned path contains a non-normal component",
+            )),
+        })
+        .collect()
+}
+
+fn resolvable_components(root: &Path, path: &Path) -> Result<Vec<OsString>, AuthorityError> {
+    let relative = path.strip_prefix(root).map_err(|_| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned path is outside its attested owner root",
+        )
+    })?;
+    relative
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(name) => Some(Ok(name.to_os_string())),
+            Component::ParentDir => Some(Ok(OsString::from(".."))),
+            Component::CurDir => None,
+            Component::RootDir | Component::Prefix(_) => Some(Err(error(
+                ParentRootReject::SymlinkEscape,
+                "parent-owned path contains an invalid root component",
+            ))),
+        })
+        .collect()
+}
+
+fn split_leaf(parts: &[OsString]) -> Result<(&[OsString], &OsStr), AuthorityError> {
+    let (leaf, parent) = parts.split_last().ok_or_else(|| {
+        error(
+            ParentRootReject::RootMismatch,
+            "owner root is not a file target",
+        )
+    })?;
+    Ok((parent, leaf.as_os_str()))
+}
+
+fn open_existing_component_prefix(
+    root: &PhysicalRoot,
+    parts: &[OsString],
+) -> Result<(Dir, Vec<ComponentIdentity>, bool), AuthorityError> {
+    let mut directory = root.directory.try_clone().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot clone attested directory capability",
+        )
+    })?;
+    let mut identities = Vec::with_capacity(parts.len());
+    for name in parts {
+        validate_component(name)?;
+        match directory.open_dir_nofollow(name) {
+            Ok(child) => {
+                let identity = identity_from_cap_metadata(&child.metadata(".").map_err(|_| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "cannot inspect parent directory identity",
+                    )
+                })?);
+                identities.push(ComponentIdentity {
+                    name: name.clone(),
+                    identity,
+                });
+                directory = child;
+            }
+            Err(error_value) if error_value.kind() == std::io::ErrorKind::NotFound => {
+                return Ok((directory, identities, false));
+            }
+            Err(_) => {
+                return Err(error(
+                    ParentRootReject::SymlinkEscape,
+                    "parent-owned path contains a symlink or non-directory component",
+                ));
+            }
+        }
+    }
+    Ok((directory, identities, true))
+}
+
+fn open_component_chain(
+    root: &PhysicalRoot,
+    parts: &[OsString],
+    expected: &[ComponentIdentity],
+    create_missing: bool,
+) -> Result<(Dir, Vec<ComponentIdentity>), AuthorityError> {
+    if expected.len() > parts.len() || (!create_missing && expected.len() != parts.len()) {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "parent component snapshot shape changed",
+        ));
+    }
+    let mut directory = root.directory.try_clone().map_err(|_| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "cannot clone attested directory capability",
+        )
+    })?;
+    let mut identities = Vec::with_capacity(parts.len());
+    for (index, name) in parts.iter().enumerate() {
+        validate_component(name)?;
+        if let Some(snapshot) = expected.get(index) {
+            if snapshot.name.as_os_str() != name.as_os_str() {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent component name changed",
+                ));
+            }
+        }
+        let child = match directory.open_dir_nofollow(name) {
+            Ok(child) => child,
+            Err(error_value)
+                if create_missing
+                    && index >= expected.len()
+                    && error_value.kind() == std::io::ErrorKind::NotFound =>
+            {
+                create_private_directory(&directory, name)?;
+                directory.open_dir_nofollow(name).map_err(|_| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "parent-owned directory changed during creation",
+                    )
+                })?
+            }
+            Err(_) => {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent directory component changed",
+                ));
+            }
+        };
+        let identity = identity_from_cap_metadata(&child.metadata(".").map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot inspect opened parent directory",
+            )
+        })?);
+        if let Some(snapshot) = expected.get(index) {
+            if snapshot.identity != identity {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "parent directory identity changed",
+                ));
+            }
+        }
+        identities.push(ComponentIdentity {
+            name: name.clone(),
+            identity,
+        });
+        directory = child;
+    }
+    Ok((directory, identities))
+}
+
+fn validate_component(name: &OsStr) -> Result<(), AuthorityError> {
+    if name.is_empty() || name == OsStr::new(".") || name == OsStr::new("..") {
+        return Err(error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned path contains an invalid component",
+        ));
+    }
+    Ok(())
+}
+
+fn entry_kind(metadata: &cap_std::fs::Metadata) -> EntryKind {
+    let kind = metadata.file_type();
+    if kind.is_file() {
+        EntryKind::File
+    } else if kind.is_dir() {
+        EntryKind::Directory
+    } else if kind.is_symlink() {
+        EntryKind::Symlink
+    } else {
+        EntryKind::Other
+    }
+}
+
+fn target_identity(parent: &Dir, leaf: &OsStr) -> Result<Option<TargetIdentity>, AuthorityError> {
+    match parent.symlink_metadata(leaf) {
+        Ok(metadata) => Ok(Some(TargetIdentity {
+            identity: identity_from_cap_metadata(&metadata),
+            kind: entry_kind(&metadata),
+        })),
+        Err(error_value) if error_value.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(error(
+            ParentRootReject::RootRaceDetected,
+            "cannot inspect parent-owned target identity",
+        )),
+    }
+}
+
+fn capture_lexical_snapshot(
+    root: &PhysicalRoot,
+    lexical_path: &Path,
+) -> Result<Option<LexicalSnapshot>, AuthorityError> {
+    let lexical_parent = lexical_path.parent().ok_or_else(|| {
+        error(
+            ParentRootReject::SymlinkEscape,
+            "parent-owned lexical path has no parent",
+        )
+    })?;
+    let parent_parts = relative_components(root.path(), lexical_parent)?;
+    let (parent, parent_components, complete) =
+        open_existing_component_prefix(root, &parent_parts)?;
+    if !complete {
+        return Ok(None);
+    }
+    let parent_identity = parent_components
+        .last()
+        .map(|component| component.identity)
+        .unwrap_or(root.identity);
+    let name = lexical_path.file_name().ok_or_else(|| {
+        error(
+            ParentRootReject::RootMismatch,
+            "parent-owned lexical file name is unavailable",
+        )
+    })?;
+    let entry = match parent.symlink_metadata(name) {
+        Ok(metadata) => {
+            let kind = entry_kind(&metadata);
+            let symlink_target = if kind == EntryKind::Symlink {
+                Some(parent.read_link(name).map_err(|_| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "cannot read parent-owned symlink target",
+                    )
+                })?)
+            } else {
+                None
+            };
+            Some(LexicalEntrySnapshot {
+                name: name.to_os_string(),
+                identity: identity_from_cap_metadata(&metadata),
+                kind,
+                symlink_target,
+            })
+        }
+        Err(error_value) if error_value.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) => {
+            return Err(error(
+                ParentRootReject::RootRaceDetected,
+                "cannot inspect parent-owned lexical entry",
+            ));
+        }
+    };
+    Ok(Some(LexicalSnapshot {
+        parent_path: lexical_parent.to_path_buf(),
+        parent_components,
+        parent_identity,
+        entry,
+    }))
+}
+
+fn validate_receipt<'a>(
+    attested: &'a AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+) -> Result<&'a PhysicalRoot, AuthorityError> {
+    let (root, identity) = owner_root(attested, receipt.owner);
+    if root.path != receipt.owner_path
+        || identity != receipt.owner_identity
+        || receipt.token_digest != attested.token_digest
+        || !receipt.lexical_path.starts_with(&receipt.owner_path)
+        || !receipt.physical_path.starts_with(&receipt.owner_path)
+    {
+        return Err(error(
+            ParentRootReject::RootMismatch,
+            format!(
+                "parent-owned path receipt for purpose {} belongs to a different attested root",
+                receipt.purpose.as_str()
+            ),
+        ));
+    }
+    Ok(root)
+}
+
+fn owner_root(attested: &AttestedParent, owner: OwnerRoot) -> (&PhysicalRoot, FileIdentity) {
+    match owner {
+        OwnerRoot::Parent => (&attested.parent_root, attested.parent_identity),
+        OwnerRoot::GitCommon => (&attested.git_common_dir, attested.git_common_identity),
+    }
+}
+
+fn verify_component_identities(
+    root: &PhysicalRoot,
+    parts: &[OsString],
+    expected: &[ComponentIdentity],
+) -> Result<(), AuthorityError> {
+    let _ = open_component_chain(root, parts, expected, false)?;
+    Ok(())
+}
+
+fn verify_target_identity(
+    parent: &Dir,
+    leaf: &OsStr,
+    expected: Option<TargetIdentity>,
+    allow_new_entry: bool,
+) -> Result<(), AuthorityError> {
+    let observed = target_identity(parent, leaf)?;
+    match (expected, observed) {
+        (Some(expected), Some(observed)) if expected == observed => Ok(()),
+        (None, None) => Ok(()),
+        (None, Some(_)) if allow_new_entry => Ok(()),
+        _ => Err(error(
+            ParentRootReject::RootRaceDetected,
+            "publication target identity changed",
+        )),
+    }
+}
+
+fn verify_lexical_snapshot(
+    root: &PhysicalRoot,
+    receipt: &ParentOwnedPathReceipt,
+    require_entry: bool,
+    allow_new_entry: bool,
+) -> Result<(), AuthorityError> {
+    let Some(snapshot) = receipt.lexical_snapshot.as_ref() else {
+        if require_entry {
+            return Err(error(
+                ParentRootReject::RootRaceDetected,
+                "path receipt has no lexical parent identity",
+            ));
+        }
+        return Ok(());
+    };
+    let parts = relative_components(root.path(), &snapshot.parent_path)?;
+    let (parent, components) =
+        open_component_chain(root, &parts, &snapshot.parent_components, false)?;
+    let parent_identity = components
+        .last()
+        .map(|component| component.identity)
+        .unwrap_or(root.identity);
+    if parent_identity != snapshot.parent_identity {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "lexical parent identity changed",
+        ));
+    }
+    let leaf = receipt.lexical_path.file_name().ok_or_else(|| {
+        error(
+            ParentRootReject::RootRaceDetected,
+            "lexical file name is unavailable",
+        )
+    })?;
+    match (&snapshot.entry, target_identity(&parent, leaf)?) {
+        (Some(expected), Some(observed))
+            if expected.identity == observed.identity && expected.kind == observed.kind =>
+        {
+            if expected.name.as_os_str() != leaf {
+                return Err(error(
+                    ParentRootReject::RootRaceDetected,
+                    "lexical entry name changed",
+                ));
+            }
+            if expected.kind == EntryKind::Symlink {
+                let expected_link = expected.symlink_target.as_ref().ok_or_else(|| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "path receipt has no lexical symlink target",
+                    )
+                })?;
+                let observed_link = parent.read_link(leaf).map_err(|_| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "cannot recheck lexical symlink target",
+                    )
+                })?;
+                if &observed_link != expected_link {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "lexical symlink target changed",
+                    ));
+                }
+                let linked_path = if expected_link.is_absolute() {
+                    expected_link.clone()
+                } else {
+                    snapshot.parent_path.join(expected_link)
+                };
+                let resolved_link =
+                    resolve_physical_allow_missing(root, &linked_path).map_err(|_| {
+                        error(
+                            ParentRootReject::RootRaceDetected,
+                            "cannot re-resolve parent-owned lexical symlink",
+                        )
+                    })?;
+                if resolved_link != receipt.physical_path {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "lexical symlink no longer resolves to the attested target",
+                    ));
+                }
+            } else {
+                match receipt.target {
+                    Some(target)
+                        if target.identity == expected.identity && target.kind == expected.kind => {
+                    }
+                    _ => {
+                        return Err(error(
+                            ParentRootReject::RootRaceDetected,
+                            "lexical entry and physical target identities differ",
+                        ));
+                    }
+                }
+            }
+            Ok(())
+        }
+        (None, None) if !require_entry => Ok(()),
+        (None, Some(_)) if !require_entry && allow_new_entry => Ok(()),
+        _ => Err(error(
+            ParentRootReject::RootRaceDetected,
+            "lexical entry identity changed",
+        )),
+    }
+}
+
+fn atomic_replace_with_hooks<W, C>(
+    attested: &AttestedParent,
+    receipt: &ParentOwnedPathReceipt,
+    bytes: &[u8],
+    mode: FileMode,
+    write: W,
+    cleanup: C,
+) -> Result<ParentOwnedPathReceipt, AuthorityError>
+where
+    W: FnOnce(&mut cap_std::fs::File, &[u8]) -> std::io::Result<()>,
+    C: FnOnce(&Dir, &OsStr) -> std::io::Result<()>,
+{
+    attested.verify_live_identity()?;
+    let root = validate_receipt(attested, receipt)?;
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, parent_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, true)?;
+    attested.verify_live_identity()?;
+    verify_component_identities(root, parent_parts, &parent_components)?;
+    verify_target_identity(&parent, leaf, receipt.target, true)?;
+    verify_lexical_snapshot(root, receipt, false, true)?;
+
+    let mut temp_name: Option<OsString> = None;
+    let operation_result = (|| {
+        let mut opened_temp = None;
+        for _ in 0..32 {
+            let mut random = [0_u8; 16];
+            getrandom::getrandom(&mut random).map_err(|_| {
+                error(
+                    ParentRootReject::UnsupportedPlatform,
+                    "operating-system temporary-name generation is unavailable",
+                )
+            })?;
+            let mut candidate = OsString::from(".");
+            candidate.push(leaf);
+            candidate.push(".");
+            candidate.push(encode_hex(&random));
+            candidate.push(".tmp");
+            let mut options = OpenOptions::new();
+            options
+                .write(true)
+                .create_new(true)
+                .follow(FollowSymlinks::No);
+            options.mode(match mode {
+                FileMode::Private0600 => 0o600,
+            });
+            match parent.open_with(&candidate, &options) {
+                Ok(file) => {
+                    temp_name = Some(candidate);
+                    opened_temp = Some(file);
+                    break;
+                }
+                Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => {
+                    continue;
+                }
+                Err(_) => {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "cannot create atomic parent-owned temporary file",
+                    ));
+                }
+            }
+        }
+        let temp_name_ref = temp_name.as_ref().ok_or_else(|| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot allocate unique parent-owned temporary file",
+            )
+        })?;
+        let mut file = opened_temp.ok_or_else(|| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "temporary file was not opened",
+            )
+        })?;
+        write(&mut file, bytes).map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot write parent-owned temporary file",
+            )
+        })?;
+        file.sync_all().map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot sync parent-owned temporary file",
+            )
+        })?;
+        drop(file);
+
+        attested.verify_live_identity()?;
+        verify_component_identities(root, parent_parts, &parent_components)?;
+        verify_target_identity(&parent, leaf, receipt.target, true)?;
+        verify_lexical_snapshot(root, receipt, false, true)?;
+        parent.rename(temp_name_ref, &parent, leaf).map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot atomically replace parent-owned file",
+            )
+        })?;
+        rustix::fs::fsync(&parent).map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot sync parent-owned destination directory",
+            )
+        })?;
+
+        attested.verify_live_identity()?;
+        verify_component_identities(root, parent_parts, &parent_components)?;
+        let target = target_identity(&parent, leaf)?.ok_or_else(|| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "published parent-owned file disappeared",
+            )
+        })?;
+        if target.kind != EntryKind::File {
+            return Err(error(
+                ParentRootReject::RootRaceDetected,
+                "published parent-owned target is not a regular file",
+            ));
+        }
+        let lexical_snapshot = capture_lexical_snapshot(root, &receipt.lexical_path)?;
+        if receipt
+            .lexical_snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.entry.as_ref())
+            .is_some_and(|entry| entry.kind == EntryKind::Symlink)
+            && receipt.lexical_snapshot != lexical_snapshot
+        {
+            return Err(error(
+                ParentRootReject::RootRaceDetected,
+                "lexical symlink changed during atomic replacement",
+            ));
+        }
+        let mut refreshed = receipt.clone();
+        refreshed.parent_components = parent_components.clone();
+        refreshed.target = Some(target);
+        refreshed.lexical_snapshot = lexical_snapshot;
+        verify_lexical_snapshot(root, &refreshed, true, false)?;
+        attested.verify_live_identity()?;
+        Ok(refreshed)
+    })();
+
+    let cleanup_result = temp_name
+        .as_ref()
+        .map(|name| cleanup(&parent, name))
+        .transpose();
+    match (operation_result, cleanup_result) {
+        (Ok(receipt), Ok(_)) => Ok(receipt),
+        (Ok(_), Err(cleanup_error)) if cleanup_error.kind() != std::io::ErrorKind::NotFound => {
+            Err(error(
+                ParentRootReject::RootRaceDetected,
+                format!("atomic replacement cleanup failed: {cleanup_error}"),
+            ))
+        }
+        (Ok(receipt), Err(_)) => Ok(receipt),
+        (Err(primary), Ok(_)) => Err(primary),
+        (Err(primary), Err(cleanup_error))
+            if cleanup_error.kind() != std::io::ErrorKind::NotFound =>
+        {
+            Err(error(
+                ParentRootReject::RootRaceDetected,
+                format!("{primary}; atomic replacement cleanup failed: {cleanup_error}"),
+            ))
+        }
+        (Err(primary), Err(_)) => Err(primary),
+    }
+}
+
+fn write_all_progress<W: Write>(writer: &mut W, bytes: &[u8]) -> std::io::Result<()> {
+    writer.write_all(bytes)
+}
+
+fn create_private_directory(parent: &Dir, name: &OsStr) -> Result<(), AuthorityError> {
+    let mut builder = DirBuilder::new();
+    builder.mode(0o700);
+    match parent.create_dir_with(name, &builder) {
+        Ok(()) => Ok(()),
+        Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(_) => Err(error(
+            ParentRootReject::RootRaceDetected,
+            "cannot create parent-owned directory component",
+        )),
+    }
 }
 
 fn verify_live_root(
@@ -1893,6 +2839,213 @@ fn write_locked_state(
 
 fn error(reject: ParentRootReject, detail: impl Into<String>) -> AuthorityError {
     AuthorityError::new(reject, detail)
+}
+
+#[cfg(test)]
+mod parent_file_tests {
+    use super::*;
+    use crate::authority::{
+        AttestationRequest, AttestedParent, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
+    };
+    use std::io::{self, Write};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_ROOT: AtomicUsize = AtomicUsize::new(0);
+
+    struct GitTempRoot(PathBuf);
+
+    impl GitTempRoot {
+        fn new() -> Self {
+            let id = NEXT_ROOT.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "agent-canon-authority-effects-{}-{id}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&path).expect("create temporary Git root");
+            let path = fs::canonicalize(path).expect("canonicalize temporary Git root");
+            let init = Command::new("git")
+                .args(["init", "-q", "-b", "main"])
+                .arg(&path)
+                .status()
+                .expect("initialize temporary Git root");
+            assert!(init.success());
+            let root = path.to_str().expect("temporary root is UTF-8");
+            let remote = Command::new("git")
+                .args([
+                    "-C",
+                    root,
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/authority-effects.git",
+                ])
+                .status()
+                .expect("set fixture Git remote");
+            assert!(remote.success());
+            let commit = Command::new("git")
+                .args([
+                    "-C",
+                    root,
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "fixture",
+                ])
+                .status()
+                .expect("commit fixture Git root");
+            assert!(commit.success());
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for GitTempRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn attested_fixture() -> (GitTempRoot, AttestedParent) {
+        let root = GitTempRoot::new();
+        let request = AttestationRequest {
+            cwd: root.path().to_path_buf(),
+            explicit_root: Some(root.path().to_path_buf()),
+            source_root: None,
+            clone_root: None,
+            topic_marker: None,
+            gitmodules: None,
+            owner_evidence: None,
+            expected_remote: None,
+            expected_module_digest: None,
+            child_handoff_token: None,
+            purpose: NonEmptyTrimmedString::new("parent-file-unit").unwrap(),
+            nonce: Nonce128::generate().unwrap(),
+        };
+        let attested = ParentRootAttestor::new()
+            .attest(&request)
+            .expect("attest temporary Git root");
+        (root, attested)
+    }
+
+    struct ShortFileWriter<'a> {
+        file: &'a mut cap_std::fs::File,
+        max_write: usize,
+    }
+
+    impl Write for ShortFileWriter<'_> {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.file.write(&bytes[..bytes.len().min(self.max_write)])
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.file.flush()
+        }
+    }
+
+    struct NoProgressWriter;
+
+    impl Write for NoProgressWriter {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn atomic_replace_handles_short_writes_and_cleans_zero_progress() {
+        let (root, attested) = attested_fixture();
+        let purpose = NonEmptyTrimmedString::new("short-write").unwrap();
+        let receipt = attested
+            .resolve_parent_owned_path(Path::new("short/result.txt"), purpose.clone())
+            .unwrap();
+        let payload = b"short-write-payload";
+        let published = atomic_replace_with_hooks(
+            &attested,
+            &receipt,
+            payload,
+            FileMode::Private0600,
+            |file, bytes| {
+                let mut writer = ShortFileWriter { file, max_write: 2 };
+                write_all_progress(&mut writer, bytes)
+            },
+            |directory, name| directory.remove_file(name),
+        )
+        .expect("short writes complete through write_all");
+        assert_eq!(
+            attested.read_parent_owned_file(&published).unwrap(),
+            payload
+        );
+
+        let zero_receipt = attested
+            .resolve_parent_owned_path(Path::new("zero/result.txt"), purpose)
+            .unwrap();
+        let rejected = atomic_replace_with_hooks(
+            &attested,
+            &zero_receipt,
+            b"no progress",
+            FileMode::Private0600,
+            |_file, bytes| {
+                let mut writer = NoProgressWriter;
+                write_all_progress(&mut writer, bytes)
+            },
+            |directory, name| directory.remove_file(name),
+        )
+        .expect_err("zero-progress write fails closed");
+        assert_eq!(rejected.reject, ParentRootReject::RootRaceDetected);
+        assert_eq!(fs::read_dir(root.path().join("zero")).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn atomic_replace_surfaces_cleanup_failure_after_publication() {
+        let (root, attested) = attested_fixture();
+        let purpose = NonEmptyTrimmedString::new("cleanup-failure").unwrap();
+        let receipt = attested
+            .resolve_parent_owned_path(Path::new("cleanup/result.txt"), purpose.clone())
+            .unwrap();
+        let rejected = atomic_replace_with_hooks(
+            &attested,
+            &receipt,
+            b"published-before-cleanup-error",
+            FileMode::Private0600,
+            |file, bytes| write_all_progress(file, bytes),
+            |_directory, _name| {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "injected cleanup failure",
+                ))
+            },
+        )
+        .expect_err("cleanup failure remains observable after rename");
+        assert_eq!(rejected.reject, ParentRootReject::RootRaceDetected);
+        assert!(rejected.detail().contains("cleanup failed"));
+        assert_eq!(
+            fs::read(root.path().join("cleanup/result.txt")).unwrap(),
+            b"published-before-cleanup-error"
+        );
+
+        let published = attested
+            .resolve_parent_owned_path(Path::new("cleanup/result.txt"), purpose)
+            .unwrap();
+        assert_eq!(
+            attested.read_parent_owned_file(&published).unwrap(),
+            b"published-before-cleanup-error"
+        );
+        assert_eq!(
+            fs::read_dir(root.path().join("cleanup")).unwrap().count(),
+            1,
+            "rename consumes the temporary entry even when cleanup reports failure"
+        );
+    }
 }
 
 #[cfg(test)]

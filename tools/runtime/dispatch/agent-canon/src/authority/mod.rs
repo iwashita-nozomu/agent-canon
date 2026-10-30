@@ -5,6 +5,7 @@
 
 use cap_std::fs::Dir;
 use sha2::{Digest, Sha256};
+use std::ffi::OsString;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -470,6 +471,79 @@ impl VerifiedChildHandoff {
     }
 }
 
+/// A validated file mode admitted by atomic parent-owned replacement.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FileMode {
+    Private0600,
+}
+
+/// A sealed capability snapshot for one file beneath an attested owner root.
+#[derive(Clone, Debug)]
+pub struct ParentOwnedPathReceipt {
+    lexical_path: PathBuf,
+    physical_path: PathBuf,
+    owner: OwnerRoot,
+    owner_path: PathBuf,
+    owner_identity: FileIdentity,
+    purpose: NonEmptyTrimmedString,
+    token_digest: Option<Sha256Digest>,
+    parent_components: Vec<ComponentIdentity>,
+    target: Option<TargetIdentity>,
+    lexical_snapshot: Option<LexicalSnapshot>,
+}
+
+impl ParentOwnedPathReceipt {
+    pub fn lexical_path(&self) -> &Path {
+        &self.lexical_path
+    }
+
+    pub fn physical_path(&self) -> &Path {
+        &self.physical_path
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OwnerRoot {
+    Parent,
+    GitCommon,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ComponentIdentity {
+    pub(crate) name: OsString,
+    pub(crate) identity: FileIdentity,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EntryKind {
+    File,
+    Directory,
+    Symlink,
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TargetIdentity {
+    pub(crate) identity: FileIdentity,
+    pub(crate) kind: EntryKind,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LexicalSnapshot {
+    pub(crate) parent_path: PathBuf,
+    pub(crate) parent_components: Vec<ComponentIdentity>,
+    pub(crate) parent_identity: FileIdentity,
+    pub(crate) entry: Option<LexicalEntrySnapshot>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct LexicalEntrySnapshot {
+    pub(crate) name: OsString,
+    pub(crate) identity: FileIdentity,
+    pub(crate) kind: EntryKind,
+    pub(crate) symlink_target: Option<PathBuf>,
+}
+
 /// Root and Git-common-directory identity established by attestation.
 pub struct AttestedParent {
     pub(crate) parent_root: PhysicalRoot,
@@ -532,6 +606,39 @@ impl AttestedParent {
 
     pub fn token_digest(&self) -> Option<Sha256Digest> {
         self.token_digest
+    }
+
+    pub fn resolve_parent_owned_path(
+        &self,
+        candidate: &Path,
+        purpose: NonEmptyTrimmedString,
+    ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+        platform::resolve_parent_owned_path(self, candidate, purpose)
+    }
+
+    pub fn read_parent_owned_file(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+    ) -> Result<Vec<u8>, AuthorityError> {
+        platform::read_parent_owned_file(self, receipt)
+    }
+
+    pub fn atomic_replace_parent_owned_file(
+        &self,
+        receipt: &ParentOwnedPathReceipt,
+        bytes: &[u8],
+        mode: FileMode,
+    ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+        platform::atomic_replace_parent_owned_file(self, receipt, bytes, mode)
+    }
+
+    pub fn write_parent_owned_file(
+        &self,
+        candidate: &Path,
+        bytes: &[u8],
+        purpose: NonEmptyTrimmedString,
+    ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
+        platform::write_parent_owned_file(self, candidate, bytes, purpose)
     }
 }
 
@@ -598,12 +705,18 @@ impl ParentRootAttestor {
 
 #[cfg(target_os = "linux")]
 mod platform {
-    pub(crate) use super::linux::{attest, issue_child_handoff, verify_live_identity};
+    pub(crate) use super::linux::{
+        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
+        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+    };
 }
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
-    pub(crate) use super::unsupported::{attest, issue_child_handoff, verify_live_identity};
+    pub(crate) use super::unsupported::{
+        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
+        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+    };
 }
 
 pub(crate) fn digest_bytes(bytes: &[u8]) -> Sha256Digest {
