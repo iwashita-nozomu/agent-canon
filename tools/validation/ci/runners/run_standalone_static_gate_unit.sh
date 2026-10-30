@@ -172,6 +172,7 @@ run_contracts() {
     tests.agent_tools.test_graph_client_source_projection \
     tests.tools.test_notebook_quality \
     tests.agent_tools.test_check_semantic_responsibility_contract \
+    tests.agent_tools.test_check_run_log_contract \
     tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
