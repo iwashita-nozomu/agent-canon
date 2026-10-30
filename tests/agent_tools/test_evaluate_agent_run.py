@@ -79,8 +79,9 @@ def write_evaluation(report_dir: Path) -> tuple[subprocess.CompletedProcess[str]
         text=True,
     )
     report_path = runtime / "agent_evaluation.md"
-    return result, report_path.read_text(encoding="utf-8") if report_path.is_file() else ""
-
+    return result, report_path.read_text(
+        encoding="utf-8"
+    ) if report_path.is_file() else ""
 
 
 def write_lines(path: Path, lines: list[str]) -> None:
@@ -324,22 +325,33 @@ class EvaluateAgentRunTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("usage: agent-canon run-evaluation", result.stdout)
-        self.assertFalse((PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py").exists())
+        self.assertFalse(
+            (PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py").exists()
+        )
 
     def test_selected_and_unselected_planning_artifacts_keep_fixed_scores(self) -> None:
         """Only manifest-required schedule/work-log files affect these criteria."""
-        for case, schedule_state in (("unselected_absent", "absent"), ("unselected_malformed", "malformed")):
+        for case, schedule_state in (
+            ("unselected_absent", "absent"),
+            ("unselected_malformed", "malformed"),
+        ):
             with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp_dir:
                 report_dir = Path(tmp_dir) / "run"
                 write_ready_run(report_dir)
-                selected = tuple(name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md")
+                selected = tuple(
+                    name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md"
+                )
                 write_team_manifest(report_dir, selected)
                 (report_dir / "schedule.md").unlink()
                 if schedule_state == "malformed":
-                    (report_dir / "schedule.md").write_text("not a schedule", encoding="utf-8")
+                    (report_dir / "schedule.md").write_text(
+                        "not a schedule", encoding="utf-8"
+                    )
                 result, report = write_evaluation(report_dir)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("| planned_work_and_chronology | 10 | 10 | pass |", report)
+                self.assertIn(
+                    "| planned_work_and_chronology | 10 | 10 | pass |", report
+                )
                 self.assertIn("| artifact_completeness | 8 | 8 | pass |", report)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -356,7 +368,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
-            materialized = tuple(name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md")
+            materialized = tuple(
+                name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md"
+            )
             write_team_manifest(report_dir, READY_REQUIRED_OUTPUTS, materialized)
             self.assertTrue((report_dir / "schedule.md").is_file())
             result, report = write_evaluation(report_dir)
@@ -370,7 +384,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             selected = tuple(
-                name for name in READY_REQUIRED_OUTPUTS
+                name
+                for name in READY_REQUIRED_OUTPUTS
                 if name not in {"schedule.md", "work_log.md"}
             )
             write_team_manifest(report_dir, selected)
@@ -400,7 +415,14 @@ class EvaluateAgentRunTest(unittest.TestCase):
             write_ready_run(report_dir)
             write_lines(
                 report_dir / "team_manifest.yaml",
-                ["run:", "  id: invalid", "roles:", "  - id: evaluator", "artifacts:", "  - schedule.md"],
+                [
+                    "run:",
+                    "  id: invalid",
+                    "roles:",
+                    "  - id: evaluator",
+                    "artifacts:",
+                    "  - schedule.md",
+                ],
             )
             result, report = write_evaluation(report_dir)
             self.assertNotEqual(result.returncode, 0)
@@ -421,7 +443,9 @@ class EvaluateAgentRunTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "empty"
             write_ready_run(report_dir)
-            (report_dir / "work_log.md").write_text("# Work Log\n## Entries\nNo bullets here.\n", encoding="utf-8")
+            (report_dir / "work_log.md").write_text(
+                "# Work Log\n## Entries\nNo bullets here.\n", encoding="utf-8"
+            )
             result, report = write_evaluation(report_dir)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("work_log.md:entries_empty", report)
@@ -510,6 +534,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "generated_role_view_v1 profile-attribution topology_derived_v1 "
                     "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
                     "model-capacity thread-capacity",
+                    "--behavior-event",
+                    "execution_path_comparison_not_required reason=unit-test-single-route",
                     "--decision",
                     "skill_improvement_decision=recorded",
                     "--decision",
