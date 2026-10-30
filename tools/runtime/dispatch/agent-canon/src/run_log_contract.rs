@@ -76,28 +76,6 @@ impl Finding {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OutputFormat {
-    Text,
-    Json,
-}
-
-#[derive(Debug)]
-struct Args {
-    root: PathBuf,
-    paths: Vec<String>,
-    excludes: Vec<String>,
-    format: OutputFormat,
-    fail_on_finding: bool,
-}
-
-#[derive(Debug)]
-enum ParsedArgs {
-    Help,
-    Run(Args),
-    Error(String),
-}
-
 struct FindingVisitor<'a> {
     relative_path: &'a str,
     source: &'a str,
