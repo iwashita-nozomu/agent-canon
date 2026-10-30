@@ -1005,42 +1005,57 @@ fn python_repr(value: &JsonValue) -> JsonString {
 }
 
 fn python_string_repr(value: &JsonString) -> JsonString {
-    let has_single_quote = value.0.contains(&u32::from(b'\''));
-    let has_double_quote = value.0.contains(&u32::from(b'"'));
-    let quote = if has_single_quote && !has_double_quote {
-        u32::from(b'"')
-    } else {
-        u32::from(b'\'')
+    let Some(text) = value.to_text() else {
+        return python_string_repr_with_surrogates(value);
     };
-    let mut rendered = JsonString::default();
-    rendered.0.push(quote);
+    JsonString::from_text(&rustpython_ast::Constant::Str(text).to_string())
+}
+
+fn python_string_repr_with_surrogates(value: &JsonString) -> JsonString {
+    let scalar_projection: String = value
+        .0
+        .iter()
+        .filter_map(|codepoint| char::from_u32(*codepoint))
+        .collect();
+    let probe = rustpython_ast::Constant::Str(scalar_projection).to_string();
+    let quote = probe
+        .chars()
+        .next()
+        .expect("RustPython string repr has quotes");
+    let mut rendered = String::with_capacity(probe.len() + value.0.len() * 6);
+    rendered.push(quote);
+
+    let mut segment = String::new();
     for &codepoint in &value.0 {
-        match codepoint {
-            0x5c => rendered.push_text("\\\\"),
-            0x0a => rendered.push_text("\\n"),
-            0x0d => rendered.push_text("\\r"),
-            0x09 => rendered.push_text("\\t"),
-            value if value == quote => {
-                rendered.0.push(u32::from(b'\\'));
-                rendered.0.push(value);
-            }
-            value if (0xd800..=0xdfff).contains(&value) => {
-                use fmt::Write as _;
-                let mut escape = String::new();
-                let _ = write!(escape, "\\u{value:04x}");
-                rendered.push_text(&escape);
-            }
-            value if char::from_u32(value).is_some_and(char::is_control) => {
-                use fmt::Write as _;
-                let mut escape = String::new();
-                let _ = write!(escape, "\\x{value:02x}");
-                rendered.push_text(&escape);
-            }
-            value => rendered.0.push(value),
+        if let Some(character) = char::from_u32(codepoint) {
+            segment.push(character);
+        } else {
+            rendered.push_str(&rustpython_string_repr_segment(&segment, quote));
+            segment.clear();
+            use fmt::Write as _;
+            let _ = write!(rendered, "\\u{codepoint:04x}");
         }
     }
-    rendered.0.push(quote);
-    rendered
+    rendered.push_str(&rustpython_string_repr_segment(&segment, quote));
+    rendered.push(quote);
+    JsonString::from_text(&rendered)
+}
+
+fn rustpython_string_repr_segment(segment: &str, quote: char) -> String {
+    if segment.is_empty() {
+        return String::new();
+    }
+    let helper_quote = if quote == '\'' { '"' } else { '\'' };
+    let mut with_helper_quote = segment.to_owned();
+    with_helper_quote.push(helper_quote);
+    let repr = rustpython_ast::Constant::Str(with_helper_quote).to_string();
+    let body = repr
+        .strip_prefix(quote)
+        .and_then(|repr| repr.strip_suffix(quote))
+        .expect("RustPython repr quote matches the whole string quote");
+    body.strip_suffix(helper_quote)
+        .expect("the helper quote remains a trailing literal character")
+        .to_owned()
 }
 
 fn python_float(value: f64) -> String {

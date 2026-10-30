@@ -88,3 +88,28 @@ def test_hlo_summary_counts_ops(tmp_path: Path) -> None:
     assert ["stablehlo", 1] in summary["dialects"]
     assert ["stablehlo.add", 1] in summary["top_ops"]
     assert ["stablehlo.multiply", 1] in summary["top_ops"]
+
+
+def test_hlo_summary_preserves_python_nested_tag_repr(tmp_path: Path) -> None:
+    """Nested tag strings keep Python repr escapes, including lone surrogates."""
+    source = tmp_path / "unicode-hlo.jsonl"
+    tag = {"nested": "separator:\u2028nbsp:\u00a0surrogate:\ud800control:\x01"}
+    hlo_text = "\ud800\x01\n"
+    source.write_text(
+        json.dumps(
+            {"case": "hlo", "tag": tag, "hlo": hlo_text},
+            ensure_ascii=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["tags"] == [[str(tag), 1]]
+    assert summary["hlo_text"]["total_chars"] == len(hlo_text)
+    assert summary["hlo_text"]["total_lines"] == sum(
+        bool(line.strip()) for line in hlo_text.splitlines()
+    )
