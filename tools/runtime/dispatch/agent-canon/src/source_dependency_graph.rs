@@ -578,7 +578,8 @@ fn diagnostic_error(
                 "{relative}:{line_number}: dependency line must be direction kind relative-path reason"
             )));
         }
-        let fields = legacy_fields(&strip_legacy_line(raw_line));
+        let normalized_line = strip_legacy_line(raw_line);
+        let fields = legacy_fields(&normalized_line);
         let declared_target = fields
             .get(2)
             .copied()
@@ -797,7 +798,8 @@ fn parse_manifest_document_with_projections(
             .find(|(line_number, _)| *line_number == declaration.line_number)
             .map(|(_, line)| line.as_str())
             .unwrap_or(&declaration.line);
-        let fields = legacy_fields(&strip_legacy_line(raw_line));
+        let normalized_line = strip_legacy_line(raw_line);
+        let fields = legacy_fields(&normalized_line);
         if fields.len() != MANIFEST_FIELD_COUNT {
             return Err(SourceDependencyError::new(format!(
                 "{canonical}:{}: dependency line must be direction kind relative-path reason",
@@ -859,7 +861,7 @@ pub fn dependency_documents(
         if !is_text_source(&relative) || canonical_sources.contains(&relative) {
             continue;
         }
-        let Ok((canonical, source)) =
+        let Ok((canonical, _)) =
             resolve_source_path_with_projections(&root, &relative, Some(&projections))
         else {
             // Git links, deleted paths, and unavailable generated views are not text sources.
