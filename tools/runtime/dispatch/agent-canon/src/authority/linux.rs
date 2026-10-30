@@ -744,7 +744,7 @@ pub(crate) fn read_parent_owned_file(
         ));
     }
     verify_component_identities(root, parent_parts, &receipt.parent_components)?;
-    verify_target_identity(parent, leaf, Some(target))?;
+    verify_target_identity(&parent, leaf, Some(target), false)?;
     verify_lexical_snapshot(root, receipt, true, false)?;
     attested.verify_live_identity()?;
     Ok(bytes)
