@@ -161,3 +161,45 @@ def test_hlo_summary_reads_universal_newlines(tmp_path: Path) -> None:
     assert summary["total_records"] == 2
     assert summary["total_selected"] == 1
     assert ["stablehlo.add", 1] in summary["top_ops"]
+
+
+def test_hlo_summary_matches_python_nesting_boundary(tmp_path: Path) -> None:
+    """The iterative reader accepts Python's measured limit and rejects the next level."""
+    source = tmp_path / "deep-record.jsonl"
+    prefix = b'{"case":"hlo","payload":'
+    suffix = b"}\n"
+
+    source.write_bytes(prefix + b"[" * 9994 + b"0" + b"]" * 9994 + suffix)
+    accepted = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert accepted.returncode == 0, accepted.stderr
+    summary = json.loads(accepted.stdout)
+    assert summary["total_records"] == 1
+    assert summary["total_selected"] == 1
+
+    source.write_bytes(prefix + b"[" * 9995 + b"0" + b"]" * 9995 + suffix)
+    rejected = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert rejected.returncode != 0
+
+
+def test_hlo_summary_renders_deep_selected_tag_and_hlo_newlines(tmp_path: Path) -> None:
+    """Nested tag repr and CRLF HLO splitting remain stack safe and Python compatible."""
+    source = tmp_path / "deep-tag.jsonl"
+    tag: object = 0
+    for _ in range(500):
+        tag = [tag]
+    hlo_text = "%0 = op()\r\n%1 = op2()"
+    source.write_text(
+        json.dumps({"case": "hlo", "tag": tag, "hlo": hlo_text}, ensure_ascii=True)
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["tags"] == [[str(tag), 1]]
+    assert summary["hlo_text"]["total_chars"] == len(hlo_text)
+    assert summary["hlo_text"]["total_lines"] == 2

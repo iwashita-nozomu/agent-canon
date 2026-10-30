@@ -151,17 +151,17 @@ impl<'de> Deserialize<'de> for JsonString {
     }
 }
 
-#[derive(Debug, Clone)]
 enum JsonValue {
     Null,
     Bool(bool),
     Number(JsonNumber),
     String(JsonString),
-    Array(Vec<JsonValue>),
+    Array(JsonArray),
     Object(JsonObject),
 }
 
-#[derive(Debug, Clone)]
+struct JsonArray(Vec<JsonValue>);
+
 enum JsonNumber {
     Integer(String),
     Float(f64),
@@ -207,15 +207,16 @@ fn parse_json_line(input: &str) -> Result<JsonValue, String> {
     JsonParser::new(input).parse()
 }
 
-const MAX_JSON_NESTING: usize = 1000;
+// Python accepts 9,994 arrays nested inside the record object (9,995 containers total).
+const MAX_JSON_NESTING: usize = 9995;
 
 enum JsonFrame {
     Array {
-        values: Vec<JsonValue>,
+        values: JsonArray,
         state: ArrayState,
     },
     Object {
-        values: Vec<(JsonString, JsonValue)>,
+        values: JsonObject,
         key: Option<JsonString>,
         state: ObjectState,
     },
@@ -294,7 +295,7 @@ impl<'a> JsonParser<'a> {
                             if !matches!(state, ArrayState::ValueOrEnd | ArrayState::Value) {
                                 return Err(self.error("unexpected array value"));
                             }
-                            values.push(value);
+                            values.0.push(value);
                             *state = ArrayState::CommaOrEnd;
                         }
                         JsonFrame::Object { values, key, state } => {
@@ -303,11 +304,11 @@ impl<'a> JsonParser<'a> {
                             }
                             let key = key.take().ok_or_else(|| self.error("missing object key"))?;
                             if let Some(position) =
-                                values.iter().position(|(existing, _)| existing == &key)
+                                values.0.iter().position(|(existing, _)| existing == &key)
                             {
-                                values[position].1 = value;
+                                values.0[position].1 = value;
                             } else {
-                                values.push((key, value));
+                                values.0.push((key, value));
                             }
                             *state = ObjectState::CommaOrEnd;
                         }
@@ -417,7 +418,7 @@ impl<'a> JsonParser<'a> {
                 self.check_depth(frames.len())?;
                 self.index += 1;
                 frames.push(JsonFrame::Object {
-                    values: Vec::new(),
+                    values: JsonObject(Vec::new()),
                     key: None,
                     state: ObjectState::KeyOrEnd,
                 });
@@ -427,7 +428,7 @@ impl<'a> JsonParser<'a> {
                 self.check_depth(frames.len())?;
                 self.index += 1;
                 frames.push(JsonFrame::Array {
-                    values: Vec::new(),
+                    values: JsonArray(Vec::new()),
                     state: ArrayState::ValueOrEnd,
                 });
                 Ok(None)
@@ -581,14 +582,47 @@ fn pop_frame(frames: &mut Vec<JsonFrame>) -> Result<JsonValue, String> {
         Some(JsonFrame::Array { values, .. }) => Ok(JsonValue::Array(values)),
         Some(JsonFrame::Object {
             values, key: None, ..
-        }) => Ok(JsonValue::Object(JsonObject(values))),
+        }) => Ok(JsonValue::Object(values)),
         Some(JsonFrame::Object { .. }) => Err("object closed with an incomplete key".to_owned()),
         None => Err("container stack is empty".to_owned()),
     }
 }
 
-#[derive(Debug, Clone)]
 struct JsonObject(Vec<(JsonString, JsonValue)>);
+
+impl Drop for JsonArray {
+    fn drop(&mut self) {
+        discard_json_values(std::mem::take(&mut self.0));
+    }
+}
+
+impl Drop for JsonObject {
+    fn drop(&mut self) {
+        discard_json_values(
+            std::mem::take(&mut self.0)
+                .into_iter()
+                .map(|(_, value)| value),
+        );
+    }
+}
+
+fn discard_json_values(values: impl IntoIterator<Item = JsonValue>) {
+    // Empty child containers before their normal field drops to keep destruction iterative.
+    let mut pending: Vec<JsonValue> = values.into_iter().collect();
+    while let Some(mut value) = pending.pop() {
+        match &mut value {
+            JsonValue::Array(array) => pending.extend(std::mem::take(&mut array.0)),
+            JsonValue::Object(object) => {
+                pending.extend(
+                    std::mem::take(&mut object.0)
+                        .into_iter()
+                        .map(|(_, value)| value),
+                );
+            }
+            JsonValue::Null | JsonValue::Bool(_) | JsonValue::Number(_) | JsonValue::String(_) => {}
+        }
+    }
+}
 
 #[derive(Default)]
 struct Counter(Vec<(JsonString, usize)>);
@@ -1044,36 +1078,50 @@ fn python_string(value: &JsonValue) -> JsonString {
 }
 
 fn python_repr(value: &JsonValue) -> JsonString {
-    match value {
-        JsonValue::Null => JsonString::from_text("None"),
-        JsonValue::Bool(value) => JsonString::from_text(if *value { "True" } else { "False" }),
-        JsonValue::Number(value) => JsonString::from_text(&value.python_string()),
-        JsonValue::String(value) => python_string_repr(value),
-        JsonValue::Array(values) => {
-            let mut rendered = JsonString::from_text("[");
-            for (index, value) in values.iter().enumerate() {
-                if index > 0 {
-                    rendered.push_text(", ");
+    enum Action<'a> {
+        Value(&'a JsonValue),
+        String(&'a JsonString),
+        Text(&'static str),
+    }
+
+    let mut output = JsonString::default();
+    let mut actions = vec![Action::Value(value)];
+    while let Some(action) = actions.pop() {
+        match action {
+            Action::Text(text) => output.push_text(text),
+            Action::String(value) => output.0.extend(python_string_repr(value).0),
+            Action::Value(value) => match value {
+                JsonValue::Null => output.push_text("None"),
+                JsonValue::Bool(value) => output.push_text(if *value { "True" } else { "False" }),
+                JsonValue::Number(value) => output.push_text(&value.python_string()),
+                JsonValue::String(value) => output.0.extend(python_string_repr(value).0),
+                JsonValue::Array(values) => {
+                    output.push_text("[");
+                    actions.push(Action::Text("]"));
+                    for index in (0..values.0.len()).rev() {
+                        actions.push(Action::Value(&values.0[index]));
+                        if index > 0 {
+                            actions.push(Action::Text(", "));
+                        }
+                    }
                 }
-                rendered.0.extend(python_repr(value).0);
-            }
-            rendered.push_text("]");
-            rendered
-        }
-        JsonValue::Object(values) => {
-            let mut rendered = JsonString::from_text("{");
-            for (index, (key, value)) in values.0.iter().enumerate() {
-                if index > 0 {
-                    rendered.push_text(", ");
+                JsonValue::Object(values) => {
+                    output.push_text("{");
+                    actions.push(Action::Text("}"));
+                    for index in (0..values.0.len()).rev() {
+                        let (key, value) = &values.0[index];
+                        actions.push(Action::Value(value));
+                        actions.push(Action::Text(": "));
+                        actions.push(Action::String(key));
+                        if index > 0 {
+                            actions.push(Action::Text(", "));
+                        }
+                    }
                 }
-                rendered.0.extend(python_string_repr(key).0);
-                rendered.push_text(": ");
-                rendered.0.extend(python_repr(value).0);
-            }
-            rendered.push_text("}");
-            rendered
+            },
         }
     }
+    output
 }
 
 fn python_string_repr(value: &JsonString) -> JsonString {
@@ -1131,69 +1179,7 @@ fn rustpython_string_repr_segment(segment: &str, quote: char) -> String {
 }
 
 fn python_float(value: f64) -> String {
-    if value.is_nan() {
-        return "nan".to_owned();
-    }
-    if value == f64::INFINITY {
-        return "inf".to_owned();
-    }
-    if value == f64::NEG_INFINITY {
-        return "-inf".to_owned();
-    }
-    if value == 0.0 {
-        return if value.is_sign_negative() {
-            "-0.0"
-        } else {
-            "0.0"
-        }
-        .to_owned();
-    }
-
-    let scientific = format!("{value:e}");
-    let Some((mantissa, exponent_text)) = scientific.split_once('e') else {
-        return scientific;
-    };
-    let exponent = exponent_text.parse::<i32>().unwrap_or(0);
-    if !(-4..16).contains(&exponent) {
-        let mut output = mantissa.to_owned();
-        if !output.contains('.') {
-            output.push_str(".0");
-        }
-        output.push('e');
-        output.push(if exponent >= 0 { '+' } else { '-' });
-        let magnitude = exponent.unsigned_abs();
-        if magnitude < 10 {
-            output.push('0');
-        }
-        output.push_str(&magnitude.to_string());
-        return output;
-    }
-
-    let negative = mantissa.starts_with('-');
-    let digits = mantissa.trim_start_matches('-').replace('.', "");
-    let decimal_point = exponent + 1;
-    let mut output = String::new();
-    if negative {
-        output.push('-');
-    }
-    if decimal_point <= 0 {
-        output.push_str("0.");
-        output.extend(std::iter::repeat_n('0', (-decimal_point) as usize));
-        output.push_str(&digits);
-    } else if decimal_point as usize >= digits.len() {
-        output.push_str(&digits);
-        output.extend(std::iter::repeat_n(
-            '0',
-            decimal_point as usize - digits.len(),
-        ));
-        output.push_str(".0");
-    } else {
-        let split = decimal_point as usize;
-        output.push_str(&digits[..split]);
-        output.push('.');
-        output.push_str(&digits[split..]);
-    }
-    output
+    rustpython_ast::Constant::Float(value).to_string()
 }
 
 fn json_float(value: f64) -> String {
@@ -1219,27 +1205,50 @@ fn json_string(value: &JsonString) -> Result<String, String> {
 }
 
 fn json_value(value: &JsonValue) -> Result<String, String> {
-    Ok(match value {
-        JsonValue::Null => "null".to_owned(),
-        JsonValue::Bool(value) => value.to_string(),
-        JsonValue::Number(value) => value.json_string(),
-        JsonValue::String(value) => json_string(value)?,
-        JsonValue::Array(values) => format!(
-            "[{}]",
-            values
-                .iter()
-                .map(json_value)
-                .collect::<Result<Vec<_>, _>>()?
-                .join(", ")
-        ),
-        JsonValue::Object(values) => {
-            let mut rendered = Vec::with_capacity(values.0.len());
-            for (key, value) in &values.0 {
-                rendered.push(format!("{}: {}", json_string(key)?, json_value(value)?));
-            }
-            format!("{{{}}}", rendered.join(", "))
+    enum Action<'a> {
+        Value(&'a JsonValue),
+        String(&'a JsonString),
+        Text(&'static str),
+    }
+
+    let mut output = String::new();
+    let mut actions = vec![Action::Value(value)];
+    while let Some(action) = actions.pop() {
+        match action {
+            Action::Text(text) => output.push_str(text),
+            Action::String(value) => output.push_str(&json_string(value)?),
+            Action::Value(value) => match value {
+                JsonValue::Null => output.push_str("null"),
+                JsonValue::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
+                JsonValue::Number(value) => output.push_str(&value.json_string()),
+                JsonValue::String(value) => output.push_str(&json_string(value)?),
+                JsonValue::Array(values) => {
+                    output.push('[');
+                    actions.push(Action::Text("]"));
+                    for index in (0..values.0.len()).rev() {
+                        actions.push(Action::Value(&values.0[index]));
+                        if index > 0 {
+                            actions.push(Action::Text(", "));
+                        }
+                    }
+                }
+                JsonValue::Object(values) => {
+                    output.push('{');
+                    actions.push(Action::Text("}"));
+                    for index in (0..values.0.len()).rev() {
+                        let (key, value) = &values.0[index];
+                        actions.push(Action::Value(value));
+                        actions.push(Action::Text(": "));
+                        actions.push(Action::String(key));
+                        if index > 0 {
+                            actions.push(Action::Text(", "));
+                        }
+                    }
+                }
+            },
         }
-    })
+    }
+    Ok(output)
 }
 
 fn counter_json(counter: &[(JsonString, usize)]) -> Result<String, String> {
