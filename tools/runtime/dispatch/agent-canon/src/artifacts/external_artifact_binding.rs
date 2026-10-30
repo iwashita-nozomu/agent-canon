@@ -14,8 +14,8 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
 
-pub(crate) const ACK_SCHEMA: &str = "agent-canon.external-projection-acknowledgement.v1";
-pub(crate) const LOCAL_EVENT_SCHEMA: &str = "agent-canon.terminal-resume-event.v3";
+pub const ACK_SCHEMA: &str = "agent-canon.external-projection-acknowledgement.v1";
+pub const LOCAL_EVENT_SCHEMA: &str = "agent-canon.terminal-resume-event.v3";
 const FORBIDDEN_RECEIPT_FIELDS: [&str; 6] = [
     "provider_receipt_bytes_sha256",
     "receipt_artifact_identity_record_id",
@@ -38,9 +38,9 @@ const GITHUB_STATUS_MAP: [(&str, &str, &str); 4] = [
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ExternalProjectionError {
-    pub(crate) code: &'static str,
-    pub(crate) detail: String,
+pub struct ExternalProjectionError {
+    pub code: &'static str,
+    pub detail: String,
 }
 
 impl ExternalProjectionError {
@@ -71,7 +71,7 @@ impl fmt::Display for ExternalProjectionError {
 
 impl std::error::Error for ExternalProjectionError {}
 
-type Result<T> = std::result::Result<T, ExternalProjectionError>;
+pub type Result<T> = std::result::Result<T, ExternalProjectionError>;
 
 fn identity_error(error: ArtifactIdentityError) -> ExternalProjectionError {
     ExternalProjectionError {
@@ -80,7 +80,7 @@ fn identity_error(error: ArtifactIdentityError) -> ExternalProjectionError {
     }
 }
 
-fn object<'a>(value: &'a Value) -> Result<&'a Map<String, Value>> {
+fn object(value: &Value) -> Result<&Map<String, Value>> {
     value
         .as_object()
         .ok_or_else(|| ExternalProjectionError::new("external_projection:local_event_mismatch"))
@@ -213,7 +213,7 @@ fn acknowledgement_seed(record: &Value) -> Result<Value> {
     Ok(Value::Object(seed))
 }
 
-pub(crate) fn materialize_external_projection_acknowledgement(
+pub fn materialize_external_projection_acknowledgement(
     local_event: &Value,
     provider_readback: &Value,
 ) -> Result<Value> {
@@ -374,10 +374,7 @@ pub(crate) fn materialize_external_projection_acknowledgement(
         }
         if projection == "github_pr_head" {
             for field in ["head_ref", "head_oid", "head_tree"] {
-                if !record[field]
-                    .as_str()
-                    .is_some_and(|value| !value.is_empty())
-                {
+                if record[field].as_str().is_none_or(|value| value.is_empty()) {
                     return Err(ExternalProjectionError::with_detail(
                         "external_projection:null_rule_mismatch",
                         field,
@@ -405,7 +402,7 @@ pub(crate) fn materialize_external_projection_acknowledgement(
     Ok(record)
 }
 
-pub(crate) fn verify_external_projection_acknowledgement(
+pub fn verify_external_projection_acknowledgement(
     local_event: &Value,
     acknowledgement: &Value,
 ) -> Result<Value> {

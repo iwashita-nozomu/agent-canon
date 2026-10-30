@@ -12,7 +12,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 
-pub(crate) const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
+pub const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
 
 fn current_home_directory() -> Result<PathBuf, String> {
     #[cfg(windows)]
@@ -46,18 +46,17 @@ fn expand_user_path(path: &Path) -> Result<PathBuf, String> {
         return Err("named-user home expansion is unsupported".to_string());
     }
     match suffix {
-        Some(suffix) => Ok(current_home_directory()?
-            .join(suffix.trim_start_matches(|character| character == '/' || character == '\\'))),
+        Some(suffix) => Ok(current_home_directory()?.join(suffix.trim_start_matches(['/', '\\']))),
         None => Ok(path.to_path_buf()),
     }
 }
 
-pub(crate) fn runtime_root_is_explicit() -> bool {
+pub fn runtime_root_is_explicit() -> bool {
     env::var_os(RUNTIME_ROOT_ENV).is_some_and(|value| !value.is_empty())
 }
 
-#[cfg(test)]
-pub(crate) fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, String> {
+#[doc(hidden)]
+pub fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, String> {
     let source_root = expand_user_path(source_root)?;
     let source = fs::canonicalize(&source_root).map_err(|error| {
         format!(
@@ -68,7 +67,6 @@ pub(crate) fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, Stri
     test_runtime_root_for_source(&source)
 }
 
-#[cfg(test)]
 fn test_runtime_root_for_source(source: &Path) -> Result<PathBuf, String> {
     let digest = Sha256::digest(source.to_string_lossy().as_bytes());
     let key = digest[..8]
@@ -107,7 +105,7 @@ fn canonical_existing_parent(path: &Path) -> Result<PathBuf, String> {
 /// Production callers must provide `AGENT_CANON_RUNTIME_ROOT`.  Unit tests
 /// use a deterministic temporary root so that existing pure Rust fixtures can
 /// continue to exercise the public command semantics without writing source.
-pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
+pub fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
     #[cfg(test)]
     {
         // Unit tests use their deterministic fixture root, not the resident
@@ -124,7 +122,7 @@ pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String
     }
 }
 
-pub(crate) fn resolve_runtime_root_at(
+pub fn resolve_runtime_root_at(
     source_root: &Path,
     requested: Option<&Path>,
 ) -> Result<PathBuf, String> {
@@ -195,7 +193,7 @@ pub(crate) fn resolve_runtime_root_at(
 
 /// Validate a write target: it must be absolute, external to the source, and
 /// contained by the runtime root after resolving all existing symlinks.
-pub(crate) fn validate_external_target(
+pub fn validate_external_target(
     source_root: &Path,
     runtime_root: &Path,
     target: &Path,
@@ -255,7 +253,7 @@ pub(crate) fn validate_external_target(
     Ok(target)
 }
 
-pub(crate) fn stable_source_key(source_root: &Path) -> String {
+pub fn stable_source_key(source_root: &Path) -> String {
     let digest = Sha256::digest(source_root.to_string_lossy().as_bytes());
     digest[..12]
         .iter()
@@ -752,7 +750,7 @@ const SOURCE_RUNTIME_DIRECTORY: &str = ".runtime";
 const SOURCE_RUNTIME_ALLOWED_TOP_LEVELS: [&str; 2] = ["locks", "spool"];
 
 /// A validated explicit runtime artifact root. This type never grants parent-root authority.
-pub(crate) struct RuntimeArtifactBoundary {
+pub struct RuntimeArtifactBoundary {
     source_root: PathBuf,
     root: PathBuf,
     directory: RuntimeDirectory,
@@ -761,7 +759,7 @@ pub(crate) struct RuntimeArtifactBoundary {
 }
 
 /// The restricted bootstrap spool/control capability, distinct from general artifacts.
-pub(crate) struct RuntimeSpoolBoundary(RuntimeArtifactBoundary);
+pub struct RuntimeSpoolBoundary(RuntimeArtifactBoundary);
 
 impl std::ops::Deref for RuntimeSpoolBoundary {
     type Target = RuntimeArtifactBoundary;
@@ -772,7 +770,7 @@ impl std::ops::Deref for RuntimeSpoolBoundary {
 }
 
 impl RuntimeArtifactBoundary {
-    pub(crate) fn for_source(
+    pub fn for_source(
         source_root: &Path,
         requested: Option<&Path>,
         create: bool,
@@ -877,11 +875,11 @@ impl RuntimeArtifactBoundary {
         })
     }
 
-    pub(crate) fn root(&self) -> &Path {
+    pub fn root(&self) -> &Path {
         &self.root
     }
 
-    pub(crate) fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
+    pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
         let relative = if path.is_absolute() {
             path.strip_prefix(&self.root)
                 .map_err(|_| format!("path escapes runtime root: {}", path.display()))?
@@ -947,7 +945,7 @@ impl RuntimeArtifactBoundary {
         Ok(joined)
     }
 
-    pub(crate) fn ensure_directory(&self, path: &Path) -> Result<PathBuf, String> {
+    pub fn ensure_directory(&self, path: &Path) -> Result<PathBuf, String> {
         let target = if path == Path::new(".") {
             self.root.clone()
         } else {
@@ -965,7 +963,7 @@ impl RuntimeArtifactBoundary {
         Ok(target)
     }
 
-    pub(crate) fn atomic_write_bytes(
+    pub fn atomic_write_bytes(
         &self,
         path: &Path,
         bytes: &[u8],
@@ -983,16 +981,11 @@ impl RuntimeArtifactBoundary {
         Ok(target)
     }
 
-    pub(crate) fn atomic_write_text(
-        &self,
-        path: &Path,
-        text: &str,
-        mode: u32,
-    ) -> Result<PathBuf, String> {
+    pub fn atomic_write_text(&self, path: &Path, text: &str, mode: u32) -> Result<PathBuf, String> {
         self.atomic_write_bytes(path, text.as_bytes(), mode)
     }
 
-    pub(crate) fn atomic_write_json(
+    pub fn atomic_write_json(
         &self,
         path: &Path,
         value: &serde_json::Value,
@@ -1004,12 +997,7 @@ impl RuntimeArtifactBoundary {
         self.atomic_write_bytes(path, &bytes, mode)
     }
 
-    pub(crate) fn append_bytes(
-        &self,
-        path: &Path,
-        bytes: &[u8],
-        mode: u32,
-    ) -> Result<PathBuf, String> {
+    pub fn append_bytes(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<PathBuf, String> {
         let target = self.resolve(path)?;
         let relative = target
             .strip_prefix(&self.root)
@@ -1034,7 +1022,7 @@ impl RuntimeArtifactBoundary {
         Ok(target)
     }
 
-    pub(crate) fn digest(&self, path: &Path) -> Result<String, String> {
+    pub fn digest(&self, path: &Path) -> Result<String, String> {
         let target = self.resolve(path)?;
         let relative = target
             .strip_prefix(&self.root)
@@ -1052,7 +1040,7 @@ impl RuntimeArtifactBoundary {
 }
 
 impl RuntimeSpoolBoundary {
-    pub(crate) fn for_source(
+    pub fn for_source(
         source_root: &Path,
         requested: Option<&Path>,
         create: bool,
@@ -1060,7 +1048,7 @@ impl RuntimeSpoolBoundary {
         RuntimeArtifactBoundary::for_spool(source_root, requested, create).map(Self)
     }
 
-    pub(crate) fn boundary(&self) -> &RuntimeArtifactBoundary {
+    pub fn boundary(&self) -> &RuntimeArtifactBoundary {
         &self.0
     }
 }
@@ -1192,7 +1180,7 @@ const RUNTIME_PATH_ENV_NAMES: [&str; 9] = [
 ];
 
 /// Copy only non-secret process settings and attach path identities, not write attestations.
-pub(crate) fn root_capability_environment(
+pub fn root_capability_environment(
     source_root: &Path,
     runtime_root: &Path,
     base_env: Option<&BTreeMap<String, String>>,

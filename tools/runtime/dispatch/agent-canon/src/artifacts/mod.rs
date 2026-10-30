@@ -7,5 +7,5 @@
 // downstream implementation external_artifact_binding.rs local-event projection acknowledgements
 // @dependency-end
 
-pub(crate) mod artifact_identity;
-pub(crate) mod external_artifact_binding;
+pub mod artifact_identity;
+pub mod external_artifact_binding;

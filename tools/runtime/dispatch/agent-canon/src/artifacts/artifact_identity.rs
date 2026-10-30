@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use time::OffsetDateTime;
 
-pub(crate) const ARTIFACT_IDENTITY_SCHEMA: &str = "agent-canon.artifact-identity.v1";
+pub const ARTIFACT_IDENTITY_SCHEMA: &str = "agent-canon.artifact-identity.v1";
 const ARTIFACT_ROLES: [&str; 6] = [
     "review_decision",
     "review_target",
@@ -54,9 +54,9 @@ const IDENTITY_KEYS: [&str; 19] = [
 const OWNER_PATH: &str = "tools/runtime/artifacts/artifact_identity.py";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ArtifactIdentityError {
-    pub(crate) code: &'static str,
-    pub(crate) detail: String,
+pub struct ArtifactIdentityError {
+    pub code: &'static str,
+    pub detail: String,
 }
 
 impl ArtifactIdentityError {
@@ -87,7 +87,7 @@ impl fmt::Display for ArtifactIdentityError {
 
 impl std::error::Error for ArtifactIdentityError {}
 
-type Result<T> = std::result::Result<T, ArtifactIdentityError>;
+pub type Result<T> = std::result::Result<T, ArtifactIdentityError>;
 
 fn git_failure(output: &std::process::Output) -> ArtifactIdentityError {
     let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -115,7 +115,7 @@ fn reject_noncanonical_json(value: &Value) -> Result<()> {
     }
 }
 
-pub(crate) fn canonical_json_bytes<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
+pub fn canonical_json_bytes<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
     let value = serde_json::to_value(value).map_err(|error| {
         if error.to_string().contains("key must be a string") {
             ArtifactIdentityError::new("artifact_identity:non_string_key")
@@ -129,7 +129,7 @@ pub(crate) fn canonical_json_bytes<T: serde::Serialize>(value: &T) -> Result<Vec
     })
 }
 
-pub(crate) fn canonical_body_sha256(record: &Value, hash_field: &str) -> Result<String> {
+pub fn canonical_body_sha256(record: &Value, hash_field: &str) -> Result<String> {
     let Value::Object(record) = record else {
         return Err(ArtifactIdentityError::new(
             "artifact_identity:record_not_object",
@@ -148,7 +148,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Return the SHA-1 object ID Git assigns to a blob containing these exact bytes.
-pub(crate) fn git_blob_oid(data: &[u8]) -> String {
+pub fn git_blob_oid(data: &[u8]) -> String {
     let mut message = format!("blob {}\0", data.len()).into_bytes();
     message.extend_from_slice(data);
     let bit_length = (message.len() as u64).wrapping_mul(8);
@@ -529,10 +529,7 @@ fn stable_seed(record: &Value) -> Result<Value> {
     Ok(Value::Object(seed))
 }
 
-pub(crate) fn materialize_artifact_identity(
-    workspace: &Path,
-    artifact_path: &Path,
-) -> Result<Value> {
+pub fn materialize_artifact_identity(workspace: &Path, artifact_path: &Path) -> Result<Value> {
     let root = fs::canonicalize(workspace).map_err(|error| {
         ArtifactIdentityError::with_detail("artifact_identity:path_invalid", error.to_string())
     })?;
@@ -651,7 +648,7 @@ pub(crate) fn materialize_artifact_identity(
     Ok(record)
 }
 
-pub(crate) fn verify_identity_record(workspace: &Path, record: &Value) -> Result<Value> {
+pub fn verify_identity_record(workspace: &Path, record: &Value) -> Result<Value> {
     if record.get("schema").and_then(Value::as_str) != Some(ARTIFACT_IDENTITY_SCHEMA)
         || record.get("schema_version").and_then(Value::as_u64) != Some(1)
     {
@@ -745,7 +742,7 @@ pub(crate) fn verify_identity_record(workspace: &Path, record: &Value) -> Result
     }))
 }
 
-pub(crate) fn verify_artifact_identity(workspace: &Path, record_path: &Path) -> Result<Value> {
+pub fn verify_artifact_identity(workspace: &Path, record_path: &Path) -> Result<Value> {
     let root = fs::canonicalize(workspace).map_err(|error| {
         ArtifactIdentityError::with_detail("artifact_identity:path_invalid", error.to_string())
     })?;

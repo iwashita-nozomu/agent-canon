@@ -2,24 +2,20 @@
 // @dependency-start
 // contract test
 // responsibility Checks runtime artifact authority, source replay identity, and external projection binding.
+// upstream implementation ../src/lib.rs exports the shared production modules
 // upstream implementation ../src/runtime_boundary.rs owns runtime root and spool capabilities
 // upstream implementation ../src/artifacts/artifact_identity.rs owns canonical artifact identity
 // upstream implementation ../src/artifacts/external_artifact_binding.rs owns external projection acknowledgements
 // @dependency-end
 
-#[path = "../src/artifacts/mod.rs"]
-mod artifacts;
-#[path = "../src/runtime_boundary.rs"]
-mod runtime_boundary;
-
-use artifacts::artifact_identity::{
+use agent_canon::artifacts::artifact_identity::{
     canonical_json_bytes, git_blob_oid, materialize_artifact_identity, verify_identity_record,
 };
-use artifacts::external_artifact_binding::{
+use agent_canon::artifacts::external_artifact_binding::{
     materialize_external_projection_acknowledgement, verify_external_projection_acknowledgement,
     LOCAL_EVENT_SCHEMA,
 };
-use runtime_boundary::{
+use agent_canon::runtime_boundary::{
     root_capability_environment, RuntimeArtifactBoundary, RuntimeSpoolBoundary, RUNTIME_ROOT_ENV,
 };
 use serde_json::{json, Value};
