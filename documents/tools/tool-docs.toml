@@ -193,9 +193,9 @@ summary = "Dependency policy decorator for the generic repository topic clone li
 [[tool]]
 id = "classify-path-risk"
 classification = "public"
-tool = "tools/validation/semantic/path/classify_path_risk.py"
+tool = "tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs"
 doc = "documents/tools/classify_path_risk.md"
-language = "python"
+language = "rust"
 summary = "Path/risk check matrix classifier documentation."
 
 [[tool]]
