@@ -68,8 +68,19 @@ const LOW_SIGNAL_HELPER_ROLES: &[&str] = &[
     "workflow_tooling",
 ];
 const MUTATING_METHODS: &[&str] = &[
-    "add", "append", "clear", "discard", "extend", "insert", "pop", "remove", "setdefault",
-    "sort", "update", "write", "writelines",
+    "add",
+    "append",
+    "clear",
+    "discard",
+    "extend",
+    "insert",
+    "pop",
+    "remove",
+    "setdefault",
+    "sort",
+    "update",
+    "write",
+    "writelines",
 ];
 const ROLE_SCORE_WEAK: usize = 1;
 const ROLE_SCORE_STANDARD: usize = 2;
@@ -101,19 +112,35 @@ fn role_name_tokens(role: &str) -> &'static [&'static str] {
         ],
         "cli_parser" => &["arg", "args", "cli", "option", "parse", "parser"],
         "collector_inventory" => &[
-            "collect", "enumerate", "extract", "find", "gather", "inventory", "list", "scan", "summary",
+            "collect",
+            "enumerate",
+            "extract",
+            "find",
+            "gather",
+            "inventory",
+            "list",
+            "scan",
+            "summary",
             "summarize",
         ],
         "command_runner" => &[
             "call", "command", "exec", "execute", "invoke", "launch", "run", "spawn",
         ],
         "converter_normalizer" => &[
-            "adapt", "coerce", "convert", "map", "materialize", "normalize", "render", "resolve",
-            "transform", "translate",
+            "adapt",
+            "coerce",
+            "convert",
+            "map",
+            "materialize",
+            "normalize",
+            "render",
+            "resolve",
+            "transform",
+            "translate",
         ],
         "data_container" => &[
-            "config", "context", "data", "info", "metadata", "metrics", "model", "options", "packet",
-            "params", "record", "result", "state",
+            "config", "context", "data", "info", "metadata", "metrics", "model", "options",
+            "packet", "params", "record", "result", "state",
         ],
         "workflow_tooling" => &["agent", "route", "task", "tool", "workflow"],
         "writer_mutator" => &[
@@ -122,18 +149,30 @@ fn role_name_tokens(role: &str) -> &'static [&'static str] {
         "exception_type" => &["error", "exception", "failure"],
         "factory_builder" => &["build", "construct", "create", "factory", "make", "new"],
         "formatter_reporter" => &[
-            "describe", "emit", "format", "render", "report", "summary", "summarize", "write",
+            "describe",
+            "emit",
+            "format",
+            "render",
+            "report",
+            "summary",
+            "summarize",
+            "write",
         ],
         "general_helper" => &["helper", "support"],
         "numeric_kernel" => &[
             "compute", "kernel", "linear", "metric", "numeric", "residual", "score", "solve",
         ],
         "parser_loader" => &[
-            "discover", "load", "materialize", "parse", "read", "resolve",
+            "discover",
+            "load",
+            "materialize",
+            "parse",
+            "read",
+            "resolve",
         ],
         "predicate" => &[
-            "allow", "allows", "can", "check", "contains", "exists", "has", "is", "match", "matches",
-            "needs", "ready", "should", "valid",
+            "allow", "allows", "can", "check", "contains", "exists", "has", "is", "match",
+            "matches", "needs", "ready", "should", "valid",
         ],
         "protocol_interface" => &["interface", "port", "protocol"],
         "state_holder" => &["cache", "holder", "registry", "session", "state", "store"],
@@ -317,13 +356,20 @@ impl Options {
                 .map(|(key, value)| (key, Some(value.to_string())))
                 .unwrap_or((token.as_str(), None));
             match key {
-                "--root" => options.root = PathBuf::from(option_value(args, &mut index, inline.as_deref(), key)?),
+                "--root" => {
+                    options.root =
+                        PathBuf::from(option_value(args, &mut index, inline.as_deref(), key)?)
+                }
                 "--format" => {
-                    options.format = match option_value(args, &mut index, inline.as_deref(), key)?.as_str() {
+                    options.format = match option_value(args, &mut index, inline.as_deref(), key)?
+                        .as_str()
+                    {
                         "text" => OutputFormat::Text,
                         "json" => OutputFormat::Json,
                         "markdown" => OutputFormat::Markdown,
-                        value => return Err(format!("invalid choice: {value:?} (choose from 'text', 'json', 'markdown')")),
+                        value => return Err(format!(
+                            "invalid choice: {value:?} (choose from 'text', 'json', 'markdown')"
+                        )),
                     }
                 }
                 "--all-functions" if inline.is_none() => options.all_functions = true,
@@ -334,20 +380,27 @@ impl Options {
                 "--include-vendor" if inline.is_none() => options.include_vendor = true,
                 "--include-hidden" if inline.is_none() => options.include_hidden = true,
                 "--include-pyi" if inline.is_none() => options.include_pyi = true,
-                "--baseline-ref" => options.baseline_ref = option_value(args, &mut index, inline.as_deref(), key)?,
+                "--baseline-ref" => {
+                    options.baseline_ref = option_value(args, &mut index, inline.as_deref(), key)?
+                }
                 "--min-confidence" => {
                     let value = option_value(args, &mut index, inline.as_deref(), key)?;
-                    options.min_confidence = value
-                        .parse::<f64>()
-                        .map_err(|_| format!("argument --min-confidence: invalid float value: {value:?}"))?;
+                    options.min_confidence = value.parse::<f64>().map_err(|_| {
+                        format!("argument --min-confidence: invalid float value: {value:?}")
+                    })?;
                 }
-                value if value.starts_with('-') => return Err(format!("unrecognized arguments: {token}")),
+                value if value.starts_with('-') => {
+                    return Err(format!("unrecognized arguments: {token}"))
+                }
                 _ => options.paths.push(token.clone()),
             }
             index += 1;
         }
         if options.only_auto_helpers && options.only_user_judgment {
-            return Err("argument --only-user-judgment: not allowed with argument --only-auto-helpers".into());
+            return Err(
+                "argument --only-user-judgment: not allowed with argument --only-auto-helpers"
+                    .into(),
+            );
         }
         Ok(options)
     }
@@ -437,11 +490,12 @@ struct FileWalkState {
 }
 
 fn logical_excluded(relative: &Path, include_vendor: bool, include_hidden: bool) -> bool {
-    let parts = relative.components().map(|part| part.as_os_str().to_string_lossy());
+    let parts = relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy());
     let parts: Vec<String> = parts.map(|part| part.into_owned()).collect();
     if parts.iter().any(|part| {
-        DEFAULT_EXCLUDED_PARTS.contains(&part.as_str())
-            && !(include_vendor && part == "vendor")
+        DEFAULT_EXCLUDED_PARTS.contains(&part.as_str()) && !(include_vendor && part == "vendor")
     }) {
         return true;
     }
@@ -518,11 +572,17 @@ fn walk_source_dir(
     include_pyi: bool,
     state: &mut FileWalkState,
 ) {
-    let real_current = current.canonicalize().unwrap_or_else(|_| current.to_path_buf());
+    let real_current = current
+        .canonicalize()
+        .unwrap_or_else(|_| current.to_path_buf());
     if !state.seen_dirs.insert(real_current) {
         return;
     }
-    if logical_excluded(&root_relative_or_self(root, current), include_vendor, include_hidden) {
+    if logical_excluded(
+        &root_relative_or_self(root, current),
+        include_vendor,
+        include_hidden,
+    ) {
         return;
     }
     let Ok(entries) = fs::read_dir(current) else {
@@ -531,8 +591,19 @@ fn walk_source_dir(
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            if !logical_excluded(&root_relative_or_self(root, &path), include_vendor, include_hidden) {
-                walk_source_dir(root, &path, include_vendor, include_hidden, include_pyi, state);
+            if !logical_excluded(
+                &root_relative_or_self(root, &path),
+                include_vendor,
+                include_hidden,
+            ) {
+                walk_source_dir(
+                    root,
+                    &path,
+                    include_vendor,
+                    include_hidden,
+                    include_pyi,
+                    state,
+                );
             }
         } else {
             append_source_once(state, path, include_pyi);
@@ -584,7 +655,13 @@ fn changed_python_files(root: &Path, options: &Options) -> Vec<PathBuf> {
     let mut names = BTreeSet::new();
     for arguments in [
         vec!["diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--"],
-        vec!["diff", "--cached", "--name-only", "--diff-filter=ACMR", "--"],
+        vec![
+            "diff",
+            "--cached",
+            "--name-only",
+            "--diff-filter=ACMR",
+            "--",
+        ],
         vec!["ls-files", "--others", "--exclude-standard"],
     ] {
         names.extend(git_lines(root, &arguments));
@@ -631,7 +708,10 @@ fn git_renamed_paths(root: &Path, reference: &str) -> BTreeMap<String, String> {
     if reference.is_empty() {
         return BTreeMap::new();
     }
-    let Some(output) = git_output(root, &["diff", "--name-status", "--find-renames", reference, "--"]) else {
+    let Some(output) = git_output(
+        root,
+        &["diff", "--name-status", "--find-renames", reference, "--"],
+    ) else {
         return BTreeMap::new();
     };
     if !output.status.success() {
@@ -653,7 +733,10 @@ fn path_domain(path: &str) -> String {
         .components()
         .map(|part| part.as_os_str().to_string_lossy().into_owned())
         .collect();
-    if parts.iter().any(|part| part == "tests" || part == "test" || part.starts_with("test_")) {
+    if parts
+        .iter()
+        .any(|part| part == "tests" || part == "test" || part.starts_with("test_"))
+    {
         "test".into()
     } else if parts.iter().any(|part| {
         part == "benchmarks"
@@ -663,7 +746,10 @@ fn path_domain(path: &str) -> String {
             || part.starts_with("experiment")
     }) {
         "experiment".into()
-    } else if parts.iter().any(|part| ["agent_tools", "scripts", "tools"].contains(&part.as_str())) {
+    } else if parts
+        .iter()
+        .any(|part| ["agent_tools", "scripts", "tools"].contains(&part.as_str()))
+    {
         "tooling".into()
     } else {
         "main".into()
@@ -868,7 +954,9 @@ impl FunctionBodyCollector<'_> {
 
 impl Visitor for FunctionBodyCollector<'_> {
     fn visit_stmt_function_def(&mut self, node: ast::StmtFunctionDef) {
-        if node.start().to_usize() == self.root_start && matches!(self.root_kind, BodyRootKind::Function) {
+        if node.start().to_usize() == self.root_start
+            && matches!(self.root_kind, BodyRootKind::Function)
+        {
             self.generic_visit_stmt_function_def(node);
         } else {
             self.add("nested_function_definition");
@@ -876,7 +964,9 @@ impl Visitor for FunctionBodyCollector<'_> {
     }
 
     fn visit_stmt_async_function_def(&mut self, node: ast::StmtAsyncFunctionDef) {
-        if node.start().to_usize() == self.root_start && matches!(self.root_kind, BodyRootKind::Function) {
+        if node.start().to_usize() == self.root_start
+            && matches!(self.root_kind, BodyRootKind::Function)
+        {
             self.generic_visit_stmt_async_function_def(node);
         } else {
             self.add("nested_function_definition");
@@ -884,7 +974,9 @@ impl Visitor for FunctionBodyCollector<'_> {
     }
 
     fn visit_stmt_class_def(&mut self, node: ast::StmtClassDef) {
-        if node.start().to_usize() == self.root_start && matches!(self.root_kind, BodyRootKind::Class) {
+        if node.start().to_usize() == self.root_start
+            && matches!(self.root_kind, BodyRootKind::Class)
+        {
             self.generic_visit_stmt_class_def(node);
         }
     }
@@ -905,7 +997,14 @@ impl Visitor for FunctionBodyCollector<'_> {
         if matches!(&node.op, ast::Operator::Div) {
             self.add("path_operation");
         }
-        if matches!(&node.op, ast::Operator::Add | ast::Operator::MatMult | ast::Operator::Mult | ast::Operator::Pow | ast::Operator::Sub) {
+        if matches!(
+            &node.op,
+            ast::Operator::Add
+                | ast::Operator::MatMult
+                | ast::Operator::Mult
+                | ast::Operator::Pow
+                | ast::Operator::Sub
+        ) {
             self.add("operator_expression");
         }
         self.generic_visit_expr_bin_op(node);
@@ -943,7 +1042,9 @@ impl Visitor for FunctionBodyCollector<'_> {
                 | ast::Expr::Set(_)
                 | ast::Expr::SetComp(_)
                 | ast::Expr::Tuple(_) => self.add("collection_return"),
-                ast::Expr::BoolOp(_) | ast::Expr::Compare(_) | ast::Expr::UnaryOp(_) => self.add("predicate_return"),
+                ast::Expr::BoolOp(_) | ast::Expr::Compare(_) | ast::Expr::UnaryOp(_) => {
+                    self.add("predicate_return")
+                }
                 _ => {}
             }
         }
@@ -961,7 +1062,12 @@ impl Visitor for FunctionBodyCollector<'_> {
     }
 
     fn visit_stmt_if(&mut self, node: ast::StmtIf) {
-        if node.body.iter().chain(&node.orelse).any(statement_contains_return) {
+        if node
+            .body
+            .iter()
+            .chain(&node.orelse)
+            .any(statement_contains_return)
+        {
             self.add("conditional_return");
         }
         self.generic_visit_stmt_if(node);
@@ -1023,21 +1129,33 @@ impl Visitor for FunctionBodyCollector<'_> {
     }
 
     fn visit_stmt_assign(&mut self, node: ast::StmtAssign) {
-        if node.targets.iter().any(|target| matches!(target, ast::Expr::Attribute(_) | ast::Expr::Subscript(_))) {
+        if node
+            .targets
+            .iter()
+            .any(|target| matches!(target, ast::Expr::Attribute(_) | ast::Expr::Subscript(_)))
+        {
             self.add("state_mutation");
         }
         self.generic_visit_stmt_assign(node);
     }
 
     fn visit_stmt_ann_assign(&mut self, node: ast::StmtAnnAssign) {
-        if matches!(&*node.target, ast::Expr::Attribute(_) | ast::Expr::Subscript(_)) {
+        if matches!(
+            &*node.target,
+            ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+        ) {
             self.add("state_mutation");
         }
         self.generic_visit_stmt_ann_assign(node);
     }
 }
 
-fn body_facts(source: &str, root: &ast::Stmt, parameters: &[String], single_statement: bool) -> BodyFacts {
+fn body_facts(
+    source: &str,
+    root: &ast::Stmt,
+    parameters: &[String],
+    single_statement: bool,
+) -> BodyFacts {
     let root_start = root.start().to_usize();
     let root_kind = match root {
         ast::Stmt::FunctionDef(_) | ast::Stmt::AsyncFunctionDef(_) => BodyRootKind::Function,
@@ -1140,7 +1258,11 @@ fn record_call_features(features: &mut BTreeSet<String>, name: &str, leaf: &str)
     if ["write", "write_text", "write_bytes", "dump", "dumps"].contains(&leaf) {
         features.insert("write".into());
     }
-    if ["mkdir", "unlink", "rename", "replace", "copy", "copy2", "rmtree"].contains(&leaf) {
+    if [
+        "mkdir", "unlink", "rename", "replace", "copy", "copy2", "rmtree",
+    ]
+    .contains(&leaf)
+    {
         features.insert("filesystem_mutation".into());
     }
     if name == "progress_callback" {
@@ -1149,7 +1271,10 @@ fn record_call_features(features: &mut BTreeSet<String>, name: &str, leaf: &str)
     if ["read", "read_text", "read_bytes", "load", "loads"].contains(&leaf) {
         features.insert("read".into());
     }
-    if ["json.", "tomllib.", "tomli.", "yaml."].iter().any(|prefix| name.starts_with(prefix)) {
+    if ["json.", "tomllib.", "tomli.", "yaml."]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
         features.insert("serialization".into());
     }
     if name.starts_with("base64.") {
@@ -1158,25 +1283,62 @@ fn record_call_features(features: &mut BTreeSet<String>, name: &str, leaf: &str)
     if name.starts_with("re.") {
         features.insert("text_transform".into());
     }
-    if name == "Path" || ["pathlib.", "os.path."].iter().any(|prefix| name.starts_with(prefix)) {
+    if name == "Path"
+        || ["pathlib.", "os.path."]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+    {
         features.insert("path_operation".into());
     }
-    if ["absolute", "expanduser", "joinpath", "relative_to", "resolve", "with_name", "with_suffix"].contains(&leaf) {
+    if [
+        "absolute",
+        "expanduser",
+        "joinpath",
+        "relative_to",
+        "resolve",
+        "with_name",
+        "with_suffix",
+    ]
+    .contains(&leaf)
+    {
         features.insert("path_operation".into());
     }
-    if ["format", "join", "lower", "removeprefix", "removesuffix", "replace", "rstrip", "split", "strip", "upper"].contains(&leaf) {
+    if [
+        "format",
+        "join",
+        "lower",
+        "removeprefix",
+        "removesuffix",
+        "replace",
+        "rstrip",
+        "split",
+        "strip",
+        "upper",
+    ]
+    .contains(&leaf)
+    {
         features.insert("text_transform".into());
     }
-    if name.starts_with("hashlib.") || name.starts_with("hmac.") || ["digest", "hexdigest"].contains(&leaf) {
+    if name.starts_with("hashlib.")
+        || name.starts_with("hmac.")
+        || ["digest", "hexdigest"].contains(&leaf)
+    {
         features.insert("digest_transform".into());
     }
     if ["decrypt", "encrypt"].contains(&leaf) {
         features.insert("security_transform".into());
     }
-    if name.starts_with("os.environ") || ["os.getenv", "getenv"].contains(&name) || name.starts_with("platform.") {
+    if name.starts_with("os.environ")
+        || ["os.getenv", "getenv"].contains(&name)
+        || name.starts_with("platform.")
+    {
         features.insert("environment".into());
     }
-    if ["ctypes.", "cffi."].iter().any(|prefix| name.starts_with(prefix)) || ["byref", "cast", "c_void_p"].contains(&leaf) {
+    if ["ctypes.", "cffi."]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+        || ["byref", "cast", "c_void_p"].contains(&leaf)
+    {
         features.insert("pointer_interop".into());
     }
     if ["getattr", "hasattr", "isinstance", "issubclass", "type"].contains(&leaf) {
@@ -1185,10 +1347,27 @@ fn record_call_features(features: &mut BTreeSet<String>, name: &str, leaf: &str)
     if name.starts_with("ast.") || name.starts_with("libcst.") {
         features.insert("static_analysis".into());
     }
-    if ["jax.", "jnp.", "np.", "numpy.", "math.", "lax."].iter().any(|prefix| name.starts_with(prefix)) {
+    if ["jax.", "jnp.", "np.", "numpy.", "math.", "lax."]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
         features.insert("numeric".into());
     }
-    if ["array", "asarray", "ascontiguousarray", "flatten", "ravel", "reshape", "tolist", "tree_flatten", "tree_leaves", "tree_map", "tree_unflatten"].contains(&leaf) {
+    if [
+        "array",
+        "asarray",
+        "ascontiguousarray",
+        "flatten",
+        "ravel",
+        "reshape",
+        "tolist",
+        "tree_flatten",
+        "tree_leaves",
+        "tree_map",
+        "tree_unflatten",
+    ]
+    .contains(&leaf)
+    {
         features.insert("data_shape_transform".into());
     }
     if name.starts_with("argparse.") || leaf == "ArgumentParser" {
@@ -1201,7 +1380,13 @@ fn record_call_features(features: &mut BTreeSet<String>, name: &str, leaf: &str)
 
 type RoleScores = Vec<(String, usize)>;
 
-fn add_role_score(scores: &mut RoleScores, evidence: &mut Vec<String>, role: &str, points: usize, reason: &str) {
+fn add_role_score(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    role: &str,
+    points: usize,
+    reason: &str,
+) {
     if let Some((_, score)) = scores.iter_mut().find(|(name, _)| name == role) {
         *score += points;
     } else {
@@ -1212,9 +1397,13 @@ fn add_role_score(scores: &mut RoleScores, evidence: &mut Vec<String>, role: &st
 
 fn ordered_roles(scores: &RoleScores) -> Vec<String> {
     let mut items = scores.iter().enumerate().collect::<Vec<_>>();
-    items.sort_by(|(left_index, (_, left_score)), (right_index, (_, right_score))| {
-        right_score.cmp(left_score).then_with(|| left_index.cmp(right_index))
-    });
+    items.sort_by(
+        |(left_index, (_, left_score)), (right_index, (_, right_score))| {
+            right_score
+                .cmp(left_score)
+                .then_with(|| left_index.cmp(right_index))
+        },
+    );
     items
         .into_iter()
         .map(|(_, (role, _))| role.clone())
@@ -1233,113 +1422,315 @@ fn path_parts(path: &str) -> Vec<String> {
 }
 
 fn add_path_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, parts: &[String]) {
-    if parts.iter().any(|part| part == "tools" || part == "agent_tools") {
-        add_role_score(scores, evidence, "workflow_tooling", ROLE_SCORE_WEAK, "tool-path");
+    if parts
+        .iter()
+        .any(|part| part == "tools" || part == "agent_tools")
+    {
+        add_role_score(
+            scores,
+            evidence,
+            "workflow_tooling",
+            ROLE_SCORE_WEAK,
+            "tool-path",
+        );
     }
     if parts.iter().any(|part| part == "tests") {
-        add_role_score(scores, evidence, "test_support", ROLE_SCORE_WEAK, "test-path");
+        add_role_score(
+            scores,
+            evidence,
+            "test_support",
+            ROLE_SCORE_WEAK,
+            "test-path",
+        );
     }
 }
 
-fn add_common_body_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, calls: &BTreeSet<String>, features: &BTreeSet<String>) {
+fn add_common_body_role_scores(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    calls: &BTreeSet<String>,
+    features: &BTreeSet<String>,
+) {
     add_effect_role_scores(scores, evidence, features);
     add_transform_role_scores(scores, evidence, features);
     add_structure_role_scores(scores, evidence, calls, features);
 }
 
-fn add_effect_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, features: &BTreeSet<String>) {
+fn add_effect_role_scores(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    features: &BTreeSet<String>,
+) {
     if features.contains("subprocess") {
-        add_role_score(scores, evidence, "command_runner", ROLE_SCORE_STRONG, "subprocess-call");
+        add_role_score(
+            scores,
+            evidence,
+            "command_runner",
+            ROLE_SCORE_STRONG,
+            "subprocess-call",
+        );
     }
     if features.contains("network") {
-        add_role_score(scores, evidence, "command_runner", ROLE_SCORE_WEAK, "network-call");
+        add_role_score(
+            scores,
+            evidence,
+            "command_runner",
+            ROLE_SCORE_WEAK,
+            "network-call",
+        );
     }
     if features.contains("cli_parser") {
-        add_role_score(scores, evidence, "cli_parser", ROLE_SCORE_DOMINANT, "argparse-call");
+        add_role_score(
+            scores,
+            evidence,
+            "cli_parser",
+            ROLE_SCORE_DOMINANT,
+            "argparse-call",
+        );
     }
     if features.contains("write") || features.contains("filesystem_mutation") {
-        add_role_score(scores, evidence, "writer_mutator", ROLE_SCORE_STANDARD, "write-or-filesystem-call");
+        add_role_score(
+            scores,
+            evidence,
+            "writer_mutator",
+            ROLE_SCORE_STANDARD,
+            "write-or-filesystem-call",
+        );
     }
     if features.contains("resource_lifecycle") {
-        add_role_score(scores, evidence, "writer_mutator", ROLE_SCORE_STRONG, "resource-lifecycle");
+        add_role_score(
+            scores,
+            evidence,
+            "writer_mutator",
+            ROLE_SCORE_STRONG,
+            "resource-lifecycle",
+        );
     }
     if features.contains("callback_emission") {
-        add_role_score(scores, evidence, "formatter_reporter", ROLE_SCORE_STRONG, "callback-emission");
+        add_role_score(
+            scores,
+            evidence,
+            "formatter_reporter",
+            ROLE_SCORE_STRONG,
+            "callback-emission",
+        );
     }
     if features.contains("call_statement") {
-        add_role_score(scores, evidence, "adapter_bridge", ROLE_SCORE_STANDARD, "call-statement");
+        add_role_score(
+            scores,
+            evidence,
+            "adapter_bridge",
+            ROLE_SCORE_STANDARD,
+            "call-statement",
+        );
     }
     if features.contains("logging") || features.contains("stdio") {
-        add_role_score(scores, evidence, "formatter_reporter", ROLE_SCORE_WEAK, "human-output");
+        add_role_score(
+            scores,
+            evidence,
+            "formatter_reporter",
+            ROLE_SCORE_WEAK,
+            "human-output",
+        );
     }
 }
 
-fn add_transform_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, features: &BTreeSet<String>) {
+fn add_transform_role_scores(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    features: &BTreeSet<String>,
+) {
     if features.contains("serialization") && features.contains("read") {
-        add_role_score(scores, evidence, "parser_loader", ROLE_SCORE_STANDARD, "serialization-read");
+        add_role_score(
+            scores,
+            evidence,
+            "parser_loader",
+            ROLE_SCORE_STANDARD,
+            "serialization-read",
+        );
     } else if features.contains("serialization") {
-        add_role_score(scores, evidence, "formatter_reporter", ROLE_SCORE_STANDARD, "serialization-transform");
+        add_role_score(
+            scores,
+            evidence,
+            "formatter_reporter",
+            ROLE_SCORE_STANDARD,
+            "serialization-transform",
+        );
     }
     if features.contains("path_operation") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STRONG, "path-operation");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STRONG,
+            "path-operation",
+        );
     }
     if features.contains("text_transform") || features.contains("encoding_transform") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STANDARD, "text-or-encoding-transform");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STANDARD,
+            "text-or-encoding-transform",
+        );
     }
     if features.contains("type_introspection") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STANDARD, "type-introspection");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STANDARD,
+            "type-introspection",
+        );
     }
     if features.contains("conditional_return") || features.contains("environment") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STANDARD, "conditional-or-environment-normalization");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STANDARD,
+            "conditional-or-environment-normalization",
+        );
     }
     if features.contains("identity_return") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STANDARD, "identity-return");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STANDARD,
+            "identity-return",
+        );
     }
     if features.contains("digest_transform") || features.contains("security_transform") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_STRONG, "digest-or-security-transform");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_STRONG,
+            "digest-or-security-transform",
+        );
     }
     if features.contains("pointer_interop") || features.contains("data_shape_transform") {
-        add_role_score(scores, evidence, "converter_normalizer", ROLE_SCORE_DOMINANT, "interop-or-shape-transform");
+        add_role_score(
+            scores,
+            evidence,
+            "converter_normalizer",
+            ROLE_SCORE_DOMINANT,
+            "interop-or-shape-transform",
+        );
     }
     if features.contains("read") {
-        add_role_score(scores, evidence, "parser_loader", ROLE_SCORE_STANDARD, "read-call");
+        add_role_score(
+            scores,
+            evidence,
+            "parser_loader",
+            ROLE_SCORE_STANDARD,
+            "read-call",
+        );
     }
 }
 
-fn add_structure_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, calls: &BTreeSet<String>, features: &BTreeSet<String>) {
+fn add_structure_role_scores(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    calls: &BTreeSet<String>,
+    features: &BTreeSet<String>,
+) {
     if features.contains("static_analysis") || calls.iter().any(|call| call.starts_with("ast.")) {
-        add_role_score(scores, evidence, "static_analyzer", ROLE_SCORE_BOUNDARY, "ast-call");
+        add_role_score(
+            scores,
+            evidence,
+            "static_analyzer",
+            ROLE_SCORE_BOUNDARY,
+            "ast-call",
+        );
     }
     if features.contains("numeric") {
-        add_role_score(scores, evidence, "numeric_kernel", ROLE_SCORE_STRONG, "numeric-call");
+        add_role_score(
+            scores,
+            evidence,
+            "numeric_kernel",
+            ROLE_SCORE_STRONG,
+            "numeric-call",
+        );
     }
     if features.contains("operator_expression") {
-        add_role_score(scores, evidence, "numeric_kernel", ROLE_SCORE_STANDARD, "operator-expression");
+        add_role_score(
+            scores,
+            evidence,
+            "numeric_kernel",
+            ROLE_SCORE_STANDARD,
+            "operator-expression",
+        );
     }
     if features.contains("mapping_return") {
-        add_role_score(scores, evidence, "formatter_reporter", ROLE_SCORE_STANDARD, "mapping-return");
+        add_role_score(
+            scores,
+            evidence,
+            "formatter_reporter",
+            ROLE_SCORE_STANDARD,
+            "mapping-return",
+        );
     }
-    if features.contains("collection_return") || features.contains("generator") || features.contains("iteration") {
-        add_role_score(scores, evidence, "collector_inventory", ROLE_SCORE_STANDARD, "collection-or-iteration");
+    if features.contains("collection_return")
+        || features.contains("generator")
+        || features.contains("iteration")
+    {
+        add_role_score(
+            scores,
+            evidence,
+            "collector_inventory",
+            ROLE_SCORE_STANDARD,
+            "collection-or-iteration",
+        );
     }
     if features.contains("nested_function_definition") {
-        add_role_score(scores, evidence, "factory_builder", ROLE_SCORE_DOMINANT, "nested-callable-definition");
+        add_role_score(
+            scores,
+            evidence,
+            "factory_builder",
+            ROLE_SCORE_DOMINANT,
+            "nested-callable-definition",
+        );
     }
     if features.contains("raises") {
-        add_role_score(scores, evidence, "validator_checker", ROLE_SCORE_STANDARD, "raises");
+        add_role_score(
+            scores,
+            evidence,
+            "validator_checker",
+            ROLE_SCORE_STANDARD,
+            "raises",
+        );
     }
 }
 
-fn add_function_body_role_scores(scores: &mut RoleScores, evidence: &mut Vec<String>, features: &BTreeSet<String>) {
+fn add_function_body_role_scores(
+    scores: &mut RoleScores,
+    evidence: &mut Vec<String>,
+    features: &BTreeSet<String>,
+) {
     if features.contains("state_mutation") || features.contains("mutation_call") {
-        add_role_score(scores, evidence, "writer_mutator", ROLE_SCORE_WEAK, "mutation-call");
+        add_role_score(
+            scores,
+            evidence,
+            "writer_mutator",
+            ROLE_SCORE_WEAK,
+            "mutation-call",
+        );
     }
     if features.contains("call_return")
         && !["read", "write", "numeric", "static_analysis"]
             .iter()
             .any(|feature| features.contains(*feature))
     {
-        add_role_score(scores, evidence, "factory_builder", ROLE_SCORE_WEAK, "call-return");
+        add_role_score(
+            scores,
+            evidence,
+            "factory_builder",
+            ROLE_SCORE_WEAK,
+            "call-return",
+        );
     }
 }
 
@@ -1351,55 +1742,147 @@ fn collection_annotation(annotation: &str) -> bool {
         || lowered.contains("sequence")
 }
 
-fn role_scores(path: &str, returns_annotation: &str, facts: &BodyFacts, is_function: bool) -> (RoleScores, Vec<String>) {
+fn role_scores(
+    path: &str,
+    returns_annotation: &str,
+    facts: &BodyFacts,
+    is_function: bool,
+) -> (RoleScores, Vec<String>) {
     let mut scores = Vec::new();
     let mut evidence = Vec::new();
     add_path_role_scores(&mut scores, &mut evidence, &path_parts(path));
     let calls = facts.calls.iter().cloned().collect::<BTreeSet<_>>();
     let features = facts.features.iter().cloned().collect::<BTreeSet<_>>();
     if is_function && (returns_annotation == "bool" || features.contains("predicate_return")) {
-        add_role_score(&mut scores, &mut evidence, "predicate", ROLE_SCORE_STRONG, "predicate-shape");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "predicate",
+            ROLE_SCORE_STRONG,
+            "predicate-shape",
+        );
     }
     if is_function && collection_annotation(returns_annotation) {
-        add_role_score(&mut scores, &mut evidence, "collector_inventory", ROLE_SCORE_STANDARD, "collection-annotation");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "collector_inventory",
+            ROLE_SCORE_STANDARD,
+            "collection-annotation",
+        );
     }
     add_common_body_role_scores(&mut scores, &mut evidence, &calls, &features);
     if is_function {
         add_function_body_role_scores(&mut scores, &mut evidence, &features);
     }
     if scores.is_empty() {
-        add_role_score(&mut scores, &mut evidence, "general_helper", ROLE_SCORE_WEAK, "unclassified");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "general_helper",
+            ROLE_SCORE_WEAK,
+            "unclassified",
+        );
     }
     (scores, evidence)
 }
 
-fn class_role_scores(path: &str, bases: &[String], decorators: &[String], annotated_fields: usize, facts: &BodyFacts) -> (RoleScores, Vec<String>) {
+fn class_role_scores(
+    path: &str,
+    bases: &[String],
+    decorators: &[String],
+    annotated_fields: usize,
+    facts: &BodyFacts,
+) -> (RoleScores, Vec<String>) {
     let mut scores = Vec::new();
     let mut evidence = Vec::new();
     add_path_role_scores(&mut scores, &mut evidence, &path_parts(path));
-    if bases.iter().any(|base| base == "Protocol" || base.ends_with(".Protocol")) {
-        add_role_score(&mut scores, &mut evidence, "protocol_interface", ROLE_SCORE_DOMINANT, "protocol-base");
+    if bases
+        .iter()
+        .any(|base| base == "Protocol" || base.ends_with(".Protocol"))
+    {
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "protocol_interface",
+            ROLE_SCORE_DOMINANT,
+            "protocol-base",
+        );
     }
-    if bases.iter().any(|base| base.ends_with("Exception") || base.ends_with("Error") || ["BaseException", "Exception"].contains(&base.as_str())) {
-        add_role_score(&mut scores, &mut evidence, "exception_type", ROLE_SCORE_BOUNDARY, "exception-base");
+    if bases.iter().any(|base| {
+        base.ends_with("Exception")
+            || base.ends_with("Error")
+            || ["BaseException", "Exception"].contains(&base.as_str())
+    }) {
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "exception_type",
+            ROLE_SCORE_BOUNDARY,
+            "exception-base",
+        );
     }
-    if bases.iter().any(|base| ["Answer", "Config", "Info", "Problem", "SolveConfig", "State"].iter().any(|suffix| base.ends_with(suffix))) {
-        add_role_score(&mut scores, &mut evidence, "data_container", ROLE_SCORE_DOMINANT, "algorithm-data-container-base");
+    if bases.iter().any(|base| {
+        [
+            "Answer",
+            "Config",
+            "Info",
+            "Problem",
+            "SolveConfig",
+            "State",
+        ]
+        .iter()
+        .any(|suffix| base.ends_with(suffix))
+    }) {
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "data_container",
+            ROLE_SCORE_DOMINANT,
+            "algorithm-data-container-base",
+        );
     }
-    if decorators.iter().any(|decorator| decorator.ends_with("dataclass") || decorator.ends_with("define")) {
-        add_role_score(&mut scores, &mut evidence, "data_container", ROLE_SCORE_DOMINANT, "data-class-decorator");
+    if decorators
+        .iter()
+        .any(|decorator| decorator.ends_with("dataclass") || decorator.ends_with("define"))
+    {
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "data_container",
+            ROLE_SCORE_DOMINANT,
+            "data-class-decorator",
+        );
     }
     if annotated_fields > 0 {
-        add_role_score(&mut scores, &mut evidence, "data_container", ROLE_SCORE_STANDARD, "annotated-fields");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "data_container",
+            ROLE_SCORE_STANDARD,
+            "annotated-fields",
+        );
     }
     let calls = facts.calls.iter().cloned().collect::<BTreeSet<_>>();
     let features = facts.features.iter().cloned().collect::<BTreeSet<_>>();
     add_common_body_role_scores(&mut scores, &mut evidence, &calls, &features);
     if features.contains("state_mutation") || features.contains("mutation_call") {
-        add_role_score(&mut scores, &mut evidence, "state_holder", ROLE_SCORE_WEAK, "state-mutation");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "state_holder",
+            ROLE_SCORE_WEAK,
+            "state-mutation",
+        );
     }
     if scores.is_empty() {
-        add_role_score(&mut scores, &mut evidence, "general_helper", ROLE_SCORE_WEAK, "unclassified");
+        add_role_score(
+            &mut scores,
+            &mut evidence,
+            "general_helper",
+            ROLE_SCORE_WEAK,
+            "unclassified",
+        );
     }
     (scores, evidence)
 }
@@ -1420,7 +1903,13 @@ fn is_candidate_symbol(kind: &str, name: &str, scope: &str, role: &str) -> bool 
     kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&role)
 }
 
-fn confidence(name: &str, scope: &str, scores: &RoleScores, facts: &BodyFacts, candidate: bool) -> f64 {
+fn confidence(
+    name: &str,
+    scope: &str,
+    scores: &RoleScores,
+    facts: &BodyFacts,
+    candidate: bool,
+) -> f64 {
     if !candidate {
         return 0.0;
     }
@@ -1432,7 +1921,8 @@ fn confidence(name: &str, scope: &str, scores: &RoleScores, facts: &BodyFacts, c
         score += NESTED_SCOPE_CONFIDENCE_BONUS;
     }
     if !scores.is_empty() {
-        score += (max_role_score(scores) as f64 / ROLE_SCORE_CONFIDENCE_DIVISOR).min(ROLE_SCORE_CONFIDENCE_CAP);
+        score += (max_role_score(scores) as f64 / ROLE_SCORE_CONFIDENCE_DIVISOR)
+            .min(ROLE_SCORE_CONFIDENCE_CAP);
     }
     if !facts.calls.is_empty() {
         score += CALL_CONFIDENCE_BONUS;
@@ -1460,11 +1950,23 @@ fn identifier_tokens(name: &str) -> Vec<String> {
                     end += 1;
                 }
                 if end == part.len() {
-                    tokens.push(part[index..end].iter().copied().collect::<String>().to_ascii_lowercase());
+                    tokens.push(
+                        part[index..end]
+                            .iter()
+                            .copied()
+                            .collect::<String>()
+                            .to_ascii_lowercase(),
+                    );
                     index = end;
                 } else if part[end].is_ascii_lowercase() {
                     if end - index > 1 {
-                        tokens.push(part[index..end - 1].iter().copied().collect::<String>().to_ascii_lowercase());
+                        tokens.push(
+                            part[index..end - 1]
+                                .iter()
+                                .copied()
+                                .collect::<String>()
+                                .to_ascii_lowercase(),
+                        );
                         index = end - 1;
                     } else {
                         let start = index;
@@ -1472,7 +1974,13 @@ fn identifier_tokens(name: &str) -> Vec<String> {
                         while index < part.len() && part[index].is_ascii_lowercase() {
                             index += 1;
                         }
-                        tokens.push(part[start..index].iter().copied().collect::<String>().to_ascii_lowercase());
+                        tokens.push(
+                            part[start..index]
+                                .iter()
+                                .copied()
+                                .collect::<String>()
+                                .to_ascii_lowercase(),
+                        );
                     }
                 } else {
                     index += 1;
@@ -1482,11 +1990,21 @@ fn identifier_tokens(name: &str) -> Vec<String> {
                 let digits = current.is_ascii_digit();
                 index += 1;
                 while index < part.len()
-                    && if digits { part[index].is_ascii_digit() } else { part[index].is_ascii_lowercase() }
+                    && if digits {
+                        part[index].is_ascii_digit()
+                    } else {
+                        part[index].is_ascii_lowercase()
+                    }
                 {
                     index += 1;
                 }
-                tokens.push(part[start..index].iter().copied().collect::<String>().to_ascii_lowercase());
+                tokens.push(
+                    part[start..index]
+                        .iter()
+                        .copied()
+                        .collect::<String>()
+                        .to_ascii_lowercase(),
+                );
             } else {
                 index += 1;
             }
@@ -1514,10 +2032,17 @@ fn role_tokens(role: &str) -> Vec<String> {
             .into_iter()
             .collect();
     }
-    identifier_tokens(role).into_iter().collect::<BTreeSet<_>>().into_iter().collect()
+    identifier_tokens(role)
+        .into_iter()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
-fn name_search_metadata(name: &str, role: &str) -> (Vec<String>, Vec<String>, Vec<String>, bool, String) {
+fn name_search_metadata(
+    name: &str,
+    role: &str,
+) -> (Vec<String>, Vec<String>, Vec<String>, bool, String) {
     let name_parts = identifier_tokens(name);
     let role_parts = role_tokens(role);
     let name_set = name_parts.iter().cloned().collect::<BTreeSet<_>>();
@@ -1530,14 +2055,38 @@ fn name_search_metadata(name: &str, role: &str) -> (Vec<String>, Vec<String>, Ve
         .collect::<Vec<_>>();
     if !matches.is_empty() {
         let joined = matches.join(",");
-        (name_parts, role_parts, matches, true, format!("role-token-match:{joined}"))
+        (
+            name_parts,
+            role_parts,
+            matches,
+            true,
+            format!("role-token-match:{joined}"),
+        )
     } else {
-        (name_parts, role_parts, Vec::new(), false, format!("role-token-review:{role}"))
+        (
+            name_parts,
+            role_parts,
+            Vec::new(),
+            false,
+            format!("role-token-review:{role}"),
+        )
     }
 }
 
 fn side_effect(feature: &str) -> bool {
-    ["environment", "filesystem_mutation", "local_import", "logging", "mutation_call", "network", "state_mutation", "stdio", "subprocess", "write"].contains(&feature)
+    [
+        "environment",
+        "filesystem_mutation",
+        "local_import",
+        "logging",
+        "mutation_call",
+        "network",
+        "state_mutation",
+        "stdio",
+        "subprocess",
+        "write",
+    ]
+    .contains(&feature)
 }
 
 fn function_qualname_and_scope(parent_stack: &[String], name: &str) -> (String, String) {
@@ -1560,12 +2109,11 @@ fn is_interface_boundary(record: &FunctionRecord) -> bool {
 }
 
 fn nested_candidate_rule(record: &FunctionRecord) -> String {
-    if record.kind == "function"
+    let function_helper = record.kind == "function"
         && PUBLIC_LOCAL_HELPER_ROLES.contains(&record.role.as_str())
-        && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str())
-    {
-        format!("{}:nested-{}", record.domain, record.role)
-    } else if record.kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str()) {
+        && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str());
+    let class_helper = record.kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str());
+    if function_helper || class_helper {
         format!("{}:nested-{}", record.domain, record.role)
     } else {
         String::new()
@@ -1604,7 +2152,10 @@ fn test_candidate_rule(record: &FunctionRecord, local: bool) -> String {
 }
 
 fn experiment_candidate_rule(record: &FunctionRecord, local: bool) -> String {
-    if record.visibility == "private" && local && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str()) {
+    if record.visibility == "private"
+        && local
+        && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str())
+    {
         return format!("experiment:private-local-{}", record.role);
     }
     if !local {
@@ -1620,7 +2171,10 @@ fn experiment_candidate_rule(record: &FunctionRecord, local: bool) -> String {
 }
 
 fn tooling_candidate_rule(record: &FunctionRecord, local: bool) -> String {
-    if record.visibility == "private" && local && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str()) {
+    if record.visibility == "private"
+        && local
+        && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str())
+    {
         return format!("tooling:private-local-{}", record.role);
     }
     if !local {
@@ -1636,7 +2190,10 @@ fn tooling_candidate_rule(record: &FunctionRecord, local: bool) -> String {
 }
 
 fn main_candidate_rule(record: &FunctionRecord, local: bool) -> String {
-    if record.visibility == "private" && local && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str()) {
+    if record.visibility == "private"
+        && local
+        && !LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str())
+    {
         format!("main:private-local-{}", record.role)
     } else {
         String::new()
@@ -1644,7 +2201,8 @@ fn main_candidate_rule(record: &FunctionRecord, local: bool) -> String {
 }
 
 fn candidate_rule(record: &FunctionRecord) -> String {
-    if record.name.starts_with("__") && record.name.ends_with("__") || is_interface_boundary(record) {
+    if record.name.starts_with("__") && record.name.ends_with("__") || is_interface_boundary(record)
+    {
         return String::new();
     }
     if record.scope == "nested" {
@@ -1662,37 +2220,50 @@ fn candidate_rule(record: &FunctionRecord) -> String {
 fn shared_private_numeric_contract(record: &FunctionRecord) -> bool {
     record.kind == "function"
         && record.incoming_count > LOCAL_CALLER_CLUSTER_LIMIT
-        && (record.role == "numeric_kernel" || record.secondary_roles.iter().any(|role| role == "numeric_kernel"))
+        && (record.role == "numeric_kernel"
+            || record
+                .secondary_roles
+                .iter()
+                .any(|role| role == "numeric_kernel"))
         && !record.redundant_helper
 }
 
 fn design_judgment_rule(record: &FunctionRecord) -> String {
-    if record.name.starts_with("__") && record.name.ends_with("__") || is_interface_boundary(record) {
+    if record.name.starts_with("__") && record.name.ends_with("__") || is_interface_boundary(record)
+    {
         return String::new();
     }
     let local = local_symbol(record);
     match record.domain.as_str() {
         "main" => {
             if local && record.visibility == "public" {
-                if record.kind == "function" && PUBLIC_LOCAL_HELPER_ROLES.contains(&record.role.as_str()) {
+                if record.kind == "function"
+                    && PUBLIC_LOCAL_HELPER_ROLES.contains(&record.role.as_str())
+                {
                     return format!("main:public-local-{}", record.role);
                 }
-                if record.kind == "class" && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str()) {
+                if record.kind == "class"
+                    && CLASS_LOCAL_HELPER_ROLES.contains(&record.role.as_str())
+                {
                     return format!("main:public-local-{}", record.role);
                 }
             }
             if local && LOW_SIGNAL_HELPER_ROLES.contains(&record.role.as_str()) {
                 return format!("main:low-signal-local-{}", record.role);
             }
-            if record.visibility == "private" && record.incoming_count > 0 {
-                if !shared_private_numeric_contract(record) {
-                    return format!("main:shared-private-{}", record.role);
-                }
+            if record.visibility == "private"
+                && record.incoming_count > 0
+                && !shared_private_numeric_contract(record)
+            {
+                return format!("main:shared-private-{}", record.role);
             }
             String::new()
         }
         "experiment" | "test" | "tooling" => {
-            if record.domain == "test" && record.kind == "function" && record.name.starts_with("test_") {
+            if record.domain == "test"
+                && record.kind == "function"
+                && record.name.starts_with("test_")
+            {
                 return String::new();
             }
             if local && ["general_helper", "numeric_kernel"].contains(&record.role.as_str()) {
@@ -1718,7 +2289,8 @@ fn verdict(record: &FunctionRecord) -> &'static str {
 }
 
 fn should_report_name_gap(record: &FunctionRecord) -> bool {
-    !record.searchable_name && (record.helper_candidate || record.needs_user_judgment || record.redundant_helper)
+    !record.searchable_name
+        && (record.helper_candidate || record.needs_user_judgment || record.redundant_helper)
 }
 
 fn function_implementation_signature(body: &[ast::Stmt], arguments: &ast::Arguments) -> String {
@@ -1740,11 +2312,25 @@ impl DefinitionCollector<'_> {
     fn record_function(&mut self, name: &str, node: &ast::StmtFunctionDef, is_async: bool) {
         let (qualname, scope) = function_qualname_and_scope(&self.stack, name);
         let facts = function_body_facts(self.source, node);
-        let returns_annotation = node.returns.as_deref().map(ToString::to_string).unwrap_or_default();
-        let (scores, mut evidence) = role_scores(&self.relative_path, &returns_annotation, &facts, true);
+        let returns_annotation = node
+            .returns
+            .as_deref()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        let (scores, mut evidence) =
+            role_scores(&self.relative_path, &returns_annotation, &facts, true);
         let roles = ordered_roles(&scores);
-        let role = roles.first().cloned().unwrap_or_else(|| "general_helper".into());
-        let (name_tokens, expected_name_tokens, matched_name_tokens, searchable_name, name_search_rule) = name_search_metadata(name, &role);
+        let role = roles
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "general_helper".into());
+        let (
+            name_tokens,
+            expected_name_tokens,
+            matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+        ) = name_search_metadata(name, &role);
         let candidate = is_candidate_symbol("function", name, &scope, &role);
         let decorators = node
             .decorator_list
@@ -1762,7 +2348,13 @@ impl DefinitionCollector<'_> {
             .map(|(call, line)| format!("{call}@{line}"))
             .collect();
         let features = facts.features.clone();
-        let calls = facts.calls.iter().cloned().collect::<BTreeSet<_>>().into_iter().collect();
+        let calls = facts
+            .calls
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
         let line = node_line(self.source, node);
         let end = node.end().to_usize();
         let end_line = line_at_offset(self.source, end.saturating_sub(1));
@@ -1776,9 +2368,18 @@ impl DefinitionCollector<'_> {
             name: name.to_string(),
             qualname,
             scope,
-            visibility: if name.starts_with('_') { "private" } else { "public" }.into(),
+            visibility: if name.starts_with('_') {
+                "private"
+            } else {
+                "public"
+            }
+            .into(),
             role,
-            secondary_roles: roles.into_iter().skip(1).take(SECONDARY_ROLE_SLICE_STOP - 1).collect(),
+            secondary_roles: roles
+                .into_iter()
+                .skip(1)
+                .take(SECONDARY_ROLE_SLICE_STOP - 1)
+                .collect(),
             name_tokens,
             role_name_tokens: expected_name_tokens,
             matched_role_name_tokens: matched_name_tokens,
@@ -1800,7 +2401,11 @@ impl DefinitionCollector<'_> {
             outgoing_call_sites: call_sites,
             specialized_helper: false,
             specialization: "not_evaluated".into(),
-            side_effects: features.iter().filter(|feature| side_effect(feature)).cloned().collect(),
+            side_effects: features
+                .iter()
+                .filter(|feature| side_effect(feature))
+                .cloned()
+                .collect(),
             features,
             calls,
             args: function_args(&node.args),
@@ -1818,25 +2423,73 @@ impl DefinitionCollector<'_> {
         let mut qual_parts = self.stack.clone();
         qual_parts.push(node.name.to_string());
         let qualname = qual_parts.join(".");
-        let scope = if self.stack.is_empty() { "module" } else { "nested" }.to_string();
+        let scope = if self.stack.is_empty() {
+            "module"
+        } else {
+            "nested"
+        }
+        .to_string();
         let facts = class_body_facts(self.source, node);
-        let bases = node.bases.iter().map(dotted_name).filter(|name| !name.is_empty()).collect::<Vec<_>>();
-        let decorators = node.decorator_list.iter().map(dotted_name).filter(|name| !name.is_empty()).collect::<Vec<_>>();
-        let method_names = node.body.iter().filter_map(|statement| match statement {
-            ast::Stmt::FunctionDef(method) => Some(method.name.to_string()),
-            ast::Stmt::AsyncFunctionDef(method) => Some(method.name.to_string()),
-            _ => None,
-        }).collect::<Vec<_>>();
-        let annotated_field_count = node.body.iter().filter(|statement| matches!(statement, ast::Stmt::AnnAssign(_) | ast::Stmt::Assign(_))).count();
-        let (scores, evidence) = class_role_scores(&self.relative_path, &bases, &decorators, annotated_field_count, &facts);
+        let bases = node
+            .bases
+            .iter()
+            .map(dotted_name)
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
+        let decorators = node
+            .decorator_list
+            .iter()
+            .map(dotted_name)
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
+        let method_names = node
+            .body
+            .iter()
+            .filter_map(|statement| match statement {
+                ast::Stmt::FunctionDef(method) => Some(method.name.to_string()),
+                ast::Stmt::AsyncFunctionDef(method) => Some(method.name.to_string()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        let annotated_field_count = node
+            .body
+            .iter()
+            .filter(|statement| matches!(statement, ast::Stmt::AnnAssign(_) | ast::Stmt::Assign(_)))
+            .count();
+        let (scores, evidence) = class_role_scores(
+            &self.relative_path,
+            &bases,
+            &decorators,
+            annotated_field_count,
+            &facts,
+        );
         let roles = ordered_roles(&scores);
-        let role = roles.first().cloned().unwrap_or_else(|| "general_helper".into());
+        let role = roles
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "general_helper".into());
         let name = node.name.to_string();
-        let (name_tokens, expected_name_tokens, matched_name_tokens, searchable_name, name_search_rule) = name_search_metadata(&name, &role);
+        let (
+            name_tokens,
+            expected_name_tokens,
+            matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+        ) = name_search_metadata(&name, &role);
         let candidate = is_candidate_symbol("class", &name, &scope, &role);
-        let call_sites = facts.call_locations.iter().map(|(call, line)| format!("{call}@{line}")).collect();
+        let call_sites = facts
+            .call_locations
+            .iter()
+            .map(|(call, line)| format!("{call}@{line}"))
+            .collect();
         let features = facts.features.clone();
-        let calls = facts.calls.iter().cloned().collect::<BTreeSet<_>>().into_iter().collect();
+        let calls = facts
+            .calls
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
         let line = node_line(self.source, node);
         let end_line = line_at_offset(self.source, node.end().to_usize().saturating_sub(1));
         let record_confidence = confidence(&name, &scope, &scores, &facts, candidate);
@@ -1849,9 +2502,18 @@ impl DefinitionCollector<'_> {
             name: name.clone(),
             qualname,
             scope,
-            visibility: if name.starts_with('_') { "private" } else { "public" }.into(),
+            visibility: if name.starts_with('_') {
+                "private"
+            } else {
+                "public"
+            }
+            .into(),
             role,
-            secondary_roles: roles.into_iter().skip(1).take(SECONDARY_ROLE_SLICE_STOP - 1).collect(),
+            secondary_roles: roles
+                .into_iter()
+                .skip(1)
+                .take(SECONDARY_ROLE_SLICE_STOP - 1)
+                .collect(),
             name_tokens,
             role_name_tokens: expected_name_tokens,
             matched_role_name_tokens: matched_name_tokens,
@@ -1873,13 +2535,20 @@ impl DefinitionCollector<'_> {
             outgoing_call_sites: call_sites,
             specialized_helper: false,
             specialization: "not_evaluated".into(),
-            side_effects: features.iter().filter(|feature| side_effect(feature)).cloned().collect(),
+            side_effects: features
+                .iter()
+                .filter(|feature| side_effect(feature))
+                .cloned()
+                .collect(),
             features,
             calls,
             args: Vec::new(),
             bases,
             method_count: method_names.len(),
-            public_method_count: method_names.iter().filter(|name| !name.starts_with('_')).count(),
+            public_method_count: method_names
+                .iter()
+                .filter(|name| !name.starts_with('_'))
+                .count(),
             decorators,
             returns_annotation: String::new(),
             doc_summary: doc_summary(docstring(&node.body).as_deref()),
@@ -1909,35 +2578,106 @@ impl Visitor for DefinitionCollector<'_> {
         // Reuse the same field contract while retaining async evidence.
         let (qualname, scope) = function_qualname_and_scope(&self.stack, &name);
         let facts = async_function_body_facts(self.source, &node);
-        let returns_annotation = node.returns.as_deref().map(ToString::to_string).unwrap_or_default();
-        let (scores, mut evidence) = role_scores(&self.relative_path, &returns_annotation, &facts, true);
+        let returns_annotation = node
+            .returns
+            .as_deref()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        let (scores, mut evidence) =
+            role_scores(&self.relative_path, &returns_annotation, &facts, true);
         let roles = ordered_roles(&scores);
-        let role = roles.first().cloned().unwrap_or_else(|| "general_helper".into());
-        let (name_tokens, expected_name_tokens, matched_name_tokens, searchable_name, name_search_rule) = name_search_metadata(&name, &role);
+        let role = roles
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "general_helper".into());
+        let (
+            name_tokens,
+            expected_name_tokens,
+            matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+        ) = name_search_metadata(&name, &role);
         let candidate = is_candidate_symbol("function", &name, &scope, &role);
-        let decorators = node.decorator_list.iter().map(dotted_name).filter(|name| !name.is_empty()).collect::<Vec<_>>();
+        let decorators = node
+            .decorator_list
+            .iter()
+            .map(dotted_name)
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
         evidence.push("async:function".into());
         let features = facts.features.clone();
-        let calls = facts.calls.iter().cloned().collect::<BTreeSet<_>>().into_iter().collect();
-        let call_sites = facts.call_locations.iter().map(|(call, line)| format!("{call}@{line}")).collect();
+        let calls = facts
+            .calls
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let call_sites = facts
+            .call_locations
+            .iter()
+            .map(|(call, line)| format!("{call}@{line}"))
+            .collect();
         let line = node_line(self.source, &node);
         let end_line = line_at_offset(self.source, node.end().to_usize().saturating_sub(1));
         let record_confidence = confidence(&name, &scope, &scores, &facts, candidate);
         self.records.push(FunctionRecord {
-            path: self.relative_path.clone(), line, end_line, kind: "function".into(), domain: path_domain(&self.relative_path),
-            name: name.clone(), qualname, scope,
-            visibility: if name.starts_with('_') { "private" } else { "public" }.into(), role,
-            secondary_roles: roles.into_iter().skip(1).take(SECONDARY_ROLE_SLICE_STOP - 1).collect(),
-            name_tokens, role_name_tokens: expected_name_tokens, matched_role_name_tokens: matched_name_tokens,
-            searchable_name, name_search_rule, confidence: record_confidence, helper_candidate: candidate,
-            candidate_rule: String::new(), needs_user_judgment: false, judgment_rule: String::new(),
-            redundant_helper: false, redundancy_rule: String::new(), redundant_with: Vec::new(),
+            path: self.relative_path.clone(),
+            line,
+            end_line,
+            kind: "function".into(),
+            domain: path_domain(&self.relative_path),
+            name: name.clone(),
+            qualname,
+            scope,
+            visibility: if name.starts_with('_') {
+                "private"
+            } else {
+                "public"
+            }
+            .into(),
+            role,
+            secondary_roles: roles
+                .into_iter()
+                .skip(1)
+                .take(SECONDARY_ROLE_SLICE_STOP - 1)
+                .collect(),
+            name_tokens,
+            role_name_tokens: expected_name_tokens,
+            matched_role_name_tokens: matched_name_tokens,
+            searchable_name,
+            name_search_rule,
+            confidence: record_confidence,
+            helper_candidate: candidate,
+            candidate_rule: String::new(),
+            needs_user_judgment: false,
+            judgment_rule: String::new(),
+            redundant_helper: false,
+            redundancy_rule: String::new(),
+            redundant_with: Vec::new(),
             implementation_signature: function_implementation_signature(&node.body, &node.args),
-            incoming_count: 0, incoming_callers: Vec::new(), incoming_call_sites: Vec::new(), outgoing_internal: Vec::new(),
-            outgoing_call_sites: call_sites, specialized_helper: false, specialization: "not_evaluated".into(),
-            side_effects: features.iter().filter(|feature| side_effect(feature)).cloned().collect(), features,
-            calls, args: function_args(&node.args), bases: Vec::new(), method_count: 0, public_method_count: 0,
-            decorators, returns_annotation, doc_summary: doc_summary(docstring(&node.body).as_deref()), evidence,
+            incoming_count: 0,
+            incoming_callers: Vec::new(),
+            incoming_call_sites: Vec::new(),
+            outgoing_internal: Vec::new(),
+            outgoing_call_sites: call_sites,
+            specialized_helper: false,
+            specialization: "not_evaluated".into(),
+            side_effects: features
+                .iter()
+                .filter(|feature| side_effect(feature))
+                .cloned()
+                .collect(),
+            features,
+            calls,
+            args: function_args(&node.args),
+            bases: Vec::new(),
+            method_count: 0,
+            public_method_count: 0,
+            decorators,
+            returns_annotation,
+            doc_summary: doc_summary(docstring(&node.body).as_deref()),
+            evidence,
         });
         self.stack.push(name);
         self.generic_visit_stmt_async_function_def(node);
@@ -1989,7 +2729,10 @@ fn call_graph_maps(records: &[FunctionRecord]) -> CallGraphMaps {
         by_name.entry(record.name.clone()).or_default().push(index);
         let _ = by_qualname.insert(record.qualname.clone(), index);
     }
-    CallGraphMaps { by_name, by_qualname }
+    CallGraphMaps {
+        by_name,
+        by_qualname,
+    }
 }
 
 fn enclosing_class(qualname: &str) -> String {
@@ -2052,7 +2795,12 @@ fn specialization(record: &FunctionRecord) -> (bool, String) {
     let caller_files = record
         .incoming_callers
         .iter()
-        .map(|caller| caller.split_once(':').map(|(path, _)| path).unwrap_or(caller))
+        .map(|caller| {
+            caller
+                .split_once(':')
+                .map(|(path, _)| path)
+                .unwrap_or(caller)
+        })
         .collect::<BTreeSet<_>>();
     if caller_files.len() == 1 && record.incoming_callers.len() <= LOCAL_CALLER_CLUSTER_LIMIT {
         return (true, "file_local_helper_cluster".into());
@@ -2101,7 +2849,11 @@ fn redundancy_rule(record: &FunctionRecord) -> String {
     if record.kind != "function" || !redundancy_eligible_symbol(record) {
         return String::new();
     }
-    let features = record.features.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let features = record
+        .features
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let simple = features.contains("single_statement_body");
     if simple && features.contains("identity_return") {
         return "identity-return".into();
@@ -2137,7 +2889,9 @@ fn attach_verdict(record: &mut FunctionRecord) {
             record.confidence = DEFAULT_HALF_CONFIDENCE;
         }
     } else if !judgment.is_empty() {
-        record.evidence.insert(0, format!("judgment-rule:{judgment}"));
+        record
+            .evidence
+            .insert(0, format!("judgment-rule:{judgment}"));
         if record.confidence == 0.0 {
             record.confidence = JUDGMENT_CONFIDENCE;
         }
@@ -2150,10 +2904,14 @@ fn attach_verdict(record: &mut FunctionRecord) {
         record.evidence.push("usage:no-internal-callers".into());
     }
     if record.specialized_helper {
-        record.evidence.push(format!("usage:{}", record.specialization));
+        record
+            .evidence
+            .push(format!("usage:{}", record.specialization));
     }
     if record.redundant_helper {
-        record.evidence.push(format!("redundant:{}", record.redundancy_rule));
+        record
+            .evidence
+            .push(format!("redundant:{}", record.redundancy_rule));
         if !record.redundant_with.is_empty() {
             record.evidence.push(format!(
                 "redundant-with:{}",
@@ -2168,7 +2926,9 @@ fn attach_verdict(record: &mut FunctionRecord) {
         }
     }
     if record.helper_candidate || record.needs_user_judgment || record.redundant_helper {
-        record.evidence.push(format!("name-search:{}", record.name_search_rule));
+        record
+            .evidence
+            .push(format!("name-search:{}", record.name_search_rule));
     }
 }
 
@@ -2250,22 +3010,41 @@ fn apply_call_graph(records: &mut [FunctionRecord]) {
 fn inventory_files(root: &Path, options: &Options) -> (Vec<PathBuf>, BTreeSet<String>) {
     if !options.changed_only {
         return (
-            iter_python_files(root, &options.paths, options.include_vendor, options.include_hidden, options.include_pyi),
+            iter_python_files(
+                root,
+                &options.paths,
+                options.include_vendor,
+                options.include_hidden,
+                options.include_pyi,
+            ),
             BTreeSet::new(),
         );
     }
     let changed = filtered_changed_python_files(root, options);
-    let report_paths = changed.iter().map(|path| stable_relative(root, path)).collect::<BTreeSet<_>>();
+    let report_paths = changed
+        .iter()
+        .map(|path| stable_relative(root, path))
+        .collect::<BTreeSet<_>>();
     if changed.is_empty() {
         return (Vec::new(), report_paths);
     }
     (
-        iter_python_files(root, &[], options.include_vendor, options.include_hidden, options.include_pyi),
+        iter_python_files(
+            root,
+            &[],
+            options.include_vendor,
+            options.include_hidden,
+            options.include_pyi,
+        ),
         report_paths,
     )
 }
 
-fn baseline_inventory_records(root: &Path, files: &[PathBuf], reference: &str) -> Vec<FunctionRecord> {
+fn baseline_inventory_records(
+    root: &Path,
+    files: &[PathBuf],
+    reference: &str,
+) -> Vec<FunctionRecord> {
     if reference.is_empty() {
         return Vec::new();
     }
@@ -2273,8 +3052,11 @@ fn baseline_inventory_records(root: &Path, files: &[PathBuf], reference: &str) -
     let mut records = Vec::new();
     for path in files {
         let relative = stable_relative(root, path);
-        let source = git_ref_text(root, reference, &relative)
-            .or_else(|| renamed_paths.get(&relative).and_then(|previous| git_ref_text(root, reference, previous)));
+        let source = git_ref_text(root, reference, &relative).or_else(|| {
+            renamed_paths
+                .get(&relative)
+                .and_then(|previous| git_ref_text(root, reference, previous))
+        });
         if let Some(source) = source {
             records.extend(analyze_source(root, path, &source));
         }
@@ -2302,7 +3084,9 @@ fn select_records(
         .filter(|record| report_paths.is_empty() || report_paths.contains(&record.path))
         .cloned()
         .collect::<Vec<_>>();
-    selected.sort_by(|left, right| (&left.path, left.line, &left.qualname).cmp(&(&right.path, right.line, &right.qualname)));
+    selected.sort_by(|left, right| {
+        (&left.path, left.line, &left.qualname).cmp(&(&right.path, right.line, &right.qualname))
+    });
     selected
 }
 
@@ -2328,17 +3112,24 @@ fn build_inventory(root: &Path, options: &Options) -> Inventory {
     apply_call_graph(&mut all_records);
     let mut selected = select_records(&all_records, options, &report_paths);
     let baseline_selected = select_records(&baseline_records, options, &report_paths);
-    let baseline_keys = baseline_selected.iter().map(record_key).collect::<BTreeSet<_>>();
+    let baseline_keys = baseline_selected
+        .iter()
+        .map(record_key)
+        .collect::<BTreeSet<_>>();
     let before_filter = selected.len();
     if !options.baseline_ref.is_empty() {
         selected.retain(|record| !baseline_keys.contains(&record_key(record)));
     }
-    selected.sort_by(|left, right| (&left.path, left.line, &left.qualname).cmp(&(&right.path, right.line, &right.qualname)));
+    selected.sort_by(|left, right| {
+        (&left.path, left.line, &left.qualname).cmp(&(&right.path, right.line, &right.qualname))
+    });
     let mut role_counts = BTreeMap::<String, usize>::new();
     let mut verdict_counts = BTreeMap::<String, usize>::new();
     for record in &selected {
         *role_counts.entry(record.role.clone()).or_default() += 1;
-        *verdict_counts.entry(verdict(record).to_string()).or_default() += 1;
+        *verdict_counts
+            .entry(verdict(record).to_string())
+            .or_default() += 1;
     }
     Inventory {
         root: root.to_string_lossy().replace('\\', "/"),
@@ -2348,12 +3139,27 @@ fn build_inventory(root: &Path, options: &Options) -> Inventory {
         baseline_filtered: before_filter.saturating_sub(selected.len()),
         files_scanned: files.len(),
         symbols_seen: all_records.len(),
-        functions_seen: all_records.iter().filter(|record| record.kind == "function").count(),
-        classes_seen: all_records.iter().filter(|record| record.kind == "class").count(),
+        functions_seen: all_records
+            .iter()
+            .filter(|record| record.kind == "function")
+            .count(),
+        classes_seen: all_records
+            .iter()
+            .filter(|record| record.kind == "class")
+            .count(),
         symbols_reported: selected.len(),
-        helpers_reported: selected.iter().filter(|record| record.helper_candidate).count(),
-        judgment_required_reported: selected.iter().filter(|record| record.needs_user_judgment).count(),
-        name_gaps_reported: selected.iter().filter(|record| should_report_name_gap(record)).count(),
+        helpers_reported: selected
+            .iter()
+            .filter(|record| record.helper_candidate)
+            .count(),
+        judgment_required_reported: selected
+            .iter()
+            .filter(|record| record.needs_user_judgment)
+            .count(),
+        name_gaps_reported: selected
+            .iter()
+            .filter(|record| should_report_name_gap(record))
+            .count(),
         role_counts,
         verdict_counts,
         records: selected,
@@ -2371,7 +3177,11 @@ fn git_sha(root: &Path) -> String {
 }
 
 fn join_or_none(values: &[String], separator: &str) -> String {
-    if values.is_empty() { "none".into() } else { values.join(separator) }
+    if values.is_empty() {
+        "none".into()
+    } else {
+        values.join(separator)
+    }
 }
 
 fn render_text(inventory: &Inventory) -> String {
@@ -2381,7 +3191,12 @@ fn render_text(inventory: &Inventory) -> String {
         let features = join_or_none(&record.features, ",");
         let outgoing = join_or_none(&record.outgoing_internal, ",");
         let evidence = join_or_none(
-            &record.evidence.iter().take(EVIDENCE_RENDER_LIMIT).cloned().collect::<Vec<_>>(),
+            &record
+                .evidence
+                .iter()
+                .take(EVIDENCE_RENDER_LIMIT)
+                .cloned()
+                .collect::<Vec<_>>(),
             ",",
         );
         let matched_name_tokens = join_or_none(&record.matched_role_name_tokens, ",");
@@ -2433,14 +3248,39 @@ fn render_text(inventory: &Inventory) -> String {
         format!("HELPER_INVENTORY_SYMBOLS={}", inventory.symbols_seen),
         format!("HELPER_INVENTORY_FUNCTIONS={}", inventory.functions_seen),
         format!("HELPER_INVENTORY_CLASSES={}", inventory.classes_seen),
-        format!("HELPER_INVENTORY_SYMBOLS_REPORTED={}", inventory.symbols_reported),
+        format!(
+            "HELPER_INVENTORY_SYMBOLS_REPORTED={}",
+            inventory.symbols_reported
+        ),
         format!("HELPER_INVENTORY_HELPERS={}", inventory.helpers_reported),
-        format!("HELPER_INVENTORY_JUDGMENT_REQUIRED={}", inventory.judgment_required_reported),
-        format!("HELPER_INVENTORY_NAME_GAPS={}", inventory.name_gaps_reported),
-        format!("HELPER_INVENTORY_CHANGED_ONLY={}", inventory.changed_only.to_string().to_lowercase()),
-        format!("HELPER_INVENTORY_BASELINE_REF={}", if inventory.baseline_ref.is_empty() { "none" } else { &inventory.baseline_ref }),
-        format!("HELPER_INVENTORY_BASELINE_SYMBOLS={}", inventory.baseline_symbols_seen),
-        format!("HELPER_INVENTORY_BASELINE_FILTERED={}", inventory.baseline_filtered),
+        format!(
+            "HELPER_INVENTORY_JUDGMENT_REQUIRED={}",
+            inventory.judgment_required_reported
+        ),
+        format!(
+            "HELPER_INVENTORY_NAME_GAPS={}",
+            inventory.name_gaps_reported
+        ),
+        format!(
+            "HELPER_INVENTORY_CHANGED_ONLY={}",
+            inventory.changed_only.to_string().to_lowercase()
+        ),
+        format!(
+            "HELPER_INVENTORY_BASELINE_REF={}",
+            if inventory.baseline_ref.is_empty() {
+                "none"
+            } else {
+                &inventory.baseline_ref
+            }
+        ),
+        format!(
+            "HELPER_INVENTORY_BASELINE_SYMBOLS={}",
+            inventory.baseline_symbols_seen
+        ),
+        format!(
+            "HELPER_INVENTORY_BASELINE_FILTERED={}",
+            inventory.baseline_filtered
+        ),
         format!("HELPER_INVENTORY_ROLES={role_summary}"),
         format!("HELPER_INVENTORY_VERDICTS={verdict_summary}"),
         "HELPER_INVENTORY=pass".into(),
@@ -2459,23 +3299,53 @@ fn render_markdown(inventory: &Inventory) -> String {
         ("functions seen", inventory.functions_seen.to_string()),
         ("classes seen", inventory.classes_seen.to_string()),
         ("symbols reported", inventory.symbols_reported.to_string()),
-        ("auto helpers reported", inventory.helpers_reported.to_string()),
-        ("user judgment required", inventory.judgment_required_reported.to_string()),
-        ("name gaps reported", inventory.name_gaps_reported.to_string()),
-        ("changed only", inventory.changed_only.to_string().to_lowercase()),
-        ("baseline ref", if inventory.baseline_ref.is_empty() { "none".into() } else { inventory.baseline_ref.clone() }),
-        ("baseline symbols seen", inventory.baseline_symbols_seen.to_string()),
+        (
+            "auto helpers reported",
+            inventory.helpers_reported.to_string(),
+        ),
+        (
+            "user judgment required",
+            inventory.judgment_required_reported.to_string(),
+        ),
+        (
+            "name gaps reported",
+            inventory.name_gaps_reported.to_string(),
+        ),
+        (
+            "changed only",
+            inventory.changed_only.to_string().to_lowercase(),
+        ),
+        (
+            "baseline ref",
+            if inventory.baseline_ref.is_empty() {
+                "none".into()
+            } else {
+                inventory.baseline_ref.clone()
+            },
+        ),
+        (
+            "baseline symbols seen",
+            inventory.baseline_symbols_seen.to_string(),
+        ),
         ("baseline filtered", inventory.baseline_filtered.to_string()),
     ];
     let verdict_rows = if inventory.verdict_counts.is_empty() {
         vec![("none".to_string(), 0)]
     } else {
-        inventory.verdict_counts.iter().map(|(name, count)| (name.clone(), *count)).collect()
+        inventory
+            .verdict_counts
+            .iter()
+            .map(|(name, count)| (name.clone(), *count))
+            .collect()
     };
     let role_rows = if inventory.role_counts.is_empty() {
         vec![("none".to_string(), 0)]
     } else {
-        inventory.role_counts.iter().map(|(name, count)| (name.clone(), *count)).collect()
+        inventory
+            .role_counts
+            .iter()
+            .map(|(name, count)| (name.clone(), *count))
+            .collect()
     };
     let mut lines = vec![
         "# Helper Symbol Inventory".to_string(),
@@ -2486,13 +3356,29 @@ fn render_markdown(inventory: &Inventory) -> String {
         "| --- | --- |".into(),
     ];
     for (metric, value) in summary_rows {
-        lines.push(format!("| {} | {} |", markdown_cell(metric), markdown_cell(&value)));
+        lines.push(format!(
+            "| {} | {} |",
+            markdown_cell(metric),
+            markdown_cell(&value)
+        ));
     }
-    lines.extend([String::new(), "## Verdict Counts".into(), String::new(), "| Verdict | Count |".into(), "| --- | --- |".into()]);
+    lines.extend([
+        String::new(),
+        "## Verdict Counts".into(),
+        String::new(),
+        "| Verdict | Count |".into(),
+        "| --- | --- |".into(),
+    ]);
     for (name, count) in verdict_rows {
         lines.push(format!("| {} | {} |", markdown_cell(&name), count));
     }
-    lines.extend([String::new(), "## Role Counts".into(), String::new(), "| Role | Count |".into(), "| --- | --- |".into()]);
+    lines.extend([
+        String::new(),
+        "## Role Counts".into(),
+        String::new(),
+        "| Role | Count |".into(),
+        "| --- | --- |".into(),
+    ]);
     for (name, count) in role_rows {
         lines.push(format!("| {} | {} |", markdown_cell(&name), count));
     }
@@ -2514,17 +3400,45 @@ fn render_markdown(inventory: &Inventory) -> String {
             markdown_cell(&record.role),
             record.searchable_name.to_string().to_lowercase(),
             markdown_cell(&record.name_search_rule),
-            markdown_cell(&if record.matched_role_name_tokens.is_empty() { "none".into() } else { record.matched_role_name_tokens.join(", ") }),
-            markdown_cell(if record.candidate_rule.is_empty() { "none" } else { &record.candidate_rule }),
-            markdown_cell(if record.judgment_rule.is_empty() { "none" } else { &record.judgment_rule }),
-            markdown_cell(if record.redundancy_rule.is_empty() { "none" } else { &record.redundancy_rule }),
-            markdown_cell(&if record.redundant_with.is_empty() { "none".into() } else { record.redundant_with.join(", ") }),
+            markdown_cell(&if record.matched_role_name_tokens.is_empty() {
+                "none".into()
+            } else {
+                record.matched_role_name_tokens.join(", ")
+            }),
+            markdown_cell(if record.candidate_rule.is_empty() {
+                "none"
+            } else {
+                &record.candidate_rule
+            }),
+            markdown_cell(if record.judgment_rule.is_empty() {
+                "none"
+            } else {
+                &record.judgment_rule
+            }),
+            markdown_cell(if record.redundancy_rule.is_empty() {
+                "none"
+            } else {
+                &record.redundancy_rule
+            }),
+            markdown_cell(&if record.redundant_with.is_empty() {
+                "none".into()
+            } else {
+                record.redundant_with.join(", ")
+            }),
             format!("{:.2}", record.confidence),
             record.incoming_count.to_string(),
             markdown_cell(&record.specialization),
             markdown_cell(&join_or_none(&record.side_effects, ", ")),
             markdown_cell(&join_or_none(&record.features, ", ")),
-            markdown_cell(&join_or_none(&record.evidence.iter().take(MARKDOWN_EVIDENCE_LIMIT).cloned().collect::<Vec<_>>(), ", ")),
+            markdown_cell(&join_or_none(
+                &record
+                    .evidence
+                    .iter()
+                    .take(MARKDOWN_EVIDENCE_LIMIT)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                ", ",
+            )),
         ];
         lines.push(format!("| {} |", values.join(" | ")));
     }
