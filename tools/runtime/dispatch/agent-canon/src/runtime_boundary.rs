@@ -14,6 +14,10 @@ use std::path::{Component, Path, PathBuf};
 
 pub const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
 
+// Win32 FILE_FLAG_BACKUP_SEMANTICS, required when opening a directory handle.
+#[cfg(windows)]
+const WINDOWS_FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
 fn current_home_directory() -> Result<PathBuf, String> {
     #[cfg(windows)]
     let home = env::var_os("USERPROFILE").or_else(|| {
@@ -429,7 +433,17 @@ impl RuntimeDirectory {
         // Dir handles are opened for capability-relative traversal and may be O_PATH.
         // Reopen `.` relative to that handle to obtain an fsync-capable descriptor.
         let mut options = cap_std::fs::OpenOptions::new();
-        options.read(true).follow(FollowSymlinks::No);
+        #[cfg(windows)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options
+                .read(true)
+                .write(true)
+                .custom_flags(WINDOWS_FILE_FLAG_BACKUP_SEMANTICS);
+        }
+        #[cfg(not(windows))]
+        options.read(true);
+        options.follow(FollowSymlinks::No);
         let directory = self.directory.open_with(Path::new("."), &options)?;
         if !directory.metadata()?.is_dir() {
             return Err(std::io::Error::new(
