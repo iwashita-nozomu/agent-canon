@@ -925,8 +925,8 @@ impl SummaryArgs {
                 } else {
                     raw.split_once('=').expect("starts with --top=").1
                 };
-                top = parse_python_int(value)
-                    .map_err(|_| format!("argument --top: invalid int value: '{value}'"))?;
+                top = crate::python_cli_integer::parse(value)
+                    .ok_or_else(|| format!("argument --top: invalid int value: '{value}'"))?;
                 index += 1;
                 continue;
             }
@@ -964,45 +964,6 @@ impl SummaryArgs {
             only_case,
         }))
     }
-}
-
-fn parse_python_int(raw: &str) -> Result<BigInt, ()> {
-    let value = raw.trim_matches(is_python_whitespace);
-    let (negative, digits) = if let Some(digits) = value.strip_prefix('-') {
-        (true, digits)
-    } else if let Some(digits) = value.strip_prefix('+') {
-        (false, digits)
-    } else {
-        (false, value)
-    };
-    let bytes = digits.as_bytes();
-    if bytes.is_empty() {
-        return Err(());
-    }
-    for (index, byte) in bytes.iter().copied().enumerate() {
-        if byte.is_ascii_digit() {
-            continue;
-        }
-        if byte == b'_'
-            && index > 0
-            && index + 1 < bytes.len()
-            && bytes[index - 1].is_ascii_digit()
-            && bytes[index + 1].is_ascii_digit()
-        {
-            continue;
-        }
-        return Err(());
-    }
-    let digits: String = digits
-        .chars()
-        .filter(|character| *character != '_')
-        .collect();
-    let value = if negative {
-        format!("-{digits}")
-    } else {
-        digits
-    };
-    value.parse::<BigInt>().map_err(|_| ())
 }
 
 struct MarkdownArgs {
