@@ -110,8 +110,10 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         check=True,
     )
     runtime_root = control / ".runtime"
-    native_target_dir = runtime_root / "tasks" / "bootstrap-native-cargo"
-    native_binary = native_target_dir / "debug" / "agent-canon"
+    configured_native = os.environ.get("AGENT_CANON_CLI")
+    assert configured_native, "AGENT_CANON_CLI must select the built native test input"
+    native_binary = Path(configured_native).resolve(strict=True)
+    assert native_binary.is_file() and os.access(native_binary, os.X_OK)
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
     environment = {
@@ -142,31 +144,6 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         timeout=120,
     )
     assert installed.returncode == 0, installed.stderr
-    cargo_home = Path(
-        os.environ.get("CARGO_HOME", str(runtime_root / "cache" / "cargo-home"))
-    )
-    cargo_home.mkdir(parents=True, exist_ok=True)
-    native_build = subprocess.run(
-        [
-            "cargo",
-            "build",
-            "--locked",
-            "--manifest-path",
-            str(repository / "tools/runtime/dispatch/agent-canon/Cargo.toml"),
-            "--target-dir",
-            str(native_target_dir),
-        ],
-        cwd=repository,
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "CARGO_HOME": str(cargo_home),
-            "CARGO_TARGET_DIR": str(native_target_dir),
-        },
-    )
-    assert native_build.returncode == 0, native_build.stdout + native_build.stderr
     subprocess.run(
         [
             "git",

@@ -11,11 +11,10 @@ use agent_canon::native_release::{
     NativeReleaseError, PublishRequest,
 };
 use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
 use flate2::{Compression, GzBuilder};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -824,7 +823,7 @@ fn interrupted_upload_resumes_only_missing_assets() {
     assert!(!uploads.iter().any(|args| {
         args.get(args.iter().position(|arg| arg == "--input").unwrap() + 1)
             .and_then(|path| Path::new(path).file_name())
-            .is_some_and(|name| name == uploaded_name)
+            .is_some_and(|name| name == uploaded_name.as_str())
     }));
     assert!(!github
         .commands
