@@ -5,7 +5,7 @@
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns external CI state and exact cleanup
 # upstream implementation ../checks/run_python_quality_checks.sh owns Python static quality checks
-# upstream implementation ../../notebooks/notebook_quality.py validates notebooks as readable runnable demos
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/notebook_quality.rs validates notebooks as readable runnable demos
 # upstream implementation ../../../bin/agent-canon invokes the canonical Rust algorithm contract checker
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the algorithm contract checker
 # upstream implementation ../../semantic/convention/check_convention_compliance.py validates convention/workflow gate wiring
@@ -376,7 +376,7 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/validation/notebooks/notebook_quality.py" --all 2>&1; then
+if run_agent_canon notebook-quality --all 2>&1; then
   echo "✅ notebook quality checks 成功"
 else
   echo "❌ notebook quality checks 失敗"
