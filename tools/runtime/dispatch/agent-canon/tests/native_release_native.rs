@@ -39,6 +39,7 @@ impl TemporaryDirectory {
             std::process::id()
         ));
         fs::create_dir_all(&path).expect("create release test directory");
+        let path = fs::canonicalize(path).expect("resolve physical release test directory");
         Self(path)
     }
 
