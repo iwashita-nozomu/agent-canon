@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests real observation classification and owner/handoff output.
-# upstream implementation ../../tools/analysis/numerical/numeric_performance.py owns the closed JSON classifier
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/numeric_performance.rs owns the closed JSON classifier
 # upstream design ../../agents/skills/computational-optimization.md owns numerical performance ownership
 # downstream implementation ../../agents/skills/catalog.yaml exposes the classifier command
 # @dependency-end
@@ -11,13 +11,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from copy import deepcopy
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASSIFIER = PROJECT_ROOT / "tools" / "analysis" / "numerical" / "numeric_performance.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 INPUT_SCHEMA = "agent-canon.numeric-performance-observation.v1"
 
 
@@ -92,8 +92,15 @@ def _observation(
 
 
 def _classify(packet: dict[str, object]) -> subprocess.CompletedProcess[str]:
+    assert AGENT_CANON_CLI is not None, (
+        "AGENT_CANON_CLI must select the current native executable"
+    )
+    executable = Path(AGENT_CANON_CLI)
+    assert executable.is_absolute(), (
+        "AGENT_CANON_CLI must be an absolute executable path"
+    )
     return subprocess.run(
-        [sys.executable, str(CLASSIFIER), "--input", "-", "--format", "json"],
+        [str(executable), "numeric-performance", "--input", "-", "--format", "json"],
         cwd=PROJECT_ROOT,
         input=json.dumps(packet),
         capture_output=True,
