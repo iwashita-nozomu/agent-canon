@@ -6,9 +6,11 @@
 //! accidentally recreating the old `.agent-canon` source-tree cache.
 
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
 
 pub(crate) const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
 
@@ -240,6 +242,45 @@ impl RuntimeDirectory {
         Ok(Self { directory })
     }
 
+    /// Open an absolute directory by walking every component without following symlinks.
+    pub(crate) fn open_nofollow(path: &Path, create: bool) -> std::io::Result<Self> {
+        use cap_fs_ext::DirExt;
+        if !path.is_absolute() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "absolute runtime directory required",
+            ));
+        }
+        let mut directory = cap_std::fs::Dir::open_ambient_dir(
+            Path::new("/"),
+            cap_std::ambient_authority(),
+        )?;
+        for component in path.components() {
+            match component {
+                Component::RootDir => {}
+                Component::Normal(name) => match directory.open_dir_nofollow(name) {
+                    Ok(child) => directory = child,
+                    Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
+                        match directory.create_dir(name) {
+                            Ok(()) => {}
+                            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                            Err(error) => return Err(error),
+                        }
+                        directory = directory.open_dir_nofollow(name)?;
+                    }
+                    Err(error) => return Err(error),
+                },
+                Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "runtime directory path is not canonical",
+                    ));
+                }
+            }
+        }
+        Ok(Self { directory })
+    }
+
     pub(crate) fn child(&self, relative: &Path, create: bool) -> std::io::Result<Self> {
         use cap_fs_ext::DirExt;
         use std::path::Component;
@@ -295,8 +336,15 @@ impl RuntimeDirectory {
     }
 
     pub(crate) fn read(&self, relative: &Path) -> std::io::Result<Option<Vec<u8>>> {
+        self.read_stable(relative)
+            .map(|result| result.map(|(bytes, _)| bytes))
+    }
+
+    pub(crate) fn read_stable(
+        &self,
+        relative: &Path,
+    ) -> std::io::Result<Option<(Vec<u8>, RuntimeFileSnapshot)>> {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
-        use std::io::Read;
         let (parent, name) = match self.parent(relative, false) {
             Ok(value) => value,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -304,8 +352,8 @@ impl RuntimeDirectory {
         };
         let mut options = cap_std::fs::OpenOptions::new();
         options.read(true).follow(FollowSymlinks::No);
-        match parent.directory.symlink_metadata(&name) {
-            Ok(metadata) if metadata.is_file() => {}
+        let before = match parent.directory.symlink_metadata(&name) {
+            Ok(metadata) if metadata.is_file() => metadata,
             Ok(_) => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -314,7 +362,7 @@ impl RuntimeDirectory {
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
-        }
+        };
         #[cfg(unix)]
         {
             use cap_fs_ext::OpenOptionsSyncExt;
@@ -325,7 +373,8 @@ impl RuntimeDirectory {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => return Err(error),
         };
-        if !file.metadata()?.is_file() {
+        let opened = file.metadata()?;
+        if !opened.is_file() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "runtime target is not a regular file",
@@ -333,7 +382,23 @@ impl RuntimeDirectory {
         }
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
-        Ok(Some(bytes))
+        let after = file.metadata()?;
+        let before_snapshot = RuntimeFileSnapshot::from_metadata(&before);
+        let opened_snapshot = RuntimeFileSnapshot::from_metadata(&opened);
+        let after_snapshot = RuntimeFileSnapshot::from_metadata(&after);
+        if before_snapshot != opened_snapshot || opened_snapshot != after_snapshot {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime file changed during read",
+            ));
+        }
+        if bytes.len() as u64 != after.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "runtime file size changed during read",
+            ));
+        }
+        Ok(Some((bytes, after_snapshot)))
     }
 
     pub(crate) fn read_candidate(&self, relative: &Path) -> std::io::Result<Option<Vec<u8>>> {
@@ -384,6 +449,11 @@ impl RuntimeDirectory {
             }
         };
         let result = (|| {
+            #[cfg(unix)]
+            {
+                use cap_std::fs::PermissionsExt;
+                file.set_permissions(cap_std::fs::Permissions::from_mode(mode))?;
+            }
             file.write_all(bytes)?;
             file.sync_all()?;
             drop(file);
@@ -396,6 +466,72 @@ impl RuntimeDirectory {
             parent
                 .directory
                 .rename(&temporary, &parent.directory, &name)
+        })();
+        let cleanup = parent.directory.remove_file(&temporary);
+        match (result, cleanup) {
+            (Err(error), _) => Err(error),
+            (Ok(()), Err(error)) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+            _ => Ok(()),
+        }
+    }
+
+    /// Atomically replace one handle-relative regular file and sync the file and parent.
+    pub(crate) fn atomic_write_bytes(
+        &self,
+        relative: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> std::io::Result<()> {
+        use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
+        let (parent, name) = self.parent(relative, true)?;
+        parent.make_private()?;
+        match parent.directory.symlink_metadata(&name) {
+            Ok(metadata) if metadata.is_file() => {}
+            Ok(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "runtime target is not a regular file",
+                ))
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        let mut options = cap_std::fs::OpenOptions::new();
+        options
+            .write(true)
+            .create_new(true)
+            .follow(FollowSymlinks::No);
+        #[cfg(unix)]
+        {
+            use cap_std::fs::OpenOptionsExt;
+            options.mode(mode);
+        }
+        let (temporary, mut file) = loop {
+            let temporary = format!(
+                ".runtime-artifact-{}-{}.tmp",
+                std::process::id(),
+                NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
+            );
+            match parent.directory.open_with(&temporary, &options) {
+                Ok(file) => break (temporary, file),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => return Err(error),
+            }
+        };
+        let result = (|| {
+            file.write_all(bytes)?;
+            file.sync_all()?;
+            drop(file);
+            parent
+                .directory
+                .rename(&temporary, &parent.directory, &name)?;
+            parent
+                .directory
+                .try_clone()?
+                .into_std_file()
+                .sync_all()
         })();
         let cleanup = parent.directory.remove_file(&temporary);
         match (result, cleanup) {
@@ -491,6 +627,40 @@ impl RuntimeDirectory {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RuntimeFileSnapshot {
+    pub(crate) device: u64,
+    pub(crate) inode: u64,
+    pub(crate) mode: u32,
+    pub(crate) size: u64,
+    pub(crate) mtime_ns: i128,
+}
+
+impl RuntimeFileSnapshot {
+    fn from_metadata(metadata: &cap_std::fs::Metadata) -> Self {
+        use cap_std::fs::MetadataExt;
+        #[cfg(unix)]
+        use cap_std::fs::PermissionsExt;
+        #[cfg(unix)]
+        let (device, inode, mode, mtime_ns) = (
+            metadata.dev(),
+            metadata.ino(),
+            metadata.permissions().mode() & 0o7777,
+            i128::from(metadata.mtime()) * 1_000_000_000
+                + i128::from(metadata.mtime_nsec()),
+        );
+        #[cfg(not(unix))]
+        let (device, inode, mode, mtime_ns) = (0, 0, 0, 0);
+        Self {
+            device,
+            inode,
+            mode,
+            size: metadata.len(),
+            mtime_ns,
+        }
+    }
+}
+
 fn identical_private_bytes(existing: &[u8], requested: &[u8]) -> std::io::Result<()> {
     if existing == requested {
         Ok(())
@@ -521,6 +691,478 @@ impl RuntimeFileLock {
     pub(crate) fn finish(self) -> std::io::Result<()> {
         self.file.unlock()
     }
+}
+
+const SOURCE_RUNTIME_DIRECTORY: &str = ".runtime";
+const SOURCE_RUNTIME_ALLOWED_TOP_LEVELS: [&str; 2] = ["locks", "spool"];
+
+/// A validated explicit runtime artifact root. This type never grants parent-root authority.
+pub(crate) struct RuntimeArtifactBoundary {
+    source_root: PathBuf,
+    root: PathBuf,
+    directory: RuntimeDirectory,
+    spool_only: bool,
+    source_runtime_spool: bool,
+}
+
+/// The restricted bootstrap spool/control capability, distinct from general artifacts.
+pub(crate) struct RuntimeSpoolBoundary(RuntimeArtifactBoundary);
+
+impl std::ops::Deref for RuntimeSpoolBoundary {
+    type Target = RuntimeArtifactBoundary;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl RuntimeArtifactBoundary {
+    pub(crate) fn for_source(
+        source_root: &Path,
+        requested: Option<&Path>,
+        create: bool,
+    ) -> Result<Self, String> {
+        let source = fs::canonicalize(source_root).map_err(|error| {
+            format!("source root is unavailable: {}: {error}", source_root.display())
+        })?;
+        let requested = requested
+            .map(Path::to_path_buf)
+            .or_else(|| {
+                env::var_os(RUNTIME_ROOT_ENV)
+                    .filter(|value| !value.is_empty())
+                    .and_then(|value| value.into_string().ok())
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .map(PathBuf::from)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
+                )
+            })?;
+        let root = resolve_explicit_root(&source, &requested, create)?;
+        let directory = RuntimeDirectory::open_nofollow(&root, false)
+            .map_err(|error| format!("runtime root is unavailable: {root}: {error}"))?;
+        Ok(Self {
+            source_root: source,
+            root,
+            directory,
+            spool_only: false,
+            source_runtime_spool: false,
+        })
+    }
+
+    fn for_spool(
+        source_root: &Path,
+        requested: Option<&Path>,
+        create: bool,
+    ) -> Result<Self, String> {
+        let source = fs::canonicalize(source_root).map_err(|error| {
+            format!("source root is unavailable: {}: {error}", source_root.display())
+        })?;
+        let requested = requested
+            .map(Path::to_path_buf)
+            .or_else(|| {
+                env::var_os(RUNTIME_ROOT_ENV)
+                    .filter(|value| !value.is_empty())
+                    .and_then(|value| value.into_string().ok())
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .map(PathBuf::from)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
+                )
+            })?;
+        if !requested.is_absolute() {
+            return Err(format!(
+                "runtime root must be absolute: {}",
+                requested.display()
+            ));
+        }
+        let source_runtime = source.join(SOURCE_RUNTIME_DIRECTORY);
+        let source_runtime_spool = requested == source_runtime;
+        let root = if source_runtime_spool {
+            reject_symlink_components(&requested, Path::new("/"))?;
+            if create {
+                RuntimeDirectory::open_nofollow(&requested, true)
+                    .map_err(|error| format!("runtime root is unavailable: {requested}: {error}"))?;
+            } else if !requested.is_dir() {
+                return Err(format!("runtime root is unavailable: {}", requested.display()));
+            }
+            requested
+        } else {
+            resolve_explicit_root(&source, &requested, create)?
+        };
+        let directory = RuntimeDirectory::open_nofollow(&root, false)
+            .map_err(|error| format!("runtime root is unavailable: {root}: {error}"))?;
+        Ok(Self {
+            source_root: source,
+            root,
+            directory,
+            spool_only: true,
+            source_runtime_spool,
+        })
+    }
+
+    pub(crate) fn root(&self) -> &Path {
+        &self.root
+    }
+
+    pub(crate) fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
+        let relative = if path.is_absolute() {
+            path.strip_prefix(&self.root)
+                .map_err(|_| format!("path escapes runtime root: {}", path.display()))?
+        } else {
+            path
+        };
+        let mut parts = Vec::new();
+        for component in relative.components() {
+            match component {
+                Component::Normal(part) => parts.push(part.to_os_string()),
+                _ => {
+                    return Err(format!(
+                        "unsafe runtime-relative path: {}",
+                        path.display()
+                    ))
+                }
+            }
+        }
+        if parts.is_empty() {
+            return Err("runtime root itself is not an artifact".to_string());
+        }
+        if self.spool_only {
+            let first = parts[0].to_string_lossy();
+            if !SOURCE_RUNTIME_ALLOWED_TOP_LEVELS
+                .iter()
+                .any(|allowed| first == *allowed)
+            {
+                return Err(format!(
+                    "runtime spool path is outside bootstrap spool/control paths: {}",
+                    path.display()
+                ));
+            }
+        }
+        let mut relative = PathBuf::new();
+        for part in &parts {
+            relative.push(part);
+        }
+        let joined = self.root.join(&relative);
+        reject_symlink_components(&joined, &self.root)?;
+        match self.directory.parent(&relative, false) {
+            Ok((parent, name)) => match parent.directory.symlink_metadata(&name) {
+                Ok(metadata) if metadata.is_symlink() => {
+                    return Err(format!("runtime target is a symlink: {}", joined.display()))
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(format!("cannot inspect runtime path {}: {error}", joined.display()))
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!("cannot inspect runtime path {}: {error}", joined.display()))
+            }
+        }
+        if self.source_runtime_spool && !joined.starts_with(&self.source_root) {
+            return Err(format!("source runtime path escaped source root: {}", joined.display()));
+        }
+        Ok(joined)
+    }
+
+    pub(crate) fn ensure_directory(&self, path: &Path) -> Result<PathBuf, String> {
+        let target = if path == Path::new(".") {
+            self.root.clone()
+        } else {
+            self.resolve(path)?
+        };
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .child(relative, true)
+            .map_err(|error| format!("cannot create runtime directory {}: {error}", target.display()))?;
+        Ok(target)
+    }
+
+    pub(crate) fn atomic_write_bytes(
+        &self,
+        path: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> Result<PathBuf, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .atomic_write_bytes(relative, bytes, mode)
+            .map_err(|error| format!("atomic runtime write failed: {}: {error}", target.display()))?;
+        Ok(target)
+    }
+
+    pub(crate) fn atomic_write_text(
+        &self,
+        path: &Path,
+        text: &str,
+        mode: u32,
+    ) -> Result<PathBuf, String> {
+        self.atomic_write_bytes(path, text.as_bytes(), mode)
+    }
+
+    pub(crate) fn atomic_write_json(
+        &self,
+        path: &Path,
+        value: &serde_json::Value,
+        mode: u32,
+    ) -> Result<PathBuf, String> {
+        let mut bytes = serde_json::to_vec_pretty(value)
+            .map_err(|error| format!("runtime JSON serialization failed: {error}"))?;
+        bytes.push(b'\n');
+        self.atomic_write_bytes(path, &bytes, mode)
+    }
+
+    pub(crate) fn append_bytes(
+        &self,
+        path: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> Result<PathBuf, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        let name = relative
+            .file_name()
+            .ok_or_else(|| format!("runtime target has no filename: {}", target.display()))?;
+        let lock_name = format!(".{}.lock", name.to_string_lossy());
+        let lock_path = relative.parent().unwrap_or(Path::new("")).join(lock_name);
+        let _lock = self
+            .directory
+            .lock(&lock_path)
+            .map_err(|error| format!("external append lock failed: {}: {error}", target.display()))?;
+        let mut merged = self
+            .directory
+            .read(relative)
+            .map_err(|error| format!("cannot read runtime artifact {}: {error}", target.display()))?
+            .unwrap_or_default();
+        merged.extend_from_slice(bytes);
+        self.directory
+            .atomic_write_bytes(relative, &merged, mode)
+            .map_err(|error| format!("external append failed: {}: {error}", target.display()))?;
+        Ok(target)
+    }
+
+    pub(crate) fn digest(&self, path: &Path) -> Result<String, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        let bytes = self
+            .directory
+            .read(relative)
+            .map_err(|error| format!("cannot read runtime artifact {}: {error}", target.display()))?
+            .ok_or_else(|| format!("cannot read runtime artifact: {}", target.display()))?;
+        Ok(Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect())
+    }
+}
+
+impl RuntimeSpoolBoundary {
+    pub(crate) fn for_source(
+        source_root: &Path,
+        requested: Option<&Path>,
+        create: bool,
+    ) -> Result<Self, String> {
+        RuntimeArtifactBoundary::for_spool(source_root, requested, create).map(Self)
+    }
+
+    pub(crate) fn boundary(&self) -> &RuntimeArtifactBoundary {
+        &self.0
+    }
+}
+
+fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Result<PathBuf, String> {
+    if !requested.is_absolute() {
+        return Err(format!("runtime root must be absolute: {}", requested.display()));
+    }
+    reject_symlink_components(requested, Path::new("/"))?;
+    let normalized = normalize_absolute_path(requested);
+    let existing_parent = canonical_existing_parent(requested).map_err(|error| {
+        format!("runtime root is unavailable: {}: {error}", requested.display())
+    })?;
+    if existing_parent == source || existing_parent.starts_with(source) {
+        return Err(format!(
+            "runtime root must not be inside source root: source={} runtime={}",
+            source.display(),
+            requested.display()
+        ));
+    }
+    if create {
+        RuntimeDirectory::open_nofollow(&normalized, true)
+            .map_err(|error| format!("runtime root is unavailable: {}: {error}", requested.display()))?;
+    } else if !normalized.is_dir() {
+        return Err(format!("runtime root is unavailable: {}", requested.display()));
+    }
+    let root = fs::canonicalize(&normalized)
+        .map_err(|error| format!("runtime root is unavailable: {}: {error}", requested.display()))?;
+    if root == source || root.starts_with(source) {
+        return Err(format!(
+            "runtime root must not be inside source root: source={} runtime={}",
+            source.display(),
+            root.display()
+        ));
+    }
+    Ok(root)
+}
+
+fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
+    let relative = path
+        .strip_prefix(stop)
+        .map_err(|_| format!("path is outside boundary: {}", path.display()))?;
+    let mut current = stop.to_path_buf();
+    for component in relative.components() {
+        match component {
+            Component::Normal(name) => {
+                current.push(name);
+                match fs::symlink_metadata(&current) {
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        return Err(format!("runtime root contains symlink component {}", current.display()))
+                    }
+                    Ok(_) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(format!("cannot inspect runtime path {}: {error}", current.display())),
+                }
+            }
+            Component::ParentDir => {
+                current.pop();
+            }
+            Component::RootDir | Component::CurDir | Component::Prefix(_) => {}
+        }
+    }
+    Ok(())
+}
+
+fn normalize_absolute_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(std::path::MAIN_SEPARATOR.to_string()),
+            Component::CurDir => {},
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Normal(name) => normalized.push(name),
+        }
+    }
+    normalized
+}
+
+const SAFE_CHILD_ENV_NAMES: [&str; 9] = [
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONUNBUFFERED",
+    "SYSTEMROOT",
+    "PATHEXT",
+];
+const RUNTIME_PATH_ENV_NAMES: [&str; 9] = [
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+];
+
+/// Copy only non-secret process settings and attach path identities, not write attestations.
+pub(crate) fn root_capability_environment(
+    source_root: &Path,
+    runtime_root: &Path,
+    base_env: Option<&BTreeMap<String, String>>,
+    target_root: Option<&Path>,
+) -> Result<BTreeMap<String, String>, String> {
+    let parent = fs::canonicalize(source_root)
+        .map_err(|error| format!("root capability is unavailable: {}: {error}", source_root.display()))?;
+    let target = fs::canonicalize(target_root.unwrap_or(source_root)).map_err(|error| {
+        format!(
+            "root capability is unavailable: {}: {error}",
+            target_root.unwrap_or(source_root).display()
+        )
+    })?;
+    let runtime = fs::canonicalize(runtime_root)
+        .map_err(|error| format!("root capability is unavailable: {}: {error}", runtime_root.display()))?;
+    let supplied = base_env.cloned().unwrap_or_else(|| {
+        env::vars_os()
+            .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
+            .collect::<BTreeMap<String, String>>()
+    });
+    let mut child = supplied
+        .into_iter()
+        .filter(|(name, _)| {
+            SAFE_CHILD_ENV_NAMES.contains(&name.as_str())
+                || RUNTIME_PATH_ENV_NAMES.contains(&name.as_str())
+                || name.starts_with("LC_")
+        })
+        .collect::<BTreeMap<_, _>>();
+    let identity = |path: &Path| -> Result<(String, String), String> {
+        let metadata = fs::metadata(path)
+            .map_err(|error| format!("root capability is unavailable: {}: {error}", path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            Ok((metadata.dev().to_string(), metadata.ino().to_string()))
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = metadata;
+            Err("root device/inode identity is unavailable on this platform".to_string())
+        }
+    };
+    let (parent_dev, parent_ino) = identity(&parent)?;
+    let (target_dev, target_ino) = identity(&target)?;
+    let (runtime_dev, runtime_ino) = identity(&runtime)?;
+    child.insert(RUNTIME_ROOT_ENV.to_string(), runtime.display().to_string());
+    child.insert("AGENT_CANON_PARENT_ROOT".to_string(), parent.display().to_string());
+    child.insert("AGENT_CANON_TARGET_ROOT".to_string(), target.display().to_string());
+    child.insert("AGENT_CANON_PARENT_ROOT_DEV".to_string(), parent_dev.clone());
+    child.insert("AGENT_CANON_PARENT_ROOT_INO".to_string(), parent_ino.clone());
+    child.insert("AGENT_CANON_TARGET_ROOT_DEV".to_string(), target_dev.clone());
+    child.insert("AGENT_CANON_TARGET_ROOT_INO".to_string(), target_ino.clone());
+    child.insert(
+        "AGENT_CANON_PARENT_ROOT_CAPABILITY".to_string(),
+        serde_json::to_string(&serde_json::json!({
+            "kind": "parent-root",
+            "root": parent.display().to_string(),
+            "dev": parent_dev,
+            "ino": parent_ino,
+        }))
+        .map_err(|error| format!("root capability serialization failed: {error}"))?,
+    );
+    child.insert(
+        "AGENT_CANON_TARGET_ROOT_CAPABILITY".to_string(),
+        serde_json::to_string(&serde_json::json!({
+            "kind": "target-root",
+            "root": target.display().to_string(),
+            "dev": target_dev,
+            "ino": target_ino,
+        }))
+        .map_err(|error| format!("root capability serialization failed: {error}"))?,
+    );
+    child.insert("AGENT_CANON_RUNTIME_ROOT_DEV".to_string(), runtime_dev);
+    child.insert("AGENT_CANON_RUNTIME_ROOT_INO".to_string(), runtime_ino);
+    Ok(child)
 }
 
 #[cfg(test)]
