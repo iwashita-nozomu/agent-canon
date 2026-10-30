@@ -826,8 +826,8 @@ pub fn tool_doc_name_matches(tool: &str, doc: &str) -> bool {
 
 pub fn validate_catalog(root: &Path) -> CatalogReport {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let (Some(data), mut findings) = load_catalog(&resolve_repo_path(&root, CATALOG_PATH, None))
-    else {
+    let (data, mut findings) = load_catalog(&resolve_repo_path(&root, CATALOG_PATH, None));
+    let Some(data) = data else {
         return CatalogReport {
             findings,
             entries: Vec::new(),

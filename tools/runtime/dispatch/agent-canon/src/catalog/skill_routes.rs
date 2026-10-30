@@ -929,8 +929,8 @@ pub fn load_skill_related_map(root: &Path) -> Result<OrderedMap<String, Vec<Stri
 
 /// Builds the catalog-ordered capability index and duplicate diagnostics.
 pub fn build_capability_index(rules: &[SkillRoutingRule]) -> CapabilityIndex {
-    let mut routes = OrderedMap::new();
-    let mut rules_by_skill = OrderedMap::new();
+    let mut routes: OrderedMap<CapabilityId, CapabilityRoute> = OrderedMap::new();
+    let mut rules_by_skill: OrderedMap<String, SkillRoutingRule> = OrderedMap::new();
     let mut owner_ambiguities = Vec::new();
     let mut duplicate_definitions = Vec::new();
     for rule in rules {
