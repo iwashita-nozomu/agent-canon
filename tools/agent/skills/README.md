@@ -6,7 +6,7 @@ upstream design ../../catalog.yaml structured tool audience and placement catalo
 upstream design ../README.md internal tool placement policy
 upstream design ../../../agents/skills/agent-orchestration.md point-of-use Skill reading policy
 downstream implementation ../../runtime/manifest/tool_catalog.py validates skill-helper placement
-downstream implementation ./skill_document_reader.py bounded direct-section reader
+downstream implementation ../../runtime/dispatch/agent-canon/src/skill_document_reader.rs bounded direct-section reader
 @dependency-end
 -->
 

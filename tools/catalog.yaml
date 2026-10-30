@@ -1715,15 +1715,15 @@ entries:
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
-    path: tools/agent/skills/skill_document_reader.py
+    path: tools/runtime/dispatch/agent-canon/src/skill_document_reader.rs
     family: agent_tools
     role: helper
     status: canonical
     command: bootstrap.sh --control-parent-root <root> tool run --root <registered-project> skill-document-reader --
     writes: false
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/skills/skill_document_reader.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, skill-document-reader]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
