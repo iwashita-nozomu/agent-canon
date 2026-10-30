@@ -15,6 +15,7 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
+// downstream implementation check_solid_evidence.rs validates SOLID evidence coverage for Python changes
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
@@ -28,6 +29,7 @@
 // @dependency-end
 
 mod check_merge_structure;
+mod check_solid_evidence;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
@@ -84,6 +86,7 @@ Commands:
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
+  check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -142,6 +145,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
         std::process::exit(semantic_responsibility::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {
+        std::process::exit(check_solid_evidence::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {

@@ -120,7 +120,7 @@ OOP / SOLID の起動は [オブジェクト指向設計方針の適用条件](.
 class や型の存在、意味を変えない annotation 修正だけでは追加検査を起動しません。
 `tools/validation/code/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` が finding kind から
 SOLID 見出しへの機械投影を所有します。
-`tools/validation/semantic/code/check_solid_evidence.py` は SOLID-sensitive な Python 差分と
+`check-solid-evidence` は SOLID-sensitive な Python 差分と
 OOP readability report の `scanned_paths` coverage を照合します。
 
 Single responsibility、Open/closed、Liskov substitution、Interface segregation、Dependency inversion の
@@ -132,7 +132,7 @@ Python 入口に第二の意味・実装契約・signal 対応表は置きませ
 validation route に置きます。repo-wide の OOP review が選択された場合は `$oop-readability-check` を使い、
 Markdown / JSON report の SOLID principle signal counts、OOP dimension、finding kind、`path:line` を
 既存 design artifact に引用します。その closeout では
-`python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>`
+`tools/bin/agent-canon check-solid-evidence --changed --evidence <oop-readability-report>`
 で選択対象の path と evidence の対応を確認します。未選択の OOP review へ追加の closeout gate を作りません。
 
 ## 目次
