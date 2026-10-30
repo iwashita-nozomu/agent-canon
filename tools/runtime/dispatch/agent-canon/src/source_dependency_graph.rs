@@ -594,9 +594,7 @@ fn diagnostic_error(
         }
         if diagnostic.code == "target-escapes-root" {
             let attempted = source.parent().unwrap_or(root).join(declared_target);
-            if let Err(error) = repo_relative(root, &attempted) {
-                return Err(error);
-            }
+            repo_relative(root, &attempted)?;
             continue;
         }
         return Err(SourceDependencyError::new(diagnostic.message.clone()));
