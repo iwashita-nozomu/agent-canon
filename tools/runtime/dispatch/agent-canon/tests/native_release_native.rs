@@ -760,8 +760,10 @@ fn draft_is_published_only_after_every_asset_is_verified() {
 #[test]
 fn creation_response_resumes_while_tag_and_release_listing_reads_lag() {
     let fixture = fixture("create-lag");
-    let mut github = FakeGitHub::default();
-    github.hide_draft_lists = true;
+    let mut github = FakeGitHub {
+        hide_draft_lists: true,
+        ..Default::default()
+    };
     assert_eq!(
         publish(&fixture, &mut github, false).unwrap()["status"],
         "published"
@@ -783,8 +785,10 @@ fn creation_response_resumes_while_tag_and_release_listing_reads_lag() {
 #[test]
 fn interrupted_upload_resumes_only_missing_assets() {
     let fixture = fixture("resume-upload");
-    let mut github = FakeGitHub::default();
-    github.fail_upload = true;
+    let mut github = FakeGitHub {
+        fail_upload: true,
+        ..Default::default()
+    };
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error.to_string().contains("upload incomplete"));
     let release = github.release.as_ref().unwrap();
@@ -860,8 +864,10 @@ fn conflicting_existing_asset_is_preserved() {
 #[test]
 fn wrong_tag_commit_never_creates_a_release() {
     let fixture = fixture("wrong-tag");
-    let mut github = FakeGitHub::default();
-    github.tagged = Some("0".repeat(40));
+    let mut github = FakeGitHub {
+        tagged: Some("0".repeat(40)),
+        ..Default::default()
+    };
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error.to_string().contains("different source commit"));
     assert_eq!(github.write_count(), 0);
@@ -894,8 +900,10 @@ fn check_only_reads_state_without_creating_a_draft() {
 #[test]
 fn changed_draft_source_is_rejected_before_publication() {
     let fixture = fixture("changed-draft");
-    let mut github = FakeGitHub::default();
-    github.change_draft_source_after_upload = true;
+    let mut github = FakeGitHub {
+        change_draft_source_after_upload: true,
+        ..Default::default()
+    };
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error
         .to_string()
@@ -906,8 +914,8 @@ fn changed_draft_source_is_rejected_before_publication() {
 #[test]
 fn unrelated_draft_assets_are_preserved_without_publication() {
     let fixture = fixture("unrelated-draft");
-    let mut github = FakeGitHub::default();
-    github.release = Some(json!({
+    let mut github = FakeGitHub {
+        release: Some(json!({
         "id": 1,
         "tag_name": "v0.1.0",
         "draft": true,
@@ -915,7 +923,9 @@ fn unrelated_draft_assets_are_preserved_without_publication() {
         "target_commitish": fixture.identity["source_commit"],
         "assets": [{"name": "unrelated.txt"}],
         "html_url": "https://github.com/owner/repo/releases/tag/v0.1.0",
-    }));
+        })),
+        ..Default::default()
+    };
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error.to_string().contains("unrelated assets"));
     assert_eq!(github.write_count(), 0);
@@ -924,8 +934,10 @@ fn unrelated_draft_assets_are_preserved_without_publication() {
 #[test]
 fn changed_tag_is_rejected_before_publication() {
     let fixture = fixture("changed-tag");
-    let mut github = FakeGitHub::default();
-    github.change_tag_after_upload = true;
+    let mut github = FakeGitHub {
+        change_tag_after_upload: true,
+        ..Default::default()
+    };
     let error = publish(&fixture, &mut github, false).unwrap_err();
     assert!(error.to_string().contains("release tag changed"));
     assert_eq!(github.publication_count(), 0);
