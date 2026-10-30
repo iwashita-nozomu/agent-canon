@@ -13,9 +13,9 @@ use catalog::skill_routes::{
     load_skill_route_rules, load_skill_route_rules_from_root, related_skill_candidates,
 };
 use catalog::tool_catalog::{
-    as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface, render_json,
-    render_markdown, resolve_repo_path, run_with_io, rust_tokens, token_sequence_matches,
-    validate_catalog, yaml_id_spans,
+    as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface,
+    referenced_tool_paths_from_text, render_json, render_markdown, resolve_repo_path, run_with_io,
+    rust_tokens, token_sequence_matches, validate_catalog, yaml_id_spans, TOOL_REFERENCE_RE,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -255,6 +255,23 @@ fn mapping_sequence_and_source_root_helpers_keep_direct_caller_contracts() {
     assert_eq!(
         resolve_repo_path(root.path(), "catalog.yaml", Some(&source_root)),
         source_root.canonicalize().unwrap().join("catalog.yaml")
+    );
+}
+
+#[test]
+fn default_reference_pattern_excludes_test_paths_and_keeps_tool_paths() {
+    let text = "python3 tests/tools/test_catalog_fixture.py\npython3 tests/tools/tools/run_symlink_lint.py\npython3 tools/runtime/manifest/uncataloged.py\n";
+    let references = referenced_tool_paths_from_text(text);
+    assert_eq!(
+        references,
+        std::collections::BTreeSet::from(["tools/runtime/manifest/uncataloged.py".to_owned()])
+    );
+    assert_eq!(
+        TOOL_REFERENCE_RE
+            .captures_iter(text)
+            .filter_map(|capture| capture.get(1).map(|path| path.as_str()))
+            .collect::<Vec<_>>(),
+        vec!["tools/runtime/manifest/uncataloged.py"]
     );
 }
 

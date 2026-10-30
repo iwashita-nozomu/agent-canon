@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::Serialize;
@@ -39,6 +40,11 @@ const CATALOG_DOCS: [&str; 4] = [
 ];
 const PUBLIC_TOOL_REFERENCE_PATTERN: &str =
     r"(?:^|[^A-Za-z0-9_./-])(tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b)";
+
+/// Regex matching default-wiring tool paths, with the path in capture group 1.
+pub static TOOL_REFERENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(PUBLIC_TOOL_REFERENCE_PATTERN).expect("static tool reference regex")
+});
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Finding {
@@ -441,12 +447,15 @@ fn read_existing_text(root: &Path, paths: &[&str]) -> String {
     chunks.join("\n")
 }
 
-fn referenced_tool_paths(root: &Path) -> BTreeSet<String> {
-    let regex = Regex::new(PUBLIC_TOOL_REFERENCE_PATTERN).expect("static tool reference regex");
-    regex
-        .captures_iter(&read_existing_text(root, &DEFAULT_COMMAND_SOURCES))
+pub fn referenced_tool_paths_from_text(text: &str) -> BTreeSet<String> {
+    TOOL_REFERENCE_RE
+        .captures_iter(text)
         .filter_map(|capture| capture.get(1).map(|value| value.as_str().to_owned()))
         .collect()
+}
+
+pub fn referenced_tool_paths(root: &Path) -> BTreeSet<String> {
+    referenced_tool_paths_from_text(&read_existing_text(root, &DEFAULT_COMMAND_SOURCES))
 }
 
 fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
