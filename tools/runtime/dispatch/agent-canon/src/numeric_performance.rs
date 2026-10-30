@@ -647,7 +647,7 @@ fn as_mapping<'a>(
 fn unknown_fields(value: &Map<String, Value>, expected: &[&str]) -> Vec<String> {
     let mut fields = value
         .keys()
-        .filter(|name| !expected.iter().any(|field| *field == name.as_str()))
+        .filter(|name| !expected.contains(&name.as_str()))
         .cloned()
         .collect::<Vec<_>>();
     fields.sort();
