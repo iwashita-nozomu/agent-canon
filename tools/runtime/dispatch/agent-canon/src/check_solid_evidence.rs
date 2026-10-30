@@ -194,19 +194,17 @@ fn parse_args(argv: &[String]) -> Result<ParseResult, String> {
             if let Some((option, inline)) = parse_option(token) {
                 match option {
                     "--changed" => {
-                        if inline.is_some() {
+                        if let Some(value) = inline {
                             return Err(format!(
-                                "argument --changed: ignored explicit argument '{}'",
-                                inline.unwrap()
+                                "argument --changed: ignored explicit argument '{value}'"
                             ));
                         }
                         args.changed = true;
                     }
                     "--verbose" => {
-                        if inline.is_some() {
+                        if let Some(value) = inline {
                             return Err(format!(
-                                "argument --verbose: ignored explicit argument '{}'",
-                                inline.unwrap()
+                                "argument --verbose: ignored explicit argument '{value}'"
                             ));
                         }
                         args.verbose = true;
