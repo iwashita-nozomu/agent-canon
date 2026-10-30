@@ -5,8 +5,8 @@ responsibility Defines the target area for skill-owned AgentCanon helper tools.
 upstream design ../../catalog.yaml structured tool audience and placement catalog
 upstream design ../README.md internal tool placement policy
 upstream design ../../../agents/skills/agent-orchestration.md point-of-use Skill reading policy
-downstream implementation ../../runtime/manifest/tool_catalog.py validates skill-helper placement
-downstream implementation ./skill_document_reader.py bounded direct-section reader
+downstream implementation ../../runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates skill-helper placement
+downstream implementation ../../runtime/dispatch/agent-canon/src/skill_document_reader.rs bounded direct-section reader
 @dependency-end
 -->
 

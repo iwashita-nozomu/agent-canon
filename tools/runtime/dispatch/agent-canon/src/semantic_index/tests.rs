@@ -687,7 +687,9 @@ fn responsibility_tree_reports_vectors_and_coverage() {
         .unwrap()
         .iter()
         .any(|directory| directory.get("vector").is_some()));
-    let output = resolve_runtime_root_at(&root, None)
+    let test_runtime_root =
+        crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+    let output = resolve_runtime_root_at(&root, Some(&test_runtime_root))
         .expect("test runtime root")
         .join("responsibility_tree.json");
     write_pretty_report(&output, &json).unwrap();
@@ -1323,7 +1325,10 @@ fn default_db_path_uses_test_runtime_and_stays_outside_repo() {
     assert!(db.is_absolute());
     assert!(!db.starts_with(&root));
     assert!(db.ends_with("index.sqlite"));
-    let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+    let test_runtime_root =
+        crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+    let runtime_root =
+        resolve_runtime_root_at(&root, Some(&test_runtime_root)).expect("test runtime root");
     crate::runtime_boundary::validate_external_target(&root, &runtime_root, &db, "default-db")
         .expect("default database is contained by the canonical external runtime root");
 }
@@ -1333,7 +1338,10 @@ fn unique_temp_dir_removes_source_and_test_runtime_roots_on_drop() {
     let (root, runtime_root) = {
         let fixture = unique_temp_dir("semantic-index-cleanup");
         let root = fixture.to_path_buf();
-        let runtime_root = resolve_runtime_root_at(&fixture, None).expect("test runtime root");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&fixture).expect("test runtime path");
+        let runtime_root =
+            resolve_runtime_root_at(&fixture, Some(&test_runtime_root)).expect("test runtime root");
         assert!(root.is_dir());
         assert!(runtime_root.is_dir());
         (root, runtime_root)
@@ -1636,8 +1644,12 @@ impl AsRef<Path> for TempDirGuard {
 
 impl TempDirGuard {
     fn track_runtime_root(&mut self, source_root: &Path) {
-        self.runtime_roots
-            .push(resolve_runtime_root_at(source_root, None).expect("test runtime root"));
+        let test_runtime_root = crate::runtime_boundary::test_runtime_root_path(source_root)
+            .expect("test runtime path");
+        self.runtime_roots.push(
+            resolve_runtime_root_at(source_root, Some(&test_runtime_root))
+                .expect("test runtime root"),
+        );
     }
 }
 
