@@ -343,7 +343,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "tool catalog",
         "Keep tool lists short while preserving catalog and docs checks.",
         "check_tool_catalog",
-        ("python3 tools/runtime/manifest/tool_catalog.py",),
+        ("tools/bin/agent-canon tool-catalog",),
         (
             "tool_catalog_summarizer.py",
             "tool-selection",

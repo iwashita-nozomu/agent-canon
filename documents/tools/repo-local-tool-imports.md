@@ -5,7 +5,7 @@ responsibility Records imported repo-local tools and their canonical disposition
 upstream design ../../tools/README.md defines shared tool families
 upstream design ../experiments/result-log-retention-and-visualization.md defines result tooling policy
 downstream design ../../tools/README.md lists canonical tool locations
-downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates retired legacy catalog status
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates retired legacy catalog status
 @dependency-end
 -->
 
@@ -41,7 +41,7 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 
 This document is the historical import-disposition ledger. The live
 machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
-`tool_catalog.py` and cross-checked by `tool_drift.py`.
+`tool_catalog.rs` and cross-checked by `tool_drift.py`.
 When a tool is promoted, left in the source repository, deleted, or converted
 into a compatibility wrapper, update both this ledger and the corresponding
 catalog entry. The catalog entry must also classify the imported tool with

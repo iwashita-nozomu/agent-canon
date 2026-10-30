@@ -3,7 +3,7 @@
 # responsibility Defines the structured AgentCanon tool catalog.
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
-# downstream implementation runtime/manifest/tool_catalog.py validates this catalog
+# downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates this catalog
 # downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
@@ -278,12 +278,12 @@ entries:
 
   - id: tool-catalog
     summary: Validates the structured tool catalog and renders the tool crosswalk.
-    path: tools/runtime/manifest/tool_catalog.py
+    path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
     family: agent_tools
     role: catalog
     status: canonical
-    command: python3 tools/runtime/manifest/tool_catalog.py
-    dispatch: {argv: ["python3", "tools/runtime/manifest/tool_catalog.py"]}
+    command: tools/bin/agent-canon tool-catalog
+    dispatch: {argv: ["tools/bin/agent-canon", "tool-catalog"]}
     writes: false
     default_wiring:
       ci: true
@@ -502,14 +502,14 @@ entries:
   - id: tool-proof-coverage
     public: true
     summary: Reports behavior and performance proof-obligation coverage for every cataloged tool without claiming unverified Lean proofs.
-    path: tools/analysis/proof/tool_proof_coverage.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_proof_coverage.rs
     family: agent_tools
     role: checker
     status: canonical
     audience: maintainer
     placement: validation_checker
-    command: python3 tools/analysis/proof/tool_proof_coverage.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/tool_proof_coverage.py"]}
+    command: tools/bin/agent-canon tool-proof-coverage
+    dispatch: {argv: ["tools/bin/agent-canon", "tool-proof-coverage"]}
     writes: false
     default_wiring:
       ci: true

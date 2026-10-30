@@ -53,6 +53,7 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
+use agent_canon::{catalog, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -69,6 +70,8 @@ Commands:
   test-design <check> [paths...]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
@@ -106,6 +109,14 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "tool-catalog" {
+        std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool-proof-coverage" {
+        std::process::exit(tool_proof_coverage::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
