@@ -19,6 +19,7 @@
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
+// downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
 mod check_merge_structure;
@@ -39,6 +40,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod result_logs;
 mod rule_inventory;
 mod runtime_boundary;
 mod rust_migration_plan;
@@ -67,6 +69,8 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  jsonl-to-md <input> <output>
+  summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
@@ -160,6 +164,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "jsonl-to-md" {
+        std::process::exit(result_logs::run_jsonl_to_md(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "summarize-hlo-jsonl" {
+        std::process::exit(result_logs::run_summary(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "semantic-index" {
