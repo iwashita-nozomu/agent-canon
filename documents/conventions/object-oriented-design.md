@@ -11,10 +11,9 @@ upstream design ../design/protocols.md Protocol and type-boundary placement cont
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility allocation and hard-edge grouping
 downstream implementation ../../tools/validation/code/oop/python/readability.py Python OOP typed-boundary evidence
 downstream implementation ../../tools/validation/code/oop/cpp/readability.py C++ OOP typed-boundary evidence
-downstream implementation ../../tools/validation/code/oop/python/rule_inventory.py inventories Python OOP rule surfaces
-downstream implementation ../../tools/validation/code/oop/cpp/rule_inventory.py inventories C++ OOP rule surfaces
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs inventories Python and C++ OOP rule surfaces
 downstream implementation ../../tools/catalog.yaml records OOP tool catalog status
-downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates OOP catalog entries
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates OOP catalog entries
 upstream implementation ../../bootstrap.sh standalone runtime entrypoint
 @dependency-end
 -->
@@ -217,12 +216,12 @@ Python surface では次を baseline として使います。
 
 ```bash
 python3 tools/validation/code/oop/python/readability.py python tools tests
-python3 tools/validation/code/oop/python/rule_inventory.py
+agent-canon oop-python-rule-inventory
 ```
 
 C++ surface では `tools/validation/code/oop/cpp/readability.py` に selected profile の native
 source/consumer paths を渡します。この command は選択された path を読むだけで、CMake profile
-は選択しません。Rule inventory は `python3 tools/validation/code/oop/cpp/rule_inventory.py` です。
+は選択しません。C++ rule inventory は `agent-canon oop-cpp-rule-inventory` です。
 
 この tool は次の risk を検出します。
 
@@ -270,8 +269,8 @@ python3 tools/validation/code/oop/python/readability.py \
 `vendor/`、過去の `reports/`、生成物、別 canon snapshot を混ぜると、対象 repo の OOP risk と持ち込み artifact の risk が区別できなくなります。
 除外した surface を後で評価する必要がある場合は、別 report として分けます。
 
-OOP policy、analyzer、reviewer、test の配置確認は、言語別の
-`tools/validation/code/oop/python/rule_inventory.py` と `tools/validation/code/oop/cpp/rule_inventory.py`
+OOP policy、analyzer、reviewer、test の配置確認は、共通 Rust module に実装された
+`agent-canon oop-python-rule-inventory` と `agent-canon oop-cpp-rule-inventory`
 を使います。旧 `tools/legacy/` provenance は廃止済みであり、workflow や
 CI の正本入口には戻しません。canonical analyzer と inventory の tool
 status は `tools/catalog.yaml` に記録し、`tool_catalog.py` の検査対象にします。

@@ -578,7 +578,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     assert "owned_by_bootstrap_container_workflow" in wrapper
     for command in (
         "cargo build",
-        "tool_catalog.py",
+        "tool-catalog",
         "run_accumulated_agent_evals.py",
         "check_github_workflows.py",
     ):

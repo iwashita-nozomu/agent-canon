@@ -3,14 +3,15 @@
 @dependency-start
 contract reference
 responsibility Documents Python OOP rule inventory behavior in Japanese.
-upstream implementation ../../../../tools/validation/code/oop/python/rule_inventory.py Python OOP inventory checker
+upstream implementation ../../../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs Python OOP inventory implementation
 upstream design ../../../conventions/object-oriented-design.md OOP policy source
 downstream design ../../tool-docs.toml one-to-one tool/document manifest
 @dependency-end
 -->
 
-この文書は `tools/validation/code/oop/python/rule_inventory.py` と一対一で対応します。
-同名の `rule_inventory.py` が tool、同名の [rule_inventory.md](rule_inventory.md) が説明文書です。
+この文書は `oop-python-rule-inventory` selector と一対一で対応します。実装は
+[`oop_rule_inventory.rs`](../../../../tools/runtime/dispatch/agent-canon/src/rule_inventory.rs)
+にあり、Python と C++ の inventory を共通の Rust module から提供します。
 
 ## 何をチェックするか
 
@@ -20,7 +21,7 @@ AgentCanon-owned shared docs は standalone AgentCanon source checkout の正本
 - [documents/conventions/object-oriented-design.md](../../../conventions/object-oriented-design.md) が存在すること。
 - [documents/conventions/coding-conventions-python.md](../../../conventions/coding-conventions-python.md) が存在すること。
 - `tools/validation/code/oop/python/readability.py` が存在すること。
-- `tools/validation/code/oop/python/rule_inventory.py` が存在すること。
+- `tools/runtime/dispatch/agent-canon/src/rule_inventory.rs` が存在すること。
 - [documents/tools/oop/python/readability.md](readability.md) が存在すること。
 - [documents/tools/oop/python/rule_inventory.md](rule_inventory.md) が存在すること。
 - `.codex/agents/oop_readability_reviewer.toml` が存在すること。
@@ -30,8 +31,8 @@ AgentCanon-owned shared docs は standalone AgentCanon source checkout の正本
 ## 実行例
 
 ```bash
-python3 tools/validation/code/oop/python/rule_inventory.py
-python3 tools/validation/code/oop/python/rule_inventory.py --format markdown
+agent-canon oop-python-rule-inventory
+agent-canon oop-python-rule-inventory --format markdown
 ```
 
 この inventory は旧 `tools/legacy/` 配置を前提にしません。必要な surface が消えた場合は fail し、OOP checker の説明と実装のずれを早めに検出します。

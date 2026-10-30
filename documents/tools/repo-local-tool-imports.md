@@ -5,7 +5,7 @@ responsibility Records imported repo-local tools and their canonical disposition
 upstream design ../../tools/README.md defines shared tool families
 upstream design ../experiments/result-log-retention-and-visualization.md defines result tooling policy
 downstream design ../../tools/README.md lists canonical tool locations
-downstream implementation ../../tools/runtime/manifest/tool_catalog.py validates retired legacy catalog status
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates retired legacy catalog status
 @dependency-end
 -->
 
@@ -41,7 +41,7 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 
 This document is the historical import-disposition ledger. The live
 machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
-`tool_catalog.py` and cross-checked by `tool_drift.py`.
+`tool_catalog.rs` and cross-checked by `tool_drift.py`.
 When a tool is promoted, left in the source repository, deleted, or converted
 into a compatibility wrapper, update both this ledger and the corresponding
 catalog entry. The catalog entry must also classify the imported tool with
@@ -62,7 +62,7 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/tools/find_redundant_designs.py` | `tools/analysis/documents/analysis/find_redundant_designs.py` | Promoted as an external-runtime document consolidation helper; deletion requires an explicit mutation capability. |
 | `scripts/tools/find_similar_designs.py` | `tools/analysis/documents/analysis/find_similar_designs.py` | Promoted as an external-runtime design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/validation/documentation/authoring/organize_designs.py` | Promoted as a read-only organization planner; source apply requires an explicit mutation capability. |
-| `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/validation/code/oop/python/rule_inventory.py`, `tools/validation/code/oop/cpp/rule_inventory.py` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
+| `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/bin/agent-canon oop-python-rule-inventory`, `tools/bin/agent-canon oop-cpp-rule-inventory` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |
 | `vendor/agent-canon/tools/experiments/artifacts/update_latest_result.py` | `tools/experiments/artifacts/update_latest_result.py` | Promoted from jax_solver_util submodule diff as a latest-result pointer helper. |
 | OOP readability local diff | `tools/validation/code/oop/shared/readability_core.py` with `tools/validation/code/oop/python/readability.py` and `tools/validation/code/oop/cpp/readability.py` entrypoints | Promoted algorithm-protocol contract-class exemption so intentional value contracts are not reported as thin classes. |

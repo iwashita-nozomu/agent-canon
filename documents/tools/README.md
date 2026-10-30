@@ -7,6 +7,7 @@ responsibility Routes readers to standalone AgentCanon tools without recreating 
 upstream design ../runtime/bootstrap-runtime.md shared tool runtime and Host adapter boundary
 upstream implementation ../../bootstrap.sh sole Host lifecycle entrypoint
 upstream implementation ../../tools/catalog.yaml machine-readable tool inventory
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates catalog documentation
 downstream design ../../agents/canonical/CLI_ENTRYPOINTS.md typed command examples
 @dependency-end
 -->
@@ -93,7 +94,7 @@ Keep guide additions, moves, and removals connected through the existing
 Validate the selected owner rather than every tool family:
 
 ```bash
-python3 tools/runtime/manifest/tool_catalog.py
+tools/bin/agent-canon tool-catalog
 python3 tools/validation/semantic/convention/check_convention_compliance.py
 python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
 ```

@@ -4,8 +4,7 @@ contract reference
 responsibility Defines retention and visualization rules for result logs and reports.
 upstream design ../conventions/coding-conventions-logging.md defines JSONL logging conventions
 downstream design experiment-report-style.md defines human-readable experiment reports
-upstream implementation ../../tools/analysis/documents/formatting/jsonl_to_md.py converts JSONL to Markdown
-upstream implementation ../../tools/analysis/hlo/summarization/summarize_hlo_jsonl.py summarizes HLO JSONL
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs converts JSONL to Markdown and summarizes HLO JSONL
 downstream implementation ../../tools/validation/dependencies/docker_dependency_validator.sh validates runtime support
 @dependency-end
 -->
@@ -104,8 +103,8 @@ point to `summary/summary.json`, `summary/cases.jsonl`, or reader-facing Markdow
 Canonical helper commands:
 
 ```bash
-python3 tools/analysis/documents/formatting/jsonl_to_md.py <input.jsonl> <output.md>
-python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
+tools/bin/agent-canon jsonl-to-md <input.jsonl> <output.md>
+tools/bin/agent-canon summarize-hlo-jsonl <hlo.jsonl> > summary.json
 python3 tools/experiments/artifacts/html_artifact_access.py <report.html>
 git annex add <archive-path>
 python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/result --variant <variant>
