@@ -100,6 +100,42 @@ fn canonical_existing_parent(path: &Path) -> Result<PathBuf, String> {
     fs::canonicalize(&cursor).map_err(|error| format!("canonicalize {}: {error}", cursor.display()))
 }
 
+fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
+    let mut cursor = path.to_path_buf();
+    let mut missing = Vec::new();
+    loop {
+        match fs::canonicalize(&cursor) {
+            Ok(mut canonical) => {
+                for component in missing.iter().rev() {
+                    canonical.push(component);
+                }
+                return Ok(canonical);
+            }
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                ) =>
+            {
+                let name = cursor
+                    .file_name()
+                    .ok_or_else(|| format!("cannot resolve runtime path {}", path.display()))?;
+                missing.push(name.to_os_string());
+                cursor = cursor
+                    .parent()
+                    .ok_or_else(|| format!("cannot resolve runtime path {}", path.display()))?
+                    .to_path_buf();
+            }
+            Err(error) => {
+                return Err(format!(
+                    "cannot resolve runtime path {}: {error}",
+                    path.display()
+                ))
+            }
+        }
+    }
+}
+
 /// Resolve the process/task runtime root and prove that it is not the source.
 ///
 /// Production callers must provide `AGENT_CANON_RUNTIME_ROOT`.  Unit tests
@@ -292,11 +328,40 @@ impl RuntimeDirectory {
                 "absolute runtime directory required",
             ));
         }
-        let mut directory =
-            cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())?;
-        for component in path.components() {
+        let mut components = path.components();
+        #[cfg(windows)]
+        let mut directory = {
+            let prefix = match components.next() {
+                Some(Component::Prefix(prefix)) => prefix,
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "absolute runtime directory requires a volume prefix",
+                    ))
+                }
+            };
+            if !matches!(components.next(), Some(Component::RootDir)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "absolute runtime directory requires a volume root",
+                ));
+            }
+            let mut volume_root = PathBuf::from(prefix.as_os_str());
+            volume_root.push(std::path::MAIN_SEPARATOR.to_string());
+            cap_std::fs::Dir::open_ambient_dir(&volume_root, cap_std::ambient_authority())?
+        };
+        #[cfg(not(windows))]
+        let mut directory = {
+            if !matches!(components.next(), Some(Component::RootDir)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "absolute runtime directory requires a root component",
+                ));
+            }
+            cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())?
+        };
+        for component in components {
             match component {
-                Component::RootDir => {}
                 Component::Normal(name) => match directory.open_dir_nofollow(name) {
                     Ok(child) => directory = child,
                     Err(error) if create && error.kind() == std::io::ErrorKind::NotFound => {
@@ -313,6 +378,12 @@ impl RuntimeDirectory {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "runtime directory path is not canonical",
+                    ));
+                }
+                Component::RootDir => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "runtime directory path contains an unexpected root component",
                     ));
                 }
             }
@@ -879,8 +950,15 @@ impl RuntimeArtifactBoundary {
     }
 
     pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
-        let relative = if path.is_absolute() {
-            path.strip_prefix(&self.root)
+        let canonical_absolute = if path.is_absolute() {
+            reject_symlink_components(path, Path::new("/"))?;
+            Some(canonicalize_with_missing_suffix(path)?)
+        } else {
+            None
+        };
+        let relative = if let Some(canonical_absolute) = &canonical_absolute {
+            canonical_absolute
+                .strip_prefix(&self.root)
                 .map_err(|_| format!("path escapes runtime root: {}", path.display()))?
         } else {
             path
@@ -1104,7 +1182,55 @@ fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Resul
     Ok(root)
 }
 
+fn inspect_runtime_path_component(path: &Path) -> Result<(), String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(format!(
+            "runtime root contains symlink component {}",
+            path.display()
+        )),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "cannot inspect runtime path {}: {error}",
+            path.display()
+        )),
+    }
+}
+
 fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
+    #[cfg(windows)]
+    if stop == Path::new("/") {
+        let mut components = path.components();
+        let prefix = match components.next() {
+            Some(Component::Prefix(prefix)) => prefix,
+            _ => return Err(format!("path is outside boundary: {}", path.display())),
+        };
+        if !matches!(components.next(), Some(Component::RootDir)) {
+            return Err(format!("path is outside boundary: {}", path.display()));
+        }
+        let mut current = PathBuf::from(prefix.as_os_str());
+        current.push(std::path::MAIN_SEPARATOR.to_string());
+        let volume_root = current.clone();
+        for component in components {
+            match component {
+                Component::Normal(name) => {
+                    current.push(name);
+                    inspect_runtime_path_component(&current)?;
+                }
+                Component::ParentDir => {
+                    if current != volume_root {
+                        current.pop();
+                    }
+                }
+                Component::CurDir => {}
+                Component::RootDir | Component::Prefix(_) => {
+                    return Err(format!("path is outside boundary: {}", path.display()))
+                }
+            }
+        }
+        return Ok(());
+    }
+
     let relative = path
         .strip_prefix(stop)
         .map_err(|_| format!("path is outside boundary: {}", path.display()))?;
@@ -1113,22 +1239,7 @@ fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
         match component {
             Component::Normal(name) => {
                 current.push(name);
-                match fs::symlink_metadata(&current) {
-                    Ok(metadata) if metadata.file_type().is_symlink() => {
-                        return Err(format!(
-                            "runtime root contains symlink component {}",
-                            current.display()
-                        ))
-                    }
-                    Ok(_) => {}
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => {
-                        return Err(format!(
-                            "cannot inspect runtime path {}: {error}",
-                            current.display()
-                        ))
-                    }
-                }
+                inspect_runtime_path_component(&current)?;
             }
             Component::ParentDir => {
                 current.pop();
@@ -1139,6 +1250,33 @@ fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn normalize_absolute_path(path: &Path) -> PathBuf {
+    let mut components = path.components();
+    let Some(Component::Prefix(prefix)) = components.next() else {
+        return path.to_path_buf();
+    };
+    if !matches!(components.next(), Some(Component::RootDir)) {
+        return path.to_path_buf();
+    }
+    let mut normalized = PathBuf::from(prefix.as_os_str());
+    normalized.push(std::path::MAIN_SEPARATOR.to_string());
+    for component in components {
+        match component {
+            Component::Normal(name) => normalized.push(name),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if normalized.components().count() > 2 {
+                    normalized.pop();
+                }
+            }
+            Component::RootDir | Component::Prefix(_) => return path.to_path_buf(),
+        }
+    }
+    normalized
+}
+
+#[cfg(not(windows))]
 fn normalize_absolute_path(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
     for component in path.components() {
@@ -1220,18 +1358,24 @@ pub fn root_capability_environment(
         })
         .collect::<BTreeMap<_, _>>();
     let identity = |path: &Path| -> Result<(String, String), String> {
-        let metadata = fs::metadata(path).map_err(|error| {
+        let directory = RuntimeDirectory::open_nofollow(path, false).map_err(|error| {
             format!(
                 "root capability is unavailable: {}: {error}",
                 path.display()
             )
         })?;
-        #[cfg(unix)]
+        let metadata = directory.directory.dir_metadata().map_err(|error| {
+            format!(
+                "root capability is unavailable: {}: {error}",
+                path.display()
+            )
+        })?;
+        #[cfg(any(unix, windows))]
         {
-            use std::os::unix::fs::MetadataExt;
+            use cap_fs_ext::MetadataExt;
             Ok((metadata.dev().to_string(), metadata.ino().to_string()))
         }
-        #[cfg(not(unix))]
+        #[cfg(not(any(unix, windows)))]
         {
             let _ = metadata;
             Err("root device/inode identity is unavailable on this platform".to_string())
