@@ -1391,8 +1391,8 @@ fn token_block_body(tokens: &[RustToken], open: usize) -> Option<Range<usize>> {
         return None;
     }
     let mut depth = 0usize;
-    for index in open..tokens.len() {
-        match tokens[index].value.as_str() {
+    for (index, token) in tokens.iter().enumerate().skip(open) {
+        match token.value.as_str() {
             "{" => depth += 1,
             "}" => {
                 depth = depth.checked_sub(1)?;
