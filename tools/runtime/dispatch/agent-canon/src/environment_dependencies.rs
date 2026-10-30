@@ -419,7 +419,15 @@ fn string_list_value(value: Option<&Value>, field: &str, allow_empty: bool) -> R
     let mut result = Vec::with_capacity(list.len());
     let mut seen = BTreeSet::new();
     for item in list {
-        let normalized = normalized_string(item, field)?;
+        let raw = item
+            .as_str()
+            .ok_or_else(|| DependencyError::new(format!("{field} must be a string array")))?;
+        let normalized = raw.trim().to_string();
+        if normalized.is_empty() {
+            return Err(DependencyError::new(format!(
+                "{field} cannot contain empty strings"
+            )));
+        }
         if !seen.insert(normalized.clone()) {
             return Err(DependencyError::new(format!(
                 "{field} must not contain duplicates"
@@ -2634,19 +2642,32 @@ impl ProbeEnvironment {
         }
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            metadata.permissions().mode() & 0o111 != 0
+            use cap_fs_ext::{AccessType, DirExt};
+            use cap_primitives::fs::AccessModes;
+
+            let Ok(relative) = physical.strip_prefix("/") else {
+                return false;
+            };
+            let Ok(root) =
+                cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())
+            else {
+                return false;
+            };
+            root.access(
+                relative,
+                AccessType::Access(AccessModes {
+                    readable: false,
+                    writable: false,
+                    executable: true,
+                }),
+            )
+            .is_ok()
         }
         #[cfg(windows)]
         {
-            path.extension()
-                .and_then(|value| value.to_str())
-                .is_some_and(|value| {
-                    matches!(
-                        value.to_ascii_lowercase().as_str(),
-                        "exe" | "com" | "bat" | "cmd"
-                    )
-                })
+            // Python's Windows os.access(X_OK) follows file existence rather
+            // than an executable-mode or filename-suffix convention.
+            true
         }
         #[cfg(not(any(unix, windows)))]
         {
@@ -3934,6 +3955,43 @@ mod tests {
             .all(|responses| responses.is_empty()));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn executable_check_uses_os_access_for_the_current_user() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = TempRoot::new();
+        let path = root.0.join("other-execute-only");
+        fs::write(&path, b"owned access fixture").expect("access fixture is written");
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o001))
+            .expect("access fixture has only other-execute permission");
+        let metadata = fs::metadata(&path).expect("access fixture metadata is available");
+        assert!(metadata.is_file());
+        assert_eq!(metadata.permissions().mode() & 0o777, 0o001);
+        let os_access = Command::new("/usr/bin/test")
+            .arg("-x")
+            .arg(&path)
+            .status()
+            .expect("POSIX test command is available")
+            .success();
+        assert_eq!(
+            ProbeEnvironment::system().is_regular_executable(&path),
+            os_access
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_executable_access_keeps_file_existence_semantics() {
+        let root = TempRoot::new();
+        let path = root.0.join("extensionless-tool");
+        fs::write(&path, b"owned Windows access fixture").expect("file is written");
+        assert!(fs::metadata(&path)
+            .expect("file metadata is available")
+            .is_file());
+        assert!(ProbeEnvironment::system().is_regular_executable(&path));
+    }
+
     fn write_success_manifest(root: &TempRoot, text: &str) -> PathBuf {
         root.write_manifest("workspace/dependencies.toml", text)
     }
@@ -4855,7 +4913,7 @@ output_contains = "0.4.0"
     }
 
     #[test]
-    fn provider_closure_and_stable_order_include_every_record_payload() {
+    fn provider_closure_accepts_leading_dash_list_capabilities() {
         let root = TempRoot::new();
         let manifest = root.write_manifest(
             "dependencies.toml",
@@ -4869,7 +4927,7 @@ package = "consumer"
 method = "npm-global"
 version = "1.0.0"
 source = "https://registry.npmjs.org/consumer"
-deps = ["provider-capability"]
+deps = ["-provider-capability"]
 provides = ["consumer"]
 failure_policy = "fail"
 [records.verification]
@@ -4885,7 +4943,7 @@ method = "npm-global"
 version = "1.0.0"
 source = "https://registry.npmjs.org/provider"
 deps = []
-provides = ["provider-capability"]
+provides = ["-provider-capability"]
 failure_policy = "fail"
 [records.verification]
 kind = "npm-package"
