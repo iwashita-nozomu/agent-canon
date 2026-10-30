@@ -1220,13 +1220,16 @@ pub fn yaml_id_spans(path: &str, text: &str) -> Result<Vec<(String, PublicSource
         if !seen.insert(value.clone()) {
             continue;
         }
+        // The Python YAML source-mark contract adds one to the zero-based
+        // yaml-rust2 scanner column.
+        let start_column = marker.col() + 1;
         let (end_line, end_column) = yaml_scalar_end(text, marker, style);
         spans.push((
             value,
             PublicSourceSpan {
                 path: path.to_owned(),
                 start_line: marker.line(),
-                start_column: marker.col(),
+                start_column,
                 end_line,
                 end_column,
             },
@@ -1237,7 +1240,8 @@ pub fn yaml_id_spans(path: &str, text: &str) -> Result<Vec<(String, PublicSource
 
 fn yaml_scalar_end(text: &str, marker: Marker, style: TScalarStyle) -> (usize, usize) {
     let characters: Vec<char> = text.chars().collect();
-    let start = char_offset(&characters, marker.line(), marker.col());
+    let start_column = marker.col() + 1;
+    let start = char_offset(&characters, marker.line(), start_column);
     let end = match style {
         TScalarStyle::SingleQuoted => scan_quoted_end(&characters, start, '\'', false),
         TScalarStyle::DoubleQuoted => scan_quoted_end(&characters, start, '"', true),
