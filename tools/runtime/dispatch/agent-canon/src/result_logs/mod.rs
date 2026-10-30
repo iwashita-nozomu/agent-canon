@@ -1387,10 +1387,8 @@ impl<R: BufRead> UniversalLineReader<R> {
             let Some(delimiter) = delimiter else {
                 continue;
             };
-            if delimiter == b'\r' && swallow_lf {
-                if self.reader.fill_buf()?.first() == Some(&b'\n') {
-                    self.reader.consume(1);
-                }
+            if delimiter == b'\r' && swallow_lf && self.reader.fill_buf()?.first() == Some(&b'\n') {
+                self.reader.consume(1);
             }
             return Ok(Some(line));
         }
