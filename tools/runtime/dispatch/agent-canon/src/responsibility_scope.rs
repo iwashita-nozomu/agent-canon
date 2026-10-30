@@ -421,7 +421,7 @@ fn scope_from_table(table: &dyn TableLike) -> Scope {
 }
 
 fn python_string_or_empty(item: Option<&Item>) -> String {
-    let Some(item) = item.filter(|item| toml_item_truthy(*item)) else {
+    let Some(item) = item.filter(|item| toml_item_truthy(item)) else {
         return String::new();
     };
     if let Some(value) = item.as_str() {
