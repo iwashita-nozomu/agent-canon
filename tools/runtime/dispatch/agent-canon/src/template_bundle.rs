@@ -30,8 +30,9 @@ const NATIVE_CLI_SCHEMA: &str = "agent-canon.native-cli-package.v1";
 const HEX_40: usize = 40;
 const HEX_64: usize = 64;
 
+/// An invalid or unreadable template bundle operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TemplateBundleError(pub(crate) String);
+pub struct TemplateBundleError(pub(crate) String);
 
 impl fmt::Display for TemplateBundleError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1211,11 +1212,12 @@ fn bundle_identity_for(
     })
 }
 
-pub(crate) fn bundle_identity(
+/// Return the source-commit-bound identity for one declared template profile.
+pub fn bundle_identity(
     source_root: &Path,
     source_ref: &str,
     profile: &str,
-) -> BundleResult<Value> {
+) -> Result<Value, TemplateBundleError> {
     let source = GitSource::open(source_root)?;
     let work = bundle_identity_for(&source, source_ref, profile)?;
     Ok(work.identity)
