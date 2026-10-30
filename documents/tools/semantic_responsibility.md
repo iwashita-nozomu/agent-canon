@@ -1,14 +1,14 @@
 <!--
 @dependency-start
 contract design
-responsibility Documents check_semantic_responsibility_contract.py operator usage.
+responsibility Documents the native semantic responsibility contract checker usage.
 upstream design ../design/semantic-responsibility-contract.md semantic responsibility contract schema
-upstream implementation ../../tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py validates schema, identity, and references
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs validates schema, identity, and references
 downstream implementation ../../tests/agent_tools/test_check_semantic_responsibility_contract.py validates focused checker behavior
 @dependency-end
 -->
 
-# check_semantic_responsibility_contract.py
+# check-semantic-responsibility-contract
 
 この checker は、semantic responsibility contract の schema、identity、参照先を
 fail-closed で検証します。template の shape と run-local task instance の必須値、
@@ -24,7 +24,7 @@ active design packet が所有します。
 ## Command
 
 ```bash
-python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py \
+tools/bin/agent-canon check-semantic-responsibility-contract \
   --root . \
   --template templates/documents/semantic-responsibility-contract.template.toml \
   --instance reports/agents/<run-id>/semantic_responsibility_contract.toml \
