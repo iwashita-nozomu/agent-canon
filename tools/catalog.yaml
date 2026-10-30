@@ -1319,7 +1319,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/check_semantic_responsibility_contract.md
+      - documents/tools/semantic_responsibility.md
       - documents/design/semantic-responsibility-contract.md
     tests:
       - tests/agent_tools/test_check_semantic_responsibility_contract.py

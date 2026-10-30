@@ -4,7 +4,7 @@
 // upstream design ../../../../../documents/design/semantic-responsibility-contract.md canonical contract
 // upstream design ../../../../../templates/documents/semantic-responsibility-contract.template.toml reusable instance shape
 // downstream test ../../../../../tests/agent_tools/test_check_semantic_responsibility_contract.py focused validator tests
-// downstream design ../../../../../documents/tools/check_semantic_responsibility_contract.md reader-facing tool documentation
+// downstream design ../../../../../documents/tools/semantic_responsibility.md reader-facing tool documentation
 // @dependency-end
 
 use serde::Serialize;
