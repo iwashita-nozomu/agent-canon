@@ -40,7 +40,7 @@ CHECKER = (
 MINIMAL_REPO_FILES: dict[str, str] = {
     "tools/catalog.yaml": """
 path: tools/analysis/dependencies/run_repo_dependency_review.sh
-path: tools/validation/notebooks/notebook_quality.py
+path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
 path: eval/producers/evaluate_agent_run.py
@@ -116,13 +116,13 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "documents/design/responsibility-scope-management.md": "responsibility_scope.py\n",
     "documents/tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py "
+        "tool_catalog.py tool_drift.py notebook-quality "
         "tool_rejection_preflight.py responsibility_scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
-        "tool_catalog.py tool_drift.py notebook_quality.py "
+        "tool_catalog.py tool_drift.py notebook-quality "
         "check_runtime_profile_inventory.py tool_rejection_preflight.py "
         "responsibility_scope responsibility-scope.toml protecting tools\n"
     ),
@@ -271,7 +271,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "run_python_quality_checks.sh "
         "check_convention_compliance.py "
         "check_skill_frontmatter.py "
-        "tool_catalog.py tool_drift.py notebook_quality.py "
+        "tool_catalog.py tool_drift.py notebook-quality "
         "check_github_workflows.py bootstrap_runtime.py check_runtime_profile_inventory.py\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
