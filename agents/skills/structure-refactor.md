@@ -14,7 +14,7 @@ upstream design ../../documents/conventions/common/05_docs.md document responsib
 upstream design dependency-analysis.md dependency and change-impact packets
 upstream design prose-reasoning-graph.md optional graph-backed prose diagnostics
 downstream implementation ../../.codex/personal/skills/structure-refactor/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this adapter dependency header
 @dependency-end
 -->
 

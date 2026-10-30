@@ -1,47 +1,36 @@
-"""Tests for dependency header validation."""
+"""Integration tests for the native selected dependency-header checker."""
 
 # @dependency-start
 # contract test
-# responsibility Tests source-owned changed-file dependency header detection.
-# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# responsibility Tests selected dependency-header behavior through the native CLI.
+# upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency contract kinds
+# upstream design ../../documents/design/dependency-manifest-design.md dependency header and edge grammar
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
-# upstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py changed-file checks
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs selected-file command
 # downstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh runs this source regression
 # @dependency-end
 
 from __future__ import annotations
 
-import contextlib
-import io
+import fnmatch
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
-
-from tools.validation.semantic.dependencies import (
-    check_dependency_headers as header_checker,
-)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = (
-    PROJECT_ROOT
-    / "tools"
-    / "validation"
-    / "semantic"
-    / "dependencies"
-    / "check_dependency_headers.py"
-)
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 def manifest(
     *,
     contract: str | None = "design",
     responsibility: str = "Documents a source fixture.",
+    comment: str = "html",
 ) -> str:
-    """Return one valid source manifest, optionally without a contract line."""
-    lines = ["<!--", "@dependency-start"]
+    """Return one valid manifest with the selected file's comment syntax."""
+    lines = ["@dependency-start"]
     if contract is not None:
         lines.append(f"contract {contract}")
     lines.extend(
@@ -49,20 +38,32 @@ def manifest(
             f"responsibility {responsibility}",
             "upstream design README.md repository overview",
             "@dependency-end",
-            "-->",
-            "",
         ]
     )
-    return "\n".join(lines)
+    if comment == "hash":
+        return "\n".join(f"# {line}" for line in lines) + "\n"
+    if comment == "slash":
+        return "\n".join(f"// {line}" for line in lines) + "\n"
+    return "<!--\n" + "\n".join(lines) + "\n-->\n"
 
 
 def run_cli(
-    root: Path, *paths: str, allow_frontmatter: bool = False
+    root: Path,
+    *paths: str,
+    allow_frontmatter: bool = False,
+    changed: bool = False,
+    surfaces: tuple[str, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
-    """Run the production CLI against one explicit repository root."""
-    command = [sys.executable, str(SCRIPT), "--root", str(root)]
+    """Run the selected native CLI against one explicit repository root."""
+    if AGENT_CANON_CLI is None:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    command = [AGENT_CANON_CLI, "check-dependency-headers", "--root", str(root)]
     if allow_frontmatter:
         command.append("--allow-frontmatter")
+    if changed:
+        command.append("--changed")
+    for surface in surfaces:
+        command.extend(["--surface", surface])
     command.extend(paths)
     return subprocess.run(
         command,
@@ -73,26 +74,51 @@ def run_cli(
     )
 
 
-def write_contract_registry(root: Path, declaration: str) -> None:
+def write_contract_registry(
+    root: Path,
+    declaration: str = 'header_surfaces = ["scoped.py"]\n',
+    *,
+    allowed: tuple[str, ...] = ("tool",),
+) -> None:
     """Write one dependency registry fixture with header selection and kinds."""
     registry = root / "documents" / "design" / "dependency-contract-kinds.toml"
     registry.parent.mkdir(parents=True, exist_ok=True)
+    allowed_text = ", ".join(f'"{kind}"' for kind in allowed)
     registry.write_text(
+        '# @dependency-start\n'
+        '# contract registry\n'
+        '# responsibility Registers dependency header test surfaces and kinds.\n'
+        '# @dependency-end\n'
         'schema = "agent_canon.dependency_contract_kinds.v1"\n'
-        "allowed_kinds = [\n"
-        '  "tool",\n'
-        "]\n" + declaration,
+        f"allowed_kinds = [{allowed_text}]\n"
+        + declaration,
         encoding="utf-8",
     )
 
 
+def git(root: Path, *args: str) -> None:
+    """Run a Git command in one disposable source fixture."""
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True)
+
+
+def init_git(root: Path, *tracked: str) -> None:
+    """Create a committed baseline so changed and untracked selection is real."""
+    git(root, "init", "--quiet")
+    git(root, "config", "user.name", "AgentCanon test")
+    git(root, "config", "user.email", "agent-canon-test@example.invalid")
+    if tracked:
+        git(root, "add", "--", *tracked)
+    git(root, "commit", "--quiet", "--allow-empty", "-m", "fixture baseline")
+
+
 class DependencyHeaderCheckTest(unittest.TestCase):
-    """Exercise source-owned dependency header checks through the CLI."""
+    """Exercise source-owned dependency header checks through the native CLI."""
 
     def test_accepts_markdown_dependency_manifest(self) -> None:
         """Accept a Markdown file with one valid dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n', allowed=("design",))
             (root / "doc.md").write_text("# Doc\n\n" + manifest(), encoding="utf-8")
 
             result = run_cli(root, "doc.md")
@@ -101,27 +127,26 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_external_provenance_stays_outside_dependency_manifest(self) -> None:
-        """Keep external provenance below, rather than inside, the manifest."""
+        """Accept external provenance after, rather than inside, the manifest."""
         provenance = "https://example.invalid/provenance"
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n', allowed=("design",))
             path = root / "doc.md"
-            path.write_text(
-                manifest() + f"External provenance: {provenance}\n",
-                encoding="utf-8",
-            )
+            source = manifest() + f"External provenance: {provenance}\n"
+            path.write_text(source, encoding="utf-8")
 
-            manifest_text = "\n".join(header_checker.manifest_lines(path))
             result = run_cli(root, "doc.md")
 
-            self.assertNotIn(provenance, manifest_text)
+            self.assertLess(source.index("@dependency-end"), source.index(provenance))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
-    def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
-        """Accept skill frontmatter before a valid dependency manifest."""
+    def test_accepts_skill_frontmatter_before_dependency_manifest_by_default(self) -> None:
+        """Accept Skill frontmatter before its comment-wrapped manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["SKILL.md"]\n', allowed=("skill",))
             (root / "SKILL.md").write_text(
                 "\n".join(
                     [
@@ -144,6 +169,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         """Reject a manifest that omits its registered contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n')
             (root / "doc.md").write_text(manifest(contract=None), encoding="utf-8")
 
             result = run_cli(root, "doc.md")
@@ -154,9 +180,10 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_unregistered_contract_kind(self) -> None:
-        """Reject a manifest that names an unknown contract kind."""
+        """Reject a manifest that names an unknown file-level contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n')
             (root / "doc.md").write_text(
                 manifest(contract="invented-kind"), encoding="utf-8"
             )
@@ -172,6 +199,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         """Reject a checkable source file without a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["tool.py"]\n')
             (root / "tool.py").write_text(
                 '"""Missing dependency header."""\n', encoding="utf-8"
             )
@@ -186,6 +214,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         """Reject the retired Dependency Files block format."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n', allowed=("design",))
             (root / "doc.md").write_text(
                 "# Doc\n\nDependency Files:\n- README.md\n", encoding="utf-8"
             )
@@ -195,151 +224,205 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
-    def test_skips_commentless_json(self) -> None:
-        """Skip commentless JSON that cannot carry a dependency manifest."""
+    def test_skips_commentless_json_and_report_artifacts(self) -> None:
+        """Skip unsupported JSON and generated report artifacts."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["data.json"]\n', allowed=("tool",))
             (root / "data.json").write_text('{"ok": true}\n', encoding="utf-8")
-
-            result = run_cli(root, "data.json")
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
-
-    def test_skips_reports_artifacts(self) -> None:
-        """Skip generated report artifacts from header enforcement."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
             artifact = root / "reports" / "some-run" / "generated_summary.md"
             artifact.parent.mkdir(parents=True)
             artifact.write_text("README.md\n", encoding="utf-8")
 
-            result = run_cli(root, "reports/some-run/generated_summary.md")
+            result = run_cli(
+                root, "data.json", "reports/some-run/generated_summary.md"
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
-
-class DependencyHeaderSourceSelectionTest(unittest.TestCase):
-    """Verify selection and validation use source bytes without graph runtime state."""
-
-    def run_main(
-        self,
-        root: Path,
-        argv: list[str],
-        *,
-        changed: list[Path] | None = None,
-    ) -> tuple[int, str]:
-        """Run the checker entry point with optional changed-path selection."""
-        output = io.StringIO()
-        patches = [patch.object(sys, "argv", ["check_dependency_headers.py", *argv])]
-        if changed is not None:
-            patches.append(
-                patch.object(header_checker, "changed_paths", lambda _root: changed)
-            )
-        with contextlib.ExitStack() as stack:
-            for active_patch in patches:
-                stack.enter_context(active_patch)
-            with contextlib.redirect_stdout(output):
-                result = header_checker.main()
-        return result, output.getvalue()
-
-    def test_source_manifest_passes_without_graph_executable_or_state(self) -> None:
-        """Validate source headers without graph runtime state."""
+    def test_skips_binary_non_owning_and_raw_nvidia_fixture_inputs(self) -> None:
+        """Preserve byte-owned fixture, binary, symlink, and package-marker skips."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / ".git").mkdir()
-            (root / "doc.md").write_text(manifest(), encoding="utf-8")
+            write_contract_registry(root, 'header_surfaces = ["**"]\n', allowed=("tool",))
+            package = root / "__init__.py"
+            package.write_text('"""Repository-local package namespace."""\n', encoding="utf-8")
+            binary = root / "binary.md"
+            binary.write_bytes(b"header\x00bytes\n")
+            fixture = root / "tests" / "fixtures" / "nvidia" / "raw.txt"
+            fixture.parent.mkdir(parents=True)
+            fixture.write_text("exact parser fixture bytes\n", encoding="utf-8")
+            source = root / "source.md"
+            source.write_text(manifest(), encoding="utf-8")
+            link = root / "alias.md"
+            link.symlink_to(source)
 
-            result, output = self.run_main(
+            result = run_cli(
                 root,
-                ["--root", str(root), "doc.md"],
+                "__init__.py",
+                "binary.md",
+                "tests/fixtures/nvidia/raw.txt",
+                "alias.md",
             )
 
-            self.assertEqual(result, 0, output)
-            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+    def test_reports_typed_edge_kind_and_target_path_diagnostics(self) -> None:
+        """Expose the shared parser's bad-kind and root-escape diagnostics via CLI."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_contract_registry(root, allowed=("implementation",))
+            bad_kind = root / "tools" / "agent" / "orchestration" / "autonomous_convergence.py"
+            bad_kind.parent.mkdir(parents=True)
+            bad_kind.write_text(
+                manifest(comment="hash").replace(
+                    "# upstream design README.md repository overview\n",
+                    "# downstream test ../../../tests/agent_tools/test_distributed_guarantee.py exercises the owner-receipt projection.\n",
+                ),
+                encoding="utf-8",
+            )
+            escaping = root / "tools" / "a" / "b" / "c" / "d" / "edge.py"
+            escaping.parent.mkdir(parents=True)
+            escaping.write_text(
+                manifest(comment="hash").replace(
+                    "# upstream design README.md repository overview\n",
+                    "# downstream implementation ../../../../../../outside.py demonstrates root escape.\n",
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_cli(
+                root,
+                "tools/agent/orchestration/autonomous_convergence.py",
+                "tools/a/b/c/d/edge.py",
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
+            self.assertIn("manifest-grammar", result.stdout)
+            self.assertIn("target-escapes-root", result.stdout)
+
+
+class DependencyHeaderSourceSelectionTest(unittest.TestCase):
+    """Verify selected source paths and registry scope without graph runtime state."""
+
+    def test_source_manifest_passes_without_graph_executable_or_state(self) -> None:
+        """Validate an explicit source file without Git or graph runtime state."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n', allowed=("design",))
+            (root / "doc.md").write_text(manifest(), encoding="utf-8")
+
+            result = run_cli(root, "doc.md")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
             self.assertFalse((root / ".agent-canon").exists())
 
     def test_missing_source_manifest_fails_closed(self) -> None:
         """Fail closed when the selected source manifest is absent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / ".git").mkdir()
+            write_contract_registry(root, 'header_surfaces = ["doc.md"]\n', allowed=("design",))
             (root / "doc.md").write_text("# doc\n", encoding="utf-8")
 
-            result, output = self.run_main(
-                root,
-                ["--root", str(root), "doc.md"],
-            )
+            result = run_cli(root, "doc.md")
 
-            self.assertNotEqual(result, 0)
-            self.assertIn("missing top dependency manifest block", output)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("missing top dependency manifest block", result.stdout)
 
     def test_changed_mode_takes_precedence_over_positional_paths(self) -> None:
-        """Prefer changed-path selection when changed mode is requested."""
+        """Prefer changed-path selection over a different invalid positional file."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / ".git").mkdir()
-            write_contract_registry(
-                root,
-                'header_surfaces = ["scoped.py"]\n',
-            )
+            write_contract_registry(root, 'header_surfaces = ["scoped.py"]\n')
             scoped = root / "scoped.py"
             scoped.write_text(
-                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
+                manifest(contract="tool", comment="hash"), encoding="utf-8"
             )
-
-            result, output = self.run_main(
+            unrelated = root / "unrelated.py"
+            unrelated.write_text("# intentionally not selected\n", encoding="utf-8")
+            init_git(
                 root,
-                ["--root", str(root), "--changed", "missing.py"],
-                changed=[scoped],
+                "documents/design/dependency-contract-kinds.toml",
+                "scoped.py",
+                "unrelated.py",
             )
+            scoped.write_text(scoped.read_text(encoding="utf-8") + "# changed\n", encoding="utf-8")
 
-            self.assertEqual(result, 0, output)
-            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            result = run_cli(root, "unrelated.py", changed=True)
 
-    def test_no_path_mode_uses_changed_untracked_selection(self) -> None:
-        """Use changed untracked selection when no explicit path is provided."""
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+
+    def test_no_path_mode_checks_changed_untracked_selected_files(self) -> None:
+        """Use changed and untracked paths in declared surfaces, not a full scan."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / ".git").mkdir()
-            write_contract_registry(
-                root,
-                'header_surfaces = ["scoped.py"]\n',
-            )
+            write_contract_registry(root, 'header_surfaces = ["scoped.py"]\n')
+            init_git(root, "documents/design/dependency-contract-kinds.toml")
             (root / "scoped.py").write_text("# no header\n", encoding="utf-8")
 
-            result, output = self.run_main(
-                root,
-                ["--root", str(root)],
-                changed=[],
-            )
+            result = run_cli(root)
 
-            self.assertEqual(result, 0, output)
-            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("scoped.py: missing top dependency manifest block", result.stdout)
 
-    def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
-        """Consume AgentCanon's dependency registry without mirroring it into a parent."""
+    def test_surface_flag_adds_to_declared_header_surfaces(self) -> None:
+        """Allow an explicitly added surface without widening the registry."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            (root / ".git").mkdir()
-            changed = root / "tools" / "agent_tools" / "scoped.py"
-            changed.parent.mkdir(parents=True)
-            changed.write_text(
-                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
-            )
+            write_contract_registry(root, 'header_surfaces = ["declared.py"]\n')
+            init_git(root, "documents/design/dependency-contract-kinds.toml")
+            (root / "extra.py").write_text("# no header\n", encoding="utf-8")
 
-            result, output = self.run_main(
-                root,
-                ["--root", str(root), "--changed"],
-                changed=[changed],
-            )
+            result = run_cli(root, changed=True, surfaces=("extra.py",))
 
-            self.assertEqual(result, 0, output)
-            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("extra.py: missing top dependency manifest block", result.stdout)
+
+    def test_surface_character_class_matches_fnmatchcase_caret_semantics(self) -> None:
+        """Select paths according to Python fnmatchcase's literal-caret class rule."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            write_contract_registry(root, 'header_surfaces = ["unselected/**"]\n')
+            init_git(root, "documents/design/dependency-contract-kinds.toml")
+            paths = ("pkg/a.py", "pkg/^.py", "pkg/b.py")
+            for relative in paths:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("# no header\n", encoding="utf-8")
+            surface = "pkg/[^a].py"
+            expected = {
+                relative for relative in paths if fnmatch.fnmatchcase(relative, surface)
+            }
+            self.assertEqual(expected, {"pkg/a.py", "pkg/^.py"})
+
+            result = run_cli(root, changed=True, surfaces=(surface,))
+
+            self.assertNotEqual(result.returncode, 0)
+            for relative in expected:
+                self.assertIn(f"{relative}: missing top dependency manifest block", result.stdout)
+            self.assertNotIn("pkg/b.py: missing top dependency manifest block", result.stdout)
+
+    def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
+        """Resolve AgentCanon's registry when the selected parent has no copy."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            init_git(root)
+            scoped = root / "scoped.py"
+            scoped.write_text(manifest(contract="tool", comment="hash"), encoding="utf-8")
+
+            result = run_cli(root, changed=True, surfaces=("scoped.py",))
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
+            self.assertFalse((root / "documents" / "design" / "dependency-contract-kinds.toml").exists())
 
     def test_changed_mode_fails_closed_for_invalid_or_empty_registry(self) -> None:
-        """Fail closed for invalid or empty changed-path scope declarations."""
+        """Fail closed for malformed or empty changed-path scope declarations."""
         for declaration in (
             "header_surfaces = [\n",
             "header_surfaces = []\n",
@@ -349,19 +432,14 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
                 tempfile.TemporaryDirectory() as tmp_dir,
             ):
                 root = Path(tmp_dir)
-                (root / ".git").mkdir()
                 write_contract_registry(root, declaration)
-                changed = root / "scoped.py"
-                changed.write_text("# scoped\n", encoding="utf-8")
+                init_git(root, "documents/design/dependency-contract-kinds.toml")
+                (root / "scoped.py").write_text("# scoped\n", encoding="utf-8")
 
-                result, output = self.run_main(
-                    root,
-                    ["--root", str(root), "--changed"],
-                    changed=[changed],
-                )
+                result = run_cli(root, changed=True)
 
-                self.assertNotEqual(result, 0)
-                self.assertIn("dependency contract registry", output)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("dependency contract registry", result.stdout)
 
 
 if __name__ == "__main__":

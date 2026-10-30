@@ -9,7 +9,7 @@ upstream design ../internal-routines/verification-result-structuring.md reader r
 upstream design prose-reasoning-graph.md prose graph diagnostics and rewrite handoff overlay
 upstream design formal-proof-workflow.md mathematical claim proof-obligation routing
 upstream design code-visualization.md visualization selection and native renderer delegation
-downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this adapter dependency header
 @dependency-end
 -->
 

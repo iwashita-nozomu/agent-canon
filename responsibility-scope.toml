@@ -157,7 +157,7 @@ exclude_paths = [
   "documents/runtime/runtime-log-archive-migration.md",
 ]
 protecting_tools = [
-  "tools/validation/semantic/dependencies/check_dependency_headers.py",
+  "tools/runtime/dispatch/agent-canon/src/dependency_headers.rs",
   "tools/validation/semantic/responsibility/responsibility_scope.py",
 ]
 issues = []
