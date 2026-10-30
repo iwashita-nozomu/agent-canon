@@ -29,6 +29,7 @@ mod docs;
 mod file_surface_inventory;
 mod graph;
 mod jit_ir_to_lean;
+pub mod log_surface_inventory;
 mod migration_audit;
 mod private_feedback;
 mod python_algorithm_contract;
@@ -63,6 +64,7 @@ Commands:
   test-design <check> [paths...]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -96,6 +98,10 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "log-surface-inventory" {
+        std::process::exit(log_surface_inventory::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
