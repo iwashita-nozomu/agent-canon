@@ -171,6 +171,56 @@ class SkillDocumentReaderCliTest(unittest.TestCase):
                         f"SKILL_DOCUMENT_READER_ERROR={code}:{offset}\n",
                     )
 
+    def test_cli_accepts_python_unicode_decimal_digits_through_15_0(self) -> None:
+        """Unicode Nd values match Python 3.12's decimal parser and age boundary."""
+        with tempfile.TemporaryDirectory() as temporary:
+            text = "0123456789abcdefghijklmnopqrstuvwxyz\n"
+            path = self.write_document(Path(temporary), text)
+            for digits in ("١", "１", "𝟏", "𞓱", "+١", "١_２"):
+                with self.subTest(digits=digits):
+                    expected_offset = int(digits)
+                    result = self.run_reader(
+                        "chunk",
+                        "--path",
+                        str(path),
+                        "--offset",
+                        digits,
+                        "--max-bytes",
+                        "2",
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    payload = json.loads(result.stdout)
+                    self.assertEqual(payload["byte_start"], expected_offset)
+                    self.assertEqual(
+                        payload["text"], text[expected_offset : expected_offset + 2]
+                    )
+                    self.assertEqual(payload["byte_end"], expected_offset + 2)
+
+            negative = "-١"
+            negative_result = self.run_reader(
+                "chunk", "--path", str(path), "--offset", negative
+            )
+            self.assertEqual(int(negative), -1)
+            self.assertEqual(negative_result.returncode, 2)
+            self.assertEqual(negative_result.stdout, "")
+            self.assertEqual(
+                negative_result.stderr,
+                "SKILL_DOCUMENT_READER_ERROR=offset_out_of_section:-1\n",
+            )
+
+            unicode_16_digit = "𐵁"
+            with self.assertRaises(ValueError):
+                int(unicode_16_digit)
+            too_new = self.run_reader(
+                "chunk", "--path", str(path), "--offset", unicode_16_digit
+            )
+            self.assertEqual(too_new.returncode, 2)
+            self.assertEqual(too_new.stdout, "")
+            self.assertIn(
+                f"argument --offset: invalid int value: '{unicode_16_digit}'",
+                too_new.stderr,
+            )
+
     def test_cli_admit_omits_text_in_json_and_text_formats(self) -> None:
         """Both formats expose the same metadata projection, including empty inputs."""
         with tempfile.TemporaryDirectory() as temporary:

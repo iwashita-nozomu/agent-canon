@@ -3,10 +3,12 @@
 // responsibility Reads selected canonical Skill bodies in bounded UTF-8 chunks and reports exact file EOF.
 // upstream design ../../../../../agents/skills/agent-orchestration.md owner-first Skill read and implementation admission
 // upstream design ../../../../../agents/canonical/CODEX_WORKFLOW.md bounded Skill read admission
+// upstream implementation python_cli_integer.rs parses Python-compatible CLI integer arguments
 // downstream implementation ../../../../../tests/agent_tools/test_skill_document_reader.py validates heading indexing, chunk boundaries, and admission state
 // @dependency-end
 //! Read selected Skill sections or canonical bodies through bounded UTF-8 chunks.
 
+use crate::python_cli_integer::{is_argparse_negative_number, parse as parse_cli_integer};
 use rustpython_ast::bigint::BigInt;
 use serde::Serialize;
 use serde_json::Value;
@@ -454,7 +456,7 @@ fn index_headings(lines: &[Line], file_end: usize) -> Vec<Heading> {
 }
 
 fn heading_from_line(line: &str) -> Option<(String, String, usize)> {
-    let line = line.trim_end_matches(|character| matches!(character, '\r' | '\n'));
+    let line = line.trim_end_matches(['\r', '\n']);
     let leading_spaces = line.bytes().take_while(|byte| *byte == b' ').count();
     if leading_spaces > 3 {
         return None;
@@ -468,13 +470,12 @@ fn heading_from_line(line: &str) -> Option<(String, String, usize)> {
     let title_part = if rest.is_empty() {
         ""
     } else if rest.starts_with(' ') || rest.starts_with('\t') {
-        rest.trim_start_matches(|character| matches!(character, ' ' | '\t'))
+        rest.trim_start_matches([' ', '\t'])
     } else {
         return None;
     };
     let mut title = title_part.trim().to_owned();
-    let without_trailing_whitespace =
-        title.trim_end_matches(|character| matches!(character, ' ' | '\t'));
+    let without_trailing_whitespace = title.trim_end_matches([' ', '\t']);
     let trailing_hashes = without_trailing_whitespace
         .bytes()
         .rev()
@@ -625,47 +626,6 @@ fn cli_integer_to_i128(value: &BigInt) -> i128 {
     })
 }
 
-fn argparse_negative_number(value: &str) -> bool {
-    value.strip_prefix('-').map_or(false, |digits| {
-        !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
-    })
-}
-
-fn parse_cli_integer(value: &str) -> Option<BigInt> {
-    let value = value.trim();
-    let (sign, digits) = if let Some(digits) = value.strip_prefix('+') {
-        ("+", digits)
-    } else if let Some(digits) = value.strip_prefix('-') {
-        ("-", digits)
-    } else {
-        ("", value)
-    };
-    if digits.is_empty() {
-        return None;
-    }
-    let bytes = digits.as_bytes();
-    let mut normalized = String::with_capacity(value.len());
-    normalized.push_str(sign);
-    let mut previous_was_digit = false;
-    for (index, byte) in bytes.iter().copied().enumerate() {
-        match byte {
-            b'0'..=b'9' => {
-                normalized.push(char::from(byte));
-                previous_was_digit = true;
-            }
-            b'_' if previous_was_digit
-                && bytes
-                    .get(index + 1)
-                    .map_or(false, |byte| byte.is_ascii_digit()) =>
-            {
-                previous_was_digit = false;
-            }
-            _ => return None,
-        }
-    }
-    normalized.parse().ok()
-}
-
 fn parse_owner_spec(value: &str) -> Result<(PathBuf, String), SkillDocumentError> {
     let (path, heading) = value
         .split_once('#')
@@ -762,7 +722,7 @@ fn parse_args(args: &[String]) -> Result<Option<CliArgs>, String> {
                             .ok_or_else(|| format!("argument {name}: expected one argument"))?;
                         if next.starts_with('-')
                             && !((name == "--offset" || name == "--max-bytes")
-                                && argparse_negative_number(next))
+                                && is_argparse_negative_number(next))
                         {
                             return Err(format!("argument {name}: expected one argument"));
                         }
@@ -1051,12 +1011,13 @@ mod tests {
                     .unwrap()
                     .remove("text")
                     .expect("chunk serialization includes text");
-                assert!(text.as_str().map_or(false, |text| !text.is_empty()));
+                assert!(text.as_str().is_some_and(|text| !text.is_empty()));
                 entry
             })
             .collect::<Vec<_>>();
         let projection = result.as_json();
 
+        let expected = Value::Array(expected);
         assert_eq!(projection["owner_sections"], expected);
         assert_eq!(projection["implementation_read"], "ready");
         assert_eq!(
