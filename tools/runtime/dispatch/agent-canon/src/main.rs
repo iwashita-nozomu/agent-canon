@@ -62,8 +62,7 @@ mod test_design;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, native_release, template_bundle,
-    tool_proof_coverage,
+    catalog, entrypoint_composer, native_release, template_bundle, tool_proof_coverage,
 };
 use std::env;
 
