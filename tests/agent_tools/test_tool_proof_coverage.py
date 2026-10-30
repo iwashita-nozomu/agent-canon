@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Lean proof-obligation coverage reporting for cataloged tools.
-# upstream implementation ../../tools/analysis/proof/tool_proof_coverage.py reports tool proof coverage
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_proof_coverage.rs reports tool proof coverage
 # upstream design ../../agents/skills/formal-proof-workflow.md defines proof status policy
 # upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 # @dependency-end
@@ -11,23 +11,25 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "analysis" / "proof" / "tool_proof_coverage.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class ToolProofCoverageTest(unittest.TestCase):
     """Exercise proof coverage reporting."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker against a root."""
+        """Run the selected native CLI against a root."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
         return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            [AGENT_CANON_CLI, "tool-proof-coverage", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,

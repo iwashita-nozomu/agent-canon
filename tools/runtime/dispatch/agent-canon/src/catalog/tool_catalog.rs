@@ -699,17 +699,28 @@ pub fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<F
                 documented_public_tools.push((id.clone(), tool.clone()));
             }
         }
-        if !seen_tools.insert(tool.clone()) {
+        let catalog_entry = catalog_by_id
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, entry)| *entry);
+        let mut tool_identity = tool.clone();
+        if Path::new(tool).extension().and_then(|value| value.to_str()) == Some("rs") {
+            if let Some(catalog_entry) = catalog_entry {
+                let argv = mapping_value(catalog_entry, "dispatch")
+                    .map(|dispatch| string_list(mapping_value(dispatch, "argv")))
+                    .unwrap_or_default();
+                if argv.len() >= 2 && argv[0] == "tools/bin/agent-canon" {
+                    tool_identity = format!("{tool}::{}", argv[1]);
+                }
+            }
+        }
+        if !seen_tools.insert(tool_identity) {
             findings.push(Finding::new("tool_docs", tool, "duplicate-tool"));
         }
         if !seen_docs.insert(doc.clone()) {
             findings.push(Finding::new("tool_docs", doc, "duplicate-doc"));
         }
         documented_ids.insert(id.clone());
-        let catalog_entry = catalog_by_id
-            .iter()
-            .find(|(key, _)| key == id)
-            .map(|(_, entry)| *entry);
         let Some(catalog_entry) = catalog_entry else {
             findings.push(Finding::new(
                 "tool_docs",

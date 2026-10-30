@@ -358,6 +358,62 @@ fn direct_manifest_api_and_cli_adapter_keep_current_test_contracts() {
         .contains("invalid choice: 'yaml'"));
 }
 
+#[test]
+fn distinct_native_selectors_share_one_documented_implementation() {
+    let root = TempRoot::new("native-shared-tool-doc");
+    let tool_path = "tools/native/rule_inventory.rs";
+    let python_doc = "documents/python/rule_inventory.md";
+    let cpp_doc = "documents/cpp/rule_inventory.md";
+    root.write(tool_path, "// shared Rust owner\n");
+    root.write(python_doc, "# Python rule inventory\n");
+    root.write(cpp_doc, "# C++ rule inventory\n");
+    root.write(
+        "documents/tools/tool-docs.toml",
+        r#"catalog_kind = "agent_canon_tool_docs"
+classification_values = ["public", "internal", "compat", "retired", "example"]
+
+[[tool]]
+id = "oop-python-rule-inventory"
+classification = "public"
+tool = "tools/native/rule_inventory.rs"
+doc = "documents/python/rule_inventory.md"
+
+[[tool]]
+id = "oop-cpp-rule-inventory"
+classification = "public"
+tool = "tools/native/rule_inventory.rs"
+doc = "documents/cpp/rule_inventory.md"
+"#,
+    );
+
+    let distinct_catalog = YamlLoader::load_from_str(
+        "entries:\n  - id: oop-python-rule-inventory\n    path: tools/native/rule_inventory.rs\n    public: true\n    docs: [documents/python/rule_inventory.md]\n    dispatch: {argv: [tools/bin/agent-canon, oop-python-rule-inventory]}\n  - id: oop-cpp-rule-inventory\n    path: tools/native/rule_inventory.rs\n    public: true\n    docs: [documents/cpp/rule_inventory.md]\n    dispatch: {argv: [tools/bin/agent-canon, oop-cpp-rule-inventory]}\n",
+    )
+    .unwrap()
+    .remove(0);
+    let distinct_entries = distinct_catalog["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    assert!(check_tool_docs_manifest(root.path(), &distinct_entries).is_empty());
+
+    let repeated_catalog = YamlLoader::load_from_str(
+        "entries:\n  - id: oop-python-rule-inventory\n    path: tools/native/rule_inventory.rs\n    public: true\n    docs: [documents/python/rule_inventory.md]\n    dispatch: {argv: [tools/bin/agent-canon, oop-python-rule-inventory]}\n  - id: oop-cpp-rule-inventory\n    path: tools/native/rule_inventory.rs\n    public: true\n    docs: [documents/cpp/rule_inventory.md]\n    dispatch: {argv: [tools/bin/agent-canon, oop-python-rule-inventory]}\n",
+    )
+    .unwrap()
+    .remove(0);
+    let repeated_entries = repeated_catalog["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    let findings = check_tool_docs_manifest(root.path(), &repeated_entries);
+    assert!(findings
+        .iter()
+        .any(|finding| finding.check == "tool_docs" && finding.detail == "duplicate-tool"));
+}
+
 fn valid_skill_root() -> TempRoot {
     let root = TempRoot::new("skill-routes");
     root.write(
