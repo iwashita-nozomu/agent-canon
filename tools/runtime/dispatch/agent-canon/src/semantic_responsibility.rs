@@ -984,7 +984,6 @@ enum ResolutionComponent {
     CurDir,
     ParentDir,
     Normal(OsString),
-    #[cfg(windows)]
     Prefix(OsString),
 }
 
@@ -1005,7 +1004,6 @@ impl ResolutionFrame {
                 Component::CurDir => ResolutionComponent::CurDir,
                 Component::ParentDir => ResolutionComponent::ParentDir,
                 Component::Normal(name) => ResolutionComponent::Normal(name.to_os_string()),
-                #[cfg(windows)]
                 Component::Prefix(prefix) => {
                     ResolutionComponent::Prefix(prefix.as_os_str().to_os_string())
                 }
@@ -1086,7 +1084,6 @@ fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
                     }
                 }
             }
-            #[cfg(windows)]
             ResolutionComponent::Prefix(prefix) => resolved.push(prefix),
         }
     }
