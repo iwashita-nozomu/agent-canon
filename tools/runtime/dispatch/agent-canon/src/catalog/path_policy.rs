@@ -56,10 +56,7 @@ pub fn retired_legacy_tool_detail(path: &str) -> &'static str {
 
 fn normalize_lexically(path: &str) -> String {
     let replaced = path.replace('\\', "/");
-    replaced
-        .strip_prefix("./")
-        .unwrap_or(&replaced)
-        .to_owned()
+    replaced.strip_prefix("./").unwrap_or(&replaced).to_owned()
 }
 
 fn walk_tools(root: &Path, current: &Path, retired: &mut Vec<String>) {

@@ -6,7 +6,11 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use toml_edit::{DocumentMut, Item, TableLike};
-use yaml_rust2::{parser::{Event, MarkedEventReceiver, Parser}, scanner::{Marker, TScalarStyle}, Yaml, YamlLoader};
+use yaml_rust2::{
+    parser::{Event, MarkedEventReceiver, Parser},
+    scanner::{Marker, TScalarStyle},
+    Yaml, YamlLoader,
+};
 
 use super::path_policy::is_retired_legacy_tool_path;
 
@@ -33,7 +37,8 @@ const CATALOG_DOCS: [&str; 4] = [
     TOOL_DOCS_PATH,
     "documents/tools/repo-local-tool-imports.md",
 ];
-const PUBLIC_TOOL_REFERENCE_PATTERN: &str = r"(?:^|[^A-Za-z0-9_./-])(tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b)";
+const PUBLIC_TOOL_REFERENCE_PATTERN: &str =
+    r"(?:^|[^A-Za-z0-9_./-])(tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b)";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Finding {
@@ -43,12 +48,23 @@ pub struct Finding {
 }
 
 impl Finding {
-    pub fn new(check: impl Into<String>, path: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self { check: check.into(), path: path.into(), detail: detail.into() }
+    pub fn new(
+        check: impl Into<String>,
+        path: impl Into<String>,
+        detail: impl Into<String>,
+    ) -> Self {
+        Self {
+            check: check.into(),
+            path: path.into(),
+            detail: detail.into(),
+        }
     }
 
     pub fn render(&self) -> String {
-        format!("TOOL_CATALOG_FINDING={}:{}:{}", self.check, self.path, self.detail)
+        format!(
+            "TOOL_CATALOG_FINDING={}:{}:{}",
+            self.check, self.path, self.detail
+        )
     }
 }
 
@@ -143,9 +159,10 @@ fn map_entries(value: &Yaml) -> Option<Vec<(&str, &Yaml)>> {
 }
 
 fn mapping_value<'a>(value: &'a Yaml, key: &str) -> Option<&'a Yaml> {
-    value.as_hash()?.iter().find_map(|(candidate, item)| {
-        (candidate.as_str() == Some(key)).then_some(item)
-    })
+    value
+        .as_hash()?
+        .iter()
+        .find_map(|(candidate, item)| (candidate.as_str() == Some(key)).then_some(item))
 }
 
 fn string_value(value: &Yaml) -> Option<&str> {
@@ -183,27 +200,49 @@ fn resolve_repo_path(root: &Path, relative_path: &str) -> PathBuf {
         return root_path;
     }
     let vendor_path = root.join("vendor/agent-canon").join(relative_path);
-    if vendor_path.exists() { vendor_path } else { root_path }
+    if vendor_path.exists() {
+        vendor_path
+    } else {
+        root_path
+    }
 }
 
 fn load_catalog(path: &Path) -> (Option<Yaml>, Vec<Finding>) {
     if !path.is_file() {
-        return (None, vec![Finding::new("catalog", CATALOG_PATH, "missing-file")]);
+        return (
+            None,
+            vec![Finding::new("catalog", CATALOG_PATH, "missing-file")],
+        );
     }
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
-        Err(_) => return (None, vec![Finding::new("catalog", CATALOG_PATH, "read-failed")]),
+        Err(_) => {
+            return (
+                None,
+                vec![Finding::new("catalog", CATALOG_PATH, "read-failed")],
+            )
+        }
     };
     match YamlLoader::load_from_str(&text) {
         Ok(mut documents) => {
             let data = documents.pop().unwrap_or(Yaml::Null);
             if map_entries(&data).is_none() {
-                (None, vec![Finding::new("catalog", CATALOG_PATH, "must-parse-as-mapping")])
+                (
+                    None,
+                    vec![Finding::new(
+                        "catalog",
+                        CATALOG_PATH,
+                        "must-parse-as-mapping",
+                    )],
+                )
             } else {
                 (Some(data), Vec::new())
             }
         }
-        Err(_) => (None, vec![Finding::new("catalog", CATALOG_PATH, "yaml-parse-failed")]),
+        Err(_) => (
+            None,
+            vec![Finding::new("catalog", CATALOG_PATH, "yaml-parse-failed")],
+        ),
     }
 }
 
@@ -232,17 +271,32 @@ fn family_default<'a>(family_defaults: &'a Yaml, family: &str) -> Option<&'a Yam
 
 fn catalog_row(entry: &Yaml, family_defaults: &Yaml) -> CatalogRow {
     let wiring = mapping_value(entry, "default_wiring").unwrap_or(&Yaml::Null);
-    let family = mapping_value(entry, "family").and_then(Yaml::as_str).unwrap_or("<missing>");
+    let family = mapping_value(entry, "family")
+        .and_then(Yaml::as_str)
+        .unwrap_or("<missing>");
     CatalogRow {
-        tool_id: mapping_value(entry, "id").and_then(Yaml::as_str).unwrap_or("<missing-id>").to_owned(),
+        tool_id: mapping_value(entry, "id")
+            .and_then(Yaml::as_str)
+            .unwrap_or("<missing-id>")
+            .to_owned(),
         path: entry_path(entry),
         summary: entry_summary(entry),
         family: family.to_owned(),
-        role: mapping_value(entry, "role").and_then(Yaml::as_str).unwrap_or("<missing>").to_owned(),
-        status: mapping_value(entry, "status").and_then(Yaml::as_str).unwrap_or("<missing>").to_owned(),
-        audience: inherited_string(entry, family_defaults, "audience").unwrap_or_else(|| "<missing>".to_owned()),
-        placement: inherited_string(entry, family_defaults, "placement").unwrap_or_else(|| "<missing>".to_owned()),
-        command: mapping_value(entry, "command").and_then(Yaml::as_str).map(str::to_owned),
+        role: mapping_value(entry, "role")
+            .and_then(Yaml::as_str)
+            .unwrap_or("<missing>")
+            .to_owned(),
+        status: mapping_value(entry, "status")
+            .and_then(Yaml::as_str)
+            .unwrap_or("<missing>")
+            .to_owned(),
+        audience: inherited_string(entry, family_defaults, "audience")
+            .unwrap_or_else(|| "<missing>".to_owned()),
+        placement: inherited_string(entry, family_defaults, "placement")
+            .unwrap_or_else(|| "<missing>".to_owned()),
+        command: mapping_value(entry, "command")
+            .and_then(Yaml::as_str)
+            .map(str::to_owned),
         writes: mapping_value(entry, "writes").and_then(Yaml::as_bool) == Some(true),
         ci: bool_from_mapping(wiring, "ci"),
         pr_check: bool_from_mapping(wiring, "pr_check"),
@@ -267,51 +321,95 @@ fn check_entry(
     let family = mapping_value(entry, "family").and_then(Yaml::as_str);
     let status = mapping_value(entry, "status").and_then(Yaml::as_str);
     let role = mapping_value(entry, "role").and_then(Yaml::as_str);
-    let defaults = family.and_then(|name| family_default(family_defaults, name)).unwrap_or(&Yaml::Null);
+    let defaults = family
+        .and_then(|name| family_default(family_defaults, name))
+        .unwrap_or(&Yaml::Null);
     let audience = inherited_string(entry, defaults, "audience");
     let placement = inherited_string(entry, defaults, "placement");
     let target = resolve_repo_path(root, &path);
 
-    if id.is_none_or(|value| !valid_id(value)) { findings.push(Finding::new("entry", &path, "invalid-id")); }
-    if mapping_value(entry, "public").is_some_and(|value| value.as_bool().is_none()) { findings.push(Finding::new("entry", &path, "invalid-public")); }
-    if family.is_none_or(|value| !families.contains(value)) { findings.push(Finding::new("entry", &path, "invalid-family")); }
-    if status.is_none_or(|value| !statuses.contains(value)) { findings.push(Finding::new("entry", &path, "invalid-status")); }
-    if role.is_none_or(|value| !roles.contains(value)) { findings.push(Finding::new("entry", &path, "invalid-role")); }
-    if has_non_string_key(entry, "audience") { findings.push(Finding::new("entry", &path, "invalid-audience")); }
-    else if audience.is_none() { findings.push(Finding::new("entry", &path, "missing-audience")); }
-    else if !audiences.contains(audience.as_deref().unwrap_or_default()) { findings.push(Finding::new("entry", &path, "invalid-audience")); }
-    if has_non_string_key(entry, "placement") { findings.push(Finding::new("entry", &path, "invalid-placement")); }
-    else if placement.is_none() { findings.push(Finding::new("entry", &path, "missing-placement")); }
-    else if !placements.contains(placement.as_deref().unwrap_or_default()) { findings.push(Finding::new("entry", &path, "invalid-placement")); }
-    if status == Some("compatibility_wrapper") && placement.as_deref() != Some("compatibility_wrapper") {
-        findings.push(Finding::new("entry", &path, "compatibility-wrapper-placement-required"));
+    if id.is_none_or(|value| !valid_id(value)) {
+        findings.push(Finding::new("entry", &path, "invalid-id"));
     }
-    if entry_summary(entry).is_empty() { findings.push(Finding::new("entry", &path, "missing-summary")); }
-    if !target.exists() { findings.push(Finding::new("entry", &path, "missing-path")); }
+    if mapping_value(entry, "public").is_some_and(|value| value.as_bool().is_none()) {
+        findings.push(Finding::new("entry", &path, "invalid-public"));
+    }
+    if family.is_none_or(|value| !families.contains(value)) {
+        findings.push(Finding::new("entry", &path, "invalid-family"));
+    }
+    if status.is_none_or(|value| !statuses.contains(value)) {
+        findings.push(Finding::new("entry", &path, "invalid-status"));
+    }
+    if role.is_none_or(|value| !roles.contains(value)) {
+        findings.push(Finding::new("entry", &path, "invalid-role"));
+    }
+    if has_non_string_key(entry, "audience") {
+        findings.push(Finding::new("entry", &path, "invalid-audience"));
+    } else if audience.is_none() {
+        findings.push(Finding::new("entry", &path, "missing-audience"));
+    } else if !audiences.contains(audience.as_deref().unwrap_or_default()) {
+        findings.push(Finding::new("entry", &path, "invalid-audience"));
+    }
+    if has_non_string_key(entry, "placement") {
+        findings.push(Finding::new("entry", &path, "invalid-placement"));
+    } else if placement.is_none() {
+        findings.push(Finding::new("entry", &path, "missing-placement"));
+    } else if !placements.contains(placement.as_deref().unwrap_or_default()) {
+        findings.push(Finding::new("entry", &path, "invalid-placement"));
+    }
+    if status == Some("compatibility_wrapper")
+        && placement.as_deref() != Some("compatibility_wrapper")
+    {
+        findings.push(Finding::new(
+            "entry",
+            &path,
+            "compatibility-wrapper-placement-required",
+        ));
+    }
+    if entry_summary(entry).is_empty() {
+        findings.push(Finding::new("entry", &path, "missing-summary"));
+    }
+    if !target.exists() {
+        findings.push(Finding::new("entry", &path, "missing-path"));
+    }
     if is_retired_legacy_tool_path(&path) || status == Some("legacy_provenance") {
         findings.push(Finding::new("legacy", &path, "legacy-tools-are-retired"));
     }
     let docs = string_list(mapping_value(entry, "docs"));
-    if docs.is_empty() { findings.push(Finding::new("entry", &path, "missing-docs")); }
+    if docs.is_empty() {
+        findings.push(Finding::new("entry", &path, "missing-docs"));
+    }
     for doc in docs {
-        if !resolve_repo_path(root, &doc).is_file() { findings.push(Finding::new("entry", &path, format!("missing-doc:{doc}"))); }
+        if !resolve_repo_path(root, &doc).is_file() {
+            findings.push(Finding::new("entry", &path, format!("missing-doc:{doc}")));
+        }
     }
     let tests = string_list(mapping_value(entry, "tests"));
     let exempt_reason = mapping_value(entry, "test_exempt_reason").and_then(Yaml::as_str);
-    if matches!(status, Some("canonical" | "compatibility_wrapper")) && tests.is_empty()
+    if matches!(status, Some("canonical" | "compatibility_wrapper"))
+        && tests.is_empty()
         && exempt_reason.is_none_or(|reason| reason.trim().is_empty())
     {
         findings.push(Finding::new("entry", &path, "missing-tests-or-exemption"));
     }
     for test in tests {
-        if !resolve_repo_path(root, &test).is_file() { findings.push(Finding::new("entry", &path, format!("missing-test:{test}"))); }
+        if !resolve_repo_path(root, &test).is_file() {
+            findings.push(Finding::new("entry", &path, format!("missing-test:{test}")));
+        }
     }
     findings
 }
 
 fn valid_id(value: &str) -> bool {
-    if value.is_empty() || value.starts_with('-') || value.ends_with('-') { return false; }
-    value.split('-').all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit()))
+    if value.is_empty() || value.starts_with('-') || value.ends_with('-') {
+        return false;
+    }
+    value.split('-').all(|part| {
+        !part.is_empty()
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+    })
 }
 
 fn read_existing_text(root: &Path, paths: &[&str]) -> String {
@@ -319,7 +417,9 @@ fn read_existing_text(root: &Path, paths: &[&str]) -> String {
     for path in paths {
         let target = resolve_repo_path(root, path);
         if target.is_file() {
-            if let Ok(text) = fs::read_to_string(target) { chunks.push(text); }
+            if let Ok(text) = fs::read_to_string(target) {
+                chunks.push(text);
+            }
         }
     }
     chunks.join("\n")
@@ -327,7 +427,8 @@ fn read_existing_text(root: &Path, paths: &[&str]) -> String {
 
 fn referenced_tool_paths(root: &Path) -> BTreeSet<String> {
     let regex = Regex::new(PUBLIC_TOOL_REFERENCE_PATTERN).expect("static tool reference regex");
-    regex.captures_iter(&read_existing_text(root, &DEFAULT_COMMAND_SOURCES))
+    regex
+        .captures_iter(&read_existing_text(root, &DEFAULT_COMMAND_SOURCES))
         .filter_map(|capture| capture.get(1).map(|value| value.as_str().to_owned()))
         .collect()
 }
@@ -337,15 +438,30 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
     let default_text = read_existing_text(root, &ENTRY_WIRING_SOURCES);
     let mut findings = Vec::new();
     for path in referenced_tool_paths(root) {
-        if !catalog_paths.contains(&path) { findings.push(Finding::new("default_wiring", &path, "uncataloged-tool-reference")); }
+        if !catalog_paths.contains(&path) {
+            findings.push(Finding::new(
+                "default_wiring",
+                &path,
+                "uncataloged-tool-reference",
+            ));
+        }
     }
     for entry in entries {
         let path = entry_path(entry);
         let wiring = mapping_value(entry, "default_wiring").unwrap_or(&Yaml::Null);
-        if !(bool_from_mapping(wiring, "ci") || bool_from_mapping(wiring, "pr_check")) { continue; }
-        let basename = Path::new(&path).file_name().and_then(|value| value.to_str()).unwrap_or(&path);
+        if !(bool_from_mapping(wiring, "ci") || bool_from_mapping(wiring, "pr_check")) {
+            continue;
+        }
+        let basename = Path::new(&path)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(&path);
         if !default_text.contains(&path) && !default_text.contains(basename) {
-            findings.push(Finding::new("default_wiring", &path, "wired-entry-not-referenced"));
+            findings.push(Finding::new(
+                "default_wiring",
+                &path,
+                "wired-entry-not-referenced",
+            ));
         }
     }
     findings
@@ -355,10 +471,19 @@ fn check_catalog_docs(root: &Path) -> Vec<Finding> {
     let mut findings = Vec::new();
     for path in CATALOG_DOCS {
         let target = resolve_repo_path(root, path);
-        if !target.is_file() { findings.push(Finding::new("catalog_docs", path, "missing-file")); continue; }
+        if !target.is_file() {
+            findings.push(Finding::new("catalog_docs", path, "missing-file"));
+            continue;
+        }
         if let Ok(text) = fs::read_to_string(target) {
             for snippet in ["tools/catalog.yaml", "tool_catalog.py"] {
-                if !text.contains(snippet) { findings.push(Finding::new("catalog_docs", path, format!("missing:{snippet}"))); }
+                if !text.contains(snippet) {
+                    findings.push(Finding::new(
+                        "catalog_docs",
+                        path,
+                        format!("missing:{snippet}"),
+                    ));
+                }
             }
         }
     }
@@ -374,59 +499,139 @@ struct ToolDocEntry {
     classification: Option<String>,
 }
 
-fn item_string(item: Option<&Item>) -> Option<&str> { item.and_then(Item::as_str) }
+fn item_string(item: Option<&Item>) -> Option<&str> {
+    item.and_then(Item::as_str)
+}
 
 fn tool_doc_entries(document: &DocumentMut) -> Option<Vec<ToolDocEntry>> {
     let item = document.get("tool")?;
     if let Some(tables) = item.as_array_of_tables() {
-        return Some(tables.iter().map(|table| tool_doc_from_table(table)).collect());
+        return Some(
+            tables
+                .iter()
+                .map(|table| tool_doc_from_table(table))
+                .collect(),
+        );
     }
     let array = item.as_array()?;
     let mut result = Vec::new();
     for value in array.iter() {
         let Some(inline) = value.as_inline_table() else {
-            result.push(ToolDocEntry { is_mapping: false, id: None, tool: None, doc: None, classification: None });
+            result.push(ToolDocEntry {
+                is_mapping: false,
+                id: None,
+                tool: None,
+                doc: None,
+                classification: None,
+            });
             continue;
         };
-        let get = |key: &str| inline.get(key).and_then(|value| value.as_str()).map(str::to_owned);
-        result.push(ToolDocEntry { is_mapping: true, id: get("id"), tool: get("tool"), doc: get("doc"), classification: get("classification") });
+        let get = |key: &str| {
+            inline
+                .get(key)
+                .and_then(|value| value.as_str())
+                .map(str::to_owned)
+        };
+        result.push(ToolDocEntry {
+            is_mapping: true,
+            id: get("id"),
+            tool: get("tool"),
+            doc: get("doc"),
+            classification: get("classification"),
+        });
     }
     Some(result)
 }
 
 fn tool_doc_from_table(table: &dyn TableLike) -> ToolDocEntry {
     let get = |key: &str| table.get(key).and_then(Item::as_str).map(str::to_owned);
-    ToolDocEntry { is_mapping: true, id: get("id"), tool: get("tool"), doc: get("doc"), classification: get("classification") }
+    ToolDocEntry {
+        is_mapping: true,
+        id: get("id"),
+        tool: get("tool"),
+        doc: get("doc"),
+        classification: get("classification"),
+    }
 }
 
 fn load_tool_docs(root: &Path) -> (Vec<ToolDocEntry>, Vec<Finding>) {
     let path = resolve_repo_path(root, TOOL_DOCS_PATH);
-    if !path.is_file() { return (Vec::new(), vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "missing-file")]); }
+    if !path.is_file() {
+        return (
+            Vec::new(),
+            vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "missing-file")],
+        );
+    }
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
-        Err(_) => return (Vec::new(), vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "read-failed")]),
+        Err(_) => {
+            return (
+                Vec::new(),
+                vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "read-failed")],
+            )
+        }
     };
     let document = match text.parse::<DocumentMut>() {
         Ok(document) => document,
-        Err(_) => return (Vec::new(), vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "invalid-toml")]),
+        Err(_) => {
+            return (
+                Vec::new(),
+                vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "invalid-toml")],
+            )
+        }
     };
     if item_string(document.get("catalog_kind")) != Some("agent_canon_tool_docs") {
-        return (Vec::new(), vec![Finding::new("tool_docs", TOOL_DOCS_PATH, "invalid-catalog-kind")]);
+        return (
+            Vec::new(),
+            vec![Finding::new(
+                "tool_docs",
+                TOOL_DOCS_PATH,
+                "invalid-catalog-kind",
+            )],
+        );
     }
-    let classifications = document.get("classification_values").and_then(Item::as_array)
-        .map(|array| array.iter().filter_map(|value| value.as_str()).collect::<BTreeSet<_>>())
+    let classifications = document
+        .get("classification_values")
+        .and_then(Item::as_array)
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|value| value.as_str())
+                .collect::<BTreeSet<_>>()
+        })
         .unwrap_or_default();
     let expected: BTreeSet<&str> = TOOL_CLASSIFICATIONS.into_iter().collect();
     let mut findings = Vec::new();
-    if classifications != expected { findings.push(Finding::new("tool_docs", TOOL_DOCS_PATH, "invalid-classification-values")); }
+    if classifications != expected {
+        findings.push(Finding::new(
+            "tool_docs",
+            TOOL_DOCS_PATH,
+            "invalid-classification-values",
+        ));
+    }
     let Some(entries) = tool_doc_entries(&document) else {
-        findings.push(Finding::new("tool_docs", TOOL_DOCS_PATH, "missing-tool-list"));
+        findings.push(Finding::new(
+            "tool_docs",
+            TOOL_DOCS_PATH,
+            "missing-tool-list",
+        ));
         return (Vec::new(), findings);
     };
-    let entries = entries.into_iter().filter_map(|entry| {
-        if entry.is_mapping { Some(entry) }
-        else { findings.push(Finding::new("tool_docs", TOOL_DOCS_PATH, "tool-entry-not-mapping")); None }
-    }).collect();
+    let entries = entries
+        .into_iter()
+        .filter_map(|entry| {
+            if entry.is_mapping {
+                Some(entry)
+            } else {
+                findings.push(Finding::new(
+                    "tool_docs",
+                    TOOL_DOCS_PATH,
+                    "tool-entry-not-mapping",
+                ));
+                None
+            }
+        })
+        .collect();
     (entries, findings)
 }
 
@@ -435,8 +640,11 @@ fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Findi
     let mut catalog_by_id: Vec<(String, &Yaml)> = Vec::new();
     for entry in catalog_entries {
         if let Some(id) = mapping_value(entry, "id").and_then(Yaml::as_str) {
-            if let Some(existing) = catalog_by_id.iter_mut().find(|(key, _)| key == id) { existing.1 = entry; }
-            else { catalog_by_id.push((id.to_owned(), entry)); }
+            if let Some(existing) = catalog_by_id.iter_mut().find(|(key, _)| key == id) {
+                existing.1 = entry;
+            } else {
+                catalog_by_id.push((id.to_owned(), entry));
+            }
         }
     }
     let mut seen_tools = BTreeSet::new();
@@ -446,50 +654,101 @@ fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Findi
     let mut documented_ids = BTreeSet::new();
     for entry in &doc_entries {
         let (Some(id), Some(tool), Some(doc)) = (&entry.id, &entry.tool, &entry.doc) else {
-            findings.push(Finding::new("tool_docs", TOOL_DOCS_PATH, "missing-id-tool-or-doc"));
+            findings.push(Finding::new(
+                "tool_docs",
+                TOOL_DOCS_PATH,
+                "missing-id-tool-or-doc",
+            ));
             continue;
         };
-        if !entry.classification.as_deref().is_some_and(|value| TOOL_CLASSIFICATIONS.contains(&value)) {
+        if !entry
+            .classification
+            .as_deref()
+            .is_some_and(|value| TOOL_CLASSIFICATIONS.contains(&value))
+        {
             findings.push(Finding::new("tool_docs", tool, "invalid-classification"));
         } else if entry.classification.as_deref() == Some("public") {
             documented_public_ids.insert(id.clone());
-            if let Some(existing) = documented_public_tools.iter_mut().find(|(key, _)| key == id) { existing.1 = tool.clone(); }
-            else { documented_public_tools.push((id.clone(), tool.clone())); }
+            if let Some(existing) = documented_public_tools
+                .iter_mut()
+                .find(|(key, _)| key == id)
+            {
+                existing.1 = tool.clone();
+            } else {
+                documented_public_tools.push((id.clone(), tool.clone()));
+            }
         }
-        if !seen_tools.insert(tool.clone()) { findings.push(Finding::new("tool_docs", tool, "duplicate-tool")); }
-        if !seen_docs.insert(doc.clone()) { findings.push(Finding::new("tool_docs", doc, "duplicate-doc")); }
+        if !seen_tools.insert(tool.clone()) {
+            findings.push(Finding::new("tool_docs", tool, "duplicate-tool"));
+        }
+        if !seen_docs.insert(doc.clone()) {
+            findings.push(Finding::new("tool_docs", doc, "duplicate-doc"));
+        }
         documented_ids.insert(id.clone());
-        let catalog_entry = catalog_by_id.iter().find(|(key, _)| key == id).map(|(_, entry)| *entry);
+        let catalog_entry = catalog_by_id
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, entry)| *entry);
         let Some(catalog_entry) = catalog_entry else {
-            findings.push(Finding::new("tool_docs", tool, format!("missing-catalog-id:{id}")));
+            findings.push(Finding::new(
+                "tool_docs",
+                tool,
+                format!("missing-catalog-id:{id}"),
+            ));
             continue;
         };
         if mapping_value(catalog_entry, "path").and_then(Yaml::as_str) != Some(tool.as_str()) {
             findings.push(Finding::new("tool_docs", tool, "catalog-path-mismatch"));
         }
-        if !resolve_repo_path(root, tool).is_file() { findings.push(Finding::new("tool_docs", tool, "missing-tool")); }
-        if !resolve_repo_path(root, doc).is_file() { findings.push(Finding::new("tool_docs", doc, "missing-doc")); }
-        if !tool_doc_name_matches(tool, doc) { findings.push(Finding::new("tool_docs", doc, "tool-doc-name-mismatch")); }
+        if !resolve_repo_path(root, tool).is_file() {
+            findings.push(Finding::new("tool_docs", tool, "missing-tool"));
+        }
+        if !resolve_repo_path(root, doc).is_file() {
+            findings.push(Finding::new("tool_docs", doc, "missing-doc"));
+        }
+        if !tool_doc_name_matches(tool, doc) {
+            findings.push(Finding::new("tool_docs", doc, "tool-doc-name-mismatch"));
+        }
         if !string_list(mapping_value(catalog_entry, "docs")).contains(doc) {
-            findings.push(Finding::new("tool_docs", tool, format!("catalog-doc-missing:{doc}")));
+            findings.push(Finding::new(
+                "tool_docs",
+                tool,
+                format!("catalog-doc-missing:{doc}"),
+            ));
         }
     }
     let mut catalog_public_ids = BTreeSet::new();
     let mut all_catalog_ids = BTreeSet::new();
     for (id, entry) in &catalog_by_id {
         all_catalog_ids.insert(id.clone());
-        if mapping_value(entry, "public").and_then(Yaml::as_bool) == Some(true) { catalog_public_ids.insert(id.clone()); }
+        if mapping_value(entry, "public").and_then(Yaml::as_bool) == Some(true) {
+            catalog_public_ids.insert(id.clone());
+        }
     }
     for id in documented_public_ids.difference(&catalog_public_ids) {
-        let tool = documented_public_tools.iter().find(|(key, _)| key == id).map(|(_, tool)| tool.as_str()).unwrap_or("");
-        let detail = if !all_catalog_ids.contains(id) { format!("missing-catalog-entry:{id}:{tool}") }
-            else { format!("missing-public-mark:{id}:{tool}") };
+        let tool = documented_public_tools
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, tool)| tool.as_str())
+            .unwrap_or("");
+        let detail = if !all_catalog_ids.contains(id) {
+            format!("missing-catalog-entry:{id}:{tool}")
+        } else {
+            format!("missing-public-mark:{id}:{tool}")
+        };
         findings.push(Finding::new("public_tools", TOOL_DOCS_PATH, detail));
     }
     for id in catalog_public_ids.difference(&documented_public_ids) {
-        let entry = catalog_by_id.iter().find(|(key, _)| key == id).map(|(_, entry)| *entry).unwrap_or(&Yaml::Null);
-        let detail = if !documented_ids.contains(id) { format!("missing-public-documentation:{id}:{}", entry_path(entry)) }
-            else { format!("non-public-documentation:{id}:{}", entry_path(entry)) };
+        let entry = catalog_by_id
+            .iter()
+            .find(|(key, _)| key == id)
+            .map(|(_, entry)| *entry)
+            .unwrap_or(&Yaml::Null);
+        let detail = if !documented_ids.contains(id) {
+            format!("missing-public-documentation:{id}:{}", entry_path(entry))
+        } else {
+            format!("non-public-documentation:{id}:{}", entry_path(entry))
+        };
         findings.push(Finding::new("public_tools", CATALOG_PATH, detail));
     }
     findings
@@ -497,10 +756,20 @@ fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Findi
 
 pub fn tool_doc_name_matches(tool: &str, doc: &str) -> bool {
     let tool_path = Path::new(tool);
-    let doc_stem = Path::new(doc).file_stem().and_then(|value| value.to_str()).unwrap_or("");
-    let tool_name = tool_path.file_name().and_then(|value| value.to_str()).unwrap_or("");
+    let doc_stem = Path::new(doc)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    let tool_name = tool_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
     if tool_name == "mod.rs" {
-        let owner = tool_path.parent().and_then(Path::file_name).and_then(|value| value.to_str()).unwrap_or("");
+        let owner = tool_path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|value| value.to_str())
+            .unwrap_or("");
         doc_stem == owner || doc_stem == owner.replace('_', "-")
     } else {
         tool_path.file_stem().and_then(|value| value.to_str()) == Some(doc_stem)
@@ -510,59 +779,135 @@ pub fn tool_doc_name_matches(tool: &str, doc: &str) -> bool {
 pub fn validate_catalog(root: &Path) -> CatalogReport {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let (Some(data), mut findings) = load_catalog(&resolve_repo_path(&root, CATALOG_PATH)) else {
-        return CatalogReport { findings, entries: Vec::new() };
+        return CatalogReport {
+            findings,
+            entries: Vec::new(),
+        };
     };
-    let family_defaults = mapping_value(&data, "families").cloned().unwrap_or(Yaml::Null);
-    let families: BTreeSet<String> = map_entries(&family_defaults).unwrap_or_default().into_iter().map(|(name, _)| name.to_owned()).collect();
+    let family_defaults = mapping_value(&data, "families")
+        .cloned()
+        .unwrap_or(Yaml::Null);
+    let families: BTreeSet<String> = map_entries(&family_defaults)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(name, _)| name.to_owned())
+        .collect();
     let statuses = allowed_values(&data, "status_values");
     let roles = allowed_values(&data, "role_values");
     let audiences = allowed_values(&data, "audience_values");
     let placements = allowed_values(&data, "placement_values");
-    if mapping_value(&data, "version").and_then(Yaml::as_i64) != Some(1) { findings.push(Finding::new("catalog", CATALOG_PATH, "unsupported-version")); }
-    if families.is_empty() { findings.push(Finding::new("catalog", CATALOG_PATH, "missing-families")); }
-    if statuses.is_empty() { findings.push(Finding::new("catalog", CATALOG_PATH, "missing-status-values")); }
-    if roles.is_empty() { findings.push(Finding::new("catalog", CATALOG_PATH, "missing-role-values")); }
-    if audiences.is_empty() { findings.push(Finding::new("catalog", CATALOG_PATH, "missing-audience-values")); }
-    if placements.is_empty() { findings.push(Finding::new("catalog", CATALOG_PATH, "missing-placement-values")); }
+    if mapping_value(&data, "version").and_then(Yaml::as_i64) != Some(1) {
+        findings.push(Finding::new("catalog", CATALOG_PATH, "unsupported-version"));
+    }
+    if families.is_empty() {
+        findings.push(Finding::new("catalog", CATALOG_PATH, "missing-families"));
+    }
+    if statuses.is_empty() {
+        findings.push(Finding::new(
+            "catalog",
+            CATALOG_PATH,
+            "missing-status-values",
+        ));
+    }
+    if roles.is_empty() {
+        findings.push(Finding::new("catalog", CATALOG_PATH, "missing-role-values"));
+    }
+    if audiences.is_empty() {
+        findings.push(Finding::new(
+            "catalog",
+            CATALOG_PATH,
+            "missing-audience-values",
+        ));
+    }
+    if placements.is_empty() {
+        findings.push(Finding::new(
+            "catalog",
+            CATALOG_PATH,
+            "missing-placement-values",
+        ));
+    }
     for (family_name, family_info) in map_entries(&family_defaults).unwrap_or_default() {
         let audience = inherited_string(family_info, &Yaml::Null, "audience");
         let placement = inherited_string(family_info, &Yaml::Null, "placement");
-        if has_non_string_key(family_info, "audience") { findings.push(Finding::new("family", family_name, "invalid-audience")); }
-        else if audience.is_none() { findings.push(Finding::new("family", family_name, "missing-audience")); }
-        else if !audiences.contains(audience.as_deref().unwrap_or_default()) { findings.push(Finding::new("family", family_name, "invalid-audience")); }
-        if has_non_string_key(family_info, "placement") { findings.push(Finding::new("family", family_name, "invalid-placement")); }
-        else if placement.is_none() { findings.push(Finding::new("family", family_name, "missing-placement")); }
-        else if !placements.contains(placement.as_deref().unwrap_or_default()) { findings.push(Finding::new("family", family_name, "invalid-placement")); }
+        if has_non_string_key(family_info, "audience") {
+            findings.push(Finding::new("family", family_name, "invalid-audience"));
+        } else if audience.is_none() {
+            findings.push(Finding::new("family", family_name, "missing-audience"));
+        } else if !audiences.contains(audience.as_deref().unwrap_or_default()) {
+            findings.push(Finding::new("family", family_name, "invalid-audience"));
+        }
+        if has_non_string_key(family_info, "placement") {
+            findings.push(Finding::new("family", family_name, "invalid-placement"));
+        } else if placement.is_none() {
+            findings.push(Finding::new("family", family_name, "missing-placement"));
+        } else if !placements.contains(placement.as_deref().unwrap_or_default()) {
+            findings.push(Finding::new("family", family_name, "invalid-placement"));
+        }
     }
     let Some(raw_entries) = mapping_value(&data, "entries").and_then(Yaml::as_vec) else {
-        findings.push(Finding::new("catalog", CATALOG_PATH, "entries-must-be-list"));
-        return CatalogReport { findings, entries: Vec::new() };
+        findings.push(Finding::new(
+            "catalog",
+            CATALOG_PATH,
+            "entries-must-be-list",
+        ));
+        return CatalogReport {
+            findings,
+            entries: Vec::new(),
+        };
     };
     let mut entries = Vec::new();
     let mut rows = Vec::new();
     let mut ids = BTreeSet::new();
     for (index, raw_entry) in raw_entries.iter().enumerate() {
         if map_entries(raw_entry).is_none() {
-            findings.push(Finding::new("entry", CATALOG_PATH, format!("entry-{}-not-mapping", index + 1)));
+            findings.push(Finding::new(
+                "entry",
+                CATALOG_PATH,
+                format!("entry-{}-not-mapping", index + 1),
+            ));
             continue;
         }
         entries.push(raw_entry);
-        let family = mapping_value(raw_entry, "family").and_then(Yaml::as_str).unwrap_or("");
+        let family = mapping_value(raw_entry, "family")
+            .and_then(Yaml::as_str)
+            .unwrap_or("");
         let defaults = family_default(&family_defaults, family).unwrap_or(&Yaml::Null);
         rows.push(catalog_row(raw_entry, defaults));
         if let Some(id) = mapping_value(raw_entry, "id").and_then(Yaml::as_str) {
-            if !ids.insert(id.to_owned()) { findings.push(Finding::new("entry", entry_path(raw_entry), format!("duplicate-id:{id}"))); }
+            if !ids.insert(id.to_owned()) {
+                findings.push(Finding::new(
+                    "entry",
+                    entry_path(raw_entry),
+                    format!("duplicate-id:{id}"),
+                ));
+            }
         }
-        findings.extend(check_entry(&root, raw_entry, &families, &statuses, &roles, &audiences, &placements, &family_defaults));
+        findings.extend(check_entry(
+            &root,
+            raw_entry,
+            &families,
+            &statuses,
+            &roles,
+            &audiences,
+            &placements,
+            &family_defaults,
+        ));
     }
     findings.extend(check_default_wiring(&root, &entries));
     findings.extend(check_catalog_docs(&root));
     findings.extend(check_tool_docs_manifest(&root, &entries));
-    findings.sort_by(|left, right| (&left.check, &left.path, &left.detail).cmp(&(&right.check, &right.path, &right.detail)));
-    CatalogReport { findings, entries: rows }
+    findings.sort_by(|left, right| {
+        (&left.check, &left.path, &left.detail).cmp(&(&right.check, &right.path, &right.detail))
+    });
+    CatalogReport {
+        findings,
+        entries: rows,
+    }
 }
 
-pub fn check_catalog(root: &Path) -> Vec<Finding> { validate_catalog(root).findings }
+pub fn check_catalog(root: &Path) -> Vec<Finding> {
+    validate_catalog(root).findings
+}
 
 /// Lexes the bounded Rust token subset used by the public dispatch extractor.
 pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
@@ -580,8 +925,12 @@ pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
         }
         if starts_with(&characters, index, "//") {
             let mut end = index;
-            while end < characters.len() && characters[end] != '\n' { end += 1; }
-            for current in &characters[index..end] { advance_position(*current, &mut line, &mut column); }
+            while end < characters.len() && characters[end] != '\n' {
+                end += 1;
+            }
+            for current in &characters[index..end] {
+                advance_position(*current, &mut line, &mut column);
+            }
             index = end;
             continue;
         }
@@ -589,12 +938,22 @@ pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
             let mut depth = 1usize;
             let mut end = index + 2;
             while end < characters.len() && depth > 0 {
-                if starts_with(&characters, end, "/*") { depth += 1; end += 2; }
-                else if starts_with(&characters, end, "*/") { depth -= 1; end += 2; }
-                else { end += 1; }
+                if starts_with(&characters, end, "/*") {
+                    depth += 1;
+                    end += 2;
+                } else if starts_with(&characters, end, "*/") {
+                    depth -= 1;
+                    end += 2;
+                } else {
+                    end += 1;
+                }
             }
-            if depth > 0 { return Err("unterminated block comment".to_owned()); }
-            for current in &characters[index..end] { advance_position(*current, &mut line, &mut column); }
+            if depth > 0 {
+                return Err("unterminated block comment".to_owned());
+            }
+            for current in &characters[index..end] {
+                advance_position(*current, &mut line, &mut column);
+            }
             index = end;
             continue;
         }
@@ -609,33 +968,49 @@ pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
             let mut closed = false;
             while cursor < characters.len() {
                 let current = characters[cursor];
-                if current == '"' && !escaped { cursor += 1; closed = true; break; }
+                if current == '"' && !escaped {
+                    cursor += 1;
+                    closed = true;
+                    break;
+                }
                 escaped = current == '\\' && !escaped;
-                if current != '\\' { escaped = false; }
+                if current != '\\' {
+                    escaped = false;
+                }
                 cursor += 1;
             }
-            if !closed { return Err("unterminated string literal".to_owned()); }
+            if !closed {
+                return Err("unterminated string literal".to_owned());
+            }
             end = cursor;
             value = characters[index..end].iter().collect::<String>();
         } else if character.is_alphabetic() || character == '_' {
             let mut cursor = index + 1;
-            while cursor < characters.len() && (characters[cursor].is_alphanumeric() || characters[cursor] == '_') { cursor += 1; }
+            while cursor < characters.len()
+                && (characters[cursor].is_alphanumeric() || characters[cursor] == '_')
+            {
+                cursor += 1;
+            }
             end = cursor;
             value = characters[index..end].iter().collect::<String>();
         } else if character.is_numeric() {
             let mut cursor = index + 1;
-            while cursor < characters.len() && characters[cursor].is_numeric() { cursor += 1; }
+            while cursor < characters.len() && characters[cursor].is_numeric() {
+                cursor += 1;
+            }
             end = cursor;
             value = characters[index..end].iter().collect::<String>();
         } else {
             let compound = ["::", "..", ">=", "&&", "||", "==", "=>"]
                 .into_iter()
                 .find(|operator| starts_with(&characters, index, operator));
-            value = compound.unwrap_or_else(|| {
-                // A one-character fallback is kept as a static slice only for
-                // the branch selection; the actual token is built below.
-                ""
-            }).to_owned();
+            value = compound
+                .unwrap_or_else(|| {
+                    // A one-character fallback is kept as a static slice only for
+                    // the branch selection; the actual token is built below.
+                    ""
+                })
+                .to_owned();
             if value.is_empty() {
                 end = index + 1;
                 value.push(character);
@@ -643,8 +1018,16 @@ pub fn rust_tokens(text: &str) -> Result<Vec<RustToken>, String> {
                 end = index + value.chars().count();
             }
         }
-        for current in &characters[index..end] { advance_position(*current, &mut line, &mut column); }
-        tokens.push(RustToken { value, start_line, start_column, end_line: line, end_column: column });
+        for current in &characters[index..end] {
+            advance_position(*current, &mut line, &mut column);
+        }
+        tokens.push(RustToken {
+            value,
+            start_line,
+            start_column,
+            end_line: line,
+            end_column: column,
+        });
         index = end;
     }
     Ok(tokens)
@@ -656,23 +1039,48 @@ fn starts_with(characters: &[char], start: usize, needle: &str) -> bool {
 }
 
 fn advance_position(character: char, line: &mut usize, column: &mut usize) {
-    if character == '\n' { *line += 1; *column = 1; } else { *column += 1; }
+    if character == '\n' {
+        *line += 1;
+        *column = 1;
+    } else {
+        *column += 1;
+    }
 }
 
 /// Returns all starts of one exact token sequence.
 pub fn token_sequence_matches(tokens: &[RustToken], values: &[&str]) -> Vec<usize> {
-    if values.is_empty() { return (0..=tokens.len()).collect(); }
-    if values.len() > tokens.len() { return Vec::new(); }
+    if values.is_empty() {
+        return (0..=tokens.len()).collect();
+    }
+    if values.len() > tokens.len() {
+        return Vec::new();
+    }
     (0..=tokens.len() - values.len())
-        .filter(|start| tokens[*start..*start + values.len()].iter().map(|token| token.value.as_str()).eq(values.iter().copied()))
+        .filter(|start| {
+            tokens[*start..*start + values.len()]
+                .iter()
+                .map(|token| token.value.as_str())
+                .eq(values.iter().copied())
+        })
         .collect()
 }
 
 /// Returns the one-based source span covering one token sequence.
-pub fn token_span(path: &str, tokens: &[RustToken], start: usize, length: usize) -> PublicSourceSpan {
+pub fn token_span(
+    path: &str,
+    tokens: &[RustToken],
+    start: usize,
+    length: usize,
+) -> PublicSourceSpan {
     let first = &tokens[start];
     let last = &tokens[start + length - 1];
-    PublicSourceSpan { path: path.to_owned(), start_line: first.start_line, start_column: first.start_column, end_line: last.end_line, end_column: last.end_column }
+    PublicSourceSpan {
+        path: path.to_owned(),
+        start_line: first.start_line,
+        start_column: first.start_column,
+        end_line: last.end_line,
+        end_column: last.end_column,
+    }
 }
 
 /// Returns a phrase span only when it occurs on exactly one source line.
@@ -682,7 +1090,13 @@ pub fn text_phrase_span(path: &str, text: &str, phrase: &str) -> Option<PublicSo
         if let Some(start) = source_line.find(phrase) {
             let start_column = source_line[..start].chars().count() + 1;
             let end_column = start_column + phrase.chars().count();
-            matches.push(PublicSourceSpan { path: path.to_owned(), start_line: line_index + 1, start_column, end_line: line_index + 1, end_column });
+            matches.push(PublicSourceSpan {
+                path: path.to_owned(),
+                start_line: line_index + 1,
+                start_column,
+                end_line: line_index + 1,
+                end_column,
+            });
         }
     }
     (matches.len() == 1).then(|| matches.remove(0))
@@ -702,14 +1116,18 @@ struct IdMarkReceiver {
 impl IdMarkReceiver {
     fn begin_child(&mut self) {
         if let Some(mapping) = self.mappings.last_mut() {
-            if mapping.pending_key.is_some() { mapping.pending_key = None; }
+            if mapping.pending_key.is_some() {
+                mapping.pending_key = None;
+            }
         }
     }
 
     fn scalar(&mut self, value: &str, marker: Marker, style: TScalarStyle) {
         if let Some(mapping) = self.mappings.last_mut() {
             if let Some(key) = mapping.pending_key.take() {
-                if key == "id" { self.spans.push((value.to_owned(), marker, style)); }
+                if key == "id" {
+                    self.spans.push((value.to_owned(), marker, style));
+                }
             } else {
                 mapping.pending_key = Some(value.to_owned());
             }
@@ -720,8 +1138,13 @@ impl IdMarkReceiver {
 impl MarkedEventReceiver for IdMarkReceiver {
     fn on_event(&mut self, event: Event, marker: Marker) {
         match event {
-            Event::MappingStart(..) => { self.begin_child(); self.mappings.push(MappingFrame::default()); }
-            Event::MappingEnd => { self.mappings.pop(); }
+            Event::MappingStart(..) => {
+                self.begin_child();
+                self.mappings.push(MappingFrame::default());
+            }
+            Event::MappingEnd => {
+                self.mappings.pop();
+            }
             Event::SequenceStart(..) => self.begin_child(),
             Event::Scalar(value, style, _, _) => self.scalar(&value, marker, style),
             Event::Alias(_) => self.scalar("", marker, TScalarStyle::Plain),
@@ -734,13 +1157,26 @@ impl MarkedEventReceiver for IdMarkReceiver {
 pub fn yaml_id_spans(path: &str, text: &str) -> Result<Vec<(String, PublicSourceSpan)>, String> {
     let mut parser = Parser::new_from_str(text);
     let mut receiver = IdMarkReceiver::default();
-    parser.load(&mut receiver, true).map_err(|error| error.to_string())?;
+    parser
+        .load(&mut receiver, true)
+        .map_err(|error| error.to_string())?;
     let mut spans = Vec::new();
     let mut seen = HashSet::new();
     for (value, marker, style) in receiver.spans {
-        if !seen.insert(value.clone()) { continue; }
+        if !seen.insert(value.clone()) {
+            continue;
+        }
         let (end_line, end_column) = yaml_scalar_end(text, marker, style);
-        spans.push((value, PublicSourceSpan { path: path.to_owned(), start_line: marker.line(), start_column: marker.col(), end_line, end_column }));
+        spans.push((
+            value,
+            PublicSourceSpan {
+                path: path.to_owned(),
+                start_line: marker.line(),
+                start_column: marker.col(),
+                end_line,
+                end_column,
+            },
+        ));
     }
     Ok(spans)
 }
@@ -751,7 +1187,9 @@ fn yaml_scalar_end(text: &str, marker: Marker, style: TScalarStyle) -> (usize, u
     let end = match style {
         TScalarStyle::SingleQuoted => scan_quoted_end(&characters, start, '\'', false),
         TScalarStyle::DoubleQuoted => scan_quoted_end(&characters, start, '"', true),
-        TScalarStyle::Literal | TScalarStyle::Folded => scan_block_end(&characters, start, marker.line()),
+        TScalarStyle::Literal | TScalarStyle::Folded => {
+            scan_block_end(&characters, start, marker.line())
+        }
         TScalarStyle::Plain => scan_plain_end(&characters, start),
     };
     position_after(&characters, start, end)
@@ -761,7 +1199,9 @@ fn char_offset(characters: &[char], wanted_line: usize, wanted_column: usize) ->
     let mut line = 1;
     let mut column = 1;
     for (index, character) in characters.iter().enumerate() {
-        if line == wanted_line && column == wanted_column { return index; }
+        if line == wanted_line && column == wanted_column {
+            return index;
+        }
         advance_position(*character, &mut line, &mut column);
     }
     characters.len()
@@ -773,10 +1213,18 @@ fn scan_quoted_end(characters: &[char], start: usize, quote: char, escapes: bool
     while index < characters.len() {
         let character = characters[index];
         if character == quote && !escaped {
-            if !escapes && characters.get(index + 1) == Some(&quote) { index += 2; continue; }
+            if !escapes && characters.get(index + 1) == Some(&quote) {
+                index += 2;
+                continue;
+            }
             return index + 1;
         }
-        if escapes { escaped = character == '\\' && !escaped; if character != '\\' { escaped = false; } }
+        if escapes {
+            escaped = character == '\\' && !escaped;
+            if character != '\\' {
+                escaped = false;
+            }
+        }
         index += 1;
     }
     characters.len()
@@ -787,26 +1235,45 @@ fn scan_plain_end(characters: &[char], start: usize) -> usize {
     let mut last_non_space = start;
     while index < characters.len() {
         let character = characters[index];
-        if character == '\n' || character == '\r' || matches!(character, ',' | ']' | '}') { break; }
-        if character == '#' && (index == start || characters[index - 1].is_whitespace()) { break; }
+        if character == '\n' || character == '\r' || matches!(character, ',' | ']' | '}') {
+            break;
+        }
+        if character == '#' && (index == start || characters[index - 1].is_whitespace()) {
+            break;
+        }
         index += 1;
-        if !character.is_whitespace() { last_non_space = index; }
+        if !character.is_whitespace() {
+            last_non_space = index;
+        }
     }
     last_non_space
 }
 
 fn scan_block_end(characters: &[char], start: usize, start_line: usize) -> usize {
     let lines: Vec<&[char]> = characters.split(|character| *character == '\n').collect();
-    if start_line == 0 || start_line > lines.len() { return start; }
-    let header_indent = lines[start_line - 1].iter().take_while(|character| **character == ' ').count();
+    if start_line == 0 || start_line > lines.len() {
+        return start;
+    }
+    let header_indent = lines[start_line - 1]
+        .iter()
+        .take_while(|character| **character == ' ')
+        .count();
     let mut current_line = start_line;
     let mut last_end = start;
     while current_line < lines.len() {
         let line = lines[current_line];
-        let indent = line.iter().take_while(|character| **character == ' ').count();
+        let indent = line
+            .iter()
+            .take_while(|character| **character == ' ')
+            .count();
         let content = &line[indent..];
-        if !content.is_empty() && indent <= header_indent { break; }
-        if let Some(last) = content.iter().rposition(|character| !character.is_whitespace()) {
+        if !content.is_empty() && indent <= header_indent {
+            break;
+        }
+        if let Some(last) = content
+            .iter()
+            .rposition(|character| !character.is_whitespace())
+        {
             last_end = line_start_offset(&lines, current_line) + indent + last + 1;
         }
         current_line += 1;
@@ -815,14 +1282,22 @@ fn scan_block_end(characters: &[char], start: usize, start_line: usize) -> usize
 }
 
 fn line_start_offset(lines: &[&[char]], line_index: usize) -> usize {
-    lines.iter().take(line_index).map(|line| line.len() + 1).sum()
+    lines
+        .iter()
+        .take(line_index)
+        .map(|line| line.len() + 1)
+        .sum()
 }
 
 fn position_after(characters: &[char], start: usize, end: usize) -> (usize, usize) {
     let mut line = 1;
     let mut column = 1;
-    for character in &characters[..start.min(characters.len())] { advance_position(*character, &mut line, &mut column); }
-    for character in &characters[start.min(characters.len())..end.min(characters.len())] { advance_position(*character, &mut line, &mut column); }
+    for character in &characters[..start.min(characters.len())] {
+        advance_position(*character, &mut line, &mut column);
+    }
+    for character in &characters[start.min(characters.len())..end.min(characters.len())] {
+        advance_position(*character, &mut line, &mut column);
+    }
     (line, column)
 }
 
@@ -837,11 +1312,16 @@ fn yaml_document(text: &str) -> Result<Yaml, String> {
 }
 
 fn yaml_sequence(value: Option<&Yaml>) -> &[Yaml] {
-    value.and_then(Yaml::as_vec).map(Vec::as_slice).unwrap_or(&[])
+    value
+        .and_then(Yaml::as_vec)
+        .map(Vec::as_slice)
+        .unwrap_or(&[])
 }
 
 fn sort_findings(findings: &mut [Finding]) {
-    findings.sort_by(|left, right| (&left.check, &left.path, &left.detail).cmp(&(&right.check, &right.path, &right.detail)));
+    findings.sort_by(|left, right| {
+        (&left.check, &left.path, &left.detail).cmp(&(&right.check, &right.path, &right.detail))
+    });
 }
 
 /// Extracts canonical public CLI, tool, and skill surfaces with source spans.
@@ -858,7 +1338,11 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
     for relative_path in required_paths {
         let resolved = resolve_repo_path(&root, relative_path);
         if !resolved.is_file() {
-            findings.push(Finding::new("public_surface", relative_path, "missing-input"));
+            findings.push(Finding::new(
+                "public_surface",
+                relative_path,
+                "missing-input",
+            ));
             continue;
         }
         match fs::read_to_string(resolved) {
@@ -866,46 +1350,152 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
             Err(_) => findings.push(Finding::new("public_surface", relative_path, "read-failed")),
         }
     }
-    let text_for = |path: &str| texts.iter().find(|(candidate, _)| *candidate == path).map(|(_, text)| text.as_str());
-    let (Some(main_text), Some(graph_text), Some(cli_text)) = (text_for(main_path), text_for(graph_path), text_for(cli_path)) else {
-        return PublicSurfaceReport { producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(), rows: Vec::new(), findings };
+    let text_for = |path: &str| {
+        texts
+            .iter()
+            .find(|(candidate, _)| *candidate == path)
+            .map(|(_, text)| text.as_str())
+    };
+    let (Some(main_text), Some(graph_text), Some(cli_text)) = (
+        text_for(main_path),
+        text_for(graph_path),
+        text_for(cli_path),
+    ) else {
+        return PublicSurfaceReport {
+            producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(),
+            rows: Vec::new(),
+            findings,
+        };
     };
     let main_tokens = match rust_tokens(main_text) {
         Ok(tokens) => tokens,
         Err(error) => {
-            findings.push(Finding::new("public_surface", "rust-dispatch", format!("rust_dispatch_invalid:{error}")));
-            return PublicSurfaceReport { producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(), rows: Vec::new(), findings };
+            findings.push(Finding::new(
+                "public_surface",
+                "rust-dispatch",
+                format!("rust_dispatch_invalid:{error}"),
+            ));
+            return PublicSurfaceReport {
+                producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(),
+                rows: Vec::new(),
+                findings,
+            };
         }
     };
     let graph_tokens = match rust_tokens(graph_text) {
         Ok(tokens) => tokens,
         Err(error) => {
-            findings.push(Finding::new("public_surface", "rust-dispatch", format!("rust_dispatch_invalid:{error}")));
-            return PublicSurfaceReport { producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(), rows: Vec::new(), findings };
+            findings.push(Finding::new(
+                "public_surface",
+                "rust-dispatch",
+                format!("rust_dispatch_invalid:{error}"),
+            ));
+            return PublicSurfaceReport {
+                producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(),
+                rows: Vec::new(),
+                findings,
+            };
         }
     };
     let mod_matches = token_sequence_matches(&main_tokens, &["mod", "graph", ";"]);
-    let main_sequence = ["if", "args", ".", "len", "(", ")", ">=", "2", "&&", "args", "[", "1", "]", "==", "\"graph\"", "{", "std", "::", "process", "::", "exit", "(", "graph", "::", "run", "(", "&", "args", "[", "2", "..", "]", ")", ")", ";", "}"];
+    let main_sequence = [
+        "if",
+        "args",
+        ".",
+        "len",
+        "(",
+        ")",
+        ">=",
+        "2",
+        "&&",
+        "args",
+        "[",
+        "1",
+        "]",
+        "==",
+        "\"graph\"",
+        "{",
+        "std",
+        "::",
+        "process",
+        "::",
+        "exit",
+        "(",
+        "graph",
+        "::",
+        "run",
+        "(",
+        "&",
+        "args",
+        "[",
+        "2",
+        "..",
+        "]",
+        ")",
+        ")",
+        ";",
+        "}",
+    ];
     let main_matches = token_sequence_matches(&main_tokens, &main_sequence);
     if mod_matches.len() != 1 || main_matches.len() != 1 {
-        let detail = if mod_matches.len() > 1 || main_matches.len() > 1 { "rust_dispatch_ambiguous" } else { "rust_dispatch_invalid" };
+        let detail = if mod_matches.len() > 1 || main_matches.len() > 1 {
+            "rust_dispatch_ambiguous"
+        } else {
+            "rust_dispatch_invalid"
+        };
         findings.push(Finding::new("public_surface", main_path, detail));
-        return PublicSurfaceReport { producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(), rows: Vec::new(), findings };
+        return PublicSurfaceReport {
+            producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(),
+            rows: Vec::new(),
+            findings,
+        };
     }
-    let main_span = token_span(main_path, &main_tokens, main_matches[0], main_sequence.len());
+    let main_span = token_span(
+        main_path,
+        &main_tokens,
+        main_matches[0],
+        main_sequence.len(),
+    );
     let mut rows = Vec::new();
-    for (operation, handler) in [("build", "build_graph_with_failure"), ("status", "read_graph_status"), ("query", "query_graph"), ("context", "context_graph")] {
-        let sequence = [format!("\"{operation}\""), "=>".to_owned(), handler.to_owned(), "(".to_owned(), "&".to_owned(), "parsed".to_owned(), ")".to_owned()];
+    for (operation, handler) in [
+        ("build", "build_graph_with_failure"),
+        ("status", "read_graph_status"),
+        ("query", "query_graph"),
+        ("context", "context_graph"),
+    ] {
+        let sequence = [
+            format!("\"{operation}\""),
+            "=>".to_owned(),
+            handler.to_owned(),
+            "(".to_owned(),
+            "&".to_owned(),
+            "parsed".to_owned(),
+            ")".to_owned(),
+        ];
         let sequence_refs: Vec<&str> = sequence.iter().map(String::as_str).collect();
         let matches = token_sequence_matches(&graph_tokens, &sequence_refs);
         let doc_span = text_phrase_span(cli_path, cli_text, &format!("graph {operation}"));
         if matches.len() != 1 || doc_span.is_none() {
-            let detail = if matches.len() > 1 { "rust_dispatch_ambiguous" } else { "rust_dispatch_invalid" };
-            findings.push(Finding::new("public_surface", graph_path, format!("{detail}:{operation}")));
+            let detail = if matches.len() > 1 {
+                "rust_dispatch_ambiguous"
+            } else {
+                "rust_dispatch_invalid"
+            };
+            findings.push(Finding::new(
+                "public_surface",
+                graph_path,
+                format!("{detail}:{operation}"),
+            ));
             continue;
         }
         let mut secondary = vec![main_span.clone(), doc_span.expect("checked above")];
-        secondary.sort_by(|left, right| (&left.path, left.start_line, left.start_column).cmp(&(&right.path, right.start_line, right.start_column)));
+        secondary.sort_by(|left, right| {
+            (&left.path, left.start_line, left.start_column).cmp(&(
+                &right.path,
+                right.start_line,
+                right.start_column,
+            ))
+        });
         rows.push(PublicSurfaceRow::new(
             format!("cli:graph {operation}"),
             "cli",
@@ -923,20 +1513,52 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
                 match tool_spans {
                     Ok(spans) => {
                         for raw_entry in yaml_sequence(mapping_value(&document, "entries")) {
-                            if map_entries(raw_entry).is_none() || mapping_value(raw_entry, "public").and_then(Yaml::as_bool) != Some(true) { continue; }
-                            let Some(identifier) = mapping_value(raw_entry, "id").and_then(Yaml::as_str) else { continue; };
-                            let Some((_, span)) = spans.iter().find(|(candidate, _)| candidate == identifier) else {
-                                findings.push(Finding::new("public_surface", tool_path, format!("span-missing:{identifier}")));
+                            if map_entries(raw_entry).is_none()
+                                || mapping_value(raw_entry, "public").and_then(Yaml::as_bool)
+                                    != Some(true)
+                            {
+                                continue;
+                            }
+                            let Some(identifier) =
+                                mapping_value(raw_entry, "id").and_then(Yaml::as_str)
+                            else {
                                 continue;
                             };
-                            let selector = mapping_value(raw_entry, "command").and_then(Yaml::as_str).unwrap_or(identifier);
-                            rows.push(PublicSurfaceRow::new(format!("tool:{identifier}"), "tool", span.path.clone(), selector, span.clone(), Vec::new()));
+                            let Some((_, span)) =
+                                spans.iter().find(|(candidate, _)| candidate == identifier)
+                            else {
+                                findings.push(Finding::new(
+                                    "public_surface",
+                                    tool_path,
+                                    format!("span-missing:{identifier}"),
+                                ));
+                                continue;
+                            };
+                            let selector = mapping_value(raw_entry, "command")
+                                .and_then(Yaml::as_str)
+                                .unwrap_or(identifier);
+                            rows.push(PublicSurfaceRow::new(
+                                format!("tool:{identifier}"),
+                                "tool",
+                                span.path.clone(),
+                                selector,
+                                span.clone(),
+                                Vec::new(),
+                            ));
                         }
                     }
-                    Err(error) => findings.push(Finding::new("public_surface", tool_path, format!("yaml-source-invalid:{error}"))),
+                    Err(error) => findings.push(Finding::new(
+                        "public_surface",
+                        tool_path,
+                        format!("yaml-source-invalid:{error}"),
+                    )),
                 }
             }
-            Err(error) => findings.push(Finding::new("public_surface", tool_path, format!("yaml-parse-failed:{error}"))),
+            Err(error) => findings.push(Finding::new(
+                "public_surface",
+                tool_path,
+                format!("yaml-parse-failed:{error}"),
+            )),
         }
     }
     if let Some(text) = text_for(skill_path) {
@@ -946,31 +1568,81 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
                 match skill_spans {
                     Ok(spans) => {
                         for raw_entry in yaml_sequence(mapping_value(&document, "skill_families")) {
-                            if map_entries(raw_entry).is_none() { continue; }
-                            let Some(identifier) = mapping_value(raw_entry, "id").and_then(Yaml::as_str) else { continue; };
-                            let Some((_, span)) = spans.iter().find(|(candidate, _)| candidate == identifier) else {
-                                findings.push(Finding::new("public_surface", skill_path, format!("span-missing:{identifier}")));
+                            if map_entries(raw_entry).is_none() {
+                                continue;
+                            }
+                            let Some(identifier) =
+                                mapping_value(raw_entry, "id").and_then(Yaml::as_str)
+                            else {
                                 continue;
                             };
-                            rows.push(PublicSurfaceRow::new(format!("skill:{identifier}"), "skill", span.path.clone(), identifier, span.clone(), Vec::new()));
+                            let Some((_, span)) =
+                                spans.iter().find(|(candidate, _)| candidate == identifier)
+                            else {
+                                findings.push(Finding::new(
+                                    "public_surface",
+                                    skill_path,
+                                    format!("span-missing:{identifier}"),
+                                ));
+                                continue;
+                            };
+                            rows.push(PublicSurfaceRow::new(
+                                format!("skill:{identifier}"),
+                                "skill",
+                                span.path.clone(),
+                                identifier,
+                                span.clone(),
+                                Vec::new(),
+                            ));
                         }
                     }
-                    Err(error) => findings.push(Finding::new("public_surface", skill_path, format!("yaml-source-invalid:{error}"))),
+                    Err(error) => findings.push(Finding::new(
+                        "public_surface",
+                        skill_path,
+                        format!("yaml-source-invalid:{error}"),
+                    )),
                 }
             }
-            Err(error) => findings.push(Finding::new("public_surface", skill_path, format!("yaml-parse-failed:{error}"))),
+            Err(error) => findings.push(Finding::new(
+                "public_surface",
+                skill_path,
+                format!("yaml-parse-failed:{error}"),
+            )),
         }
     }
-    rows.sort_by(|left, right| (&left.kind, &left.surface_id, &left.source_span.path, left.source_span.start_line).cmp(&(&right.kind, &right.surface_id, &right.source_span.path, right.source_span.start_line)));
+    rows.sort_by(|left, right| {
+        (
+            &left.kind,
+            &left.surface_id,
+            &left.source_span.path,
+            left.source_span.start_line,
+        )
+            .cmp(&(
+                &right.kind,
+                &right.surface_id,
+                &right.source_span.path,
+                right.source_span.start_line,
+            ))
+    });
     let mut seen = BTreeSet::new();
     for row in &rows {
         if !seen.insert(row.surface_id.clone()) {
-            findings.push(Finding::new("public_surface", &row.source_span.path, format!("surface-id-duplicate:{}", row.surface_id)));
+            findings.push(Finding::new(
+                "public_surface",
+                &row.source_span.path,
+                format!("surface-id-duplicate:{}", row.surface_id),
+            ));
         }
     }
     sort_findings(&mut findings);
-    if !findings.is_empty() { rows.clear(); }
-    PublicSurfaceReport { producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(), rows, findings }
+    if !findings.is_empty() {
+        rows.clear();
+    }
+    PublicSurfaceReport {
+        producer_version: PUBLIC_SURFACE_PRODUCER_VERSION.to_owned(),
+        rows,
+        findings,
+    }
 }
 
 /// Renders the stable JSON bundle used by catalog callers.
@@ -984,22 +1656,31 @@ pub fn render_json(report: &CatalogReport, public: Option<&PublicSurfaceReport>)
     payload.insert("schema".to_owned(), json!("agent_canon.catalog_bundle.v1"));
     payload.insert("catalog".to_owned(), catalog);
     if let Some(public) = public {
-        payload.insert("public".to_owned(), json!({
-            "producer_version": &public.producer_version,
-            "status": if public.findings.is_empty() { "pass" } else { "fail" },
-            "findings": &public.findings,
-            "rows": &public.rows,
-        }));
+        payload.insert(
+            "public".to_owned(),
+            json!({
+                "producer_version": &public.producer_version,
+                "status": if public.findings.is_empty() { "pass" } else { "fail" },
+                "findings": &public.findings,
+                "rows": &public.rows,
+            }),
+        );
     }
     serde_json::to_string_pretty(&JsonValue::Object(payload)).expect("catalog JSON serialization")
 }
 
 /// Escapes the only Markdown table delimiter used by the report projection.
-pub fn markdown_cell(value: &str) -> String { value.replace('|', "\\|") }
+pub fn markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|")
+}
 
 /// Renders the catalog validation report and tool crosswalk.
 pub fn render_markdown(report: &CatalogReport) -> String {
-    let status = if report.findings.is_empty() { "pass" } else { "fail" };
+    let status = if report.findings.is_empty() {
+        "pass"
+    } else {
+        "fail"
+    };
     let mut lines = vec![
         "# AgentCanon Tool Catalog".to_owned(),
         String::new(),
@@ -1009,17 +1690,46 @@ pub fn render_markdown(report: &CatalogReport) -> String {
         String::new(),
     ];
     if !report.findings.is_empty() {
-        lines.extend(["## Findings".to_owned(), String::new(), "| Check | Path | Detail |".to_owned(), "| ----- | ---- | ------ |".to_owned()]);
+        lines.extend([
+            "## Findings".to_owned(),
+            String::new(),
+            "| Check | Path | Detail |".to_owned(),
+            "| ----- | ---- | ------ |".to_owned(),
+        ]);
         for finding in &report.findings {
-            lines.push(format!("| {} | `{}` | {} |", markdown_cell(&finding.check), markdown_cell(&finding.path), markdown_cell(&finding.detail)));
+            lines.push(format!(
+                "| {} | `{}` | {} |",
+                markdown_cell(&finding.check),
+                markdown_cell(&finding.path),
+                markdown_cell(&finding.detail)
+            ));
         }
         lines.push(String::new());
     }
-    lines.extend(["## Tool Crosswalk".to_owned(), String::new(), "| ID | Family | Audience | Placement | Status | Default | Path | Summary |".to_owned(), "| -- | ------ | -------- | --------- | ------ | ------- | ---- | ------- |".to_owned()]);
+    lines.extend([
+        "## Tool Crosswalk".to_owned(),
+        String::new(),
+        "| ID | Family | Audience | Placement | Status | Default | Path | Summary |".to_owned(),
+        "| -- | ------ | -------- | --------- | ------ | ------- | ---- | ------- |".to_owned(),
+    ]);
     for entry in &report.entries {
-        let default = [entry.ci.then_some("ci"), entry.pr_check.then_some("pr")].into_iter().flatten().collect::<Vec<_>>().join(",");
+        let default = [entry.ci.then_some("ci"), entry.pr_check.then_some("pr")]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join(",");
         let default = if default.is_empty() { "-" } else { &default };
-        lines.push(format!("| `{}` | {} | {} | {} | {} | {} | `{}` | {} |", markdown_cell(&entry.tool_id), markdown_cell(&entry.family), markdown_cell(&entry.audience), markdown_cell(&entry.placement), markdown_cell(&entry.status), markdown_cell(default), markdown_cell(&entry.path), markdown_cell(&entry.summary)));
+        lines.push(format!(
+            "| `{}` | {} | {} | {} | {} | {} | `{}` | {} |",
+            markdown_cell(&entry.tool_id),
+            markdown_cell(&entry.family),
+            markdown_cell(&entry.audience),
+            markdown_cell(&entry.placement),
+            markdown_cell(&entry.status),
+            markdown_cell(default),
+            markdown_cell(&entry.path),
+            markdown_cell(&entry.summary)
+        ));
     }
     lines.join("\n")
 }
