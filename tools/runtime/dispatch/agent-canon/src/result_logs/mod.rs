@@ -642,7 +642,7 @@ impl Counter {
         }
         let mut sorted = self.0.clone();
         // Stable sorting preserves Counter.most_common's first-seen tie order.
-        sorted.sort_by(|left, right| right.1.cmp(&left.1));
+        sorted.sort_by_key(|entry| std::cmp::Reverse(entry.1));
         if let Some(limit) = limit {
             let entry_count = BigInt::from(sorted.len());
             if limit < &entry_count {
