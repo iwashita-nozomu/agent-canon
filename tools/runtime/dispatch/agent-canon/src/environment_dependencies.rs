@@ -1588,12 +1588,12 @@ fn validate_record_values(record: &DependencyRecord) -> Result<()> {
             "{id}.package has an unsupported value"
         )));
     }
-    if record.method == Method::AptRepository {
-        if record.key_fingerprint.is_none() || record.key_url.is_none() {
-            return Err(DependencyError::new(format!(
-                "{id}: apt-repository requires key_url and key_fingerprint"
-            )));
-        }
+    if record.method == Method::AptRepository
+        && (record.key_fingerprint.is_none() || record.key_url.is_none())
+    {
+        return Err(DependencyError::new(format!(
+            "{id}: apt-repository requires key_url and key_fingerprint"
+        )));
     }
     if record.method == Method::AptPackage
         && !matches(r"^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$", &record.source)
@@ -2453,15 +2453,15 @@ fn run_command(
             "{record_id}: shell execution is forbidden in {operation}"
         )));
     }
-    probe.execute(
-        argv,
-        workspace,
-        path_override,
-        None,
-        false,
-        operation,
-        record_id,
-    )
+    probe.execute(&CommandInvocation {
+        argv: argv.iter().map(|argument| argument.to_string()).collect(),
+        workspace: workspace.to_path_buf(),
+        path: path_override.map(str::to_string),
+        cargo_home: None,
+        clear_rustup_overrides: false,
+        operation: operation.to_string(),
+        record_id: record_id.to_string(),
+    })
 }
 
 fn command_output(output: Output, record_id: &str, operation: &str) -> Result<CommandOutput> {
@@ -2491,14 +2491,15 @@ struct CommandOutput {
     stderr: String,
 }
 
-#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CommandInvocation {
     argv: Vec<String>,
+    workspace: PathBuf,
     path: Option<String>,
     cargo_home: Option<String>,
     clear_rustup_overrides: bool,
     operation: String,
+    record_id: String,
 }
 
 #[cfg(test)]
@@ -2653,58 +2654,43 @@ impl ProbeEnvironment {
         }
     }
 
-    fn execute(
-        &self,
-        argv: &[&str],
-        workspace: &Path,
-        path_override: Option<&str>,
-        cargo_home_override: Option<&str>,
-        clear_rustup_overrides: bool,
-        operation: &str,
-        record_id: &str,
-    ) -> Result<CommandOutput> {
+    fn execute(&self, invocation: &CommandInvocation) -> Result<CommandOutput> {
         match &self.command_runner {
             CommandRunner::System => {
-                let mut process = Command::new(argv[0]);
-                process.args(&argv[1..]).current_dir(workspace);
-                if let Some(path) = path_override {
+                let mut process = Command::new(&invocation.argv[0]);
+                process
+                    .args(&invocation.argv[1..])
+                    .current_dir(&invocation.workspace);
+                if let Some(path) = &invocation.path {
                     process.env("PATH", path);
                 }
-                if let Some(cargo_home) = cargo_home_override {
+                if let Some(cargo_home) = &invocation.cargo_home {
                     process.env("CARGO_HOME", cargo_home);
                 }
-                if clear_rustup_overrides {
+                if invocation.clear_rustup_overrides {
                     process.env_remove("RUSTUP_TOOLCHAIN");
                     process.env_remove("ELAN_TOOLCHAIN");
                 }
                 let output = process.output().map_err(|error| {
                     DependencyError::new(format!(
-                        "{record_id}: {operation} command failed to start: {error}"
+                        "{}: {} command failed to start: {error}",
+                        invocation.record_id, invocation.operation
                     ))
                 })?;
-                command_output(output, record_id, operation)
+                command_output(output, &invocation.record_id, &invocation.operation)
             }
             #[cfg(test)]
             CommandRunner::Fake(runner) => {
-                let owned_argv = argv
-                    .iter()
-                    .map(|value| value.to_string())
-                    .collect::<Vec<_>>();
-                runner.invocations.borrow_mut().push(CommandInvocation {
-                    argv: owned_argv.clone(),
-                    path: path_override.map(str::to_string),
-                    cargo_home: cargo_home_override.map(str::to_string),
-                    clear_rustup_overrides,
-                    operation: operation.to_string(),
-                });
+                runner.invocations.borrow_mut().push(invocation.clone());
                 runner
                     .responses
                     .borrow_mut()
-                    .get_mut(&owned_argv)
+                    .get_mut(&invocation.argv)
                     .and_then(VecDeque::pop_front)
                     .ok_or_else(|| {
                         DependencyError::new(format!(
-                            "{record_id}: unexpected test provider command for {operation}"
+                            "{}: unexpected test provider command for {}",
+                            invocation.record_id, invocation.operation
                         ))
                     })
             }
@@ -3215,15 +3201,15 @@ fn run_rust_command(
             "command argv contains an empty or control-character token",
         ));
     }
-    probe.execute(
-        argv,
-        workspace,
-        Some(path),
-        Some(cargo_home),
-        true,
-        operation,
-        record_id,
-    )
+    probe.execute(&CommandInvocation {
+        argv: argv.iter().map(|argument| argument.to_string()).collect(),
+        workspace: workspace.to_path_buf(),
+        path: Some(path.to_string()),
+        cargo_home: Some(cargo_home.to_string()),
+        clear_rustup_overrides: true,
+        operation: operation.to_string(),
+        record_id: record_id.to_string(),
+    })
 }
 
 fn executable_bindings(
