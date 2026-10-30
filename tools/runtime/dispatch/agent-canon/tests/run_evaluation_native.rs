@@ -32,6 +32,7 @@ impl Fixture {
             std::process::id()
         ));
         fs::create_dir_all(&path).unwrap();
+        let path = fs::canonicalize(path).unwrap();
         Self(path)
     }
 
