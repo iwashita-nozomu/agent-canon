@@ -43,6 +43,7 @@ mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
 mod skill_projection_registry;
+pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
@@ -188,3 +189,6 @@ fn main() {
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
 }
+
+#[cfg(test)]
+mod source_dependency_tests;

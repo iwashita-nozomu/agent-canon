@@ -1,12 +1,4 @@
-#[path = "../src/dependency_manifest.rs"]
-mod dependency_manifest;
-#[path = "../src/skill_projection_registry.rs"]
-mod skill_projection_registry;
-#[path = "../src/source_dependency_graph.rs"]
-mod source_dependency_graph;
-#[path = "../src/surface_manifest.rs"]
-mod surface_manifest;
-
+use crate::source_dependency_graph;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs;
