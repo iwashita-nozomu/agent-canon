@@ -134,6 +134,23 @@ fn external_runtime_root_writes_atomically_and_rejects_source_escape() {
         b"runtime\n"
     );
     assert_eq!(fs::read(source.join("tracked.txt")).unwrap(), source_before);
+    let mode_target = boundary
+        .atomic_write_bytes(Path::new("tasks/run/mode.txt"), b"mode\n", 0o640)
+        .expect("publish artifact with requested mode");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(mode_target)
+                .expect("stat mode fixture")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o640
+        );
+    }
+    #[cfg(not(unix))]
+    let _ = mode_target;
     assert_eq!(
         boundary
             .digest(Path::new("tasks/run/receipt.json"))
@@ -184,6 +201,29 @@ fn external_runtime_root_writes_atomically_and_rejects_source_escape() {
             .is_err());
         assert!(!outside.join("escape.json").exists());
     }
+}
+
+#[test]
+fn explicit_tilde_runtime_root_resolves_to_current_home_without_writing_there() {
+    let temp = TempTree::new("tilde-root");
+    let source = temp.0.join("source");
+    fs::create_dir_all(&source).expect("create source fixture");
+    #[cfg(windows)]
+    let home = std::env::var_os("USERPROFILE")
+        .or_else(|| {
+            let mut drive = std::env::var_os("HOMEDRIVE").unwrap_or_default();
+            drive.push(std::env::var_os("HOMEPATH")?);
+            Some(drive)
+        })
+        .expect("current home root");
+    #[cfg(not(windows))]
+    let home = std::env::var_os("HOME").expect("current home root");
+    let expected = fs::canonicalize(PathBuf::from(home)).expect("canonicalize current home");
+
+    let boundary = RuntimeArtifactBoundary::for_source(&source, Some(Path::new("~")), false)
+        .expect("resolve explicit current-home runtime root");
+
+    assert_eq!(boundary.root(), expected.as_path());
 }
 
 #[test]
@@ -263,12 +303,8 @@ fn source_runtime_alias_and_external_spool_paths_are_rejected_or_restricted() {
 #[test]
 fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
     let temp = TempTree::new("environment");
-    let source = temp.0.join("source");
-    let target = temp.0.join("target");
     let runtime = temp.0.join("runtime");
-    for root in [&source, &target, &runtime] {
-        fs::create_dir_all(root).expect("create environment root");
-    }
+    fs::create_dir_all(&runtime).expect("create environment root");
     let base = BTreeMap::from([
         ("PATH".to_string(), "/usr/bin".to_string()),
         ("LANG".to_string(), "C.UTF-8".to_string()),
@@ -284,8 +320,9 @@ fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
         ),
         ("GITHUB_TOKEN".to_string(), "fixture-token".to_string()),
     ]);
-    let child = root_capability_environment(&source, &runtime, Some(&base), Some(&target))
-        .expect("build filtered child environment");
+    let child =
+        root_capability_environment(Path::new("~"), &runtime, Some(&base), Some(Path::new("~/")))
+            .expect("build filtered child environment from current-home paths");
 
     assert_eq!(child.get("PATH").map(String::as_str), Some("/usr/bin"));
     assert_eq!(child.get("LANG").map(String::as_str), Some("C.UTF-8"));
@@ -304,7 +341,10 @@ fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
     let parent: Value = serde_json::from_str(&child["AGENT_CANON_PARENT_ROOT_CAPABILITY"])
         .expect("parse parent root identity metadata");
     assert_eq!(parent["kind"], "parent-root");
-    assert_eq!(parent["root"], source.to_str().unwrap());
+    let root = parent["root"].as_str().expect("canonical home root string");
+    assert_eq!(child["AGENT_CANON_PARENT_ROOT"].as_str(), Some(root));
+    assert_eq!(child["AGENT_CANON_TARGET_ROOT"].as_str(), Some(root));
+    assert!(Path::new(root).is_absolute());
     assert!(parent["dev"].as_str().is_some());
     assert!(parent["ino"].as_str().is_some());
 }

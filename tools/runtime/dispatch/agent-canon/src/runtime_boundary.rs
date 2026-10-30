@@ -14,13 +14,52 @@ use std::path::{Component, Path, PathBuf};
 
 pub(crate) const RUNTIME_ROOT_ENV: &str = "AGENT_CANON_RUNTIME_ROOT";
 
+fn current_home_directory() -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    let home = env::var_os("USERPROFILE").or_else(|| {
+        let mut drive = env::var_os("HOMEDRIVE").unwrap_or_default();
+        drive.push(env::var_os("HOMEPATH")?);
+        Some(drive)
+    });
+    #[cfg(not(windows))]
+    let home = env::var_os("HOME");
+    home.map(PathBuf::from)
+        .filter(|home| home.is_absolute())
+        .ok_or_else(|| "home directory unavailable for explicit ~ path".to_string())
+}
+
+/// Expand only the current-user `~` form; named-user lookup is deliberately unsupported.
+fn expand_user_path(path: &Path) -> Result<PathBuf, String> {
+    let Some(value) = path.to_str() else {
+        return Ok(path.to_path_buf());
+    };
+    let suffix = if value == "~" {
+        Some("")
+    } else if let Some(suffix) = value.strip_prefix("~/") {
+        Some(suffix)
+    } else if cfg!(windows) {
+        value.strip_prefix("~\\")
+    } else {
+        None
+    };
+    if suffix.is_none() && value.starts_with('~') {
+        return Err("named-user home expansion is unsupported".to_string());
+    }
+    match suffix {
+        Some(suffix) => Ok(current_home_directory()?
+            .join(suffix.trim_start_matches(|character| character == '/' || character == '\\'))),
+        None => Ok(path.to_path_buf()),
+    }
+}
+
 pub(crate) fn runtime_root_is_explicit() -> bool {
     env::var_os(RUNTIME_ROOT_ENV).is_some_and(|value| !value.is_empty())
 }
 
 #[cfg(test)]
 pub(crate) fn test_runtime_root_path(source_root: &Path) -> Result<PathBuf, String> {
-    let source = fs::canonicalize(source_root).map_err(|error| {
+    let source_root = expand_user_path(source_root)?;
+    let source = fs::canonicalize(&source_root).map_err(|error| {
         format!(
             "canonicalize source root {}: {error}",
             source_root.display()
@@ -42,11 +81,12 @@ fn test_runtime_root_for_source(source: &Path) -> Result<PathBuf, String> {
 }
 
 fn absolute(path: &Path) -> Result<PathBuf, String> {
+    let path = expand_user_path(path)?;
     if path.is_absolute() {
-        Ok(path.to_path_buf())
+        Ok(path)
     } else {
         env::current_dir()
-            .map(|cwd| cwd.join(path))
+            .map(|cwd| cwd.join(&path))
             .map_err(|error| format!("resolve {}: {error}", path.display()))
     }
 }
@@ -88,7 +128,8 @@ pub(crate) fn resolve_runtime_root_at(
     source_root: &Path,
     requested: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    let source = fs::canonicalize(source_root).map_err(|error| {
+    let source_root = expand_user_path(source_root)?;
+    let source = fs::canonicalize(&source_root).map_err(|error| {
         format!(
             "canonicalize source root {}: {error}",
             source_root.display()
@@ -160,13 +201,15 @@ pub(crate) fn validate_external_target(
     target: &Path,
     label: &str,
 ) -> Result<PathBuf, String> {
-    let source = fs::canonicalize(source_root).map_err(|error| {
+    let source_root = expand_user_path(source_root)?;
+    let runtime_root = expand_user_path(runtime_root)?;
+    let source = fs::canonicalize(&source_root).map_err(|error| {
         format!(
             "canonicalize source root {}: {error}",
             source_root.display()
         )
     })?;
-    let runtime = fs::canonicalize(runtime_root).map_err(|error| {
+    let runtime = fs::canonicalize(&runtime_root).map_err(|error| {
         format!(
             "canonicalize runtime root {}: {error}",
             runtime_root.display()
@@ -447,11 +490,6 @@ impl RuntimeDirectory {
             }
         };
         let result = (|| {
-            #[cfg(unix)]
-            {
-                use cap_std::fs::PermissionsExt;
-                file.set_permissions(cap_std::fs::Permissions::from_mode(mode))?;
-            }
             file.write_all(bytes)?;
             file.sync_all()?;
             drop(file);
@@ -480,6 +518,8 @@ impl RuntimeDirectory {
         bytes: &[u8],
         mode: u32,
     ) -> std::io::Result<()> {
+        #[cfg(not(unix))]
+        let _ = mode;
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
@@ -519,6 +559,11 @@ impl RuntimeDirectory {
             }
         };
         let result = (|| {
+            #[cfg(unix)]
+            {
+                use cap_std::fs::PermissionsExt;
+                file.set_permissions(cap_std::fs::Permissions::from_mode(mode))?;
+            }
             file.write_all(bytes)?;
             file.sync_all()?;
             drop(file);
@@ -715,7 +760,8 @@ impl RuntimeArtifactBoundary {
         requested: Option<&Path>,
         create: bool,
     ) -> Result<Self, String> {
-        let source = fs::canonicalize(source_root).map_err(|error| {
+        let source_root = expand_user_path(source_root)?;
+        let source = fs::canonicalize(&source_root).map_err(|error| {
             format!(
                 "source root is unavailable: {}: {error}",
                 source_root.display()
@@ -753,7 +799,8 @@ impl RuntimeArtifactBoundary {
         requested: Option<&Path>,
         create: bool,
     ) -> Result<Self, String> {
-        let source = fs::canonicalize(source_root).map_err(|error| {
+        let source_root = expand_user_path(source_root)?;
+        let source = fs::canonicalize(&source_root).map_err(|error| {
             format!(
                 "source root is unavailable: {}: {error}",
                 source_root.display()
@@ -774,6 +821,7 @@ impl RuntimeArtifactBoundary {
                     "explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
                 )
             })?;
+        let requested = expand_user_path(&requested)?;
         if !requested.is_absolute() {
             return Err(format!(
                 "runtime root must be absolute: {}",
@@ -998,15 +1046,16 @@ impl RuntimeSpoolBoundary {
 }
 
 fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Result<PathBuf, String> {
+    let requested = expand_user_path(requested)?;
     if !requested.is_absolute() {
         return Err(format!(
             "runtime root must be absolute: {}",
             requested.display()
         ));
     }
-    reject_symlink_components(requested, Path::new("/"))?;
-    let normalized = normalize_absolute_path(requested);
-    let existing_parent = canonical_existing_parent(requested).map_err(|error| {
+    reject_symlink_components(&requested, Path::new("/"))?;
+    let normalized = normalize_absolute_path(&requested);
+    let existing_parent = canonical_existing_parent(&requested).map_err(|error| {
         format!(
             "runtime root is unavailable: {}: {error}",
             requested.display()
@@ -1129,19 +1178,22 @@ pub(crate) fn root_capability_environment(
     base_env: Option<&BTreeMap<String, String>>,
     target_root: Option<&Path>,
 ) -> Result<BTreeMap<String, String>, String> {
-    let parent = fs::canonicalize(source_root).map_err(|error| {
+    let source_root = expand_user_path(source_root)?;
+    let target_root = expand_user_path(target_root.unwrap_or(&source_root))?;
+    let runtime_root = expand_user_path(runtime_root)?;
+    let parent = fs::canonicalize(&source_root).map_err(|error| {
         format!(
             "root capability is unavailable: {}: {error}",
             source_root.display()
         )
     })?;
-    let target = fs::canonicalize(target_root.unwrap_or(source_root)).map_err(|error| {
+    let target = fs::canonicalize(&target_root).map_err(|error| {
         format!(
             "root capability is unavailable: {}: {error}",
-            target_root.unwrap_or(source_root).display()
+            target_root.display()
         )
     })?;
-    let runtime = fs::canonicalize(runtime_root).map_err(|error| {
+    let runtime = fs::canonicalize(&runtime_root).map_err(|error| {
         format!(
             "root capability is unavailable: {}: {error}",
             runtime_root.display()
@@ -1235,6 +1287,19 @@ pub(crate) fn root_capability_environment(
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn expands_only_explicit_current_home_paths() {
+        let home = current_home_directory().expect("current home directory");
+        assert_eq!(
+            expand_user_path(Path::new("~/runtime-fixture")).unwrap(),
+            home.join("runtime-fixture")
+        );
+        assert_eq!(
+            expand_user_path(Path::new("~named-user/runtime-fixture")).unwrap_err(),
+            "named-user home expansion is unsupported"
+        );
+    }
 
     #[test]
     fn rejects_source_and_symlink_escape() {
