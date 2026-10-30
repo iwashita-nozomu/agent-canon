@@ -1912,7 +1912,7 @@ fn write_cli_help<W: std::io::Write>(output: &mut W) -> std::io::Result<()> {
     writeln!(output, "  --format {{text,json,markdown}}")
 }
 
-pub(crate) fn run_with_io<W: std::io::Write, E: std::io::Write>(
+fn run_with_io<W: std::io::Write, E: std::io::Write>(
     args: &[String],
     stdout: &mut W,
     stderr: &mut E,

@@ -4,10 +4,7 @@
 // upstream implementation ../src/catalog/mod.rs native catalog core under test
 // @dependency-end
 
-#[path = "../src/catalog/mod.rs"]
-mod catalog;
-#[path = "../src/tool_proof_coverage.rs"]
-mod tool_proof_coverage;
+use agent_canon::{catalog, tool_proof_coverage};
 
 use catalog::path_policy::{self, LEGACY_TOKEN_RE};
 use catalog::skill_routes::{
@@ -17,11 +14,12 @@ use catalog::skill_routes::{
 };
 use catalog::tool_catalog::{
     as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface,
-    referenced_tool_paths_from_text, render_json, render_markdown, resolve_repo_path, run_with_io,
-    rust_tokens, token_sequence_matches, validate_catalog, yaml_id_spans, TOOL_REFERENCE_RE,
+    referenced_tool_paths_from_text, render_json, render_markdown, resolve_repo_path, rust_tokens,
+    token_sequence_matches, validate_catalog, yaml_id_spans, TOOL_REFERENCE_RE,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use yaml_rust2::YamlLoader;
@@ -60,6 +58,19 @@ impl Drop for TempRoot {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
+}
+
+fn run_native_cli(root: &Path, args: &[&str]) -> Output {
+    let mut command_args = vec![
+        "tool-catalog".to_owned(),
+        "--root".to_owned(),
+        root.display().to_string(),
+    ];
+    command_args.extend(args.iter().map(|argument| (*argument).to_owned()));
+    Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args(command_args)
+        .output()
+        .expect("native catalog CLI starts")
 }
 
 #[test]
@@ -391,47 +402,32 @@ fn default_reference_pattern_excludes_test_paths_and_keeps_tool_paths() {
 #[test]
 fn catalog_cli_adapter_preserves_existing_output_contract() {
     let root = valid_tool_catalog_root();
-    let args = [
-        "--root".to_owned(),
-        root.path().display().to_string(),
-        "--format".to_owned(),
-        "markdown".to_owned(),
-    ];
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    assert_eq!(run_with_io(&args, &mut stdout, &mut stderr), 0);
-    assert!(String::from_utf8(stdout)
+    let markdown = run_native_cli(root.path(), &["--format", "markdown"]);
+    assert_eq!(
+        markdown.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&markdown.stderr)
+    );
+    assert!(String::from_utf8(markdown.stdout)
         .unwrap()
         .contains("# AgentCanon Tool Catalog"));
-    assert!(stderr.is_empty());
 
-    let text_args = ["--root".to_owned(), root.path().display().to_string()];
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    assert_eq!(run_with_io(&text_args, &mut stdout, &mut stderr), 1);
-    assert!(String::from_utf8(stdout)
+    let text = run_native_cli(root.path(), &[]);
+    assert_eq!(text.status.code(), Some(1));
+    assert!(String::from_utf8(text.stdout)
         .unwrap()
         .contains("TOOL_CATALOG_FINDINGS=4\nTOOL_CATALOG=fail"));
-    assert!(stderr.is_empty());
 
-    let json_args = [
-        "--root".to_owned(),
-        root.path().display().to_string(),
-        "--format=json".to_owned(),
-    ];
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    assert_eq!(run_with_io(&json_args, &mut stdout, &mut stderr), 1);
-    let json = String::from_utf8(stdout).unwrap();
+    let json_output = run_native_cli(root.path(), &["--format=json"]);
+    assert_eq!(json_output.status.code(), Some(1));
+    let json = String::from_utf8(json_output.stdout).unwrap();
     assert!(json.contains("agent_canon.catalog_bundle.v1"));
     assert!(json.contains("public-surface.v1"));
-    assert!(stderr.is_empty());
 
-    let invalid_args = ["--format".to_owned(), "yaml".to_owned()];
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    assert_eq!(run_with_io(&invalid_args, &mut stdout, &mut stderr), 2);
-    assert!(String::from_utf8(stderr)
+    let invalid = run_native_cli(root.path(), &["--format", "yaml"]);
+    assert_eq!(invalid.status.code(), Some(2));
+    assert!(String::from_utf8(invalid.stderr)
         .unwrap()
         .contains("invalid choice: 'yaml'"));
 }

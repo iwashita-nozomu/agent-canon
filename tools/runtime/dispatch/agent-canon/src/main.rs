@@ -21,7 +21,6 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // @dependency-end
 
-pub mod catalog;
 mod check_merge_structure;
 mod config;
 mod dependency_headers;
@@ -48,8 +47,8 @@ mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
-pub mod tool_proof_coverage;
 
+use agent_canon::{catalog, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
