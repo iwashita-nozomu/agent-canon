@@ -457,6 +457,28 @@ def validate_retired_command_or_skill(value: str, child: str) -> None:
             f"retired route {child} command path is not a catalog-backed canonical tool: {tool_path}",
         )
         return
+    native_command = re.fullmatch(
+        r"command-only:tools/bin/agent-canon ([a-z0-9][a-z0-9-]*|--[a-z][a-z0-9-]*)",
+        value,
+    )
+    if native_command:
+        from tools.runtime.dispatch.tool_dispatch import load_specs
+
+        selector = native_command.group(1)
+        specs, _schema = load_specs(ROOT)
+        matching_specs = [
+            spec
+            for spec in specs.values()
+            if spec.runtime == "rust"
+            and len(spec.argv) >= 2
+            and spec.argv[0] == "tools/bin/agent-canon"
+            and spec.argv[1] == selector
+        ]
+        ensure(
+            bool(matching_specs),
+            f"retired route {child} native selector is not a catalog-backed canonical tool: {selector}",
+        )
+        return
     grammar = re.compile(
         r"(?:skill-only:\$[a-z0-9][a-z0-9-]*|docs-only:tools/bin/agent-canon docs check)$"
     )
