@@ -27,6 +27,7 @@ yaml-rust2 = "0.11"
 toml_edit = { version = "0.25.15", features = ["serde"] }
 pathdiff = "0.2.3"
 cap-std = "=4.0.3"
+cap-primitives = "=4.0.3"
 cap-fs-ext = "=4.0.3"
 regex = "=1.12.2"
 time = { version = "=0.3.47", features = ["formatting"] }

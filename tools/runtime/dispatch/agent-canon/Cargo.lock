@@ -7,6 +7,7 @@ name = "agent-canon"
 version = "0.1.0"
 dependencies = [
  "cap-fs-ext",
+ "cap-primitives",
  "cap-std",
  "pathdiff",
  "regex",
