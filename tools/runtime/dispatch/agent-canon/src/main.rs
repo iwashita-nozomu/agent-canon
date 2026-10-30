@@ -4,6 +4,8 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
+// upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
+// downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation docs.rs routes unified documentation formatting and checks
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -20,6 +22,7 @@
 // downstream implementation rust_migration_plan.rs prints sequential Rust migration candidates
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
+// downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
@@ -33,7 +36,7 @@ mod graph;
 mod jit_ir_to_lean;
 pub mod log_surface_inventory;
 mod migration_audit;
-mod private_feedback;
+mod notebook_quality;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -45,7 +48,6 @@ mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod result_logs;
 mod rule_inventory;
-mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
 pub mod skill_document_reader;
@@ -54,6 +56,8 @@ mod structured_analysis;
 mod surface_manifest;
 mod test_design;
 
+#[cfg(not(test))]
+use agent_canon::runtime_boundary;
 use agent_canon::{catalog, tool_proof_coverage};
 use std::env;
 
@@ -69,6 +73,7 @@ Commands:
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
@@ -169,7 +174,7 @@ fn main() {
     }
 
     if args.len() >= 2 && matches!(args[1].as_str(), "knowledge" | "k" | "feedback" | "f") {
-        std::process::exit(private_feedback::run(&args[1..]));
+        std::process::exit(agent_canon::private_feedback::run(&args[1..]));
     }
 
     if args.len() >= 2 && args[1] == "graph" {
@@ -198,6 +203,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "test-design" {
         std::process::exit(test_design::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "notebook-quality" {
+        std::process::exit(notebook_quality::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-merge-structure" {
@@ -235,4 +244,38 @@ fn main() {
     eprintln!("agent-canon: unknown or missing command");
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod runtime_boundary {
+    use std::path::{Path, PathBuf};
+
+    pub(crate) use agent_canon::runtime_boundary::{
+        runtime_root_is_explicit, stable_source_key, test_runtime_root_path,
+        validate_external_target, RUNTIME_ROOT_ENV,
+    };
+
+    // Cargo builds the library as a normal dependency of the binary test target, without `cfg(test)`.
+    // Preserve only the binary test fixture selection and delegate all resolution to the library.
+    pub(crate) fn resolve_runtime_root(source_root: &Path) -> Result<PathBuf, String> {
+        resolve_runtime_root_at(source_root, None)
+    }
+
+    pub(crate) fn resolve_runtime_root_at(
+        source_root: &Path,
+        requested: Option<&Path>,
+    ) -> Result<PathBuf, String> {
+        match requested {
+            Some(requested) => {
+                agent_canon::runtime_boundary::resolve_runtime_root_at(source_root, Some(requested))
+            }
+            None => {
+                let test_root = test_runtime_root_path(source_root)?;
+                agent_canon::runtime_boundary::resolve_runtime_root_at(
+                    source_root,
+                    Some(&test_root),
+                )
+            }
+        }
+    }
 }
