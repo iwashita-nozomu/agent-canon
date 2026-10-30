@@ -3,26 +3,33 @@
 # @dependency-start
 # contract test
 # responsibility Tests helper function inventory and role inference.
-# upstream implementation ../../tools/analysis/code/helper_function_inventory.py inventories helper roles
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs inventories helper roles
 # upstream design ../../documents/tools/README.md documents tool entrypoints
 # @dependency-end
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from textwrap import dedent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-INVENTORY = PROJECT_ROOT / "tools" / "analysis" / "code" / "helper_function_inventory.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+AGENT_CANON_PREFIX = [AGENT_CANON_CLI or "", "helper-function-inventory"]
 
 
 class HelperFunctionInventoryTest(unittest.TestCase):
     """Verify helper candidate and role reports."""
+
+    def setUp(self) -> None:
+        self.assertIsNotNone(
+            AGENT_CANON_CLI,
+            "AGENT_CANON_CLI must select the current native executable",
+        )
 
     def test_role_inference_uses_static_body_facts(self) -> None:
         """Roles should reflect AST/call facts, not only function names."""
@@ -66,8 +73,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -100,10 +106,14 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(records["build_parser"]["role"], "cli_parser")
             self.assertFalse(records["execute"]["helper_candidate"])
             self.assertTrue(records["execute"]["needs_user_judgment"])
-            self.assertEqual(records["execute"]["judgment_rule"], "main:public-local-command_runner")
+            self.assertEqual(
+                records["execute"]["judgment_rule"], "main:public-local-command_runner"
+            )
             self.assertFalse(records["build_parser"]["helper_candidate"])
             self.assertTrue(records["build_parser"]["needs_user_judgment"])
-            self.assertEqual(records["build_parser"]["judgment_rule"], "main:public-local-cli_parser")
+            self.assertEqual(
+                records["build_parser"]["judgment_rule"], "main:public-local-cli_parser"
+            )
 
     def test_all_functions_reports_public_api(self) -> None:
         """The all-functions mode should include non-helper public functions."""
@@ -116,8 +126,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -139,7 +148,9 @@ class HelperFunctionInventoryTest(unittest.TestCase):
         """Changed baseline mode should hide findings already present at HEAD."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "init"], cwd=root, check=True, capture_output=True, text=True
+            )
             subprocess.run(
                 ["git", "config", "user.email", "agent@example.invalid"],
                 cwd=root,
@@ -165,7 +176,13 @@ class HelperFunctionInventoryTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(["git", "add", "sample.py"], cwd=root, check=True)
-            subprocess.run(["git", "commit", "-m", "baseline"], cwd=root, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["git", "commit", "-m", "baseline"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             source.write_text(
                 "\n".join(
                     [
@@ -188,8 +205,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--changed",
@@ -212,9 +228,14 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             records = {record["qualname"]: record for record in payload["records"]}
             self.assertNotIn("_ready", records)
             self.assertEqual(records["_format"]["role"], "formatter_reporter")
-            self.assertEqual(records["_format"]["candidate_rule"], "main:private-local-formatter_reporter")
+            self.assertEqual(
+                records["_format"]["candidate_rule"],
+                "main:private-local-formatter_reporter",
+            )
 
-    def test_public_names_without_functional_evidence_are_not_default_helpers(self) -> None:
+    def test_public_names_without_functional_evidence_are_not_default_helpers(
+        self,
+    ) -> None:
         """Names alone should not make public main-code helpers."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -234,8 +255,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -285,8 +305,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -300,7 +319,10 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            records = {
+                record["qualname"]: record
+                for record in json.loads(result.stdout)["records"]
+            }
             self.assertEqual(records["_residual_score"]["incoming_count"], 4)
             self.assertEqual(records["_residual_score"]["role"], "numeric_kernel")
             self.assertFalse(records["_residual_score"]["helper_candidate"])
@@ -339,8 +361,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -359,9 +380,15 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(records["LocalMetrics"]["domain"], "main")
             self.assertFalse(records["LocalMetrics"]["helper_candidate"])
             self.assertTrue(records["LocalMetrics"]["needs_user_judgment"])
-            self.assertEqual(records["LocalMetrics"]["judgment_rule"], "main:public-local-data_container")
+            self.assertEqual(
+                records["LocalMetrics"]["judgment_rule"],
+                "main:public-local-data_container",
+            )
             self.assertEqual(records["_InternalInfo"]["role"], "data_container")
-            self.assertIn("candidate-rule:main:private-local-data_container", records["_InternalInfo"]["evidence"])
+            self.assertIn(
+                "candidate-rule:main:private-local-data_container",
+                records["_InternalInfo"]["evidence"],
+            )
             self.assertNotIn("PublicInfo", records)
 
     def test_protocol_interfaces_are_not_reported_as_helpers(self) -> None:
@@ -392,14 +419,21 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             default_result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root), "--format", "json"],
+                [*AGENT_CANON_PREFIX, "--root", str(root), "--format", "json"],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
             )
             all_result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root), "--all-functions", "--format", "json"],
+                [
+                    *AGENT_CANON_PREFIX,
+                    "--root",
+                    str(root),
+                    "--all-functions",
+                    "--format",
+                    "json",
+                ],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -409,11 +443,15 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(default_result.returncode, 0, default_result.stderr)
             self.assertEqual(all_result.returncode, 0, all_result.stderr)
             default_records = {
-                record["qualname"]: record for record in json.loads(default_result.stdout)["records"]
+                record["qualname"]: record
+                for record in json.loads(default_result.stdout)["records"]
             }
             self.assertNotIn("PublicPort", default_records)
             self.assertNotIn("_PrivatePort", default_records)
-            records = {record["qualname"]: record for record in json.loads(all_result.stdout)["records"]}
+            records = {
+                record["qualname"]: record
+                for record in json.loads(all_result.stdout)["records"]
+            }
             self.assertEqual(records["PublicPort"]["role"], "protocol_interface")
             self.assertEqual(records["_PrivatePort"]["role"], "protocol_interface")
             self.assertNotEqual(records["_ThinBase"]["role"], "protocol_interface")
@@ -456,8 +494,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -472,12 +509,19 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(result.stdout)
             records = {record["qualname"]: record for record in payload["records"]}
-            self.assertIn("candidate-rule:test:local-test-class", records["Session"]["evidence"])
-            self.assertIn("candidate-rule:test:fixture-function", records["session"]["evidence"])
+            self.assertIn(
+                "candidate-rule:test:local-test-class", records["Session"]["evidence"]
+            )
+            self.assertIn(
+                "candidate-rule:test:fixture-function", records["session"]["evidence"]
+            )
             self.assertNotIn("TestWorkflow", records)
             self.assertNotIn("TestWorkflow.test_case", records)
             self.assertNotIn("test_numeric", records)
-            self.assertIn("candidate-rule:test:private-local-numeric_kernel", records["_reference"]["evidence"])
+            self.assertIn(
+                "candidate-rule:test:private-local-numeric_kernel",
+                records["_reference"]["evidence"],
+            )
 
     def test_experiment_directory_local_parser_rules(self) -> None:
         """Experiment files can keep local parser helpers without flagging unused names."""
@@ -507,8 +551,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -523,7 +566,10 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(result.stdout)
             records = {record["qualname"]: record for record in payload["records"]}
-            self.assertIn("candidate-rule:experiment:local-parser_loader", records["parse_config"]["evidence"])
+            self.assertIn(
+                "candidate-rule:experiment:local-parser_loader",
+                records["parse_config"]["evidence"],
+            )
             self.assertNotIn("normalize_unused", records)
 
     def test_functional_features_do_not_depend_on_informative_names(self) -> None:
@@ -574,8 +620,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -629,8 +674,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--only-name-gaps",
@@ -694,8 +738,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -740,7 +783,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [sys.executable, str(INVENTORY), "--root", str(root)],
+                [*AGENT_CANON_PREFIX, "--root", str(root)],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -773,8 +816,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -822,8 +864,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--all-functions",
@@ -872,8 +913,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -886,13 +926,20 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            records = {
+                record["qualname"]: record
+                for record in json.loads(result.stdout)["records"]
+            }
             self.assertTrue(records["_same"]["redundant_helper"])
             self.assertEqual(records["_same"]["redundancy_rule"], "identity-return")
             self.assertTrue(records["_wrap"]["redundant_helper"])
-            self.assertEqual(records["_wrap"]["redundancy_rule"], "pass-through-return-internal")
+            self.assertEqual(
+                records["_wrap"]["redundancy_rule"], "pass-through-return-internal"
+            )
             self.assertTrue(records["_proxy"]["redundant_helper"])
-            self.assertEqual(records["_proxy"]["redundancy_rule"], "pass-through-return-internal")
+            self.assertEqual(
+                records["_proxy"]["redundancy_rule"], "pass-through-return-internal"
+            )
 
     def test_duplicate_helper_implementations_are_marked(self) -> None:
         """Duplicate helper bodies should be linked as redundant alternatives."""
@@ -917,8 +964,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -931,9 +977,16 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
-            self.assertEqual(records["_format"]["redundancy_rule"], "duplicate-implementation")
-            self.assertEqual(records["_render"]["redundancy_rule"], "duplicate-implementation")
+            records = {
+                record["qualname"]: record
+                for record in json.loads(result.stdout)["records"]
+            }
+            self.assertEqual(
+                records["_format"]["redundancy_rule"], "duplicate-implementation"
+            )
+            self.assertEqual(
+                records["_render"]["redundancy_rule"], "duplicate-implementation"
+            )
             self.assertEqual(records["_format"]["redundant_with"], ["_render"])
             self.assertEqual(records["_render"]["redundant_with"], ["_format"])
 
@@ -965,8 +1018,7 @@ class HelperFunctionInventoryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(INVENTORY),
+                    *AGENT_CANON_PREFIX,
                     "--root",
                     str(root),
                     "--format",
@@ -979,7 +1031,10 @@ class HelperFunctionInventoryTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            records = {record["qualname"]: record for record in json.loads(result.stdout)["records"]}
+            records = {
+                record["qualname"]: record
+                for record in json.loads(result.stdout)["records"]
+            }
             self.assertFalse(records["_orchestrate"]["redundant_helper"])
             self.assertEqual(records["_orchestrate"]["redundancy_rule"], "")
 
