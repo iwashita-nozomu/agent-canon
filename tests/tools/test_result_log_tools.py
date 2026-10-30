@@ -35,7 +35,9 @@ def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
     source.write_text(
         "\n".join(
             [
-                json.dumps({"case": "demo", "iter": 1, "metric": 2.5}, ensure_ascii=True),
+                json.dumps(
+                    {"case": "demo", "iter": 1, "metric": 2.5}, ensure_ascii=True
+                ),
                 "not-json",
                 json.dumps({"event": "done", "status": "ok"}, ensure_ascii=True),
             ]
@@ -68,10 +70,17 @@ def test_hlo_summary_counts_ops(tmp_path: Path) -> None:
         "\n".join(
             [
                 json.dumps(
-                    {"case": "hlo", "tag": "demo", "dialect": "stablehlo", "hlo": hlo_text},
+                    {
+                        "case": "hlo",
+                        "tag": "demo",
+                        "dialect": "stablehlo",
+                        "hlo": hlo_text,
+                    },
                     ensure_ascii=True,
                 ),
-                json.dumps({"case": "other", "hlo": "%x = ignored()"}, ensure_ascii=True),
+                json.dumps(
+                    {"case": "other", "hlo": "%x = ignored()"}, ensure_ascii=True
+                ),
             ]
         )
         + "\n",
@@ -123,8 +132,7 @@ def test_hlo_summary_top_accepts_arbitrary_python_integers(tmp_path: Path) -> No
         f"%{index} = {operation}()" for index, operation in enumerate(operations)
     )
     source.write_text(
-        json.dumps({"case": "hlo", "hlo": hlo_text}, ensure_ascii=True)
-        + "\n",
+        json.dumps({"case": "hlo", "hlo": hlo_text}, ensure_ascii=True) + "\n",
         encoding="utf-8",
     )
 
@@ -203,3 +211,17 @@ def test_hlo_summary_renders_deep_selected_tag_and_hlo_newlines(tmp_path: Path) 
     assert summary["tags"] == [[str(tag), 1]]
     assert summary["hlo_text"]["total_chars"] == len(hlo_text)
     assert summary["hlo_text"]["total_lines"] == 2
+
+
+def test_hlo_summary_reuses_python_unicode_integer_arguments(tmp_path: Path) -> None:
+    """The shared integer owner accepts Python's decimal digit spellings."""
+    source = tmp_path / "unicode-top.jsonl"
+    source.write_text(
+        json.dumps({"case": "hlo", "hlo": "%0 = op-a()\n%1 = op-b()"}) + "\n",
+        encoding="utf-8",
+    )
+    operations = [["op-a", 1], ["op-b", 1]]
+    for spelling in ("١", "１", "𝟙", " ١_٠ "):
+        result = _run_native("summarize-hlo-jsonl", "--top", spelling, str(source))
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["top_ops"] == operations[: int(spelling)]

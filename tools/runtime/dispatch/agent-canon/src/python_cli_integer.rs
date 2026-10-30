@@ -4,6 +4,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md native CLI compatibility
 // downstream implementation skill_document_reader.rs parses bounded reader options
 // downstream implementation notebook_quality.rs parses Python-compatible notebook thresholds
+// downstream implementation result_logs/mod.rs parses summary top limits
 // @dependency-end
 
 use regex::Regex;
