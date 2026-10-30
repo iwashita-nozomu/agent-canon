@@ -1936,12 +1936,12 @@ entries:
   - id: oop-python-rule-inventory
     public: true
     summary: Inventories Python OOP policy, tool, document, and test surfaces.
-    path: tools/validation/code/oop/python/rule_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/rule_inventory.rs
     family: oop_python
     role: inventory
     status: canonical
-    command: python3 tools/validation/code/oop/python/rule_inventory.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/python/rule_inventory.py"]}
+    command: tools/bin/agent-canon oop-python-rule-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "oop-python-rule-inventory"]}
     writes: false
     default_wiring:
       ci: false
@@ -1974,12 +1974,12 @@ entries:
   - id: oop-cpp-rule-inventory
     public: true
     summary: Inventories C++ OOP policy, tool, document, and test surfaces.
-    path: tools/validation/code/oop/cpp/rule_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/rule_inventory.rs
     family: oop_cpp
     role: inventory
     status: canonical
-    command: python3 tools/validation/code/oop/cpp/rule_inventory.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/rule_inventory.py"]}
+    command: tools/bin/agent-canon oop-cpp-rule-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "oop-cpp-rule-inventory"]}
     writes: false
     default_wiring:
       ci: false
