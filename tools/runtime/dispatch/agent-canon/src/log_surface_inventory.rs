@@ -1396,7 +1396,7 @@ fn write_pretty_json(value: &Value, indent: usize, output: &mut String) {
 }
 
 fn write_indent(output: &mut String, indent: usize) {
-    output.extend(std::iter::repeat(' ').take(indent));
+    output.extend(std::iter::repeat_n(' ', indent));
 }
 
 fn write_ascii_json_string(value: &str, output: &mut String) {
