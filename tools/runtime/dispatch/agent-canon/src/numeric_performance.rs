@@ -945,7 +945,7 @@ fn float_integer_value(value: f64) -> Option<BigInt> {
         }
         integer = BigInt::from(significand >> right_shift);
     } else if shift > 0 {
-        integer = integer << shift as usize;
+        integer <<= shift as usize;
     }
     Some(if negative { -integer } else { integer })
 }
