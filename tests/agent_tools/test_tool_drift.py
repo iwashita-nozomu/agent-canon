@@ -300,7 +300,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
                 "missing-reverse-manifest-link:tool_catalog:"
-                "tools/runtime/manifest/tool_catalog.py:tools/catalog.yaml",
+                "tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs:tools/catalog.yaml",
                 result.stdout,
             )
 
@@ -423,7 +423,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             catalog = root / "tools" / "catalog.yaml"
             catalog.write_text(
                 catalog.read_text(encoding="utf-8").replace(
-                    "tools/runtime/manifest/tool_catalog.py",
+                    "tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs",
                     "tools/agent_tools/missing_tool.py",
                 ),
                 encoding="utf-8",
@@ -687,18 +687,18 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         self.write_file(root, "README.md", "# Fixture\n")
         self.write_file(
             root,
-            "tools/runtime/manifest/tool_catalog.py",
+            "tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Validates tool catalog.",
-                    "# upstream design ../../catalog.yaml catalog",
-                    "# upstream design ../../README.md tool docs",
-                    "# upstream design ../../../documents/tools/README.md root docs",
-                    "# upstream design ../../../documents/tools/tool-docs.toml docs map",
-                    "# upstream design ../../../documents/tools/repo-local-tool-imports.md imports",
-                    "# downstream implementation ../../validation/ci/runners/run_all_checks.sh ci",
-                    "# downstream implementation ../../../tests/agent_tools/test_tool_catalog.py tests",
+                    "# upstream design ../../../../../../tools/catalog.yaml catalog",
+                    "# upstream design ../../../../../../README.md tool docs",
+                    "# upstream design ../../../../../../documents/tools/README.md root docs",
+                    "# upstream design ../../../../../../documents/tools/tool-docs.toml docs map",
+                    "# upstream design ../../../../../../documents/tools/repo-local-tool-imports.md imports",
+                    "# downstream implementation ../../../../../../tools/validation/ci/runners/run_all_checks.sh ci",
+                    "# downstream implementation ../../../../../../tests/agent_tools/test_tool_catalog.py tests",
                     "# @dependency-end",
                     "",
                 ]
@@ -711,13 +711,13 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 [
                     "# @dependency-start",
                     "# responsibility Defines fixture tool catalog.",
-                    "# downstream implementation runtime/manifest/tool_catalog.py checker",
+                    "# downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs checker",
                     "# @dependency-end",
                     "",
                     "version: 1",
                     "entries:",
                     "  - id: tool-catalog",
-                    "    path: tools/runtime/manifest/tool_catalog.py",
+                    "    path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs",
                     "    status: canonical",
                     "",
                 ]
@@ -740,11 +740,11 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         "@dependency-start",
                         "responsibility Provides tool catalog fixture.",
                         "upstream design README.md fixture anchor",
-                        "downstream implementation tools/runtime/manifest/tool_catalog.py checker",
+                        "downstream implementation tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs checker",
                         "@dependency-end",
                         "-->",
                         "tools/catalog.yaml",
-                        "tool_catalog.py",
+                        "tool_catalog.rs",
                         "tool-docs.toml",
                         "",
                     ]
