@@ -855,7 +855,7 @@ fn resolve_physical_allow_missing(
                     "parent-owned path contains too many symbolic links",
                 ));
             }
-            let target = parent.read_link(&component).map_err(|_| {
+            let target = parent.read_link_contents(&component).map_err(|_| {
                 error(
                     ParentRootReject::SymlinkEscape,
                     "cannot read parent-owned symbolic link",
@@ -1160,7 +1160,7 @@ fn capture_lexical_snapshot(
         Ok(metadata) => {
             let kind = entry_kind(&metadata);
             let symlink_target = if kind == EntryKind::Symlink {
-                Some(parent.read_link(name).map_err(|_| {
+                Some(parent.read_link_contents(name).map_err(|_| {
                     error(
                         ParentRootReject::RootRaceDetected,
                         "cannot read parent-owned symlink target",
@@ -1299,7 +1299,7 @@ fn verify_lexical_snapshot(
                         "path receipt has no lexical symlink target",
                     )
                 })?;
-                let observed_link = parent.read_link(leaf).map_err(|_| {
+                let observed_link = parent.read_link_contents(leaf).map_err(|_| {
                     error(
                         ParentRootReject::RootRaceDetected,
                         "cannot recheck lexical symlink target",
