@@ -264,7 +264,7 @@ fn required_value<'a>(raw: &'a [String], index: usize, option: &str) -> Result<&
     let value = raw
         .get(index + 1)
         .filter(|value| {
-            !value.starts_with('-') || value == "-" || parse_negative_integer(value).is_some()
+            !value.starts_with('-') || *value == "-" || parse_negative_integer(value).is_some()
         })
         .ok_or_else(|| format!("argument {option}: expected one argument"))?;
     Ok(value)
@@ -793,7 +793,7 @@ fn record_code_cell(
                 index,
                 line as i64,
                 check,
-                detail,
+                *detail,
             ));
         }
     }
