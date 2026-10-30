@@ -2634,7 +2634,7 @@ impl ProbeEnvironment {
 
     fn is_regular_executable(&self, path: &Path) -> bool {
         let physical = self.filesystem_path(path);
-        let Ok(metadata) = fs::metadata(physical) else {
+        let Ok(metadata) = fs::metadata(&physical) else {
             return false;
         };
         if !metadata.is_file() {
