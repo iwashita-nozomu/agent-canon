@@ -101,11 +101,11 @@ Docstring の意味契約へ混ぜません。
   class / module contract、責務 scope、issue、docs、test のいずれかで境界を
   固定し、既存 helper / API を再利用できない理由を明示します。
 - identity return、pass-through wrapper、同じ normalized body を持つ duplicate
-  helper は冗長 helper として扱います。`helper_function_inventory.py` の
+  helper は冗長 helper として扱います。`helper-function-inventory` の
   `redundant_helper`、`redundancy_rule`、`redundant_with` を見て、既存実装へ
   統合するか、残す理由を design / issue に書きます。
 - helper / local function の名前は、推定 role に対応する action token を含めます。
-  `python3 tools/analysis/code/helper_function_inventory.py --changed --baseline-ref HEAD --only-name-gaps`
+  `tools/bin/agent-canon helper-function-inventory --changed --baseline-ref HEAD --only-name-gaps`
   は、責務検索で再利用候補として見つけやすい名前へ寄せる review 対象を出します。
 - `tools/runtime/authority/task_authority.py` と
   `tools/validation/semantic/responsibility/responsibility_scope.py` はこの規約の edit-time owner です。

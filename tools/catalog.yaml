@@ -2054,12 +2054,12 @@ entries:
 
   - id: helper-function-inventory
     summary: Inventories Python helper functions/classes with functional AST facts and role/action name tokens.
-    path: tools/analysis/code/helper_function_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/analysis/code/helper_function_inventory.py
-    dispatch: {argv: ["python3", "tools/analysis/code/helper_function_inventory.py"]}
+    command: tools/bin/agent-canon helper-function-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "helper-function-inventory"]}
     writes: false
     default_wiring:
       ci: false
