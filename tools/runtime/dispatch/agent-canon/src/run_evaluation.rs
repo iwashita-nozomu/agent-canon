@@ -2266,6 +2266,43 @@ fn source_root() -> Result<PathBuf, String> {
         .map_err(|error| format!("AgentCanon source root unavailable: {error}"))
 }
 
+fn nearest_existing_directory(path: &Path) -> Result<PathBuf, String> {
+    let mut current = path.to_path_buf();
+    while !current.is_dir() {
+        if !current.pop() {
+            return Err(format!(
+                "no existing parent directory for {}",
+                path.display()
+            ));
+        }
+    }
+    fs::canonicalize(current).map_err(|error| format!("cannot resolve report root: {error}"))
+}
+
+fn is_filesystem_root(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        let mut components = path.components();
+        matches!(components.next(), Some(Component::Prefix(_)))
+            && matches!(components.next(), Some(Component::RootDir))
+            && components.next().is_none()
+    }
+    #[cfg(not(windows))]
+    {
+        path == Path::new("/")
+    }
+}
+
+fn report_root_avoids_source(source: &Path, report_root: &Path) -> Result<(), String> {
+    if is_filesystem_root(report_root) || source.starts_with(report_root) {
+        return Err(format!(
+            "runtime report root must not be a filesystem root or contain AgentCanon source: {}",
+            report_root.display()
+        ));
+    }
+    Ok(())
+}
+
 fn runtime_boundary_for_report_root(
     source: &Path,
     report_root: Option<&Path>,
@@ -2278,12 +2315,36 @@ fn runtime_boundary_for_report_root(
         let resolved = boundary.resolve(declared)?;
         return Ok((boundary, resolved));
     }
-    // Resolve the configured absolute root as the validated boundary itself,
-    // not as an artifact beneath a parent boundary. The selected run-id child
-    // is resolved through the same capability by the caller.
-    let boundary = RuntimeArtifactBoundary::for_source(source, Some(declared), false)?;
-    let resolved = boundary.root().to_path_buf();
-    Ok((boundary, resolved))
+    let missing_root_error = format!("runtime root is unavailable: {}", declared.display());
+    match RuntimeArtifactBoundary::for_source(source, Some(declared), false) {
+        Ok(boundary) => {
+            let resolved = boundary.root().to_path_buf();
+            report_root_avoids_source(source, &resolved)?;
+            Ok((boundary, resolved))
+        }
+        Err(error) if error == missing_root_error => {
+            let normalized = resolve_existing_or_lexical(declared)?;
+            if normalized.is_dir() {
+                let boundary =
+                    RuntimeArtifactBoundary::for_source(source, Some(&normalized), false)?;
+                let resolved = boundary.root().to_path_buf();
+                report_root_avoids_source(source, &resolved)?;
+                return Ok((boundary, resolved));
+            }
+            let parent = nearest_existing_directory(&normalized)?;
+            if is_filesystem_root(&parent) {
+                return Err(format!(
+                    "no narrow existing external boundary for report root {}",
+                    normalized.display()
+                ));
+            }
+            let boundary = RuntimeArtifactBoundary::for_source(source, Some(&parent), false)?;
+            let resolved = boundary.resolve(&normalized)?;
+            report_root_avoids_source(source, &resolved)?;
+            Ok((boundary, resolved))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 pub fn run_cli(args: &[String]) -> i32 {

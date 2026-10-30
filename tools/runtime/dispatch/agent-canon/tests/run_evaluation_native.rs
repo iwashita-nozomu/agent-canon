@@ -404,3 +404,39 @@ fn native_cli_accepts_existing_absolute_report_root_without_runtime_environment(
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("AGENT_EVALUATION_STATUS=pass"));
 }
+
+#[test]
+fn native_cli_scores_missing_absolute_report_root_without_creating_it() {
+    let external = Fixture::new("missing-absolute-report-root");
+    let report_root = external.root().join("reports/agents");
+    assert!(!report_root.exists());
+
+    let source = source_root();
+    let behavior = source.join(eval_manifest_path("agent_behavior_eval.toml"));
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args([
+            "run-evaluation",
+            "--run-id",
+            "missing-run",
+            "--report-root",
+            report_root.to_str().unwrap(),
+            "--workspace-root",
+            source.to_str().unwrap(),
+            "--behavior-manifest",
+            behavior.to_str().unwrap(),
+        ])
+        .env_remove("AGENT_CANON_RUNTIME_ROOT")
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("AGENT_EVALUATION_STATUS=revise"));
+    assert!(stdout.contains("AGENT_EVALUATION_SCORE="));
+    assert!(!report_root.exists());
+}
