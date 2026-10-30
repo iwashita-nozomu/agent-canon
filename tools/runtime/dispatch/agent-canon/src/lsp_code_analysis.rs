@@ -2862,7 +2862,7 @@ fn file_uri(path: &Path) -> String {
             || matches!(byte, b'/' | b'-' | b'.' | b'_' | b'~')
             || (windows_drive && index == 1 && byte == b':')
         {
-            encoded.push(char::from(*byte));
+            encoded.push(char::from(byte));
         } else {
             use std::fmt::Write as _;
             write!(encoded, "%{byte:02X}").expect("write URI escape to String");
