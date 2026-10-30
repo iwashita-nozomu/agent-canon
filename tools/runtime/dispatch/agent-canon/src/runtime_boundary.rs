@@ -444,14 +444,25 @@ impl RuntimeDirectory {
         #[cfg(not(windows))]
         options.read(true);
         options.follow(FollowSymlinks::No);
-        let directory = self.directory.open_with(Path::new("."), &options)?;
-        if !directory.metadata()?.is_dir() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "runtime directory handle is not a directory",
+        let directory = self
+            .directory
+            .open_with(Path::new("."), &options)
+            .map_err(|error| atomic_write_stage("parent_directory_open", error))?;
+        let metadata = directory
+            .metadata()
+            .map_err(|error| atomic_write_stage("parent_directory_metadata", error))?;
+        if !metadata.is_dir() {
+            return Err(atomic_write_stage(
+                "parent_directory_type_check",
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "runtime directory handle is not a directory",
+                ),
             ));
         }
-        directory.sync_all()
+        directory
+            .sync_all()
+            .map_err(|error| atomic_write_stage("parent_directory_flush", error))
     }
 
     fn parent(&self, relative: &Path, create: bool) -> std::io::Result<(Self, std::ffi::OsString)> {
@@ -681,9 +692,7 @@ impl RuntimeDirectory {
                 .directory
                 .rename(&temporary, &parent.directory, &name)
                 .map_err(|error| atomic_write_stage("target_rename", error))?;
-            parent
-                .sync_directory()
-                .map_err(|error| atomic_write_stage("parent_directory_sync", error))
+            parent.sync_directory()
         })();
         let cleanup = parent.directory.remove_file(&temporary);
         match (result, cleanup) {
