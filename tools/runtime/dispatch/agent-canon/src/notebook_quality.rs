@@ -21,6 +21,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::str::FromStr;
 use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -31,11 +32,12 @@ const MAX_CODE_CELL_LINES: i64 = 80;
 const MIN_MARKDOWN_CHARS: i64 = 120;
 const GIT_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 struct Finding {
     cell: usize,
     check: String,
     detail: String,
+    #[serde(serialize_with = "serialize_bigint_line")]
     line: BigInt,
     path: String,
 }
@@ -108,6 +110,14 @@ struct NotebookReport {
     findings: Vec<Finding>,
     warnings: Vec<Warning>,
     metrics: Vec<NotebookMetrics>,
+}
+
+#[derive(Serialize)]
+struct JsonReport<'a> {
+    findings: &'a [Finding],
+    metrics: &'a [NotebookMetrics],
+    status: &'static str,
+    warnings: &'a [Warning],
 }
 
 #[derive(Default)]
@@ -976,44 +986,27 @@ fn render_text(report: &NotebookReport) -> String {
 }
 
 fn render_json(report: &NotebookReport) -> String {
-    let findings = render_findings_json(&report.findings);
-    let metrics = serde_json::to_string(&report.metrics).expect("metrics are JSON serializable");
-    let status = if report.findings.is_empty() {
-        "pass"
-    } else {
-        "fail"
+    let payload = JsonReport {
+        findings: &report.findings,
+        metrics: &report.metrics,
+        status: if report.findings.is_empty() {
+            "pass"
+        } else {
+            "fail"
+        },
+        warnings: &report.warnings,
     };
-    let status = serde_json::to_string(status).expect("status is JSON serializable");
-    let warnings = serde_json::to_string(&report.warnings).expect("warnings are JSON serializable");
-    format!(
-        "{{\"findings\":{findings},\"metrics\":{metrics},\"status\":{status},\"warnings\":{warnings}}}"
-    )
+    serde_json::to_string(&payload)
+        .expect("BigInt finding lines are valid arbitrary-precision JSON numbers")
 }
 
-fn render_findings_json(findings: &[Finding]) -> String {
-    let mut rendered = String::from("[");
-    for (index, finding) in findings.iter().enumerate() {
-        if index > 0 {
-            rendered.push(',');
-        }
-        rendered.push_str("{\"cell\":");
-        rendered.push_str(&finding.cell.to_string());
-        rendered.push_str(",\"check\":");
-        append_json_string(&mut rendered, &finding.check);
-        rendered.push_str(",\"detail\":");
-        append_json_string(&mut rendered, &finding.detail);
-        rendered.push_str(",\"line\":");
-        rendered.push_str(&finding.line.to_string());
-        rendered.push_str(",\"path\":");
-        append_json_string(&mut rendered, &finding.path);
-        rendered.push('}');
-    }
-    rendered.push(']');
-    rendered
-}
-
-fn append_json_string(output: &mut String, value: &str) {
-    output.push_str(&serde_json::to_string(value).expect("string is JSON serializable"));
+fn serialize_bigint_line<S>(value: &BigInt, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let number =
+        serde_json::Number::from_str(&value.to_string()).map_err(serde::ser::Error::custom)?;
+    number.serialize(serializer)
 }
 
 #[cfg(test)]
