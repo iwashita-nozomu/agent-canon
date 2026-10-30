@@ -3535,12 +3535,15 @@ mod tests {
             "src/main.rs",
             "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../documents/README.md fixture docs\n// @dependency-end\nfn main() {}\n",
         );
-        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+        let runtime_root =
+            resolve_runtime_root_at(&root, Some(&test_runtime_root)).expect("test runtime root");
         let out_dir = runtime_root.join("structured-analysis-build-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
-            runtime_root: None,
+            runtime_root: Some(runtime_root.clone()),
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })
@@ -3614,12 +3617,15 @@ mod tests {
             "docs/runtime.md",
             "# Runtime\n\n<!--\n@dependency-start\nresponsibility Documents runtime cache and bootstrap behavior.\n@dependency-end\n-->\n",
         );
-        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+        let runtime_root =
+            resolve_runtime_root_at(&root, Some(&test_runtime_root)).expect("test runtime root");
         let out_dir = runtime_root.join("structured-analysis-directory-responsibility-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
-            runtime_root: None,
+            runtime_root: Some(runtime_root.clone()),
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })
@@ -3673,12 +3679,15 @@ mod tests {
             "src/main.rs",
             "// @dependency-start\n// responsibility Implements fixture Rust code.\n// upstream design ../README.md fixture root\n// @dependency-end\nfn main() {}\n",
         );
-        let runtime_root = resolve_runtime_root_at(&root, None).expect("test runtime root");
+        let test_runtime_root =
+            crate::runtime_boundary::test_runtime_root_path(&root).expect("test runtime path");
+        let runtime_root =
+            resolve_runtime_root_at(&root, Some(&test_runtime_root)).expect("test runtime root");
         let out_dir = runtime_root.join("structured-analysis-graph-contract-out");
 
         let result = build_structured_analysis_cache(&BuildArgs {
             root: root.clone(),
-            runtime_root: None,
+            runtime_root: Some(runtime_root.clone()),
             profile: "test".to_string(),
             out_dir: Some(out_dir.clone()),
         })
