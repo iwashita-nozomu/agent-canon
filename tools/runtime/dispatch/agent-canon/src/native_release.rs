@@ -723,6 +723,7 @@ fn append_github_outputs(outputs: &[(&str, String)]) -> ReleaseResult<()> {
         .ok_or_else(|| release_error("GITHUB_OUTPUT is required for this operation"))?;
     let mut file = OpenOptions::new()
         .append(true)
+        .create(true)
         .open(PathBuf::from(path))
         .map_err(|error| release_error(format!("open GITHUB_OUTPUT: {error}")))?;
     for (key, value) in outputs {

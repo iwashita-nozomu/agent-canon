@@ -88,6 +88,7 @@ _agent_canon_remove_global_links
 
 def test_codex_hook_routes_register_only_trusted_project_targets(
     tmp_path: Path,
+    native_cli_input: Path,
 ) -> None:
     """Both hook routes reuse the resident and target API with exact file cleanup."""
     home = tmp_path / "home"
@@ -110,10 +111,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         check=True,
     )
     runtime_root = control / ".runtime"
-    configured_native = os.environ.get("AGENT_CANON_CLI")
-    assert configured_native, "AGENT_CANON_CLI must select the built native test input"
-    native_binary = Path(configured_native).resolve(strict=True)
-    assert native_binary.is_file() and os.access(native_binary, os.X_OK)
+    native_binary = native_cli_input
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
     environment = {
