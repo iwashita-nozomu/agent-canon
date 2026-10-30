@@ -191,7 +191,7 @@ audience_values: [operators]
 placement_values: [repository]
 entries:
   - id: demo-tool
-    path: tools/demo_tool.py
+    path: tools/demo-tool.py
     summary: Demonstration tool.
     family: core
     role: checker
@@ -202,27 +202,27 @@ entries:
     default_wiring: {ci: false, pr_check: false}
 "#,
     );
-    root.write("tools/demo_tool.py", "# source\n");
+    root.write("tools/demo-tool.py", "# source\n");
     root.write("documents/tools/demo-tool.md", "# Demo\n");
     root.write("tests/demo_tool_test.py", "# test\n");
-    root.write("tools/README.md", "tools/catalog.yaml tool_catalog.py\n");
+    root.write("tools/README.md", "tools/catalog.yaml tool_catalog.rs\n");
     root.write(
         "documents/tools/README.md",
-        "tools/catalog.yaml tool_catalog.py\n",
+        "tools/catalog.yaml tool_catalog.rs\n",
     );
     root.write(
         "documents/tools/repo-local-tool-imports.md",
-        "tools/catalog.yaml tool_catalog.py\n",
+        "tools/catalog.yaml tool_catalog.rs\n",
     );
     root.write(
         "documents/tools/tool-docs.toml",
-        r#"# tools/catalog.yaml tool_catalog.py
+        r#"# tools/catalog.yaml tool_catalog.rs
 catalog_kind = "agent_canon_tool_docs"
 classification_values = ["public", "internal", "compat", "retired", "example"]
 
 [[tool]]
 id = "demo-tool"
-tool = "tools/demo_tool.py"
+    tool = "tools/demo-tool.py"
 doc = "documents/tools/demo-tool.md"
 classification = "internal"
 "#,
@@ -284,14 +284,8 @@ fn default_reference_pattern_excludes_test_paths_and_keeps_tool_paths() {
 }
 
 #[test]
-fn direct_manifest_api_and_cli_adapter_keep_current_test_contracts() {
+fn catalog_cli_adapter_preserves_existing_output_contract() {
     let root = valid_tool_catalog_root();
-    let catalog_text = fs::read_to_string(root.path().join("tools/catalog.yaml")).unwrap();
-    let catalog = YamlLoader::load_from_str(&catalog_text).unwrap().remove(0);
-    let entries = catalog["entries"].as_vec().unwrap();
-    let entry_refs = entries.iter().collect::<Vec<_>>();
-    assert!(check_tool_docs_manifest(root.path(), &entry_refs).is_empty());
-
     let args = [
         "--root".to_owned(),
         root.path().display().to_string(),
@@ -328,27 +322,6 @@ fn direct_manifest_api_and_cli_adapter_keep_current_test_contracts() {
     assert!(json.contains("public-surface.v1"));
     assert!(stderr.is_empty());
 
-    let docs = fs::read_to_string(root.path().join("documents/tools/tool-docs.toml"))
-        .unwrap()
-        .replace(
-            "classification = \"internal\"",
-            "classification = \"public\"",
-        );
-    root.write("documents/tools/tool-docs.toml", &docs);
-    let findings = check_tool_docs_manifest(root.path(), &entry_refs);
-    assert!(findings.iter().any(|finding| {
-        finding.render()
-            == "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-public-mark:demo-tool:tools/demo_tool.py"
-    }));
-
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    assert_eq!(run_with_io(&args, &mut stdout, &mut stderr), 1);
-    assert!(String::from_utf8(stdout)
-        .unwrap()
-        .contains("# AgentCanon Tool Catalog"));
-    assert!(stderr.is_empty());
-
     let invalid_args = ["--format".to_owned(), "yaml".to_owned()];
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -356,6 +329,106 @@ fn direct_manifest_api_and_cli_adapter_keep_current_test_contracts() {
     assert!(String::from_utf8(stderr)
         .unwrap()
         .contains("invalid choice: 'yaml'"));
+}
+
+#[test]
+fn public_tool_declarations_are_bidirectionally_complete_native() {
+    let root = valid_tool_catalog_root();
+    let catalog_path = root.path().join("tools/catalog.yaml");
+    let catalog_text = fs::read_to_string(&catalog_path)
+        .unwrap()
+        .replace("    public: false\n", "    public: true\n");
+    root.write("tools/catalog.yaml", &catalog_text);
+    let docs_path = root.path().join("documents/tools/tool-docs.toml");
+    let public_docs = fs::read_to_string(&docs_path).unwrap().replace(
+        "classification = \"internal\"",
+        "classification = \"public\"",
+    );
+    root.write("documents/tools/tool-docs.toml", &public_docs);
+    let catalog = YamlLoader::load_from_str(&catalog_text).unwrap().remove(0);
+    let entries = catalog["entries"].as_vec().unwrap();
+    let entry_refs = entries.iter().collect::<Vec<_>>();
+    assert!(check_tool_docs_manifest(root.path(), &entry_refs).is_empty());
+
+    let catalog_without_public_mark = catalog_text.replace("    public: true\n", "");
+    root.write("tools/catalog.yaml", &catalog_without_public_mark);
+    let unmarked_catalog = YamlLoader::load_from_str(&catalog_without_public_mark)
+        .unwrap()
+        .remove(0);
+    let unmarked_entries = unmarked_catalog["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    let missing_mark = check_tool_docs_manifest(root.path(), &unmarked_entries);
+    assert!(missing_mark.iter().any(|finding| {
+        finding.render()
+            == "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-public-mark:demo-tool:tools/demo-tool.py"
+    }));
+
+    root.write(
+        "tools/runtime/manifest/catalog_only.py",
+        "# catalog-only fixture\n",
+    );
+    root.write("documents/tools/catalog_only.md", "# catalog-only doc\n");
+    let with_catalog_only = format!(
+        "{catalog_without_public_mark}  - id: catalog-only\n    path: tools/runtime/manifest/catalog_only.py\n    summary: Catalog-only fixture.\n    family: core\n    role: checker\n    status: canonical\n    public: true\n    docs: [documents/tools/catalog_only.md]\n    tests: [tests/demo_tool_test.py]\n    default_wiring: {{ci: false, pr_check: false}}\n"
+    );
+    let expanded = YamlLoader::load_from_str(&with_catalog_only)
+        .unwrap()
+        .remove(0);
+    let expanded_entries = expanded["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    let findings = check_tool_docs_manifest(root.path(), &expanded_entries);
+    assert!(findings.iter().any(|finding| {
+        finding.render()
+            == "TOOL_CATALOG_FINDING=public_tools:tools/catalog.yaml:missing-public-documentation:catalog-only:tools/runtime/manifest/catalog_only.py"
+    }));
+}
+
+#[test]
+fn missing_non_default_public_catalog_entry_is_reported_native() {
+    let root = valid_tool_catalog_root();
+    root.write("tools/runtime/manifest/extra.py", "# extra fixture\n");
+    root.write("documents/tools/extra.md", "# extra doc\n");
+    let docs_path = root.path().join("documents/tools/tool-docs.toml");
+    let docs = fs::read_to_string(&docs_path).unwrap()
+        + "\n[[tool]]\nid = \"extra-public\"\nclassification = \"public\"\ntool = \"tools/runtime/manifest/extra.py\"\ndoc = \"documents/tools/extra.md\"\n";
+    root.write("documents/tools/tool-docs.toml", &docs);
+    let catalog_text = fs::read_to_string(root.path().join("tools/catalog.yaml")).unwrap();
+    let catalog = YamlLoader::load_from_str(&catalog_text).unwrap().remove(0);
+    let entries = catalog["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    let findings = check_tool_docs_manifest(root.path(), &entries);
+    assert!(findings.iter().any(|finding| {
+        finding.render()
+            == "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-catalog-entry:extra-public:tools/runtime/manifest/extra.py"
+    }));
+}
+
+#[test]
+fn internal_tool_declaration_is_excluded_from_public_set_native() {
+    let root = valid_tool_catalog_root();
+    let catalog_path = root.path().join("tools/catalog.yaml");
+    let catalog_text = fs::read_to_string(catalog_path)
+        .unwrap()
+        .replace("    public: false\n", "");
+    let catalog = YamlLoader::load_from_str(&catalog_text).unwrap().remove(0);
+    let entries = catalog["entries"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .collect::<Vec<_>>();
+    let findings = check_tool_docs_manifest(root.path(), &entries);
+    assert!(!findings
+        .iter()
+        .any(|finding| finding.check == "public_tools"));
 }
 
 #[test]

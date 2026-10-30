@@ -497,7 +497,7 @@ fn check_catalog_docs(root: &Path) -> Vec<Finding> {
             continue;
         }
         if let Ok(text) = fs::read_to_string(target) {
-            for snippet in ["tools/catalog.yaml", "tool_catalog.py"] {
+            for snippet in ["tools/catalog.yaml", "tool_catalog.rs"] {
                 if !text.contains(snippet) {
                     findings.push(Finding::new(
                         "catalog_docs",

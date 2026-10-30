@@ -204,7 +204,7 @@ class ToolProofCoverageTest(unittest.TestCase):
                 root,
                 doc,
                 self.manifest("Fixture doc.")
-                + "\ntools/catalog.yaml\ntool_catalog.py\ndocuments/tools/tool-docs.toml\n",
+                + "\ntools/catalog.yaml\ntool_catalog.rs\ndocuments/tools/tool-docs.toml\n",
             )
 
     def tool_docs_manifest(self) -> str:
@@ -214,10 +214,10 @@ class ToolProofCoverageTest(unittest.TestCase):
                 "# @dependency-start",
                 "# responsibility Defines fixture tool-doc map.",
                 "# upstream design ../../tools/catalog.yaml fixture catalog",
-                "# downstream implementation ../../tools/runtime/manifest/tool_catalog.py checker",
+                    "# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs checker",
                 "# @dependency-end",
                 "# tools/catalog.yaml",
-                "# tool_catalog.py",
+                    "# tool_catalog.rs",
                 "",
                 'catalog_kind = "agent_canon_tool_docs"',
                 "version = 1",

@@ -3,35 +3,34 @@
 # @dependency-start
 # contract test
 # responsibility Tests structured AgentCanon tool catalog validation.
-# upstream implementation ../../tools/runtime/manifest/tool_catalog.py validates tool catalog
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates tool catalog
 # upstream design ../../tools/catalog.yaml structured tool catalog fixture
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical managed GPU admission route
 # @dependency-end
 
 from __future__ import annotations
 
-import runpy
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 import yaml
 
-from tools.runtime.manifest.tool_catalog import check_tool_docs_manifest
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "runtime" / "manifest" / "tool_catalog.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class CheckToolCatalogTest(unittest.TestCase):
     """Exercise structured tool catalog validation."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker against a root."""
+        """Run the selected native CLI against a root."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
         return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            [AGENT_CANON_CLI, "tool-catalog", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -138,99 +137,6 @@ class CheckToolCatalogTest(unittest.TestCase):
                 "TOOL_CATALOG_FINDING=entry:tools/runtime/manifest/missing_tool.py:missing-path",
                 result.stdout,
             )
-
-    def test_public_tool_declarations_are_bidirectionally_complete(self) -> None:
-        """The explicit docs owner and catalog public marks form one set."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_minimal_repo(root)
-            catalog = yaml.safe_load(
-                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
-            )
-            findings = check_tool_docs_manifest(root, catalog["entries"])
-            self.assertEqual(findings, [])
-
-            catalog["entries"][0].pop("public")
-            findings = check_tool_docs_manifest(root, catalog["entries"])
-            self.assertIn(
-                "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-public-mark:tool-catalog:tools/runtime/manifest/tool_catalog.py",
-                [finding.render() for finding in findings],
-            )
-
-            self.write_file(
-                root,
-                "tools/runtime/manifest/catalog_only.py",
-                self.manifest("Catalog-only fixture."),
-            )
-            self.write_file(
-                root,
-                "documents/tools/catalog_only.md",
-                self.manifest("Catalog-only doc."),
-            )
-            catalog_entry = dict(catalog["entries"][0])
-            catalog_entry.update(
-                {
-                    "id": "catalog-only",
-                    "path": "tools/runtime/manifest/catalog_only.py",
-                    "docs": ["documents/tools/catalog_only.md"],
-                    "public": True,
-                }
-            )
-            catalog["entries"].append(catalog_entry)
-            findings = check_tool_docs_manifest(root, catalog["entries"])
-            self.assertIn(
-                "TOOL_CATALOG_FINDING=public_tools:tools/catalog.yaml:missing-public-documentation:catalog-only:tools/runtime/manifest/catalog_only.py",
-                [finding.render() for finding in findings],
-            )
-
-    def test_missing_non_default_public_catalog_entry_is_reported(self) -> None:
-        """A public declaration fails even when it is absent from default wiring."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_minimal_repo(root)
-            self.write_file(
-                root, "tools/runtime/manifest/extra.py", self.manifest("Extra fixture.")
-            )
-            self.write_file(
-                root, "documents/tools/extra.md", self.manifest("Extra fixture doc.")
-            )
-            docs = root / "documents/tools/tool-docs.toml"
-            docs.write_text(
-                docs.read_text(encoding="utf-8")
-                + "\n[[tool]]\n"
-                + 'id = "extra-public"\n'
-                + 'classification = "public"\n'
-                + 'tool = "tools/runtime/manifest/extra.py"\n'
-                + 'doc = "documents/tools/extra.md"\n',
-                encoding="utf-8",
-            )
-            catalog = yaml.safe_load(
-                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
-            )
-            findings = check_tool_docs_manifest(root, catalog["entries"])
-            self.assertIn(
-                "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-catalog-entry:extra-public:tools/runtime/manifest/extra.py",
-                [finding.render() for finding in findings],
-            )
-
-    def test_internal_tool_declaration_is_excluded_from_public_set(self) -> None:
-        """Internal/support rows do not require a public catalog mark."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_minimal_repo(root)
-            docs = root / "documents/tools/tool-docs.toml"
-            docs.write_text(
-                docs.read_text(encoding="utf-8").replace(
-                    'classification = "public"', 'classification = "internal"'
-                ),
-                encoding="utf-8",
-            )
-            catalog = yaml.safe_load(
-                (root / "tools/catalog.yaml").read_text(encoding="utf-8")
-            )
-            catalog["entries"][0].pop("public")
-            findings = check_tool_docs_manifest(root, catalog["entries"])
-            self.assertNotIn("public_tools", {finding.check for finding in findings})
 
     def test_legacy_entry_is_retired(self) -> None:
         """Legacy provenance entries are no longer accepted in AgentCanon."""
@@ -411,26 +317,6 @@ class CheckToolCatalogTest(unittest.TestCase):
                 "default_wiring:tools/runtime/manifest/uncataloged.py:uncataloged-tool-reference",
                 result.stdout,
             )
-
-    def test_test_paths_are_not_default_tool_references(self) -> None:
-        """Test paths are not mistaken for root tool references."""
-        sys.path.insert(0, str(CHECKER.parent))
-        try:
-            namespace = runpy.run_path(str(CHECKER))
-        finally:
-            sys.path.pop(0)
-        pattern = namespace["TOOL_REFERENCE_RE"]
-        matches = set(
-            pattern.findall(
-                "python3 tests/tools/test_catalog_fixture.py\n"
-                "python3 tests/tools/tools/run_symlink_lint.py\n"
-                "python3 tools/runtime/manifest/uncataloged.py\n"
-            )
-        )
-
-        self.assertNotIn("tools/test_catalog_fixture.py", matches)
-        self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
-        self.assertIn("tools/runtime/manifest/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
         """Catalog entries must include a reader-facing summary."""
@@ -688,7 +574,7 @@ class CheckToolCatalogTest(unittest.TestCase):
                 root,
                 doc,
                 self.manifest("Fixture doc.")
-                + "\ntools/catalog.yaml\ntool_catalog.py\ndocuments/tools/tool-docs.toml\n",
+                + "\ntools/catalog.yaml\ntool_catalog.rs\ndocuments/tools/tool-docs.toml\n",
             )
         self.write_file(
             root,
@@ -698,10 +584,10 @@ class CheckToolCatalogTest(unittest.TestCase):
                     "# @dependency-start",
                     "# responsibility Defines fixture tool-doc map.",
                     "# upstream design ../../tools/catalog.yaml fixture catalog",
-                    "# downstream implementation ../../tools/runtime/manifest/tool_catalog.py checker",
+                    "# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs checker",
                     "# @dependency-end",
                     "# tools/catalog.yaml",
-                    "# tool_catalog.py",
+                    "# tool_catalog.rs",
                     "",
                     'catalog_kind = "agent_canon_tool_docs"',
                     "version = 1",
