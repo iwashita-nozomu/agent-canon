@@ -1338,7 +1338,7 @@ fn prepare_runtime_output(runtime_root: &Path, output: &Path, label: &str) -> Bu
     Ok(())
 }
 
-pub(crate) fn write_output_file(path: &Path, bytes: &[u8], mode: u32) -> BundleResult<()> {
+pub(crate) fn write_output_file(path: &Path, bytes: &[u8], _mode: u32) -> BundleResult<()> {
     let parent = path
         .parent()
         .ok_or_else(|| bundle_error(format!("output file has no parent: {}", path.display())))?;
@@ -1363,9 +1363,9 @@ pub(crate) fn write_output_file(path: &Path, bytes: &[u8], mode: u32) -> BundleR
     file.flush()
         .map_err(|error| bundle_error(format!("write output file {}: {error}", path.display())))?;
     #[cfg(unix)]
-    if mode == 0o755 {
+    if _mode == 0o755 {
         use std::os::unix::fs::PermissionsExt;
-        file.set_permissions(fs::Permissions::from_mode(mode))
+        file.set_permissions(fs::Permissions::from_mode(_mode))
             .map_err(|error| {
                 bundle_error(format!("set output mode {}: {error}", path.display()))
             })?;

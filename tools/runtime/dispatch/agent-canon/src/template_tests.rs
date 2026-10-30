@@ -665,10 +665,14 @@ fn exports_accept_prepared_empty_roots_and_preserve_occupied_or_symlinked_roots(
     fs::create_dir_all(&runtime).unwrap();
     let prepared = runtime.join("prepared");
     fs::create_dir(&prepared).unwrap();
+    let expected_prepared = fs::canonicalize(&prepared).unwrap();
     let result =
         template_bundle::export_bundle_at(&source, "HEAD", "agent-artifacts", &prepared, &runtime)
             .expect("accept a dispatcher-prepared empty directory");
-    assert_eq!(result["output"], prepared.to_string_lossy().as_ref());
+    assert_eq!(
+        result["output"],
+        expected_prepared.to_string_lossy().as_ref()
+    );
     assert!(prepared.join("template-bundle-provenance.json").is_file());
 
     let occupied = runtime.join("occupied");
