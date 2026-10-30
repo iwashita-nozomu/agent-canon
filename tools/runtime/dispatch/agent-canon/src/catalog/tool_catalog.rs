@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 use std::fs;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -1385,6 +1386,390 @@ fn sort_findings(findings: &mut [Finding]) {
     });
 }
 
+fn token_block_body(tokens: &[RustToken], open: usize) -> Option<Range<usize>> {
+    if tokens.get(open).map(|token| token.value.as_str()) != Some("{") {
+        return None;
+    }
+    let mut depth = 0usize;
+    for index in open..tokens.len() {
+        match tokens[index].value.as_str() {
+            "{" => depth += 1,
+            "}" => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(open + 1..index);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn function_body(tokens: &[RustToken], start: usize) -> Option<Range<usize>> {
+    let open = (start..tokens.len()).find(|index| tokens[*index].value == "{")?;
+    token_block_body(tokens, open)
+}
+
+fn function_definitions(tokens: &[RustToken], name: &str) -> Vec<usize> {
+    token_sequence_matches(tokens, &["fn", name, "("])
+}
+
+fn token_sequence_matches_in(
+    tokens: &[RustToken],
+    scope: &Range<usize>,
+    values: &[&str],
+) -> Vec<usize> {
+    token_sequence_matches(&tokens[scope.clone()], values)
+        .into_iter()
+        .map(|start| scope.start + start)
+        .collect()
+}
+
+fn graph_dispatch_finding(graph_path: &str, detail: impl Into<String>) -> Finding {
+    Finding::new("public_surface", graph_path, detail)
+}
+
+fn legacy_graph_dispatch_rows(
+    graph_path: &str,
+    cli_path: &str,
+    cli_text: &str,
+    main_span: &PublicSourceSpan,
+    graph_tokens: &[RustToken],
+) -> (Vec<PublicSurfaceRow>, Vec<Finding>) {
+    let mut rows = Vec::new();
+    let mut findings = Vec::new();
+    for (operation, handler) in [
+        ("build", "build_graph_with_failure"),
+        ("status", "read_graph_status"),
+        ("query", "query_graph"),
+        ("context", "context_graph"),
+    ] {
+        let literal = format!("\"{operation}\"");
+        let selector = [literal.as_str(), "=>"];
+        let selectors = token_sequence_matches(graph_tokens, &selector);
+        let sequence = [
+            literal,
+            "=>".to_owned(),
+            handler.to_owned(),
+            "(".to_owned(),
+            "&".to_owned(),
+            "parsed".to_owned(),
+            ")".to_owned(),
+        ];
+        let sequence_refs: Vec<&str> = sequence.iter().map(String::as_str).collect();
+        let matches = token_sequence_matches(graph_tokens, &sequence_refs);
+        if selectors.len() != 1 || matches.len() != 1 {
+            let detail = if selectors.len() > 1 || matches.len() > 1 {
+                "rust_dispatch_ambiguous"
+            } else {
+                "rust_dispatch_invalid"
+            };
+            findings.push(graph_dispatch_finding(
+                graph_path,
+                format!("{detail}:{operation}"),
+            ));
+            continue;
+        }
+        let Some(doc_span) = text_phrase_span(cli_path, cli_text, &format!("graph {operation}"))
+        else {
+            findings.push(graph_dispatch_finding(
+                graph_path,
+                format!("rust_dispatch_invalid:{operation}"),
+            ));
+            continue;
+        };
+        let mut secondary = vec![main_span.clone(), doc_span];
+        secondary.sort_by(|left, right| {
+            (&left.path, left.start_line, left.start_column).cmp(&(
+                &right.path,
+                right.start_line,
+                right.start_column,
+            ))
+        });
+        rows.push(PublicSurfaceRow::new(
+            format!("cli:graph {operation}"),
+            "cli",
+            graph_path,
+            format!("graph {operation}"),
+            token_span(graph_path, graph_tokens, matches[0], sequence.len()),
+            secondary,
+        ));
+    }
+    (rows, findings)
+}
+
+fn shared_caller_span(
+    graph_path: &str,
+    graph_tokens: &[RustToken],
+    caller: &str,
+    findings: &mut Vec<Finding>,
+) -> Option<PublicSourceSpan> {
+    let definitions = function_definitions(graph_tokens, caller);
+    if definitions.len() != 1 {
+        let detail = if definitions.len() > 1 {
+            "rust_dispatch_ambiguous"
+        } else {
+            "rust_dispatch_invalid"
+        };
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            format!("{detail}:{caller}-caller"),
+        ));
+        return None;
+    }
+    let Some(body) = function_body(graph_tokens, definitions[0]) else {
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            format!("rust_dispatch_invalid:{caller}-caller"),
+        ));
+        return None;
+    };
+    let parse_calls = token_sequence_matches_in(graph_tokens, &body, &["parse_args", "("]);
+    if parse_calls.len() != 1 {
+        let detail = if parse_calls.len() > 1 {
+            "rust_dispatch_ambiguous"
+        } else {
+            "rust_dispatch_invalid"
+        };
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            format!("{detail}:{caller}-parser"),
+        ));
+        return None;
+    }
+    let dispatch_call = ["dispatch_command", "(", "command", ",", "&", "parsed", ")"];
+    let dispatch_calls = token_sequence_matches_in(graph_tokens, &body, &dispatch_call);
+    if dispatch_calls.len() != 1 || parse_calls[0] >= dispatch_calls[0] {
+        let detail = if dispatch_calls.len() > 1 {
+            "rust_dispatch_ambiguous"
+        } else {
+            "rust_dispatch_invalid"
+        };
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            format!("{detail}:{caller}-dispatch"),
+        ));
+        return None;
+    }
+    Some(token_span(
+        graph_path,
+        graph_tokens,
+        dispatch_calls[0],
+        dispatch_call.len(),
+    ))
+}
+
+fn shared_graph_dispatch_rows(
+    graph_path: &str,
+    cli_path: &str,
+    cli_text: &str,
+    main_span: &PublicSourceSpan,
+    graph_tokens: &[RustToken],
+    helper_definition: usize,
+) -> (Vec<PublicSurfaceRow>, Vec<Finding>) {
+    let mut rows = Vec::new();
+    let mut findings = Vec::new();
+    let helper_signature = [
+        "fn",
+        "dispatch_command",
+        "(",
+        "command",
+        ":",
+        "&",
+        "str",
+        ",",
+        "args",
+        ":",
+        "&",
+        "GraphArgs",
+        ")",
+        "-",
+        ">",
+        "Result",
+        "<",
+        "Value",
+        ",",
+        "GraphError",
+        ">",
+        "{",
+    ];
+    if token_sequence_matches(graph_tokens, &helper_signature).len() != 1 {
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            "rust_dispatch_invalid:dispatch_command-signature",
+        ));
+        return (rows, findings);
+    }
+    let Some(helper_body) = function_body(graph_tokens, helper_definition) else {
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            "rust_dispatch_invalid:dispatch_command-body",
+        ));
+        return (rows, findings);
+    };
+    let match_sequences =
+        token_sequence_matches_in(graph_tokens, &helper_body, &["match", "command", "{"]);
+    if match_sequences.len() != 1 {
+        let detail = if match_sequences.len() > 1 {
+            "rust_dispatch_ambiguous:dispatch_command-match"
+        } else {
+            "rust_dispatch_invalid:dispatch_command-match"
+        };
+        findings.push(graph_dispatch_finding(graph_path, detail));
+        return (rows, findings);
+    }
+    let match_body = token_block_body(graph_tokens, match_sequences[0] + 2);
+    let Some(match_body) = match_body else {
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            "rust_dispatch_invalid:dispatch_command-match-body",
+        ));
+        return (rows, findings);
+    };
+
+    let invoke_span = shared_caller_span(graph_path, graph_tokens, "invoke", &mut findings);
+    let run_span = shared_caller_span(graph_path, graph_tokens, "run", &mut findings);
+    let call_sequence = ["dispatch_command", "(", "command", ",", "&", "parsed", ")"];
+    let all_calls = token_sequence_matches(graph_tokens, &call_sequence);
+    if all_calls.len() != 2 {
+        let detail = if all_calls.len() > 2 {
+            "rust_dispatch_ambiguous:dispatch-caller"
+        } else {
+            "rust_dispatch_invalid:dispatch-caller"
+        };
+        findings.push(graph_dispatch_finding(graph_path, detail));
+    }
+    let (Some(invoke_span), Some(run_span)) = (invoke_span, run_span) else {
+        return (rows, findings);
+    };
+    if all_calls.len() != 2 {
+        return (rows, findings);
+    }
+
+    let mut unknown_operations = BTreeSet::new();
+    let known_operations = ["build", "status", "query", "context"];
+    for index in match_body.start..match_body.end.saturating_sub(1) {
+        let token = graph_tokens[index].value.as_str();
+        if token.starts_with('"') && token.ends_with('"') && graph_tokens[index + 1].value == "=>" {
+            let operation = token.trim_matches('"');
+            if !known_operations.contains(&operation) {
+                unknown_operations.insert(operation.to_owned());
+            }
+        }
+    }
+    for operation in unknown_operations {
+        findings.push(graph_dispatch_finding(
+            graph_path,
+            format!("rust_dispatch_invalid:unknown-operation:{operation}"),
+        ));
+    }
+
+    for (operation, handler) in [
+        ("build", "build_graph_with_failure"),
+        ("status", "read_graph_status"),
+        ("query", "query_graph"),
+        ("context", "context_graph"),
+    ] {
+        let literal = format!("\"{operation}\"");
+        let selector = [literal.as_str(), "=>"];
+        let selectors = token_sequence_matches_in(graph_tokens, &match_body, &selector);
+        let sequence = [
+            literal,
+            "=>".to_owned(),
+            handler.to_owned(),
+            "(".to_owned(),
+            "args".to_owned(),
+            ")".to_owned(),
+        ];
+        let sequence_refs: Vec<&str> = sequence.iter().map(String::as_str).collect();
+        let matches = token_sequence_matches_in(graph_tokens, &match_body, &sequence_refs);
+        let legacy_sequence = [
+            format!("\"{operation}\""),
+            "=>".to_owned(),
+            handler.to_owned(),
+            "(".to_owned(),
+            "&".to_owned(),
+            "parsed".to_owned(),
+            ")".to_owned(),
+        ];
+        let legacy_refs: Vec<&str> = legacy_sequence.iter().map(String::as_str).collect();
+        let legacy_matches = token_sequence_matches(graph_tokens, &legacy_refs);
+        if selectors.len() != 1 || matches.len() != 1 || !legacy_matches.is_empty() {
+            let detail = if selectors.len() > 1 || matches.len() > 1 || !legacy_matches.is_empty() {
+                "rust_dispatch_ambiguous"
+            } else {
+                "rust_dispatch_invalid"
+            };
+            findings.push(graph_dispatch_finding(
+                graph_path,
+                format!("{detail}:{operation}"),
+            ));
+            continue;
+        }
+        let Some(doc_span) = text_phrase_span(cli_path, cli_text, &format!("graph {operation}"))
+        else {
+            findings.push(graph_dispatch_finding(
+                graph_path,
+                format!("rust_dispatch_invalid:{operation}"),
+            ));
+            continue;
+        };
+        let mut secondary = vec![
+            main_span.clone(),
+            invoke_span.clone(),
+            run_span.clone(),
+            doc_span,
+        ];
+        secondary.sort_by(|left, right| {
+            (&left.path, left.start_line, left.start_column).cmp(&(
+                &right.path,
+                right.start_line,
+                right.start_column,
+            ))
+        });
+        rows.push(PublicSurfaceRow::new(
+            format!("cli:graph {operation}"),
+            "cli",
+            graph_path,
+            format!("graph {operation}"),
+            token_span(graph_path, graph_tokens, matches[0], sequence.len()),
+            secondary,
+        ));
+    }
+    (rows, findings)
+}
+
+fn graph_dispatch_rows(
+    graph_path: &str,
+    cli_path: &str,
+    cli_text: &str,
+    main_span: &PublicSourceSpan,
+    graph_tokens: &[RustToken],
+) -> (Vec<PublicSurfaceRow>, Vec<Finding>) {
+    let helper_definitions = function_definitions(graph_tokens, "dispatch_command");
+    if helper_definitions.is_empty() {
+        return legacy_graph_dispatch_rows(graph_path, cli_path, cli_text, main_span, graph_tokens);
+    }
+    if helper_definitions.len() > 1 {
+        return (
+            Vec::new(),
+            vec![graph_dispatch_finding(
+                graph_path,
+                "rust_dispatch_ambiguous:dispatch_command",
+            )],
+        );
+    }
+    shared_graph_dispatch_rows(
+        graph_path,
+        cli_path,
+        cli_text,
+        main_span,
+        graph_tokens,
+        helper_definitions[0],
+    )
+}
+
 /// Extracts canonical public CLI, tool, and skill surfaces with source spans.
 pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
@@ -1517,55 +1902,9 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
         main_matches[0],
         main_sequence.len(),
     );
-    let mut rows = Vec::new();
-    for (operation, handler) in [
-        ("build", "build_graph_with_failure"),
-        ("status", "read_graph_status"),
-        ("query", "query_graph"),
-        ("context", "context_graph"),
-    ] {
-        let sequence = [
-            format!("\"{operation}\""),
-            "=>".to_owned(),
-            handler.to_owned(),
-            "(".to_owned(),
-            "&".to_owned(),
-            "parsed".to_owned(),
-            ")".to_owned(),
-        ];
-        let sequence_refs: Vec<&str> = sequence.iter().map(String::as_str).collect();
-        let matches = token_sequence_matches(&graph_tokens, &sequence_refs);
-        let doc_span = text_phrase_span(cli_path, cli_text, &format!("graph {operation}"));
-        if matches.len() != 1 || doc_span.is_none() {
-            let detail = if matches.len() > 1 {
-                "rust_dispatch_ambiguous"
-            } else {
-                "rust_dispatch_invalid"
-            };
-            findings.push(Finding::new(
-                "public_surface",
-                graph_path,
-                format!("{detail}:{operation}"),
-            ));
-            continue;
-        }
-        let mut secondary = vec![main_span.clone(), doc_span.expect("checked above")];
-        secondary.sort_by(|left, right| {
-            (&left.path, left.start_line, left.start_column).cmp(&(
-                &right.path,
-                right.start_line,
-                right.start_column,
-            ))
-        });
-        rows.push(PublicSurfaceRow::new(
-            format!("cli:graph {operation}"),
-            "cli",
-            graph_path,
-            format!("graph {operation}"),
-            token_span(graph_path, &graph_tokens, matches[0], sequence.len()),
-            secondary,
-        ));
-    }
+    let (mut rows, graph_findings) =
+        graph_dispatch_rows(graph_path, cli_path, cli_text, &main_span, &graph_tokens);
+    findings.extend(graph_findings);
 
     if let Some(text) = text_for(tool_path) {
         match yaml_document(text) {
