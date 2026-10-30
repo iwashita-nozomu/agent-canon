@@ -345,8 +345,8 @@ fn existing_invalid_utf8_wiring_and_catalog_docs_fail_validation() {
         .path()
         .join("tools/validation/ci/runners/run_all_checks.sh");
     fs::create_dir_all(wiring_path.parent().unwrap()).unwrap();
-    fs::write(&wiring_path, &[0xff_u8]).unwrap();
-    fs::write(root.path().join("tools/README.md"), &[0xff_u8]).unwrap();
+    fs::write(&wiring_path, [0xff_u8]).unwrap();
+    fs::write(root.path().join("tools/README.md"), [0xff_u8]).unwrap();
 
     let report = validate_catalog(root.path());
     assert!(report.findings.iter().any(|finding| {
