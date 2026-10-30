@@ -670,6 +670,11 @@ impl ParentRootAttestor {
         Self
     }
 
+    /// Attest exactly the roots, bindings, purpose, nonce, and token in `request`.
+    ///
+    /// This low-level operation does not construct a request from process environment.
+    /// Callers that intentionally consume a child handoff use `reattest_child` after
+    /// supplying its token and all request bindings explicitly.
     pub fn attest(&self, request: &AttestationRequest) -> Result<AttestedParent, AuthorityError> {
         platform::attest(request)
     }
@@ -681,6 +686,7 @@ impl ParentRootAttestor {
         platform::issue_child_handoff(request)
     }
 
+    /// Reattest an explicitly populated child request and consume its handoff token.
     pub fn reattest_child(
         &self,
         request: &AttestationRequest,
