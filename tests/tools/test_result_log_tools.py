@@ -139,3 +139,25 @@ def test_hlo_summary_top_accepts_arbitrary_python_integers(tmp_path: Path) -> No
     assert json.loads(negative.stdout)["top_ops"] == []
     assert underscored.returncode == 0, underscored.stderr
     assert json.loads(underscored.stdout)["top_ops"] == all_ops
+
+
+def test_hlo_summary_reads_universal_newlines(tmp_path: Path) -> None:
+    """JSONL records may be separated by bare CR, LF, or CRLF."""
+    source = tmp_path / "universal-newlines.jsonl"
+    selected = json.dumps(
+        {"case": "hlo", "hlo": "%0 = stablehlo.add()"},
+        ensure_ascii=True,
+    )
+    ignored = json.dumps(
+        {"case": "other", "hlo": "%x = ignored()"},
+        ensure_ascii=True,
+    )
+    source.write_bytes(f"{selected}\r{ignored}\r\n".encode("utf-8"))
+
+    result = _run_native("summarize-hlo-jsonl", str(source))
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+    assert summary["total_records"] == 2
+    assert summary["total_selected"] == 1
+    assert ["stablehlo.add", 1] in summary["top_ops"]

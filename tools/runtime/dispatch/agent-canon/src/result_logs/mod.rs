@@ -10,6 +10,7 @@ use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
 use std::fs;
+use std::io::{self, BufRead, BufReader};
 use std::path::PathBuf;
 
 const PREFERRED_KEYS: &[&str] = &[
@@ -638,7 +639,7 @@ pub fn run_summary(args: &[String]) -> i32 {
         }
     };
 
-    let input = match fs::read_to_string(&parsed.path) {
+    let input = match fs::File::open(&parsed.path) {
         Ok(input) => input,
         Err(error) => {
             eprintln!(
@@ -657,8 +658,33 @@ pub fn run_summary(args: &[String]) -> i32 {
     let mut hlo_lines_total = 0usize;
     let mut hlo_chars_total = 0usize;
 
-    for (line_number, line) in universal_lines(&input).into_iter().enumerate() {
-        let stripped = python_trim(line);
+    let mut line_reader = UniversalLineReader::new(BufReader::new(input));
+    let mut line_number = 0;
+    loop {
+        let bytes = match line_reader.next_line() {
+            Ok(Some(bytes)) => bytes,
+            Ok(None) => break,
+            Err(error) => {
+                eprintln!(
+                    "agent-canon summarize-hlo-jsonl: read {}: {error}",
+                    parsed.path.display()
+                );
+                return 1;
+            }
+        };
+        line_number += 1;
+        let line = match String::from_utf8(bytes) {
+            Ok(line) => line,
+            Err(error) => {
+                eprintln!(
+                    "agent-canon summarize-hlo-jsonl: decode {} at line {}: {error}",
+                    parsed.path.display(),
+                    line_number
+                );
+                return 1;
+            }
+        };
+        let stripped = python_trim(&line);
         if stripped.is_empty() {
             continue;
         }
@@ -668,7 +694,7 @@ pub fn run_summary(args: &[String]) -> i32 {
                 eprintln!(
                     "agent-canon summarize-hlo-jsonl: invalid JSON in {} at line {}: {error}",
                     parsed.path.display(),
-                    line_number + 1
+                    line_number
                 );
                 return 1;
             }
@@ -1301,6 +1327,65 @@ fn universal_lines(text: &str) -> Vec<&str> {
         lines.push(&text[start..]);
     }
     lines
+}
+
+struct UniversalLineReader<R> {
+    reader: R,
+}
+
+impl<R: BufRead> UniversalLineReader<R> {
+    fn new(reader: R) -> Self {
+        Self { reader }
+    }
+
+    fn next_line(&mut self) -> io::Result<Option<Vec<u8>>> {
+        let mut line = Vec::new();
+        loop {
+            let (consumed, delimiter, swallow_lf) = {
+                let buffer = self.reader.fill_buf()?;
+                if buffer.is_empty() {
+                    return if line.is_empty() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(line))
+                    };
+                }
+                if let Some(index) = buffer
+                    .iter()
+                    .position(|byte| *byte == b'\r' || *byte == b'\n')
+                {
+                    line.extend_from_slice(&buffer[..index]);
+                    let delimiter = buffer[index];
+                    let mut consumed = index + 1;
+                    let swallow_lf = if delimiter == b'\r' {
+                        if buffer.get(consumed) == Some(&b'\n') {
+                            consumed += 1;
+                            false
+                        } else {
+                            consumed == buffer.len()
+                        }
+                    } else {
+                        false
+                    };
+                    (consumed, Some(delimiter), swallow_lf)
+                } else {
+                    let consumed = buffer.len();
+                    line.extend_from_slice(buffer);
+                    (consumed, None, false)
+                }
+            };
+            self.reader.consume(consumed);
+            let Some(delimiter) = delimiter else {
+                continue;
+            };
+            if delimiter == b'\r' && swallow_lf {
+                if self.reader.fill_buf()?.first() == Some(&b'\n') {
+                    self.reader.consume(1);
+                }
+            }
+            return Ok(Some(line));
+        }
+    }
 }
 
 fn python_splitlines(text: &[u32]) -> Vec<std::ops::Range<usize>> {
