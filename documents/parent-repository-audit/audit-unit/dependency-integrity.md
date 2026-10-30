@@ -5,7 +5,7 @@ contract design
 responsibility Audits dependency headers, graph direction, manifests, and full-tree dependency evidence.
 upstream design ../README.md owns unit closure and evidence separation
 upstream design ../../../agents/internal-routines/README.md owns internal dependency route
-upstream implementation ../../../tools/validation/semantic/dependencies/check_dependency_headers.py owns header validation
+upstream implementation ../../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs owns selected-header validation
 downstream implementation ../../../agents/skills/dependency-analysis.md repairs dependency evidence
 @dependency-end
 -->
@@ -30,14 +30,14 @@ self-reference、cycle、孤立 manifest、古い header 形式がない。depen
 ## Evidence Sources
 
 - `@dependency-start` / `@dependency-end` headers
-- `tools/validation/semantic/dependencies/check_dependency_headers.py`
+- `tools/bin/agent-canon check-dependency-headers`
 - `tools/analysis/dependencies/check_dependency_graph.sh`
 - `tools/analysis/dependencies/run_repo_dependency_review.sh`
 - [documents/design/parent-repository-audit.md](../../design/parent-repository-audit.md) の dependency edge
 
 ## Repair Route
 
-owner skill は `dependency-analysis`、主 tool は `check_dependency_headers.py`、
+owner skill は `dependency-analysis`、主 tool は `check-dependency-headers` native command、
 `check_dependency_graph.sh`、`run_repo_dependency_review.sh`。既存 helper と graph
 owner を再利用し、別の checker を増やさずに header/edge の正本を修正します。
 

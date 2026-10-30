@@ -663,7 +663,7 @@ fn contains_static_analysis_command(text_lower: &str) -> bool {
         "shellcheck",
         "cargo check",
         "cargo clippy",
-        "check_dependency_headers.py",
+        "agent-canon check-dependency-headers",
         "scan_dependency_headers.sh",
         "check_dependency_header_format.sh",
         "check_convention_compliance.py",

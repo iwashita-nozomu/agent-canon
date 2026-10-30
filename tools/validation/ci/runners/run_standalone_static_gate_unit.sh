@@ -164,6 +164,7 @@ run_rust() {
 
 run_contracts() {
   node --version
+  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider --pyargs \
     tests.agent_tools.test_tool_dispatch \
     tests.agent_tools.test_paper_writing_citeproc \

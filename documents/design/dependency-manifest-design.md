@@ -6,14 +6,14 @@ contract design
 responsibility Defines the optional dependency manifest DSL and validation model for explicitly selected analysis.
 downstream design source-owned-dependency-validation.md applies the DSL to source-owned validation
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
-downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates changed-file manifests
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates selected-file manifests
 downstream implementation ../../tools/analysis/dependencies/scan_dependency_headers.sh scans manifest marker coverage
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP artifacts and bounded query projections
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
-downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies the native manifest checker CLI
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph materialization and queries
@@ -255,7 +255,7 @@ agent は file を読む前に `contract` と `responsibility` を読み、設�
 外側 comment syntax だけを file type に合わせます。
 manifest block は、選択した scanner が読める file 冒頭付近に置きます。
 必要な YAML frontmatter、H1 title、shebang、encoding comment の後に配置できます。
-現行の `check_dependency_headers.py` は先頭 40 行、shell tool 群は既定で先頭 80 行を読みます。
+現行の `check-dependency-headers` native command と shell tool 群は先頭 80 行を読みます。
 この値は現行 scanner の入力範囲です。範囲を変えるときは tool と caller の入力契約を合わせて更新します。
 
 Markdown:
