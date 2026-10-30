@@ -5,6 +5,9 @@
 // downstream implementation ../../../../../../../tests/tools/test_result_log_tools.py exercises both public commands
 // @dependency-end
 
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
+use serde_json::value::RawValue;
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
@@ -24,230 +27,108 @@ const PREFERRED_KEYS: &[&str] = &[
 enum JsonValue {
     Null,
     Bool(bool),
-    Integer(String),
-    Float(f64),
+    Number(JsonNumber),
     String(String),
     Array(Vec<JsonValue>),
-    Object(Vec<(String, JsonValue)>),
+    Object(JsonObject),
 }
 
-struct JsonParser<'a> {
-    input: &'a str,
-    bytes: &'a [u8],
-    index: usize,
+#[derive(Debug, Clone)]
+struct JsonNumber(String);
+
+impl JsonNumber {
+    fn is_float(&self) -> bool {
+        self.0
+            .chars()
+            .any(|character| matches!(character, '.' | 'e' | 'E'))
+    }
+
+    fn python_string(&self) -> String {
+        if self.is_float() {
+            python_float(self.0.parse().expect("serde validated a JSON float"))
+        } else if self.0 == "-0" {
+            "0".to_owned()
+        } else {
+            self.0.clone()
+        }
+    }
+
+    fn json_string(&self) -> String {
+        if self.is_float() {
+            json_float(self.0.parse().expect("serde validated a JSON float"))
+        } else if self.0 == "-0" {
+            "0".to_owned()
+        } else {
+            self.0.clone()
+        }
+    }
 }
 
-impl<'a> JsonParser<'a> {
-    fn new(input: &'a str) -> Self {
-        Self {
-            input,
-            bytes: input.as_bytes(),
-            index: 0,
-        }
+impl<'de> Deserialize<'de> for JsonValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = Box::<RawValue>::deserialize(deserializer)?;
+        parse_raw_value(raw.get()).map_err(de::Error::custom)
     }
+}
 
-    fn parse(mut self) -> Result<JsonValue, String> {
-        self.skip_whitespace();
-        let value = self.parse_value()?;
-        self.skip_whitespace();
-        if self.index != self.bytes.len() {
-            return Err(self.error("unexpected trailing characters"));
-        }
-        Ok(value)
+fn parse_raw_value(raw: &str) -> Result<JsonValue, String> {
+    let raw = raw.trim();
+    match raw.as_bytes().first().copied() {
+        Some(b'n') => Ok(JsonValue::Null),
+        Some(b't') => Ok(JsonValue::Bool(true)),
+        Some(b'f') => Ok(JsonValue::Bool(false)),
+        Some(b'"') => serde_json::from_str::<String>(raw)
+            .map(JsonValue::String)
+            .map_err(|error| error.to_string()),
+        Some(b'[') => serde_json::from_str::<Vec<JsonValue>>(raw)
+            .map(JsonValue::Array)
+            .map_err(|error| error.to_string()),
+        Some(b'{') => serde_json::from_str::<JsonObject>(raw)
+            .map(JsonValue::Object)
+            .map_err(|error| error.to_string()),
+        Some(b'-' | b'0'..=b'9') => Ok(JsonValue::Number(JsonNumber(raw.to_owned()))),
+        _ => Err("invalid JSON value".to_owned()),
     }
+}
 
-    fn parse_value(&mut self) -> Result<JsonValue, String> {
-        match self.peek() {
-            Some(b'{') => self.parse_object(),
-            Some(b'[') => self.parse_array(),
-            Some(b'"') => self.parse_string().map(JsonValue::String),
-            Some(b't') => {
-                self.consume_literal("true")?;
-                Ok(JsonValue::Bool(true))
-            }
-            Some(b'f') => {
-                self.consume_literal("false")?;
-                Ok(JsonValue::Bool(false))
-            }
-            Some(b'n') => {
-                self.consume_literal("null")?;
-                Ok(JsonValue::Null)
-            }
-            Some(b'N') => {
-                self.consume_literal("NaN")?;
-                Ok(JsonValue::Float(f64::NAN))
-            }
-            Some(b'I') => {
-                self.consume_literal("Infinity")?;
-                Ok(JsonValue::Float(f64::INFINITY))
-            }
-            Some(b'-') if self.input[self.index..].starts_with("-Infinity") => {
-                self.consume_literal("-Infinity")?;
-                Ok(JsonValue::Float(f64::NEG_INFINITY))
-            }
-            Some(b'-' | b'0'..=b'9') => self.parse_number(),
-            Some(_) => Err(self.error("expected a JSON value")),
-            None => Err(self.error("unexpected end of input")),
-        }
-    }
+#[derive(Debug, Clone)]
+struct JsonObject(Vec<(String, JsonValue)>);
 
-    fn parse_object(&mut self) -> Result<JsonValue, String> {
-        self.index += 1;
-        self.skip_whitespace();
-        let mut values: Vec<(String, JsonValue)> = Vec::new();
-        if self.consume_if(b'}') {
-            return Ok(JsonValue::Object(values));
-        }
-        loop {
-            if self.peek() != Some(b'"') {
-                return Err(self.error("object keys must be strings"));
-            }
-            let key = self.parse_string()?;
-            self.skip_whitespace();
-            if !self.consume_if(b':') {
-                return Err(self.error("expected ':' after object key"));
-            }
-            self.skip_whitespace();
-            let value = self.parse_value()?;
-            if let Some(position) = values.iter().position(|(existing, _)| existing == &key) {
-                values[position].1 = value;
-            } else {
-                values.push((key, value));
-            }
-            self.skip_whitespace();
-            if self.consume_if(b'}') {
-                return Ok(JsonValue::Object(values));
-            }
-            if !self.consume_if(b',') {
-                return Err(self.error("expected ',' or '}' after object value"));
-            }
-            self.skip_whitespace();
-        }
-    }
+impl<'de> Deserialize<'de> for JsonObject {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct JsonObjectVisitor;
 
-    fn parse_array(&mut self) -> Result<JsonValue, String> {
-        self.index += 1;
-        self.skip_whitespace();
-        let mut values = Vec::new();
-        if self.consume_if(b']') {
-            return Ok(JsonValue::Array(values));
-        }
-        loop {
-            values.push(self.parse_value()?);
-            self.skip_whitespace();
-            if self.consume_if(b']') {
-                return Ok(JsonValue::Array(values));
-            }
-            if !self.consume_if(b',') {
-                return Err(self.error("expected ',' or ']' after array value"));
-            }
-            self.skip_whitespace();
-        }
-    }
+        impl<'de> Visitor<'de> for JsonObjectVisitor {
+            type Value = JsonObject;
 
-    fn parse_string(&mut self) -> Result<String, String> {
-        let start = self.index;
-        self.index += 1;
-        while self.index < self.bytes.len() {
-            match self.bytes[self.index] {
-                b'"' => {
-                    self.index += 1;
-                    return serde_json::from_str(&self.input[start..self.index])
-                        .map_err(|error| format!("invalid JSON string: {error}"));
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a JSON object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut values: Vec<(String, JsonValue)> = Vec::new();
+                while let Some((key, value)) = map.next_entry::<String, JsonValue>()? {
+                    if let Some(position) = values.iter().position(|(existing, _)| existing == &key)
+                    {
+                        values[position].1 = value;
+                    } else {
+                        values.push((key, value));
+                    }
                 }
-                b'\\' => self.index = (self.index + 2).min(self.bytes.len()),
-                byte if byte < 0x20 => {
-                    return Err(self.error("unescaped control character in string"))
-                }
-                _ => self.index += 1,
+                Ok(JsonObject(values))
             }
         }
-        Err(self.error("unterminated string"))
-    }
 
-    fn parse_number(&mut self) -> Result<JsonValue, String> {
-        let start = self.index;
-        self.consume_if(b'-');
-        match self.peek() {
-            Some(b'0') => {
-                self.index += 1;
-                if matches!(self.peek(), Some(b'0'..=b'9')) {
-                    return Err(self.error("leading zeros are not permitted in numbers"));
-                }
-            }
-            Some(b'1'..=b'9') => {
-                self.index += 1;
-                while matches!(self.peek(), Some(b'0'..=b'9')) {
-                    self.index += 1;
-                }
-            }
-            _ => return Err(self.error("expected a digit in number")),
-        }
-        let mut is_float = false;
-        if self.consume_if(b'.') {
-            is_float = true;
-            if !matches!(self.peek(), Some(b'0'..=b'9')) {
-                return Err(self.error("expected a digit after decimal point"));
-            }
-            while matches!(self.peek(), Some(b'0'..=b'9')) {
-                self.index += 1;
-            }
-        }
-        if matches!(self.peek(), Some(b'e' | b'E')) {
-            is_float = true;
-            self.index += 1;
-            if matches!(self.peek(), Some(b'+' | b'-')) {
-                self.index += 1;
-            }
-            if !matches!(self.peek(), Some(b'0'..=b'9')) {
-                return Err(self.error("expected a digit in exponent"));
-            }
-            while matches!(self.peek(), Some(b'0'..=b'9')) {
-                self.index += 1;
-            }
-        }
-        let raw = &self.input[start..self.index];
-        if is_float {
-            raw.parse::<f64>()
-                .map(JsonValue::Float)
-                .map_err(|error| format!("invalid JSON number '{raw}': {error}"))
-        } else if raw == "-0" {
-            Ok(JsonValue::Integer("0".to_owned()))
-        } else {
-            Ok(JsonValue::Integer(raw.to_owned()))
-        }
-    }
-
-    fn consume_literal(&mut self, literal: &str) -> Result<(), String> {
-        if self.input[self.index..].starts_with(literal) {
-            self.index += literal.len();
-            Ok(())
-        } else {
-            Err(self.error("invalid literal"))
-        }
-    }
-
-    fn skip_whitespace(&mut self) {
-        while matches!(self.peek(), Some(b' ' | b'\t' | b'\r' | b'\n')) {
-            self.index += 1;
-        }
-    }
-
-    fn consume_if(&mut self, expected: u8) -> bool {
-        if self.peek() == Some(expected) {
-            self.index += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn peek(&self) -> Option<u8> {
-        self.bytes.get(self.index).copied()
-    }
-
-    fn error(&self, message: &str) -> String {
-        format!("{message} at column {}", self.index + 1)
+        deserializer.deserialize_map(JsonObjectVisitor)
     }
 }
 
@@ -321,7 +202,7 @@ pub fn run_summary(args: &[String]) -> i32 {
         if stripped.is_empty() {
             continue;
         }
-        let value = match JsonParser::new(stripped).parse() {
+        let value = match serde_json::from_str::<JsonValue>(stripped) {
             Ok(value) => value,
             Err(error) => {
                 eprintln!(
@@ -378,6 +259,7 @@ pub fn run_summary(args: &[String]) -> i32 {
         "{{\"jsonl\": {}, \"total_records\": {}, \"total_selected\": {}, \"filter\": {{\"only_case\": {}}}, \"tags\": {}, \"dialects\": {}, \"hlo_text\": {{\"total_lines\": {}, \"total_chars\": {}}}, \"top_ops\": {}}}",
         json_string(&parsed.path_text),
         total_records,
+        total_selected,
         json_string(&parsed.only_case),
         counter_json(&tags.pairs(None)),
         counter_json(&dialects.pairs(None)),
@@ -424,7 +306,7 @@ pub fn run_jsonl_to_md(args: &[String]) -> i32 {
         if stripped.is_empty() {
             continue;
         }
-        if let Ok(JsonValue::Object(record)) = JsonParser::new(stripped).parse() {
+        if let Ok(JsonValue::Object(record)) = serde_json::from_str::<JsonValue>(stripped) {
             records.push(record);
         }
     }
@@ -577,13 +459,14 @@ impl MarkdownArgs {
     }
 }
 
-fn object_get<'a>(record: &'a [(String, JsonValue)], key: &str) -> Option<&'a JsonValue> {
+fn object_get<'a>(record: &'a JsonObject, key: &str) -> Option<&'a JsonValue> {
     record
+        .0
         .iter()
         .find_map(|(candidate, value)| (candidate.as_str() == key).then_some(value))
 }
 
-fn record_key(record: &[(String, JsonValue)], key: &str) -> String {
+fn record_key(record: &JsonObject, key: &str) -> String {
     match object_get(record, key) {
         None | Some(JsonValue::Null) => String::new(),
         Some(value) => python_string(value),
@@ -594,8 +477,7 @@ fn python_string(value: &JsonValue) -> String {
     match value {
         JsonValue::Null => "None".to_owned(),
         JsonValue::Bool(value) => if *value { "True" } else { "False" }.to_owned(),
-        JsonValue::Integer(value) => value.clone(),
-        JsonValue::Float(value) => python_float(*value),
+        JsonValue::Number(value) => value.python_string(),
         JsonValue::String(value) => value.clone(),
         JsonValue::Array(_) | JsonValue::Object(_) => python_repr(value),
     }
@@ -605,8 +487,7 @@ fn python_repr(value: &JsonValue) -> String {
     match value {
         JsonValue::Null => "None".to_owned(),
         JsonValue::Bool(value) => if *value { "True" } else { "False" }.to_owned(),
-        JsonValue::Integer(value) => value.clone(),
-        JsonValue::Float(value) => python_float(*value),
+        JsonValue::Number(value) => value.python_string(),
         JsonValue::String(value) => python_string_repr(value),
         JsonValue::Array(values) => format!(
             "[{}]",
@@ -619,6 +500,7 @@ fn python_repr(value: &JsonValue) -> String {
         JsonValue::Object(values) => format!(
             "{{{}}}",
             values
+                .0
                 .iter()
                 .map(|(key, value)| format!("{}: {}", python_string_repr(key), python_repr(value)))
                 .collect::<Vec<_>>()
@@ -739,8 +621,7 @@ fn json_value(value: &JsonValue) -> String {
     match value {
         JsonValue::Null => "null".to_owned(),
         JsonValue::Bool(value) => value.to_string(),
-        JsonValue::Integer(value) => value.clone(),
-        JsonValue::Float(value) => json_float(*value),
+        JsonValue::Number(value) => value.json_string(),
         JsonValue::String(value) => json_string(value),
         JsonValue::Array(values) => format!(
             "[{}]",
@@ -749,6 +630,7 @@ fn json_value(value: &JsonValue) -> String {
         JsonValue::Object(values) => format!(
             "{{{}}}",
             values
+                .0
                 .iter()
                 .map(|(key, value)| format!("{}: {}", json_string(key), json_value(value)))
                 .collect::<Vec<_>>()
@@ -776,7 +658,7 @@ fn format_value(value: &JsonValue) -> String {
     rendered.replace('|', "\\|").replace('\n', "<br>")
 }
 
-fn render_markdown(input_path: &str, records: &[Vec<(String, JsonValue)>]) -> String {
+fn render_markdown(input_path: &str, records: &[JsonObject]) -> String {
     let mut lines = vec![
         "# JSONL Report".to_owned(),
         String::new(),
@@ -800,6 +682,7 @@ fn render_markdown(input_path: &str, records: &[Vec<(String, JsonValue)>]) -> St
             }
         }
         let mut remaining: Vec<_> = record
+            .0
             .iter()
             .filter(|(key, _)| !PREFERRED_KEYS.contains(&key.as_str()))
             .collect();
