@@ -2266,19 +2266,6 @@ fn source_root() -> Result<PathBuf, String> {
         .map_err(|error| format!("AgentCanon source root unavailable: {error}"))
 }
 
-fn nearest_existing_directory(path: &Path) -> Result<PathBuf, String> {
-    let mut current = path.to_path_buf();
-    while !current.is_dir() {
-        if !current.pop() {
-            return Err(format!(
-                "no existing parent directory for {}",
-                path.display()
-            ));
-        }
-    }
-    fs::canonicalize(current).map_err(|error| format!("cannot resolve report root: {error}"))
-}
-
 fn runtime_boundary_for_report_root(
     source: &Path,
     report_root: Option<&Path>,
@@ -2291,16 +2278,11 @@ fn runtime_boundary_for_report_root(
         let resolved = boundary.resolve(declared)?;
         return Ok((boundary, resolved));
     }
-    let parent = nearest_existing_directory(declared)?;
-    let boundary = RuntimeArtifactBoundary::for_source(source, Some(&parent), false)?;
-    // An existing absolute report root is the boundary itself, not an artifact
-    // to resolve beneath that boundary. Keep resolve()'s root-self rejection
-    // for the later report_root/run_id bundle path.
-    let resolved = if declared.is_dir() {
-        declared.to_path_buf()
-    } else {
-        boundary.resolve(declared)?
-    };
+    // Resolve the configured absolute root as the validated boundary itself,
+    // not as an artifact beneath a parent boundary. The selected run-id child
+    // is resolved through the same capability by the caller.
+    let boundary = RuntimeArtifactBoundary::for_source(source, Some(declared), false)?;
+    let resolved = boundary.root().to_path_buf();
     Ok((boundary, resolved))
 }
 

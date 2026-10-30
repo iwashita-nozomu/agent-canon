@@ -364,10 +364,16 @@ fn native_cli_writes_only_through_explicit_external_runtime_boundary() {
 
 #[test]
 fn native_cli_accepts_existing_absolute_report_root_without_runtime_environment() {
-    let report_root = Fixture::new("absolute-report-root");
-    let report_root_path = report_root.root().canonicalize().unwrap();
+    let external = Fixture::new("absolute-report-root");
+    let external_root = external.root().canonicalize().unwrap();
+    let canonical_report_root = external_root.join("reports/agents");
+    fs::create_dir_all(&canonical_report_root).unwrap();
+    let missing_base = external_root.join("missing-base");
+    assert!(!missing_base.exists());
+    let declared_report_root = missing_base.join("..").join("reports/agents");
+    assert!(declared_report_root.is_absolute());
     let run_id = "fixture-run";
-    let run_directory = report_root_path.join(run_id);
+    let run_directory = canonical_report_root.join(run_id);
     fs::create_dir_all(&run_directory).unwrap();
     let run = Fixture(run_directory);
     write_ready_run(&run, READY_OUTPUTS);
@@ -380,7 +386,7 @@ fn native_cli_accepts_existing_absolute_report_root_without_runtime_environment(
             "--run-id",
             run_id,
             "--report-root",
-            report_root_path.to_str().unwrap(),
+            declared_report_root.to_str().unwrap(),
             "--workspace-root",
             source.to_str().unwrap(),
             "--behavior-manifest",
