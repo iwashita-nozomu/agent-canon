@@ -2,8 +2,7 @@
 # contract test
 # responsibility Tests result-log conversion and summary tools.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md result policy
-# upstream implementation ../../tools/analysis/documents/formatting/jsonl_to_md.py converter under test
-# upstream implementation ../../tools/analysis/hlo/summarization/summarize_hlo_jsonl.py HLO summary under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs native transforms under test
 # @dependency-end
 
 """Tests for result-log conversion and summary helpers."""
@@ -11,13 +10,22 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-JSONL_TO_MD = PROJECT_ROOT / "tools" / "analysis" / "documents" / "formatting" / "jsonl_to_md.py"
-HLO_SUMMARY = PROJECT_ROOT / "tools" / "analysis" / "hlo" / "summarization" / "summarize_hlo_jsonl.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+
+def _run_native(*args: str) -> subprocess.CompletedProcess[str]:
+    if AGENT_CANON_CLI is None:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return subprocess.run(
+        [AGENT_CANON_CLI, *args],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
@@ -36,12 +44,7 @@ def test_jsonl_to_md_writes_markdown_table(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        [sys.executable, str(JSONL_TO_MD), str(source), str(output)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_native("jsonl-to-md", str(source), str(output))
 
     assert result.returncode == 0, result.stderr
     text = output.read_text(encoding="utf-8")
@@ -75,12 +78,7 @@ def test_hlo_summary_counts_ops(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = subprocess.run(
-        [sys.executable, str(HLO_SUMMARY), str(source)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = _run_native("summarize-hlo-jsonl", str(source))
 
     assert result.returncode == 0, result.stderr
     summary = json.loads(result.stdout)
