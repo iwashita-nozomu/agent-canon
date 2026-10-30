@@ -13,6 +13,7 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation python_ast.rs shares native Python AST helper behavior
+// downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
 // downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
@@ -20,6 +21,7 @@
 // downstream implementation structured_analysis.rs routes structured prose/document analysis commands
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
+// downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
 mod check_merge_structure;
@@ -35,15 +37,19 @@ mod notebook_quality;
 mod private_feedback;
 mod python_algorithm_contract;
 mod python_ast;
+mod python_cli_integer;
 mod python_helper_function_inventory;
 mod python_module_groups;
 mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod result_logs;
+mod rule_inventory;
 mod runtime_boundary;
 mod rust_migration_plan;
 mod semantic_index;
+pub mod skill_document_reader;
 mod skill_projection_registry;
 mod structured_analysis;
 mod surface_manifest;
@@ -66,6 +72,10 @@ Commands:
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  skill-document-reader <index|chunk|admit> [options]
+  jsonl-to-md <input> <output>
+  summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -99,6 +109,19 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "skill-document-reader" {
+        std::process::exit(skill_document_reader::run(&args[2..]));
+    }
+
+    if args.len() >= 2
+        && matches!(
+            args[1].as_str(),
+            rule_inventory::PYTHON_SELECTOR | rule_inventory::CPP_SELECTOR
+        )
+    {
+        std::process::exit(rule_inventory::run(&args[1], &args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
@@ -141,6 +164,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "jsonl-to-md" {
+        std::process::exit(result_logs::run_jsonl_to_md(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "summarize-hlo-jsonl" {
+        std::process::exit(result_logs::run_summary(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "semantic-index" {

@@ -1715,15 +1715,15 @@ entries:
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
-    path: tools/agent/skills/skill_document_reader.py
+    path: tools/runtime/dispatch/agent-canon/src/skill_document_reader.rs
     family: agent_tools
     role: helper
     status: canonical
     command: bootstrap.sh --control-parent-root <root> tool run --root <registered-project> skill-document-reader --
     writes: false
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/skills/skill_document_reader.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, skill-document-reader]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
@@ -1936,12 +1936,12 @@ entries:
   - id: oop-python-rule-inventory
     public: true
     summary: Inventories Python OOP policy, tool, document, and test surfaces.
-    path: tools/validation/code/oop/python/rule_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/rule_inventory.rs
     family: oop_python
     role: inventory
     status: canonical
-    command: python3 tools/validation/code/oop/python/rule_inventory.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/python/rule_inventory.py"]}
+    command: tools/bin/agent-canon oop-python-rule-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "oop-python-rule-inventory"]}
     writes: false
     default_wiring:
       ci: false
@@ -1974,12 +1974,12 @@ entries:
   - id: oop-cpp-rule-inventory
     public: true
     summary: Inventories C++ OOP policy, tool, document, and test surfaces.
-    path: tools/validation/code/oop/cpp/rule_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/rule_inventory.rs
     family: oop_cpp
     role: inventory
     status: canonical
-    command: python3 tools/validation/code/oop/cpp/rule_inventory.py
-    dispatch: {argv: ["python3", "tools/validation/code/oop/cpp/rule_inventory.py"]}
+    command: tools/bin/agent-canon oop-cpp-rule-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "oop-cpp-rule-inventory"]}
     writes: false
     default_wiring:
       ci: false
@@ -2289,12 +2289,12 @@ entries:
 
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
-    path: tools/analysis/documents/formatting/jsonl_to_md.py
+    path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
     family: data
     role: helper
     status: canonical
-    command: python3 tools/analysis/documents/formatting/jsonl_to_md.py
-    dispatch: {argv: ["python3", "tools/analysis/documents/formatting/jsonl_to_md.py"]}
+    command: tools/bin/agent-canon jsonl-to-md
+    dispatch: {argv: ["tools/bin/agent-canon", "jsonl-to-md"]}
     writes: true
     default_wiring:
       ci: false
@@ -2308,12 +2308,12 @@ entries:
 
   - id: summarize-hlo-jsonl
     summary: Summarizes HLO JSONL dialect, tag, and operation counts.
-    path: tools/analysis/hlo/summarization/summarize_hlo_jsonl.py
+    path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
     family: hlo
     role: helper
     status: canonical
-    command: python3 tools/analysis/hlo/summarization/summarize_hlo_jsonl.py
-    dispatch: {argv: ["python3", "tools/analysis/hlo/summarization/summarize_hlo_jsonl.py"]}
+    command: tools/bin/agent-canon summarize-hlo-jsonl
+    dispatch: {argv: ["tools/bin/agent-canon", "summarize-hlo-jsonl"]}
     writes: false
     default_wiring:
       ci: false
