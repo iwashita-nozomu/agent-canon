@@ -211,12 +211,19 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""
         runtime_alignment.validate_retired_command_or_skill(
-            "command-only:python3 tools/validation/notebooks/notebook_quality.py",
+            "command-only:tools/bin/agent-canon notebook-quality",
             "notebook_quality_guard.py",
         )
         with self.assertRaisesRegex(RuntimeError, "invalid tombstone representation"):
             runtime_alignment.validate_retired_command_or_skill(
                 "command-only:python3 tools/ci/not_registered.py",
+                "notebook_quality_guard.py",
+            )
+        with self.assertRaisesRegex(
+            RuntimeError, "not a catalog-backed canonical tool"
+        ):
+            runtime_alignment.validate_retired_command_or_skill(
+                "command-only:tools/bin/agent-canon unregistered-selector",
                 "notebook_quality_guard.py",
             )
 

@@ -111,6 +111,14 @@ language = "rust"
 summary = "Rust test design resilience diagnostics."
 
 [[tool]]
+id = "notebook-quality"
+classification = "internal"
+tool = "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+doc = "documents/tools/notebook_quality.md"
+language = "rust"
+summary = "Rust-native notebook quality checker for readable runnable demos."
+
+[[tool]]
 id = "github-publish"
 classification = "public"
 tool = "tools/repository/github/github_publish.py"
