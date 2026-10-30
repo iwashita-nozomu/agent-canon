@@ -361,3 +361,40 @@ fn native_cli_writes_only_through_explicit_external_runtime_boundary() {
     assert!(runtime.join("agent_evaluation.md").is_file());
     assert!(!fixture.root().join("agent_evaluation.md").exists());
 }
+
+#[test]
+fn native_cli_accepts_existing_absolute_report_root_without_runtime_environment() {
+    let report_root = Fixture::new("absolute-report-root");
+    let report_root_path = report_root.root().canonicalize().unwrap();
+    let run_id = "fixture-run";
+    let run_directory = report_root_path.join(run_id);
+    fs::create_dir_all(&run_directory).unwrap();
+    let run = Fixture(run_directory);
+    write_ready_run(&run, READY_OUTPUTS);
+
+    let source = source_root();
+    let behavior = source.join(eval_manifest_path("agent_behavior_eval.toml"));
+    let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
+        .args([
+            "run-evaluation",
+            "--run-id",
+            run_id,
+            "--report-root",
+            report_root_path.to_str().unwrap(),
+            "--workspace-root",
+            source.to_str().unwrap(),
+            "--behavior-manifest",
+            behavior.to_str().unwrap(),
+        ])
+        .env_remove("AGENT_CANON_RUNTIME_ROOT")
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("AGENT_EVALUATION_STATUS=pass"));
+}

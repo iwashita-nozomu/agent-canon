@@ -2293,7 +2293,14 @@ fn runtime_boundary_for_report_root(
     }
     let parent = nearest_existing_directory(declared)?;
     let boundary = RuntimeArtifactBoundary::for_source(source, Some(&parent), false)?;
-    let resolved = boundary.resolve(declared)?;
+    // An existing absolute report root is the boundary itself, not an artifact
+    // to resolve beneath that boundary. Keep resolve()'s root-self rejection
+    // for the later report_root/run_id bundle path.
+    let resolved = if declared.is_dir() {
+        declared.to_path_buf()
+    } else {
+        boundary.resolve(declared)?
+    };
     Ok((boundary, resolved))
 }
 
