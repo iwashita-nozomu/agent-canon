@@ -251,10 +251,8 @@ impl RuntimeDirectory {
                 "absolute runtime directory required",
             ));
         }
-        let mut directory = cap_std::fs::Dir::open_ambient_dir(
-            Path::new("/"),
-            cap_std::ambient_authority(),
-        )?;
+        let mut directory =
+            cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())?;
         for component in path.components() {
             match component {
                 Component::RootDir => {}
@@ -527,11 +525,7 @@ impl RuntimeDirectory {
             parent
                 .directory
                 .rename(&temporary, &parent.directory, &name)?;
-            parent
-                .directory
-                .try_clone()?
-                .into_std_file()
-                .sync_all()
+            parent.directory.try_clone()?.into_std_file().sync_all()
         })();
         let cleanup = parent.directory.remove_file(&temporary);
         match (result, cleanup) {
@@ -646,8 +640,7 @@ impl RuntimeFileSnapshot {
             metadata.dev(),
             metadata.ino(),
             metadata.permissions().mode() & 0o7777,
-            i128::from(metadata.mtime()) * 1_000_000_000
-                + i128::from(metadata.mtime_nsec()),
+            i128::from(metadata.mtime()) * 1_000_000_000 + i128::from(metadata.mtime_nsec()),
         );
         #[cfg(not(unix))]
         let (device, inode, mode, mtime_ns) = (0, 0, 0, 0);
@@ -723,7 +716,10 @@ impl RuntimeArtifactBoundary {
         create: bool,
     ) -> Result<Self, String> {
         let source = fs::canonicalize(source_root).map_err(|error| {
-            format!("source root is unavailable: {}: {error}", source_root.display())
+            format!(
+                "source root is unavailable: {}: {error}",
+                source_root.display()
+            )
         })?;
         let requested = requested
             .map(Path::to_path_buf)
@@ -758,7 +754,10 @@ impl RuntimeArtifactBoundary {
         create: bool,
     ) -> Result<Self, String> {
         let source = fs::canonicalize(source_root).map_err(|error| {
-            format!("source root is unavailable: {}: {error}", source_root.display())
+            format!(
+                "source root is unavailable: {}: {error}",
+                source_root.display()
+            )
         })?;
         let requested = requested
             .map(Path::to_path_buf)
@@ -786,10 +785,14 @@ impl RuntimeArtifactBoundary {
         let root = if source_runtime_spool {
             reject_symlink_components(&requested, Path::new("/"))?;
             if create {
-                RuntimeDirectory::open_nofollow(&requested, true)
-                    .map_err(|error| format!("runtime root is unavailable: {requested}: {error}"))?;
+                RuntimeDirectory::open_nofollow(&requested, true).map_err(|error| {
+                    format!("runtime root is unavailable: {requested}: {error}")
+                })?;
             } else if !requested.is_dir() {
-                return Err(format!("runtime root is unavailable: {}", requested.display()));
+                return Err(format!(
+                    "runtime root is unavailable: {}",
+                    requested.display()
+                ));
             }
             requested
         } else {
@@ -821,12 +824,7 @@ impl RuntimeArtifactBoundary {
         for component in relative.components() {
             match component {
                 Component::Normal(part) => parts.push(part.to_os_string()),
-                _ => {
-                    return Err(format!(
-                        "unsafe runtime-relative path: {}",
-                        path.display()
-                    ))
-                }
+                _ => return Err(format!("unsafe runtime-relative path: {}", path.display())),
             }
         }
         if parts.is_empty() {
@@ -858,16 +856,25 @@ impl RuntimeArtifactBoundary {
                 Ok(_) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => {
-                    return Err(format!("cannot inspect runtime path {}: {error}", joined.display()))
+                    return Err(format!(
+                        "cannot inspect runtime path {}: {error}",
+                        joined.display()
+                    ))
                 }
             },
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => {
-                return Err(format!("cannot inspect runtime path {}: {error}", joined.display()))
+                return Err(format!(
+                    "cannot inspect runtime path {}: {error}",
+                    joined.display()
+                ))
             }
         }
         if self.source_runtime_spool && !joined.starts_with(&self.source_root) {
-            return Err(format!("source runtime path escaped source root: {}", joined.display()));
+            return Err(format!(
+                "source runtime path escaped source root: {}",
+                joined.display()
+            ));
         }
         Ok(joined)
     }
@@ -881,9 +888,12 @@ impl RuntimeArtifactBoundary {
         let relative = target
             .strip_prefix(&self.root)
             .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
-        self.directory
-            .child(relative, true)
-            .map_err(|error| format!("cannot create runtime directory {}: {error}", target.display()))?;
+        self.directory.child(relative, true).map_err(|error| {
+            format!(
+                "cannot create runtime directory {}: {error}",
+                target.display()
+            )
+        })?;
         Ok(target)
     }
 
@@ -899,7 +909,9 @@ impl RuntimeArtifactBoundary {
             .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
         self.directory
             .atomic_write_bytes(relative, bytes, mode)
-            .map_err(|error| format!("atomic runtime write failed: {}: {error}", target.display()))?;
+            .map_err(|error| {
+                format!("atomic runtime write failed: {}: {error}", target.display())
+            })?;
         Ok(target)
     }
 
@@ -939,10 +951,9 @@ impl RuntimeArtifactBoundary {
             .ok_or_else(|| format!("runtime target has no filename: {}", target.display()))?;
         let lock_name = format!(".{}.lock", name.to_string_lossy());
         let lock_path = relative.parent().unwrap_or(Path::new("")).join(lock_name);
-        let _lock = self
-            .directory
-            .lock(&lock_path)
-            .map_err(|error| format!("external append lock failed: {}: {error}", target.display()))?;
+        let _lock = self.directory.lock(&lock_path).map_err(|error| {
+            format!("external append lock failed: {}: {error}", target.display())
+        })?;
         let mut merged = self
             .directory
             .read(relative)
@@ -988,12 +999,18 @@ impl RuntimeSpoolBoundary {
 
 fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Result<PathBuf, String> {
     if !requested.is_absolute() {
-        return Err(format!("runtime root must be absolute: {}", requested.display()));
+        return Err(format!(
+            "runtime root must be absolute: {}",
+            requested.display()
+        ));
     }
     reject_symlink_components(requested, Path::new("/"))?;
     let normalized = normalize_absolute_path(requested);
     let existing_parent = canonical_existing_parent(requested).map_err(|error| {
-        format!("runtime root is unavailable: {}: {error}", requested.display())
+        format!(
+            "runtime root is unavailable: {}: {error}",
+            requested.display()
+        )
     })?;
     if existing_parent == source || existing_parent.starts_with(source) {
         return Err(format!(
@@ -1003,13 +1020,24 @@ fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Resul
         ));
     }
     if create {
-        RuntimeDirectory::open_nofollow(&normalized, true)
-            .map_err(|error| format!("runtime root is unavailable: {}: {error}", requested.display()))?;
+        RuntimeDirectory::open_nofollow(&normalized, true).map_err(|error| {
+            format!(
+                "runtime root is unavailable: {}: {error}",
+                requested.display()
+            )
+        })?;
     } else if !normalized.is_dir() {
-        return Err(format!("runtime root is unavailable: {}", requested.display()));
+        return Err(format!(
+            "runtime root is unavailable: {}",
+            requested.display()
+        ));
     }
-    let root = fs::canonicalize(&normalized)
-        .map_err(|error| format!("runtime root is unavailable: {}: {error}", requested.display()))?;
+    let root = fs::canonicalize(&normalized).map_err(|error| {
+        format!(
+            "runtime root is unavailable: {}: {error}",
+            requested.display()
+        )
+    })?;
     if root == source || root.starts_with(source) {
         return Err(format!(
             "runtime root must not be inside source root: source={} runtime={}",
@@ -1031,11 +1059,19 @@ fn reject_symlink_components(path: &Path, stop: &Path) -> Result<(), String> {
                 current.push(name);
                 match fs::symlink_metadata(&current) {
                     Ok(metadata) if metadata.file_type().is_symlink() => {
-                        return Err(format!("runtime root contains symlink component {}", current.display()))
+                        return Err(format!(
+                            "runtime root contains symlink component {}",
+                            current.display()
+                        ))
                     }
                     Ok(_) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(format!("cannot inspect runtime path {}: {error}", current.display())),
+                    Err(error) => {
+                        return Err(format!(
+                            "cannot inspect runtime path {}: {error}",
+                            current.display()
+                        ))
+                    }
                 }
             }
             Component::ParentDir => {
@@ -1053,7 +1089,7 @@ fn normalize_absolute_path(path: &Path) -> PathBuf {
         match component {
             Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
             Component::RootDir => normalized.push(std::path::MAIN_SEPARATOR.to_string()),
-            Component::CurDir => {},
+            Component::CurDir => {}
             Component::ParentDir => {
                 normalized.pop();
             }
@@ -1093,16 +1129,24 @@ pub(crate) fn root_capability_environment(
     base_env: Option<&BTreeMap<String, String>>,
     target_root: Option<&Path>,
 ) -> Result<BTreeMap<String, String>, String> {
-    let parent = fs::canonicalize(source_root)
-        .map_err(|error| format!("root capability is unavailable: {}: {error}", source_root.display()))?;
+    let parent = fs::canonicalize(source_root).map_err(|error| {
+        format!(
+            "root capability is unavailable: {}: {error}",
+            source_root.display()
+        )
+    })?;
     let target = fs::canonicalize(target_root.unwrap_or(source_root)).map_err(|error| {
         format!(
             "root capability is unavailable: {}: {error}",
             target_root.unwrap_or(source_root).display()
         )
     })?;
-    let runtime = fs::canonicalize(runtime_root)
-        .map_err(|error| format!("root capability is unavailable: {}: {error}", runtime_root.display()))?;
+    let runtime = fs::canonicalize(runtime_root).map_err(|error| {
+        format!(
+            "root capability is unavailable: {}: {error}",
+            runtime_root.display()
+        )
+    })?;
     let supplied = base_env.cloned().unwrap_or_else(|| {
         env::vars_os()
             .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)))
@@ -1117,8 +1161,12 @@ pub(crate) fn root_capability_environment(
         })
         .collect::<BTreeMap<_, _>>();
     let identity = |path: &Path| -> Result<(String, String), String> {
-        let metadata = fs::metadata(path)
-            .map_err(|error| format!("root capability is unavailable: {}: {error}", path.display()))?;
+        let metadata = fs::metadata(path).map_err(|error| {
+            format!(
+                "root capability is unavailable: {}: {error}",
+                path.display()
+            )
+        })?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;
@@ -1134,12 +1182,30 @@ pub(crate) fn root_capability_environment(
     let (target_dev, target_ino) = identity(&target)?;
     let (runtime_dev, runtime_ino) = identity(&runtime)?;
     child.insert(RUNTIME_ROOT_ENV.to_string(), runtime.display().to_string());
-    child.insert("AGENT_CANON_PARENT_ROOT".to_string(), parent.display().to_string());
-    child.insert("AGENT_CANON_TARGET_ROOT".to_string(), target.display().to_string());
-    child.insert("AGENT_CANON_PARENT_ROOT_DEV".to_string(), parent_dev.clone());
-    child.insert("AGENT_CANON_PARENT_ROOT_INO".to_string(), parent_ino.clone());
-    child.insert("AGENT_CANON_TARGET_ROOT_DEV".to_string(), target_dev.clone());
-    child.insert("AGENT_CANON_TARGET_ROOT_INO".to_string(), target_ino.clone());
+    child.insert(
+        "AGENT_CANON_PARENT_ROOT".to_string(),
+        parent.display().to_string(),
+    );
+    child.insert(
+        "AGENT_CANON_TARGET_ROOT".to_string(),
+        target.display().to_string(),
+    );
+    child.insert(
+        "AGENT_CANON_PARENT_ROOT_DEV".to_string(),
+        parent_dev.clone(),
+    );
+    child.insert(
+        "AGENT_CANON_PARENT_ROOT_INO".to_string(),
+        parent_ino.clone(),
+    );
+    child.insert(
+        "AGENT_CANON_TARGET_ROOT_DEV".to_string(),
+        target_dev.clone(),
+    );
+    child.insert(
+        "AGENT_CANON_TARGET_ROOT_INO".to_string(),
+        target_ino.clone(),
+    );
     child.insert(
         "AGENT_CANON_PARENT_ROOT_CAPABILITY".to_string(),
         serde_json::to_string(&serde_json::json!({

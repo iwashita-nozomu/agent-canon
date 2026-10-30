@@ -27,7 +27,9 @@ const ARTIFACT_ROLES: [&str; 6] = [
     "source_packet_artifact",
 ];
 const SOURCE_BINDING_KINDS: [&str; 2] = ["git_commit_path", "filesystem_immutable"];
-const TEXT_EXTENSIONS: [&str; 8] = [".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml", ".txt"];
+const TEXT_EXTENSIONS: [&str; 8] = [
+    ".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml", ".txt",
+];
 const IDENTITY_KEYS: [&str; 19] = [
     "schema",
     "schema_version",
@@ -94,9 +96,9 @@ fn git_failure(output: &std::process::Output) -> ArtifactIdentityError {
 
 fn reject_noncanonical_json(value: &Value) -> Result<()> {
     match value {
-        Value::Number(number) if number.is_f64() => {
-            Err(ArtifactIdentityError::new("artifact_identity:float_forbidden"))
-        }
+        Value::Number(number) if number.is_f64() => Err(ArtifactIdentityError::new(
+            "artifact_identity:float_forbidden",
+        )),
         Value::Array(values) => {
             for value in values {
                 reject_noncanonical_json(value)?;
@@ -129,7 +131,9 @@ pub(crate) fn canonical_json_bytes<T: serde::Serialize>(value: &T) -> Result<Vec
 
 pub(crate) fn canonical_body_sha256(record: &Value, hash_field: &str) -> Result<String> {
     let Value::Object(record) = record else {
-        return Err(ArtifactIdentityError::new("artifact_identity:record_not_object"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:record_not_object",
+        ));
     };
     let mut body = record.clone();
     body.remove(hash_field);
@@ -167,8 +171,9 @@ pub(crate) fn git_blob_oid(data: &[u8]) -> String {
             words[index] = u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
         }
         for index in 16..80 {
-            words[index] = (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16])
-                .rotate_left(1);
+            words[index] =
+                (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16])
+                    .rotate_left(1);
         }
         let [mut a, mut b, mut c, mut d, mut e] = state;
         for (index, word) in words.iter().enumerate() {
@@ -206,7 +211,10 @@ fn run_git(workspace: &Path, args: &[&str]) -> Result<Vec<u8>> {
         .args(args)
         .output()
         .map_err(|error| {
-            ArtifactIdentityError::with_detail("artifact_identity:git_read_failed", error.to_string())
+            ArtifactIdentityError::with_detail(
+                "artifact_identity:git_read_failed",
+                error.to_string(),
+            )
         })?;
     if !output.status.success() {
         return Err(git_failure(&output));
@@ -216,9 +224,14 @@ fn run_git(workspace: &Path, args: &[&str]) -> Result<Vec<u8>> {
 
 fn run_git_text(workspace: &Path, args: &[&str]) -> Result<String> {
     let bytes = run_git(workspace, args)?;
-    String::from_utf8(bytes).map(|value| value.trim().to_string()).map_err(|error| {
-        ArtifactIdentityError::with_detail("artifact_identity:git_read_failed", error.to_string())
-    })
+    String::from_utf8(bytes)
+        .map(|value| value.trim().to_string())
+        .map_err(|error| {
+            ArtifactIdentityError::with_detail(
+                "artifact_identity:git_read_failed",
+                error.to_string(),
+            )
+        })
 }
 
 fn absolute_path(path: &Path, workspace: &Path) -> PathBuf {
@@ -234,7 +247,12 @@ fn resolve_with_missing(path: &Path) -> Result<PathBuf> {
         path.to_path_buf()
     } else {
         std::env::current_dir()
-            .map_err(|error| ArtifactIdentityError::with_detail("artifact_identity:path_invalid", error.to_string()))?
+            .map_err(|error| {
+                ArtifactIdentityError::with_detail(
+                    "artifact_identity:path_invalid",
+                    error.to_string(),
+                )
+            })?
             .join(path)
     };
     resolve_path_with_missing(&absolute, 0)
@@ -244,10 +262,15 @@ fn resolve_path_with_missing(path: &Path, depth: usize) -> Result<PathBuf> {
     if depth > 40 {
         return Err(ArtifactIdentityError::new("artifact_identity:path_invalid"));
     }
-    let mut cursor = PathBuf::from(path.components().next().and_then(|component| match component {
-        Component::Prefix(prefix) => Some(prefix.as_os_str()),
-        _ => None,
-    }).unwrap_or_else(|| std::ffi::OsStr::new("/")));
+    let mut cursor = PathBuf::from(
+        path.components()
+            .next()
+            .and_then(|component| match component {
+                Component::Prefix(prefix) => Some(prefix.as_os_str()),
+                _ => None,
+            })
+            .unwrap_or_else(|| std::ffi::OsStr::new("/")),
+    );
     let components = path.components().collect::<Vec<_>>();
     for (index, component) in components.iter().enumerate() {
         match component {
@@ -315,9 +338,10 @@ fn normalized_relative_path(workspace: &Path, artifact_path: &Path) -> Result<St
     let mut parts = Vec::new();
     for component in relative.components() {
         match component {
-            Component::Normal(part) => parts.push(part.to_str().ok_or_else(|| {
-                ArtifactIdentityError::new("artifact_identity:path_invalid")
-            })?),
+            Component::Normal(part) => parts.push(
+                part.to_str()
+                    .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:path_invalid"))?,
+            ),
             _ => return Err(ArtifactIdentityError::new("artifact_identity:path_invalid")),
         }
     }
@@ -337,7 +361,8 @@ fn infer_artifact_role(path: &str) -> &'static str {
         "review_decision"
     } else if name.contains("review") {
         "review_target"
-    } else if name.contains("publication") && (name.contains("receipt") || name.contains("result")) {
+    } else if name.contains("publication") && (name.contains("receipt") || name.contains("result"))
+    {
         "publication_receipt"
     } else if name.contains("publication") || name.contains("authority") {
         "publication_authority"
@@ -370,7 +395,11 @@ fn text_characteristics(path: &str, data: &[u8]) -> (&'static str, &'static str,
     } else {
         "LF"
     };
-    ("UTF-8", if bom { "present" } else { "absent" }, line_endings)
+    (
+        "UTF-8",
+        if bom { "present" } else { "absent" },
+        line_endings,
+    )
 }
 
 fn snapshot_value(snapshot: RuntimeFileSnapshot, size_before: u64, mtime_before: i128) -> Value {
@@ -398,10 +427,9 @@ fn stable_read_error(error: std::io::Error) -> ArtifactIdentityError {
         "runtime file size changed during read" => {
             ArtifactIdentityError::new("artifact_identity:size_changed")
         }
-        detail => ArtifactIdentityError::with_detail(
-            "artifact_identity:filesystem_read_failed",
-            detail,
-        ),
+        detail => {
+            ArtifactIdentityError::with_detail("artifact_identity:filesystem_read_failed", detail)
+        }
     }
 }
 
@@ -418,7 +446,10 @@ fn git_source_binding(workspace: &Path, path: &str) -> Result<Option<(Value, Vec
         Ok(value) => value,
         Err(_) => return Ok(None),
     };
-    let Some(entry) = entries.split(|byte| *byte == 0).find(|entry| !entry.is_empty()) else {
+    let Some(entry) = entries
+        .split(|byte| *byte == 0)
+        .find(|entry| !entry.is_empty())
+    else {
         return Ok(None);
     };
     let separator = entry
@@ -427,14 +458,17 @@ fn git_source_binding(workspace: &Path, path: &str) -> Result<Option<(Value, Vec
         .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:tree_path_mismatch"))?;
     let (metadata, entry_path) = (&entry[..separator], &entry[separator + 1..]);
     if entry_path != path.as_bytes() {
-        return Err(ArtifactIdentityError::new("artifact_identity:tree_path_mismatch"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:tree_path_mismatch",
+        ));
     }
-    let metadata = std::str::from_utf8(metadata).map_err(|_| {
-        ArtifactIdentityError::new("artifact_identity:tree_entry_not_blob")
-    })?;
+    let metadata = std::str::from_utf8(metadata)
+        .map_err(|_| ArtifactIdentityError::new("artifact_identity:tree_entry_not_blob"))?;
     let fields = metadata.split_whitespace().collect::<Vec<_>>();
     if fields.len() != 3 || fields[1] != "blob" {
-        return Err(ArtifactIdentityError::new("artifact_identity:tree_entry_not_blob"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:tree_entry_not_blob",
+        ));
     }
     let blob = fields[2];
     let data = run_git(workspace, &["cat-file", "blob", blob])?;
@@ -460,7 +494,10 @@ fn owner_tool_identity(workspace: &Path) -> Result<Value> {
         }));
     }
     let owner_bytes = fs::read(workspace.join(OWNER_PATH)).map_err(|error| {
-        ArtifactIdentityError::with_detail("artifact_identity:owner_tool_unavailable", error.to_string())
+        ArtifactIdentityError::with_detail(
+            "artifact_identity:owner_tool_unavailable",
+            error.to_string(),
+        )
     })?;
     let head = run_git_text(workspace, &["rev-parse", "HEAD"])?;
     let tree = run_git_text(workspace, &["rev-parse", "HEAD^{tree}"])?;
@@ -484,25 +521,35 @@ fn stable_seed(record: &Value) -> Result<Value> {
     ];
     let mut seed = Map::new();
     for field in fields {
-        let value = record.get(field).ok_or_else(|| {
-            ArtifactIdentityError::new("artifact_identity:key_set_mismatch")
-        })?;
+        let value = record
+            .get(field)
+            .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:key_set_mismatch"))?;
         seed.insert(field.to_string(), value.clone());
     }
     Ok(Value::Object(seed))
 }
 
-pub(crate) fn materialize_artifact_identity(workspace: &Path, artifact_path: &Path) -> Result<Value> {
+pub(crate) fn materialize_artifact_identity(
+    workspace: &Path,
+    artifact_path: &Path,
+) -> Result<Value> {
     let root = fs::canonicalize(workspace).map_err(|error| {
         ArtifactIdentityError::with_detail("artifact_identity:path_invalid", error.to_string())
     })?;
     let relative = normalized_relative_path(&root, artifact_path)?;
     let committed = git_source_binding(&root, &relative)?;
-    let (source_binding, data, filesystem_readback) = if let Some((source_binding, data)) = committed {
+    let (source_binding, data, filesystem_readback) = if let Some((source_binding, data)) =
+        committed
+    {
         let source_file = root.join(&relative);
-        let filesystem_readback = if fs::metadata(&source_file).is_ok_and(|metadata| metadata.is_file()) {
+        let filesystem_readback = if fs::metadata(&source_file)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
             let directory = RuntimeDirectory::open_nofollow(&root, false).map_err(|error| {
-                ArtifactIdentityError::with_detail("artifact_identity:filesystem_read_failed", error.to_string())
+                ArtifactIdentityError::with_detail(
+                    "artifact_identity:filesystem_read_failed",
+                    error.to_string(),
+                )
             })?;
             let (_, snapshot) = directory
                 .read_stable(Path::new(&relative))
@@ -525,7 +572,10 @@ pub(crate) fn materialize_artifact_identity(workspace: &Path, artifact_path: &Pa
         (source_binding, data, filesystem_readback)
     } else {
         let directory = RuntimeDirectory::open_nofollow(&root, false).map_err(|error| {
-            ArtifactIdentityError::with_detail("artifact_identity:filesystem_read_failed", error.to_string())
+            ArtifactIdentityError::with_detail(
+                "artifact_identity:filesystem_read_failed",
+                error.to_string(),
+            )
         })?;
         let (data, snapshot) = directory
             .read_stable(Path::new(&relative))
@@ -605,7 +655,9 @@ pub(crate) fn verify_identity_record(workspace: &Path, record: &Value) -> Result
     if record.get("schema").and_then(Value::as_str) != Some(ARTIFACT_IDENTITY_SCHEMA)
         || record.get("schema_version").and_then(Value::as_u64) != Some(1)
     {
-        return Err(ArtifactIdentityError::new("artifact_identity:schema_mismatch"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:schema_mismatch",
+        ));
     }
     let object = record
         .as_object()
@@ -613,27 +665,36 @@ pub(crate) fn verify_identity_record(workspace: &Path, record: &Value) -> Result
     let keys = object.keys().map(String::as_str).collect::<BTreeSet<_>>();
     let expected = IDENTITY_KEYS.iter().copied().collect::<BTreeSet<_>>();
     if keys != expected {
-        return Err(ArtifactIdentityError::new("artifact_identity:key_set_mismatch"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:key_set_mismatch",
+        ));
     }
-    let role = record.get("artifact_role").and_then(Value::as_str).ok_or_else(|| {
-        ArtifactIdentityError::new("artifact_identity:artifact_role_invalid")
-    })?;
+    let role = record
+        .get("artifact_role")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:artifact_role_invalid"))?;
     if !ARTIFACT_ROLES.contains(&role) {
-        return Err(ArtifactIdentityError::new("artifact_identity:artifact_role_invalid"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:artifact_role_invalid",
+        ));
     }
-    let source_binding = record.get("source_binding").and_then(Value::as_object).ok_or_else(|| {
-        ArtifactIdentityError::new("artifact_identity:source_binding_invalid")
-    })?;
+    let source_binding = record
+        .get("source_binding")
+        .and_then(Value::as_object)
+        .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:source_binding_invalid"))?;
     if !source_binding
         .get("kind")
         .and_then(Value::as_str)
         .is_some_and(|kind| SOURCE_BINDING_KINDS.contains(&kind))
     {
-        return Err(ArtifactIdentityError::new("artifact_identity:source_binding_invalid"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:source_binding_invalid",
+        ));
     }
-    let artifact_path = record.get("artifact_path").and_then(Value::as_str).ok_or_else(|| {
-        ArtifactIdentityError::new("artifact_identity:path_invalid")
-    })?;
+    let artifact_path = record
+        .get("artifact_path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:path_invalid"))?;
     let current = materialize_artifact_identity(workspace, Path::new(artifact_path))?;
     for field in [
         "artifact_role",
@@ -669,7 +730,9 @@ pub(crate) fn verify_identity_record(workspace: &Path, record: &Value) -> Result
         .and_then(Value::as_str)
         != Some(expected_body.as_str())
     {
-        return Err(ArtifactIdentityError::new("artifact_identity:body_hash_mismatch"));
+        return Err(ArtifactIdentityError::new(
+            "artifact_identity:body_hash_mismatch",
+        ));
     }
     Ok(json!({
         "schema": "agent-canon.artifact-identity-verification.v1",
@@ -688,11 +751,19 @@ pub(crate) fn verify_artifact_identity(workspace: &Path, record_path: &Path) -> 
     })?;
     let relative = normalized_relative_path(&root, record_path)?;
     let directory = RuntimeDirectory::open_nofollow(&root, false).map_err(|error| {
-        ArtifactIdentityError::with_detail("artifact_identity:record_unavailable", error.to_string())
+        ArtifactIdentityError::with_detail(
+            "artifact_identity:record_unavailable",
+            error.to_string(),
+        )
     })?;
     let (bytes, _) = directory
         .read_stable(Path::new(&relative))
-        .map_err(|error| ArtifactIdentityError::with_detail("artifact_identity:record_unavailable", error.to_string()))?
+        .map_err(|error| {
+            ArtifactIdentityError::with_detail(
+                "artifact_identity:record_unavailable",
+                error.to_string(),
+            )
+        })?
         .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:record_unavailable"))?;
     let record: Value = serde_json::from_slice(&bytes).map_err(|error| {
         ArtifactIdentityError::with_detail("artifact_identity:record_invalid", error.to_string())
@@ -727,7 +798,10 @@ mod tests {
 
     #[test]
     fn computes_git_blob_oid_for_empty_bytes() {
-        assert_eq!(git_blob_oid(b""), "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
+        assert_eq!(
+            git_blob_oid(b""),
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+        );
     }
 
     #[test]
@@ -745,13 +819,18 @@ mod tests {
             "8d3427a4781d0d93575fe50fe56942d1d8eadd6bf4f403457f327a47a0b06c77"
         );
 
-        let nested = BTreeMap::from([
-            ("b", Value::Bool(true)),
-            ("a", Value::Null),
-        ]);
+        let nested = BTreeMap::from([("b", Value::Bool(true)), ("a", Value::Null)]);
         let map = BTreeMap::from([
             ("z", Value::from(1_u64)),
-            ("nested", Value::Object(nested.into_iter().map(|(key, value)| (key.to_string(), value)).collect())),
+            (
+                "nested",
+                Value::Object(
+                    nested
+                        .into_iter()
+                        .map(|(key, value)| (key.to_string(), value))
+                        .collect(),
+                ),
+            ),
             ("a", Value::String("é".to_string())),
         ]);
         assert_eq!(canonical_json_bytes(&map).unwrap(), expected);

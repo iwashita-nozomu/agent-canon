@@ -128,7 +128,10 @@ fn required_int(mapping: &Map<String, Value>, field: &str) -> Result<u64> {
 
 fn candidate_fields(local_event: &Map<String, Value>) -> Result<BTreeMap<String, Value>> {
     let mut candidate = BTreeMap::new();
-    candidate.insert("candidate_id".to_string(), json!(required_text(local_event, "candidate_id")?));
+    candidate.insert(
+        "candidate_id".to_string(),
+        json!(required_text(local_event, "candidate_id")?),
+    );
     candidate.insert(
         "candidate_revision".to_string(),
         json!(required_int(local_event, "candidate_revision")?),
@@ -164,7 +167,10 @@ fn projection_kind(
     }
 }
 
-fn mapped_status(projection: &str, provider_status: &str) -> Result<(&'static str, &'static str, &'static str)> {
+fn mapped_status(
+    projection: &str,
+    provider_status: &str,
+) -> Result<(&'static str, &'static str, &'static str)> {
     let rule = match projection {
         "codex_review_dispatch" => "agent-canon.projection-map.codex-dispatch.v1",
         "github_review_decision" => "agent-canon.projection-map.github-review.v1",
@@ -221,7 +227,10 @@ pub(crate) fn materialize_external_projection_acknowledgement(
             forbidden,
         ));
     }
-    let local_schema = local_event.get("schema").and_then(Value::as_str).unwrap_or_default();
+    let local_schema = local_event
+        .get("schema")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if ![
         LOCAL_EVENT_SCHEMA,
         "agent-canon.review-decision-event.v1",
@@ -245,8 +254,7 @@ pub(crate) fn materialize_external_projection_acknowledgement(
     let mut provider_payload = provider_readback.clone();
     provider_payload.remove("provider_readback_sha256");
     let readback_sha = hex_sha256(
-        &canonical_json_bytes(&Value::Object(provider_payload))
-            .map_err(identity_error)?,
+        &canonical_json_bytes(&Value::Object(provider_payload)).map_err(identity_error)?,
     );
     if let Some(supplied) = provider_readback.get("provider_readback_sha256") {
         if !supplied.is_null() && supplied.as_str() != Some(readback_sha.as_str()) {
@@ -275,7 +283,10 @@ pub(crate) fn materialize_external_projection_acknowledgement(
         ("local_event_schema", "schema"),
         ("local_event_kind", "event_kind"),
     ] {
-        record.insert(output.to_string(), json!(required_text(local_event, input)?));
+        record.insert(
+            output.to_string(),
+            json!(required_text(local_event, input)?),
+        );
     }
     record.insert(
         "local_event_id".to_string(),
@@ -289,7 +300,11 @@ pub(crate) fn materialize_external_projection_acknowledgement(
         "local_event_order_index".to_string(),
         json!(required_int(local_event, "event_order_index")?),
     );
-    for field in ["review_lineage_id", "review_request_id", "review_context_id"] {
+    for field in [
+        "review_lineage_id",
+        "review_request_id",
+        "review_context_id",
+    ] {
         record.insert(field.to_string(), json!(required_text(local_event, field)?));
     }
     record.insert(
@@ -305,9 +320,15 @@ pub(crate) fn materialize_external_projection_acknowledgement(
     ] {
         record.insert(field.to_string(), value_or_null(provider_readback, field));
     }
-    record.insert("provider_object_kind".to_string(), json!(provider_object_kind));
+    record.insert(
+        "provider_object_kind".to_string(),
+        json!(provider_object_kind),
+    );
     record.insert("provider_object_id".to_string(), json!(provider_object_id));
-    record.insert("provider_object_version".to_string(), json!(provider_object_version));
+    record.insert(
+        "provider_object_version".to_string(),
+        json!(provider_object_version),
+    );
     for field in [
         "provider_parent_object_id",
         "provider_operation_id",
@@ -324,7 +345,10 @@ pub(crate) fn materialize_external_projection_acknowledgement(
     record.insert("provider_readback_sha256".to_string(), json!(readback_sha));
     record.insert(
         "acknowledgement_order_index".to_string(),
-        json!(required_int(provider_readback, "acknowledgement_order_index")?),
+        json!(required_int(
+            provider_readback,
+            "acknowledgement_order_index"
+        )?),
     );
     record.insert("external_projection_ack_body_sha256".to_string(), json!(""));
     if provider_kind == "codex_runtime" {
@@ -336,8 +360,7 @@ pub(crate) fn materialize_external_projection_acknowledgement(
                 ));
             }
         }
-        if record["provider_instance_id"].is_null()
-            || record["provider_parent_object_id"].is_null()
+        if record["provider_instance_id"].is_null() || record["provider_parent_object_id"].is_null()
         {
             return Err(ExternalProjectionError::new(
                 "external_projection:null_rule_mismatch",
@@ -351,7 +374,10 @@ pub(crate) fn materialize_external_projection_acknowledgement(
         }
         if projection == "github_pr_head" {
             for field in ["head_ref", "head_oid", "head_tree"] {
-                if !record[field].as_str().is_some_and(|value| !value.is_empty()) {
+                if !record[field]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty())
+                {
                     return Err(ExternalProjectionError::with_detail(
                         "external_projection:null_rule_mismatch",
                         field,
@@ -370,10 +396,7 @@ pub(crate) fn materialize_external_projection_acknowledgement(
     let mut record = Value::Object(record);
     let ack_id = format!(
         "external-projection-ack:{}",
-        hex_sha256(
-            &canonical_json_bytes(&acknowledgement_seed(&record)?)
-                .map_err(identity_error)?,
-        )
+        hex_sha256(&canonical_json_bytes(&acknowledgement_seed(&record)?).map_err(identity_error)?,)
     );
     record["external_projection_ack_id"] = json!(ack_id);
     let body_sha = canonical_body_sha256(&record, "external_projection_ack_body_sha256")
@@ -389,7 +412,10 @@ pub(crate) fn verify_external_projection_acknowledgement(
     let local_event = object(local_event)?;
     let acknowledgement = object(acknowledgement)?;
     if acknowledgement.get("schema").and_then(Value::as_str) != Some(ACK_SCHEMA)
-        || acknowledgement.get("schema_version").and_then(Value::as_u64) != Some(1)
+        || acknowledgement
+            .get("schema_version")
+            .and_then(Value::as_u64)
+            != Some(1)
     {
         return Err(ExternalProjectionError::new(
             "external_projection:schema_mismatch",
@@ -401,7 +427,10 @@ pub(crate) fn verify_external_projection_acknowledgement(
             forbidden,
         ));
     }
-    let local_schema = local_event.get("schema").and_then(Value::as_str).unwrap_or_default();
+    let local_schema = local_event
+        .get("schema")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     let local_id_field = if local_schema == LOCAL_EVENT_SCHEMA {
         "resume_event_id"
     } else {
@@ -448,8 +477,7 @@ pub(crate) fn verify_external_projection_acknowledgement(
     let expected_id = format!(
         "external-projection-ack:{}",
         hex_sha256(
-            &canonical_json_bytes(&acknowledgement_seed(&ack_value)?)
-                .map_err(identity_error)?,
+            &canonical_json_bytes(&acknowledgement_seed(&ack_value)?).map_err(identity_error)?,
         )
     );
     if acknowledgement
@@ -457,7 +485,9 @@ pub(crate) fn verify_external_projection_acknowledgement(
         .and_then(Value::as_str)
         != Some(expected_id.as_str())
     {
-        return Err(ExternalProjectionError::new("external_projection:id_mismatch"));
+        return Err(ExternalProjectionError::new(
+            "external_projection:id_mismatch",
+        ));
     }
     Ok(json!({
         "schema": "agent-canon.external-projection-verification.v1",

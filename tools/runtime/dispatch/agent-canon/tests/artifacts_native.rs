@@ -7,17 +7,17 @@
 // upstream implementation ../src/artifacts/external_artifact_binding.rs owns external projection acknowledgements
 // @dependency-end
 
-#[path = "../src/runtime_boundary.rs"]
-mod runtime_boundary;
 #[path = "../src/artifacts/mod.rs"]
 mod artifacts;
+#[path = "../src/runtime_boundary.rs"]
+mod runtime_boundary;
 
 use artifacts::artifact_identity::{
     canonical_json_bytes, git_blob_oid, materialize_artifact_identity, verify_identity_record,
 };
 use artifacts::external_artifact_binding::{
-    materialize_external_projection_acknowledgement,
-    verify_external_projection_acknowledgement, LOCAL_EVENT_SCHEMA,
+    materialize_external_projection_acknowledgement, verify_external_projection_acknowledgement,
+    LOCAL_EVENT_SCHEMA,
 };
 use runtime_boundary::{
     root_capability_environment, RuntimeArtifactBoundary, RuntimeSpoolBoundary, RUNTIME_ROOT_ENV,
@@ -64,8 +64,14 @@ fn git(root: &Path, args: &[&str]) -> Output {
 fn init_repository(root: &Path) {
     fs::create_dir_all(root).expect("create repository");
     assert!(git(root, &["init", "-q"]).status.success());
-    assert!(git(root, &["config", "user.name", "Artifact Test"]).status.success());
-    assert!(git(root, &["config", "user.email", "artifact@example.invalid"]).status.success());
+    assert!(git(root, &["config", "user.name", "Artifact Test"])
+        .status
+        .success());
+    assert!(
+        git(root, &["config", "user.email", "artifact@example.invalid"])
+            .status
+            .success()
+    );
     let owner = root.join("tools/runtime/artifacts/artifact_identity.py");
     fs::create_dir_all(owner.parent().unwrap()).expect("create artifact owner directory");
     fs::write(&owner, b"# committed fixture owner\n").expect("write owner fixture");
@@ -123,15 +129,22 @@ fn external_runtime_root_writes_atomically_and_rejects_source_escape() {
         .expect("publish external file");
 
     assert_eq!(target, runtime.join("tasks/run/receipt.json"));
-    assert_eq!(fs::read(&target).expect("read published file"), b"runtime\n");
+    assert_eq!(
+        fs::read(&target).expect("read published file"),
+        b"runtime\n"
+    );
     assert_eq!(fs::read(source.join("tracked.txt")).unwrap(), source_before);
     assert_eq!(
-        boundary.digest(Path::new("tasks/run/receipt.json")).unwrap(),
+        boundary
+            .digest(Path::new("tasks/run/receipt.json"))
+            .unwrap(),
         "fae9d8f386d67956867dedef7c89476199a4a25ee9ffe13560a6bfae7ae6c407"
     );
     assert!(boundary.resolve(Path::new("../outside/file")).is_err());
     assert!(RuntimeArtifactBoundary::for_source(&source, Some(&source), true).is_err());
-    assert!(RuntimeArtifactBoundary::for_source(&source, Some(&source.join(".runtime")), true).is_err());
+    assert!(
+        RuntimeArtifactBoundary::for_source(&source, Some(&source.join(".runtime")), true).is_err()
+    );
     let manifest = boundary
         .atomic_write_json(
             Path::new("tasks/run/manifest.json"),
@@ -191,14 +204,18 @@ fn spool_boundary_admits_only_locks_and_spool_for_exact_source_runtime() {
         spool.boundary().resolve(Path::new("locks/archive.lock")),
         Ok(root.join("locks/archive.lock"))
     );
-    assert!(spool.boundary().resolve(Path::new("archive/report.json")).is_err());
-    assert!(spool.boundary().resolve(Path::new("tasks/request.json")).is_err());
-    assert!(RuntimeSpoolBoundary::for_source(
-        &source,
-        Some(&source.join("nested/.runtime")),
-        true
-    )
-    .is_err());
+    assert!(spool
+        .boundary()
+        .resolve(Path::new("archive/report.json"))
+        .is_err());
+    assert!(spool
+        .boundary()
+        .resolve(Path::new("tasks/request.json"))
+        .is_err());
+    assert!(
+        RuntimeSpoolBoundary::for_source(&source, Some(&source.join("nested/.runtime")), true)
+            .is_err()
+    );
     #[cfg(unix)]
     {
         let outside = temp.0.join("outside");
@@ -237,7 +254,9 @@ fn source_runtime_alias_and_external_spool_paths_are_rejected_or_restricted() {
         let source_runtime_link = source.join(".runtime");
         std::os::unix::fs::symlink(&outside, &source_runtime_link)
             .expect("create source runtime alias");
-        assert!(RuntimeSpoolBoundary::for_source(&source, Some(&source_runtime_link), true).is_err());
+        assert!(
+            RuntimeSpoolBoundary::for_source(&source, Some(&source_runtime_link), true).is_err()
+        );
     }
 }
 
@@ -254,9 +273,15 @@ fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
         ("PATH".to_string(), "/usr/bin".to_string()),
         ("LANG".to_string(), "C.UTF-8".to_string()),
         ("LC_NUMERIC".to_string(), "C".to_string()),
-        ("CARGO_TARGET_DIR".to_string(), "/tmp/agent-canon-target".to_string()),
+        (
+            "CARGO_TARGET_DIR".to_string(),
+            "/tmp/agent-canon-target".to_string(),
+        ),
         ("OPENAI_API_KEY".to_string(), "fixture-secret".to_string()),
-        ("HTTPS_PROXY".to_string(), "https://user:pass@example.invalid".to_string()),
+        (
+            "HTTPS_PROXY".to_string(),
+            "https://user:pass@example.invalid".to_string(),
+        ),
         ("GITHUB_TOKEN".to_string(), "fixture-token".to_string()),
     ]);
     let child = root_capability_environment(&source, &runtime, Some(&base), Some(&target))
@@ -269,7 +294,10 @@ fn child_environment_filters_secrets_and_carries_only_root_identity_metadata() {
         child.get("CARGO_TARGET_DIR").map(String::as_str),
         Some("/tmp/agent-canon-target")
     );
-    assert_eq!(child.get(RUNTIME_ROOT_ENV).map(String::as_str), Some(runtime.to_str().unwrap()));
+    assert_eq!(
+        child.get(RUNTIME_ROOT_ENV).map(String::as_str),
+        Some(runtime.to_str().unwrap())
+    );
     assert!(!child.contains_key("OPENAI_API_KEY"));
     assert!(!child.contains_key("HTTPS_PROXY"));
     assert!(!child.contains_key("GITHUB_TOKEN"));
@@ -287,8 +315,11 @@ fn artifact_identity_replays_head_bytes_and_reads_untracked_files_safely() {
     let repo = temp.0.join("repo");
     init_repository(&repo);
     let original = b"committed bytes\n";
-    fs::write(repo.join("tracked.md"), b"working-tree replacement is ignored\n")
-        .expect("modify tracked file");
+    fs::write(
+        repo.join("tracked.md"),
+        b"working-tree replacement is ignored\n",
+    )
+    .expect("modify tracked file");
     let record = materialize_artifact_identity(&repo, Path::new("tracked.md"))
         .expect("materialize tracked identity");
     assert_eq!(record["source_binding"]["kind"], "git_commit_path");
@@ -300,9 +331,12 @@ fn artifact_identity_replays_head_bytes_and_reads_untracked_files_safely() {
     let untracked = repo.join("reports/untracked.json");
     fs::create_dir_all(untracked.parent().unwrap()).expect("create untracked parent");
     fs::write(&untracked, b"{\"ok\":true}\n").expect("write untracked artifact");
-    let untracked_record = materialize_artifact_identity(&repo, &untracked)
-        .expect("materialize filesystem identity");
-    assert_eq!(untracked_record["source_binding"]["kind"], "filesystem_immutable");
+    let untracked_record =
+        materialize_artifact_identity(&repo, &untracked).expect("materialize filesystem identity");
+    assert_eq!(
+        untracked_record["source_binding"]["kind"],
+        "filesystem_immutable"
+    );
     assert!(verify_identity_record(&repo, &untracked_record).is_ok());
     #[cfg(unix)]
     {
@@ -349,16 +383,21 @@ fn artifact_identity_replays_head_bytes_and_reads_untracked_files_safely() {
 #[test]
 fn canonical_json_rejects_floats_and_external_ack_binds_local_event() {
     assert_eq!(
-        canonical_json_bytes(&json!({ "value": 1.5 })).unwrap_err().code,
+        canonical_json_bytes(&json!({ "value": 1.5 }))
+            .unwrap_err()
+            .code,
         "artifact_identity:float_forbidden"
     );
     let event = local_event();
-    let acknowledgement = materialize_external_projection_acknowledgement(&event, &codex_readback())
-        .expect("materialize Codex acknowledgement");
+    let acknowledgement =
+        materialize_external_projection_acknowledgement(&event, &codex_readback())
+            .expect("materialize Codex acknowledgement");
     let verified = verify_external_projection_acknowledgement(&event, &acknowledgement)
         .expect("verify Codex acknowledgement");
     assert_eq!(verified["provider_status"], "running");
-    assert!(acknowledgement.get("provider_receipt_bytes_sha256").is_none());
+    assert!(acknowledgement
+        .get("provider_receipt_bytes_sha256")
+        .is_none());
 
     let mut forbidden = codex_readback();
     forbidden["nested"] = json!({ "dispatch_receipt_sha256": "forbidden" });
