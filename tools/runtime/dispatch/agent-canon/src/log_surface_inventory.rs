@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
-// upstream implementation ../../../archive/log_surface_inventory.py frozen scanner and output contract
+// upstream design ../../../../../documents/design/agentcanon-hook-simplification-wave3.md frozen scanner and output contract
 // upstream implementation python_ast.rs Python source normalization and source positions
 // downstream implementation main.rs exposes the stable log-surface-inventory command
 // downstream implementation ../../../../../tests/agent_tools/test_log_surface_inventory.py verifies extraction and baseline behavior
