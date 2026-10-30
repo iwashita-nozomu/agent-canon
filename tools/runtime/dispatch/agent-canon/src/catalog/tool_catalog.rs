@@ -158,6 +158,16 @@ fn map_entries(value: &Yaml) -> Option<Vec<(&str, &Yaml)>> {
     Some(entries)
 }
 
+/// Returns a YAML mapping only when all keys are strings.
+pub fn as_mapping(value: &Yaml) -> Option<Vec<(&str, &Yaml)>> {
+    map_entries(value)
+}
+
+/// Returns a YAML sequence, excluding scalar strings and mappings.
+pub fn as_sequence(value: &Yaml) -> Option<&[Yaml]> {
+    value.as_vec().map(Vec::as_slice)
+}
+
 fn mapping_value<'a>(value: &'a Yaml, key: &str) -> Option<&'a Yaml> {
     value
         .as_hash()?
@@ -194,7 +204,13 @@ fn has_non_string_key(mapping: &Yaml, key: &str) -> bool {
     mapping_value(mapping, key).is_some_and(|value| value.as_str().is_none())
 }
 
-fn resolve_repo_path(root: &Path, relative_path: &str) -> PathBuf {
+pub fn resolve_repo_path(root: &Path, relative_path: &str, source_root: Option<&Path>) -> PathBuf {
+    if let Some(source_root) = source_root {
+        let source_root = source_root
+            .canonicalize()
+            .unwrap_or_else(|_| source_root.to_path_buf());
+        return source_root.join(relative_path);
+    }
     let root_path = root.join(relative_path);
     if root_path.exists() {
         return root_path;
@@ -326,7 +342,7 @@ fn check_entry(
         .unwrap_or(&Yaml::Null);
     let audience = inherited_string(entry, defaults, "audience");
     let placement = inherited_string(entry, defaults, "placement");
-    let target = resolve_repo_path(root, &path);
+    let target = resolve_repo_path(root, &path, None);
 
     if id.is_none_or(|value| !valid_id(value)) {
         findings.push(Finding::new("entry", &path, "invalid-id"));
@@ -380,7 +396,7 @@ fn check_entry(
         findings.push(Finding::new("entry", &path, "missing-docs"));
     }
     for doc in docs {
-        if !resolve_repo_path(root, &doc).is_file() {
+        if !resolve_repo_path(root, &doc, None).is_file() {
             findings.push(Finding::new("entry", &path, format!("missing-doc:{doc}")));
         }
     }
@@ -393,7 +409,7 @@ fn check_entry(
         findings.push(Finding::new("entry", &path, "missing-tests-or-exemption"));
     }
     for test in tests {
-        if !resolve_repo_path(root, &test).is_file() {
+        if !resolve_repo_path(root, &test, None).is_file() {
             findings.push(Finding::new("entry", &path, format!("missing-test:{test}")));
         }
     }
@@ -415,7 +431,7 @@ fn valid_id(value: &str) -> bool {
 fn read_existing_text(root: &Path, paths: &[&str]) -> String {
     let mut chunks = Vec::new();
     for path in paths {
-        let target = resolve_repo_path(root, path);
+        let target = resolve_repo_path(root, path, None);
         if target.is_file() {
             if let Ok(text) = fs::read_to_string(target) {
                 chunks.push(text);
@@ -470,7 +486,7 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
 fn check_catalog_docs(root: &Path) -> Vec<Finding> {
     let mut findings = Vec::new();
     for path in CATALOG_DOCS {
-        let target = resolve_repo_path(root, path);
+        let target = resolve_repo_path(root, path, None);
         if !target.is_file() {
             findings.push(Finding::new("catalog_docs", path, "missing-file"));
             continue;
@@ -555,7 +571,7 @@ fn tool_doc_from_table(table: &dyn TableLike) -> ToolDocEntry {
 }
 
 fn load_tool_docs(root: &Path) -> (Vec<ToolDocEntry>, Vec<Finding>) {
-    let path = resolve_repo_path(root, TOOL_DOCS_PATH);
+    let path = resolve_repo_path(root, TOOL_DOCS_PATH, None);
     if !path.is_file() {
         return (
             Vec::new(),
@@ -635,7 +651,7 @@ fn load_tool_docs(root: &Path) -> (Vec<ToolDocEntry>, Vec<Finding>) {
     (entries, findings)
 }
 
-fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Finding> {
+pub fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Finding> {
     let (doc_entries, mut findings) = load_tool_docs(root);
     let mut catalog_by_id: Vec<(String, &Yaml)> = Vec::new();
     for entry in catalog_entries {
@@ -700,10 +716,10 @@ fn check_tool_docs_manifest(root: &Path, catalog_entries: &[&Yaml]) -> Vec<Findi
         if mapping_value(catalog_entry, "path").and_then(Yaml::as_str) != Some(tool.as_str()) {
             findings.push(Finding::new("tool_docs", tool, "catalog-path-mismatch"));
         }
-        if !resolve_repo_path(root, tool).is_file() {
+        if !resolve_repo_path(root, tool, None).is_file() {
             findings.push(Finding::new("tool_docs", tool, "missing-tool"));
         }
-        if !resolve_repo_path(root, doc).is_file() {
+        if !resolve_repo_path(root, doc, None).is_file() {
             findings.push(Finding::new("tool_docs", doc, "missing-doc"));
         }
         if !tool_doc_name_matches(tool, doc) {
@@ -778,7 +794,8 @@ pub fn tool_doc_name_matches(tool: &str, doc: &str) -> bool {
 
 pub fn validate_catalog(root: &Path) -> CatalogReport {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let (Some(data), mut findings) = load_catalog(&resolve_repo_path(&root, CATALOG_PATH)) else {
+    let (Some(data), mut findings) = load_catalog(&resolve_repo_path(&root, CATALOG_PATH, None))
+    else {
         return CatalogReport {
             findings,
             entries: Vec::new(),
@@ -1336,7 +1353,7 @@ pub fn extract_public_surface(root: &Path) -> PublicSurfaceReport {
     let mut findings = Vec::new();
     let mut texts = Vec::new();
     for relative_path in required_paths {
-        let resolved = resolve_repo_path(&root, relative_path);
+        let resolved = resolve_repo_path(&root, relative_path, None);
         if !resolved.is_file() {
             findings.push(Finding::new(
                 "public_surface",
@@ -1732,4 +1749,181 @@ pub fn render_markdown(report: &CatalogReport) -> String {
         ));
     }
     lines.join("\n")
+}
+
+enum CatalogCliArgs {
+    Help,
+    Run {
+        root: PathBuf,
+        format: CatalogOutputFormat,
+    },
+    Error(String),
+}
+
+#[derive(Clone, Copy)]
+enum CatalogOutputFormat {
+    Text,
+    Json,
+    Markdown,
+}
+
+const CLI_USAGE: &str = "usage: tool_catalog.py [-h] [--root ROOT] [--format {text,json,markdown}]";
+
+fn parse_cli_args(args: &[String]) -> CatalogCliArgs {
+    let mut root = PathBuf::from(".");
+    let mut format = CatalogOutputFormat::Text;
+    let mut unexpected = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        let argument = args[index].as_str();
+        if argument == "-h" || argument == "--help" {
+            return CatalogCliArgs::Help;
+        }
+        if argument == "--root" {
+            let Some(value) = args.get(index + 1) else {
+                return CatalogCliArgs::Error("argument --root: expected one argument".to_owned());
+            };
+            if value.starts_with('-') {
+                return CatalogCliArgs::Error("argument --root: expected one argument".to_owned());
+            }
+            root = if value.is_empty() {
+                PathBuf::from(".")
+            } else {
+                PathBuf::from(value)
+            };
+            index += 2;
+            continue;
+        }
+        if let Some(value) = argument.strip_prefix("--root=") {
+            root = if value.is_empty() {
+                PathBuf::from(".")
+            } else {
+                PathBuf::from(value)
+            };
+            index += 1;
+            continue;
+        }
+        if argument == "--format" {
+            let Some(value) = args.get(index + 1) else {
+                return CatalogCliArgs::Error(
+                    "argument --format: expected one argument".to_owned(),
+                );
+            };
+            if value.starts_with('-') {
+                return CatalogCliArgs::Error(
+                    "argument --format: expected one argument".to_owned(),
+                );
+            }
+            match parse_output_format(value) {
+                Some(parsed) => format = parsed,
+                None => return CatalogCliArgs::Error(invalid_format_error(value)),
+            }
+            index += 2;
+            continue;
+        }
+        if let Some(value) = argument.strip_prefix("--format=") {
+            match parse_output_format(value) {
+                Some(parsed) => format = parsed,
+                None => return CatalogCliArgs::Error(invalid_format_error(value)),
+            }
+            index += 1;
+            continue;
+        }
+        unexpected.push(args[index].clone());
+        index += 1;
+    }
+    if !unexpected.is_empty() {
+        return CatalogCliArgs::Error(format!("unrecognized arguments: {}", unexpected.join(" ")));
+    }
+    CatalogCliArgs::Run { root, format }
+}
+
+fn parse_output_format(value: &str) -> Option<CatalogOutputFormat> {
+    match value {
+        "text" => Some(CatalogOutputFormat::Text),
+        "json" => Some(CatalogOutputFormat::Json),
+        "markdown" => Some(CatalogOutputFormat::Markdown),
+        _ => None,
+    }
+}
+
+fn invalid_format_error(value: &str) -> String {
+    format!("argument --format: invalid choice: '{value}' (choose from 'text', 'json', 'markdown')")
+}
+
+fn write_cli_help<W: std::io::Write>(output: &mut W) -> std::io::Result<()> {
+    writeln!(output, "{CLI_USAGE}")?;
+    writeln!(output)?;
+    writeln!(output, "Validate the structured AgentCanon tool catalog.")?;
+    writeln!(output)?;
+    writeln!(output, "options:")?;
+    writeln!(
+        output,
+        "  -h, --help            show this help message and exit"
+    )?;
+    writeln!(
+        output,
+        "  --root ROOT           Repository root. Defaults to cwd."
+    )?;
+    writeln!(output, "  --format {{text,json,markdown}}")
+}
+
+pub(crate) fn run_with_io<W: std::io::Write, E: std::io::Write>(
+    args: &[String],
+    stdout: &mut W,
+    stderr: &mut E,
+) -> i32 {
+    let (root, format) = match parse_cli_args(args) {
+        CatalogCliArgs::Help => return if write_cli_help(stdout).is_ok() { 0 } else { 1 },
+        CatalogCliArgs::Error(error) => {
+            let _ = writeln!(stderr, "{CLI_USAGE}");
+            let _ = writeln!(stderr, "tool_catalog.py: error: {error}");
+            return 2;
+        }
+        CatalogCliArgs::Run { root, format } => (root, format),
+    };
+
+    let report = validate_catalog(&root);
+    let public = extract_public_surface(&root);
+    match format {
+        CatalogOutputFormat::Json => {
+            if writeln!(stdout, "{}", render_json(&report, Some(&public))).is_err() {
+                return 1;
+            }
+        }
+        CatalogOutputFormat::Markdown => {
+            if writeln!(stdout, "{}", render_markdown(&report)).is_err() {
+                return 1;
+            }
+            return if report.findings.is_empty() { 0 } else { 1 };
+        }
+        CatalogOutputFormat::Text => {
+            for finding in report.findings.iter().chain(&public.findings) {
+                if writeln!(stdout, "{}", finding.render()).is_err() {
+                    return 1;
+                }
+            }
+            let total_findings = report.findings.len() + public.findings.len();
+            let status = if total_findings == 0 { "pass" } else { "fail" };
+            if writeln!(stdout, "TOOL_CATALOG_FINDINGS={total_findings}").is_err()
+                || writeln!(stdout, "TOOL_CATALOG={status}").is_err()
+            {
+                return 1;
+            }
+        }
+    }
+    if report.findings.is_empty() && public.findings.is_empty() {
+        0
+    } else {
+        1
+    }
+}
+
+/// Runs the existing tool-catalog CLI contract on native catalog owners.
+pub fn run(args: &[String]) -> i32 {
+    let stdout = std::io::stdout();
+    let stderr = std::io::stderr();
+    let mut output = stdout.lock();
+    let mut error = stderr.lock();
+    run_with_io(args, &mut output, &mut error)
 }

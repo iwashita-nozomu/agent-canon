@@ -13,7 +13,8 @@ use catalog::skill_routes::{
     load_skill_route_rules, load_skill_route_rules_from_root, related_skill_candidates,
 };
 use catalog::tool_catalog::{
-    extract_public_surface, render_json, render_markdown, rust_tokens, token_sequence_matches,
+    as_mapping, as_sequence, check_tool_docs_manifest, extract_public_surface, render_json,
+    render_markdown, resolve_repo_path, run_with_io, rust_tokens, token_sequence_matches,
     validate_catalog, yaml_id_spans,
 };
 use std::fs;
@@ -234,6 +235,102 @@ fn catalog_validation_and_report_rendering_match_native_records() {
     let json = render_json(&report, None);
     assert!(json.contains("agent_canon.catalog_bundle.v1"));
     assert!(json.contains("demo-tool"));
+}
+
+#[test]
+fn mapping_sequence_and_source_root_helpers_keep_direct_caller_contracts() {
+    let mapping = YamlLoader::load_from_str("name: value\n")
+        .unwrap()
+        .remove(0);
+    assert_eq!(as_mapping(&mapping).unwrap()[0].0, "name");
+    assert!(as_sequence(&mapping).is_none());
+    let sequence = YamlLoader::load_from_str("- value\n").unwrap().remove(0);
+    assert_eq!(as_sequence(&sequence).unwrap().len(), 1);
+    let scalar = YamlLoader::load_from_str("value\n").unwrap().remove(0);
+    assert!(as_sequence(&scalar).is_none());
+
+    let root = TempRoot::new("source-root-helper");
+    let source_root = root.path().join("external-source");
+    fs::create_dir_all(&source_root).unwrap();
+    assert_eq!(
+        resolve_repo_path(root.path(), "catalog.yaml", Some(&source_root)),
+        source_root.canonicalize().unwrap().join("catalog.yaml")
+    );
+}
+
+#[test]
+fn direct_manifest_api_and_cli_adapter_keep_current_test_contracts() {
+    let root = valid_tool_catalog_root();
+    let catalog_text = fs::read_to_string(root.path().join("tools/catalog.yaml")).unwrap();
+    let catalog = YamlLoader::load_from_str(&catalog_text).unwrap().remove(0);
+    let entries = catalog["entries"].as_vec().unwrap();
+    let entry_refs = entries.iter().collect::<Vec<_>>();
+    assert!(check_tool_docs_manifest(root.path(), &entry_refs).is_empty());
+
+    let args = [
+        "--root".to_owned(),
+        root.path().display().to_string(),
+        "--format".to_owned(),
+        "markdown".to_owned(),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    assert_eq!(run_with_io(&args, &mut stdout, &mut stderr), 0);
+    assert!(String::from_utf8(stdout)
+        .unwrap()
+        .contains("# AgentCanon Tool Catalog"));
+    assert!(stderr.is_empty());
+
+    let text_args = ["--root".to_owned(), root.path().display().to_string()];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    assert_eq!(run_with_io(&text_args, &mut stdout, &mut stderr), 1);
+    assert!(String::from_utf8(stdout)
+        .unwrap()
+        .contains("TOOL_CATALOG_FINDINGS=4\nTOOL_CATALOG=fail"));
+    assert!(stderr.is_empty());
+
+    let json_args = [
+        "--root".to_owned(),
+        root.path().display().to_string(),
+        "--format=json".to_owned(),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    assert_eq!(run_with_io(&json_args, &mut stdout, &mut stderr), 1);
+    let json = String::from_utf8(stdout).unwrap();
+    assert!(json.contains("agent_canon.catalog_bundle.v1"));
+    assert!(json.contains("public-surface.v1"));
+    assert!(stderr.is_empty());
+
+    let docs = fs::read_to_string(root.path().join("documents/tools/tool-docs.toml"))
+        .unwrap()
+        .replace(
+            "classification = \"internal\"",
+            "classification = \"public\"",
+        );
+    root.write("documents/tools/tool-docs.toml", &docs);
+    let findings = check_tool_docs_manifest(root.path(), &entry_refs);
+    assert!(findings.iter().any(|finding| {
+        finding.render()
+            == "TOOL_CATALOG_FINDING=public_tools:documents/tools/tool-docs.toml:missing-public-mark:demo-tool:tools/demo_tool.py"
+    }));
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    assert_eq!(run_with_io(&args, &mut stdout, &mut stderr), 1);
+    assert!(String::from_utf8(stdout)
+        .unwrap()
+        .contains("# AgentCanon Tool Catalog"));
+    assert!(stderr.is_empty());
+
+    let invalid_args = ["--format".to_owned(), "yaml".to_owned()];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    assert_eq!(run_with_io(&invalid_args, &mut stdout, &mut stderr), 2);
+    assert!(String::from_utf8(stderr)
+        .unwrap()
+        .contains("invalid choice: 'yaml'"));
 }
 
 fn valid_skill_root() -> TempRoot {
