@@ -51,7 +51,6 @@ pub const VALIDATION_FAILURE_FORBIDDEN_TOKENS: &[&str] = &[
     "behavior_simplified=",
     "validation_downscope=",
 ];
-const DEFAULT_BEHAVIOR_MANIFEST: &str = "eval/definitions/agent_behavior_eval.toml";
 const BEHAVIOR_INVENTORY_RELATIVE_PATH: &str =
     "documents/runtime/runtime-profiles-and-check-matrix.json";
 const MANIFEST_NAME: &str = "team_manifest.yaml";
@@ -1267,10 +1266,6 @@ fn tool_warning_problems(evidence: &RunEvidence) -> Vec<String> {
         }
     }
     problems
-}
-
-fn tool_warnings_closed(evidence: &RunEvidence) -> bool {
-    tool_warning_problems(evidence).is_empty()
 }
 
 fn orchestration_evidence_present(evidence: &RunEvidence) -> bool {
