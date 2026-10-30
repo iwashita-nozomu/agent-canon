@@ -693,7 +693,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# @dependency-start",
                     "# responsibility Validates tool catalog.",
                     "# upstream design ../../../../../../tools/catalog.yaml catalog",
-                    "# upstream design ../../../../../../README.md tool docs",
+                    "# upstream design ../../../../../../tools/README.md tool docs",
                     "# upstream design ../../../../../../documents/tools/README.md root docs",
                     "# upstream design ../../../../../../documents/tools/tool-docs.toml docs map",
                     "# upstream design ../../../../../../documents/tools/repo-local-tool-imports.md imports",
