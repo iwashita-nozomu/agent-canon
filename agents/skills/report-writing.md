@@ -11,7 +11,7 @@ upstream design result-artifact-writeout.md raw result artifact placement skill
 upstream design result-visualize.md reusable result visualization contract
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../.codex/personal/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this adapter dependency header
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this adapter dependency header
 @dependency-end
 -->
 

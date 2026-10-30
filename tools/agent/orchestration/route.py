@@ -272,7 +272,7 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Select changed-file or full dependency manifest checks.",
         "select_dependency_review",
         (
-            "python3 tools/validation/semantic/dependencies/check_dependency_headers.py --changed",
+            "tools/bin/agent-canon check-dependency-headers --changed",
             "bash tools/analysis/dependencies/scan_dependency_headers.sh --changed --fail-missing",
         ),
         (

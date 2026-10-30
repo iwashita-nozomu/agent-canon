@@ -1362,13 +1362,13 @@ entries:
       - tests/agent_tools/test_dependency_manifest_tools.py
 
   - id: check-dependency-headers
-    summary: Checks selected files for dependency manifests and registered contract kinds.
-    path: tools/validation/semantic/dependencies/check_dependency_headers.py
+    summary: Checks selected files for dependency manifests, registered contract kinds, and typed edge/path grammar.
+    path: tools/runtime/dispatch/agent-canon/src/dependency_headers.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/dependencies/check_dependency_headers.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/dependencies/check_dependency_headers.py"]}
+    command: tools/bin/agent-canon check-dependency-headers
+    dispatch: {argv: ["tools/bin/agent-canon", "check-dependency-headers"]}
     writes: false
     default_wiring:
       ci: false

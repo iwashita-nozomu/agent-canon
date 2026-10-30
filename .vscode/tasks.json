@@ -18,7 +18,7 @@
     {
       "label": "AgentCanon: Dependency Headers",
       "type": "shell",
-      "command": "python3 \"${workspaceFolder}/tools/validation/semantic/dependencies/check_dependency_headers.py\" --changed && bash \"${workspaceFolder}/tools/analysis/dependencies/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${workspaceFolder}/tools/validation/semantic/dependencies/check_dependency_header_format.sh\" --changed --require-header",
+      "command": "\"${workspaceFolder}/tools/bin/agent-canon\" check-dependency-headers --changed && bash \"${workspaceFolder}/tools/analysis/dependencies/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${workspaceFolder}/tools/validation/semantic/dependencies/check_dependency_header_format.sh\" --changed --require-header",
       "group": "test",
       "problemMatcher": []
     },

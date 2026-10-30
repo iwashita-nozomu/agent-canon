@@ -6,7 +6,7 @@
 # responsibility Verifies repository-topic clone prepare, merge-main, and cleanup gates.
 # upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone lifecycle contract
 # downstream implementation ../../tools/repository/workspace/repository_topic_clone.py owns lifecycle behavior exercised by this test
-# downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_headers.py validates this test header
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this test header
 # @dependency-end
 
 from __future__ import annotations
