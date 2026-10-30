@@ -35,7 +35,7 @@ judgement は同じ対象に対する補完 evidence として記録します。
 - language source と public API/type declarations
 - `documents/design/` の implementation trace
 - BasedPyright `reportExplicitAny`、Ruff `PLR2004`、および native clang-tidy
-- `oop_rule_inventory.py` と dependency graph
+- `tools/bin/agent-canon oop-python-rule-inventory` / `oop-cpp-rule-inventory` と dependency graph
 - `oop-readability-check` の対象 report
 - reviewer が確認した責務境界、state ownership、helper boundary
 
