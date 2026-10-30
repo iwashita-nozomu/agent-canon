@@ -95,6 +95,82 @@ class SkillDocumentReaderCliTest(unittest.TestCase):
                 "SKILL_DOCUMENT_READER_ERROR=heading_not_found:Missing\n",
             )
 
+    def test_cli_preserves_python_sized_integer_behavior(self) -> None:
+        """Unbounded argparse integers keep the old EOF, sign, and offset semantics."""
+        with tempfile.TemporaryDirectory() as temporary:
+            text = "## Operation\nselected body\n## Later\nother body\n"
+            path = self.write_document(Path(temporary), text)
+            huge = 10**100
+            huge_decimal = str(huge)
+            huge_negative = str(-huge)
+            huge_with_separators = f"{huge:_}"
+
+            full_read = self.run_reader(
+                "chunk",
+                "--path",
+                str(path),
+                "--max-bytes",
+                huge_with_separators,
+            )
+            self.assertEqual(full_read.returncode, 0, full_read.stderr)
+            full_chunk = json.loads(full_read.stdout)
+            self.assertEqual(full_chunk["text"], text)
+            self.assertEqual(full_chunk["byte_start"], 0)
+            self.assertEqual(full_chunk["byte_end"], len(text.encode("utf-8")))
+            self.assertEqual(full_chunk["next_offset"], len(text.encode("utf-8")))
+            self.assertTrue(full_chunk["section_eof"])
+            self.assertTrue(full_chunk["file_eof"])
+
+            for maximum, expected_detail in (
+                (huge_negative, huge_negative),
+                ("0", "0"),
+            ):
+                with self.subTest(maximum=maximum):
+                    result = self.run_reader(
+                        "chunk",
+                        "--path",
+                        str(path),
+                        "--max-bytes",
+                        maximum,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertEqual(
+                        result.stderr,
+                        f"SKILL_DOCUMENT_READER_ERROR=invalid_max_bytes:{expected_detail}\n",
+                    )
+
+            for offset, code in (
+                (huge_decimal, "offset_out_of_section"),
+                (huge_negative, "offset_out_of_section"),
+            ):
+                with self.subTest(offset=offset):
+                    result = self.run_reader(
+                        "chunk", "--path", str(path), "--offset", offset
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertEqual(
+                        result.stderr,
+                        f"SKILL_DOCUMENT_READER_ERROR={code}:{offset}\n",
+                    )
+
+            file_eof = len(text.encode("utf-8"))
+            for offset, code in (
+                (str(file_eof), "offset_at_eof"),
+                (str(file_eof + 1), "offset_out_of_section"),
+            ):
+                with self.subTest(offset=offset):
+                    result = self.run_reader(
+                        "chunk", "--path", str(path), "--offset", offset
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(result.stdout, "")
+                    self.assertEqual(
+                        result.stderr,
+                        f"SKILL_DOCUMENT_READER_ERROR={code}:{offset}\n",
+                    )
+
     def test_cli_admit_omits_text_in_json_and_text_formats(self) -> None:
         """Both formats expose the same metadata projection, including empty inputs."""
         with tempfile.TemporaryDirectory() as temporary:

@@ -7,6 +7,7 @@
 // @dependency-end
 //! Read selected Skill sections or canonical bodies through bounded UTF-8 chunks.
 
+use rustpython_ast::bigint::BigInt;
 use serde::Serialize;
 use serde_json::Value;
 use std::error::Error;
@@ -512,8 +513,8 @@ struct CliArgs {
     command: String,
     path: Option<PathBuf>,
     heading: Option<String>,
-    offset: i128,
-    max_bytes: i128,
+    offset: BigInt,
+    max_bytes: BigInt,
     owners: Vec<String>,
     format: OutputFormat,
 }
@@ -556,6 +557,23 @@ pub fn run(args: &[String]) -> i32 {
 }
 
 fn execute(args: &CliArgs) -> Result<CliResult, SkillDocumentError> {
+    execute_bounded(args).map_err(|error| {
+        let detail = match error.code {
+            "invalid_max_bytes" if !cli_integer_fits_i128(&args.max_bytes) => {
+                args.max_bytes.to_string()
+            }
+            "offset_out_of_section" if !cli_integer_fits_i128(&args.offset) => {
+                args.offset.to_string()
+            }
+            _ => error.detail,
+        };
+        SkillDocumentError::new(error.code, detail)
+    })
+}
+
+fn execute_bounded(args: &CliArgs) -> Result<CliResult, SkillDocumentError> {
+    let offset = cli_integer_to_i128(&args.offset);
+    let max_bytes = cli_integer_to_i128(&args.max_bytes);
     match args.command.as_str() {
         "index" => {
             let path = args
@@ -574,8 +592,8 @@ fn execute(args: &CliArgs) -> Result<CliResult, SkillDocumentError> {
             let reader = SkillDocumentReader::new(path)?;
             Ok(CliResult::Chunk(reader.chunk(
                 args.heading.as_deref(),
-                args.offset,
-                args.max_bytes,
+                offset,
+                max_bytes,
             )?))
         }
         "admit" => {
@@ -586,11 +604,66 @@ fn execute(args: &CliArgs) -> Result<CliResult, SkillDocumentError> {
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(CliResult::Admission(admit_implementation_read(
                 &owner_sections,
-                args.max_bytes,
+                max_bytes,
             )?))
         }
         _ => unreachable!("command choices are validated by parse_args"),
     }
+}
+
+fn cli_integer_fits_i128(value: &BigInt) -> bool {
+    value.to_string().parse::<i128>().is_ok()
+}
+
+fn cli_integer_to_i128(value: &BigInt) -> i128 {
+    value.to_string().parse::<i128>().unwrap_or_else(|_| {
+        if value < &BigInt::from(0) {
+            i128::MIN
+        } else {
+            i128::MAX
+        }
+    })
+}
+
+fn argparse_negative_number(value: &str) -> bool {
+    value.strip_prefix('-').map_or(false, |digits| {
+        !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
+    })
+}
+
+fn parse_cli_integer(value: &str) -> Option<BigInt> {
+    let value = value.trim();
+    let (sign, digits) = if let Some(digits) = value.strip_prefix('+') {
+        ("+", digits)
+    } else if let Some(digits) = value.strip_prefix('-') {
+        ("-", digits)
+    } else {
+        ("", value)
+    };
+    if digits.is_empty() {
+        return None;
+    }
+    let bytes = digits.as_bytes();
+    let mut normalized = String::with_capacity(value.len());
+    normalized.push_str(sign);
+    let mut previous_was_digit = false;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        match byte {
+            b'0'..=b'9' => {
+                normalized.push(char::from(byte));
+                previous_was_digit = true;
+            }
+            b'_' if previous_was_digit
+                && bytes
+                    .get(index + 1)
+                    .map_or(false, |byte| byte.is_ascii_digit()) =>
+            {
+                previous_was_digit = false;
+            }
+            _ => return None,
+        }
+    }
+    normalized.parse().ok()
 }
 
 fn parse_owner_spec(value: &str) -> Result<(PathBuf, String), SkillDocumentError> {
@@ -654,8 +727,8 @@ fn parse_args(args: &[String]) -> Result<Option<CliArgs>, String> {
     let mut command = None;
     let mut path = None;
     let mut heading = None;
-    let mut offset = 0i128;
-    let mut max_bytes = DEFAULT_MAX_BYTES;
+    let mut offset = BigInt::from(0);
+    let mut max_bytes = BigInt::from(DEFAULT_MAX_BYTES);
     let mut owners = Vec::new();
     let mut output_format = OutputFormat::Json;
     let mut unknown: Vec<String> = Vec::new();
@@ -689,7 +762,7 @@ fn parse_args(args: &[String]) -> Result<Option<CliArgs>, String> {
                             .ok_or_else(|| format!("argument {name}: expected one argument"))?;
                         if next.starts_with('-')
                             && !((name == "--offset" || name == "--max-bytes")
-                                && next.parse::<i128>().is_ok())
+                                && argparse_negative_number(next))
                         {
                             return Err(format!("argument {name}: expected one argument"));
                         }
@@ -701,12 +774,12 @@ fn parse_args(args: &[String]) -> Result<Option<CliArgs>, String> {
                     "--path" => path = Some(PathBuf::from(value)),
                     "--heading" => heading = Some(value),
                     "--offset" => {
-                        offset = value.parse().map_err(|_| {
+                        offset = parse_cli_integer(&value).ok_or_else(|| {
                             format!("argument --offset: invalid int value: '{value}'")
                         })?;
                     }
                     "--max-bytes" => {
-                        max_bytes = value.parse().map_err(|_| {
+                        max_bytes = parse_cli_integer(&value).ok_or_else(|| {
                             format!("argument --max-bytes: invalid int value: '{value}'")
                         })?;
                     }
