@@ -2783,16 +2783,7 @@ fn uri_path(root: &Path, uri: &str) -> Result<String, AnalysisFailure> {
         uri
     };
     let raw_path = raw.split(['?', '#']).next().unwrap_or_default();
-    let mut decoded = percent_decode(raw_path);
-    if cfg!(windows)
-        && decoded.len() >= 3
-        && decoded.starts_with('/')
-        && decoded.as_bytes()[1].is_ascii_alphabetic()
-        && decoded.as_bytes()[2] == b':'
-    {
-        decoded.remove(0);
-    }
-    let path = PathBuf::from(decoded);
+    let path = uri_path_buf(raw_path);
     let candidate = if path.is_absolute() {
         path
     } else {
@@ -2807,6 +2798,22 @@ fn uri_path(root: &Path, uri: &str) -> Result<String, AnalysisFailure> {
     relative_to_root(root, &resolved).ok_or_else(|| {
         AnalysisFailure::new("path-escape", format!("URI outside analysis root: {uri}"))
     })
+}
+
+/// Decode a URI path component using the host path syntax.
+pub(crate) fn uri_path_buf(raw_path: &str) -> PathBuf {
+    let decoded = percent_decode(raw_path);
+    let drive_path = decoded.trim_start_matches('/');
+    if cfg!(windows)
+        && decoded.starts_with('/')
+        && drive_path.len() >= 2
+        && drive_path.as_bytes()[0].is_ascii_alphabetic()
+        && drive_path.as_bytes()[1] == b':'
+    {
+        PathBuf::from(drive_path)
+    } else {
+        PathBuf::from(decoded)
+    }
 }
 
 fn percent_decode(value: &str) -> String {
@@ -2837,9 +2844,17 @@ fn percent_decode(value: &str) -> String {
     String::from_utf8_lossy(&decoded).into_owned()
 }
 
-fn file_uri(path: &Path) -> String {
+/// Encode a source path as a standard file URI.
+pub fn file_uri(path: &Path) -> String {
     let path = resolve_weakly(path).unwrap_or_else(|_| path.to_path_buf());
-    let value = path_as_posix(&path);
+    let mut value = path_as_posix(&path);
+    if cfg!(windows) {
+        if let Some(unc) = value.strip_prefix("//?/UNC/") {
+            value = format!("//{unc}");
+        } else if let Some(drive_path) = value.strip_prefix("//?/") {
+            value = drive_path.to_owned();
+        }
+    }
     let windows_drive = cfg!(windows)
         && value.len() >= 2
         && value.as_bytes()[0].is_ascii_alphabetic()
