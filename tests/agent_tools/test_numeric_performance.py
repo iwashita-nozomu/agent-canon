@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests real observation classification and owner/handoff output.
-# upstream implementation ../../tools/analysis/numerical/numeric_performance.py owns the closed JSON classifier
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/numeric_performance.rs owns the closed JSON classifier
 # upstream design ../../agents/skills/computational-optimization.md owns numerical performance ownership
 # downstream implementation ../../agents/skills/catalog.yaml exposes the classifier command
 # @dependency-end
@@ -11,13 +11,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from copy import deepcopy
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLASSIFIER = PROJECT_ROOT / "tools" / "analysis" / "numerical" / "numeric_performance.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 INPUT_SCHEMA = "agent-canon.numeric-performance-observation.v1"
 
 
@@ -92,8 +92,15 @@ def _observation(
 
 
 def _classify(packet: dict[str, object]) -> subprocess.CompletedProcess[str]:
+    assert AGENT_CANON_CLI is not None, (
+        "AGENT_CANON_CLI must select the current native executable"
+    )
+    executable = Path(AGENT_CANON_CLI)
+    assert executable.is_absolute(), (
+        "AGENT_CANON_CLI must be an absolute executable path"
+    )
     return subprocess.run(
-        [sys.executable, str(CLASSIFIER), "--input", "-", "--format", "json"],
+        [str(executable), "numeric-performance", "--input", "-", "--format", "json"],
         cwd=PROJECT_ROOT,
         input=json.dumps(packet),
         capture_output=True,
@@ -156,6 +163,46 @@ def test_context_mismatch_is_unresolved_and_forbids_jit() -> None:
     assert result["owner_route"] == "computational-optimization"
     assert "mathematical_problem" in result["evidence"]["context_mismatches"]
     assert "JIT" in result["forbidden_writes"]
+
+
+def test_large_integer_context_mismatch_is_not_rounded() -> None:
+    """Distinct Python-valid integer identities remain distinct above u64."""
+    packet = _observation()
+    before = packet["before"]
+    after = packet["after"]
+    assert isinstance(before, dict)
+    assert isinstance(after, dict)
+    before["workload"] = 18446744073709551616
+    after["workload"] = 18446744073709551617
+
+    result = _result(packet)
+    assert result["category"] == "evidence_missing"
+    assert result["owner_route"] == "computational-optimization"
+    assert result["evidence"]["context_mismatches"] == ["workload"]
+    assert "JIT" in result["forbidden_writes"]
+
+
+def test_context_integer_float_equality_matches_python() -> None:
+    """Large integer and float context equality follows Python's numeric oracle."""
+    large_integer = 2**128
+    pairs = (
+        (large_integer, float(large_integer)),
+        (large_integer + 1, float(large_integer)),
+        (-large_integer, float(-large_integer)),
+        (-large_integer - 1, float(-large_integer)),
+    )
+    for before_identity, after_identity in pairs:
+        packet = _observation()
+        before = packet["before"]
+        after = packet["after"]
+        assert isinstance(before, dict)
+        assert isinstance(after, dict)
+        before["workload"] = before_identity
+        after["workload"] = after_identity
+
+        result = _result(packet)
+        mismatches = result["evidence"]["context_mismatches"]
+        assert ("workload" in mismatches) is (before_identity != after_identity)
 
 
 def test_kkt_or_finite_event_change_routes_to_math() -> None:

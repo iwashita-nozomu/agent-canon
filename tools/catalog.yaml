@@ -280,6 +280,24 @@ entries:
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
 
+  - id: numeric-performance
+    summary: Classifies post-run numerical performance observations using task-owned mathematical evidence.
+    path: tools/runtime/dispatch/agent-canon/src/numeric_performance.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon numeric-performance
+    dispatch: {argv: ["tools/bin/agent-canon", "numeric-performance"]}
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/experiments/experiment-critical-review.md
+    tests:
+      - tests/agent_tools/test_numeric_performance.py
+      - tests/agent_tools/test_numeric_performance_routing.py
+
   - id: tool-catalog
     summary: Validates the structured tool catalog and renders the tool crosswalk.
     path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
