@@ -13,6 +13,7 @@
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
+// downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
@@ -68,7 +69,7 @@ mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, tool_proof_coverage};
+use agent_canon::{catalog, theorem_graph_board, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -91,6 +92,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
@@ -146,6 +148,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "theorem-graph-board" {
+        std::process::exit(theorem_graph_board::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-run-log-contract" {

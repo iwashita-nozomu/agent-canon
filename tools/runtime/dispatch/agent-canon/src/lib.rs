@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, private feedback, artifact, catalog, and proof APIs.
+//! Shared AgentCanon runtime, artifact, catalog, proof coverage, and theorem-board APIs.
 
 // @dependency-start
 // contract implementation
@@ -13,9 +13,11 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
+// downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
+// downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
 pub mod artifacts;
@@ -23,4 +25,5 @@ pub mod catalog;
 pub mod environment_dependencies;
 pub mod private_feedback;
 pub mod runtime_boundary;
+pub mod theorem_graph_board;
 pub mod tool_proof_coverage;
