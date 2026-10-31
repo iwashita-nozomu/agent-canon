@@ -5,7 +5,6 @@
 # upstream design ../../../README.md shared automation index
 # upstream design ../../../documents/design/request-intent-and-update-relation.md run-bundle temporary-state and retention readback projection
 # upstream implementation ../manifest/manifest_rendering.py renders optional run-bundle artifacts
-# downstream implementation ../lifecycle/task_close.py consumes actual run-artifact checks
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""

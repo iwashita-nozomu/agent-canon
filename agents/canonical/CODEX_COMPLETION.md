@@ -65,7 +65,7 @@ the selected operations. Decide commit and push under
 
 The selected results are the evidence. This route creates no coordination run
 bundle, `user_request_contract.md`, `schedule.md`, or `closeout_gate.md`, and does
-not call `task_close.py`. A concrete new
+not invoke `agent-canon task-close`. A concrete new
 coordination need returns only that changed decision to the route owner; labels,
 links, and report length do not initiate a route change.
 
@@ -85,7 +85,7 @@ in-scope repair. Preserve the intent through repair, redesign, or authorized
 escalation. Use [review activation and adjudication](../skills/agent-orchestration.md#review-activation-and-adjudication)
 for those decisions.
 
-For an explicitly selected coordination closeout, `task_close.py` checks the
+For an explicitly selected coordination closeout, `agent-canon task-close` checks the
 requested outcome, actual validation and delivery evidence, and applicable
 closeout records. It does not require a task graph, stage plan, or planned-work
 ledger. Record `not_applicable` only where the selected closeout artifact defines
@@ -162,7 +162,7 @@ The user's explicit step boundary defines that step's deliverable; do not expand
 it to the entire project or wait for unrelated work.
 
 Return a completion result only when the selected bounded evidence or coordination
-`task_close.py` result establishes all required outcomes on the final source.
+`agent-canon task-close` result establishes all required outcomes on the final source.
 If the user explicitly requests pause/handoff, preserve that boundary. Otherwise,
 an incomplete blocker handoff requires evidence that the next required operations
 cannot proceed under current authority, safety, or available execution routes,
@@ -181,8 +181,9 @@ Issue. Review-only/no-change work retains its result and source-backed rationale
 
 ## Coordination closeout
 
-For the selected coordination run, pass the existing run evidence through its
-closeout owner. `task_close.py` remains the sole coordination terminal predicate;
+For the selected coordination run, pass the existing run evidence through the
+[native TaskClose owner](../../tools/runtime/dispatch/agent-canon/src/task_close.rs).
+`agent-canon task-close` remains the sole coordination terminal predicate;
 this owner does not restate its artifact fields or create another checklist.
 Keep source/config/schema/fixtures/documentation/tool entrypoints needed by the
 runnable commit together under [Branch Scope](../../documents/operations/BRANCH_SCOPE.md).

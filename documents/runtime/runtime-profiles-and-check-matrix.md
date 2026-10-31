@@ -56,7 +56,7 @@ temporary directory outside the source checkout and one shared tool image at
 most. Track any image/container created for validation and remove that exact
 resource after evidence is captured. Creator-owned temporary resources also
 require a cleanup receipt naming each exact path or resource ID and an absence
-readback before `task_close.py` can report a terminal result.
+readback before `agent-canon task-close` can report a terminal result.
 
 ## Validation Failure Response
 

@@ -2259,12 +2259,12 @@ entries:
 
   - id: task-close
     summary: Checks closeout evidence before task completion.
-    path: tools/runtime/lifecycle/task_close.py
+    path: tools/runtime/dispatch/agent-canon/src/task_close.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/runtime/lifecycle/task_close.py
-    dispatch: {argv: ["python3", "tools/runtime/lifecycle/task_close.py"]}
+    command: tools/bin/agent-canon task-close
+    dispatch: {argv: ["tools/bin/agent-canon", "task-close"]}
     writes: true
     default_wiring:
       ci: false
@@ -2275,6 +2275,7 @@ entries:
       - agents/canonical/CODEX_COMPLETION.md
     tests:
       - tests/agent_tools/test_bootstrap_and_close.py
+      - tools/runtime/dispatch/agent-canon/tests/task_close_native.rs
 
   - id: evaluate-agent-run
     public: true

@@ -183,7 +183,8 @@ to root entrypoints to satisfy a test.
 
 Bounded execution consumes existing structured task evidence. Full staging, DIC,
 child handoff, and coordinated completion have separate explicit conditions before
-their detail sections. `task_close.py` remains the single coordinated terminal owner;
+their detail sections. Native [TaskClose](../../tools/runtime/dispatch/agent-canon/src/task_close.rs)
+remains the single coordinated terminal owner;
 bounded delivery uses the existing `execution_route_policy` instead of materializing
 a new ledger to satisfy unrelated fields. Family selection comes from task_catalog,
 not an independently maintained six-family prose list.

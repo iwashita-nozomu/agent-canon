@@ -48,7 +48,7 @@ global Python executable, or Host Cargo fallback.
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
 | docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py` |
 | Skill loading | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` via the persistent AgentCanon tool container (bounded UTF-8 chunks and EOF admission) |
-| review and closeout | `review_dispatch.py`, `task_close.py`, canonical workflow |
+| review and closeout | `review_dispatch.py`, `tools/bin/agent-canon task-close`, canonical workflow |
 
 Each tool that writes requires an external runtime/output root or an explicit
 target mutation capability. Read-only tools must not create a source-local

@@ -15,6 +15,7 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
+// downstream implementation task_close.rs consumes the task-close terminal predicates
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -76,6 +77,7 @@ pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
 pub mod stablehlo_value_closure;
+pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;

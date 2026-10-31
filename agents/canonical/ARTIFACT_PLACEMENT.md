@@ -74,7 +74,7 @@ immutable snapshot, append-only index, push and remote readback. Broad `sync` is
 explicitly selected cumulative runtime families, not a replacement report publisher.
 Read actual placement/identity from that owner's status output rather than guessing.
 
-When coordinated closeout is selected, `task_close.py` checks artifact placement.
+When coordinated closeout is selected, native `agent-canon task-close` checks artifact placement.
 Tracked durable reports are allowed by canon; untracked/ignored reports belong only
 to the current run directory. Old run bundles follow archive/closeout rather than
 being copied into a new run.

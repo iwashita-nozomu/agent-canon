@@ -162,7 +162,7 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
             )
 
     def test_allows_run_bundle_reports_for_closeout_gate(self) -> None:
-        """Run bundles are one-shot evidence and remain task_close.py responsibility."""
+        """Run bundles are one-shot evidence and remain native TaskClose responsibility."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.init_repo(root)
