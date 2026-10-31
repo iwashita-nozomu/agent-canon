@@ -25,7 +25,7 @@ impl RuntimeRoot {
             std::process::id()
         ));
         fs::create_dir_all(&path).expect("external runtime fixture is created");
-        Self(path)
+        Self(fs::canonicalize(path).expect("runtime fixture has a physical path"))
     }
 
     fn report_dir(&self, run_id: &str) -> PathBuf {
