@@ -55,14 +55,13 @@ fn bool_field(value: &JsonValue, key: &str) -> Option<bool> {
 }
 
 fn decode_hex(value: &str) -> Vec<u8> {
-    assert_eq!(
-        value.len() % 2,
-        0,
+    let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
+    assert!(
+        remainder.is_empty(),
         "fixture byte payload has even hex length"
     );
-    value
-        .as_bytes()
-        .chunks_exact(2)
+    pairs
+        .iter()
         .map(|pair| {
             let pair = std::str::from_utf8(pair).expect("fixture byte payload is ASCII");
             u8::from_str_radix(pair, 16).expect("fixture byte payload is hexadecimal")
