@@ -43,7 +43,7 @@ pub type Result<T> = std::result::Result<T, SourceMutationError>;
 #[derive(Debug, Clone)]
 pub struct SourceMutationCapability {
     source_root: PathBuf,
-    allowed_paths: Vec<String>,
+    allowed_paths: Vec<PathBuf>,
     _purpose: String,
     _authority: String,
 }
@@ -100,16 +100,12 @@ impl SourceMutationCapability {
                 path.display()
             ))
         })?;
-        let relative = posix_path(relative);
         if !self.allowed_paths.iter().any(|allowed| {
-            allowed.is_empty()
-                || relative == *allowed
-                || relative
-                    .strip_prefix(allowed)
-                    .is_some_and(|suffix| suffix.starts_with('/'))
+            allowed.as_os_str().is_empty() || relative == allowed || relative.starts_with(allowed)
         }) {
             return Err(SourceMutationError::new(format!(
-                "mutation target is outside allowed_paths: {relative}"
+                "mutation target is outside allowed_paths: {}",
+                relative.display()
             )));
         }
         Ok(resolved)
@@ -185,7 +181,7 @@ fn reject_unknown_fields(object: &Map<String, Value>) -> Result<()> {
     }
 }
 
-fn parse_allowed_paths(object: &Map<String, Value>, source_root: &Path) -> Result<Vec<String>> {
+fn parse_allowed_paths(object: &Map<String, Value>, source_root: &Path) -> Result<Vec<PathBuf>> {
     let allowed = object
         .get("allowed_paths")
         .and_then(Value::as_array)
@@ -223,7 +219,7 @@ fn parse_allowed_paths(object: &Map<String, Value>, source_root: &Path) -> Resul
                 part => parts.push(part),
             }
         }
-        let relative = parts.join("/");
+        let relative = PathBuf::from(parts.join("/"));
         let lexical = source_root.join(&relative);
         if !candidate_resolves_under(source_root, &lexical)? {
             return Err(SourceMutationError::new(format!(
@@ -326,17 +322,6 @@ fn resolve_with_missing(path: &Path) -> Result<PathBuf> {
                 )))
             }
         }
-    }
-}
-
-fn posix_path(path: &Path) -> String {
-    #[cfg(windows)]
-    {
-        path.to_string_lossy().replace('\\', "/")
-    }
-    #[cfg(not(windows))]
-    {
-        path.to_string_lossy().into_owned()
     }
 }
 

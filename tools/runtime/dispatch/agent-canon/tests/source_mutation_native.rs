@@ -99,6 +99,34 @@ fn posix_backslash_filename_does_not_alias_a_slash_allowed_subtree() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn posix_replacement_character_grant_does_not_alias_invalid_utf8_component() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let root = TempRoot::new();
+    let valid = root.write("docs/�/guide.md", "valid subtree\n");
+    let invalid = root
+        .0
+        .join("docs")
+        .join(std::ffi::OsString::from_vec(vec![0xff]))
+        .join("guide.md");
+    fs::create_dir_all(invalid.parent().expect("invalid-byte fixture has parent"))
+        .expect("invalid-byte fixture directory is created");
+    fs::write(&invalid, "invalid-byte subtree remains\n").expect("invalid-byte fixture is written");
+    let capability = capability(&root.0, &["docs/�"]);
+
+    assert!(capability.assert_allowed(&valid).is_ok());
+    assert!(capability.assert_allowed(&invalid).is_err());
+    assert!(capability
+        .write_text(&invalid, "must remain denied\n")
+        .is_err());
+    assert_eq!(
+        fs::read_to_string(&invalid).unwrap(),
+        "invalid-byte subtree remains\n"
+    );
+}
+
 #[test]
 fn source_capability_writes_only_the_approved_file() {
     let root = TempRoot::new();
