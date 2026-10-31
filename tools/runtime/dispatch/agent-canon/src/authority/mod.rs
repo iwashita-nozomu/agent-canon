@@ -722,10 +722,10 @@ impl ParentRootAttestor {
         #[cfg(not(target_os = "linux"))]
         {
             let _ = request;
-            return Err(AuthorityError::new(
+            Err(AuthorityError::new(
                 ParentRootReject::UnsupportedPlatform,
                 "native parent-root authority currently requires Linux",
-            ));
+            ))
         }
         #[cfg(target_os = "linux")]
         {
