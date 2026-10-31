@@ -10,6 +10,7 @@
 // upstream implementation private_feedback.rs owns private feedback storage using the shared boundary
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
+// upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation lsp_code_analysis.rs owns the reusable native LSP analysis API
@@ -22,6 +23,7 @@ pub mod artifacts;
 pub mod catalog;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
+pub mod environment_dependencies;
 pub mod lsp_code_analysis;
 pub mod private_feedback;
 #[allow(dead_code)]
