@@ -89,6 +89,22 @@ Catalog-declared native CLI commands use the same route and execute their fixed
 argv prefix directly inside the authenticated tool container; they do not add
 host executables or shell-command dispatch.
 
+### Native CLI release workflow
+
+The workflow invokes the release owner from the checked-out source:
+
+```sh
+cargo run --locked \
+  --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
+  -- native-release <operation>
+```
+
+`native-release prepare` assigns the version and validates the mainline source,
+`select-artifacts` selects retained CI attempts, `compare-reproducible` checks
+the independent Windows rebuild, and `publish` verifies, resumes, and reads
+back a GitHub draft release. Build jobs invoke package creation and verification
+from the same checkout's native executable.
+
 Invoke the prescribed command first; the dispatcher retains its admission checks.
 Only after a relevant failure, follow [bootstrap](../agents/skills/agent-canon-bootstrap.md)
 for route diagnosis and authorized target/lifecycle repair. Do not prepend `status`

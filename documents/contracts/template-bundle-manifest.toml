@@ -3,7 +3,7 @@
 # contract configuration
 # responsibility Declares canonical template, Codex plugin, and native CLI package inputs.
 # upstream design ../design/agent-canon-bootstrap-tool-runtime.md distribution boundary
-# downstream implementation ../../tools/agent/templates/template_bundle.py snapshot exporter
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs snapshot exporter
 # @dependency-end
 version = 1
 source_index = "templates/README.md"
@@ -26,7 +26,7 @@ roots = ["templates/experiments"]
 # materialized skill discovery metadata with canonical skill bodies, and
 # composes guidance/AGENTS.md from ROOT_AGENTS.md. Local Markdown references
 # close over commit-bound resources; template assets retain consumer-relative links.
-producer = "tools/agent/templates/template_bundle.py"
+producer = "tools/runtime/dispatch/agent-canon/src/template_bundle.rs"
 roots = [
   "LICENSE",
   "ROOT_AGENTS.md",
@@ -49,8 +49,6 @@ roots = [
   "tools/agent/orchestration/__init__.py",
   "tools/agent/skills/__init__.py",
   "tools/agent/templates/__init__.py",
-  "tools/agent/templates/entrypoint_composer.py",
-  "tools/agent/templates/template_bundle.py",
   "tools/agent/orchestration/capability_route.py",
   "tools/agent/orchestration/mid_task_user_input_policy.py",
   "tools/agent/orchestration/prompt_capture.py",
