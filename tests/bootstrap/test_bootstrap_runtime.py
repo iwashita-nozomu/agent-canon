@@ -39,7 +39,6 @@ from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     build_parser,
     run,
 )
-from tools.runtime.archive.runtime_exchange_cleanup import clear_exchange  # noqa: E402
 from tools.runtime.dispatch import tool_dispatch  # noqa: E402
 
 
@@ -1718,53 +1717,6 @@ def test_gc_enforces_archive_quota_only_without_unpublished_spool(
     assert cleaned["archive_cleanup_blocked_by_spool"] is False
     assert "archive:agent-canon-log" in cleaned["deleted"]
     assert not archive_cache.exists()
-
-
-
-
-def test_exchange_cleanup_unlinks_symlink_without_touching_target(
-    tmp_path: Path,
-) -> None:
-    """The in-container cleanup cannot follow an exchange child symlink."""
-    exchange = tmp_path / "exchange"
-    outside = tmp_path / "outside"
-    exchange.mkdir()
-    outside.mkdir()
-    protected = outside / "protected"
-    protected.write_text("keep", encoding="utf-8")
-    (exchange / "linked").symlink_to(outside, target_is_directory=True)
-
-    assert clear_exchange(exchange) == (1, 0)
-    assert protected.read_text(encoding="utf-8") == "keep"
-    assert not (exchange / "linked").exists()
-
-
-def test_exchange_cleanup_preserves_host_owned_entries_for_host_phase(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A root-Host entry may remain until the following Host cleanup phase."""
-    exchange = tmp_path / "exchange"
-    host_owned = exchange / "host-owned"
-    host_file = host_owned / "receipt"
-    host_owned.mkdir(parents=True)
-    host_file.write_text("host", encoding="utf-8")
-    original_unlink = Path.unlink
-
-    def deny_container_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
-        if path == host_file:
-            raise PermissionError("simulated root-Host ownership")
-        original_unlink(path, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "unlink", deny_container_unlink)
-
-    assert clear_exchange(exchange) == (0, 1)
-    assert host_file.read_text(encoding="utf-8") == "host"
-    original_unlink(host_file)
-    host_owned.rmdir()
-    exchange.rmdir()
-    assert not exchange.exists()
-
-
 
 
 def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:

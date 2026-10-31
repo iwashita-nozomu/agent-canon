@@ -5279,6 +5279,7 @@ def test_gpu006_stale_source_sync_mount_is_recreated_by_public_route(
 
 def test_public_clean_install_uses_tracked_skills_and_first_target(
     tmp_path: Path,
+    native_cli_input: Path,
 ) -> None:
     """Install from empty state, then reconstruct over stale runtime residue."""
     home = tmp_path / "home"
@@ -5312,6 +5313,7 @@ def test_public_clean_install_uses_tracked_skills_and_first_target(
     environment = {
         **os.environ,
         "HOME": str(home),
+        "AGENT_CANON_NATIVE_BIN": str(native_cli_input),
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(fake_state),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
