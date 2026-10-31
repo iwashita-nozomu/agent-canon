@@ -405,11 +405,12 @@ where
                     home = windows_path_join(&parent, username);
                 }
             }
-            if suffix.is_empty() {
-                Ok(PathBuf::from(home))
+            let expanded = if suffix.is_empty() {
+                home
             } else {
-                Ok(PathBuf::from(windows_path_join(&home, suffix)))
-            }
+                windows_path_join(&home, suffix)
+            };
+            Ok(PathBuf::from(expanded.replace('/', "\\")))
         }
     }
 }
