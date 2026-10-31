@@ -102,6 +102,7 @@ paths. The optional `--check` flag runs the complete docs check after rewriting.
 explicit external `--runtime-root` (or the equivalent runtime environment) for
 its report. Its `--delete` mode requires an explicit source mutation capability;
 all deletion grants and the external report destination are admitted before
-source files are removed. Similarity and organization remain separate Python
-tools with external reports; organization apply requires its explicit mutation
-capability. No documentation tool defaults output to the source checkout.
+source files are removed. `docs find-similar-designs` compares design Markdown
+with the native SequenceMatcher owner and writes its report to the external
+runtime. Organization remains a Python planner; apply requires its explicit
+mutation capability. No documentation tool defaults output to the source checkout.

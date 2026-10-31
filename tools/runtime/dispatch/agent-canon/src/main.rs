@@ -107,7 +107,7 @@ Commands:
   agent-search [search options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
-  docs <check|format|find-redundant-designs|check-bootstrap|check-entrypoints> [options] [paths...]
+  docs <check|format|find-redundant-designs|find-similar-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]

@@ -11,19 +11,22 @@
 // downstream implementation entrypoint_owner_map.rs owns the root entrypoint grammar subcommand
 // upstream design ../../../../../documents/contracts/template-bootstrap.md default bootstrap doc contract
 // upstream design ../../../../../documents/contracts/static-seed-export.md source-free static-seed contract
-// upstream implementation python_cli_integer.rs shares argparse negative-number classification
+// upstream implementation python_cli_integer.rs shares Python Unicode decimal-digit classification
+// upstream implementation python_sequence_matcher.rs provides CPython-compatible similarity scoring
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
 // downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
 // downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle
+// downstream test ../tests/design_similarity_native.rs compares similarity CLI behavior with frozen Python oracles
 // @dependency-end
 
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::runtime_boundary::{RuntimeArtifactBoundary, RUNTIME_ROOT_ENV};
 use crate::source_mutation::SourceMutationCapability;
 use regex::{Captures, Regex};
+use rustpython_literal::format::Case as FloatFormatCase;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -40,6 +43,10 @@ static DOCS_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const REDUNDANT_DESIGN_PROGRAM: &str = "agent-canon docs find-redundant-designs";
 const REDUNDANT_DESIGN_USAGE: &str = "usage: agent-canon docs find-redundant-designs [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]";
+const SIMILAR_DESIGN_PROGRAM: &str = "find_similar_designs.py";
+const SIMILAR_DESIGN_USAGE: &str = "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
+const SIMILAR_DESIGN_TASK_DIRECTORY: &str = "tasks/similar-designs";
+const SIMILAR_DESIGN_REPORT_FILENAME: &str = "similar_designs_report.txt";
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -70,6 +77,8 @@ const LINK_SKIP_PARTS: &[&str] = &[".git", ".worktrees", "__pycache__", "Archive
 
 static MARKDOWN_LINK_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").expect("static Markdown link regex"));
+static CODE_FENCE_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("static Markdown code-fence regex"));
 static EXTERNAL_LINK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-zA-Z][a-zA-Z0-9+.-]*://").expect("static external link scheme regex")
 });
@@ -195,6 +204,12 @@ struct WriteSummary {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| argument.as_str() == "find-similar-designs")
+    {
+        return run_similar_designs(&args[1..]);
+    }
     if args
         .first()
         .is_some_and(|argument| argument.as_str() == "find-redundant-designs")
@@ -358,7 +373,12 @@ fn run_redundant_designs(raw: &[String]) -> i32 {
         Ok(path) => path,
         Err(error) => return redundant_design_runtime_error(error),
     };
-    let target = match admit_redundant_report_target(&boundary, output.as_deref()) {
+    let target = match admit_external_report_target(
+        &boundary,
+        output.as_deref(),
+        Path::new("tasks/redundant-designs"),
+        "redundant_designs.txt",
+    ) {
         Ok(target) => target,
         Err(error) => return redundant_design_runtime_error(error),
     };
@@ -385,6 +405,351 @@ fn run_redundant_designs(raw: &[String]) -> i32 {
     }
     println!("Report written to {}", target.display());
     0
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct SimilarDesignArgs {
+    design_root: PathBuf,
+    minimum: f64,
+    runtime_root: Option<PathBuf>,
+    output: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SimilarDesignOption {
+    Help,
+    DesignRoot,
+    Minimum,
+    RuntimeRoot,
+    Output,
+}
+
+const SIMILAR_DESIGN_OPTIONS: &[(&str, SimilarDesignOption)] = &[
+    ("--help", SimilarDesignOption::Help),
+    ("--design-root", SimilarDesignOption::DesignRoot),
+    ("--min", SimilarDesignOption::Minimum),
+    ("--runtime-root", SimilarDesignOption::RuntimeRoot),
+    ("--output", SimilarDesignOption::Output),
+];
+
+enum SimilarDesignParse {
+    Run(SimilarDesignArgs),
+    Help,
+}
+
+fn run_similar_designs(raw: &[String]) -> i32 {
+    let parsed = match parse_similar_design_args(raw) {
+        Ok(SimilarDesignParse::Run(parsed)) => parsed,
+        Ok(SimilarDesignParse::Help) => {
+            print_similar_design_help();
+            return 0;
+        }
+        Err(message) => return similar_design_error(&message),
+    };
+
+    let current_dir = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            return similar_design_runtime_error(format!("cannot resolve source root: {error}"));
+        }
+    };
+    let source_root = match fs::canonicalize(&current_dir) {
+        Ok(path) => path,
+        Err(error) => {
+            return similar_design_runtime_error(format!(
+                "cannot resolve source root {}: {error}",
+                current_dir.display()
+            ));
+        }
+    };
+    let design_dir = match resolve_design_root(&parsed.design_root, &current_dir) {
+        Ok(path) => path,
+        Err(message) => return similar_design_error(&message),
+    };
+    if !design_dir.is_dir() {
+        return similar_design_error(format!(
+            "design root is not a directory: {}",
+            design_dir.display()
+        ));
+    }
+    if !(0.0..=1.0).contains(&parsed.minimum) {
+        return similar_design_error("--min must be between 0 and 1");
+    }
+
+    let requested_runtime_root = parsed.runtime_root.clone().or_else(|| {
+        std::env::var_os(RUNTIME_ROOT_ENV)
+            .filter(|value| !value.is_empty())
+            .and_then(|value| value.into_string().ok())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    });
+    let runtime_root = match requested_runtime_root
+        .as_deref()
+        .map(expand_cli_path)
+        .transpose()
+    {
+        Ok(path) => path,
+        Err(error) => return similar_design_runtime_error(error),
+    };
+    let boundary =
+        match RuntimeArtifactBoundary::for_source(&source_root, runtime_root.as_deref(), true) {
+            Ok(boundary) => boundary,
+            Err(error) => return similar_design_runtime_error(error),
+        };
+    let output = match parsed.output.as_deref().map(expand_cli_path).transpose() {
+        Ok(path) => path,
+        Err(error) => return similar_design_runtime_error(error),
+    };
+    let target = match admit_external_report_target(
+        &boundary,
+        output.as_deref(),
+        Path::new(SIMILAR_DESIGN_TASK_DIRECTORY),
+        SIMILAR_DESIGN_REPORT_FILENAME,
+    ) {
+        Ok(target) => target,
+        Err(error) => return similar_design_runtime_error(error),
+    };
+
+    let report = match build_similar_design_report(&design_dir, parsed.minimum) {
+        Ok(report) => report,
+        Err(error) => return similar_design_runtime_error(error),
+    };
+    let relative_target = match target.strip_prefix(boundary.root()) {
+        Ok(path) => path,
+        Err(_) => {
+            return similar_design_runtime_error(format!(
+                "path escapes runtime root: {}",
+                target.display()
+            ));
+        }
+    };
+    if let Err(error) = boundary.atomic_write_text(relative_target, &report, 0o600) {
+        return similar_design_runtime_error(error);
+    }
+    println!("Report written to {}", target.display());
+    0
+}
+
+fn parse_similar_design_args(raw: &[String]) -> Result<SimilarDesignParse, String> {
+    let mut parsed = SimilarDesignArgs {
+        design_root: PathBuf::from("documents/design"),
+        minimum: 0.6,
+        runtime_root: None,
+        output: None,
+    };
+    let mut index = 0;
+    let mut unrecognized = Vec::new();
+    while index < raw.len() {
+        let argument = raw[index].as_str();
+        if argument == "-h" {
+            return Ok(SimilarDesignParse::Help);
+        }
+
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        if !option.starts_with("--") || option == "--" {
+            unrecognized.push(argument.to_string());
+            index += 1;
+            continue;
+        }
+
+        let name = match resolve_long_option_prefix(option, SIMILAR_DESIGN_OPTIONS) {
+            Ok(name) => name,
+            Err(LongOptionError::Unrecognized) => {
+                unrecognized.push(argument.to_string());
+                index += 1;
+                continue;
+            }
+            Err(LongOptionError::Ambiguous(matches)) => {
+                return Err(format!(
+                    "ambiguous option: {option} could match {}",
+                    matches.join(", ")
+                ));
+            }
+        };
+        match name {
+            SimilarDesignOption::Help => {
+                return match inline_value {
+                    Some(value) => Err(format!(
+                        "argument -h/--help: ignored explicit argument '{value}'"
+                    )),
+                    None => Ok(SimilarDesignParse::Help),
+                };
+            }
+            option_name => {
+                let value = match inline_value {
+                    Some(value) => value.to_string(),
+                    None => {
+                        index += 1;
+                        let Some(value) = raw.get(index) else {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                similar_design_option_label(option_name)
+                            ));
+                        };
+                        if value.starts_with("--") {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                similar_design_option_label(option_name)
+                            ));
+                        }
+                        value.clone()
+                    }
+                };
+                match option_name {
+                    SimilarDesignOption::DesignRoot => parsed.design_root = PathBuf::from(value),
+                    SimilarDesignOption::Minimum => {
+                        parsed.minimum = parse_python_float(&value).ok_or_else(|| {
+                            format!(
+                                "argument --min: invalid float value: {}",
+                                rustpython_ast::Constant::Str(value.clone()).to_string()
+                            )
+                        })?;
+                    }
+                    SimilarDesignOption::RuntimeRoot => {
+                        parsed.runtime_root = Some(PathBuf::from(value))
+                    }
+                    SimilarDesignOption::Output => parsed.output = Some(PathBuf::from(value)),
+                    SimilarDesignOption::Help => {
+                        unreachable!("help is handled before its value is read")
+                    }
+                }
+            }
+        }
+        index += 1;
+    }
+    if unrecognized.is_empty() {
+        Ok(SimilarDesignParse::Run(parsed))
+    } else {
+        Err(format!(
+            "unrecognized arguments: {}",
+            unrecognized.join(" ")
+        ))
+    }
+}
+
+fn parse_python_float(value: &str) -> Option<f64> {
+    let normalized = value
+        .chars()
+        .map(|character| {
+            crate::python_cli_integer::decimal_digit_value(character)
+                .map_or(character, |digit| char::from(b'0' + digit))
+        })
+        .collect::<String>();
+    rustpython_literal::float::parse_str(&normalized)
+}
+
+fn similar_design_option_label(option: SimilarDesignOption) -> &'static str {
+    match option {
+        SimilarDesignOption::DesignRoot => "--design-root",
+        SimilarDesignOption::Minimum => "--min",
+        SimilarDesignOption::RuntimeRoot => "--runtime-root",
+        SimilarDesignOption::Output => "--output",
+        SimilarDesignOption::Help => unreachable!("help does not take a value"),
+    }
+}
+
+fn print_similar_design_help() {
+    println!("{SIMILAR_DESIGN_USAGE}\n");
+    println!("Detect similar design documents without writing into the source checkout.");
+    println!("\noptions:");
+    println!("  -h, --help            show this help message and exit");
+    println!("  --design-root DESIGN_ROOT");
+    println!("                        Read-only design root (defaults to documents/design).");
+    println!("  --min MIN");
+    println!("  --runtime-root RUNTIME_ROOT");
+    println!(
+        "                        External runtime root (or AGENT_CANON_RUNTIME_ROOT); never source-local."
+    );
+    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file");
+    println!("                        is created under the runtime root.");
+}
+
+fn similar_design_error(message: impl std::fmt::Display) -> i32 {
+    eprintln!("{SIMILAR_DESIGN_USAGE}");
+    eprintln!("{SIMILAR_DESIGN_PROGRAM}: error: {message}");
+    2
+}
+
+fn similar_design_runtime_error(message: impl std::fmt::Display) -> i32 {
+    similar_design_error(format!("runtime_or_input_error: {message}"))
+}
+
+fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String, String> {
+    let mut files = Vec::new();
+    collect_redundant_markdown_files(design_dir, &mut files)?;
+    files.sort();
+
+    let mut normalized = Vec::with_capacity(files.len());
+    for path in &files {
+        let text = fs::read_to_string(path)
+            .map_err(|error| format!("cannot read design document {}: {error}", path.display()))?;
+        normalized.push(normalize_similar_design_text(&text));
+    }
+
+    let mut pairs = Vec::new();
+    for first in 0..files.len() {
+        for second in first + 1..files.len() {
+            let score = crate::python_sequence_matcher::SequenceMatcher::new(
+                &normalized[first],
+                &normalized[second],
+            )
+            .ratio();
+            if score >= minimum {
+                pairs.push((score, &files[first], &files[second]));
+            }
+        }
+    }
+    pairs.sort_by(|left, right| {
+        right
+            .0
+            .total_cmp(&left.0)
+            .then_with(|| right.1.cmp(left.1))
+            .then_with(|| right.2.cmp(left.2))
+    });
+
+    let threshold = crate::python_json::python_float(minimum);
+    let mut lines = if pairs.is_empty() {
+        vec![format!(
+            "No similar design files found with threshold >= {threshold}"
+        )]
+    } else {
+        vec![format!(
+            "Similar design file pairs (threshold >= {threshold})"
+        )]
+    };
+    lines.extend(pairs.into_iter().map(|(score, first, second)| {
+        format!(
+            "{}  {}  {}",
+            rustpython_literal::float::format_fixed(3, score, FloatFormatCase::Lower, false),
+            first.display(),
+            second.display()
+        )
+    }));
+    Ok(format!("{}\n", lines.join("\n")))
+}
+
+fn normalize_similar_design_text(text: &str) -> String {
+    let without_fences = CODE_FENCE_PATTERN.replace_all(text, "");
+    let without_link_destinations = MARKDOWN_LINK_PATTERN.replace_all(&without_fences, "$1");
+    let punctuation_normalized = without_link_destinations
+        .chars()
+        .map(|character| {
+            if matches!(character, '#' | '>' | '*' | '-' | '[' | ']') || character == 0x60 as char {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    punctuation_normalized
+        .split(crate::python_text::is_python_whitespace)
+        .filter(|piece| !piece.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 fn parse_redundant_design_args(raw: &[String]) -> Result<RedundantDesignParse, String> {
@@ -690,9 +1055,11 @@ fn redundant_as_posix(path: &Path) -> String {
     }
 }
 
-fn admit_redundant_report_target(
+fn admit_external_report_target(
     boundary: &RuntimeArtifactBoundary,
     output: Option<&Path>,
+    task_directory: &Path,
+    report_filename: &str,
 ) -> Result<PathBuf, String> {
     if let Some(output) = output {
         let target = boundary.resolve(output)?;
@@ -713,7 +1080,7 @@ fn admit_redundant_report_target(
         return Ok(target);
     }
 
-    boundary.ensure_directory(Path::new("tasks/redundant-designs"))?;
+    boundary.ensure_directory(task_directory)?;
     let mut random = [0u8; 16];
     getrandom::getrandom(&mut random)
         .map_err(|error| format!("cannot create unique report directory: {error}"))?;
@@ -724,9 +1091,8 @@ fn admit_redundant_report_target(
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>()
     );
-    let run_dir =
-        boundary.ensure_directory(&Path::new("tasks/redundant-designs").join(run_name))?;
-    Ok(run_dir.join("redundant_designs.txt"))
+    let run_dir = boundary.ensure_directory(&task_directory.join(run_name))?;
+    Ok(run_dir.join(report_filename))
 }
 
 impl Args {
@@ -1111,6 +1477,7 @@ commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
+  find-similar-designs    compare Markdown design documents and write an external runtime report\n\
   links                   check Markdown links; --apply requires an exact source mutation capability\n\
   check-entrypoints       check the finite root entrypoint owner-map contract\n\
   check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\
