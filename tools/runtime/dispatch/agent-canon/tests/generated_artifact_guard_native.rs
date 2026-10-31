@@ -144,7 +144,14 @@ fn git(root: &Path, args: &[&str]) -> Output {
 }
 
 fn initialize_repository(root: &Path) {
-    assert!(git(root, &["init", "-q"]).status.success());
+    let output = git(root, &["init", "-q"]);
+    assert!(
+        output.status.success(),
+        "Git fixture command failed (git init -q): status={:?}, stdout={:?}, stderr={:?}",
+        output.status,
+        output.stdout,
+        output.stderr
+    );
 }
 
 fn write_ignore_patterns(root: &Path, patterns: &[Value]) {
