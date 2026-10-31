@@ -1185,7 +1185,6 @@ entries:
       - documents/tools/lsp_code_analysis.md
       - documents/structured-analysis/code-analysis.md
     tests:
-      - tests/agent_tools/test_lsp_code_analysis.py
       - tools/runtime/dispatch/agent-canon/tests/lsp_code_analysis_native.rs
 
   - id: semantic-index
