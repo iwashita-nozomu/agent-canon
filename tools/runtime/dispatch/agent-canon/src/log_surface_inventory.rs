@@ -3,12 +3,14 @@
 // responsibility Inventories machine-readable log and hook output fields from hooks, skills, Python tools, shell tools, and Rust CLI tools.
 // upstream design ../../../../../documents/design/agentcanon-hook-simplification-wave3.md frozen scanner and output contract
 // upstream implementation python_ast.rs Python source normalization and source positions
+// upstream implementation dependency_headers.rs shared Python fnmatch path matching
 // downstream implementation main.rs exposes the stable log-surface-inventory command
 // downstream implementation ../../../../../tests/agent_tools/test_log_surface_inventory.py verifies extraction and baseline behavior
 // @dependency-end
 
 //! Inventory machine-readable fields emitted by hooks, skills, and tools.
 
+use crate::dependency_headers::fnmatch_case;
 use crate::python_ast::{line_at_offset, normalize_python_newlines};
 use agent_canon::authority::{
     AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor, ParentRootReject,
@@ -840,34 +842,6 @@ fn should_skip(relative: &Path) -> bool {
 
 fn matches_any(path: &str, patterns: &[&str]) -> bool {
     patterns.iter().any(|pattern| fnmatch_case(path, pattern))
-}
-
-fn fnmatch_case(path: &str, pattern: &str) -> bool {
-    let path = path.chars().collect::<Vec<_>>();
-    let pattern = pattern.chars().collect::<Vec<_>>();
-    let (mut path_index, mut pattern_index) = (0, 0);
-    let (mut star_index, mut star_path_index) = (None, 0);
-    while path_index < path.len() {
-        if pattern_index < pattern.len()
-            && (pattern[pattern_index] == '?' || pattern[pattern_index] == path[path_index])
-        {
-            pattern_index += 1;
-            path_index += 1;
-        } else if pattern_index < pattern.len() && pattern[pattern_index] == '*' {
-            star_index = Some(pattern_index);
-            pattern_index += 1;
-            star_path_index = path_index;
-        } else if let Some(star) = star_index {
-            star_path_index += 1;
-            path_index = star_path_index;
-            pattern_index = star + 1;
-        } else {
-            return false;
-        }
-    }
-    pattern[pattern_index..]
-        .iter()
-        .all(|character| *character == '*')
 }
 
 fn fs_glob_matches_any(path: &str) -> bool {
