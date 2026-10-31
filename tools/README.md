@@ -126,7 +126,7 @@ catalog/checker owners rather than adding a second README registry.
 | runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
 | archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
 | eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
-| path-risk/profile selection | `python3 tools/validation/semantic/path/classify_path_risk.py` |
+| path-risk/profile selection | `tools/bin/agent-canon classify-path-risk` |
 | one-shot LSP code analysis | `tools/bin/agent-canon lsp-code-analysis analyze --root <root> --format json` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |
 | semantic repository search | `tools/bin/agent-canon semantic-index ...` |
