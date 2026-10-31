@@ -4504,7 +4504,7 @@ _agent_canon_codex_hook() {
     _agent_canon_use_active_image "$container" || return $?
     container=$(_agent_canon_ensure_container) || return $?
     if ! _agent_canon_container_exec "$container" \
-      python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
+      "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" template-bundle \
       verify --root "$AGENT_CANON_SOURCE_DESTINATION" >/dev/null; then
       _agent_canon_json_error codex_bundle_invalid \
         "Codex user bundle integrity readback failed"
@@ -4619,7 +4619,7 @@ _agent_canon_codex_bundle_install_locked() {
   container=$(_agent_canon_ensure_container) || return $?
   records=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.codex-bundle-install.XXXXXX") || return $?
   if ! _agent_canon_container_exec "$container" \
-    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/agent/templates/template_bundle.py" \
+    "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" template-bundle \
     verify --root "$AGENT_CANON_SOURCE_DESTINATION" --format install-tsv > "$records"; then
     rm -f -- "$records"
     _agent_canon_json_error codex_bundle_invalid \

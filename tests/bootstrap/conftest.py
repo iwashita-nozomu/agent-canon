@@ -83,6 +83,16 @@ def materialize_source_fixture(tmp_path: Path) -> Path:
     return create_source_checkout(source)
 
 
+@pytest.fixture(scope="session")
+def native_cli_input() -> Path:
+    """Capture the built API input before each test isolates runtime settings."""
+    configured = os.environ.get("AGENT_CANON_CLI")
+    assert configured, "AGENT_CANON_CLI must select the built native test input"
+    binary = Path(configured).resolve(strict=True)
+    assert binary.is_file() and os.access(binary, os.X_OK)
+    return binary
+
+
 @pytest.fixture(autouse=True)
 def bootstrap_test_isolation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

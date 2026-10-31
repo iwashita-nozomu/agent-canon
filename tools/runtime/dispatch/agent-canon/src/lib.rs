@@ -1,10 +1,10 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, docs, source mutation, artifact, catalog, parent-root authority, proof, and evaluation APIs.
+//! Shared AgentCanon runtime, LSP, Template, release, docs, source mutation, artifact, catalog, parent-root authority, proof, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
-// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, docs/link repair and source mutation, catalog, and proof APIs.
+// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, Template/release, docs/link repair, source mutation, catalog, and proof APIs.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust implementation ownership
 // upstream implementation runtime_boundary.rs owns external runtime and restricted spool capabilities
 // upstream implementation runtime_boundary.rs owns external artifact I/O capabilities
@@ -15,6 +15,10 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
+// downstream implementation code_template_rendering.rs owns code template rendering
+// downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
+// downstream implementation native_release.rs owns source-bound native releases
+// downstream implementation template_bundle.rs owns native template package operations
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
@@ -34,6 +38,7 @@
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
+// downstream test template_tests.rs validates native Template APIs
 // downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
@@ -41,7 +46,9 @@
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
+pub mod code_template_rendering;
 pub mod docs;
+pub mod entrypoint_composer;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod environment_dependencies;
@@ -49,6 +56,7 @@ pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
+pub mod native_release;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
@@ -63,7 +71,11 @@ pub mod runtime_boundary;
 pub mod scip_index;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;
 pub mod update_lifecycle_contract;
+
+#[cfg(test)]
+mod template_tests;
