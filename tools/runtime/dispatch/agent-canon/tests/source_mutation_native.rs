@@ -62,14 +62,14 @@ fn capability(root: &Path, allowed_paths: &[&str]) -> SourceMutationCapability {
 fn source_capability_binds_root_and_exact_allowed_subtree() {
     let root = TempRoot::new();
     let guide = root.write("docs/guide.md", "before\n");
-    let capability = capability(&root.0, &["docs/guide.md"]);
+    let exact_capability = capability(&root.0, &["docs/guide.md"]);
     assert_eq!(
-        capability
+        exact_capability
             .assert_allowed(&guide)
             .expect("allowed file resolves"),
         guide.canonicalize().expect("file is canonical")
     );
-    assert!(capability
+    assert!(exact_capability
         .assert_allowed(&root.0.join("README.md"))
         .is_err());
     let subtree_capability = capability(&root.0, &["docs"]);
@@ -77,7 +77,7 @@ fn source_capability_binds_root_and_exact_allowed_subtree() {
 
     let other = TempRoot::new();
     let outside = other.write("docs/guide.md", "outside\n");
-    assert!(capability.assert_allowed(&outside).is_err());
+    assert!(exact_capability.assert_allowed(&outside).is_err());
 }
 
 #[cfg(unix)]
