@@ -31,6 +31,7 @@
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
+// downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -72,6 +73,7 @@ pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
 pub(crate) mod python_cli_options;
 pub mod python_json;
+pub mod python_sequence_matcher;
 pub(crate) mod python_text;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
