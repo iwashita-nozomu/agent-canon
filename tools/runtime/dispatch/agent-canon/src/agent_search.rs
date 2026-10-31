@@ -6,6 +6,7 @@
 // upstream implementation semantic_index/mod.rs owns semantic-index search
 // upstream implementation ../../../../../../bootstrap/container/image/dependencies.toml owns LSP server tool inputs
 // upstream implementation lsp_code_analysis.rs owns bounded code facts and LSP discovery
+// upstream implementation lib.rs exposes shared user-home path expansion
 // upstream design ../../../../../tools/catalog.yaml owns structured tool metadata
 // downstream implementation ../../../../../tests/agent_tools/test_search.py validates CLI provider routing and failure semantics
 // downstream test agent_search_tests.rs validates in-process owner composition with independent source and LSP fixtures
@@ -15,13 +16,15 @@ use crate::graph_client::GraphClient;
 use agent_canon::lsp_code_analysis::{
     self, LanguageId, LspServerSpec, DEFAULT_TIMEOUT as LSP_DEFAULT_TIMEOUT,
 };
+pub(crate) use agent_canon::path_expansion::{
+    expand_user_path_with, native_home_lookup, HomeLookupRequest,
+    PathExpansionEnvironment as SearchPathEnvironment, PathExpansionError,
+    PathPlatform as SearchPathPlatform,
+};
 use icu_casemap::CaseMapper;
-#[cfg(unix)]
-use nix::unistd::{Uid, User};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -74,47 +77,13 @@ impl SearchInputError {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct SearchPathEnvironment {
-    pub(crate) home: Option<OsString>,
-    pub(crate) user_profile: Option<OsString>,
-    pub(crate) home_drive: Option<OsString>,
-    pub(crate) home_path: Option<OsString>,
-    pub(crate) user_name: Option<OsString>,
-}
-
-impl SearchPathEnvironment {
-    fn from_process() -> Self {
-        Self {
-            home: std::env::var_os("HOME"),
-            user_profile: std::env::var_os("USERPROFILE"),
-            home_drive: std::env::var_os("HOMEDRIVE"),
-            home_path: std::env::var_os("HOMEPATH"),
-            user_name: std::env::var_os("USERNAME"),
+impl From<PathExpansionError> for SearchInputError {
+    fn from(error: PathExpansionError) -> Self {
+        match error {
+            PathExpansionError::UnresolvedHome => Self::UnresolvedHome,
+            PathExpansionError::HomeLookup(message) => Self::HomeLookup(message),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SearchPathPlatform {
-    Posix,
-    Windows,
-}
-
-impl SearchPathPlatform {
-    fn native() -> Self {
-        if cfg!(windows) {
-            Self::Windows
-        } else {
-            Self::Posix
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum HomeLookupRequest {
-    CurrentUser,
-    NamedUser(String),
 }
 
 #[derive(Debug, Clone)]
@@ -335,270 +304,6 @@ impl CliArgs {
 
 fn resolve_path(path: &Path) -> Result<PathBuf, String> {
     crate::semantic_responsibility::resolve_non_strict(path)
-}
-
-fn unresolved_home() -> SearchInputError {
-    SearchInputError::UnresolvedHome
-}
-
-fn lookup_home_directory<F>(
-    request: HomeLookupRequest,
-    lookup: &mut F,
-) -> Result<PathBuf, SearchInputError>
-where
-    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
-{
-    match lookup(request) {
-        Ok(Some(home)) => Ok(home),
-        Ok(None) => Err(unresolved_home()),
-        Err(error) => Err(SearchInputError::HomeLookup(error)),
-    }
-}
-
-pub(crate) fn expand_user_path_with<F>(
-    path: &Path,
-    platform: SearchPathPlatform,
-    environment: &SearchPathEnvironment,
-    mut home_lookup: F,
-) -> Result<PathBuf, SearchInputError>
-where
-    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
-{
-    let Some(value) = path.to_str() else {
-        return Ok(path.to_path_buf());
-    };
-    let Some((username, suffix)) = tilde_path_parts(value, platform) else {
-        return Ok(path.to_path_buf());
-    };
-
-    match platform {
-        SearchPathPlatform::Posix => {
-            let home = if username.is_empty() {
-                match &environment.home {
-                    Some(home) if home.is_empty() => PathBuf::from("/"),
-                    Some(home) => PathBuf::from(home),
-                    None => {
-                        lookup_home_directory(HomeLookupRequest::CurrentUser, &mut home_lookup)?
-                    }
-                }
-            } else {
-                lookup_home_directory(
-                    HomeLookupRequest::NamedUser(username.to_string()),
-                    &mut home_lookup,
-                )?
-            };
-            let suffix = suffix.trim_start_matches('/');
-            if suffix.is_empty() {
-                Ok(home)
-            } else {
-                Ok(home.join(suffix))
-            }
-        }
-        SearchPathPlatform::Windows => {
-            let mut home = windows_current_home(environment)?;
-            if !username.is_empty() {
-                let current_user = environment.user_name.as_deref().and_then(OsStr::to_str);
-                if current_user != Some(username) {
-                    let (parent, basename) = windows_path_split(&home);
-                    if current_user != Some(basename.as_str()) {
-                        return Err(unresolved_home());
-                    }
-                    home = windows_path_join(&parent, username);
-                }
-            }
-            let expanded = if suffix.is_empty() {
-                home
-            } else {
-                windows_path_join(&home, suffix)
-            };
-            Ok(PathBuf::from(expanded.replace('/', "\\")))
-        }
-    }
-}
-
-fn tilde_path_parts(value: &str, platform: SearchPathPlatform) -> Option<(&str, &str)> {
-    if !value.starts_with('~') {
-        return None;
-    }
-    match platform {
-        SearchPathPlatform::Posix if value.starts_with('/') => return None,
-        SearchPathPlatform::Windows if windows_path_is_anchored(value) => return None,
-        _ => {}
-    }
-    let suffix = &value[1..];
-    let separator = |character| match platform {
-        SearchPathPlatform::Posix => character == '/',
-        SearchPathPlatform::Windows => matches!(character, '/' | '\\'),
-    };
-    let Some((index, character)) = suffix
-        .char_indices()
-        .find(|(_, character)| separator(*character))
-    else {
-        return Some((suffix, ""));
-    };
-    let username = &suffix[..index];
-    let suffix_start = index + character.len_utf8();
-    let suffix = &suffix[suffix_start..];
-    let suffix = match platform {
-        SearchPathPlatform::Posix => suffix.trim_start_matches('/'),
-        SearchPathPlatform::Windows => suffix.trim_start_matches(['/', '\\']),
-    };
-    Some((username, suffix))
-}
-
-fn windows_path_is_anchored(value: &str) -> bool {
-    if value.starts_with('\\') || value.starts_with('/') {
-        return true;
-    }
-    let mut characters = value.chars();
-    characters.next();
-    characters.next() == Some(':')
-}
-
-fn windows_current_home(environment: &SearchPathEnvironment) -> Result<String, SearchInputError> {
-    if let Some(user_profile) = &environment.user_profile {
-        return user_profile
-            .to_str()
-            .map(str::to_owned)
-            .ok_or_else(unresolved_home);
-    }
-    let Some(home_path) = &environment.home_path else {
-        return Err(unresolved_home());
-    };
-    let home_path = home_path.to_str().ok_or_else(unresolved_home)?;
-    let home_drive = match environment.home_drive.as_deref() {
-        Some(home_drive) => home_drive.to_str().ok_or_else(unresolved_home)?,
-        None => "",
-    };
-    Ok(windows_path_join(home_drive, home_path))
-}
-
-fn windows_path_join(first: &str, second: &str) -> String {
-    let (mut drive, mut root, mut path) = windows_splitroot(first);
-    let (second_drive, second_root, second_path) = windows_splitroot(second);
-    if !second_root.is_empty() {
-        if !second_drive.is_empty() || drive.is_empty() {
-            drive = second_drive;
-        }
-        root = second_root;
-        path = second_path;
-    } else if !second_drive.is_empty() && !second_drive.eq_ignore_ascii_case(&drive) {
-        drive = second_drive;
-        root = second_root;
-        path = second_path;
-    } else {
-        if !second_drive.is_empty() {
-            drive = second_drive;
-        }
-        if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
-            path.push('\\');
-        }
-        path.push_str(&second_path);
-    }
-    if !path.is_empty()
-        && root.is_empty()
-        && !drive.is_empty()
-        && !drive.ends_with(':')
-        && !drive.ends_with('\\')
-        && !drive.ends_with('/')
-    {
-        drive.push('\\');
-    }
-    format_windows_path(&drive, &root, &path)
-}
-
-fn windows_splitroot(path: &str) -> (String, String, String) {
-    let normalized = path.replace('/', "\\");
-    if normalized.starts_with("\\\\") {
-        let unc_prefix = "\\\\?\\UNC\\";
-        let start = if normalized
-            .get(..unc_prefix.len())
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(unc_prefix))
-        {
-            unc_prefix.len()
-        } else {
-            2
-        };
-        let Some(first_separator) = normalized[start..].find('\\').map(|index| start + index)
-        else {
-            return (path.to_string(), String::new(), String::new());
-        };
-        let Some(second_separator) = normalized[first_separator + 1..]
-            .find('\\')
-            .map(|index| first_separator + 1 + index)
-        else {
-            return (path.to_string(), String::new(), String::new());
-        };
-        return (
-            path[..second_separator].to_string(),
-            path[second_separator..second_separator + 1].to_string(),
-            path[second_separator + 1..].to_string(),
-        );
-    }
-    if path.starts_with('\\') || path.starts_with('/') {
-        return (String::new(), path[..1].to_string(), path[1..].to_string());
-    }
-    let mut characters = path.char_indices();
-    let Some((_, _)) = characters.next() else {
-        return (String::new(), String::new(), String::new());
-    };
-    let Some((colon_index, ':')) = characters.next() else {
-        return (String::new(), String::new(), path.to_string());
-    };
-    let drive_end = colon_index + 1;
-    let after_drive = &path[drive_end..];
-    if after_drive.starts_with('\\') || after_drive.starts_with('/') {
-        let root_end = drive_end + 1;
-        (
-            path[..drive_end].to_string(),
-            path[drive_end..root_end].to_string(),
-            path[root_end..].to_string(),
-        )
-    } else {
-        (
-            path[..drive_end].to_string(),
-            String::new(),
-            after_drive.to_string(),
-        )
-    }
-}
-
-fn windows_path_split(path: &str) -> (String, String) {
-    let (drive, root, tail) = windows_splitroot(path);
-    let split_at = tail
-        .char_indices()
-        .filter(|(_, character)| matches!(character, '\\' | '/'))
-        .map(|(index, character)| index + character.len_utf8())
-        .next_back()
-        .unwrap_or(0);
-    let head = tail[..split_at].trim_end_matches(['\\', '/']);
-    let directory = if head.is_empty() {
-        format!("{drive}{root}")
-    } else {
-        format!("{drive}{root}{head}")
-    };
-    (directory, tail[split_at..].to_string())
-}
-
-fn format_windows_path(drive: &str, root: &str, path: &str) -> String {
-    format!("{drive}{root}{path}")
-}
-
-fn native_home_lookup(request: HomeLookupRequest) -> Result<Option<PathBuf>, String> {
-    #[cfg(unix)]
-    {
-        let user = match request {
-            HomeLookupRequest::CurrentUser => User::from_uid(Uid::current()),
-            HomeLookupRequest::NamedUser(username) => User::from_name(&username),
-        };
-        user.map(|user| user.map(|user| user.dir))
-            .map_err(|error| error.to_string())
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = request;
-        Ok(None)
-    }
 }
 
 fn normalize_universal_newlines(text: &str) -> String {

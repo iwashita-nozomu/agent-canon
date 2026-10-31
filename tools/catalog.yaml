@@ -432,21 +432,43 @@ entries:
   - id: git-dependency-diff-summary
     public: true
     summary: Summarizes Git diffs with optional SCIP impact references and dependency-header edit-scope artifacts.
-    path: tools/analysis/dependencies/git_dependency_diff_summary.py
+    path: tools/runtime/dispatch/agent-canon/src/git_dependency_diff_summary.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/analysis/dependencies/git_dependency_diff_summary.py
-    dispatch: {argv: ["python3", "tools/analysis/dependencies/git_dependency_diff_summary.py"]}
+    command: tools/bin/agent-canon git-dependency-diff-summary
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, git-dependency-diff-summary]}
     writes: true
     default_wiring:
       ci: false
       pr_check: false
     docs:
+      - tools/README.md
       - documents/tools/git_dependency_diff_summary.md
       - documents/design/dependency-manifest-design.md
     tests:
-      - tests/agent_tools/test_git_dependency_diff_summary.py
+      - tools/runtime/dispatch/agent-canon/tests/git_dependency_diff_summary_native.rs
+
+  - id: scip-index
+    public: true
+    summary: Writes standard SCIP protobuf indexes with verified native producers and projects bounded definitions, references, and declared implementations.
+    path: tools/runtime/dispatch/agent-canon/src/scip_index.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon scip-index query --root . --runtime-root <external-runtime-root> --index <index.scip> --path <source-path>
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, scip-index]}
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/scip_index.md
+      - documents/design/dependency-manifest-design.md
+      - agents/skills/dependency-analysis.md
+    tests:
+      - tools/runtime/dispatch/agent-canon/tests/scip_index_native.rs
 
   - id: classify-path-risk
     public: true
@@ -1500,7 +1522,6 @@ entries:
       - documents/tools/dependency-tools-and-licenses.md
     tests:
       - tests/agent_tools/test_tool_dispatch.py
-      - tests/agent_tools/test_scip_index.py
 
   - id: check-github-workflows
     summary: Validates GitHub Actions and PR template surfaces.
