@@ -613,7 +613,7 @@ fn process_returncode(status: ExitStatus) -> i32 {
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt;
-        return status.signal().map_or(1, |signal| -signal);
+        status.signal().map_or(1, |signal| -signal)
     }
     #[cfg(not(unix))]
     {
