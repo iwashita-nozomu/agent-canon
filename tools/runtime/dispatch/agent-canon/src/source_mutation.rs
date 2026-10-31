@@ -376,11 +376,10 @@ fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
     Ok(directory)
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
     #[test]
     fn allowed_path_comparison_keeps_invalid_utf8_component_identity() {
         use std::os::unix::ffi::OsStringExt;
