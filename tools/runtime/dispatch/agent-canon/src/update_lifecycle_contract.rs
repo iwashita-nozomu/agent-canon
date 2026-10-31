@@ -44,6 +44,96 @@ pub const TRANSACTION_STATES: &[&str] = &[
     "successor_required",
 ];
 
+#[derive(Clone, Copy)]
+struct TransactionTransition {
+    current_state: &'static str,
+    next_state: &'static str,
+    required_evidence: &'static [&'static str],
+}
+
+const TRANSACTION_TRANSITIONS: &[TransactionTransition] = &[
+    TransactionTransition {
+        current_state: "created",
+        next_state: "prepared",
+        required_evidence: &["prepare_receipt"],
+    },
+    TransactionTransition {
+        current_state: "prepared",
+        next_state: "generated",
+        required_evidence: &["generate_receipt"],
+    },
+    TransactionTransition {
+        current_state: "generated",
+        next_state: "gates_ready",
+        required_evidence: &["gate_verdicts"],
+    },
+    TransactionTransition {
+        current_state: "gates_ready",
+        next_state: "reviewed",
+        required_evidence: &["candidate_review_receipt", "candidate_cas_receipt"],
+    },
+    TransactionTransition {
+        current_state: "reviewed",
+        next_state: "pr_open",
+        required_evidence: &["pr_lifecycle"],
+    },
+    TransactionTransition {
+        current_state: "pr_open",
+        next_state: "pr_merged",
+        required_evidence: &["pr_lifecycle"],
+    },
+    TransactionTransition {
+        current_state: "pr_merged",
+        next_state: "source_main_readback",
+        required_evidence: &["publication_readback_receipt"],
+    },
+    TransactionTransition {
+        current_state: "source_main_readback",
+        next_state: "queue_enqueued",
+        required_evidence: &["queue_receipt"],
+    },
+    TransactionTransition {
+        current_state: "queue_enqueued",
+        next_state: "frontier_accepted",
+        required_evidence: &["dependency_frontier"],
+    },
+    TransactionTransition {
+        current_state: "frontier_accepted",
+        next_state: "remote_readback",
+        required_evidence: &["gate_verdicts"],
+    },
+    TransactionTransition {
+        current_state: "remote_readback",
+        next_state: "durable_handback",
+        required_evidence: &["durable_handback"],
+    },
+    TransactionTransition {
+        current_state: "durable_handback",
+        next_state: "descendants_closed",
+        required_evidence: &["descendants_closed_evidence_ref"],
+    },
+    TransactionTransition {
+        current_state: "descendants_closed",
+        next_state: "reservations_released",
+        required_evidence: &["reservations_released_evidence_ref"],
+    },
+    TransactionTransition {
+        current_state: "reservations_released",
+        next_state: "cleanup_proven",
+        required_evidence: &["cleanup_proof"],
+    },
+    TransactionTransition {
+        current_state: "cleanup_proven",
+        next_state: "nested_lifecycle_cleanup",
+        required_evidence: &["gate_verdicts", "cleanup_proof"],
+    },
+    TransactionTransition {
+        current_state: "nested_lifecycle_cleanup",
+        next_state: "closed",
+        required_evidence: &["close_agent_tool_call"],
+    },
+];
+
 const GATE_IDS: &[&str] = &["G1", "G2", "G3", "G4", "G5", "G6"];
 const CHECKPOINT_IDS: &[&str] = &[
     "prepare",
@@ -3716,6 +3806,159 @@ pub fn materialize_close_agent_tool_call(
         JsonValue::String(format!("sha256:{body_digest}")),
     );
     validate_close_agent_tool_call(&JsonValue::Object(record))
+}
+
+pub fn guard_transition(
+    current_state: &str,
+    next_state: &str,
+    evidence: &JsonValue,
+) -> Result<(), LifecycleContractError> {
+    let current_state = one_of(
+        &JsonValue::String(current_state.to_owned()),
+        TRANSACTION_STATES,
+        "transition.current_state",
+    )?;
+    let next_state = one_of(
+        &JsonValue::String(next_state.to_owned()),
+        TRANSACTION_STATES,
+        "transition.next_state",
+    )?;
+    if next_state == "failed" || next_state == "successor_required" {
+        let required = if next_state == "failed" {
+            "failure_code"
+        } else {
+            "successor_transaction_id"
+        };
+        string_value(
+            evidence
+                .as_object()
+                .and_then(|record| record.get(required))
+                .unwrap_or(&JsonValue::Null),
+            &format!("transition.{required}"),
+        )?;
+        return Ok(());
+    }
+    let Some(transition) = TRANSACTION_TRANSITIONS.iter().find(|transition| {
+        transition.current_state == current_state.as_str()
+            && transition.next_state == next_state.as_str()
+    }) else {
+        return Err(fail(
+            "lifecycle:transition_invalid",
+            &format!("{current_state}->{next_state}"),
+        ));
+    };
+    let evidence = mapping(evidence, "transition.evidence")?;
+    for field in transition.required_evidence {
+        if !evidence.contains_key(*field) {
+            return Err(fail("lifecycle:transition_evidence_missing", field));
+        }
+    }
+    match (current_state.as_str(), next_state.as_str()) {
+        ("generated", "gates_ready") => {
+            let Some(gates) = evidence.get("gate_verdicts").and_then(JsonValue::as_array) else {
+                return Err(fail("lifecycle:gates_not_ready", ""));
+            };
+            if let Err(error) = validate_gate_chain(gates, Some(&["G1", "G2"]), true) {
+                if error.code.starts_with("artifact_identity:") {
+                    return Err(error);
+                }
+                return Err(fail("lifecycle:gates_not_ready", ""));
+            }
+        }
+        ("reviewed", "pr_open") => {
+            let lifecycle = validate_pull_request_lifecycle(
+                evidence
+                    .get("pr_lifecycle")
+                    .expect("required PR lifecycle evidence is present"),
+            )?;
+            let pr_state = lifecycle.get("state").and_then(JsonValue::as_str);
+            if pr_state != Some("ready") && pr_state != Some("external_review") {
+                return Err(fail("lifecycle:pr_not_open_ready", ""));
+            }
+        }
+        ("pr_open", "pr_merged") => {
+            let lifecycle = validate_pull_request_lifecycle(
+                evidence
+                    .get("pr_lifecycle")
+                    .expect("required PR lifecycle evidence is present"),
+            )?;
+            if lifecycle.get("state").and_then(JsonValue::as_str) != Some("merged") {
+                return Err(fail("lifecycle:pr_not_merged", ""));
+            }
+        }
+        ("source_main_readback", "queue_enqueued") => {
+            let queue = validate_queue_receipt(
+                evidence
+                    .get("queue_receipt")
+                    .expect("required queue receipt evidence is present"),
+            )?;
+            if queue.get("state").and_then(JsonValue::as_str) != Some("accepted") {
+                return Err(fail("lifecycle:queue_not_accepted", ""));
+            }
+        }
+        ("queue_enqueued", "frontier_accepted") => {
+            let frontier = validate_dependency_frontier(
+                evidence
+                    .get("dependency_frontier")
+                    .expect("required dependency frontier evidence is present"),
+            )?;
+            if frontier.get("frontier_state").and_then(JsonValue::as_str) != Some("accepted") {
+                return Err(fail("lifecycle:frontier_not_accepted", ""));
+            }
+        }
+        ("remote_readback", "durable_handback") => {
+            validate_durable_handback(
+                evidence
+                    .get("durable_handback")
+                    .expect("required durable handback evidence is present"),
+            )?;
+        }
+        ("reservations_released", "cleanup_proven") => {
+            validate_cleanup_proof(
+                evidence
+                    .get("cleanup_proof")
+                    .expect("required cleanup proof evidence is present"),
+            )?;
+        }
+        ("cleanup_proven", "nested_lifecycle_cleanup") => {
+            let Some(gates) = evidence.get("gate_verdicts").and_then(JsonValue::as_array) else {
+                return Err(fail(
+                    "lifecycle:sequence_required",
+                    "transition.gate_verdicts",
+                ));
+            };
+            let gates = gates
+                .iter()
+                .map(validate_gate_verdict)
+                .collect::<Result<Vec<_>, _>>()?;
+            let last_gate = gates.last();
+            if last_gate
+                .and_then(|gate| gate.get("gate_id"))
+                .and_then(JsonValue::as_str)
+                != Some("G6")
+                || last_gate
+                    .and_then(|gate| gate.get("verdict"))
+                    .and_then(JsonValue::as_str)
+                    != Some("pass")
+            {
+                return Err(fail("lifecycle:g6_not_passed", ""));
+            }
+            validate_cleanup_proof(
+                evidence
+                    .get("cleanup_proof")
+                    .expect("required cleanup proof evidence is present"),
+            )?;
+        }
+        ("nested_lifecycle_cleanup", "closed") => {
+            validate_close_agent_tool_call(
+                evidence
+                    .get("close_agent_tool_call")
+                    .expect("required close-agent token evidence is present"),
+            )?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn validate_remote_git_identity(
