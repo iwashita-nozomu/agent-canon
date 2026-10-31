@@ -13,6 +13,7 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -42,6 +43,7 @@
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
+pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
