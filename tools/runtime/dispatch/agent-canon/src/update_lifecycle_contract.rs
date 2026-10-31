@@ -12,7 +12,7 @@
 use crate::artifacts::artifact_identity::canonical_json_bytes;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub const TRANSACTION_STATES: &[&str] = &[
@@ -883,8 +883,12 @@ pub fn materialize_gate_verdict(
         "retry_reason": input.retry_reason,
         "next_checkpoint": input.next_checkpoint,
     });
-    let digest =
-        sha256_hex(&canonical_json_bytes(&evidence_seed).map_err(LifecycleContractError::from)?);
+    let canonical_bytes =
+        canonical_json_bytes(&evidence_seed).map_err(LifecycleContractError::from)?;
+    let digest = Sha256::digest(canonical_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     let evidence_digest = format!("sha256:{digest}");
     let mut gate_binding = checked_binding
         .as_object()
