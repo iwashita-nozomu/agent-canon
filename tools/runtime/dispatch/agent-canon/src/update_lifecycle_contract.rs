@@ -2113,10 +2113,10 @@ pub fn materialize_publication_readback_receipt(
     let readback = mapping(authoritative_pr_readback, "authoritative_pr_readback")?;
     let pr_number = readback.get("number").unwrap_or(&JsonValue::Null);
     positive_integer(pr_number, "authoritative_pr_readback.number", false)?;
-    if !readback
+    if readback
         .get("state")
         .and_then(JsonValue::as_str)
-        .is_some_and(|state| state.to_uppercase() == "MERGED")
+        .is_none_or(|state| state.to_uppercase() != "MERGED")
     {
         return Err(fail("lifecycle:pr_not_merged", ""));
     }
