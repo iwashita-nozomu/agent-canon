@@ -15,6 +15,7 @@
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
+// upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
@@ -39,6 +40,7 @@
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
+// upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // @dependency-end
 
 mod agent_search;
@@ -122,6 +124,8 @@ Commands:
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   lsp-code-analysis analyze [--root ROOT] [--files FILES...] [--server LANGUAGE=COMMAND] [--timeout SECONDS] [--format json|text]
+  scip-index <index|query> [options]
+  git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
@@ -213,6 +217,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "lsp-code-analysis" {
         std::process::exit(agent_canon::lsp_code_analysis::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "scip-index" {
+        std::process::exit(agent_canon::scip_index::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "git-dependency-diff-summary" {
+        std::process::exit(agent_canon::git_dependency_diff_summary::run(&args[2..]));
     }
 
     if args.len() >= 2

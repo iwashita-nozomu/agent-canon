@@ -13,6 +13,8 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
+// downstream implementation python_cli_integer.rs parses Python-compatible integer options
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
@@ -23,6 +25,9 @@
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
 // downstream implementation lsp_code_analysis.rs owns the reusable native LSP analysis API
+// downstream implementation path_expansion.rs owns shared user-home path expansion
+// downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
+// downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
@@ -37,16 +42,21 @@ pub mod catalog;
 // API uses only the newline and source-offset helpers from this owner.
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
+pub mod git_dependency_diff_summary;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
+pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
+pub(crate) mod python_cli_integer;
 pub mod python_json;
+pub(crate) mod python_text;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
+pub mod scip_index;
 pub mod stablehlo_value_closure;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;

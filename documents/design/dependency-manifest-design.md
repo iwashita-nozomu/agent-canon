@@ -11,7 +11,7 @@ downstream implementation ../../tools/analysis/dependencies/scan_dependency_head
 downstream implementation ../../tools/validation/semantic/dependencies/check_dependency_header_format.sh validates manifest syntax and contract kinds
 downstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh validates manifest graph semantics
 downstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh wraps repo-wide dependency review
-downstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP artifacts and bounded query projections
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs owns native SCIP artifacts and bounded query projections
 downstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies the native manifest checker CLI
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
@@ -418,8 +418,8 @@ downstream<TAB>implementation<TAB>tools/example.py<TAB>tests/tools/test_example.
 
 This dependency graph contains declared header facts only. SCIP code
 definitions/references remain a separate evidence source: the optional
-`scip_index.py` API reads/writes standard `index.scip` artifacts and returns a
-bounded query projection, but does not write a Graph DSL relation or persistent
+`agent-canon scip-index` API reads/writes standard `index.scip` artifacts and
+returns a bounded query projection, but does not write a Graph DSL relation or persistent
 code-graph mirror. The dependency graph build does not invoke a code indexer.
 
 Completeness is explicit. Unresolved targets, ambiguous bindings, uncovered
@@ -615,9 +615,9 @@ even when only A is selected and B/C are unchanged.
 ## Tool Split
 
 Code dependency evidence remains separate from dependency-manifest validation.
-`scip_index.py` writes the standard SCIP artifact using a selected native
+`agent-canon scip-index` writes the standard SCIP artifact using a selected native
 producer and projects bounded definitions, references, and explicitly declared
-implementation relationships through the official SCIP reader. Point LSP
+implementation relationships through the official SCIP SDK. Point LSP
 analysis and diagnostics remain owned by
 `lsp_code_analysis.py analyze` and are not repository-wide SCIP indexing.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
