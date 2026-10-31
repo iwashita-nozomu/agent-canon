@@ -344,7 +344,7 @@ fn date_prefix_length(value: &str) -> Option<usize> {
         if value.len() >= 10 && bytes.get(8) == Some(&b'-') {
             return valid_iso_week_date(year, week, decimal(value.get(9..10)?)?).then_some(10);
         }
-        return valid_iso_week_date(year, week, 1).then_some(8);
+        return None;
     }
     if value.len() >= 8 && bytes.get(4).is_some_and(u8::is_ascii_digit) {
         if value.get(0..8)?.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -358,7 +358,7 @@ fn date_prefix_length(value: &str) -> Option<usize> {
         if value.len() >= 8 && bytes.get(7).is_some_and(u8::is_ascii_digit) {
             return valid_iso_week_date(year, week, decimal(value.get(7..8)?)?).then_some(8);
         }
-        return valid_iso_week_date(year, week, 1).then_some(7);
+        return None;
     }
     None
 }
