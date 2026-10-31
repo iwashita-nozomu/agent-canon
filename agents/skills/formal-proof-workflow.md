@@ -9,7 +9,7 @@ upstream design lean-algorithm-design.md Lean-first algorithm design workflow.
 upstream design algorithm-proof-exploration.md proof-guided algorithm exploration workflow.
 upstream design literature-survey.md source search and bibliography workflow.
 upstream design research-workflow.md external research and implementation loop.
-upstream implementation ../../tools/analysis/proof/lean_proof_env.py creates Lean proof-search, theorem-search, and counterexample environments.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs creates Lean proof-search, theorem-search, and counterexample environments.
 upstream design ../../documents/tools/lean_capability_matrix.md routes Lean/Mathlib/Aesop/Plausible/LeanSearchClient capabilities by proof-frontier shape.
 upstream implementation ../../tools/analysis/proof/jit_canonical_ir.py extracts StableHLO-derived thin operational IR and backend traces.
 upstream implementation ../../tools/analysis/code/cpp_source_canonical_ir.py extracts C++ source-canonical IR into thin operational IR.
