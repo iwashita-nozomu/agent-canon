@@ -372,7 +372,16 @@ fn cli_fails_at_changed_file_utf8_boundary_before_report_or_provider_writes() {
     let source = fixture.source();
     init_repository(&source);
     let raw_path = OsString::from_vec(b"tracked-\xff.py".to_vec());
-    fs::write(source.join(&raw_path), "before\n").unwrap();
+    if let Err(error) = fs::write(source.join(&raw_path), "before\n") {
+        #[cfg(target_os = "macos")]
+        if error.raw_os_error() == Some(92) {
+            println!(
+                "filesystem-bound CLI oracle unavailable: macOS rejected the raw filename with EILSEQ (errno 92)"
+            );
+            return;
+        }
+        panic!("create raw-byte Git fixture path: {error}");
+    }
     add_native_path(&source, &raw_path);
     assert!(git(&source, &["commit", "-m", "initial"]).status.success());
     fs::write(source.join(&raw_path), "after\n").unwrap();
