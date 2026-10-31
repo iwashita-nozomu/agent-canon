@@ -766,7 +766,6 @@ pub(crate) fn digest_hex(bytes: &[u8]) -> String {
     digest_bytes(bytes).to_hex()
 }
 
-#[cfg(target_os = "linux")]
 pub(crate) fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);
