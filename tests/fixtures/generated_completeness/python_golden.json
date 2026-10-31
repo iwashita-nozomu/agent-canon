@@ -1,0 +1,703 @@
+{
+  "source": "293eb89abbe5f3ae34d1369f53d9bb769cad8096",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "binding_fixture": "tests/agent_tools/test_publication_integrator.py::lifecycle_binding",
+  "g1_premise": "G1 materialize_gate_verdict using publication_components owner/invariant fields",
+  "check_ids": [
+    "standalone_static_gate_ci",
+    "documentation_checks",
+    "repository_quick_ci",
+    "generated_artifact_guard"
+  ],
+  "cases": [
+    {
+      "name": "valid-ordered-g2",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          }
+        ]
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:2086ee8b7c20b13c6de7c4baf6bba1ae5326add061331b977c83cd1863198e2f",
+          "evidence_ref": "evidence:2086ee8b7c20b13c6de7c4baf6bba1ae5326add061331b977c83cd1863198e2f",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G2",
+        "invariant": "generated_completeness",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383"
+        ],
+        "output_digest": "sha256:6f7ec54633a97291eef5cef519fce2159e8eaff1b13e101e51f50e8a854bcd40",
+        "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:2086ee8b7c20b13c6de7c4baf6bba1ae5326add061331b977c83cd1863198e2f\",\"evidence_ref\":\"evidence:2086ee8b7c20b13c6de7c4baf6bba1ae5326add061331b977c83cd1863198e2f\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G2\",\"invariant\":\"generated_completeness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383\"],\"output_digest\":\"sha256:6f7ec54633a97291eef5cef519fce2159e8eaff1b13e101e51f50e8a854bcd40\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "fded69bfe88c17cd36a06048f54e308ba2ab9cd3eafd9f8d1499d3e626b980dc"
+    },
+    {
+      "name": "wrong-g1-gate-before-bad-candidate-and-results",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:ac6f2576166f23ed6b836105e981b71b22cdc74bf50721787a9b3cac1d58be92",
+            "evidence_ref": "evidence:ac6f2576166f23ed6b836105e981b71b22cdc74bf50721787a9b3cac1d58be92",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "bad-candidate",
+        "tree_sha": "bad-tree",
+        "check_results": [
+          {
+            "extra": true
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "lifecycle:gate_order_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "g1-not-passed-before-bad-candidate-and-results",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:2c5e4c934212672430c668ec1d90b8cccc80ac6208914e660e6fe2ab474686e2",
+            "evidence_ref": "evidence:2c5e4c934212672430c668ec1d90b8cccc80ac6208914e660e6fe2ab474686e2",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "fail"
+        },
+        "candidate_sha": "bad-candidate",
+        "tree_sha": "bad-tree",
+        "check_results": [
+          {
+            "extra": true
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "lifecycle:gate_not_passed",
+        "detail": ""
+      }
+    },
+    {
+      "name": "candidate-identity-before-bad-result-shape",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "9999999999999999999999999999999999999999",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "extra": true
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:candidate_identity_mismatch"
+      }
+    },
+    {
+      "name": "tree-identity-mismatch",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "9999999999999999999999999999999999999999",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:candidate_identity_mismatch"
+      }
+    },
+    {
+      "name": "missing-result-field",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_result_fields_invalid"
+      }
+    },
+    {
+      "name": "extra-result-field",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass",
+            "note": "unexpected"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_result_fields_invalid"
+      }
+    },
+    {
+      "name": "non-string-result-value",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": 7,
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_result_invalid"
+      }
+    },
+    {
+      "name": "missing-result-row",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_order_invalid"
+      }
+    },
+    {
+      "name": "extra-result-row",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          },
+          {
+            "check_id": "unexpected_check",
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_order_invalid"
+      }
+    },
+    {
+      "name": "check-id-order-mismatch",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_order_invalid"
+      }
+    },
+    {
+      "name": "check-not-passed",
+      "input": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "evidence_ref": "evidence:cffef297cffe2b1ec8f2551491a2161fe2a430bcd30fa1c0b17ec92d4f298383",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "fail"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          }
+        ]
+      },
+      "error": {
+        "exception_class": "ValueError",
+        "message": "generated_completeness:check_not_passed"
+      }
+    }
+  ]
+}

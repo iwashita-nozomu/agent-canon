@@ -26,6 +26,7 @@
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
+// downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
@@ -49,6 +50,7 @@ pub mod catalog;
 pub mod code_template_rendering;
 pub mod docs;
 pub mod entrypoint_composer;
+pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod environment_dependencies;

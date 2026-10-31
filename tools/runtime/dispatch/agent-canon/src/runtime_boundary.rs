@@ -1015,6 +1015,17 @@ impl RuntimeArtifactBoundary {
         &self.root
     }
 
+    /// Read one existing artifact through the owned no-follow runtime directory.
+    pub fn read_bytes(&self, path: &Path) -> Result<Option<Vec<u8>>, String> {
+        let target = self.resolve(path)?;
+        let relative = target
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        self.directory
+            .read(relative)
+            .map_err(|error| format!("runtime read failed: {}: {error}", target.display()))
+    }
+
     pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
         let canonical_absolute = if path.is_absolute() {
             reject_symlink_components(path, Path::new("/"))?;
