@@ -121,7 +121,7 @@ pub fn normalize_paths(
 }
 
 fn python_strip(value: &str) -> &str {
-    value.trim_matches(|character| {
+    value.trim_matches(|character: char| {
         character.is_whitespace() || matches!(character, '\u{001c}'..='\u{001f}')
     })
 }
