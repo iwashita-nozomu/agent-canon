@@ -17,7 +17,7 @@
 # upstream implementation ../../documents/runtime/shared-runtime-surfaces.toml is embedded by the graph CLI
 # downstream design ./lean-proof-dependencies.toml pins the native Lean test toolchain
 # downstream implementation ./test_live_projection_authority.py exercises the shared host Docker daemon
-# downstream implementation ../../tools/analysis/proof/lean_proof_env.py owns native Lean behavior
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs owns native Lean behavior
 # @dependency-end
 
 FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517

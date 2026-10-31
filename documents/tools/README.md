@@ -43,7 +43,7 @@ global Python executable, or Host Cargo fallback.
 | Family | Canonical owner |
 | --- | --- |
 | typed dispatch and route selection | `tools/runtime/dispatch/tool_dispatch.py`, `tools/catalog.yaml` |
-| search, source/dependency analysis | `search.py`, `source_dependency_graph.py`, `graph_client.py`, `lsp_code_analysis.py`, Rust `semantic-index` |
+| search and source/dependency analysis | Rust `agent_search.rs`, source graph, GraphClient, LSP API, and semantic index; Python LSP and graph adapters remain for other callers |
 | runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
 | eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
 | docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py` |
