@@ -21,6 +21,7 @@
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
+// downstream implementation python_text.rs shares Python-compatible Unicode string trimming
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
 // downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
@@ -54,6 +55,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
