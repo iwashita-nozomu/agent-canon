@@ -6,33 +6,152 @@
 // upstream test ../../../../../tests/fixtures/update_lifecycle/freshclone_python_golden.json freezes the actual old-owner callback outputs and replay oracle.
 // @dependency-end
 
+#[cfg(unix)]
 use agent_canon::artifacts::artifact_identity::canonical_json_bytes;
 use agent_canon::update_lifecycle_contract::{
     materialize_fresh_clone_source_projection_packet, FreshCloneSourceProjectionError,
-    SourceProjectionGateOwnerApis,
+    SourceProjectionG2Callback, SourceProjectionG3Callback, SourceProjectionGateOwnerApis,
 };
-use serde_json::{json, Value};
+#[cfg(unix)]
+use serde_json::json;
+use serde_json::Value;
+#[cfg(unix)]
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(unix)]
+use std::path::PathBuf;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallbackMustNotRun;
+
+const VALID_SHAS: [&str; 4] = [
+    "1111111111111111111111111111111111111111",
+    "2222222222222222222222222222222222222222",
+    "3333333333333333333333333333333333333333",
+    "4444444444444444444444444444444444444444",
+];
+
+fn unexpected_g2_callback(
+    _: &Value,
+    _: &str,
+    _: &str,
+    _: &[Value],
+) -> Result<Value, CallbackMustNotRun> {
+    panic!("G2 must not run before all four SHA40 inputs validate")
+}
+
+fn unexpected_g3_callback(
+    _: &Value,
+    _: &Value,
+    _: &Value,
+    _: &[Value],
+) -> Result<Value, CallbackMustNotRun> {
+    panic!("G3 must not run before all four SHA40 inputs validate")
+}
+
+fn callbacks_that_must_not_run(
+    check_ids: &[String],
+) -> SourceProjectionGateOwnerApis<'_, CallbackMustNotRun, CallbackMustNotRun> {
+    let g2_callback: &SourceProjectionG2Callback<'_, CallbackMustNotRun> = &unexpected_g2_callback;
+    let g3_callback: &SourceProjectionG3Callback<'_, CallbackMustNotRun> = &unexpected_g3_callback;
+    SourceProjectionGateOwnerApis {
+        generated_completeness_check_ids: check_ids,
+        materialize_generated_completeness_receipt: g2_callback,
+        materialize_pr_identity_gate: g3_callback,
+    }
+}
+
+#[test]
+fn each_invalid_fresh_clone_sha_matches_old_error_before_callbacks() {
+    // These four ordered failures are copied from the executed old-Python probe.
+    let invalid_cases = [
+        (0, "candidate_sha", "fresh_clone.candidate_sha"),
+        (1, "candidate_tree_sha", "fresh_clone.candidate_tree_sha"),
+        (2, "publication_sha", "fresh_clone.publication_sha"),
+        (
+            3,
+            "publication_tree_sha",
+            "fresh_clone.publication_tree_sha",
+        ),
+    ];
+    let check_ids = Vec::new();
+    let gate_owner_apis = callbacks_that_must_not_run(&check_ids);
+
+    for (invalid_index, field, detail) in invalid_cases {
+        let mut inputs = VALID_SHAS;
+        inputs[invalid_index] = "bad";
+        let error = match materialize_fresh_clone_source_projection_packet(
+            inputs[0],
+            inputs[1],
+            inputs[2],
+            inputs[3],
+            Path::new("."),
+            &gate_owner_apis,
+        ) {
+            Err(FreshCloneSourceProjectionError::Lifecycle(error)) => error,
+            Err(_) => panic!("invalid {field} produced a callback error"),
+            Ok(_) => panic!("invalid {field} was accepted"),
+        };
+        assert_eq!(error.code, "lifecycle:identity_invalid", "field {field}");
+        assert_eq!(error.detail, detail, "field {field}");
+        assert_eq!(
+            error.to_string(),
+            format!("lifecycle:identity_invalid:{detail}"),
+            "old API message for {field}"
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_native_owner_path_rejects_drive_root_before_callbacks() {
+    // This is source-derived from the current owner validator; no old Python
+    // Windows execution or positive Windows owner golden is claimed.
+    let source_root = std::env::current_dir().expect("Windows source root is available");
+    assert!(source_root.is_absolute());
+    assert!(!source_root.to_string_lossy().starts_with('/'));
+    let check_ids = Vec::new();
+    let gate_owner_apis = callbacks_that_must_not_run(&check_ids);
+    let error = match materialize_fresh_clone_source_projection_packet(
+        VALID_SHAS[0],
+        VALID_SHAS[1],
+        VALID_SHAS[2],
+        VALID_SHAS[3],
+        &source_root,
+        &gate_owner_apis,
+    ) {
+        Err(FreshCloneSourceProjectionError::Lifecycle(error)) => error,
+        Err(_) => panic!("G1 owner rejection was reported as a callback error"),
+        Ok(_) => panic!("drive-qualified owner passed the slash-prefix contract"),
+    };
+    assert_eq!(error.code, "lifecycle:owner_invalid");
+    assert_eq!(error.detail, "gate_verdict.owner");
+}
+
+#[cfg(unix)]
 const GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/update_lifecycle/freshclone_python_golden.json");
 
+#[cfg(unix)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct OwnerCallbackSentinel {
     owner: String,
     message: String,
 }
 
+#[cfg(unix)]
 fn field<'a>(value: &'a Value, key: &str) -> &'a Value {
     value.get(key).expect("frozen fresh-clone field is present")
 }
 
+#[cfg(unix)]
 fn text(value: &Value) -> &str {
     value.as_str().expect("frozen fresh-clone value is text")
 }
 
+#[cfg(unix)]
 fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -40,6 +159,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
+#[cfg(unix)]
 fn recorded_source_root(golden: &Value) -> PathBuf {
     Path::new(text(field(golden, "source_path")))
         .ancestors()
@@ -48,6 +168,7 @@ fn recorded_source_root(golden: &Value) -> PathBuf {
         .to_path_buf()
 }
 
+#[cfg(unix)]
 fn invoke_with_recorded_callbacks(
     golden: &Value,
     source_root: &Path,
@@ -137,6 +258,7 @@ fn invoke_with_recorded_callbacks(
     )
 }
 
+#[cfg(unix)]
 #[test]
 fn fresh_clone_projection_matches_recorded_owner_calls_packet_bytes_and_hash() {
     let golden: Value = serde_json::from_str(GOLDEN)
@@ -208,6 +330,7 @@ fn fresh_clone_projection_matches_recorded_owner_calls_packet_bytes_and_hash() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn fresh_clone_projection_propagates_owner_errors_without_later_callbacks() {
     let golden: Value = serde_json::from_str(GOLDEN)
