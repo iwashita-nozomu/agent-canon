@@ -13,7 +13,7 @@
 # upstream implementation ../../../../.codex/personal/skills/oop-readability-check/SKILL.md owns OOP readability review routing
 # upstream implementation ../../../runtime/authority/task_authority.py owns library implementation authority.
 # upstream implementation ../../../bin/agent-canon owns selected style checks.
-# upstream implementation ../responsibility/responsibility_scope.py validates responsibility owner scopes
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility owner scopes
 # downstream implementation ../../../runtime/manifest/manifest_rendering.py injects preflight protocol into team manifests
 # downstream implementation ../../../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
 # @dependency-end
@@ -23,22 +23,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
-import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-
-from tools.validation.semantic.responsibility.responsibility_scope import (
-    Scope,
-    ScopeReport,
-    scope_covers,
-)
-from tools.validation.semantic.responsibility.responsibility_scope import (
-    validate as validate_responsibility_scope,
-)
 
 PYTHON_SUFFIXES = {".py"}
 CPP_SUFFIXES = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
@@ -129,7 +117,9 @@ LIBRARY_SURFACE_PREFIXES = (
     ".venv/",
 )
 AGENT_CANON_TOOL_SOURCE_ROOT = "tools"
-RESPONSIBILITY_SCOPE_COMMAND = "python3 tools/validation/semantic/responsibility/responsibility_scope.py --root . --format json"
+RESPONSIBILITY_SCOPE_COMMAND = (
+    "tools/bin/agent-canon responsibility-scope --root . --format json"
+)
 
 
 @dataclass(frozen=True, order=True)
@@ -415,15 +405,74 @@ def normalize_path(root: Path, raw_path: str) -> str:
 
 def predict_gates(root: Path, paths: tuple[str, ...]) -> tuple[PredictedGate, ...]:
     """Predict rejection gates for planned paths."""
-    scope_report = validate_responsibility_scope(root, "responsibility-scope.toml")
+    scope_report = query_responsibility_scope(root, paths)
     gates: set[PredictedGate] = set()
     for path in paths:
         gates.update(path_gates(root, path, scope_report))
     return tuple(sorted(gates))
 
 
+def query_responsibility_scope(root: Path, paths: tuple[str, ...]) -> dict[str, object]:
+    """Ask the native owner to validate and match planned paths."""
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    native_binary = os.environ.get("AGENT_CANON_NATIVE_BIN")
+    cache_root = os.environ.get("AGENT_CANON_CACHE_ROOT")
+    if selected_cli:
+        command = [str(Path(selected_cli).resolve())]
+    elif native_binary:
+        command = [str(Path(native_binary).resolve())]
+    elif cache_root:
+        command = [str(Path(cache_root).resolve() / "bin" / "agent-canon")]
+    else:
+        source_root = Path(
+            os.environ.get(
+                "AGENT_CANON_SOURCE_ROOT",
+                str(Path(__file__).resolve().parents[4]),
+            )
+        ).resolve()
+        command = [str(source_root / "tools/bin/agent-canon")]
+    command.extend(["responsibility-scope", "--root", str(root), "--format", "json"])
+    command.extend(f"--path={path}" for path in paths)
+    try:
+        result = subprocess.run(
+            command,
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        return native_scope_failure(f"exec:{type(error).__name__}")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return native_scope_failure(f"invalid-json:exit-{result.returncode}")
+    if not isinstance(payload, dict):
+        return native_scope_failure(f"invalid-report:exit-{result.returncode}")
+    if result.returncode not in (0, 1):
+        return native_scope_failure(f"exit:{result.returncode}")
+    if paths:
+        ownerships = payload.get("path_owners")
+        if (
+            not isinstance(ownerships, list)
+            or tuple(item.get("path") for item in ownerships if isinstance(item, dict))
+            != paths
+        ):
+            return native_scope_failure("path-owner-response-mismatch")
+    return payload
+
+
+def native_scope_failure(detail: str) -> dict[str, object]:
+    """Keep this optional diagnostic advisory when the native owner is unavailable."""
+    return {
+        "findings": [{"check": "native_cli", "detail": detail}],
+        "scopes": [],
+        "path_owners": [],
+    }
+
+
 def path_gates(
-    root: Path, path: str, scope_report: ScopeReport
+    root: Path, path: str, scope_report: dict[str, object]
 ) -> tuple[PredictedGate, ...]:
     """Return predicted gates for one path."""
     suffix = Path(path).suffix
@@ -461,17 +510,51 @@ def path_gates(
     return tuple(gates)
 
 
-def render_responsibility_scope_gate(path: str, report: ScopeReport) -> PredictedGate:
-    """Return the owner-scope gate for one planned path."""
-    if report.findings:
+def render_responsibility_scope_gate(
+    path: str, report: dict[str, object]
+) -> PredictedGate:
+    """Return the owner-scope gate using owner IDs from the native checker."""
+    findings = report.get("findings")
+    if isinstance(findings, list) and findings:
         handoff = (
             "repair responsibility-scope.toml or run from the repository owner "
-            f"root before editing; findings:{len(report.findings)}"
+            f"root before editing; findings:{len(findings)}"
         )
     else:
-        scopes = tuple(scope for scope in report.scopes if scope_covers(scope, path))
+        raw_scopes = report.get("scopes")
+        scopes_by_id = (
+            {
+                scope["scope_id"]: scope
+                for scope in raw_scopes
+                if isinstance(scope, dict) and isinstance(scope.get("scope_id"), str)
+            }
+            if isinstance(raw_scopes, list)
+            else {}
+        )
+        raw_owners = report.get("path_owners")
+        owner_ids = (
+            next(
+                (
+                    item.get("scope_ids")
+                    for item in raw_owners
+                    if isinstance(item, dict) and item.get("path") == path
+                ),
+                [],
+            )
+            if isinstance(raw_owners, list)
+            else []
+        )
+        scopes = (
+            [
+                scopes_by_id[scope_id]
+                for scope_id in owner_ids
+                if isinstance(scope_id, str) and scope_id in scopes_by_id
+            ]
+            if isinstance(owner_ids, list)
+            else []
+        )
         if len(scopes) == 1:
-            handoff = " | ".join(render_scope_handoff(scope) for scope in scopes)
+            handoff = render_scope_handoff(scopes[0])
         elif scopes:
             handoff = (
                 "resolve planned path responsibility overlap before editing; "
@@ -490,12 +573,20 @@ def render_responsibility_scope_gate(path: str, report: ScopeReport) -> Predicte
     )
 
 
-def render_scope_handoff(scope: Scope) -> str:
-    """Render one responsibility scope as compact handoff text."""
-    protecting_tools = ",".join(scope.protecting_tools)
+def render_scope_handoff(scope: dict[str, object]) -> str:
+    """Render one native scope row as compact handoff text."""
+    scope_id = scope.get("scope_id", "")
+    owner = scope.get("owner", "")
+    scope_class = scope.get("scope_class", "")
+    raw_tools = scope.get("protecting_tools", [])
+    tools = (
+        [tool for tool in raw_tools if isinstance(tool, str)]
+        if isinstance(raw_tools, list)
+        else []
+    )
     return (
-        f"scope:{scope.scope_id} owner:{scope.owner} class:{scope.scope_class} "
-        f"protecting_tools:{protecting_tools}"
+        f"scope:{scope_id} owner:{owner} class:{scope_class} "
+        f"protecting_tools:{','.join(tools)}"
     )
 
 

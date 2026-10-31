@@ -108,7 +108,7 @@ Docstring の意味契約へ混ぜません。
   `tools/bin/agent-canon helper-function-inventory --changed --baseline-ref HEAD --only-name-gaps`
   は、責務検索で再利用候補として見つけやすい名前へ寄せる review 対象を出します。
 - `tools/runtime/authority/task_authority.py` と
-  `tools/validation/semantic/responsibility/responsibility_scope.py` はこの規約の edit-time owner です。
+  `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` はこの規約の edit-time owner です。
 - 原因調査と必要な検証は上記 owner に従います。パスからの予測は
   [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) の補助診断であり、cause evidence の代替ではありません。
 
