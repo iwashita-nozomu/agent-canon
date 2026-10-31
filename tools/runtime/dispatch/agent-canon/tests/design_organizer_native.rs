@@ -277,13 +277,17 @@ fn assert_default_report_path(path: &Path, runtime: &Path) {
         .strip_prefix(runtime)
         .expect("default report is beneath the external runtime");
     let components = relative.components().collect::<Vec<_>>();
-    assert_eq!(components.len(), 3, "default report has task/run/file path");
+    assert_eq!(
+        components.len(),
+        4,
+        "default report has task/category/run/file path"
+    );
     assert_eq!(components[0].as_os_str(), "tasks");
     assert_eq!(components[1].as_os_str(), "design-organization");
     let run_name = components[2].as_os_str().to_string_lossy().to_string();
     assert!(run_name.starts_with("run-"));
     assert_eq!(
-        path.file_name().and_then(|name| name.to_str()),
+        components[3].as_os_str().to_str(),
         Some("design_organize_report.txt")
     );
 }

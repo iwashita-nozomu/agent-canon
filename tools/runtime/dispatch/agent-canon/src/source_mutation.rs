@@ -538,11 +538,15 @@ fn copy_symlink_xattrs(
     let names = match llistxattr_query(&source_path) {
         Ok(length) => {
             let mut buffer = vec![0; length];
-            let written = llistxattr(&source_path, &mut buffer).map_err(io::Error::from)?;
+            let written = match llistxattr(&source_path, &mut buffer) {
+                Ok(written) => written,
+                Err(error) if ignored_xattr_list_error(error) => return Ok(()),
+                Err(error) => return Err(error.into()),
+            };
             buffer.truncate(written);
             buffer
         }
-        Err(error) if ignored_xattr_error(error) => return Ok(()),
+        Err(error) if ignored_xattr_list_error(error) => return Ok(()),
         Err(error) => return Err(error.into()),
     };
 
@@ -559,16 +563,16 @@ fn copy_symlink_xattrs(
                         buffer.truncate(written);
                         buffer
                     }
-                    Err(error) if ignored_xattr_error(error) => continue,
+                    Err(error) if ignored_xattr_attribute_error(error) => continue,
                     Err(error) => return Err(error.into()),
                 }
             }
-            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) if ignored_xattr_attribute_error(error) => continue,
             Err(error) => return Err(error.into()),
         };
         match lsetxattr(&target_path, name, &value, XattrFlags::empty()) {
             Ok(()) => {}
-            Err(error) if ignored_xattr_error(error) => {}
+            Err(error) if ignored_xattr_attribute_error(error) => {}
             Err(error) => return Err(error.into()),
         }
     }
@@ -843,11 +847,15 @@ where
     let names = match flistxattr_query(source) {
         Ok(length) => {
             let mut buffer = vec![0; length];
-            let written = flistxattr(source, &mut buffer).map_err(io::Error::from)?;
+            let written = match flistxattr(source, &mut buffer) {
+                Ok(written) => written,
+                Err(error) if ignored_xattr_list_error(error) => return Ok(()),
+                Err(error) => return Err(error.into()),
+            };
             buffer.truncate(written);
             buffer
         }
-        Err(error) if ignored_xattr_error(error) => return Ok(()),
+        Err(error) if ignored_xattr_list_error(error) => return Ok(()),
         Err(error) => return Err(error.into()),
     };
 
@@ -864,16 +872,16 @@ where
                         buffer.truncate(written);
                         buffer
                     }
-                    Err(error) if ignored_xattr_error(error) => continue,
+                    Err(error) if ignored_xattr_attribute_error(error) => continue,
                     Err(error) => return Err(error.into()),
                 }
             }
-            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) if ignored_xattr_attribute_error(error) => continue,
             Err(error) => return Err(error.into()),
         };
         match fsetxattr(target, name, &value, XattrFlags::empty()) {
             Ok(()) => {}
-            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) if ignored_xattr_attribute_error(error) => continue,
             Err(error) => return Err(error.into()),
         }
     }
@@ -881,15 +889,19 @@ where
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos"))]
-fn ignored_xattr_error(error: rustix::io::Errno) -> bool {
+fn ignored_xattr_list_error(error: rustix::io::Errno) -> bool {
     use rustix::io::Errno;
 
-    error == Errno::PERM
-        || error == Errno::NOTSUP
-        || error == Errno::OPNOTSUPP
-        || error == Errno::NODATA
-        || error == Errno::INVAL
-        || error == Errno::ACCESS
+    // shutil._copyxattr treats these three listxattr errors as an absent
+    // listing. Permission errors are only ignored for individual attributes.
+    error == Errno::NOTSUP || error == Errno::NODATA || error == Errno::INVAL
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn ignored_xattr_attribute_error(error: rustix::io::Errno) -> bool {
+    use rustix::io::Errno;
+
+    ignored_xattr_list_error(error) || error == Errno::PERM || error == Errno::ACCESS
 }
 
 fn open_file_parent_nofollow(
@@ -1171,5 +1183,121 @@ mod tests {
             &invalid_target,
             std::slice::from_ref(&allowed)
         ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn copy_file_with_metadata_preserves_nonzero_regular_and_symlink_flags() {
+        use cap_std::io_lifetimes::AsFd;
+        use rustix::fs::{fstat, openat, statat, AtFlags, Mode, OFlags};
+        use std::os::unix::fs::symlink;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+        struct TempRoot(PathBuf);
+
+        impl TempRoot {
+            fn new() -> Self {
+                let nonce = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("clock is after epoch")
+                    .as_nanos();
+                let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+                let path = std::env::temp_dir().join(format!(
+                    "agent-canon-macos-copy-flags-{}-{sequence}-{nonce}",
+                    std::process::id()
+                ));
+                fs::create_dir_all(path.join("docs")).expect("copy flag root is created");
+                Self(path.canonicalize().expect("copy flag root is canonical"))
+            }
+        }
+
+        impl Drop for TempRoot {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+
+        let root = TempRoot::new();
+        let docs_path = root.0.join("docs");
+        fs::write(docs_path.join("regular-source.md"), "regular source\n")
+            .expect("regular source is written");
+        fs::write(docs_path.join("payload.md"), "symlink payload\n")
+            .expect("symlink payload is written");
+        symlink("payload.md", docs_path.join("symlink-source.md"))
+            .expect("source symlink is created");
+
+        let source_root =
+            cap_std::fs::Dir::open_ambient_dir(&docs_path, cap_std::ambient_authority())
+                .expect("source directory is opened");
+        let mut read_options = cap_std::fs::OpenOptions::new();
+        read_options.read(true);
+        let regular_source = source_root
+            .open_with("regular-source.md", &read_options)
+            .expect("regular source is opened");
+        let flags = nix::libc::UF_NODUMP as u64;
+        set_file_flags(&regular_source, flags).expect("regular source flag is set");
+        assert_eq!(
+            fstat(&regular_source).unwrap().st_flags as u64 & flags,
+            flags,
+            "fixture starts with the requested nonzero regular-file flag"
+        );
+
+        let source_link = openat(
+            &source_root,
+            "symlink-source.md",
+            OFlags::SYMLINK | OFlags::RDONLY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .expect("source symlink opens without following its target");
+        fchflags_borrowed_fd(source_link.as_fd(), flags)
+            .expect("source symlink flag is set through its link descriptor");
+        assert_eq!(
+            statat(&source_root, "symlink-source.md", AtFlags::SYMLINK_NOFOLLOW)
+                .unwrap()
+                .st_flags as u64
+                & flags,
+            flags,
+            "fixture starts with the requested nonzero symlink flag"
+        );
+
+        let capability_json = serde_json::json!({
+            "allowed_paths": ["docs/regular-copy.md", "docs/symlink-copy.md"],
+            "purpose": "copy-flag-test",
+            "authority": "issue-1630"
+        });
+        let capability = SourceMutationCapability::from_json(
+            &root.0,
+            Some(&serde_json::to_string(&capability_json).unwrap()),
+        )
+        .expect("exact copy capability is created");
+        let regular_target = docs_path.join("regular-copy.md");
+        let symlink_target = docs_path.join("symlink-copy.md");
+
+        capability
+            .copy_file_with_metadata(&docs_path.join("regular-source.md"), &regular_target)
+            .expect("regular file copy succeeds");
+        capability
+            .copy_file_with_metadata(&docs_path.join("symlink-source.md"), &symlink_target)
+            .expect("symlink copy succeeds");
+
+        let regular_target_file = source_root
+            .open_with("regular-copy.md", &read_options)
+            .expect("regular target is opened");
+        assert_eq!(
+            fstat(&regular_target_file).unwrap().st_flags as u64 & flags,
+            flags,
+            "copy2-style regular copy preserves nonzero file flags"
+        );
+        assert_eq!(
+            statat(&source_root, "symlink-copy.md", AtFlags::SYMLINK_NOFOLLOW)
+                .unwrap()
+                .st_flags as u64
+                & flags,
+            flags,
+            "copy2-style symlink copy preserves nonzero link flags"
+        );
     }
 }
