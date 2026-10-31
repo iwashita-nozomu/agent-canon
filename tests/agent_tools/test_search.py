@@ -249,6 +249,8 @@ class SearchRouteTest(unittest.TestCase):
                 root,
                 "--query",
                 "token",
+                "--surface",
+                "docs.md",
                 "--providers",
                 "text,tool,text",
                 "--format",
