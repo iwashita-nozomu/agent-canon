@@ -3,7 +3,7 @@
 # responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
 # upstream design ../../../../documents/design/entrypoint-owner-map.md root entrypoint responsibility boundary
 # downstream implementation ./check_convention_compliance.py loads marker contracts
-# downstream implementation ../entrypoint/check_entrypoint_owner_map.py rejects operational marker ownership in root entrypoints
+# downstream implementation ../../../runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs rejects operational marker ownership in root entrypoints
 # downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
 
