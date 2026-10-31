@@ -532,6 +532,15 @@ class CodexHooksTest(unittest.TestCase):
         self.assertEqual(len(retired_rows), 23)
         self.assertEqual(len(moved_rows), 1)
         self.assertTrue(set(retired_routes).isdisjoint(active_handlers))
+        scanner_route = retired_routes["log_surface_inventory_guard.py"]
+        self.assertEqual(
+            scanner_route["owner"],
+            "tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs",
+        )
+        self.assertEqual(
+            scanner_route["command_or_skill"],
+            "command-only:tools/bin/agent-canon log-surface-inventory",
+        )
 
         for event, expected_active in (
             *((event, True) for event in ACTIVE_EVENTS),
