@@ -137,6 +137,11 @@ fn run_oracle_case(case: &Value) -> bool {
     let before = content_snapshot(&source);
     let runtime = temp.runtime();
     let output = run_native(&source, &runtime, case);
+    if output.status.success() {
+        // Check copystat timestamps before the independent content oracle reads
+        // the files and can itself advance their access times.
+        assert_successful_copy_metadata(case, &source, metadata_setup_complete);
+    }
     let actual_report_path = report_path(&output);
     if case["legacy_discrepancy_only"].as_bool().unwrap_or(false)
         || is_existing_target_symlink_case(name)
@@ -234,7 +239,6 @@ fn run_oracle_case(case: &Value) -> bool {
         }
     }
 
-    assert_successful_copy_metadata(case, &source, metadata_setup_complete);
     true
 }
 
