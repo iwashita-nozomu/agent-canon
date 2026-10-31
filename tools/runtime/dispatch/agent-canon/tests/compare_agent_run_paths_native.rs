@@ -59,15 +59,12 @@ fn write_run(root: &Path, name: &str, content: Option<&str>) -> PathBuf {
     run
 }
 
-fn report_oracle(
-    case: &Value,
-    comparison: &agent_canon::compare_agent_run_paths::RunPathComparison,
-) -> String {
+fn report_oracle(case: &Value, baseline: &Path, candidate: &Path) -> String {
     let mut report = text(field(case, "report")).to_owned();
     let old_baseline = text(field(case, "baseline_path"));
     let old_candidate = text(field(case, "candidate_path"));
-    let baseline = comparison.baseline.path.display().to_string();
-    let candidate = comparison.candidate.path.display().to_string();
+    let baseline = baseline.display().to_string();
+    let candidate = candidate.display().to_string();
     assert_eq!(
         report.matches(old_baseline).count(),
         1,
@@ -112,8 +109,22 @@ fn run_path_comparison_matches_all_frozen_cpython_cli_cases() {
             "candidate",
             field(case, "candidate_text").as_str(),
         );
+        let expected_baseline =
+            fs::canonicalize(&baseline).expect("test-created baseline directory resolves");
+        let expected_candidate =
+            fs::canonicalize(&candidate).expect("test-created candidate directory resolves");
         let comparison = compare_agent_run_paths(&baseline, &candidate)
             .expect("frozen UTF-8 inputs yield a comparison");
+        assert_eq!(
+            comparison.baseline.path.as_path(),
+            expected_baseline.as_path(),
+            "baseline input path for {name}"
+        );
+        assert_eq!(
+            comparison.candidate.path.as_path(),
+            expected_candidate.as_path(),
+            "candidate input path for {name}"
+        );
         let expected_exit = field(case, "exit")
             .as_i64()
             .expect("frozen CLI exit code is an integer") as i32;
@@ -135,7 +146,7 @@ fn run_path_comparison_matches_all_frozen_cpython_cli_cases() {
         assert_eq!(text(field(case, "stderr")), "", "stderr for {name}");
         assert_eq!(
             render_report(&comparison),
-            report_oracle(case, &comparison),
+            report_oracle(case, &expected_baseline, &expected_candidate),
             "report for {name}"
         );
     }
