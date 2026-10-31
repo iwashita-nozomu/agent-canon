@@ -18,7 +18,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
-WORK_LOG_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "work_log.py"
 
 
 def _native_command(*arguments: str) -> list[str]:
@@ -251,7 +250,12 @@ class WorkLogTest(unittest.TestCase):
                         "sample local timestamp",
                     ]
                     command = (
-                        [sys.executable, str(WORK_LOG_SCRIPT), *common]
+                        [
+                            sys.executable,
+                            "-m",
+                            "tools.runtime.archive.work_log",
+                            *common,
+                        ]
                         if owner == "python"
                         else _native_command(*common)
                     )
