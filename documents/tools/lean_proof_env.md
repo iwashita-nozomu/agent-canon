@@ -1,8 +1,8 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents the native Lake and Lean boundary of lean_proof_env.py.
-upstream implementation ../../tools/analysis/proof/lean_proof_env.py runs native setup and selected checks
+responsibility Documents the native Lake and Lean boundary of lean-proof-env.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs runs native setup and selected checks
 upstream design ../../agents/skills/formal-proof-workflow.md owns proof workflow selection
 upstream design lean_capability_matrix.md distinguishes proof and theorem-search capabilities
 @dependency-end
@@ -10,7 +10,7 @@ upstream design lean_capability_matrix.md distinguishes proof and theorem-search
 
 # Lean proof environment
 
-`tools/analysis/proof/lean_proof_env.py` は、選択済みの Lake package で証明自動化、
+`tools/bin/agent-canon lean-proof-env` は、選択済みの Lake package で証明自動化、
 LeanSearchClient の公開型、Plausible の反例検査を実行する入口です。
 package・依存・toolchain の設定と更新は Lake の標準形式を正本とし、この tool で再生成しません。
 
@@ -21,12 +21,12 @@ package・依存・toolchain の設定と更新は Lake の標準形式を正本
 `RUNTIME_ROOT` は既存の外部 artifact 保存先、`--env-dir` は今回使う package の実体を指定します。
 
 ```bash
-python3 tools/analysis/proof/lean_proof_env.py init \
+tools/bin/agent-canon lean-proof-env init \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --lean-toolchain "<selected exact toolchain>" --execute --format json
-python3 tools/analysis/proof/lean_proof_env.py all-smoke \
+tools/bin/agent-canon lean-proof-env all-smoke \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" --execute --format json
-python3 tools/analysis/proof/lean_proof_env.py check-file \
+tools/bin/agent-canon lean-proof-env check-file \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --lean-file "$RUNTIME_ROOT/tasks/formal-proof/example.lean" --execute --format json
 ```
@@ -51,7 +51,7 @@ python3 tools/analysis/proof/lean_proof_env.py check-file \
 空の directory では `--lean-toolchain` で選択した toolchain の標準 `math` template が
 初期化を所有します。`lean-toolchain` だけがある directory も標準初期化の入力として
 受け入れ、その宣言を選択値として使います。既存 `lakefile.lean` / `lakefile.toml` がある場合は
-その package を使い、Python は設定を上書きしません。Lake 設定のないその他の非空 directory は
+その package を使い、native CLI は設定を上書きしません。Lake 設定のないその他の非空 directory は
 拒否し、旧環境の削除や自動改造を行いません。
 
 既存 package は `lean-toolchain` ファイル、または明示 selector が必要です。全 native command は
@@ -66,7 +66,7 @@ python3 tools/analysis/proof/lean_proof_env.py check-file \
 `--lean-toolchain` に固定 default はありません。`--mathlib-rev`、`--module-name`、`--force` は
 使いません。Lake の標準設定と exact toolchain 選択を使い、互換 flag や別設定 schema は設けません。
 
-Python が書くのは選択した smoke source だけです。同内容は再利用しますが、異なる既存内容や
+native CLI が書くのは選択した smoke source だけです。同内容は再利用しますが、異なる既存内容や
 symlink は上書きしません。旧版が生成した probe と衝突した場合は、所有者がその probe の差分を
 確認して移行するか、別の空の作業用 directory を選びます。package 全体を消して解決しません。
 
@@ -75,7 +75,7 @@ symlink は上書きしません。旧版が生成した probe と衝突した�
 反例用の proposition は `forall (n : Nat), n < n` です。どの標本も反例となるため、
 たまたま反例を発見できるかに依存する命題を使いません。`quiet := true` による診断を
 Lean 自身の `#guard_msgs` が確認します。期待診断の欠落、追加の型エラー、import failure は
-Lean の通常の検査失敗です。Python は stdout の部分文字列を見て nonzero を 0 に変換しません。
+Lean の通常の検査失敗です。native CLI は stdout の部分文字列を見て nonzero を 0 に変換しません。
 
 各 command の argv 表示、native stdout/stderr、終了コードを結果へ残し、最初の nonzero で
 後続 command を起動しません。外部 file のパスは1つの argv 要素として渡します。
@@ -89,9 +89,11 @@ LeanSearchClient の外部サービス疎通でもありません。期待反例
 
 ## 検証
 
-既存 `tests/agent_tools/test_lean_proof_env.py` は process fake を用いて、exact toolchain 選択、
+既存 `tests/agent_tools/test_lean_proof_env.py` は native CLI と外部 Lake provider fake を用いて、
+exact toolchain 選択、
 toolchain-only bootstrap、native command、manifest/version readback、既存設定の保全、no-write dry run、
 初期化/build/Lean失敗時の停止、native終了コードの保持を確認します。
+Rust API regression は unexecuted plan、result schema、check-file input boundary を確認します。
 これだけで実際の Lean/Mathlib/Plausible の互換性を検証したとは扱いません。
 
 正規 runtime では、同じ package で `all-smoke` と `check-file` を実行します。
