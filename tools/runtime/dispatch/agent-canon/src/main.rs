@@ -14,9 +14,11 @@
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
+// downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
@@ -34,6 +36,7 @@
 // @dependency-end
 
 mod check_merge_structure;
+pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
@@ -71,7 +74,7 @@ mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
+use agent_canon::{catalog, run_evaluation, theorem_graph_board, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -83,6 +86,7 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
@@ -95,6 +99,7 @@ Commands:
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   lsp-code-analysis analyze [--root ROOT] [--files FILES...] [--server LANGUAGE=COMMAND] [--timeout SECONDS] [--format json|text]
@@ -158,12 +163,20 @@ fn main() {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "theorem-graph-board" {
+        std::process::exit(theorem_graph_board::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "check-run-log-contract" {
         std::process::exit(run_log_contract::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "classify-path-risk" {
+        std::process::exit(classify_path_risk::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "lsp-code-analysis" {
