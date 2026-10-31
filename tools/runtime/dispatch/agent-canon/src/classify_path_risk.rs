@@ -40,7 +40,9 @@ const CONTAINER_PREFIXES: &[&str] = &["docker/", "bootstrap/", "tests/bootstrap/
 const CONTAINER_PATHS: &[&str] = &[
     "bootstrap.sh",
     "tools/runtime/container/bootstrap_runtime.py",
+    "tools/runtime/container/compile.sh",
     "tests/tools/test_bootstrap_container_contract.py",
+    "tests/tools/test_compile_cache.py",
 ];
 const GITHUB_PREFIXES: &[&str] = &[".github/"];
 const EVAL_PREFIXES: &[&str] = &["eval/", "reports/agent-runtime-dashboard/"];
