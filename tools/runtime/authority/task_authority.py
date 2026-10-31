@@ -4,7 +4,7 @@
 # responsibility Loads and validates request-local task authority for hooks and subagent handoffs.
 # upstream design ../../../agents/agents_config.json defines role write policies.
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md requires request clauses before repo edits.
-# downstream implementation ../../validation/semantic/responsibility/responsibility_scope.py consumes helper change authority.
+# downstream implementation ../dispatch/agent-canon/src/responsibility_scope.rs consumes helper change authority.
 # downstream implementation ../../../tests/agent_tools/test_codex_hooks.py validates hook integration.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates bundle generation.
 # @dependency-end

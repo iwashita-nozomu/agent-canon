@@ -369,13 +369,13 @@ entries:
       - tests/agent_tools/test_checkout_identity.py
 
   - id: responsibility-scope
-    summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
-    path: tools/validation/semantic/responsibility/responsibility_scope.py
+    summary: Validates responsibility scopes, owner classes, protecting tool coverage, and planned path owners.
+    path: tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/responsibility/responsibility_scope.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/responsibility_scope.py"]}
+    command: tools/bin/agent-canon responsibility-scope
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "responsibility-scope"]}
     writes: false
     default_wiring:
       ci: true
