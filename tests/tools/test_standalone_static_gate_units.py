@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies standalone static-gate unit ownership, canonical selection, workflow activation, and full-confidence parity.
-# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical selector and unit mapping
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs canonical selector and unit mapping
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh unit executor
 # upstream implementation ../../tools/validation/ci/checks/check_agent_canon_pr.sh manual full-confidence aggregate
 # upstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote selected-unit shared runtime
@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import os
 import shlex
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -20,10 +19,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tools.validation.semantic.path.classify_path_risk import STATIC_GATE_UNITS
-
 ROOT = Path(__file__).resolve().parents[2]
-SELECTOR = ROOT / "tools/validation/semantic/path/classify_path_risk.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+STATIC_GATE_UNITS = ("docs", "rust", "contracts", "eval", "workflow-container")
+SELECTOR_SOURCE = "tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs"
+RETIRED_SELECTOR_SOURCE = "tools/validation/semantic/path/classify_path_risk.py"
 RUNNER = ROOT / "tools/validation/ci/runners/run_standalone_static_gate_unit.sh"
 FULL_WRAPPER = ROOT / "tools/validation/ci/checks/check_agent_canon_pr.sh"
 WORKFLOW = ROOT / ".github/workflows/agent-canon-static-gates.yml"
@@ -65,20 +65,30 @@ def run_shell(
     )
 
 
-def selected_units(*paths: str) -> tuple[str, ...]:
-    result = subprocess.run(
-        [
-            "python3",
-            str(SELECTOR),
-            "--format",
-            "json",
-            *(arg for path in paths for arg in ("--path", path)),
-        ],
+def native_cli() -> str:
+    if AGENT_CANON_CLI is None:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return AGENT_CANON_CLI
+
+
+def run_selector(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [native_cli(), "classify-path-risk", *args],
         cwd=ROOT,
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
     )
+
+
+def selected_units(*paths: str) -> tuple[str, ...]:
+    result = run_selector(
+        "--format",
+        "json",
+        *(argument for path in paths for argument in ("--path", path)),
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr)
     return tuple(json.loads(result.stdout)["units"])
 
 
@@ -121,35 +131,37 @@ def test_selector_routes_each_surface_and_mixed_unknowns(paths, units) -> None:
 
 
 def test_selector_boundary_and_manual_dispatch_select_all_units() -> None:
-    for path in (str(SELECTOR.relative_to(ROOT)), str(WORKFLOW.relative_to(ROOT))):
+    for path in (
+        SELECTOR_SOURCE,
+        RETIRED_SELECTOR_SOURCE,
+        str(WORKFLOW.relative_to(ROOT)),
+    ):
         assert selected_units(path) == STATIC_GATE_UNITS
-    result = subprocess.run(
-        ["python3", str(SELECTOR), "--full-confidence", "--format", "github-output"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    result = run_selector("--full-confidence", "--format", "github-output")
+    assert result.returncode == 0, result.stderr
     outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
     assert outputs["units"].split(",") == list(STATIC_GATE_UNITS)
     assert json.loads(outputs["docs_paths"]) == []
 
 
 def test_selector_preserves_document_arguments_and_full_docs_inputs() -> None:
-    from tools.validation.semantic.path.classify_path_risk import render_github_output
-
     paths = ("documents/has space.md", "documents/日本語.md", "documents/$data.md")
-    outputs = dict(
-        line.split("=", 1)
-        for line in render_github_output(paths, ("docs",)).splitlines()
+    result = run_selector(
+        "--format",
+        "github-output",
+        *(argument for path in paths for argument in ("--path", path)),
     )
+    assert result.returncode == 0, result.stderr
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
     assert json.loads(outputs["docs_paths"]) == list(paths)
-    outputs = dict(
-        line.split("=", 1)
-        for line in render_github_output(
-            (*paths, "tools/runtime/dispatch/agent-canon/src/docs.rs"), ("docs", "rust")
-        ).splitlines()
+    full_paths = (*paths, "tools/runtime/dispatch/agent-canon/src/docs.rs")
+    result = run_selector(
+        "--format",
+        "github-output",
+        *(argument for path in full_paths for argument in ("--path", path)),
     )
+    assert result.returncode == 0, result.stderr
+    outputs = dict(line.split("=", 1) for line in result.stdout.splitlines())
     assert json.loads(outputs["docs_paths"]) == []
 
 
@@ -163,6 +175,30 @@ def test_workflow_triggers_and_one_authoritative_selector() -> None:
     assert "if" not in selector
     assert "--full-confidence" in str(selector)
     assert '"${BASE_SHA}" HEAD' in str(selector)
+    selector_steps = selector["steps"]
+    build_index = next(
+        index
+        for index, item in enumerate(selector_steps)
+        if item["name"] == "Build native path-risk selector from checked-out source"
+    )
+    select_index = next(
+        index for index, item in enumerate(selector_steps) if item.get("id") == "select"
+    )
+    assert build_index < select_index
+    build_script = selector_steps[build_index]["run"]
+    assert "cargo build --locked" in build_script
+    assert "tools/runtime/dispatch/agent-canon/Cargo.toml" in build_script
+    assert "--target-dir" in build_script and "${RUNNER_TEMP}" in build_script
+    assert "printf 'AGENT_CANON_CLI=%s\\n'" in build_script
+    selection_script = selector_steps[select_index]["run"]
+    assert (
+        '"${AGENT_CANON_CLI:?AGENT_CANON_CLI is required}" classify-path-risk'
+        in selection_script
+    )
+    assert (
+        "python3 tools/validation/semantic/path/classify_path_risk.py"
+        not in selection_script
+    )
     assert config["jobs"]["static-gates"]["needs"] == "select-static-units"
     assert config["jobs"]["static-gates"]["if"] == "always()"
     assert "rust,contracts,eval,workflow-container" not in WORKFLOW.read_text()
@@ -388,9 +424,7 @@ def test_main_selection_uses_push_range_and_handles_unavailable_base(
 ) -> None:
     root = executable_fixture_root(tmp_path) / "event-source"
     root.mkdir()
-    copied = root / SELECTOR.relative_to(ROOT)
-    copied.parent.mkdir(parents=True)
-    shutil.copyfile(SELECTOR, copied)
+    (root / "README.md").write_text("base\n")
     subprocess.run(["git", "init", "-q", str(root)], check=True)
 
     def commit(message):
@@ -433,6 +467,7 @@ def test_main_selection_uses_push_range_and_handles_unavailable_base(
         PUSH_BEFORE_SHA=before if known_base else "0" * 40,
         RUNNER_TEMP=str(tmp_path),
         GITHUB_OUTPUT=str(output),
+        AGENT_CANON_CLI=native_cli(),
     )
     assert actual.returncode == 0, actual.stderr
     assert (
@@ -507,10 +542,15 @@ def test_contract_collection_and_source_toolchain_owners() -> None:
     assert "python3 -m pytest -p no:cacheprovider --pyargs" in body
     assert "python3 -m unittest" not in body
     assert "tests.tools.test_standalone_static_gate_source_runtime_contract" in body
+    assert "tests.agent_tools.test_classify_path_risk" in body
     assert "tests/agent_tools/test_dependency_*.py" in body
     assert "RUNTIME_ROOT=/usr/local/share/agent-canon/runtime" not in text
     assert "export RUSTUP_HOME=" not in text
     assert "export CARGO_HOME=" not in text
+    assert (
+        'AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}"'
+        in text
+    )
     assert (
         "/opt/agent-canon/source/tools/validation/ci/runners/" in WORKFLOW.read_text()
     )

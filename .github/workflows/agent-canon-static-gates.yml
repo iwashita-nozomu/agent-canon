@@ -4,7 +4,7 @@
 # upstream design ../../agents/skills/agent-canon-update.md agent-canon PR workflow
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # upstream design ../../documents/runtime/runtime-log-archive.md canonical eval archive storage
-# upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py canonical changed-path selector and unit mapping
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs canonical changed-path selector and unit mapping
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh executes one selected static-gate unit
 # downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow and PR template conventions
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
@@ -40,6 +40,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Build native path-risk selector from checked-out source
+        run: |
+          target_dir="${RUNNER_TEMP}/agent-canon-path-risk-target"
+          cargo build --locked \
+            --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
+            --target-dir "${target_dir}"
+          selector="${target_dir}/debug/agent-canon"
+          [[ -x "${selector}" ]]
+          printf 'AGENT_CANON_CLI=%s\n' "${selector}" >> "${GITHUB_ENV}"
       - name: Select validation units from trusted event diff
         id: select
         env:
@@ -48,16 +57,16 @@ jobs:
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             git -c core.quotePath=false diff --name-only --no-renames "${BASE_SHA}" HEAD > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
-            python3 tools/validation/semantic/path/classify_path_risk.py \
+            "${AGENT_CANON_CLI:?AGENT_CANON_CLI is required}" classify-path-risk \
               --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
               --format github-output | tee -a "${GITHUB_OUTPUT}"
           elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             if git cat-file -e "${PUSH_BEFORE_SHA}^{commit}" 2>/dev/null; then
               git -c core.quotePath=false diff --name-only --no-renames "${PUSH_BEFORE_SHA}" HEAD > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
-              selection="$(python3 tools/validation/semantic/path/classify_path_risk.py \
+              selection="$("${AGENT_CANON_CLI:?AGENT_CANON_CLI is required}" classify-path-risk \
                 --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" --format github-output)"
             else
-              selection="$(python3 tools/validation/semantic/path/classify_path_risk.py \
+              selection="$("${AGENT_CANON_CLI:?AGENT_CANON_CLI is required}" classify-path-risk \
                 --full-confidence --format github-output)"
             fi
             units="$(printf '%s\n' "${selection}" | sed -n 's/^units=//p')"
@@ -67,7 +76,7 @@ jobs:
               printf 'units=\ndocs_paths=[]\n' | tee -a "${GITHUB_OUTPUT}"
             fi
           else
-            python3 tools/validation/semantic/path/classify_path_risk.py \
+            "${AGENT_CANON_CLI:?AGENT_CANON_CLI is required}" classify-path-risk \
               --full-confidence --format github-output | tee -a "${GITHUB_OUTPUT}"
           fi
 
