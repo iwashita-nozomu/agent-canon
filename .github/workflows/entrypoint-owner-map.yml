@@ -39,7 +39,8 @@ jobs:
       - name: Verify entrypoint grammar
         env:
           AGENT_CANON_CLI: ${{ runner.temp }}/entrypoint-owner-map-cargo/debug/agent-canon
-        run: "$AGENT_CANON_CLI" docs check-entrypoints --root . --format json
+        run: |
+          "$AGENT_CANON_CLI" docs check-entrypoints --root . --format json
       - name: Run entrypoint regression tests
         env:
           AGENT_CANON_CLI: ${{ runner.temp }}/entrypoint-owner-map-cargo/debug/agent-canon
