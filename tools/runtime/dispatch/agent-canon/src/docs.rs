@@ -681,7 +681,7 @@ fn similar_design_runtime_error(message: impl std::fmt::Display) -> i32 {
 fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String, String> {
     let mut files = Vec::new();
     collect_redundant_markdown_files(design_dir, &mut files)?;
-    #[cfg(windows)]
+    // Python 3.12 uses Unicode 15.0 lowercase; Rust 1.89 std lowercase uses Unicode 16.
     let case_mapper = icu_casemap::CaseMapper::new();
     #[cfg(windows)]
     let path_order = |left: &Path, right: &Path| similarity_path_order(left, right, &case_mapper);
@@ -693,7 +693,7 @@ fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String
     for path in &files {
         let text = fs::read_to_string(path)
             .map_err(|error| format!("cannot read design document {}: {error}", path.display()))?;
-        normalized.push(normalize_similar_design_text(&text));
+        normalized.push(normalize_similar_design_text(&text, &case_mapper));
     }
 
     let mut pairs = Vec::new();
@@ -772,7 +772,7 @@ fn similarity_path_order(left: &Path, right: &Path) -> Ordering {
     left.cmp(right)
 }
 
-fn normalize_similar_design_text(text: &str) -> String {
+fn normalize_similar_design_text(text: &str, case_mapper: &icu_casemap::CaseMapper) -> String {
     let without_fences = CODE_FENCE_PATTERN.replace_all(text, "");
     let without_link_destinations = MARKDOWN_LINK_PATTERN.replace_all(&without_fences, "$1");
     let punctuation_normalized = without_link_destinations
@@ -785,12 +785,12 @@ fn normalize_similar_design_text(text: &str) -> String {
             }
         })
         .collect::<String>();
-    punctuation_normalized
+    let whitespace_normalized = punctuation_normalized
         .split(crate::python_text::is_python_whitespace)
         .filter(|piece| !piece.is_empty())
         .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
+        .join(" ");
+    case_mapper.lowercase_to_string(&whitespace_normalized, &Default::default())
 }
 
 fn parse_redundant_design_args(raw: &[String]) -> Result<RedundantDesignParse, String> {

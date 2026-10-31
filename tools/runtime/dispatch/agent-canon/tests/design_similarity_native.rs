@@ -187,6 +187,38 @@ fn native_similarity_path_order_uses_python_lowercase_not_casefold() {
 }
 
 #[test]
+fn native_similarity_lowercase_matches_python_312_unicode_15() {
+    // Actual CPython 3.12 and native std-lower probes showed U+1C89 and U+1C8A
+    // remain distinct under Unicode 15, while Rust 1.89 std lowercase merged them.
+    let temp = TempRoot::new();
+    let source = temp.source();
+    let runtime = temp.runtime();
+    write(&source.join("documents/design/a.md"), "\u{1c89}");
+    write(&source.join("documents/design/b.md"), "\u{1c8a}");
+    let before = snapshot(&source);
+
+    let output = run_native(
+        &source,
+        &runtime,
+        &["--min", "0.6", "--output", "report.txt"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!(
+            "Report written to {}\n",
+            runtime.join("report.txt").display()
+        )
+    );
+    assert_eq!(
+        fs::read_to_string(runtime.join("report.txt")).expect("lowercase report exists"),
+        "No similar design files found with threshold >= 0.6\n"
+    );
+    assert_eq!(snapshot(&source), before, "source tree stays unchanged");
+}
+
+#[test]
 fn native_similarity_default_report_is_run_scoped_in_external_runtime() {
     let temp = TempRoot::new();
     let source = temp.source();
