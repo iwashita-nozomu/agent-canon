@@ -388,16 +388,6 @@ pub fn owner_receipt_key(packet: &JsonValue) -> Result<[JsonString; 5], OwnerGua
     ])
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct OwnerReceiptCompatibility<'a> {
-    pub candidate_digest: Option<&'a JsonString>,
-    pub property_ref: Option<&'a JsonString>,
-    pub owner_ref: Option<&'a JsonString>,
-    pub execution_plane: Option<&'a JsonString>,
-    pub tool_input_locator: Option<&'a JsonString>,
-    pub mechanism_ref: Option<&'a JsonString>,
-}
-
 pub fn owner_receipt_is_compatible(
     packet: &JsonValue,
     expected: &OwnerReceiptCompatibility<'_>,
@@ -494,19 +484,6 @@ pub fn owner_receipt_is_invalidated(
             && normalized_text(&invalidation, "invalidated_property_ref")
                 == normalized_text(&packet, "property_ref"),
     )
-}
-
-pub struct OwnerReceiptCloseoutInput<'a> {
-    pub owner_receipts: &'a [JsonValue],
-    pub candidate_digest: Option<&'a JsonString>,
-    pub required_owner_refs: &'a [JsonString],
-    pub dependency_edges: &'a [JsonString],
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OwnerReceiptCloseoutDecision {
-    pub ready: bool,
-    pub reasons: Vec<JsonString>,
 }
 
 fn prefix_value(prefix: &str, value: &JsonString) -> JsonString {
