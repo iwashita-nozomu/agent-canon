@@ -20,6 +20,7 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation stablehlo_value_closure.rs exposes scoped SSA dependency closure APIs
 // downstream implementation theorem_graph_circularity_check.rs validates theorem graph proof frontiers
+// downstream implementation work_log.rs owns canonical workflow ledger and plain work-log command
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
@@ -81,7 +82,7 @@ mod tool_drift;
 use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, run_evaluation, stablehlo_value_closure, theorem_graph_board,
-    theorem_graph_circularity_check, tool_proof_coverage,
+    theorem_graph_circularity_check, tool_proof_coverage, work_log,
 };
 use std::env;
 
@@ -106,6 +107,7 @@ Commands:
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
+  work-log [--report-dir PATH|--run-id ID] --message TEXT [options]
   numeric-performance [--input <path|->] [--format json]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
@@ -168,6 +170,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == work_log::SELECTOR {
+        std::process::exit(work_log::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {

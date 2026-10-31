@@ -2,21 +2,31 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests test work log behavior.
-# upstream implementation ../../tools/runtime/archive/work_log.py appends run-local logs
+# responsibility Tests run-local work-log CLI behavior against the native owner.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/work_log.rs appends run-local logs
 # @dependency-end
 
 from __future__ import annotations
 
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-WORK_LOG_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "work_log.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+
+def _native_command(*arguments: str) -> list[str]:
+    assert AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+    executable = Path(AGENT_CANON_CLI)
+    assert (
+        executable.is_absolute()
+        and executable.is_file()
+        and os.access(executable, os.X_OK)
+    )
+    return [str(executable), "work-log", *arguments]
 
 
 class WorkLogTest(unittest.TestCase):
@@ -45,9 +55,7 @@ class WorkLogTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -62,7 +70,7 @@ class WorkLogTest(unittest.TestCase):
                     "updated docs",
                     "--next",
                     "run tests",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -105,9 +113,7 @@ class WorkLogTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--kind",
@@ -118,7 +124,7 @@ class WorkLogTest(unittest.TestCase):
                     "ran targeted pytest",
                     "--next",
                     "update closeout",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -145,9 +151,7 @@ class WorkLogTest(unittest.TestCase):
             report_dir = runtime_root / "reports" / "agents" / "run-3"
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -161,7 +165,7 @@ class WorkLogTest(unittest.TestCase):
                     "contract not created yet",
                     "--message",
                     "checked MCP inventory",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -184,9 +188,7 @@ class WorkLogTest(unittest.TestCase):
             report_dir = runtime_root / "reports" / "agents" / "run-4"
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -198,7 +200,7 @@ class WorkLogTest(unittest.TestCase):
                     "--allow-missing-request-clause-id",
                     "--message",
                     "checked MCP inventory",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
