@@ -12,6 +12,7 @@
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation agent_search.rs routes explicit repository-search provider requests
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -29,6 +30,7 @@
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // @dependency-end
 
+mod agent_search;
 mod check_merge_structure;
 mod config;
 mod dependency_headers;
@@ -76,6 +78,7 @@ Commands:
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
+  agent-search [search options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   docs <check|format> [paths...]
   codex-config --source-config <path>
@@ -198,6 +201,10 @@ fn main() {
         std::process::exit(graph::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "agent-search" {
+        std::process::exit(agent_search::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
     }
@@ -299,3 +306,6 @@ mod runtime_boundary {
         }
     }
 }
+
+#[cfg(test)]
+mod agent_search_tests;

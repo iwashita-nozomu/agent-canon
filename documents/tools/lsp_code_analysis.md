@@ -5,14 +5,13 @@ responsibility Documents the canonical LSP 3.17 code-analysis command, transport
 upstream design ../structured-analysis/code-analysis.md structured-analysis boundary
 upstream design ../design/dependency-manifest-design.md dependency evidence separation
 downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns process lifecycle and report
-downstream implementation ../../tools/analysis/search/search.py consumes selected in-memory facts
 downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies golden behavior
 @dependency-end
 -->
 
 # LSP Code Analysis
 
-`lsp_code_analysis.py` は AgentCanon の code analysis 実行正本です。LSP 3.17
+`lsp_code_analysis.py` は AgentCanon の standalone code analysis command です。LSP 3.17
 JSON-RPC を一回の session として起動し、結果を
 `agent-canon.lsp-code-analysis.v1` JSON に正規化します。index、persistent
 cache、ambient PATH discovery は持ちません。
@@ -73,8 +72,8 @@ deterministic relation に正規化します。
 
 ## Consumer boundary
 
-`search.py --providers code-deps` は選択された場合だけこの owner に一回限りの
-analysis を依頼し、native LSP report を独立して返します。LSP failure は failure
+`tools/bin/agent-canon agent-search --providers code-deps` は選択された場合だけ native
+in-process LSP API に一回限りの analysis を依頼し、その report を独立して返します。LSP failure は failure
 のまま返し、AST heuristic や別 provider への fallback は行いません。汎用 text
 search、header dependency graph、manifest evidence はそれぞれの owner を選択し、
 LSP edge と manifest edge の意味を混同しません。
