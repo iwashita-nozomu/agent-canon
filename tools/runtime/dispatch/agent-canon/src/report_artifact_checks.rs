@@ -138,7 +138,7 @@ fn is_mechanically_regenerated_report_path(path: &[u8]) -> bool {
     let filename = filename.strip_suffix(b"\n").unwrap_or(filename);
     GENERATED_ARTIFACT_FILE_SUFFIXES
         .iter()
-        .any(|suffix| filename.len() > suffix.len() && filename.ends_with(*suffix))
+        .any(|suffix| filename.len() > suffix.len() && filename.ends_with(suffix))
 }
 
 fn python_surrogateescape_sort_key(path: &[u8]) -> Vec<u32> {
