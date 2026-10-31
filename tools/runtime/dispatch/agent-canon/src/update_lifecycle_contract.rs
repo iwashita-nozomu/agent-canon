@@ -7,6 +7,7 @@
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
+// downstream test ../tests/update_lifecycle_pr_native.rs freezes the native PR lifecycle APIs against CPython outputs
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -92,6 +93,59 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
 const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
+const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
+const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
+const PR_STATES: &[&str] = &[
+    "draft",
+    "ready",
+    "permission_unknown",
+    "permission_denied",
+    "changes_requested",
+    "external_review",
+    "merged",
+    "closed_head",
+    "multiple_remotes",
+    "conflict_successor",
+];
+const PR_OPEN_STATES: &[&str] = &[
+    "draft",
+    "ready",
+    "permission_unknown",
+    "permission_denied",
+    "changes_requested",
+    "external_review",
+];
+const PR_REVIEWABLE_STATES: &[&str] = &["ready", "changes_requested", "external_review"];
+const PULL_REQUEST_TRANSITIONS: &[(&str, &str)] = &[
+    ("draft", "ready"),
+    ("draft", "permission_unknown"),
+    ("permission_unknown", "permission_denied"),
+    ("permission_unknown", "ready"),
+    ("permission_denied", "ready"),
+    ("ready", "changes_requested"),
+    ("ready", "external_review"),
+    ("changes_requested", "ready"),
+    ("external_review", "ready"),
+    ("multiple_remotes", "ready"),
+    ("ready", "merged"),
+];
+const PR_BRANCH_RULES: &[(&str, &[&str], &[&str])] = &[
+    (
+        "user",
+        &["user_identity"],
+        &["fork_identity", "contributor_identity", "contributor_diff"],
+    ),
+    (
+        "fork",
+        &["fork_identity"],
+        &["user_identity", "contributor_identity", "contributor_diff"],
+    ),
+    (
+        "contributor",
+        &["contributor_identity", "contributor_diff"],
+        &["user_identity", "fork_identity"],
+    ),
+];
 pub const SOURCE_MAIN_REBIND_SCHEMA: &str = "agent-canon.source-main-rebind-receipt.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1120,6 +1174,646 @@ pub fn materialize_candidate_cas_receipt(
     let receipt = JsonValue::Object(receipt);
     let checked = validate_candidate_cas_transition(&review, &receipt)?;
     validate_candidate_cas_rebind_transition(&rebind, &checked)
+}
+
+pub fn pull_request_branch_table() -> JsonValue {
+    let mut table = JsonMap::new();
+    for (kind, required, forbidden) in PR_BRANCH_RULES {
+        table.insert(
+            (*kind).to_owned(),
+            serde_json::json!({
+                "required": *required,
+                "forbidden": *forbidden,
+            }),
+        );
+    }
+    JsonValue::Object(table)
+}
+
+fn validate_pr_repo_identity(
+    value: &JsonValue,
+    field: &str,
+    remote: bool,
+) -> Result<JsonValue, LifecycleContractError> {
+    let identity = mapping(value, field)?;
+    let required = if remote {
+        &[
+            "repo_owner",
+            "repo_name",
+            "remote_name",
+            "url_digest",
+            "ref",
+            "commit_sha",
+            "tree_sha",
+        ][..]
+    } else {
+        &["repo_owner", "repo_name", "ref", "commit_sha", "tree_sha"][..]
+    };
+    exact_keys(identity, required, &[], field)?;
+    for key in ["repo_owner", "repo_name", "ref"] {
+        string_value(
+            required_value(identity, key, field)?,
+            &format!("{field}.{key}"),
+        )?;
+    }
+    if remote {
+        string_value(
+            required_value(identity, "remote_name", field)?,
+            &format!("{field}.remote_name"),
+        )?;
+        pattern_value(
+            required_value(identity, "url_digest", field)?,
+            &format!("{field}.url_digest"),
+            valid_sha256,
+        )?;
+    }
+    for key in ["commit_sha", "tree_sha"] {
+        pattern_value(
+            required_value(identity, key, field)?,
+            &format!("{field}.{key}"),
+            |text| lower_hex(text, 40),
+        )?;
+    }
+    canonical_clone(value)
+}
+
+fn validate_pr_actor(value: &JsonValue, field: &str) -> Result<JsonValue, LifecycleContractError> {
+    let actor = mapping(value, field)?;
+    exact_keys(actor, &["actor_id", "display_name"], &[], field)?;
+    for key in ["actor_id", "display_name"] {
+        string_value(
+            required_value(actor, key, field)?,
+            &format!("{field}.{key}"),
+        )?;
+    }
+    canonical_clone(value)
+}
+
+fn validate_pr_branch_table(value: &JsonValue) -> Result<(), LifecycleContractError> {
+    let table = mapping(value, "pull_request_lifecycle.branch")?;
+    exact_keys(table, PR_KINDS, &[], "pull_request_lifecycle.branch")?;
+    for (kind, expected_required, expected_forbidden) in PR_BRANCH_RULES {
+        let field = format!("pull_request_lifecycle.branch.{kind}");
+        let rule = mapping(
+            required_value(table, kind, "pull_request_lifecycle.branch")?,
+            &field,
+        )?;
+        exact_keys(rule, &["required", "forbidden"], &[], &field)?;
+        let required = string_list(
+            required_value(rule, "required", &field)?,
+            &format!("{field}.required"),
+            false,
+            true,
+            None,
+        )?;
+        let forbidden = string_list(
+            required_value(rule, "forbidden", &field)?,
+            &format!("{field}.forbidden"),
+            false,
+            true,
+            None,
+        )?;
+        let expected_required = expected_required
+            .iter()
+            .map(|field| (*field).to_owned())
+            .collect::<Vec<_>>();
+        let expected_forbidden = expected_forbidden
+            .iter()
+            .map(|field| (*field).to_owned())
+            .collect::<Vec<_>>();
+        if required != expected_required || forbidden != expected_forbidden {
+            return Err(fail("pr_lifecycle:branch_rule_mismatch", kind));
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_pull_request_lifecycle(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let lifecycle = mapping(value, "pull_request_lifecycle")?;
+    let common = [
+        "schema",
+        "kind",
+        "binding",
+        "state",
+        "remote_identity",
+        "base_identity",
+        "head_identity",
+        "branch",
+        "permission_identity",
+        "pr_essence",
+        "reviews",
+    ];
+    let optional = [
+        "user_identity",
+        "fork_identity",
+        "contributor_identity",
+        "contributor_diff",
+        "successor_ref",
+    ];
+    exact_keys(lifecycle, &common, &optional, "pull_request_lifecycle")?;
+    if lifecycle.get("schema").and_then(JsonValue::as_str) != Some(PULL_REQUEST_LIFECYCLE_SCHEMA) {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            PULL_REQUEST_LIFECYCLE_SCHEMA,
+        ));
+    }
+    let kind = one_of(
+        required_value(lifecycle, "kind", "pull_request_lifecycle")?,
+        PR_KINDS,
+        "pull_request_lifecycle.kind",
+    )?;
+    let state = one_of(
+        required_value(lifecycle, "state", "pull_request_lifecycle")?,
+        PR_STATES,
+        "pull_request_lifecycle.state",
+    )?;
+    let binding = validate_record_binding(required_value(
+        lifecycle,
+        "binding",
+        "pull_request_lifecycle",
+    )?)?;
+    let remote = validate_pr_repo_identity(
+        required_value(lifecycle, "remote_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.remote_identity",
+        true,
+    )?;
+    let base = validate_pr_repo_identity(
+        required_value(lifecycle, "base_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.base_identity",
+        false,
+    )?;
+    let head = validate_pr_repo_identity(
+        required_value(lifecycle, "head_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.head_identity",
+        false,
+    )?;
+    let binding_map = mapping(&binding, "binding")?;
+    let head_map = mapping(&head, "pull_request_lifecycle.head_identity")?;
+    if required_value(
+        head_map,
+        "commit_sha",
+        "pull_request_lifecycle.head_identity",
+    )? != required_value(binding_map, "candidate_sha", "binding")?
+        || required_value(head_map, "tree_sha", "pull_request_lifecycle.head_identity")?
+            != required_value(binding_map, "tree_sha", "binding")?
+    {
+        return Err(fail("pr_lifecycle:head_binding_mismatch", ""));
+    }
+    let remote_map = mapping(&remote, "pull_request_lifecycle.remote_identity")?;
+    for field in ["repo_owner", "repo_name", "ref", "commit_sha", "tree_sha"] {
+        if required_value(remote_map, field, "pull_request_lifecycle.remote_identity")?
+            != required_value(head_map, field, "pull_request_lifecycle.head_identity")?
+        {
+            return Err(fail("pr_lifecycle:remote_head_identity_mismatch", ""));
+        }
+    }
+    validate_pr_branch_table(required_value(
+        lifecycle,
+        "branch",
+        "pull_request_lifecycle",
+    )?)?;
+    let (_, required_branch_fields, forbidden_branch_fields) = PR_BRANCH_RULES
+        .iter()
+        .copied()
+        .find(|(rule_kind, _, _)| *rule_kind == kind.as_str())
+        .ok_or_else(|| fail("lifecycle:enum_invalid", "pull_request_lifecycle.kind"))?;
+    for &field in required_branch_fields {
+        if !lifecycle.contains_key(field) {
+            return Err(fail("pr_lifecycle:branch_field_missing", field));
+        }
+    }
+    for &field in forbidden_branch_fields {
+        if lifecycle.contains_key(field) {
+            return Err(fail("pr_lifecycle:branch_field_forbidden", field));
+        }
+    }
+
+    let mut user_identity = None;
+    match kind.as_str() {
+        "user" => {
+            user_identity = Some(validate_pr_actor(
+                required_value(lifecycle, "user_identity", "pull_request_lifecycle")?,
+                "pull_request_lifecycle.user_identity",
+            )?);
+            let base_map = mapping(&base, "pull_request_lifecycle.base_identity")?;
+            for field in ["repo_owner", "repo_name"] {
+                if required_value(base_map, field, "pull_request_lifecycle.base_identity")?
+                    != required_value(head_map, field, "pull_request_lifecycle.head_identity")?
+                {
+                    return Err(fail("pr_lifecycle:user_repository_mismatch", ""));
+                }
+            }
+        }
+        "fork" => {
+            let field = "pull_request_lifecycle.fork_identity";
+            let fork = mapping(
+                required_value(lifecycle, "fork_identity", "pull_request_lifecycle")?,
+                field,
+            )?;
+            exact_keys(
+                fork,
+                &[
+                    "repo_owner",
+                    "repo_name",
+                    "parent_repo_owner",
+                    "parent_repo_name",
+                    "ref",
+                ],
+                &[],
+                field,
+            )?;
+            for key in [
+                "repo_owner",
+                "repo_name",
+                "parent_repo_owner",
+                "parent_repo_name",
+                "ref",
+            ] {
+                string_value(required_value(fork, key, field)?, &format!("{field}.{key}"))?;
+            }
+            let base_map = mapping(&base, "pull_request_lifecycle.base_identity")?;
+            let comparisons = [
+                (
+                    "repo_owner",
+                    head_map,
+                    "pull_request_lifecycle.head_identity",
+                    "repo_owner",
+                ),
+                (
+                    "repo_name",
+                    head_map,
+                    "pull_request_lifecycle.head_identity",
+                    "repo_name",
+                ),
+                (
+                    "parent_repo_owner",
+                    base_map,
+                    "pull_request_lifecycle.base_identity",
+                    "repo_owner",
+                ),
+                (
+                    "parent_repo_name",
+                    base_map,
+                    "pull_request_lifecycle.base_identity",
+                    "repo_name",
+                ),
+                (
+                    "ref",
+                    head_map,
+                    "pull_request_lifecycle.head_identity",
+                    "ref",
+                ),
+            ];
+            for (source_field, target, target_parent, target_field) in comparisons {
+                if required_value(fork, source_field, field)?
+                    != required_value(target, target_field, target_parent)?
+                {
+                    return Err(fail("pr_lifecycle:fork_identity_mismatch", ""));
+                }
+            }
+        }
+        "contributor" => {
+            validate_pr_actor(
+                required_value(lifecycle, "contributor_identity", "pull_request_lifecycle")?,
+                "pull_request_lifecycle.contributor_identity",
+            )?;
+            let field = "pull_request_lifecycle.contributor_diff";
+            let diff = mapping(
+                required_value(lifecycle, "contributor_diff", "pull_request_lifecycle")?,
+                field,
+            )?;
+            exact_keys(diff, &["commit_sha", "tree_sha", "diff_sha256"], &[], field)?;
+            for key in ["commit_sha", "tree_sha"] {
+                pattern_value(
+                    required_value(diff, key, field)?,
+                    &format!("{field}.{key}"),
+                    |text| lower_hex(text, 40),
+                )?;
+            }
+            pattern_value(
+                required_value(diff, "diff_sha256", field)?,
+                &format!("{field}.diff_sha256"),
+                valid_sha256,
+            )?;
+            if required_value(diff, "commit_sha", field)?
+                != required_value(
+                    head_map,
+                    "commit_sha",
+                    "pull_request_lifecycle.head_identity",
+                )?
+                || required_value(diff, "tree_sha", field)?
+                    != required_value(head_map, "tree_sha", "pull_request_lifecycle.head_identity")?
+            {
+                return Err(fail("pr_lifecycle:contributor_diff_identity_mismatch", ""));
+            }
+        }
+        _ => {
+            return Err(fail(
+                "lifecycle:enum_invalid",
+                "pull_request_lifecycle.kind",
+            ))
+        }
+    }
+
+    let permission_field = "pull_request_lifecycle.permission_identity";
+    let permission = mapping(
+        required_value(lifecycle, "permission_identity", "pull_request_lifecycle")?,
+        permission_field,
+    )?;
+    exact_keys(
+        permission,
+        &[
+            "actor_id",
+            "permission_state",
+            "permission_evidence_id",
+            "authority_source",
+            "assumption_forbidden",
+        ],
+        &[],
+        permission_field,
+    )?;
+    let permission_actor = string_value(
+        required_value(permission, "actor_id", permission_field)?,
+        "pull_request_lifecycle.permission_identity.actor_id",
+    )?;
+    let permission_state = one_of(
+        required_value(permission, "permission_state", permission_field)?,
+        &["unknown", "verified_true", "verified_false"],
+        "pull_request_lifecycle.permission_identity.permission_state",
+    )?;
+    pattern_value(
+        required_value(permission, "permission_evidence_id", permission_field)?,
+        "pull_request_lifecycle.permission_identity.permission_evidence_id",
+        valid_evidence_ref,
+    )?;
+    string_value(
+        required_value(permission, "authority_source", permission_field)?,
+        "pull_request_lifecycle.permission_identity.authority_source",
+    )?;
+    if required_value(permission, "assumption_forbidden", permission_field)?
+        != &JsonValue::Bool(true)
+    {
+        return Err(fail("pr_lifecycle:permission_assumption_forbidden", ""));
+    }
+    if kind == "user"
+        && user_identity
+            .as_ref()
+            .and_then(|identity| identity.get("actor_id"))
+            != Some(&JsonValue::String(permission_actor))
+    {
+        return Err(fail("pr_lifecycle:actor_identity_mismatch", ""));
+    }
+    if (state == "permission_unknown" && permission_state != "unknown")
+        || (state == "permission_denied" && permission_state != "verified_false")
+    {
+        return Err(fail("pr_lifecycle:permission_state_mismatch", ""));
+    }
+    if (PR_REVIEWABLE_STATES.contains(&state.as_str()) || state == "merged")
+        && permission_state != "verified_true"
+    {
+        return Err(fail("pr_lifecycle:verified_permission_required", &state));
+    }
+
+    let essence_field = "pull_request_lifecycle.pr_essence";
+    let essence = mapping(
+        required_value(lifecycle, "pr_essence", "pull_request_lifecycle")?,
+        essence_field,
+    )?;
+    exact_keys(
+        essence,
+        &[
+            "problem",
+            "intent",
+            "canonical_owner",
+            "contract_delta",
+            "evidence_refs",
+        ],
+        &[],
+        essence_field,
+    )?;
+    for key in ["problem", "intent", "canonical_owner", "contract_delta"] {
+        string_value(
+            required_value(essence, key, essence_field)?,
+            &format!("{essence_field}.{key}"),
+        )?;
+    }
+    string_list(
+        required_value(essence, "evidence_refs", essence_field)?,
+        "pull_request_lifecycle.pr_essence.evidence_refs",
+        true,
+        true,
+        Some(valid_evidence_ref),
+    )?;
+
+    let reviews = required_value(lifecycle, "reviews", "pull_request_lifecycle")?
+        .as_array()
+        .ok_or_else(|| {
+            fail(
+                "lifecycle:sequence_required",
+                "pull_request_lifecycle.reviews",
+            )
+        })?;
+    for (index, review_value) in reviews.iter().enumerate() {
+        let field = format!("pull_request_lifecycle.reviews[{index}]");
+        let review = mapping(review_value, &field)?;
+        exact_keys(
+            review,
+            &["review_id", "reviewer_id", "state", "body_digest"],
+            &[],
+            &field,
+        )?;
+        for key in ["review_id", "reviewer_id"] {
+            string_value(
+                required_value(review, key, &field)?,
+                &format!("{field}.{key}"),
+            )?;
+        }
+        one_of(
+            required_value(review, "state", &field)?,
+            &["approved", "changes_requested", "commented", "dismissed"],
+            &format!("{field}.state"),
+        )?;
+        pattern_value(
+            required_value(review, "body_digest", &field)?,
+            &format!("{field}.body_digest"),
+            valid_sha256,
+        )?;
+    }
+
+    let successor = lifecycle.get("successor_ref").unwrap_or(&JsonValue::Null);
+    if state == "conflict_successor" {
+        let successor = pattern_value(
+            successor,
+            "pull_request_lifecycle.successor_ref",
+            valid_hash_id,
+        )?;
+        if !successor.starts_with("pr-successor:") {
+            return Err(fail(
+                "lifecycle:identity_invalid",
+                "pull_request_lifecycle.successor_ref",
+            ));
+        }
+    } else if !successor.is_null() {
+        return Err(fail("pr_lifecycle:successor_forbidden", ""));
+    }
+    canonical_clone(value)
+}
+
+pub fn validate_pull_request_transition(
+    previous: &JsonValue,
+    current: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let old = validate_pull_request_lifecycle(previous)?;
+    let new = validate_pull_request_lifecycle(current)?;
+    let old_map = mapping(&old, "pull_request_lifecycle")?;
+    let new_map = mapping(&new, "pull_request_lifecycle")?;
+    let old_state = required_string(old_map, "state", "pull_request_lifecycle")?;
+    let new_state = required_string(new_map, "state", "pull_request_lifecycle")?;
+    same_binding(
+        required_value(old_map, "binding", "pull_request_lifecycle")?,
+        required_value(new_map, "binding", "pull_request_lifecycle")?,
+        "pull_request_lifecycle",
+    )?;
+    let mut allowed = PULL_REQUEST_TRANSITIONS.contains(&(old_state.as_str(), new_state.as_str()))
+        || (old_state == new_state && PR_OPEN_STATES.contains(&old_state.as_str()));
+    if PR_OPEN_STATES.contains(&old_state.as_str())
+        && matches!(new_state.as_str(), "closed_head" | "multiple_remotes")
+    {
+        allowed = true;
+    }
+    if PR_REVIEWABLE_STATES.contains(&old_state.as_str()) && new_state == "conflict_successor" {
+        allowed = true;
+    }
+    if !allowed {
+        return Err(fail(
+            "pr_lifecycle:transition_invalid",
+            &format!("{old_state}->{new_state}"),
+        ));
+    }
+
+    for field in [
+        "kind",
+        "remote_identity",
+        "base_identity",
+        "head_identity",
+        "branch",
+        "permission_identity",
+    ] {
+        if required_value(old_map, field, "pull_request_lifecycle")?
+            != required_value(new_map, field, "pull_request_lifecycle")?
+        {
+            let permission_refresh = field == "permission_identity"
+                && ((matches!(
+                    old_state.as_str(),
+                    "permission_unknown" | "permission_denied" | "multiple_remotes"
+                ) && new_state == "ready")
+                    || (old_state == "permission_unknown" && new_state == "permission_denied"));
+            if !permission_refresh {
+                return Err(fail("pr_lifecycle:immutable_identity_changed", field));
+            }
+        }
+    }
+    if required_value(old_map, "pr_essence", "pull_request_lifecycle")?
+        != required_value(new_map, "pr_essence", "pull_request_lifecycle")?
+    {
+        return Err(fail("pr_lifecycle:retained_field_changed", "pr_essence"));
+    }
+    let old_reviews = required_value(old_map, "reviews", "pull_request_lifecycle")?
+        .as_array()
+        .ok_or_else(|| {
+            fail(
+                "lifecycle:sequence_required",
+                "pull_request_lifecycle.reviews",
+            )
+        })?;
+    let new_reviews = required_value(new_map, "reviews", "pull_request_lifecycle")?
+        .as_array()
+        .ok_or_else(|| {
+            fail(
+                "lifecycle:sequence_required",
+                "pull_request_lifecycle.reviews",
+            )
+        })?;
+    if new_reviews.get(..old_reviews.len()) != Some(old_reviews.as_slice()) {
+        return Err(fail("pr_lifecycle:retained_field_changed", "reviews"));
+    }
+    if required_value(old_map, "kind", "pull_request_lifecycle")?
+        == &JsonValue::String("contributor".to_owned())
+        && required_value(old_map, "contributor_diff", "pull_request_lifecycle")?
+            != required_value(new_map, "contributor_diff", "pull_request_lifecycle")?
+    {
+        return Err(fail(
+            "pr_lifecycle:retained_field_changed",
+            "contributor_diff",
+        ));
+    }
+    Ok(new)
+}
+
+pub fn validate_candidate_cas_pr_transition(
+    cas: &JsonValue,
+    pr_lifecycle: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_cas = validate_candidate_cas_receipt(cas)?;
+    let checked_pr = validate_pull_request_lifecycle(pr_lifecycle)?;
+    let cas_map = mapping(&checked_cas, "candidate_cas_receipt")?;
+    let pr_map = mapping(&checked_pr, "pull_request_lifecycle")?;
+    same_binding(
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
+        required_value(pr_map, "binding", "pull_request_lifecycle")?,
+        "candidate_cas.pr",
+    )?;
+    let candidate = mapping(
+        required_value(cas_map, "candidate_identity", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.candidate_identity",
+    )?;
+    let head = mapping(
+        required_value(pr_map, "head_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.head_identity",
+    )?;
+    if required_value(
+        candidate,
+        "candidate_sha",
+        "candidate_cas_receipt.candidate_identity",
+    )? != required_value(head, "commit_sha", "pull_request_lifecycle.head_identity")?
+        || required_value(
+            candidate,
+            "tree_sha",
+            "candidate_cas_receipt.candidate_identity",
+        )? != required_value(head, "tree_sha", "pull_request_lifecycle.head_identity")?
+    {
+        return Err(fail(
+            "lifecycle:candidate_identity_mismatch",
+            "candidate_cas.pr",
+        ));
+    }
+    let cas_base = mapping(
+        required_value(cas_map, "cas_base_identity", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.cas_base_identity",
+    )?;
+    let pr_base = mapping(
+        required_value(pr_map, "base_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.base_identity",
+    )?;
+    if required_value(
+        cas_base,
+        "commit_sha",
+        "candidate_cas_receipt.cas_base_identity",
+    )? != required_value(
+        pr_base,
+        "commit_sha",
+        "pull_request_lifecycle.base_identity",
+    )? || required_value(
+        cas_base,
+        "tree_sha",
+        "candidate_cas_receipt.cas_base_identity",
+    )? != required_value(pr_base, "tree_sha", "pull_request_lifecycle.base_identity")?
+    {
+        return Err(fail("lifecycle:cas_base_identity_mismatch", ""));
+    }
+    Ok(checked_pr)
 }
 
 fn validate_remote_git_identity(
