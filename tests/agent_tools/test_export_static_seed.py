@@ -2,6 +2,7 @@
 # contract test
 # responsibility Verifies deterministic static-seed export, forbidden-surface rejection, and source-hidden consumer validation.
 # upstream implementation ../../tools/runtime/source/export_static_seed.py exports one committed exact-path seed.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs validates the source-hidden exported seed.
 # upstream design ../../documents/contracts/static-seed-export.md defines the static seed boundary.
 # upstream design ../../documents/contracts/static-seed-allowlist.toml defines the canonical production allowlist.
 # @dependency-end
@@ -28,6 +29,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "source" / "export_static_seed.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 ALLOWLIST_PATH = Path("documents/contracts/static-seed-allowlist.toml")
 PROVENANCE_PATH = "agent-canon-static-seed.json"
 
@@ -287,10 +289,15 @@ class ExportStaticSeedTest(unittest.TestCase):
                 },
                 {path.relative_to(first).as_posix() for path in role_files},
             )
+            if AGENT_CANON_CLI is None:
+                raise RuntimeError(
+                    "AGENT_CANON_CLI must select the current native executable"
+                )
             checker = subprocess.run(
                 (
-                    sys.executable,
-                    str(PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_bootstrap_docs.py"),
+                    AGENT_CANON_CLI,
+                    "docs",
+                    "check-bootstrap",
                     "--root",
                     str(first),
                     "--static-seed-consumer",

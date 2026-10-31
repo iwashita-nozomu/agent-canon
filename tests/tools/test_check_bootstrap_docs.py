@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests default bootstrap docs and source-hidden static-seed consumer validation.
-# upstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py bootstrap and static-consumer checker under test
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs docs check-bootstrap implementation under test
 # upstream design ../../documents/contracts/template-bootstrap.md default static-seed bootstrap contract
 # upstream design ../../documents/contracts/static-seed-export.md static seed boundary
 # @dependency-end
@@ -12,20 +12,12 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = (
-    PROJECT_ROOT
-    / "tools"
-    / "validation"
-    / "documentation"
-    / "checks"
-    / "check_bootstrap_docs.py"
-)
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class CheckBootstrapDocsTest(unittest.TestCase):
@@ -38,7 +30,18 @@ class CheckBootstrapDocsTest(unittest.TestCase):
         env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run the validator for one temporary root."""
-        command = [sys.executable, str(SCRIPT_PATH), "--root", str(root), *args]
+        if AGENT_CANON_CLI is None:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
+        command = [
+            AGENT_CANON_CLI,
+            "docs",
+            "check-bootstrap",
+            "--root",
+            str(root),
+            *args,
+        ]
         return subprocess.run(
             command,
             cwd=PROJECT_ROOT,

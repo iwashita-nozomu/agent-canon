@@ -80,7 +80,7 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
-  docs <check|format> [paths...]
+  docs <check|format|check-bootstrap> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]

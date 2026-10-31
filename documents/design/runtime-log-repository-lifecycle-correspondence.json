@@ -55,7 +55,7 @@
     {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_bootstrap_container_contract.py"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["python3", "-m", "pytest", "-q", "tests/bootstrap/test_bootstrap_runtime.py"], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["bash", "tools/validation/semantic/dependencies/check_dependency_header_format.sh", "--root", ".", "--changed"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "tools/validation/documentation/checks/check_bootstrap_docs.py", "--root", "."], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["tools/bin/agent-canon", "docs", "check-bootstrap", "--root", "."], "cwd": ".", "owner_stage": "validation"},
     {"argv": ["git", "diff", "--check"], "cwd": ".", "owner_stage": "validation"}
   ],
   "state": "review_ready"
