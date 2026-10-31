@@ -4,7 +4,8 @@
 // responsibility Owns closed owner-guarantee and invalidation packet APIs plus the pure local closeout projection.
 // upstream implementation python_json.rs preserves Python code-point strings and canonical ASCII bytes
 // upstream implementation python_text.rs owns Python-compatible whitespace stripping
-// downstream implementation packets.py remains active for Python publication and TaskClose consumers
+// upstream data ../../../../../tests/fixtures/owner_guarantee/python_golden.json freezes the old packet API behavior
+// downstream implementation lib.rs exports the native owner-guarantee API
 // downstream test ../tests/owner_guarantee_native.rs freezes the old packet APIs and projection
 // @dependency-end
 
