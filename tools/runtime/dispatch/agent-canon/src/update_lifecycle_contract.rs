@@ -346,12 +346,13 @@ fn date_prefix_length(value: &str) -> Option<usize> {
         }
         return None;
     }
-    if value.len() >= 8 && bytes.get(4).is_some_and(u8::is_ascii_digit) {
-        if value.get(0..8)?.bytes().all(|byte| byte.is_ascii_digit()) {
-            let month = decimal(value.get(4..6)?)?;
-            let day = decimal(value.get(6..8)?)?;
-            return valid_calendar_date(year, month, day).then_some(8);
-        }
+    if value.len() >= 8
+        && bytes.get(4).is_some_and(u8::is_ascii_digit)
+        && value.get(0..8)?.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        let month = decimal(value.get(4..6)?)?;
+        let day = decimal(value.get(6..8)?)?;
+        return valid_calendar_date(year, month, day).then_some(8);
     }
     if value.len() >= 7 && bytes.get(4) == Some(&b'W') {
         let week = decimal(value.get(5..7)?)?;
@@ -391,7 +392,7 @@ fn parse_clock_components(value: &str) -> Option<(u32, u32, u32, bool)> {
 }
 
 fn valid_clock(value: &str) -> bool {
-    let (clock, has_fraction) = match value.find(|character| character == '.' || character == ',') {
+    let (clock, has_fraction) = match value.find(['.', ',']) {
         Some(index) => {
             let clock = &value[..index];
             let fraction = &value[index + 1..];
@@ -416,8 +417,7 @@ fn valid_timezone_offset(value: &str) -> bool {
         return false;
     }
     let offset = &value[sign.len_utf8()..];
-    let (clock, has_fraction) = match offset.find(|character| character == '.' || character == ',')
-    {
+    let (clock, has_fraction) = match offset.find(['.', ',']) {
         Some(index) => {
             let clock = &offset[..index];
             let fraction = &offset[index + 1..];
