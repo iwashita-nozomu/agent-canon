@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -998,6 +998,13 @@ pub fn related_skill_candidates(
 
 /// Runs the optional authoring-only YAML and JSON schema checks.
 pub fn validate_catalog_schemas(root: &Path) -> Result<Vec<JsonValue>, CapabilityRootError> {
+    validate_catalog_schemas_with(root, &mut Command::output)
+}
+
+fn validate_catalog_schemas_with(
+    root: &Path,
+    execute: &mut impl FnMut(&mut Command) -> std::io::Result<Output>,
+) -> Result<Vec<JsonValue>, CapabilityRootError> {
     let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let config = root.join(CATALOG_SCHEMA_ROOT).join("yamllint.yaml");
     let documents: Vec<PathBuf> = CATALOG_SCHEMA_PATHS
@@ -1010,18 +1017,26 @@ pub fn validate_catalog_schemas(root: &Path) -> Result<Vec<JsonValue>, Capabilit
         .arg(&config)
         .args(&documents)
         .current_dir(&root);
-    if !yaml.output().is_ok_and(|output| output.status.success()) {
+    let yaml_output = execute(&mut yaml).map_err(|error| {
+        CapabilityRootError::new(format!("catalog-validator-execution:yamllint:{error}"))
+    })?;
+    if !yaml_output.status.success() {
         return Err(CapabilityRootError::new("catalog-yaml-invalid"));
     }
     let mut results = Vec::new();
     for ((document, schema), document_path) in CATALOG_SCHEMA_PATHS.iter().zip(documents) {
-        let output = Command::new("check-jsonschema")
+        let mut schema_command = Command::new("check-jsonschema");
+        schema_command
             .arg("--schemafile")
             .arg(root.join(schema))
             .arg(&document_path)
-            .current_dir(&root)
-            .output();
-        if !output.is_ok_and(|output| output.status.success()) {
+            .current_dir(&root);
+        let output = execute(&mut schema_command).map_err(|error| {
+            CapabilityRootError::new(format!(
+                "catalog-validator-execution:check-jsonschema:{error}"
+            ))
+        })?;
+        if !output.status.success() {
             return Err(CapabilityRootError::new(format!(
                 "catalog-schema-invalid:{document}"
             )));
@@ -1035,4 +1050,142 @@ pub fn validate_catalog_schemas(root: &Path) -> Result<Vec<JsonValue>, Capabilit
         }));
     }
     Ok(results)
+}
+
+#[cfg(test)]
+mod validator_tests {
+    use super::*;
+    use std::io;
+    use std::process::ExitStatus;
+
+    fn result(code: u32) -> Output {
+        #[cfg(unix)]
+        let status = {
+            use std::os::unix::process::ExitStatusExt;
+            ExitStatus::from_raw((code as i32) << 8)
+        };
+        #[cfg(windows)]
+        let status = {
+            use std::os::windows::process::ExitStatusExt;
+            ExitStatus::from_raw(code)
+        };
+        Output {
+            status,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn explicit_validation_preserves_provider_order_arguments_and_fresh_execution() {
+        let root = std::env::temp_dir().canonicalize().unwrap();
+        let mut calls = Vec::new();
+        let mut execute = |command: &mut Command| {
+            calls.push((
+                command.get_program().to_owned(),
+                command
+                    .get_args()
+                    .map(ToOwned::to_owned)
+                    .collect::<Vec<_>>(),
+            ));
+            assert_eq!(command.get_current_dir(), Some(root.as_path()));
+            Ok(result(0))
+        };
+        let first = validate_catalog_schemas_with(&root, &mut execute).unwrap();
+        assert_eq!(
+            first,
+            validate_catalog_schemas_with(&root, &mut execute).unwrap()
+        );
+        assert_eq!(calls.len(), 8);
+        let expected_documents = [
+            "agents/skills/catalog.yaml",
+            "agents/skills/skill-dependencies.yaml",
+            "tools/catalog.yaml",
+        ];
+        let expected_schemas = [
+            "schemas/agent-canon/skill-catalog.schema.json",
+            "schemas/agent-canon/skill-dependencies.schema.json",
+            "schemas/agent-canon/tool-catalog.schema.json",
+        ];
+        let (rounds, remainder) = calls.as_chunks::<4>();
+        assert!(remainder.is_empty());
+        for round in rounds {
+            assert_eq!(round[0].0, "yamllint");
+            let mut yaml_args = vec![
+                "--strict".into(),
+                "--config-file".into(),
+                root.join("schemas/agent-canon/yamllint.yaml")
+                    .into_os_string(),
+            ];
+            yaml_args.extend(expected_documents.map(|path| root.join(path).into_os_string()));
+            assert_eq!(round[0].1, yaml_args);
+            for (index, (document, schema)) in
+                expected_documents.iter().zip(expected_schemas).enumerate()
+            {
+                assert_eq!(round[index + 1].0, "check-jsonschema");
+                assert_eq!(
+                    round[index + 1].1,
+                    vec![
+                        std::ffi::OsString::from("--schemafile"),
+                        root.join(schema).into_os_string(),
+                        root.join(document).into_os_string()
+                    ]
+                );
+            }
+        }
+        assert_eq!(first, expected_documents.iter().zip(expected_schemas).map(|(document, schema)| json!({"tool":"check-jsonschema","document":document,"schema":schema,"argv":["--schemafile",schema,document],"exit_code":0})).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn spawn_failures_remain_distinct_from_validator_rejections() {
+        let root = std::env::temp_dir();
+        for failed_call in 0..2 {
+            let mut count = 0;
+            let error = validate_catalog_schemas_with(&root, &mut |_| {
+                let index = count;
+                count += 1;
+                if index == failed_call {
+                    Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "missing executable",
+                    ))
+                } else {
+                    Ok(result(0))
+                }
+            })
+            .unwrap_err();
+            let provider = if failed_call == 0 {
+                "yamllint"
+            } else {
+                "check-jsonschema"
+            };
+            assert_eq!(
+                error.code,
+                format!("catalog-validator-execution:{provider}:missing executable")
+            );
+            assert_eq!(count, failed_call + 1);
+        }
+    }
+
+    #[test]
+    fn validator_rejection_codes_and_short_circuit_remain_stable() {
+        for failed_call in 0..2 {
+            let mut count = 0;
+            let error = validate_catalog_schemas_with(&std::env::temp_dir(), &mut |_| {
+                let index = count;
+                count += 1;
+                Ok(result(if index == failed_call { 1 } else { 0 }))
+            })
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                if failed_call == 0 {
+                    "catalog-yaml-invalid"
+                } else {
+                    "catalog-schema-invalid:agents/skills/catalog.yaml"
+                }
+            );
+            assert_eq!(count, failed_call + 1);
+        }
+    }
 }
