@@ -343,6 +343,32 @@ pub struct SourceProjectionPacketInput<'a> {
     pub acceptance_evidence_ref: &'a str,
 }
 
+pub type SourceProjectionG2Callback<'a, Error> =
+    dyn Fn(&JsonValue, &str, &str, &[JsonValue]) -> Result<JsonValue, Error> + 'a;
+pub type SourceProjectionG3Callback<'a, Error> =
+    dyn Fn(&JsonValue, &JsonValue, &JsonValue, &[JsonValue]) -> Result<JsonValue, Error> + 'a;
+
+pub struct SourceProjectionGateOwnerApis<'a, G2Error, G3Error> {
+    pub generated_completeness_check_ids: &'a [String],
+    pub materialize_generated_completeness_receipt: &'a SourceProjectionG2Callback<'a, G2Error>,
+    pub materialize_pr_identity_gate: &'a SourceProjectionG3Callback<'a, G3Error>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FreshCloneSourceProjectionError<G2Error, G3Error> {
+    Lifecycle(LifecycleContractError),
+    G2Owner(G2Error),
+    G3Owner(G3Error),
+}
+
+impl<G2Error, G3Error> From<LifecycleContractError>
+    for FreshCloneSourceProjectionError<G2Error, G3Error>
+{
+    fn from(error: LifecycleContractError) -> Self {
+        Self::Lifecycle(error)
+    }
+}
+
 fn fail(code: &str, detail: &str) -> LifecycleContractError {
     LifecycleContractError::new(code, detail)
 }
@@ -1021,6 +1047,329 @@ pub fn materialize_source_projection_packet(
         JsonValue::String(input.acceptance_evidence_ref.to_owned()),
     );
     validate_source_projection_packet(&JsonValue::Object(packet))
+}
+
+fn fresh_clone_projection_digest(
+    label: &str,
+    value: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    let record = serde_json::json!({"label": label, "value": value});
+    let canonical = canonical_json_bytes(&record).map_err(LifecycleContractError::from)?;
+    Ok(Sha256::digest(canonical)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn fresh_clone_projection_evidence(
+    label: &str,
+    value: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    Ok(format!(
+        "evidence:{}",
+        fresh_clone_projection_digest(label, value)?
+    ))
+}
+
+/// Materialize a fresh-clone source packet from observed identities and owner callbacks.
+/// `source_root` is the resolved Python lifecycle module root serialized in owner paths.
+pub fn materialize_fresh_clone_source_projection_packet<G2Error, G3Error>(
+    candidate_sha: &str,
+    candidate_tree_sha: &str,
+    publication_sha: &str,
+    publication_tree_sha: &str,
+    source_root: &Path,
+    gate_owner_apis: &SourceProjectionGateOwnerApis<'_, G2Error, G3Error>,
+) -> Result<JsonValue, FreshCloneSourceProjectionError<G2Error, G3Error>> {
+    for (value, field) in [
+        (candidate_sha, "fresh_clone.candidate_sha"),
+        (candidate_tree_sha, "fresh_clone.candidate_tree_sha"),
+        (publication_sha, "fresh_clone.publication_sha"),
+        (publication_tree_sha, "fresh_clone.publication_tree_sha"),
+    ] {
+        pattern_value(&JsonValue::String(value.to_owned()), field, |text| {
+            lower_hex(text, 40)
+        })?;
+    }
+
+    let identity = serde_json::json!({
+        "candidate_sha": candidate_sha,
+        "candidate_tree_sha": candidate_tree_sha,
+        "publication_sha": publication_sha,
+        "publication_tree_sha": publication_tree_sha,
+    });
+    let input_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-input", &identity)?
+    );
+    let transaction_id = format!(
+        "tx:{}",
+        fresh_clone_projection_digest("fresh-clone-transaction", &identity)?
+    );
+    let snapshot_id = format!(
+        "snapshot:{}",
+        fresh_clone_projection_digest("fresh-clone-snapshot", &identity)?
+    );
+    let binding_evidence = fresh_clone_projection_evidence("fresh-clone-binding", &identity)?;
+    let binding_evidence_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-binding", &identity)?
+    );
+    let binding = serde_json::json!({
+        "transaction_id": transaction_id,
+        "snapshot_id": snapshot_id,
+        "candidate_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+        "input_digest": input_digest,
+        "tool_id": "update-agent-canon",
+        "tool_version": "fresh-clone-acceptance.v1",
+        "evidence_ref": binding_evidence,
+        "evidence_digest": binding_evidence_digest,
+        "timing": {
+            "started_at": "2026-01-01T00:00:00Z",
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false,
+        },
+    });
+    let checked_binding = validate_record_binding(&binding)?;
+    let base_identity = serde_json::json!({
+        "remote": "origin",
+        "ref": "refs/heads/main",
+        "commit_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+    });
+    let rebind_readback_evidence =
+        fresh_clone_projection_evidence("fresh-clone-origin-main-readback", &identity)?;
+    let rebind = materialize_source_main_rebind_receipt(
+        &checked_binding,
+        &base_identity,
+        &base_identity,
+        &rebind_readback_evidence,
+    )?;
+
+    let cas_evidence_digest = fresh_clone_projection_digest("fresh-clone-cas", &identity)?;
+    let cas_evidence_ref = format!("evidence:{cas_evidence_digest}");
+    let mut cas_binding = checked_binding.clone();
+    let cas_binding = cas_binding
+        .as_object_mut()
+        .expect("validated binding is an object");
+    cas_binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(cas_evidence_ref.clone()),
+    );
+    cas_binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(format!("sha256:{cas_evidence_digest}")),
+    );
+    let rebind_map = rebind
+        .as_object()
+        .expect("validated source-main rebind receipt is an object");
+    let binding_map = checked_binding
+        .as_object()
+        .expect("validated binding is an object");
+    let cas_receipt = serde_json::json!({
+        "schema": CANDIDATE_CAS_SCHEMA,
+        "cas_receipt_id": format!(
+            "cas:{}",
+            fresh_clone_projection_digest("fresh-clone-cas-id", &identity)?
+        ),
+        "binding": JsonValue::Object(cas_binding.clone()),
+        "predecessor_evidence_id": binding_map.get("evidence_ref").expect("validated binding has evidence"),
+        "rebind_receipt_evidence_id": rebind_map.get("rebind_receipt_id").expect("validated rebind has an ID"),
+        "candidate_identity": {
+            "candidate_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "cas_base_identity": {
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "cas_evidence_ref": cas_evidence_ref,
+        "cas_stage": "cas",
+    });
+    let cas = validate_candidate_cas_rebind_transition(&rebind, &cas_receipt)?;
+
+    let repository_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-remote-url", &identity)?
+    );
+    let branch_ref = "refs/heads/canon/fresh-clone-acceptance";
+    let lifecycle_evidence =
+        fresh_clone_projection_evidence("fresh-clone-pr-lifecycle", &identity)?;
+    let lifecycle_evidence_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-pr-lifecycle", &identity)?
+    );
+    let mut lifecycle_binding = checked_binding.clone();
+    let lifecycle_binding = lifecycle_binding
+        .as_object_mut()
+        .expect("validated binding is an object");
+    lifecycle_binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(lifecycle_evidence),
+    );
+    lifecycle_binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(lifecycle_evidence_digest),
+    );
+    let lifecycle = serde_json::json!({
+        "schema": PULL_REQUEST_LIFECYCLE_SCHEMA,
+        "kind": "user",
+        "binding": JsonValue::Object(lifecycle_binding.clone()),
+        "state": "merged",
+        "remote_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "remote_name": "origin",
+            "url_digest": repository_digest,
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "base_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": "refs/heads/main",
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "head_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "branch": pull_request_branch_table(),
+        "permission_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "permission_state": "verified_true",
+            "permission_evidence_id": fresh_clone_projection_evidence(
+                "fresh-clone-permission", &identity
+            )?,
+            "authority_source": "canonical fresh-clone acceptance fixture",
+            "assumption_forbidden": true,
+        },
+        "pr_essence": {
+            "problem": "exercise standalone source publication from a fresh clone",
+            "intent": "queue the observed AgentCanon source branch update",
+            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+            "contract_delta": "fresh-clone source PR",
+            "evidence_refs": [fresh_clone_projection_evidence(
+                "fresh-clone-pr-essence", &identity
+            )?],
+        },
+        "reviews": [],
+        "user_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "display_name": "Fresh Clone Acceptance",
+        },
+    });
+    let checked_lifecycle = validate_candidate_cas_pr_transition(&cas, &lifecycle)?;
+
+    let authoritative_pr_readback = serde_json::json!({
+        "number": 1,
+        "state": "MERGED",
+        "baseRefName": "main",
+        "baseRefOid": publication_sha,
+        "mergeCasBaseOid": candidate_sha,
+        "mergeCasBaseTreeOid": candidate_tree_sha,
+        "headRefName": "canon/fresh-clone-acceptance",
+        "headRefOid": candidate_sha,
+        "headRepository": {
+            "nameWithOwner": "fresh-clone-acceptance/agent-canon",
+        },
+        "mergeCommit": {"oid": publication_sha},
+        "mergeTreeOid": publication_tree_sha,
+    });
+    let readback = materialize_publication_readback_receipt(
+        &cas,
+        &checked_lifecycle,
+        &authoritative_pr_readback,
+    )?;
+
+    let g1_owner_path = "tools/repository/github/publication_integrator.py";
+    let g1_owner = format!(
+        "{}#resolve_publication_eligibility",
+        source_root.join(g1_owner_path).to_string_lossy()
+    );
+    let g1_output_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-g1", &identity)?
+    );
+    let g1 = materialize_gate_verdict(&GateVerdictInput {
+        binding: checked_binding.clone(),
+        gate_id: "G1".to_owned(),
+        ordered_input_evidence_refs: vec![binding_map
+            .get("evidence_ref")
+            .and_then(JsonValue::as_str)
+            .expect("validated binding has evidence")
+            .to_owned()],
+        invariant: "source_correctness".to_owned(),
+        output_digest: g1_output_digest,
+        owner: g1_owner,
+        verdict: "pass".to_owned(),
+        retry_reason: None,
+        next_checkpoint: None,
+    })?;
+
+    let check_results = gate_owner_apis
+        .generated_completeness_check_ids
+        .iter()
+        .map(|check_id| serde_json::json!({"check_id": check_id, "status": "pass"}))
+        .collect::<Vec<_>>();
+    let g2 = (gate_owner_apis.materialize_generated_completeness_receipt)(
+        &g1,
+        candidate_sha,
+        candidate_tree_sha,
+        &check_results,
+    )
+    .map_err(FreshCloneSourceProjectionError::G2Owner)?;
+    let upstream_gates = [g1.clone(), g2.clone()];
+    let g3 = (gate_owner_apis.materialize_pr_identity_gate)(
+        &checked_lifecycle,
+        &cas,
+        &rebind,
+        &upstream_gates,
+    )
+    .map_err(FreshCloneSourceProjectionError::G3Owner)?;
+
+    let predecessor_388 =
+        fresh_clone_projection_evidence("fresh-clone-predecessor-388", &identity)?;
+    let predecessor_389_digest =
+        fresh_clone_projection_digest("fresh-clone-predecessor-389", &identity)?;
+    let predecessor_389_sha = predecessor_389_digest[..40].to_owned();
+    let predecessor_389 = format!("evidence:{predecessor_389_digest}");
+    let acceptance_evidence_ref =
+        fresh_clone_projection_evidence("fresh-clone-frontier-acceptance", &identity)?;
+    let predecessors = [
+        serde_json::json!({
+            "queue_number": 388,
+            "source_pr": "#388",
+            "publication_evidence_id": predecessor_388,
+        }),
+        serde_json::json!({
+            "queue_number": 389,
+            "source_pr": "#389",
+            "source_pr_sha": predecessor_389_sha,
+            "publication_evidence_id": predecessor_389,
+        }),
+    ];
+    let gates = [g1, g2, g3];
+    materialize_source_projection_packet(&SourceProjectionPacketInput {
+        binding: &checked_binding,
+        source_main_rebind_receipt: &rebind,
+        candidate_cas_receipt: &cas,
+        pull_request_lifecycle: &checked_lifecycle,
+        publication_readback_receipt: &readback,
+        source_gate_verdicts: &gates,
+        ordered_predecessor_evidence: &predecessors,
+        acceptance_evidence_ref: &acceptance_evidence_ref,
+    })
+    .map_err(FreshCloneSourceProjectionError::Lifecycle)
 }
 
 #[derive(Clone, Copy)]
