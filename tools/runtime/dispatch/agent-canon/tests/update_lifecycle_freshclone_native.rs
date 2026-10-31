@@ -190,7 +190,7 @@ fn fresh_clone_projection_matches_recorded_owner_calls_packet_bytes_and_hash() {
             .as_array()
             .expect("frozen G2 check IDs are an array")
             .iter()
-            .map(|check_id| text(check_id))
+            .map(text)
             .collect::<Vec<_>>()
     );
 
