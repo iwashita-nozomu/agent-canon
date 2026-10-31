@@ -580,14 +580,14 @@ entries:
 
   - id: stablehlo-value-closure
     summary: Traces scoped StableHLO SSA value dependencies from JIT-canonical operational IR.
-    path: tools/analysis/proof/stablehlo_value_closure.py
+    path: tools/runtime/dispatch/agent-canon/src/stablehlo_value_closure.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/stablehlo_value_closure.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/stablehlo_value_closure.py"]}
+    command: tools/bin/agent-canon stablehlo-value-closure
+    dispatch: {argv: ["tools/bin/agent-canon", "stablehlo-value-closure"]}
     writes: false
     default_wiring:
       ci: false
@@ -600,6 +600,28 @@ entries:
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_stablehlo_value_closure.py
+
+  - id: theorem-graph-circularity-check
+    summary: Checks theorem graph circularity, proof-leaf origins, and forbidden reachability.
+    path: tools/runtime/dispatch/agent-canon/src/theorem_graph_circularity_check.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    audience: internal
+    placement: support_library
+    command: tools/bin/agent-canon theorem-graph-circularity-check
+    dispatch: {argv: ["tools/bin/agent-canon", "theorem-graph-circularity-check"]}
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - agents/skills/formal-proof-workflow.md
+      - agents/skills/algorithm-proof-exploration.md
+    tests:
+      - tests/agent_tools/test_theorem_graph_circularity_check.py
 
   - id: cpp-source-canonical-ir
     summary: Extracts source-only C++ records into the shared thin operational IR.

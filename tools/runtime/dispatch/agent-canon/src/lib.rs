@@ -42,5 +42,7 @@ pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod source_mutation;
+pub mod stablehlo_value_closure;
 pub mod theorem_graph_board;
+pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;
