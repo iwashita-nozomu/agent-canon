@@ -35,3 +35,6 @@ rustpython-ast = { version = "0.4.0", default-features = false, features = ["loc
 rustpython-parser = { version = "0.4.0", default-features = false, features = ["location", "num-bigint"] }
 
 lsp-server = "=0.10.0"
+
+scip = "=0.10.0"
+protobuf = "=3.7.2"
