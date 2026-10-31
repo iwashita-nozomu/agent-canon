@@ -119,6 +119,14 @@ language = "rust"
 summary = "Rust-native notebook quality checker for readable runnable demos."
 
 [[tool]]
+id = "check-algorithm-config-partition"
+classification = "internal"
+tool = "tools/runtime/dispatch/agent-canon/src/check_algorithm_config_partition.rs"
+doc = "documents/tools/check_algorithm_config_partition.md"
+language = "rust"
+summary = "Rust-native algorithm InitializeConfig/SolveConfig ownership and runtime-default checker."
+
+[[tool]]
 id = "github-publish"
 classification = "public"
 tool = "tools/repository/github/github_publish.py"
