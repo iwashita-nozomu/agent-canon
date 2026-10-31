@@ -139,6 +139,8 @@ catalog/checker owners rather than adding a second README registry.
 | catalog shape and docs wiring | `tools/bin/agent-canon tool-catalog` |
 | tool/workflow drift | `tools/bin/agent-canon tool-drift --root .` |
 | responsibility scope | `tools/bin/agent-canon responsibility-scope --root .` |
+| scoped StableHLO SSA closure | `tools/bin/agent-canon stablehlo-value-closure` |
+| theorem graph proof-frontier checks | `tools/bin/agent-canon theorem-graph-circularity-check` |
 | runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
 | archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
 | eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
