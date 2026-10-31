@@ -6,10 +6,9 @@
 // upstream test ../../../../../tests/fixtures/update_lifecycle/records_python_golden.json freezes CPython 3.12.3 inputs, outputs, and errors.
 // @dependency-end
 
-use agent_canon::update_lifecycle_contract::{
-    validate_checkpoint_receipt, validate_evidence_identity, validate_snapshot,
-    LifecycleContractError,
-};
+#[cfg(unix)]
+use agent_canon::update_lifecycle_contract::{validate_checkpoint_receipt, LifecycleContractError};
+use agent_canon::update_lifecycle_contract::{validate_evidence_identity, validate_snapshot};
 use serde_json::Value;
 
 #[cfg(unix)]
