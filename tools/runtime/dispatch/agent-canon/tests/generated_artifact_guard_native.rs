@@ -63,20 +63,18 @@ impl Drop for Fixture {
 }
 
 fn decode_hex(value: &str) -> Vec<u8> {
-    let digits = value.as_bytes().chunks_exact(2);
-    assert!(
-        digits.remainder().is_empty(),
-        "hex fixture has paired digits"
-    );
+    let (digits, remainder) = value.as_bytes().as_chunks::<2>();
+    assert!(remainder.is_empty(), "hex fixture has paired digits");
     digits
-        .map(|digits| {
+        .iter()
+        .map(|[high, low]| {
             let digit = |byte: u8| match byte {
                 b'0'..=b'9' => byte - b'0',
                 b'a'..=b'f' => byte - b'a' + 10,
                 b'A'..=b'F' => byte - b'A' + 10,
                 _ => panic!("fixture contains a non-hex digit"),
             };
-            digit(digits[0]) * 16 + digit(digits[1])
+            digit(*high) * 16 + digit(*low)
         })
         .collect()
 }
