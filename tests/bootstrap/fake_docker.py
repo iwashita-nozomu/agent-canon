@@ -385,6 +385,92 @@ def _run_source_free_resident_python(
     return result.returncode
 
 
+def _run_source_free_resident_native(
+    command: list[str],
+    exec_environment: dict[str, str],
+    container: dict,
+    runtime_root: Path,
+    workdir_container: str,
+) -> int:
+    """Execute the selected native CLI in the fake resident container."""
+    if runtime_root is None:
+        return 1
+    native = os.environ.get("FAKE_DOCKER_NATIVE_BIN", "")
+    binary = Path(native)
+    if not binary.is_file() or binary.is_symlink() or not os.access(binary, os.X_OK):
+        return 127
+    source_mount = next(
+        (
+            mount
+            for mount in container.get("Mounts", [])
+            if mount.get("Destination") == "/opt/agent-canon/source"
+        ),
+        None,
+    )
+    if source_mount is None:
+        return 1
+    source_root = Path(source_mount["Source"]).resolve()
+    source_container = Path("/opt/agent-canon/source")
+    mapped_args: list[str] = []
+    for value in command[1:]:
+        argument = Path(value)
+        try:
+            relative = argument.relative_to(source_container)
+        except ValueError:
+            try:
+                relative = argument.relative_to("/var/lib/agent-canon/runtime")
+            except ValueError:
+                mapped_args.append(value)
+            else:
+                mapped_args.append(str(runtime_root / relative))
+        else:
+            mapped_args.append(str(source_root / relative))
+    if workdir_container == str(source_container):
+        workdir = source_root
+    elif workdir_container == "/var/lib/agent-canon/runtime":
+        workdir = runtime_root
+    else:
+        workdir = runtime_root
+    environment = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": str(runtime_root.parent / "fake-home"),
+        "AGENT_CANON_SOURCE_ROOT": str(source_root),
+        "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+        "AGENT_CANON_PRIVATE_LOG_ROOT": str(runtime_root.parent / "private-log"),
+    }
+    Path(environment["HOME"]).mkdir(parents=True, exist_ok=True)
+    Path(environment["AGENT_CANON_PRIVATE_LOG_ROOT"]).mkdir(parents=True, exist_ok=True)
+    target_digest = exec_environment.get("AGENT_CANON_TARGET_DIGEST", "")
+    if target_digest:
+        state_path = runtime_root / "state.json"
+        if not state_path.is_file():
+            return 1
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        target = state.get("targets", {}).get(target_digest)
+        if not isinstance(target, dict) or target.get("mode") != "read-only":
+            return 1
+        target_root = target.get("host_root")
+        if (
+            not isinstance(target_root, str)
+            or target_root != exec_environment.get("AGENT_CANON_TARGET_HOST_ROOT")
+            or not Path(target_root).is_dir()
+        ):
+            return 1
+        environment["AGENT_CANON_TARGET_CONTAINER_ROOT"] = target_root
+        environment["AGENT_CANON_TARGET_DIGEST"] = target_digest
+    result = subprocess.run(
+        [str(binary), *mapped_args],
+        input=sys.stdin.buffer.read(),
+        capture_output=True,
+        cwd=workdir,
+        env=environment,
+        check=False,
+    )
+    sys.stdout.buffer.write(result.stdout)
+    sys.stderr.buffer.write(result.stderr)
+    return result.returncode
+
+
 def main(argv: list[str]) -> int:
     """Implement the small Docker command subset used by tests."""
     call_log = os.environ.get("FAKE_DOCKER_CALLS")
@@ -1340,6 +1426,7 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:1] == ["exec"]:
         index = argv.index("--workdir") + 2
+        workdir_container = argv[index - 1]
         exec_environment = {}
         while index < len(argv) and argv[index] == "--env":
             key, _, value = argv[index + 1].partition("=")
@@ -1416,13 +1503,13 @@ def main(argv: list[str]) -> int:
                 return 1
             sys.stdout.write(content)
             return 0
-        if (
-            len(command) >= 2
-            and command[0] == "python3"
-            and command[1].endswith("tools/agent/templates/template_bundle.py")
-        ):
-            return _run_source_free_resident_python(
-                command, exec_environment, found[1], runtime_root
+        if command and (command[0] == "/var/lib/agent-canon/cache/bin/agent-canon"):
+            return _run_source_free_resident_native(
+                command,
+                exec_environment,
+                found[1],
+                runtime_root,
+                workdir_container,
             )
         if (
             len(command) >= 2
