@@ -67,16 +67,17 @@ mod semantic_responsibility;
 pub mod skill_document_reader;
 mod skill_projection_registry;
 pub mod source_dependency_graph;
-mod stablehlo_value_closure;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
-mod theorem_graph_circularity_check;
 mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
+use agent_canon::{
+    catalog, run_evaluation, stablehlo_value_closure, theorem_graph_circularity_check,
+    tool_proof_coverage,
+};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
