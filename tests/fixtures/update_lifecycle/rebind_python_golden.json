@@ -1,0 +1,1120 @@
+{
+  "source": "e86a39e5cb0afa2de60234c11b39b701f0b9e530",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "positive": [
+    {
+      "name": "changed-base",
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "old_base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "new_base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "origin_main_readback_evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"input_identity\":{\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"tool\":\"cmd_latest\"},\"new_base_identity\":{\"commit_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\"},\"old_base_identity\":{\"commit_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"origin_main_readback\":{\"command\":\"git ls-remote origin refs/heads/main\",\"commit_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"evidence_ref\":\"evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\"},\"rebind_receipt_id\":\"rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69\",\"schema\":\"agent-canon.source-main-rebind-receipt.v1\"}",
+      "sha256": "3d1707eff13d052b628e2329108f48ad7edcb565aae4d2d2ffed72eb06fc09f2"
+    },
+    {
+      "name": "same-base",
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "old_base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "new_base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "origin_main_readback_evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:b0898a20a8379ef4a04ed932cd65181ebfbec6153dcda66cb97f2aa1796426c8",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"input_identity\":{\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"tool\":\"cmd_latest\"},\"new_base_identity\":{\"commit_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\"},\"old_base_identity\":{\"commit_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\"},\"origin_main_readback\":{\"command\":\"git ls-remote origin refs/heads/main\",\"commit_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"evidence_ref\":\"evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\"},\"rebind_receipt_id\":\"rebind:b0898a20a8379ef4a04ed932cd65181ebfbec6153dcda66cb97f2aa1796426c8\",\"schema\":\"agent-canon.source-main-rebind-receipt.v1\"}",
+      "sha256": "37492395c625c973e8ac06e13ee85ad8066e98ceb60cbdc9a8f0a17e9d2ab3e5"
+    }
+  ],
+  "validation_cases": [
+    {
+      "name": "missing-schema",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69"
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "source_main_rebind_receipt:schema"
+      }
+    },
+    {
+      "name": "extra-key",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1",
+        "unknown": true
+      },
+      "error": {
+        "code": "lifecycle:field_forbidden",
+        "detail": "source_main_rebind_receipt:unknown"
+      }
+    },
+    {
+      "name": "invalid-schema",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "unknown"
+      },
+      "error": {
+        "code": "lifecycle:schema_invalid",
+        "detail": "agent-canon.source-main-rebind-receipt.v1"
+      }
+    },
+    {
+      "name": "wrong-id-prefix",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "queue:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "source_main_rebind_receipt.rebind_receipt_id"
+      }
+    },
+    {
+      "name": "nonrecomputed-hash",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:0000000000000000000000000000000000000000000000000000000000000000",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:0000000000000000000000000000000000000000000000000000000000000000",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      }
+    },
+    {
+      "name": "wrong-tool",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "other"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:tool_id_invalid",
+        "detail": "source_main_rebind_receipt.input_identity.tool"
+      }
+    },
+    {
+      "name": "digest-mismatch",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "input_identity_mismatch",
+        "detail": "source_main_rebind_receipt.input_identity"
+      }
+    },
+    {
+      "name": "old-remote",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "upstream",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:source_main_identity_invalid",
+        "detail": "old_base_identity"
+      }
+    },
+    {
+      "name": "new-ref",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/topic",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:source_main_identity_invalid",
+        "detail": "new_base_identity"
+      }
+    },
+    {
+      "name": "new-ref-nonrefs",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:ref_invalid",
+        "detail": "source_main_rebind_receipt.new_base_identity.ref"
+      }
+    },
+    {
+      "name": "uppercase-commit",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "source_main_rebind_receipt.new_base_identity.commit_sha"
+      }
+    },
+    {
+      "name": "missing-tree",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "source_main_rebind_receipt.new_base_identity:tree_sha"
+      }
+    },
+    {
+      "name": "wrong-command",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git fetch origin main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:readback_command_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "readback-mismatch",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "0000000000000000000000000000000000000000",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:source_main_readback_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "invalid-evidence",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "missing",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "source_main_rebind_receipt.origin_main_readback.evidence_ref"
+      }
+    },
+    {
+      "name": "empty-remote",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": ""
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:string_invalid",
+        "detail": "source_main_rebind_receipt.origin_main_readback.remote"
+      }
+    },
+    {
+      "name": "binding-bool-attempt",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": true,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "input_identity": {
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+        },
+        "old_base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "evidence_ref": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:5ca9116de446646b90e462d124ce16a1cfd56e201f28dab025481821ab60ed69",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      },
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "binding.timing.attempt"
+      }
+    }
+  ]
+}
