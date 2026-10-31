@@ -1,0 +1,118 @@
+{
+  "source_commit": "3befe1bd7880105ebdfee3633099ce9f2fbdc1f3",
+  "source_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g6-packet-oracle-isolated-oybeq4lu/source/eval/checkers/compare_agent_run_paths.py",
+  "source_sha256": "cdd8a7f9cfe2377e43530c9e2cf1dc56bc629fc9ac21c2ae478f94aca3b04134",
+  "cases": [
+    {
+      "name": "candidate-inefficient",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "execution_path=new-tool-first route_efficiency=inefficient static_analysis_feedback=applied\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-inefficient/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-inefficient/candidate",
+      "exit": 1,
+      "stdout": "RUN_PATH_COMPARISON=fail\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=new-tool-first\nSELECTED_ROUTE_EFFICIENCY=inefficient\nSELECTED_INEFFICIENT_ROUTE=yes\nSTATIC_ANALYSIS_FEEDBACK=applied\nNEXT_ACTION=repair_skill_workflow_prompt\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: fail\n- paths_differ: yes\n- selected_execution_path: new-tool-first\n- selected_route_efficiency: inefficient\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-inefficient/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-inefficient/candidate | new-tool-first | inefficient | applied |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=fail\n- selected_inefficient_route=yes\n- route_efficiency=inefficient\n- static_analysis_feedback=applied\n"
+    },
+    {
+      "name": "candidate-efficient",
+      "baseline_text": "execution_path=parent-only route_efficiency=acceptable\n",
+      "candidate_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=recorded\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-efficient/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-efficient/candidate",
+      "exit": 0,
+      "stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=parent-only\nCANDIDATE_EXECUTION_PATH=reuse-first\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- paths_differ: yes\n- selected_execution_path: reuse-first\n- selected_route_efficiency: efficient\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-efficient/baseline | parent-only | acceptable | missing |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-efficient/candidate | reuse-first | efficient | recorded |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=pass\n- selected_inefficient_route=no\n- route_efficiency=efficient\n- static_analysis_feedback=recorded\n"
+    },
+    {
+      "name": "missing-candidate-file",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": null,
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-candidate-file/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-candidate-file/candidate",
+      "exit": 0,
+      "stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=unknown\nSELECTED_ROUTE_EFFICIENCY=unknown\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=missing\nNEXT_ACTION=record_static_analysis_feedback\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- paths_differ: yes\n- selected_execution_path: unknown\n- selected_route_efficiency: unknown\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-candidate-file/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-candidate-file/candidate | unknown | unknown | missing |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=pass\n- selected_inefficient_route=no\n- route_efficiency=unknown\n- static_analysis_feedback=missing\n"
+    },
+    {
+      "name": "missing-feedback",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "execution_path=preferred route_efficiency=preferred\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-feedback/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-feedback/candidate",
+      "exit": 0,
+      "stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=preferred\nSELECTED_ROUTE_EFFICIENCY=preferred\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=missing\nNEXT_ACTION=record_static_analysis_feedback\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- paths_differ: yes\n- selected_execution_path: preferred\n- selected_route_efficiency: preferred\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-feedback/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/missing-feedback/candidate | preferred | preferred | missing |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=pass\n- selected_inefficient_route=no\n- route_efficiency=preferred\n- static_analysis_feedback=missing\n"
+    },
+    {
+      "name": "unknown-tokens",
+      "baseline_text": null,
+      "candidate_text": "execution_path=other route_efficiency=uncertain static_analysis_feedback=unverified\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unknown-tokens/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unknown-tokens/candidate",
+      "exit": 0,
+      "stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=other\nSELECTED_ROUTE_EFFICIENCY=uncertain\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=unverified\nNEXT_ACTION=record_comparison_and_continue\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- paths_differ: yes\n- selected_execution_path: other\n- selected_route_efficiency: uncertain\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unknown-tokens/baseline | unknown | unknown | missing |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unknown-tokens/candidate | other | uncertain | unverified |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=pass\n- selected_inefficient_route=no\n- route_efficiency=uncertain\n- static_analysis_feedback=unverified\n"
+    },
+    {
+      "name": "case-first-match",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "EXECUTION_PATH=First execution_path=second ROUTE_EFFICIENCY=AVOIDABLE static_analysis_feedback=APPLIED\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/case-first-match/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/case-first-match/candidate",
+      "exit": 1,
+      "stdout": "RUN_PATH_COMPARISON=fail\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=first\nSELECTED_ROUTE_EFFICIENCY=avoidable\nSELECTED_INEFFICIENT_ROUTE=yes\nSTATIC_ANALYSIS_FEEDBACK=applied\nNEXT_ACTION=repair_skill_workflow_prompt\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: fail\n- paths_differ: yes\n- selected_execution_path: first\n- selected_route_efficiency: avoidable\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/case-first-match/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/case-first-match/candidate | first | avoidable | applied |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=fail\n- selected_inefficient_route=yes\n- route_efficiency=avoidable\n- static_analysis_feedback=applied\n"
+    },
+    {
+      "name": "unicode-boundaries",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "\u03b1execution_path=blocked \u0301execution_path=Combining route_efficiency=acceptable static_analysis_feedback=recorded\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unicode-boundaries/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unicode-boundaries/candidate",
+      "exit": 0,
+      "stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=combining\nSELECTED_ROUTE_EFFICIENCY=acceptable\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: pass\n- paths_differ: yes\n- selected_execution_path: combining\n- selected_route_efficiency: acceptable\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unicode-boundaries/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/unicode-boundaries/candidate | combining | acceptable | recorded |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=pass\n- selected_inefficient_route=no\n- route_efficiency=acceptable\n- static_analysis_feedback=recorded\n"
+    },
+    {
+      "name": "candidate-wasteful",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "execution_path=slow route_efficiency=wasteful\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-wasteful/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-wasteful/candidate",
+      "exit": 1,
+      "stdout": "RUN_PATH_COMPARISON=fail\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=slow\nSELECTED_ROUTE_EFFICIENCY=wasteful\nSELECTED_INEFFICIENT_ROUTE=yes\nSTATIC_ANALYSIS_FEEDBACK=missing\nNEXT_ACTION=repair_skill_workflow_prompt\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: fail\n- paths_differ: yes\n- selected_execution_path: slow\n- selected_route_efficiency: wasteful\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-wasteful/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-wasteful/candidate | slow | wasteful | missing |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=fail\n- selected_inefficient_route=yes\n- route_efficiency=wasteful\n- static_analysis_feedback=missing\n"
+    },
+    {
+      "name": "candidate-avoidable",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "execution_path=slow route_efficiency=avoidable\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-avoidable/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-avoidable/candidate",
+      "exit": 1,
+      "stdout": "RUN_PATH_COMPARISON=fail\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=slow\nSELECTED_ROUTE_EFFICIENCY=avoidable\nSELECTED_INEFFICIENT_ROUTE=yes\nSTATIC_ANALYSIS_FEEDBACK=missing\nNEXT_ACTION=repair_skill_workflow_prompt\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: fail\n- paths_differ: yes\n- selected_execution_path: slow\n- selected_route_efficiency: avoidable\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-avoidable/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-avoidable/candidate | slow | avoidable | missing |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=fail\n- selected_inefficient_route=yes\n- route_efficiency=avoidable\n- static_analysis_feedback=missing\n"
+    },
+    {
+      "name": "candidate-slow_path",
+      "baseline_text": "execution_path=reuse-first route_efficiency=efficient static_analysis_feedback=applied\n",
+      "candidate_text": "execution_path=slow route_efficiency=slow_path\n",
+      "baseline_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-slow_path/baseline",
+      "candidate_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-slow_path/candidate",
+      "exit": 1,
+      "stdout": "RUN_PATH_COMPARISON=fail\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=reuse-first\nCANDIDATE_EXECUTION_PATH=slow\nSELECTED_ROUTE_EFFICIENCY=slow_path\nSELECTED_INEFFICIENT_ROUTE=yes\nSTATIC_ANALYSIS_FEEDBACK=missing\nNEXT_ACTION=repair_skill_workflow_prompt\n",
+      "stderr": "",
+      "report": "# Agent Run Path Comparison\n<!--\n@dependency-start\nresponsibility Records two-run execution path comparison evidence.\nupstream implementation ../../eval/checkers/compare_agent_run_paths.py generates this report\n@dependency-end\n-->\n\n## Summary\n\n- comparison_status: fail\n- paths_differ: yes\n- selected_execution_path: slow\n- selected_route_efficiency: slow_path\n\n## Runs\n\n| Label | Run Directory | execution_path | route_efficiency | static_analysis_feedback |\n| ----- | ------------- | -------------- | ---------------- | ------------------------ |\n| baseline | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-slow_path/baseline | reuse-first | efficient | applied |\n| candidate | /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/run-path-comparison-native-n93xk30h/cases/candidate-slow_path/candidate | slow | slow_path | missing |\n\n## Workflow Monitoring Tokens\n\n- execution_path_comparison=fail\n- selected_inefficient_route=yes\n- route_efficiency=slow_path\n- static_analysis_feedback=missing\n"
+    }
+  ],
+  "intentional_context_mapping": "Replace each recorded absolute baseline/candidate input path by the corresponding current test input path. Replace only retired Python source edge in report header with native owner. Other bytes/exit unchanged."
+}
