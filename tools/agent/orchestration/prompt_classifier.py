@@ -565,7 +565,7 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "agent dashboard",
         "dashboard",
     ),
-    "log_surface_inventory.py": ("ログ項目", "log surface", "hook log"),
+    "log_surface_inventory.rs": ("ログ項目", "log surface", "hook log"),
     "run_repo_dependency_review.sh": (
         "run_repo_dependency_review.sh",
         "dependency review",
