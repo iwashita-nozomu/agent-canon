@@ -3,8 +3,11 @@
 //! This module is the authority foundation for later Rust-owned filesystem
 //! effects. It deliberately exposes no raw-path mutation operation.
 
+#[cfg(target_os = "linux")]
 use cap_std::fs::Dir;
+#[cfg(target_os = "linux")]
 use sha2::{Digest, Sha256};
+#[cfg(target_os = "linux")]
 use std::ffi::OsString;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -15,6 +18,7 @@ mod linux;
 #[cfg(not(target_os = "linux"))]
 mod unsupported;
 
+#[cfg(target_os = "linux")]
 const HANDOFF_SCHEMA: &str = "agent-canon.child-handoff.v1";
 const DEFAULT_HANDOFF_TTL: Duration = Duration::from_secs(900);
 
@@ -152,7 +156,14 @@ impl Sha256Digest {
             ));
         }
         let mut bytes = [0_u8; 32];
-        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
+        if !remainder.is_empty() {
+            return Err(AuthorityError::new(
+                ParentRootReject::ModuleInvalid,
+                "SHA-256 digest must contain 64 hexadecimal characters",
+            ));
+        }
+        for (index, pair) in pairs.iter().enumerate() {
             let high = hex_nibble(pair[0]).ok_or_else(|| {
                 AuthorityError::new(
                     ParentRootReject::ModuleInvalid,
@@ -217,6 +228,7 @@ impl SecretToken {
         &self.0
     }
 
+    #[cfg(target_os = "linux")]
     fn digest(&self) -> Sha256Digest {
         Sha256Digest(Sha256::digest(self.0.as_bytes()).into())
     }
@@ -247,6 +259,7 @@ impl Eq for SecretToken {}
 /// The canonical display path and already-opened directory capability.
 pub struct PhysicalRoot {
     pub(crate) path: PathBuf,
+    #[cfg(target_os = "linux")]
     pub(crate) directory: Dir,
     pub(crate) identity: FileIdentity,
 }
@@ -341,6 +354,7 @@ impl HandoffTransport {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn from_str(value: &str) -> Option<Self> {
         match value {
             "parent-local-file" => Some(Self::ParentLocalFile),
@@ -482,13 +496,21 @@ pub enum FileMode {
 pub struct ParentOwnedPathReceipt {
     lexical_path: PathBuf,
     physical_path: PathBuf,
+    #[cfg(target_os = "linux")]
     owner: OwnerRoot,
+    #[cfg(target_os = "linux")]
     owner_path: PathBuf,
+    #[cfg(target_os = "linux")]
     owner_identity: FileIdentity,
+    #[cfg(target_os = "linux")]
     purpose: NonEmptyTrimmedString,
+    #[cfg(target_os = "linux")]
     token_digest: Option<Sha256Digest>,
+    #[cfg(target_os = "linux")]
     parent_components: Vec<ComponentIdentity>,
+    #[cfg(target_os = "linux")]
     target: Option<TargetIdentity>,
+    #[cfg(target_os = "linux")]
     lexical_snapshot: Option<LexicalSnapshot>,
 }
 
@@ -502,18 +524,21 @@ impl ParentOwnedPathReceipt {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum OwnerRoot {
     Parent,
     GitCommon,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ComponentIdentity {
     pub(crate) name: OsString,
     pub(crate) identity: FileIdentity,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EntryKind {
     File,
@@ -522,12 +547,14 @@ pub(crate) enum EntryKind {
     Other,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct TargetIdentity {
     pub(crate) identity: FileIdentity,
     pub(crate) kind: EntryKind,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LexicalSnapshot {
     pub(crate) parent_path: PathBuf,
@@ -536,6 +563,7 @@ pub(crate) struct LexicalSnapshot {
     pub(crate) entry: Option<LexicalEntrySnapshot>,
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct LexicalEntrySnapshot {
     pub(crate) name: OsString,
@@ -692,10 +720,13 @@ impl ParentRootAttestor {
         request: &AttestationRequest,
     ) -> Result<AttestedParent, AuthorityError> {
         #[cfg(not(target_os = "linux"))]
-        return Err(AuthorityError::new(
-            ParentRootReject::UnsupportedPlatform,
-            "native parent-root authority currently requires Linux",
-        ));
+        {
+            let _ = request;
+            return Err(AuthorityError::new(
+                ParentRootReject::UnsupportedPlatform,
+                "native parent-root authority currently requires Linux",
+            ));
+        }
         #[cfg(target_os = "linux")]
         {
             if request.child_handoff_token.is_none() {
@@ -725,14 +756,17 @@ mod platform {
     };
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) fn digest_bytes(bytes: &[u8]) -> Sha256Digest {
     Sha256Digest(Sha256::digest(bytes).into())
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) fn digest_hex(bytes: &[u8]) -> String {
     digest_bytes(bytes).to_hex()
 }
 
+#[cfg(target_os = "linux")]
 pub(crate) fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut output = String::with_capacity(bytes.len() * 2);

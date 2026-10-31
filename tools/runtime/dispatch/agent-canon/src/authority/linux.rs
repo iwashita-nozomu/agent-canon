@@ -2506,12 +2506,15 @@ fn canonical_existing(path: &str) -> Result<PathBuf, AuthorityError> {
 }
 
 fn decode_hex(value: &str) -> Option<Vec<u8>> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return None;
     }
-    value
-        .as_bytes()
-        .chunks_exact(2)
+    let (pairs, remainder) = value.as_bytes().as_chunks::<2>();
+    if !remainder.is_empty() {
+        return None;
+    }
+    pairs
+        .iter()
         .map(|pair| {
             let high = hex(pair[0])?;
             let low = hex(pair[1])?;
