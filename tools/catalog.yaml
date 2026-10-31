@@ -1658,14 +1658,25 @@ entries:
 
   - id: materialize-agent-canon-pr-g2
     summary: Materializes the canonical G2 receipt from the ordered passing AgentCanon generated-completeness checks.
-    path: tools/validation/ci/checks/check_agent_canon_pr.py
+    path: tools/runtime/dispatch/agent-canon/src/generated_completeness.rs
     family: ci
     role: checker
     status: canonical
     audience: workflow
     placement: workflow_helper
-    command: python3 tools/validation/ci/checks/check_agent_canon_pr.py --g1-bundle <path> --source-root .
-    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_agent_canon_pr.py", "--g1-bundle", "<path>", "--source-root", "."]}
+    command: tools/bin/agent-canon materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
+    dispatch:
+      runtime: native
+      argv: [tools/bin/agent-canon, materialize-agent-canon-pr-g2]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
     writes: true
     default_wiring:
       ci: false
@@ -1674,7 +1685,9 @@ entries:
       - documents/agent-canon/agent-canon-update-route.md
       - agents/skills/agent-canon-update.md
     tests:
+      - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
       - tests/agent_tools/test_github_publish.py
+      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
