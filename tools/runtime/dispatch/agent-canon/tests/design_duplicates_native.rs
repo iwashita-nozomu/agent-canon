@@ -21,6 +21,9 @@ const PYTHON_GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/design_duplicates/python_golden.json");
 const PYTHON_GOLDEN_SHA256: &str =
     "9d39e8739fa7ff56c437873587131b40bf41fa1c993c3111488e224858e5e971";
+const NATIVE_PROGRAM: &str = "agent-canon docs find-redundant-designs";
+const PREFIX_USAGE: &str = "usage: agent-canon docs find-redundant-designs [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]";
+const PREFIX_HELP: &str = "usage: agent-canon docs find-redundant-designs [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\n\nDetect exact-duplicate design documents. The analyzer is read-only by default.\nReports are runtime artifacts and therefore require an explicit external\nruntime root (or its explicitly configured environment capability).\n``--delete`` is a separate source mutation operation and requires an exact\ntyped ``--mutation-capability-json``.\n\noptions:\n  -h, --help            show this help message and exit\n  --design-root DESIGN_ROOT\n                        Read-only design root (defaults to documents/design).\n  --delete              Delete redundant source files; requires an explicit\n                        mutation capability.\n  --mutation-capability-json MUTATION_CAPABILITY_JSON\n                        Exact typed source mutation capability JSON.\n  --runtime-root RUNTIME_ROOT\n                        External runtime root (or AGENT_CANON_RUNTIME_ROOT);\n                        never source-local.\n  --output OUTPUT       External report path; when omitted, a run-scoped file\n                        is created under the runtime root.\n";
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -67,6 +70,133 @@ fn native_duplicate_design_cli_matches_frozen_python_oracle() {
     for case in cases {
         run_oracle_case(case);
     }
+}
+
+#[test]
+fn native_duplicate_cli_matches_observed_argparse_prefixes() {
+    // These cases preserve the old CLI observations with only the native command
+    // label and temporary source/runtime roots substituted.
+    let help_temp = TempRoot::new();
+    let help_source = help_temp.source();
+    let (help_a, help_b) = write_duplicate_pair(&help_source);
+    let help = run_native_args(&help_source, &["--he".to_string()]);
+    assert_eq!(help.status.code(), Some(0));
+    assert_eq!(String::from_utf8_lossy(&help.stdout), PREFIX_HELP);
+    assert!(help.stderr.is_empty());
+    assert!(help_a.exists() && help_b.exists());
+    assert!(!help_temp.runtime().exists());
+
+    let data_temp = TempRoot::new();
+    let data_source = data_temp.source();
+    let data_runtime = data_temp.runtime();
+    let (data_a, data_b) = write_duplicate_pair(&data_source);
+    let data_design = data_source.join("documents/design");
+    let data_output = data_runtime.join("report.txt");
+    let data = run_native_args(
+        &data_source,
+        &[
+            "--des".to_string(),
+            data_design.display().to_string(),
+            "--runtime-r".to_string(),
+            data_runtime.display().to_string(),
+            "--out".to_string(),
+            "report.txt".to_string(),
+        ],
+    );
+    assert_eq!(data.status.code(), Some(0));
+    assert!(data.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&data.stdout),
+        format!("Report written to {}\n", data_output.display())
+    );
+    assert_eq!(
+        fs::read_to_string(&data_output).expect("prefix report is written"),
+        duplicate_pair_report(&data_design, false)
+    );
+    assert!(data_a.exists() && data_b.exists());
+
+    let delete_temp = TempRoot::new();
+    let delete_source = delete_temp.source();
+    let delete_runtime = delete_temp.runtime();
+    let (delete_a, delete_b) = write_duplicate_pair(&delete_source);
+    let delete_design = delete_source.join("documents/design");
+    let delete_output = delete_runtime.join("report.txt");
+    let delete = run_native_args(
+        &delete_source,
+        &[
+            "--des".to_string(),
+            delete_design.display().to_string(),
+            "--del".to_string(),
+            "--mutation-c".to_string(),
+            r#"{"allowed_paths": ["documents/design/b.md"], "purpose": "oracle", "authority": "issue-1630"}"#.to_string(),
+            "--runtime-r".to_string(),
+            delete_runtime.display().to_string(),
+            "--out".to_string(),
+            "report.txt".to_string(),
+        ],
+    );
+    assert_eq!(delete.status.code(), Some(0));
+    assert!(delete.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&delete.stdout),
+        format!("Report written to {}\n", delete_output.display())
+    );
+    assert_eq!(
+        fs::read_to_string(&delete_output).expect("delete-prefix report is written"),
+        duplicate_pair_report(&delete_design, true)
+    );
+    assert!(delete_a.exists());
+    assert!(!delete_b.exists());
+
+    for (arguments, detail) in [
+        (
+            vec!["--d".to_string()],
+            "ambiguous option: --d could match --design-root, --delete",
+        ),
+        (
+            vec!["--he=value".to_string()],
+            "argument -h/--help: ignored explicit argument 'value'",
+        ),
+    ] {
+        let temp = TempRoot::new();
+        let source = temp.source();
+        let (a, b) = write_duplicate_pair(&source);
+        let result = run_native_args(&source, &arguments);
+        assert_eq!(result.status.code(), Some(2));
+        assert!(result.stdout.is_empty());
+        assert_eq!(
+            String::from_utf8_lossy(&result.stderr),
+            format!("{PREFIX_USAGE}\n{NATIVE_PROGRAM}: error: {detail}\n")
+        );
+        assert!(a.exists() && b.exists());
+        assert!(!temp.runtime().exists());
+    }
+}
+
+fn write_duplicate_pair(source: &Path) -> (PathBuf, PathBuf) {
+    let design_root = source.join("documents/design");
+    fs::create_dir_all(&design_root).expect("design root is created");
+    let a = design_root.join("a.md");
+    let b = design_root.join("b.md");
+    fs::write(&a, "same").expect("first design is written");
+    fs::write(&b, "same").expect("second design is written");
+    (a, b)
+}
+
+fn duplicate_pair_report(design_root: &Path, delete: bool) -> String {
+    let a = design_root.join("a.md");
+    let b = design_root.join("b.md");
+    let mut report = format!(
+        "DUP_GROUP:\n  {}\n  {}\n  KEEP: {}\n  DELETE: {}\n\n",
+        a.display(),
+        b.display(),
+        a.display(),
+        b.display()
+    );
+    if delete {
+        report.push_str(&format!("\nDELETED:\n{}\n", b.display()));
+    }
+    report
 }
 
 fn run_oracle_case(case: &Value) {
@@ -200,6 +330,16 @@ fn run_cli(case: &Value, source: &Path, runtime: &Path) -> Output {
             .replace(old_runtime, &runtime.display().to_string());
         command.arg("--output").arg(output);
     }
+    command.output().expect("native duplicate CLI runs")
+}
+
+fn run_native_args(source: &Path, args: &[String]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
+    command
+        .args(["docs", "find-redundant-designs"])
+        .args(args)
+        .current_dir(source)
+        .env_remove("AGENT_CANON_RUNTIME_ROOT");
     command.output().expect("native duplicate CLI runs")
 }
 

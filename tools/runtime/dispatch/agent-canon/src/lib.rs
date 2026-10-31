@@ -23,6 +23,7 @@
 // downstream implementation template_bundle.rs owns native template package operations
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
+// downstream implementation python_cli_options.rs resolves Python-compatible long-option prefixes
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
@@ -69,6 +70,7 @@ pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
+pub(crate) mod python_cli_options;
 pub mod python_json;
 pub(crate) mod python_text;
 pub mod report_artifact_checks;

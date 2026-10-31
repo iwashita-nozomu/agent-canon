@@ -6,6 +6,8 @@
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
 // upstream implementation source_mutation.rs owns explicit capability-bound source rewrites
 // upstream implementation path_resolution.rs owns non-strict design-root path resolution
+// upstream implementation path_expansion.rs owns Python-compatible CLI user-home expansion
+// upstream implementation python_cli_options.rs resolves Python-compatible long-option prefixes
 // downstream implementation entrypoint_owner_map.rs owns the root entrypoint grammar subcommand
 // upstream design ../../../../../documents/contracts/template-bootstrap.md default bootstrap doc contract
 // upstream design ../../../../../documents/contracts/static-seed-export.md source-free static-seed contract
@@ -18,7 +20,8 @@
 // downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle
 // @dependency-end
 
-use crate::runtime_boundary::RuntimeArtifactBoundary;
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
+use crate::runtime_boundary::{RuntimeArtifactBoundary, RUNTIME_ROOT_ENV};
 use crate::source_mutation::SourceMutationCapability;
 use regex::{Captures, Regex};
 use serde_json::Value;
@@ -249,6 +252,28 @@ struct RedundantDesignArgs {
     output: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RedundantDesignOption {
+    Help,
+    DesignRoot,
+    Delete,
+    MutationCapabilityJson,
+    RuntimeRoot,
+    Output,
+}
+
+const REDUNDANT_DESIGN_OPTIONS: &[(&str, RedundantDesignOption)] = &[
+    ("--help", RedundantDesignOption::Help),
+    ("--design-root", RedundantDesignOption::DesignRoot),
+    ("--delete", RedundantDesignOption::Delete),
+    (
+        "--mutation-capability-json",
+        RedundantDesignOption::MutationCapabilityJson,
+    ),
+    ("--runtime-root", RedundantDesignOption::RuntimeRoot),
+    ("--output", RedundantDesignOption::Output),
+];
+
 enum RedundantDesignParse {
     Run(RedundantDesignArgs),
     Help,
@@ -308,15 +333,32 @@ fn run_redundant_designs(raw: &[String]) -> i32 {
             Err(error) => return redundant_design_runtime_error(error),
         };
 
-    let boundary = match RuntimeArtifactBoundary::for_source(
-        &source_root,
-        parsed.runtime_root.as_deref(),
-        true,
-    ) {
-        Ok(boundary) => boundary,
+    let requested_runtime_root = parsed.runtime_root.clone().or_else(|| {
+        std::env::var_os(RUNTIME_ROOT_ENV)
+            .filter(|value| !value.is_empty())
+            .and_then(|value| value.into_string().ok())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    });
+    let runtime_root = match requested_runtime_root
+        .as_deref()
+        .map(expand_cli_path)
+        .transpose()
+    {
+        Ok(path) => path,
         Err(error) => return redundant_design_runtime_error(error),
     };
-    let target = match admit_redundant_report_target(&boundary, parsed.output.as_deref()) {
+    let boundary =
+        match RuntimeArtifactBoundary::for_source(&source_root, runtime_root.as_deref(), true) {
+            Ok(boundary) => boundary,
+            Err(error) => return redundant_design_runtime_error(error),
+        };
+    let output = match parsed.output.as_deref().map(expand_cli_path).transpose() {
+        Ok(path) => path,
+        Err(error) => return redundant_design_runtime_error(error),
+    };
+    let target = match admit_redundant_report_target(&boundary, output.as_deref()) {
         Ok(target) => target,
         Err(error) => return redundant_design_runtime_error(error),
     };
@@ -357,53 +399,84 @@ fn parse_redundant_design_args(raw: &[String]) -> Result<RedundantDesignParse, S
     let mut unrecognized = Vec::new();
     while index < raw.len() {
         let argument = raw[index].as_str();
-        if matches!(argument, "-h" | "--help") {
+        if argument == "-h" {
             return Ok(RedundantDesignParse::Help);
-        }
-        if argument == "--delete" {
-            parsed.delete = true;
-            index += 1;
-            continue;
         }
 
         let (option, inline_value) = argument
             .split_once('=')
             .map_or((argument, None), |(option, value)| (option, Some(value)));
-        let option_slot = match option {
-            "--design-root" => Some(0),
-            "--mutation-capability-json" => Some(1),
-            "--runtime-root" => Some(2),
-            "--output" => Some(3),
-            _ => None,
-        };
-        let Some(option_slot) = option_slot else {
+        if !option.starts_with("--") || option == "--" {
             unrecognized.push(argument.to_string());
             index += 1;
             continue;
-        };
-        let value = match inline_value {
-            Some(value) => value.to_string(),
-            None => {
-                let Some(value) = raw.get(index + 1) else {
-                    return Err(format!(
-                        "argument {}: expected one argument",
-                        match option_slot {
-                            0 => "--design-root",
-                            1 => "--mutation-capability-json",
-                            2 => "--runtime-root",
-                            _ => "--output",
-                        }
-                    ));
-                };
+        }
+
+        let name = match resolve_long_option_prefix(option, REDUNDANT_DESIGN_OPTIONS) {
+            Ok(name) => name,
+            Err(LongOptionError::Unrecognized) => {
+                unrecognized.push(argument.to_string());
                 index += 1;
-                value.clone()
+                continue;
+            }
+            Err(LongOptionError::Ambiguous(matches)) => {
+                return Err(format!(
+                    "ambiguous option: {option} could match {}",
+                    matches.join(", ")
+                ));
             }
         };
-        match option_slot {
-            0 => parsed.design_root = PathBuf::from(value),
-            1 => parsed.mutation_capability_json = Some(value),
-            2 => parsed.runtime_root = Some(PathBuf::from(value)),
-            _ => parsed.output = Some(PathBuf::from(value)),
+        match name {
+            RedundantDesignOption::Help => {
+                return match inline_value {
+                    Some(value) => Err(format!(
+                        "argument -h/--help: ignored explicit argument '{value}'"
+                    )),
+                    None => Ok(RedundantDesignParse::Help),
+                };
+            }
+            RedundantDesignOption::Delete => {
+                if let Some(value) = inline_value {
+                    return Err(format!(
+                        "argument --delete: ignored explicit argument '{value}'"
+                    ));
+                }
+                parsed.delete = true;
+            }
+            option_name => {
+                let value = match inline_value {
+                    Some(value) => value.to_string(),
+                    None => {
+                        index += 1;
+                        let Some(value) = raw.get(index) else {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                redundant_design_option_label(option_name)
+                            ));
+                        };
+                        if value.starts_with("--") {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                redundant_design_option_label(option_name)
+                            ));
+                        }
+                        value.clone()
+                    }
+                };
+                match option_name {
+                    RedundantDesignOption::DesignRoot => parsed.design_root = PathBuf::from(value),
+                    RedundantDesignOption::MutationCapabilityJson => {
+                        parsed.mutation_capability_json = Some(value)
+                    }
+                    RedundantDesignOption::RuntimeRoot => {
+                        parsed.runtime_root = Some(PathBuf::from(value))
+                    }
+                    RedundantDesignOption::Output => parsed.output = Some(PathBuf::from(value)),
+                    RedundantDesignOption::Help | RedundantDesignOption::Delete => {
+                        unreachable!("flag options are handled before their values")
+                    }
+                }
+            }
         }
         index += 1;
     }
@@ -418,18 +491,25 @@ fn parse_redundant_design_args(raw: &[String]) -> Result<RedundantDesignParse, S
 }
 
 fn print_redundant_design_help() {
-    println!("{REDUNDANT_DESIGN_USAGE}");
-    println!("\nDetect exact-duplicate design documents.\n");
+    println!("{REDUNDANT_DESIGN_USAGE}\n");
+    println!("Detect exact-duplicate design documents. The analyzer is read-only by default.");
+    println!("Reports are runtime artifacts and therefore require an explicit external");
+    println!("runtime root (or its explicitly configured environment capability).");
+    println!("``--delete`` is a separate source mutation operation and requires an exact");
+    println!("typed ``--mutation-capability-json``.\n");
     println!("options:");
     println!("  -h, --help            show this help message and exit");
     println!("  --design-root DESIGN_ROOT");
     println!("                        Read-only design root (defaults to documents/design).");
-    println!("  --delete              Delete redundant source files; requires an explicit mutation capability.");
+    println!("  --delete              Delete redundant source files; requires an explicit");
+    println!("                        mutation capability.");
     println!("  --mutation-capability-json MUTATION_CAPABILITY_JSON");
     println!("                        Exact typed source mutation capability JSON.");
     println!("  --runtime-root RUNTIME_ROOT");
-    println!("                        External runtime root (or AGENT_CANON_RUNTIME_ROOT); never source-local.");
-    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file is created under the runtime root.");
+    println!("                        External runtime root (or AGENT_CANON_RUNTIME_ROOT);");
+    println!("                        never source-local.");
+    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file");
+    println!("                        is created under the runtime root.");
 }
 
 fn redundant_design_error(message: impl std::fmt::Display) -> i32 {
@@ -442,8 +522,20 @@ fn redundant_design_runtime_error(message: impl std::fmt::Display) -> i32 {
     redundant_design_error(format!("runtime_or_mutation_error: {message}"))
 }
 
+fn redundant_design_option_label(option: RedundantDesignOption) -> &'static str {
+    match option {
+        RedundantDesignOption::DesignRoot => "--design-root",
+        RedundantDesignOption::MutationCapabilityJson => "--mutation-capability-json",
+        RedundantDesignOption::RuntimeRoot => "--runtime-root",
+        RedundantDesignOption::Output => "--output",
+        RedundantDesignOption::Help | RedundantDesignOption::Delete => {
+            unreachable!("flag options do not take values")
+        }
+    }
+}
+
 fn resolve_design_root(raw: &Path, current_dir: &Path) -> Result<PathBuf, String> {
-    let expanded = expand_design_home(raw)?;
+    let expanded = expand_cli_path(raw)?;
     let absolute = if expanded.is_absolute() {
         expanded
     } else {
@@ -453,34 +545,8 @@ fn resolve_design_root(raw: &Path, current_dir: &Path) -> Result<PathBuf, String
         .map_err(|error| format!("cannot resolve design root {}: {error}", absolute.display()))
 }
 
-fn expand_design_home(path: &Path) -> Result<PathBuf, String> {
-    let Some(value) = path.to_str() else {
-        return Ok(path.to_path_buf());
-    };
-    let suffix = if value == "~" {
-        Some("")
-    } else if let Some(suffix) = value.strip_prefix("~/") {
-        Some(suffix)
-    } else if cfg!(windows) {
-        value.strip_prefix("~\\")
-    } else {
-        None
-    };
-    if suffix.is_none() && value.starts_with('~') {
-        return Err(format!("cannot expand design root: {}", path.display()));
-    }
-    match suffix {
-        Some(suffix) => {
-            #[cfg(windows)]
-            let home = std::env::var_os("USERPROFILE");
-            #[cfg(not(windows))]
-            let home = std::env::var_os("HOME");
-            let home =
-                home.ok_or_else(|| "home directory unavailable for design root".to_string())?;
-            Ok(PathBuf::from(home).join(suffix.trim_start_matches(['/', '\\'])))
-        }
-        None => Ok(path.to_path_buf()),
-    }
+fn expand_cli_path(path: &Path) -> Result<PathBuf, String> {
+    crate::path_expansion::expand_user_path(path).map_err(|error| error.to_string())
 }
 
 fn build_redundant_design_report(
