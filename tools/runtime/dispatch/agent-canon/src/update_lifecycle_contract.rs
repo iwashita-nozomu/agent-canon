@@ -4,12 +4,19 @@
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns update lifecycle meaning
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes and body hashes
 // upstream implementation ../../../../../tools/runtime/lifecycle/update_lifecycle_contract.py remains the full lifecycle owner until later slices migrate
+// upstream implementation ../src/python_json.rs owns Python-compatible DSV text and byte payload parsing
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
+// downstream test ../tests/update_lifecycle_dsv_native.rs freezes DSV envelope values, bytes, and errors
 // @dependency-end
 
-use crate::artifacts::artifact_identity::canonical_json_bytes;
+use crate::artifacts::artifact_identity::{canonical_json_bytes, ArtifactIdentityError};
+use crate::python_json::{
+    canonical_utf8_surrogate_position, contains_float, parse_json, parse_json_bytes,
+    parse_json_python_string, to_serde_json_value, JsonString as PythonJsonString,
+    JsonValue as PythonJsonValue,
+};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -57,6 +64,7 @@ const CHECKPOINT_IDS: &[&str] = &[
     "G6",
     "nested_lifecycle_cleanup",
 ];
+const DECISION_SUFFICIENCY_SCHEMA: &str = "agent-canon.decision-sufficiency.v1";
 const BINDING_FIELDS: &[&str] = &[
     "transaction_id",
     "snapshot_id",
@@ -124,6 +132,44 @@ impl From<crate::artifacts::artifact_identity::ArtifactIdentityError> for Lifecy
     fn from(error: crate::artifacts::artifact_identity::ArtifactIdentityError) -> Self {
         Self::new(error.code, error.detail)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecisionSufficiencyEnvelopeError {
+    Lifecycle(LifecycleContractError),
+    ArtifactIdentity(ArtifactIdentityError),
+    UnicodeEncodeError { message: String },
+}
+
+impl fmt::Display for DecisionSufficiencyEnvelopeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lifecycle(error) => fmt::Display::fmt(error, formatter),
+            Self::ArtifactIdentity(error) => fmt::Display::fmt(error, formatter),
+            Self::UnicodeEncodeError { message } => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for DecisionSufficiencyEnvelopeError {}
+
+impl From<LifecycleContractError> for DecisionSufficiencyEnvelopeError {
+    fn from(error: LifecycleContractError) -> Self {
+        Self::Lifecycle(error)
+    }
+}
+
+impl From<ArtifactIdentityError> for DecisionSufficiencyEnvelopeError {
+    fn from(error: ArtifactIdentityError) -> Self {
+        Self::ArtifactIdentity(error)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum DecisionSufficiencyInput<'a> {
+    Mapping(&'a PythonJsonValue),
+    Text(&'a PythonJsonString),
+    Bytes(&'a [u8]),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -591,6 +637,108 @@ pub fn binding_identity(
 ) -> Result<RecordBindingIdentity, LifecycleContractError> {
     let binding = validate_record_binding(value)?;
     binding_identity_from_validated(&binding)
+}
+
+fn dsv_envelope(value: &PythonJsonValue) -> Result<(), DsvEnvelopeError> {
+    let PythonJsonValue::Object(object) = value else {
+        return Err(fail("lifecycle:mapping_required", "decision_sufficiency_packet").into());
+    };
+    let schema = object
+        .0
+        .iter()
+        .rev()
+        .find(|(key, _)| key.equals_text("schema"))
+        .map(|(_, value)| value);
+    if !matches!(
+        schema,
+        Some(PythonJsonValue::String(value))
+            if value.equals_text(DECISION_SUFFICIENCY_SCHEMA)
+    ) {
+        return Err(fail("decision_sufficiency:envelope_schema_invalid", "").into());
+    }
+    Ok(())
+}
+
+fn dsv_json_invalid() -> DsvEnvelopeError {
+    fail("decision_sufficiency:envelope_json_invalid", "").into()
+}
+
+fn dsv_artifact_json_invalid(detail: String) -> DsvEnvelopeError {
+    DsvEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
+        code: "artifact_identity:json_invalid",
+        detail,
+    })
+}
+
+fn dsv_canonical_json_bytes(value: &PythonJsonValue) -> Result<Vec<u8>, DsvEnvelopeError> {
+    if contains_float(value) {
+        return Err(DsvEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
+            code: "artifact_identity:float_forbidden",
+            detail: String::new(),
+        }));
+    }
+    if let Some((position, codepoint)) =
+        canonical_utf8_surrogate_position(value).map_err(dsv_artifact_json_invalid)?
+    {
+        let escaped = format!("\\u{codepoint:04x}");
+        return Err(DsvEnvelopeError::UnicodeEncodeError {
+            message: format!(
+                "'utf-8' codec can't encode character '{escaped}' in position {position}: surrogates not allowed"
+            ),
+        });
+    }
+    let serde_value = to_serde_json_value(value).map_err(dsv_artifact_json_invalid)?;
+    canonical_json_bytes(&serde_value).map_err(DsvEnvelopeError::ArtifactIdentity)
+}
+
+fn clone_dsv_envelope(value: &PythonJsonValue) -> Result<PythonJsonValue, DsvEnvelopeError> {
+    let bytes = dsv_canonical_json_bytes(value)?;
+    parse_json_bytes(&bytes).map_err(|_| dsv_json_invalid())
+}
+
+fn parse_dsv_mapping(value: &PythonJsonValue) -> Result<PythonJsonValue, DsvEnvelopeError> {
+    dsv_envelope(value)?;
+    clone_dsv_envelope(value)
+}
+
+pub fn parse_decision_sufficiency_verdict(
+    payload: DsvEnvelopeInput<'_>,
+) -> Result<PythonJsonValue, DsvEnvelopeError> {
+    match payload {
+        DsvEnvelopeInput::Mapping(value) => parse_dsv_mapping(value),
+        DsvEnvelopeInput::Text(value) => {
+            let parsed = parse_json_python_string(value).map_err(|_| dsv_json_invalid())?;
+            parse_dsv_mapping(&parsed)
+        }
+        DsvEnvelopeInput::Bytes(value) => {
+            let parsed = parse_json_bytes(value).map_err(|_| dsv_json_invalid())?;
+            parse_dsv_mapping(&parsed)
+        }
+    }
+}
+
+pub fn serialize_decision_sufficiency_verdict(
+    packet: &PythonJsonValue,
+) -> Result<Vec<u8>, DsvEnvelopeError> {
+    dsv_envelope(packet)?;
+    dsv_canonical_json_bytes(packet)
+}
+
+pub fn import_decision_sufficiency_verdict(
+    payload: DsvEnvelopeInput<'_>,
+    expected_digest: Option<&str>,
+) -> Result<PythonJsonValue, DsvEnvelopeError> {
+    let packet = parse_decision_sufficiency_verdict(payload)?;
+    let bytes = dsv_canonical_json_bytes(&packet)?;
+    let digest = Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let digest = format!("sha256:{digest}");
+    if expected_digest.is_some_and(|expected| expected != digest) {
+        return Err(fail("decision_sufficiency:envelope_digest_mismatch", "").into());
+    }
+    Ok(packet)
 }
 
 #[derive(Clone, Copy)]
