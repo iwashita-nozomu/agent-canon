@@ -3,7 +3,8 @@
 // responsibility Verifies G6 close-agent owner composition against the frozen old Python API oracle.
 // upstream implementation ../src/agent_tool_calls.rs owns native G6 lifecycle policy.
 // upstream implementation ../src/update_lifecycle_contract.rs owns terminal receipt and token primitives.
-// upstream test ../../../../../tests/fixtures/update_lifecycle/g6_python_golden.json freezes direct old API premises and outputs.
+// upstream test ../../../../../tests/fixtures/update_lifecycle/g6_python_golden.json freezes the original direct old API oracle.
+// upstream test ../../../../../tests/fixtures/update_lifecycle/g6_portable_python_golden.json freezes portable direct old API premises and outputs.
 // @dependency-end
 
 use agent_canon::agent_tool_calls::{
@@ -14,8 +15,11 @@ use agent_canon::artifacts::artifact_identity::canonical_json_bytes;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+#[cfg(unix)]
 const GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/update_lifecycle/g6_python_golden.json");
+const PORTABLE_GOLDEN: &str =
+    include_str!("../../../../../tests/fixtures/update_lifecycle/g6_portable_python_golden.json");
 const OLD_G6_SOURCE_SUFFIX: &str = "/tools/agent/orchestration/tool_calls.py";
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -154,14 +158,9 @@ fn python_error_class(error: &CloseAgentToolCallError) -> &'static str {
     }
 }
 
-#[test]
-fn direct_g6_owner_cases_match_frozen_python_outputs_bytes_hashes_and_errors() {
-    let golden: Value =
-        serde_json::from_str(GOLDEN).expect("frozen G6 Python oracle fixture parses");
-    assert_eq!(
-        sha256_hex(GOLDEN.as_bytes()),
-        "93c22d933ad71d43fca186c233542f7babdfbe7382ab01036af75c4382c5a2d6"
-    );
+fn verify_direct_g6_cases(golden_json: &str, golden_sha256: &str) {
+    let golden: Value = serde_json::from_str(golden_json).expect("frozen G6 Python oracle parses");
+    assert_eq!(sha256_hex(golden_json.as_bytes()), golden_sha256);
     assert_eq!(
         golden["source"]["tool_calls_sha256"].as_str(),
         Some("09aadf364ac06f19aa5bdeb49b99db84a82c4b9deab800b1b0df7bd599ac2fc7")
@@ -248,4 +247,21 @@ fn direct_g6_owner_cases_match_frozen_python_outputs_bytes_hashes_and_errors() {
     }
     assert_eq!(accepted, 1);
     assert_eq!(rejected, 9);
+}
+
+#[cfg(unix)]
+#[test]
+fn original_posix_g6_owner_cases_match_frozen_python_outputs_and_errors() {
+    verify_direct_g6_cases(
+        GOLDEN,
+        "93c22d933ad71d43fca186c233542f7babdfbe7382ab01036af75c4382c5a2d6",
+    );
+}
+
+#[test]
+fn portable_g6_owner_cases_match_frozen_python_outputs_and_errors_on_every_host() {
+    verify_direct_g6_cases(
+        PORTABLE_GOLDEN,
+        "69012a989b68502acdd74bcce70ac06f00a7787798dd7ce6c4cfbee1167cc003",
+    );
 }
