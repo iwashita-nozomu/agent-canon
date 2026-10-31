@@ -20,6 +20,7 @@ const PYTHON_ORACLE: &str =
     include_str!("../../../../../tests/fixtures/generated_artifact_guard/python_golden.json");
 
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
+const EMPTY_GLOBAL_GIT_CONFIG: &str = ".agent-canon-test-empty-global-gitconfig";
 
 const PORTABLE_ORACLE_CASES: &[&str] = &[
     "tracked-generated-report",
@@ -90,9 +91,9 @@ fn path_from_bytes(path: &[u8]) -> PathBuf {
 }
 
 fn empty_global_git_config(root: &Path) -> PathBuf {
-    let path = root.join(".agent-canon-test-empty-global-gitconfig");
+    let path = root.join(EMPTY_GLOBAL_GIT_CONFIG);
     fs::write(&path, b"").expect("write empty global Git config");
-    path
+    PathBuf::from(EMPTY_GLOBAL_GIT_CONFIG)
 }
 
 fn fixture_command(root: &Path, program: &str) -> Command {
@@ -147,7 +148,9 @@ fn initialize_repository(root: &Path) {
     let output = git(root, &["init", "-q"]);
     assert!(
         output.status.success(),
-        "Git fixture command failed (git init -q): status={:?}, stdout={:?}, stderr={:?}",
+        "Git fixture command failed (git init -q): root={:?}, GIT_CONFIG_GLOBAL={:?}, status={:?}, stdout={:?}, stderr={:?}",
+        root,
+        EMPTY_GLOBAL_GIT_CONFIG,
         output.status,
         output.stdout,
         output.stderr
