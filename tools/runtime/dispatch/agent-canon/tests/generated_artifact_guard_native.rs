@@ -166,12 +166,14 @@ fn prepare_fixture(case: &Value, root: &Path) -> Result<(), io::Error> {
     if case["name"] != "plain-non-git-root" {
         initialize_repository(root);
     }
-    write_ignore_patterns(
-        root,
-        case["ignore_patterns_hex"]
-            .as_array()
-            .expect("ignore patterns are a list"),
-    );
+    if let Some(patterns) = case.get("ignore_patterns_hex") {
+        write_ignore_patterns(
+            root,
+            patterns
+                .as_array()
+                .expect("ignore patterns are a list when present"),
+        );
+    }
     for fixture_file in case["fixture_files"]
         .as_array()
         .expect("fixture files are a list")
