@@ -1931,13 +1931,20 @@ def materialize_fresh_clone_source_projection_packet(
         },
     )
 
+    g1_owners = cast(tuple[str, ...], GATE_CONTRACTS["G1"]["owners"])
+    g1_owner_contract = g1_owners[0]
+    g1_owner_path, g1_owner_symbol = g1_owner_contract.split("#", maxsplit=1)
+    g1_owner = (
+        f"{(Path(__file__).resolve().parents[3] / g1_owner_path).resolve()}#"
+        f"{g1_owner_symbol}"
+    )
     g1 = materialize_gate_verdict(
         binding=checked_binding,
         gate_id="G1",
         ordered_input_evidence_refs=[checked_binding["evidence_ref"]],
         invariant="source_correctness",
         output_digest="sha256:" + digest("fresh-clone-g1", identity),
-        owner=f"{Path(__file__).resolve().with_name('publication_integrator.py')}#resolve_publication_eligibility",
+        owner=g1_owner,
         verdict="pass",
     )
     g2 = gate_owner_apis.materialize_generated_completeness_receipt(
