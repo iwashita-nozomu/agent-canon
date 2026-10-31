@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 36c2442657835c72fd3fe8e611a9b92ce22c724d64302ca261d838eda3d23b85
+# source canonical digest: 5265eeffadff91df148163438ac147ba24f4d3fb3c087c9569f52666827bf7ec
 
 name = "python_reviewer"
 description = "Read-only reviewer for Python diffs, type boundaries, and parent-selected validation evidence."
