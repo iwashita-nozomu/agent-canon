@@ -177,9 +177,12 @@ run_contracts() {
     tests.agent_tools.test_structured_document_inventory_cli \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
+    tests.agent_tools.test_check_convention_compliance \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_tool_drift \
     tests/agent_tools/test_dependency_*.py
+  AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
+    python3 -m pytest -p no:cacheprovider -q tests/agent_tools/test_evaluate_agent_run.py
   python3 -m pytest -p no:cacheprovider \
     tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
