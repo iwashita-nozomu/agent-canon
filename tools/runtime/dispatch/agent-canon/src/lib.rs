@@ -13,6 +13,7 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -36,6 +37,7 @@
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
+// downstream test ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
 // downstream test template_tests.rs validates native Template APIs
@@ -58,6 +60,7 @@ pub mod git_dependency_diff_summary;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod native_release;
+pub mod owner_guarantee;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
