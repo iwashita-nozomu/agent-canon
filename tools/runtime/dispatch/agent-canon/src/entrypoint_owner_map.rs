@@ -757,37 +757,7 @@ fn io_error_name(error: &std::io::Error) -> &'static str {
 }
 
 fn python_string_repr(value: &str) -> String {
-    let quote = if value.contains('\'') && !value.contains('"') {
-        '"'
-    } else {
-        '\''
-    };
-    let mut rendered = String::from(quote);
-    for character in value.chars() {
-        match character {
-            '\\' => rendered.push_str("\\\\"),
-            character if character == quote => {
-                rendered.push('\\');
-                rendered.push(character);
-            }
-            '\t' => rendered.push_str("\\t"),
-            '\n' => rendered.push_str("\\n"),
-            '\r' => rendered.push_str("\\r"),
-            character if character.is_control() => {
-                let codepoint = character as u32;
-                if codepoint <= 0xff {
-                    rendered.push_str(&format!("\\x{codepoint:02x}"));
-                } else if codepoint <= 0xffff {
-                    rendered.push_str(&format!("\\u{codepoint:04x}"));
-                } else {
-                    rendered.push_str(&format!("\\U{codepoint:08x}"));
-                }
-            }
-            character => rendered.push(character),
-        }
-    }
-    rendered.push(quote);
-    rendered
+    rustpython_ast::Constant::Str(value.to_owned()).to_string()
 }
 
 fn python_strip(value: &str) -> &str {
