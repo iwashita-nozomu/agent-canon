@@ -4,17 +4,18 @@ contract reference
 responsibility Routes repository search requests to native text, semantic-index, catalog, dependency, or LSP owners without combining their results.
 upstream design ../../tools/README.md shared tool command surface
 upstream design ../../tools/README.md operator-facing tool guide
-downstream implementation ../../tools/analysis/search/search.py routes explicit providers
-downstream implementation ../../tools/analysis/dependencies/graph_client.py owns source-derived dependency context
-downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns code facts and bounded LSP discovery
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_search.rs routes explicit providers
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs owns source-derived dependency context
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs owns code facts and bounded LSP discovery
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/semantic_index/mod.rs owns semantic-index search
-downstream implementation ../../tests/agent_tools/test_search.py validates provider routing and failure semantics
+downstream implementation ../../tests/agent_tools/test_search.py validates CLI input and provider routing
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_search_tests.rs validates in-process provider composition and LSP behavior
 @dependency-end
 -->
 
 # Repository Search
 
-`tools/analysis/search/search.py` is the public AgentCanon search entrypoint and
+`tools/bin/agent-canon agent-search` is the public AgentCanon search entrypoint and
 a thin router to existing owners. It runs only the selected providers and
 returns their results separately. It does not build local cards, implement a
 ranker, or combine provider scores.
@@ -29,10 +30,10 @@ a failure: search does not build an index or silently fall back to text.
 | Provider | Owner and behavior |
 | --- | --- |
 | `text` | Git `grep` over the selected or default repository surfaces. This is exact text/regex matching, not relevance ranking. |
-| `semantic` | Rust `agent-canon semantic-index search`. It reads the selected semantic-index cache and returns that owner's result and failure status. |
+| `semantic` | Rust `tools/bin/agent-canon semantic-index search`. It reads the selected semantic-index cache and returns that owner's result and failure status. |
 | `tool` | Git `grep` restricted to `tools/catalog.yaml`, the canonical tool catalog. |
 | `header-deps` | `GraphClient` source-derived dependency context for the supplied source path. It does not parse dependency headers again or require a persisted graph. |
-| `code-deps` | One-shot LSP facts from `lsp_code_analysis.py`, filtered by a case-insensitive literal query over native symbol/relation/candidate fields. It does not rank results or fall back to a Python AST call approximation. |
+| `code-deps` | One-shot LSP facts from the native `lsp_code_analysis` API, filtered by a Unicode case-folded literal query over symbol/relation/candidate fields. It does not rank results or fall back to a Python AST call approximation. |
 
 When multiple providers are explicitly selected, their result blocks remain
 independent. A failure from one selected provider is reported as a failure; it
@@ -60,13 +61,13 @@ query contracts.
 Examples:
 
 ```bash
-python3 tools/analysis/search/search.py \
+tools/bin/agent-canon agent-search \
   --query 'dependency|graph' --regex --word-regexp --providers text --format json
 
-python3 tools/analysis/search/search.py \
+tools/bin/agent-canon agent-search \
   --query-file reports/search-patterns.txt --providers text --format json
 
-python3 tools/analysis/search/search.py \
+tools/bin/agent-canon agent-search \
   --query 'semantic-index' --providers tool --format json
 ```
 
@@ -81,13 +82,13 @@ Use the semantic owner only when semantic repository retrieval is the actual
 intent and its index is available for the selected source surface:
 
 ```bash
-python3 tools/analysis/search/search.py \
+tools/bin/agent-canon agent-search \
   --purpose 'find responsibility scope tooling' \
   --providers semantic --format json
 ```
 
 Building or repairing a semantic index is a separate explicit
-`agent-canon semantic-index build` operation. `search.py` does not refresh an
+`tools/bin/agent-canon semantic-index build` operation. `agent-search` does not refresh an
 index as a side effect. Semantic-index cache, provider, source identity, and
 stale-state semantics remain owned by [Semantic Index](semantic_index.md).
 
@@ -95,16 +96,16 @@ Dependency context uses an exact source path rather than a natural-language
 ranker:
 
 ```bash
-python3 tools/analysis/search/search.py \
-  --query tools/analysis/search/search.py --providers header-deps --format json
+tools/bin/agent-canon agent-search \
+  --query documents/tools/search-coordination.md --providers header-deps --format json
 ```
 
 For code facts, select paths and use the LSP owner:
 
 ```bash
-python3 tools/analysis/search/search.py \
+tools/bin/agent-canon agent-search \
   --query 'target_symbol' --providers code-deps \
-  --surface tools/analysis/search/search.py --format json
+  --surface tools/runtime/dispatch/agent-canon/src/agent_search.rs --format json
 ```
 
 Code analysis failures remain visible and typed. Exact text search, semantic

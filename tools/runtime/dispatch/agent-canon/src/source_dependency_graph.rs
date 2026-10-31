@@ -8,7 +8,7 @@
 // downstream implementation main.rs dispatches the native source dependency review command
 // downstream implementation ../../../../analysis/dependencies/graph_client.py exposes source-derived dependency query and context compatibility
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
-// downstream implementation ../../../../analysis/search/search.py routes selected dependency requests through the source graph owner
+// downstream implementation agent_search.rs routes selected dependency requests through the source graph owner
 // downstream implementation ../../../../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
 // downstream implementation ../../../../../tests/agent_tools/test_dependency_graph_cycles.py verifies snapshot and normal-path boundaries
 // @dependency-end
