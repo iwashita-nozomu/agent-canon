@@ -89,6 +89,9 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
     "retry_reason",
     "next_checkpoint",
 ];
+const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
+const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
+const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
 pub const SOURCE_MAIN_REBIND_SCHEMA: &str = "agent-canon.source-main-rebind-receipt.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -588,6 +591,535 @@ pub fn binding_identity(
 ) -> Result<RecordBindingIdentity, LifecycleContractError> {
     let binding = validate_record_binding(value)?;
     binding_identity_from_validated(&binding)
+}
+
+#[derive(Clone, Copy)]
+struct CandidateStageSpec {
+    field: &'static str,
+    schema: &'static str,
+    receipt_id_field: &'static str,
+    receipt_id_prefix: &'static str,
+    stage_field: &'static str,
+    stage_value: &'static str,
+    extra_fields: &'static [&'static str],
+}
+
+const CANDIDATE_FREEZE_SPEC: CandidateStageSpec = CandidateStageSpec {
+    field: "candidate_freeze_receipt",
+    schema: CANDIDATE_FREEZE_SCHEMA,
+    receipt_id_field: "freeze_receipt_id",
+    receipt_id_prefix: "freeze:",
+    stage_field: "freeze_stage",
+    stage_value: "candidate_freeze",
+    extra_fields: &["freeze_evidence_ref"],
+};
+const CANDIDATE_REVIEW_SPEC: CandidateStageSpec = CandidateStageSpec {
+    field: "candidate_review_receipt",
+    schema: CANDIDATE_REVIEW_SCHEMA,
+    receipt_id_field: "review_receipt_id",
+    receipt_id_prefix: "review:",
+    stage_field: "review_stage",
+    stage_value: "independent_exact_review",
+    extra_fields: &["reviewer_id", "independent_review_evidence_ref"],
+};
+const CANDIDATE_CAS_SPEC: CandidateStageSpec = CandidateStageSpec {
+    field: "candidate_cas_receipt",
+    schema: CANDIDATE_CAS_SCHEMA,
+    receipt_id_field: "cas_receipt_id",
+    receipt_id_prefix: "cas:",
+    stage_field: "cas_stage",
+    stage_value: "cas",
+    extra_fields: &["cas_base_identity", "cas_evidence_ref"],
+};
+
+fn validate_candidate_identity(
+    value: &JsonValue,
+    field: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let identity = mapping(value, field)?;
+    exact_keys(identity, &["candidate_sha", "tree_sha"], &[], field)?;
+    pattern_value(
+        required_value(identity, "candidate_sha", field)?,
+        &format!("{field}.candidate_sha"),
+        |text| lower_hex(text, 40),
+    )?;
+    pattern_value(
+        required_value(identity, "tree_sha", field)?,
+        &format!("{field}.tree_sha"),
+        |text| lower_hex(text, 40),
+    )?;
+    canonical_clone(value)
+}
+
+fn candidate_matches_binding(
+    candidate: &JsonValue,
+    binding: &JsonValue,
+    field: &str,
+) -> Result<(), LifecycleContractError> {
+    let binding = validate_record_binding(binding)?;
+    let candidate = mapping(candidate, &format!("{field}.candidate_identity"))?;
+    let binding = mapping(&binding, "binding")?;
+    for key in ["candidate_sha", "tree_sha"] {
+        if required_value(candidate, key, &format!("{field}.candidate_identity"))?
+            != required_value(binding, key, "binding")?
+        {
+            return Err(fail("lifecycle:candidate_identity_mismatch", field));
+        }
+    }
+    Ok(())
+}
+
+fn validate_candidate_stage_receipt(
+    value: &JsonValue,
+    spec: CandidateStageSpec,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, spec.field)?;
+    let mut required_fields = vec![
+        "schema",
+        spec.receipt_id_field,
+        "binding",
+        "predecessor_evidence_id",
+        "rebind_receipt_evidence_id",
+        "candidate_identity",
+    ];
+    required_fields.extend_from_slice(spec.extra_fields);
+    required_fields.push(spec.stage_field);
+    exact_keys(receipt, &required_fields, &[], spec.field)?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(spec.schema) {
+        return Err(fail("lifecycle:schema_invalid", spec.schema));
+    }
+    let receipt_id = pattern_value(
+        required_value(receipt, spec.receipt_id_field, spec.field)?,
+        &format!("{}.{}", spec.field, spec.receipt_id_field),
+        valid_hash_id,
+    )?;
+    if !receipt_id.starts_with(spec.receipt_id_prefix) {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            &format!("{}.{}", spec.field, spec.receipt_id_field),
+        ));
+    }
+    let binding = validate_record_binding(required_value(receipt, "binding", spec.field)?)?;
+    pattern_value(
+        required_value(receipt, "predecessor_evidence_id", spec.field)?,
+        &format!("{}.predecessor_evidence_id", spec.field),
+        valid_evidence_ref,
+    )?;
+    let rebind_id = pattern_value(
+        required_value(receipt, "rebind_receipt_evidence_id", spec.field)?,
+        &format!("{}.rebind_receipt_evidence_id", spec.field),
+        valid_hash_id,
+    )?;
+    if !rebind_id.starts_with("rebind:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            &format!("{}.rebind_receipt_evidence_id", spec.field),
+        ));
+    }
+    let candidate = validate_candidate_identity(
+        required_value(receipt, "candidate_identity", spec.field)?,
+        &format!("{}.candidate_identity", spec.field),
+    )?;
+    candidate_matches_binding(&candidate, &binding, spec.field)?;
+    if required_value(receipt, spec.stage_field, spec.field)?.as_str() != Some(spec.stage_value) {
+        return Err(fail("lifecycle:stage_invalid", spec.field));
+    }
+    canonical_clone(value)
+}
+
+pub fn validate_candidate_freeze_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = validate_candidate_stage_receipt(value, CANDIDATE_FREEZE_SPEC)?;
+    let mapping = mapping(&receipt, CANDIDATE_FREEZE_SPEC.field)?;
+    pattern_value(
+        required_value(mapping, "freeze_evidence_ref", CANDIDATE_FREEZE_SPEC.field)?,
+        "candidate_freeze_receipt.freeze_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    Ok(receipt)
+}
+
+pub fn validate_candidate_review_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = validate_candidate_stage_receipt(value, CANDIDATE_REVIEW_SPEC)?;
+    let mapping = mapping(&receipt, CANDIDATE_REVIEW_SPEC.field)?;
+    let reviewer_id = required_string(mapping, "reviewer_id", CANDIDATE_REVIEW_SPEC.field)?;
+    if !reviewer_id.starts_with("reviewer:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "candidate_review_receipt.reviewer_id",
+        ));
+    }
+    pattern_value(
+        required_value(
+            mapping,
+            "independent_review_evidence_ref",
+            CANDIDATE_REVIEW_SPEC.field,
+        )?,
+        "candidate_review_receipt.independent_review_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    Ok(receipt)
+}
+
+fn validate_candidate_cas_base_identity(value: &JsonValue) -> Result<(), LifecycleContractError> {
+    let field = "candidate_cas_receipt.cas_base_identity";
+    let identity = mapping(value, field)?;
+    exact_keys(identity, &["commit_sha", "tree_sha"], &[], field)?;
+    pattern_value(
+        required_value(identity, "commit_sha", field)?,
+        "candidate_cas_receipt.cas_base_identity.commit_sha",
+        |text| lower_hex(text, 40),
+    )?;
+    pattern_value(
+        required_value(identity, "tree_sha", field)?,
+        "candidate_cas_receipt.cas_base_identity.tree_sha",
+        |text| lower_hex(text, 40),
+    )?;
+    Ok(())
+}
+
+pub fn validate_candidate_cas_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = validate_candidate_stage_receipt(value, CANDIDATE_CAS_SPEC)?;
+    let mapping = mapping(&receipt, CANDIDATE_CAS_SPEC.field)?;
+    validate_candidate_cas_base_identity(required_value(
+        mapping,
+        "cas_base_identity",
+        CANDIDATE_CAS_SPEC.field,
+    )?)?;
+    pattern_value(
+        required_value(mapping, "cas_evidence_ref", CANDIDATE_CAS_SPEC.field)?,
+        "candidate_cas_receipt.cas_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    Ok(receipt)
+}
+
+fn same_binding(
+    left: &JsonValue,
+    right: &JsonValue,
+    field: &str,
+) -> Result<(), LifecycleContractError> {
+    if binding_identity(left)? != binding_identity(right)? {
+        return Err(fail("input_identity_mismatch", field));
+    }
+    Ok(())
+}
+
+fn validate_candidate_stage_transition(
+    previous: &JsonValue,
+    current: &JsonValue,
+    field: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let previous = mapping(previous, field)?;
+    let current = mapping(current, field)?;
+    same_binding(
+        required_value(previous, "binding", field)?,
+        required_value(current, "binding", field)?,
+        field,
+    )?;
+    if required_value(previous, "candidate_identity", field)?
+        != required_value(current, "candidate_identity", field)?
+    {
+        return Err(fail("lifecycle:candidate_identity_mismatch", field));
+    }
+    let previous_binding = mapping(required_value(previous, "binding", field)?, "binding")?;
+    if required_value(current, "predecessor_evidence_id", field)?
+        != required_value(previous_binding, "evidence_ref", "binding")?
+    {
+        return Err(fail("lifecycle:predecessor_mismatch", field));
+    }
+    if required_value(current, "rebind_receipt_evidence_id", field)?
+        != required_value(previous, "rebind_receipt_evidence_id", field)?
+    {
+        return Err(fail("lifecycle:rebind_mismatch", field));
+    }
+    Ok(JsonValue::Object(current.clone()))
+}
+
+pub fn validate_candidate_freeze_transition(
+    rebind: &JsonValue,
+    freeze: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_rebind = validate_source_main_rebind_receipt(rebind)?;
+    let checked_freeze = validate_candidate_freeze_receipt(freeze)?;
+    let rebind_map = mapping(&checked_rebind, "source_main_rebind_receipt")?;
+    let freeze_map = mapping(&checked_freeze, "candidate_freeze_receipt")?;
+    same_binding(
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        required_value(freeze_map, "binding", "candidate_freeze_receipt")?,
+        "candidate_freeze",
+    )?;
+    let rebind_binding = mapping(
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        "binding",
+    )?;
+    if required_value(
+        freeze_map,
+        "predecessor_evidence_id",
+        "candidate_freeze_receipt",
+    )? != required_value(rebind_binding, "evidence_ref", "binding")?
+    {
+        return Err(fail("lifecycle:predecessor_mismatch", "candidate_freeze"));
+    }
+    if required_value(
+        freeze_map,
+        "rebind_receipt_evidence_id",
+        "candidate_freeze_receipt",
+    )? != required_value(
+        rebind_map,
+        "rebind_receipt_id",
+        "source_main_rebind_receipt",
+    )? {
+        return Err(fail("lifecycle:rebind_mismatch", "candidate_freeze"));
+    }
+    Ok(checked_freeze)
+}
+
+pub fn validate_candidate_review_transition(
+    freeze: &JsonValue,
+    review: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_freeze = validate_candidate_freeze_receipt(freeze)?;
+    let checked_review = validate_candidate_review_receipt(review)?;
+    validate_candidate_stage_transition(&checked_freeze, &checked_review, "candidate_review")
+}
+
+pub fn validate_candidate_cas_transition(
+    review: &JsonValue,
+    cas: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_review = validate_candidate_review_receipt(review)?;
+    let checked_cas = validate_candidate_cas_receipt(cas)?;
+    validate_candidate_stage_transition(&checked_review, &checked_cas, "candidate_cas")
+}
+
+pub fn validate_candidate_cas_rebind_transition(
+    rebind: &JsonValue,
+    cas: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_rebind = validate_source_main_rebind_receipt(rebind)?;
+    let checked_cas = validate_candidate_cas_receipt(cas)?;
+    let rebind_map = mapping(&checked_rebind, "source_main_rebind_receipt")?;
+    let cas_map = mapping(&checked_cas, "candidate_cas_receipt")?;
+    same_binding(
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
+        "candidate_cas.rebind",
+    )?;
+    if required_value(
+        cas_map,
+        "rebind_receipt_evidence_id",
+        "candidate_cas_receipt",
+    )? != required_value(
+        rebind_map,
+        "rebind_receipt_id",
+        "source_main_rebind_receipt",
+    )? {
+        return Err(fail("lifecycle:rebind_mismatch", "candidate_cas"));
+    }
+    let rebind_base = mapping(
+        required_value(
+            rebind_map,
+            "new_base_identity",
+            "source_main_rebind_receipt",
+        )?,
+        "source_main_rebind_receipt.new_base_identity",
+    )?;
+    let cas_base = mapping(
+        required_value(cas_map, "cas_base_identity", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.cas_base_identity",
+    )?;
+    if required_value(
+        rebind_base,
+        "remote",
+        "source_main_rebind_receipt.new_base_identity",
+    )?
+    .as_str()
+        != Some("origin")
+        || required_value(
+            rebind_base,
+            "ref",
+            "source_main_rebind_receipt.new_base_identity",
+        )?
+        .as_str()
+            != Some("refs/heads/main")
+        || required_value(
+            cas_base,
+            "commit_sha",
+            "candidate_cas_receipt.cas_base_identity",
+        )? != required_value(
+            rebind_base,
+            "commit_sha",
+            "source_main_rebind_receipt.new_base_identity",
+        )?
+        || required_value(
+            cas_base,
+            "tree_sha",
+            "candidate_cas_receipt.cas_base_identity",
+        )? != required_value(
+            rebind_base,
+            "tree_sha",
+            "source_main_rebind_receipt.new_base_identity",
+        )?
+    {
+        return Err(LifecycleContractError::code(
+            "lifecycle:rebind_cas_base_identity_mismatch",
+        ));
+    }
+    Ok(checked_cas)
+}
+
+pub fn materialize_candidate_cas_receipt(
+    candidate_review_receipt: &JsonValue,
+    source_main_rebind_receipt: &JsonValue,
+    cas_evidence_ref: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let review = validate_candidate_review_receipt(candidate_review_receipt)?;
+    let rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)?;
+    let review_map = mapping(&review, "candidate_review_receipt")?;
+    let rebind_map = mapping(&rebind, "source_main_rebind_receipt")?;
+    same_binding(
+        required_value(review_map, "binding", "candidate_review_receipt")?,
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        "candidate_cas.rebind",
+    )?;
+    if required_value(
+        review_map,
+        "rebind_receipt_evidence_id",
+        "candidate_review_receipt",
+    )? != required_value(
+        rebind_map,
+        "rebind_receipt_id",
+        "source_main_rebind_receipt",
+    )? {
+        return Err(fail("lifecycle:rebind_mismatch", "candidate_cas"));
+    }
+    let rebind_base = mapping(
+        required_value(
+            rebind_map,
+            "new_base_identity",
+            "source_main_rebind_receipt",
+        )?,
+        "source_main_rebind_receipt.new_base_identity",
+    )?;
+    let mut cas_base_fields = JsonMap::new();
+    cas_base_fields.insert(
+        "commit_sha".to_owned(),
+        required_value(
+            rebind_base,
+            "commit_sha",
+            "source_main_rebind_receipt.new_base_identity",
+        )?
+        .clone(),
+    );
+    cas_base_fields.insert(
+        "tree_sha".to_owned(),
+        required_value(
+            rebind_base,
+            "tree_sha",
+            "source_main_rebind_receipt.new_base_identity",
+        )?
+        .clone(),
+    );
+    let cas_base = JsonValue::Object(cas_base_fields);
+    let cas_evidence_ref = pattern_value(
+        &JsonValue::String(cas_evidence_ref.to_owned()),
+        "candidate_cas_receipt.cas_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    let review_binding = mapping(
+        required_value(review_map, "binding", "candidate_review_receipt")?,
+        "binding",
+    )?;
+    let mut binding = review_binding.clone();
+    let evidence_hex = cas_evidence_ref.strip_prefix("evidence:").ok_or_else(|| {
+        fail(
+            "lifecycle:identity_invalid",
+            "candidate_cas_receipt.cas_evidence_ref",
+        )
+    })?;
+    binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(cas_evidence_ref.clone()),
+    );
+    binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(format!("sha256:{evidence_hex}")),
+    );
+    let binding = JsonValue::Object(binding);
+    let identity = binding_identity(&binding)?;
+    let predecessor_evidence_id =
+        required_value(review_binding, "evidence_ref", "binding")?.clone();
+    let rebind_receipt_evidence_id = required_value(
+        review_map,
+        "rebind_receipt_evidence_id",
+        "candidate_review_receipt",
+    )?
+    .clone();
+    let candidate_identity =
+        required_value(review_map, "candidate_identity", "candidate_review_receipt")?.clone();
+    let key = serde_json::json!({
+        "binding_identity": [
+            identity.transaction_id,
+            identity.snapshot_id,
+            identity.candidate_sha,
+            identity.tree_sha,
+            identity.input_digest,
+            identity.tool_id,
+            identity.tool_version,
+        ],
+        "predecessor_evidence_id": predecessor_evidence_id,
+        "rebind_receipt_evidence_id": rebind_receipt_evidence_id,
+        "candidate_identity": candidate_identity,
+        "cas_base_identity": cas_base.clone(),
+        "cas_evidence_ref": cas_evidence_ref.clone(),
+    });
+    let canonical = canonical_json_bytes(&key).map_err(LifecycleContractError::from)?;
+    let digest = Sha256::digest(canonical)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let mut receipt = JsonMap::new();
+    receipt.insert(
+        "schema".to_owned(),
+        JsonValue::String(CANDIDATE_CAS_SCHEMA.to_owned()),
+    );
+    receipt.insert(
+        "cas_receipt_id".to_owned(),
+        JsonValue::String(format!("cas:{digest}")),
+    );
+    receipt.insert("binding".to_owned(), binding);
+    receipt.insert(
+        "predecessor_evidence_id".to_owned(),
+        required_value(review_binding, "evidence_ref", "binding")?.clone(),
+    );
+    receipt.insert(
+        "rebind_receipt_evidence_id".to_owned(),
+        required_value(
+            review_map,
+            "rebind_receipt_evidence_id",
+            "candidate_review_receipt",
+        )?
+        .clone(),
+    );
+    receipt.insert(
+        "candidate_identity".to_owned(),
+        required_value(review_map, "candidate_identity", "candidate_review_receipt")?.clone(),
+    );
+    receipt.insert("cas_base_identity".to_owned(), cas_base);
+    receipt.insert(
+        "cas_evidence_ref".to_owned(),
+        JsonValue::String(cas_evidence_ref),
+    );
+    receipt.insert("cas_stage".to_owned(), JsonValue::String("cas".to_owned()));
+    let receipt = JsonValue::Object(receipt);
+    let checked = validate_candidate_cas_transition(&review, &receipt)?;
+    validate_candidate_cas_rebind_transition(&rebind, &checked)
 }
 
 fn validate_remote_git_identity(
