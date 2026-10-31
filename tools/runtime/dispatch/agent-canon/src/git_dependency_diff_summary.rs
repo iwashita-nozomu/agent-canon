@@ -13,13 +13,13 @@ use crate::python_text::python_strip;
 use crate::runtime_boundary::{root_capability_environment, RuntimeArtifactBoundary};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
-use std::cmp::Ordering;
+use std::cmp::Ordering as PathOrdering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -341,7 +341,7 @@ fn is_file_in_worktree(root: &Path, path: &OsStr) -> bool {
     fs::metadata(root.join(path)).is_ok_and(|metadata| metadata.is_file())
 }
 
-fn path_order(left: &OsStr, right: &OsStr) -> Ordering {
+fn path_order(left: &OsStr, right: &OsStr) -> PathOrdering {
     match (left.to_str(), right.to_str()) {
         (Some(left), Some(right)) => left.cmp(right),
         _ => left.cmp(right),
@@ -910,7 +910,10 @@ fn emit(summary: &Value, format: &str) -> Result<String, String> {
                 .as_object()
                 .ok_or_else(|| "summary totals must be an object".to_string())?;
             let value = |map: &Map<String, Value>, key: &str| {
-                map.get(key).and_then(Value::as_str).unwrap_or_default()
+                map.get(key)
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string()
             };
             Ok(vec![
                 format!(
@@ -1081,7 +1084,7 @@ fn parse_options(args: &[String]) -> Result<CliOptions, String> {
 fn fresh_report_directory(boundary: &RuntimeArtifactBoundary) -> Result<PathBuf, String> {
     let parent = Path::new("tasks/dependency-diff");
     boundary.ensure_directory(parent)?;
-    let sequence = NEXT_REPORT_DIRECTORY.fetch_add(1, Ordering::Relaxed);
+    let sequence = NEXT_REPORT_DIRECTORY.fetch_add(1, AtomicOrdering::Relaxed);
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| format!("system clock is unavailable: {error}"))?
