@@ -1,21 +1,38 @@
 # @dependency-start
 # contract test
 # responsibility Tests agent run path comparison behavior.
-# upstream implementation ../../eval/checkers/compare_agent_run_paths.py compares runs  # noqa: E501
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/compare_agent_run_paths.rs compares runs  # noqa: E501
 # upstream design ../../agents/skills/adaptive-improvement-loop.md compares reruns  # noqa: E501
 # @dependency-end
 """Tests for two-run execution path comparison."""
 
 from __future__ import annotations
 
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "compare_agent_run_paths.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+
+def run_native(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    assert AGENT_CANON_CLI is not None, (
+        "AGENT_CANON_CLI must select the current native executable"
+    )
+    executable = Path(AGENT_CANON_CLI)
+    assert executable.is_absolute(), (
+        "AGENT_CANON_CLI must be an absolute executable path"
+    )
+    return subprocess.run(
+        [str(executable), "compare-agent-run-paths", *arguments],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 def write_run(
@@ -47,6 +64,23 @@ def write_run(
 class CompareAgentRunPathsTest(unittest.TestCase):
     """Verify path comparison status and reports."""
 
+    def test_unambiguous_help_prefix_matches_long_help(self) -> None:
+        """Argparse-compatible help prefixes remain available in the native CLI."""
+        long_help = run_native(["--help"])
+        self.assertEqual(long_help.returncode, 0, long_help.stderr)
+        self.assertEqual(long_help.stderr, "")
+        for option in ("-h", "--he"):
+            with self.subTest(option=option):
+                result = run_native([option])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, long_help.stdout)
+                self.assertEqual(result.stderr, "")
+
+        explicit_value = run_native(["--he=ignored"])
+        self.assertEqual(explicit_value.returncode, 2)
+        self.assertEqual(explicit_value.stdout, "")
+        self.assertIn("ignored explicit argument 'ignored'", explicit_value.stderr)
+
     def test_candidate_inefficient_route_fails(self) -> None:
         """A selected inefficient route should fail mechanically."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -65,21 +99,12 @@ class CompareAgentRunPathsTest(unittest.TestCase):
                 route_efficiency="inefficient",
             )
 
-            result = subprocess.run(
+            result = run_native(
                 [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--baseline-run",
-                    str(baseline),
-                    "--candidate-run",
-                    str(candidate),
-                    "--report-out",
-                    str(report),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
+                    f"--baseline-run={baseline}",
+                    f"--candidate-r={candidate}",
+                    f"--report-out={report}",
+                ]
             )
 
             self.assertEqual(result.returncode, 1)
@@ -88,6 +113,28 @@ class CompareAgentRunPathsTest(unittest.TestCase):
             self.assertIn("NEXT_ACTION=repair_skill_workflow_prompt", result.stdout)
             text = report.read_text(encoding="utf-8")
             self.assertIn("selected_inefficient_route=yes", text)
+
+    def test_unreadable_monitoring_input_exits_one(self) -> None:
+        """Invalid UTF-8 is an input error, not an empty monitoring record."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            write_run(
+                baseline,
+                execution_path="reuse-first",
+                route_efficiency="efficient",
+            )
+            candidate.mkdir()
+            (candidate / "workflow_monitoring.md").write_bytes(b"\xff")
+
+            result = run_native(
+                ["--baseline-run", str(baseline), "--candidate-run", str(candidate)]
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, "")
+            self.assertNotEqual(result.stderr, "")
 
     def test_candidate_efficient_route_passes(self) -> None:
         """An efficient selected route should pass and record feedback tokens."""
@@ -107,19 +154,13 @@ class CompareAgentRunPathsTest(unittest.TestCase):
                 static_feedback="recorded",
             )
 
-            result = subprocess.run(
+            result = run_native(
                 [
-                    sys.executable,
-                    str(SCRIPT),
                     "--baseline-run",
                     str(baseline),
                     "--candidate-run",
                     str(candidate),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
+                ]
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
