@@ -204,7 +204,7 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Agent Evaluation Evidence（agent evaluation evidence）
 
-<!-- evaluation reviewer が `eval/producers/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
+<!-- evaluation reviewer が `tools/bin/agent-canon run-evaluation --report-dir <this-run> --behavior-manifest eval/definitions/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
 
 ## Runtime Log Archive Evidence（runtime log archive evidence）
 

@@ -273,10 +273,10 @@ summary = "Proof trace code-path and proposition alignment checker documentation
 [[tool]]
 id = "lsp-code-analysis"
 classification = "public"
-tool = "tools/analysis/code/lsp_code_analysis.py"
+tool = "tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs"
 doc = "documents/tools/lsp_code_analysis.md"
-language = "python"
-summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy adapter documentation."
+language = "rust"
+summary = "Canonical native LSP 3.17 code-analysis API, protocol, and report schema documentation."
 
 [[tool]]
 id = "extract-docx"
@@ -285,3 +285,11 @@ tool = "tools/analysis/documents/extraction/extract_docx.py"
 doc = "documents/tools/extract_docx.md"
 language = "python"
 summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."
+
+[[tool]]
+id = "evaluate-agent-run"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/run_evaluation.rs"
+doc = "documents/tools/run_evaluation.md"
+language = "rust"
+summary = "Native agent run evaluation using selected run-bundle artifacts and fixed rubric scores."
