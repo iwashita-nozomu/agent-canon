@@ -64,6 +64,23 @@ def write_run(
 class CompareAgentRunPathsTest(unittest.TestCase):
     """Verify path comparison status and reports."""
 
+    def test_unambiguous_help_prefix_matches_long_help(self) -> None:
+        """Argparse-compatible help prefixes remain available in the native CLI."""
+        long_help = run_native(["--help"])
+        self.assertEqual(long_help.returncode, 0, long_help.stderr)
+        self.assertEqual(long_help.stderr, "")
+        for option in ("-h", "--he"):
+            with self.subTest(option=option):
+                result = run_native([option])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, long_help.stdout)
+                self.assertEqual(result.stderr, "")
+
+        explicit_value = run_native(["--he=ignored"])
+        self.assertEqual(explicit_value.returncode, 2)
+        self.assertEqual(explicit_value.stdout, "")
+        self.assertIn("ignored explicit argument 'ignored'", explicit_value.stderr)
+
     def test_candidate_inefficient_route_fails(self) -> None:
         """A selected inefficient route should fail mechanically."""
         with tempfile.TemporaryDirectory() as tmp_dir:

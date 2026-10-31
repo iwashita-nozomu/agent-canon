@@ -285,6 +285,7 @@ pub fn render_machine_status(comparison: &RunPathComparison) -> String {
 
 #[derive(Clone, Copy)]
 enum OptionName {
+    Help,
     BaselineRun,
     CandidateRun,
     ReportOut,
@@ -298,6 +299,7 @@ struct CliOptions {
 
 fn option_name(value: &str) -> Result<OptionName, String> {
     const OPTIONS: &[(&str, OptionName)] = &[
+        ("--help", OptionName::Help),
         ("--baseline-run", OptionName::BaselineRun),
         ("--candidate-run", OptionName::CandidateRun),
         ("--report-out", OptionName::ReportOut),
@@ -315,18 +317,15 @@ fn option_name(value: &str) -> Result<OptionName, String> {
 }
 
 fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
-    if args
-        .iter()
-        .any(|arg| matches!(arg.as_str(), "-h" | "--help"))
-    {
-        return Ok(None);
-    }
     let mut baseline_run = None;
     let mut candidate_run = None;
     let mut report_out = None;
     let mut index = 0;
     while index < args.len() {
         let argument = &args[index];
+        if argument == "-h" {
+            return Ok(None);
+        }
         let (option, inline_value) = argument
             .split_once('=')
             .map_or((argument.as_str(), None), |(option, value)| {
@@ -336,6 +335,14 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             return Err(format!("unrecognized argument: {argument}"));
         }
         let name = option_name(option)?;
+        if matches!(name, OptionName::Help) {
+            return match inline_value {
+                Some(value) => Err(format!(
+                    "argument -h/--help: ignored explicit argument '{value}'"
+                )),
+                None => Ok(None),
+            };
+        }
         let value = match inline_value {
             Some(value) => value,
             None => {
@@ -350,6 +357,7 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             }
         };
         match name {
+            OptionName::Help => unreachable!("help option returns before assigning a value"),
             OptionName::BaselineRun => baseline_run = Some(value),
             OptionName::CandidateRun => candidate_run = Some(value),
             OptionName::ReportOut => report_out = Some(value),
