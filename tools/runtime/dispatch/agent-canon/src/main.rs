@@ -15,6 +15,7 @@
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
+// upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI

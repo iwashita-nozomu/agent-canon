@@ -2,12 +2,16 @@
 // contract implementation
 // responsibility Verifies native SCIP producers, writes external index artifacts, and projects bounded facts from official SCIP indexes.
 // upstream implementation environment_dependencies.rs owns verified executable resolution
+// upstream implementation path_expansion.rs owns Python-compatible user-home expansion
 // upstream implementation runtime_boundary.rs owns external artifact paths and root capabilities
 // downstream implementation git_dependency_diff_summary.rs consumes bounded SCIP impact
 // downstream design ../../../../../documents/tools/scip_index.md documents the native command
 // @dependency-end
 
 use crate::environment_dependencies::resolve_verified_executable;
+use crate::path_expansion::{
+    native_home_lookup, HomeLookupRequest, PathExpansionEnvironment, PathPlatform,
+};
 use crate::python_text::python_strip;
 use crate::runtime_boundary::{root_capability_environment, RuntimeArtifactBoundary};
 use protobuf::Message;
@@ -173,30 +177,36 @@ fn source_repository_root() -> Result<PathBuf, ScipError> {
         .ok_or_else(|| ScipError::failure("native SCIP source root is unavailable"))
 }
 
-fn expand_current_home(path: &Path) -> PathBuf {
-    let value = path.to_string_lossy();
-    if value == "~" {
-        return env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| path.to_path_buf());
-    }
-    if let Some(suffix) = value.strip_prefix("~/") {
-        if let Some(home) = env::var_os("HOME") {
-            return PathBuf::from(home).join(suffix);
-        }
-    }
-    path.to_path_buf()
+fn expand_config_override_path_with<F>(
+    path: &Path,
+    label: &str,
+    platform: PathPlatform,
+    environment: &PathExpansionEnvironment,
+    home_lookup: F,
+) -> Result<PathBuf, ScipError>
+where
+    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
+{
+    crate::path_expansion::expand_user_path_with(path, platform, environment, home_lookup)
+        .map_err(|error| ScipError::failure(format!("unable to expand {label} path: {error}")))
 }
 
 fn manifest_and_receipts() -> Result<(PathBuf, PathBuf), ScipError> {
     let repository_root = source_repository_root()?;
+    let path_environment = PathExpansionEnvironment::from_process();
     let manifest_override = env::var_os("AGENT_CANON_DEPENDENCY_MANIFEST").and_then(|value| {
         let value = value.to_string_lossy();
         let value = python_strip(&value);
         (!value.is_empty()).then(|| PathBuf::from(value))
     });
     let manifest = if let Some(manifest) = manifest_override {
-        let manifest = expand_current_home(&manifest);
+        let manifest = expand_config_override_path_with(
+            &manifest,
+            "shared tool dependency manifest",
+            PathPlatform::native(),
+            &path_environment,
+            native_home_lookup,
+        )?;
         fs::canonicalize(&manifest).map_err(|_| {
             ScipError::failure(format!(
                 "shared tool dependency manifest is unavailable: {}",
@@ -230,7 +240,13 @@ fn manifest_and_receipts() -> Result<(PathBuf, PathBuf), ScipError> {
                 "shared tool dependency receipts are unavailable; start bootstrap.sh",
             ));
         };
-        expand_current_home(&receipts)
+        expand_config_override_path_with(
+            &receipts,
+            "shared tool dependency receipts",
+            PathPlatform::native(),
+            &path_environment,
+            native_home_lookup,
+        )?
     };
     Ok((manifest, receipts))
 }
@@ -1454,6 +1470,79 @@ mod tests {
         index
             .write_to_bytes()
             .expect("official SCIP index serializes")
+    }
+
+    #[test]
+    fn manifest_override_expands_named_user_from_injected_account_lookup() {
+        let environment = PathExpansionEnvironment {
+            home: Some("/home/current-user".into()),
+            ..PathExpansionEnvironment::default()
+        };
+        let home = PathBuf::from("/home/scip-manifest-owner");
+        let requests = RefCell::new(Vec::new());
+
+        let expanded = expand_config_override_path_with(
+            Path::new("~scip-manifest-owner/bootstrap/container/image/dependencies.toml"),
+            "shared tool dependency manifest",
+            PathPlatform::Posix,
+            &environment,
+            |request| {
+                requests.borrow_mut().push(request.clone());
+                match request {
+                    HomeLookupRequest::NamedUser(username) if username == "scip-manifest-owner" => {
+                        Ok(Some(home.clone()))
+                    }
+                    _ => panic!("manifest expansion requests its named account"),
+                }
+            },
+        )
+        .expect("named-user manifest override expands");
+
+        assert_eq!(
+            expanded,
+            home.join("bootstrap/container/image/dependencies.toml")
+        );
+        assert_eq!(
+            requests.borrow().as_slice(),
+            &[HomeLookupRequest::NamedUser(
+                "scip-manifest-owner".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn receipts_override_expands_named_user_from_injected_account_lookup() {
+        let environment = PathExpansionEnvironment {
+            home: Some("/home/current-user".into()),
+            ..PathExpansionEnvironment::default()
+        };
+        let home = PathBuf::from("/home/scip-receipt-owner");
+        let requests = RefCell::new(Vec::new());
+
+        let expanded = expand_config_override_path_with(
+            Path::new("~scip-receipt-owner/tool-receipts"),
+            "shared tool dependency receipts",
+            PathPlatform::Posix,
+            &environment,
+            |request| {
+                requests.borrow_mut().push(request.clone());
+                match request {
+                    HomeLookupRequest::NamedUser(username) if username == "scip-receipt-owner" => {
+                        Ok(Some(home.clone()))
+                    }
+                    _ => panic!("receipt expansion requests its named account"),
+                }
+            },
+        )
+        .expect("named-user receipt override expands");
+
+        assert_eq!(expanded, home.join("tool-receipts"));
+        assert_eq!(
+            requests.borrow().as_slice(),
+            &[HomeLookupRequest::NamedUser(
+                "scip-receipt-owner".to_string()
+            )]
+        );
     }
 
     #[test]

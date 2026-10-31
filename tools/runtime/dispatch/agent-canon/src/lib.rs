@@ -21,6 +21,7 @@
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
 // downstream implementation lsp_code_analysis.rs owns the reusable native LSP analysis API
+// downstream implementation path_expansion.rs owns shared user-home path expansion
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
@@ -37,6 +38,7 @@ pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
 pub mod lsp_code_analysis;
+pub mod path_expansion;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
