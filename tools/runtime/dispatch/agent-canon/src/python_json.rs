@@ -1,8 +1,10 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides Python-compatible JSON values, parsing, number formatting, and compact ASCII canonicalization.
+// downstream implementation update_lifecycle_contract.rs reuses Python integer/bool equality after canonical float rejection.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
 // downstream test ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
+// downstream test ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
 // @dependency-end
 
 use serde::de::{self, Visitor};
@@ -747,4 +749,73 @@ fn write_u16_escape(codepoint: u16, output: &mut Vec<u8>) {
     output.push(HEX[((codepoint >> 8) & 0xf) as usize]);
     output.push(HEX[((codepoint >> 4) & 0xf) as usize]);
     output.push(HEX[(codepoint & 0xf) as usize]);
+}
+
+fn integer_number_text(value: &serde_json::Number) -> Option<String> {
+    if value.is_f64() {
+        return None;
+    }
+    let text = value.to_string();
+    Some(if text == "-0" { "0".to_owned() } else { text })
+}
+
+/// Compare canonicalized serde JSON values using Python's integer/bool equality.
+/// Callers must canonical-clone first, which rejects floats through the artifact owner.
+pub(crate) fn python_json_equal_after_float_rejection(
+    left: &serde_json::Value,
+    right: &serde_json::Value,
+) -> bool {
+    let mut pending = vec![(left, right)];
+    while let Some((left, right)) = pending.pop() {
+        match (left, right) {
+            (serde_json::Value::Null, serde_json::Value::Null) => {}
+            (serde_json::Value::Bool(left), serde_json::Value::Bool(right)) => {
+                if left != right {
+                    return false;
+                }
+            }
+            (serde_json::Value::Bool(left), serde_json::Value::Number(right)) => {
+                let expected = if *left { "1" } else { "0" };
+                if integer_number_text(right).as_deref() != Some(expected) {
+                    return false;
+                }
+            }
+            (serde_json::Value::Number(left), serde_json::Value::Bool(right)) => {
+                let expected = if *right { "1" } else { "0" };
+                if integer_number_text(left).as_deref() != Some(expected) {
+                    return false;
+                }
+            }
+            (serde_json::Value::Number(left), serde_json::Value::Number(right)) => {
+                match (integer_number_text(left), integer_number_text(right)) {
+                    (Some(left), Some(right)) if left == right => {}
+                    _ => return false,
+                }
+            }
+            (serde_json::Value::String(left), serde_json::Value::String(right)) => {
+                if left != right {
+                    return false;
+                }
+            }
+            (serde_json::Value::Array(left), serde_json::Value::Array(right)) => {
+                if left.len() != right.len() {
+                    return false;
+                }
+                pending.extend(left.iter().zip(right));
+            }
+            (serde_json::Value::Object(left), serde_json::Value::Object(right)) => {
+                if left.len() != right.len() {
+                    return false;
+                }
+                for (key, left_value) in left {
+                    let Some(right_value) = right.get(key) else {
+                        return false;
+                    };
+                    pending.push((left_value, right_value));
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
 }
