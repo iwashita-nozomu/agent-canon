@@ -1,16 +1,17 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, theorem-board, artifact, catalog, path-resolution, proof environment, and evaluation APIs.
+//! Shared AgentCanon runtime, LSP, artifact, catalog, parent-root authority, path-resolution, proof environment, theorem, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
-// responsibility Exposes shared runtime, LSP analysis, native evaluation, artifact, catalog, and proof-coverage APIs.
+// responsibility Exposes shared runtime, LSP analysis, native evaluation, private feedback, artifact identity and external binding, parent-root authority, catalog, and proof-coverage APIs.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust implementation ownership
 // upstream implementation runtime_boundary.rs owns external runtime and restricted spool capabilities
 // upstream implementation runtime_boundary.rs owns external artifact I/O capabilities
 // upstream implementation private_feedback.rs owns private feedback storage using the shared boundary
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
+// downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
@@ -37,6 +38,7 @@
 // @dependency-end
 
 pub mod artifacts;
+pub mod authority;
 pub mod catalog;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
