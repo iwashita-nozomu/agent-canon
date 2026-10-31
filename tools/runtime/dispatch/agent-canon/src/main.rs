@@ -58,6 +58,7 @@ mod file_surface_inventory;
 mod graph;
 pub mod graph_client;
 mod jit_ir_to_lean;
+pub mod log_surface_inventory;
 mod migration_audit;
 mod notebook_quality;
 mod numeric_performance;
@@ -114,6 +115,7 @@ Commands:
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
   numeric-performance [--input <path|->] [--format json]
@@ -165,6 +167,10 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "log-surface-inventory" {
+        std::process::exit(log_surface_inventory::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
