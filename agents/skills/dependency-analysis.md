@@ -8,7 +8,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../canonical/CODEX_WORKFLOW.md defines workflow gate usage
 upstream design ./catalog.yaml registers this public skill
 upstream design ../../documents/tools/lsp_code_analysis.md owns LSP relation evidence and capability limits
-upstream implementation ../../tools/analysis/dependencies/scip_index.py owns native SCIP index and bounded query operations
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs owns native SCIP index and bounded query operations
 @dependency-end
 -->
 
@@ -83,7 +83,7 @@ entry condition.
   is available when a suitable index exists:
 
   ```bash
-  python3 tools/analysis/dependencies/scip_index.py query \
+  tools/bin/agent-canon scip-index query \
     --root . \
     --runtime-root <external-runtime-root> \
     --index <runtime-relative-path>/index.scip \
