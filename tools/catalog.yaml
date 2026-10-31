@@ -2181,12 +2181,12 @@ entries:
 
   - id: log-surface-inventory
     summary: Inventories hook, skill, and tool machine-readable output fields.
-    path: tools/runtime/archive/log_surface_inventory.py
+    path: tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/runtime/archive/log_surface_inventory.py
-    dispatch: {argv: ["python3", "tools/runtime/archive/log_surface_inventory.py"]}
+    command: tools/bin/agent-canon log-surface-inventory
+    dispatch: {argv: ["tools/bin/agent-canon", "log-surface-inventory"]}
     writes: false
     default_wiring:
       ci: false
