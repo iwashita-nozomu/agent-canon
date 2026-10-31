@@ -1,13 +1,19 @@
 // @dependency-start
 // contract implementation
-// responsibility Composes native Markdown providers with AgentCanon-specific documentation checks.
+// responsibility Composes native Markdown providers with AgentCanon-specific documentation and bootstrap checks.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
+// upstream design ../../../../../documents/contracts/template-bootstrap.md default bootstrap doc contract
+// upstream design ../../../../../documents/contracts/static-seed-export.md source-free static-seed contract
+// upstream implementation python_cli_integer.rs shares argparse negative-number classification
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
+// downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
+// downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // @dependency-end
 
+use regex::Regex;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -15,6 +21,8 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::OnceLock;
+use toml_edit::{DocumentMut, Item, TableLike};
 
 static DOCS_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -39,6 +47,63 @@ const BOOTSTRAP_DOCS: &[&str] = &[
     "documents/contracts/template-bootstrap.md",
     "documents/contracts/linux-wsl-host-requirements.md",
 ];
+
+const DEFAULT_CONSUMER_CONTRACT_DOCS: &[&str] = &[
+    "agents/skills/start-repository.md",
+    "documents/contracts/template-bootstrap.md",
+    "templates/README.md",
+];
+
+const DEFAULT_CONSUMER_FORBIDDEN_MARKERS: &[&str] = &[
+    "vendor/agent-canon",
+    "tools/agent-canon",
+    "agent_canon_source_root",
+    "agent-canon-update",
+    "agent-canon-latest-check",
+    "agent-canon-ensure-latest",
+    "git submodule",
+    ".gitmodules",
+];
+
+const DEFAULT_BOOTSTRAP_REQUIRED_MARKERS: &[&str] = &[
+    "static seed",
+    "agent-canon-static-seed.json",
+    "regular file",
+    "one-way",
+];
+
+const STATIC_SEED_FORBIDDEN_PATHS: &[&str] = &[
+    ".agent-canon",
+    ".gitmodules",
+    "tools/agent-canon",
+    "vendor/agent-canon",
+];
+
+const STATIC_SEED_FORBIDDEN_CONTENT: &[&[u8]] = &[
+    b"agent_canon_source_root",
+    b"agent-canon-latest-check",
+    b"agent-canon-update",
+    b"check_agent_canon_latest",
+    b"checkout_agent_canon_submodule",
+    b"from agent_tools",
+    b"git submodule",
+    b"http://",
+    b"https://",
+    b"import agent_tools",
+    b"tools/agent-canon",
+    b"vendor/agent-canon",
+];
+
+const STATIC_SEED_FORBIDDEN_PREFIXES: &[&[u8]] = &[
+    b"agents/skills/",
+    b"agents/model_profiles.toml",
+    b"tools/agent_tools/",
+    b"../../agents/",
+    b"../../tools/",
+];
+
+const STATIC_SEED_PROVENANCE_PATH: &str = "agent-canon-static-seed.json";
+const STATIC_SEED_SOURCE_REPOSITORY: &str = "iwashita-nozomu/agent-canon";
 
 const DERIVED_REPO_STALE_STRINGS: &[&str] = &[
     "Project Template",
@@ -91,6 +156,12 @@ struct WriteSummary {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| argument.as_str() == "check-bootstrap")
+    {
+        return run_bootstrap_command(&args[1..]);
+    }
     match Args::parse(args) {
         Ok(parsed) => run_parsed(parsed),
         Err(message) => {
@@ -162,12 +233,315 @@ impl Args {
     }
 }
 
+struct BootstrapArgs {
+    root: PathBuf,
+    static_seed_consumer: bool,
+}
+
+enum BootstrapParseResult {
+    Help,
+    Options(BootstrapArgs),
+}
+
+fn run_bootstrap_command(raw: &[String]) -> i32 {
+    let args = match parse_bootstrap_args(raw) {
+        Ok(BootstrapParseResult::Help) => {
+            print_bootstrap_help();
+            return 0;
+        }
+        Ok(BootstrapParseResult::Options(args)) => args,
+        Err(error) => {
+            eprintln!(
+                "usage: agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]"
+            );
+            eprintln!("agent-canon docs check-bootstrap: error: {error}");
+            return 2;
+        }
+    };
+    let root = fs::canonicalize(&args.root).unwrap_or_else(|_| {
+        if args.root.is_absolute() {
+            args.root.clone()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(&args.root)
+        }
+    });
+    let (title, findings) = if args.static_seed_consumer {
+        (
+            "Static seed consumer check",
+            iter_static_seed_consumer_findings(&root),
+        )
+    } else {
+        match iter_bootstrap_doc_findings(&root) {
+            Ok(findings) => ("Bootstrap docs check", findings),
+            Err(error) => {
+                eprintln!("agent-canon docs check-bootstrap: {error}");
+                return 1;
+            }
+        }
+    };
+    print_bootstrap_findings(title, &findings)
+}
+
+fn parse_bootstrap_args(raw: &[String]) -> Result<BootstrapParseResult, String> {
+    let mut args = BootstrapArgs {
+        root: PathBuf::from("."),
+        static_seed_consumer: false,
+    };
+    let mut index = 0;
+    while index < raw.len() {
+        let token = &raw[index];
+        if matches!(token.as_str(), "-h" | "--help") {
+            return Ok(BootstrapParseResult::Help);
+        }
+        if token == "--root" {
+            args.root = PathBuf::from(required_bootstrap_value(raw, index, token)?);
+            index += 2;
+            continue;
+        }
+        if let Some(value) = token.strip_prefix("--root=") {
+            args.root = PathBuf::from(value);
+        } else if token == "--static-seed-consumer" {
+            args.static_seed_consumer = true;
+        } else if token == "--" {
+            if index + 1 < raw.len() {
+                return Err(format!(
+                    "unrecognized arguments: {}",
+                    raw[index + 1..].join(" ")
+                ));
+            }
+        } else {
+            return Err(format!("unrecognized arguments: {token}"));
+        }
+        index += 1;
+    }
+    Ok(BootstrapParseResult::Options(args))
+}
+
+fn required_bootstrap_value<'a>(
+    raw: &'a [String],
+    index: usize,
+    option: &str,
+) -> Result<&'a str, String> {
+    raw.get(index + 1)
+        .filter(|value| {
+            !value.starts_with('-')
+                || *value == "-"
+                || crate::python_cli_integer::is_argparse_negative_number(value)
+                || is_argparse_negative_float(value)
+        })
+        .map(String::as_str)
+        .ok_or_else(|| format!("argument {option}: expected one argument"))
+}
+
+fn is_argparse_negative_float(value: &str) -> bool {
+    static NEGATIVE_FLOAT: OnceLock<Regex> = OnceLock::new();
+    NEGATIVE_FLOAT
+        .get_or_init(|| Regex::new(r"^-\d*\.\d+$").expect("static negative float expression"))
+        .is_match(value)
+}
+
+fn print_bootstrap_help() {
+    println!(
+        "Validate bootstrap docs or a source-free static-seed consumer.\n\n\
+         usage: agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]\n\n\
+         options:\n\
+           -h, --help             show this help message and exit\n\
+           --root <path>          Repository or exported seed root. Defaults to cwd.\n\
+           --static-seed-consumer validate only the source-free static-seed consumer surface."
+    );
+}
+
+fn print_bootstrap_findings(title: &str, findings: &[String]) -> i32 {
+    if findings.is_empty() {
+        println!("{title} passed");
+        0
+    } else {
+        println!("{title} failed:");
+        for finding in findings {
+            println!("- {finding}");
+        }
+        1
+    }
+}
+
+fn iter_bootstrap_doc_findings(root: &Path) -> Result<Vec<String>, String> {
+    let project_name = read_project_name(root)?;
+    let check_derived_stale_strings = project_name
+        .as_deref()
+        .is_some_and(|name| name != "project-template");
+    let default_consumer_docs = DEFAULT_CONSUMER_CONTRACT_DOCS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut scan_paths = BOOTSTRAP_DOCS.to_vec();
+    for relative in DEFAULT_CONSUMER_CONTRACT_DOCS.iter().copied() {
+        if !scan_paths.contains(&relative) {
+            scan_paths.push(relative);
+        }
+    }
+
+    let mut findings = Vec::new();
+    let mut template_bootstrap_text = None;
+    for relative in scan_paths {
+        let path = root.join(relative);
+        if !path.exists() && !is_symlink(&path) {
+            continue;
+        }
+        let is_default_consumer_doc = default_consumer_docs.contains(relative);
+        if is_default_consumer_doc && is_symlink(&path) {
+            findings.push(format!(
+                "{relative}: default consumer contract must be a regular file, not a symlink"
+            ));
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let text = fs::read_to_string(&path)
+            .map_err(|error| format!("{relative}: cannot read UTF-8 document: {error}"))?;
+        if relative == "documents/contracts/template-bootstrap.md" {
+            template_bootstrap_text = Some(text.clone());
+        }
+        for (line_number, line) in python_split_lines(&text).into_iter().enumerate() {
+            if absolute_workspace_link_pattern().is_match(line) {
+                findings.push(format!(
+                    "{relative}:{}: replace workspace-absolute markdown links with relative links",
+                    line_number + 1
+                ));
+            }
+            if check_derived_stale_strings {
+                for stale in DERIVED_REPO_STALE_STRINGS {
+                    if line.contains(stale) {
+                        findings.push(format!(
+                            "{relative}:{}: stale template bootstrap text remains: {stale}",
+                            line_number + 1
+                        ));
+                    }
+                }
+            }
+            if is_default_consumer_doc {
+                let lowered = line.to_lowercase();
+                for marker in DEFAULT_CONSUMER_FORBIDDEN_MARKERS {
+                    if lowered.contains(marker) {
+                        findings.push(format!(
+                            "{relative}:{}: default consumer contract references live runtime marker: {marker}",
+                            line_number + 1
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(template_bootstrap_text) = template_bootstrap_text {
+        let lowered = template_bootstrap_text.to_lowercase();
+        for marker in DEFAULT_BOOTSTRAP_REQUIRED_MARKERS {
+            if !lowered.contains(marker) {
+                findings.push(format!(
+                    "documents/contracts/template-bootstrap.md: missing static consumer marker: {marker}"
+                ));
+            }
+        }
+    }
+    Ok(findings)
+}
+
+fn read_project_name(root: &Path) -> Result<Option<String>, String> {
+    let path = root.join("pyproject.toml");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(&path)
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let document = text
+        .parse::<DocumentMut>()
+        .map_err(|error| format!("cannot parse {}: {error}", path.display()))?;
+    let Some(project) = document.get("project").and_then(item_as_table_like) else {
+        return Ok(None);
+    };
+    let Some(name) = project.get("name").and_then(Item::as_str) else {
+        return Ok(None);
+    };
+    let name = name.trim();
+    Ok((!name.is_empty()).then(|| name.to_owned()))
+}
+
+fn absolute_workspace_link_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| {
+        Regex::new(r"\]\(/mnt/l/workspace/[^)]+\)")
+            .expect("static absolute workspace link expression")
+    })
+}
+
+fn python_split_lines(value: &str) -> Vec<&str> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut chars = value.char_indices().peekable();
+    while let Some((index, character)) = chars.next() {
+        if !is_python_line_break(character) {
+            continue;
+        }
+        lines.push(&value[start..index]);
+        start = index + character.len_utf8();
+        if character == '\r' && chars.peek().is_some_and(|(_, next)| *next == '\n') {
+            let (newline_index, newline) = chars.next().expect("peeked newline exists");
+            start = newline_index + newline.len_utf8();
+        }
+    }
+    if start < value.len() {
+        lines.push(&value[start..]);
+    }
+    lines
+}
+
+fn is_python_line_break(character: char) -> bool {
+    matches!(
+        character,
+        '\n' | '\r'
+            | '\u{000b}'
+            | '\u{000c}'
+            | '\u{001c}'
+            | '\u{001d}'
+            | '\u{001e}'
+            | '\u{0085}'
+            | '\u{2028}'
+            | '\u{2029}'
+    )
+}
+
+fn is_symlink(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|metadata| metadata.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+fn is_regular_file(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|metadata| metadata.file_type().is_file())
+        .unwrap_or(false)
+}
+
+fn is_regular_directory(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|metadata| metadata.file_type().is_dir())
+        .unwrap_or(false)
+}
+
+fn item_as_table_like(item: &Item) -> Option<&dyn TableLike> {
+    item.as_table()
+        .map(|table| table as &dyn TableLike)
+        .or_else(|| item.as_inline_table().map(|table| table as &dyn TableLike))
+}
+
 fn usage_text() -> &'static str {
     "usage: agent-canon docs <command> [options] [paths...]\n\
 \n\
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
+  check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\
   render-runtime-profile  render the runtime profile inventory\n\
   help, -h, --help        show this command contract\n\
 \n\
@@ -177,6 +551,8 @@ options:\n\
 examples:\n\
   tools/bin/agent-canon docs -h\n\
   tools/bin/agent-canon docs check documents/tools/agent-canon.md\n\
+  tools/bin/agent-canon docs check-bootstrap --root .\n\
+  tools/bin/agent-canon docs check-bootstrap --root <seed> --static-seed-consumer\n\
   tools/bin/agent-canon docs format README.md"
 }
 
@@ -198,6 +574,362 @@ fn render_runtime_profile_command(root: &Path) -> i32 {
             1
         }
     }
+}
+
+fn iter_static_seed_consumer_findings(root: &Path) -> Vec<String> {
+    let mut findings = Vec::new();
+    for relative in STATIC_SEED_FORBIDDEN_PATHS {
+        let path = root.join(relative);
+        if path.exists() || is_symlink(&path) {
+            findings.push(format!(
+                "{relative}: live AgentCanon consumer surface is forbidden"
+            ));
+        }
+    }
+
+    let provenance_path = root.join(STATIC_SEED_PROVENANCE_PATH);
+    let provenance = if !is_regular_file(&provenance_path) {
+        findings.push(format!(
+            "{STATIC_SEED_PROVENANCE_PATH}: expected a regular provenance file"
+        ));
+        None
+    } else {
+        match fs::read_to_string(&provenance_path) {
+            Err(error) => {
+                findings.push(format!(
+                    "{STATIC_SEED_PROVENANCE_PATH}: invalid JSON: {error}"
+                ));
+                None
+            }
+            Ok(text) => match serde_json::from_str::<Value>(&text) {
+                Err(error) => {
+                    findings.push(format!(
+                        "{STATIC_SEED_PROVENANCE_PATH}: invalid JSON: {error}"
+                    ));
+                    None
+                }
+                Ok(Value::Object(object)) => Some(object),
+                Ok(_) => {
+                    findings.push(format!(
+                        "{STATIC_SEED_PROVENANCE_PATH}: JSON root must be an object"
+                    ));
+                    None
+                }
+            },
+        }
+    };
+    if let Some(provenance) = provenance.as_ref() {
+        let expected_keys = ["schema_version", "source_commit", "source_repository"];
+        let mut actual_keys = provenance.keys().cloned().collect::<Vec<_>>();
+        actual_keys.sort();
+        if actual_keys.iter().map(String::as_str).collect::<Vec<_>>() != expected_keys {
+            findings.push(format!(
+                "{STATIC_SEED_PROVENANCE_PATH}: keys must be exactly {}",
+                python_list_repr(&expected_keys)
+            ));
+        }
+        if !json_value_equals_python_integer_one(provenance.get("schema_version")) {
+            findings.push(format!(
+                "{STATIC_SEED_PROVENANCE_PATH}: schema_version must be 1"
+            ));
+        }
+        if provenance.get("source_repository").and_then(Value::as_str)
+            != Some(STATIC_SEED_SOURCE_REPOSITORY)
+        {
+            findings.push(format!(
+                "{STATIC_SEED_PROVENANCE_PATH}: source_repository must be {STATIC_SEED_SOURCE_REPOSITORY}"
+            ));
+        }
+        let source_commit = provenance.get("source_commit").and_then(Value::as_str);
+        if !source_commit.is_some_and(|commit| object_id_pattern().is_match(commit)) {
+            findings.push(format!(
+                "{STATIC_SEED_PROVENANCE_PATH}: source_commit must be a lowercase Git object ID"
+            ));
+        }
+    }
+
+    let codex_root = root.join(".codex");
+    let agents_root = codex_root.join("agents");
+    for (relative, path) in [
+        (".codex", codex_root.as_path()),
+        (".codex/agents", agents_root.as_path()),
+    ] {
+        if !is_regular_directory(path) {
+            findings.push(format!("{relative}: expected a regular directory"));
+        }
+    }
+
+    let config_path = codex_root.join("config.toml");
+    let config = if !is_regular_file(&config_path) {
+        findings.push(".codex/config.toml: expected a regular file".to_owned());
+        None
+    } else {
+        load_static_seed_toml(&config_path, ".codex/config.toml", &mut findings)
+    };
+
+    let mut referenced_roles = BTreeSet::new();
+    if let Some(config) = config.as_ref() {
+        if let Some(raw_agents) = config.get("agents").and_then(item_as_table_like) {
+            for (raw_role, raw_value) in raw_agents.iter() {
+                let Some(role_table) = item_as_table_like(raw_value) else {
+                    continue;
+                };
+                let Some(config_file) = role_table.get("config_file").and_then(Item::as_str) else {
+                    findings.push(format!(
+                        ".codex/config.toml: agents.{raw_role}.config_file must be a string"
+                    ));
+                    continue;
+                };
+                let Some(resolved) = canonical_role_path(raw_role, config_file) else {
+                    findings.push(format!(
+                        ".codex/config.toml: agents.{raw_role}.config_file must be agents/{raw_role}.toml"
+                    ));
+                    continue;
+                };
+                referenced_roles.insert(resolved.clone());
+                if !is_regular_file(&root.join(&resolved)) {
+                    findings.push(format!(
+                        "{resolved}: expected a regular referenced role file"
+                    ));
+                }
+            }
+        } else {
+            findings.push(".codex/config.toml: [agents] table is required".to_owned());
+        }
+    }
+
+    finish_static_seed_consumer(root, findings, config, referenced_roles, &agents_root)
+}
+
+fn finish_static_seed_consumer(
+    root: &Path,
+    mut findings: Vec<String>,
+    config: Option<DocumentMut>,
+    referenced_roles: BTreeSet<String>,
+    agents_root: &Path,
+) -> Vec<String> {
+    let mut actual_roles = BTreeSet::new();
+    if is_regular_directory(agents_root) {
+        collect_static_role_files(root, agents_root, &mut actual_roles, &mut findings);
+    }
+    if actual_roles != referenced_roles {
+        let missing = referenced_roles
+            .difference(&actual_roles)
+            .cloned()
+            .collect::<Vec<_>>();
+        let extra = actual_roles
+            .difference(&referenced_roles)
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing.is_empty() {
+            findings.push(format!(
+                ".codex/agents: missing referenced role files: {}",
+                python_list_repr(&missing.iter().map(String::as_str).collect::<Vec<_>>())
+            ));
+        }
+        if !extra.is_empty() {
+            findings.push(format!(
+                ".codex/agents: unreferenced role files: {}",
+                python_list_repr(&extra.iter().map(String::as_str).collect::<Vec<_>>())
+            ));
+        }
+    }
+
+    let mut toml_payloads = BTreeMap::<String, DocumentMut>::new();
+    if let Some(config) = config {
+        toml_payloads.insert(".codex/config.toml".to_owned(), config);
+    }
+    for relative in &actual_roles {
+        let path = root.join(relative);
+        if let Some(document) = load_static_seed_toml(&path, relative, &mut findings) {
+            toml_payloads.insert(relative.clone(), document);
+        }
+    }
+
+    let mut controlled_files = BTreeSet::from([STATIC_SEED_PROVENANCE_PATH.to_owned()]);
+    controlled_files.insert(".codex/config.toml".to_owned());
+    controlled_files.extend(referenced_roles);
+    controlled_files.extend(actual_roles);
+    for relative in controlled_files {
+        let path = root.join(&relative);
+        if !is_regular_file(&path) {
+            continue;
+        }
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                findings.push(format!("{relative}: cannot read file: {error}"));
+                continue;
+            }
+        };
+        let lowered = bytes.to_ascii_lowercase();
+        for marker in STATIC_SEED_FORBIDDEN_CONTENT {
+            if contains_bytes(&lowered, marker) {
+                findings.push(format!(
+                    "{relative}: static seed contains forbidden runtime marker: {}",
+                    String::from_utf8_lossy(marker)
+                ));
+            }
+        }
+    }
+
+    for (relative, document) in toml_payloads {
+        let mut found_prefixes = BTreeSet::new();
+        scan_toml_table(document.as_table(), &mut found_prefixes);
+        for marker in found_prefixes {
+            findings.push(format!(
+                "{relative}: static seed contains forbidden runtime marker: {}",
+                String::from_utf8_lossy(&marker)
+            ));
+        }
+    }
+    findings
+}
+
+fn collect_static_role_files(
+    root: &Path,
+    directory: &Path,
+    files: &mut BTreeSet<String>,
+    findings: &mut Vec<String>,
+) {
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    let mut entries = entries.flatten().collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        let path = entry.path();
+        let relative = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if metadata.file_type().is_symlink() {
+            findings.push(format!("{relative}: static seed must not contain symlinks"));
+        } else if metadata.file_type().is_dir() {
+            collect_static_role_files(root, &path, files, findings);
+        } else if metadata.file_type().is_file() {
+            files.insert(relative);
+        }
+    }
+}
+
+fn load_static_seed_toml(
+    path: &Path,
+    label: &str,
+    findings: &mut Vec<String>,
+) -> Option<DocumentMut> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) => {
+            findings.push(format!("{label}: invalid UTF-8 TOML: {error}"));
+            return None;
+        }
+    };
+    match text.parse::<DocumentMut>() {
+        Ok(document) => Some(document),
+        Err(error) => {
+            findings.push(format!("{label}: invalid UTF-8 TOML: {error}"));
+            None
+        }
+    }
+}
+
+fn canonical_role_path(role: &str, raw_path: &str) -> Option<String> {
+    if raw_path.is_empty()
+        || raw_path.starts_with('/')
+        || raw_path
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return None;
+    }
+    let resolved = format!(".codex/{raw_path}");
+    let expected = format!(".codex/agents/{role}.toml");
+    (resolved == expected).then_some(resolved)
+}
+
+fn scan_toml_table(table: &dyn TableLike, found: &mut BTreeSet<Vec<u8>>) {
+    for (key, item) in table.iter() {
+        scan_toml_string(key, found);
+        scan_toml_item(item, found);
+    }
+}
+
+fn scan_toml_item(item: &Item, found: &mut BTreeSet<Vec<u8>>) {
+    if let Some(value) = item.as_str() {
+        scan_toml_string(value, found);
+    } else if let Some(table) = item.as_table() {
+        scan_toml_table(table, found);
+    } else if let Some(tables) = item.as_array_of_tables() {
+        for table in tables.iter() {
+            scan_toml_table(table, found);
+        }
+    } else if let Some(values) = item.as_array() {
+        for value in values.iter() {
+            scan_toml_value(value, found);
+        }
+    } else if let Some(table) = item.as_inline_table() {
+        scan_toml_table(table, found);
+    }
+}
+
+fn scan_toml_value(value: &toml_edit::Value, found: &mut BTreeSet<Vec<u8>>) {
+    if let Some(value) = value.as_str() {
+        scan_toml_string(value, found);
+    } else if let Some(values) = value.as_array() {
+        for value in values.iter() {
+            scan_toml_value(value, found);
+        }
+    } else if let Some(table) = value.as_inline_table() {
+        scan_toml_table(table, found);
+    }
+}
+
+fn scan_toml_string(value: &str, found: &mut BTreeSet<Vec<u8>>) {
+    let lowered = value.to_lowercase().into_bytes();
+    for marker in STATIC_SEED_FORBIDDEN_PREFIXES {
+        if contains_bytes(&lowered, marker) {
+            found.insert(marker.to_vec());
+        }
+    }
+}
+
+fn contains_bytes(source: &[u8], needle: &[u8]) -> bool {
+    !needle.is_empty() && source.windows(needle.len()).any(|window| window == needle)
+}
+
+fn object_id_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| Regex::new(r"^[0-9a-f]{40,64}$").expect("static object ID expression"))
+}
+
+fn json_value_equals_python_integer_one(value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Bool(true)) => true,
+        Some(Value::Number(number)) => {
+            number.as_i64() == Some(1) || number.as_u64() == Some(1) || number.as_f64() == Some(1.0)
+        }
+        _ => false,
+    }
+}
+
+fn python_string_repr(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
+}
+
+fn python_list_repr(values: &[&str]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|value| python_string_repr(value))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 fn render_check(root: &Path, raw_paths: &[String]) -> i32 {
@@ -1178,6 +1910,7 @@ mod tests {
 
         assert!(usage.contains("docs check"));
         assert!(usage.contains("docs format"));
+        assert!(usage.contains("docs check-bootstrap"));
     }
 
     #[test]
