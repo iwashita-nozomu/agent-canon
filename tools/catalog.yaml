@@ -1109,12 +1109,25 @@ entries:
   - id: lsp-code-analysis
     public: true
     summary: Runs one-shot LSP 3.17 code analysis and emits deterministic symbols, relations, diagnostics, lexical candidates, lifecycle, and provenance.
-    path: tools/analysis/code/lsp_code_analysis.py
+    path: tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/analysis/code/lsp_code_analysis.py analyze --root . --format json
-    dispatch: {argv: ["python3", "tools/analysis/code/lsp_code_analysis.py", "analyze", "--root", ".", "--format", "json"]}
+    command: tools/bin/agent-canon lsp-code-analysis analyze --root . --format json
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, lsp-code-analysis, analyze, --root, ., --format, json]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
     writes: false
     default_wiring:
       ci: false
@@ -1126,6 +1139,7 @@ entries:
       - documents/structured-analysis/code-analysis.md
     tests:
       - tests/agent_tools/test_lsp_code_analysis.py
+      - tools/runtime/dispatch/agent-canon/tests/lsp_code_analysis_native.rs
 
   - id: semantic-index
     public: true

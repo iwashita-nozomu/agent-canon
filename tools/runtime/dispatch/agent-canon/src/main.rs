@@ -29,6 +29,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // @dependency-end
 
 mod check_merge_structure;
@@ -96,6 +97,7 @@ Commands:
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
+  lsp-code-analysis analyze [--root ROOT] [--files FILES...] [--server LANGUAGE=COMMAND] [--timeout SECONDS] [--format json|text]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
@@ -161,6 +163,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "classify-path-risk" {
         std::process::exit(classify_path_risk::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "lsp-code-analysis" {
+        std::process::exit(agent_canon::lsp_code_analysis::run(&args[2..]));
     }
 
     if args.len() >= 2
