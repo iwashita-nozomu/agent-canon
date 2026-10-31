@@ -318,7 +318,7 @@ def add_closeout_decision_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help=(
             "Append standard closeout observations consumed by "
-            "evaluate_agent_run.py. This preset never substitutes for a canonical "
+            "the native `agent-canon run-evaluation` command. This preset never substitutes for a canonical "
             "CloseAgentToolCall; use only after lifecycle evidence and the token "
             "reference have been recorded through append_monitoring."
         ),
