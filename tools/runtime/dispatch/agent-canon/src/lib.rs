@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, theorem-board, artifact, catalog, proof environment, and evaluation APIs.
+//! Shared AgentCanon runtime, LSP, theorem-board, artifact, catalog, path-resolution, proof environment, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
@@ -12,6 +12,7 @@
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
@@ -35,6 +36,7 @@ pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
+pub mod path_resolution;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;

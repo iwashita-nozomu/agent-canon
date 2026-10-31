@@ -2,17 +2,19 @@
 // contract implementation
 // responsibility Runs native Lake setup and Lean proof, interface, and counterexample checks without interpreting diagnostic text as success.
 // upstream design ../../../../../agents/skills/formal-proof-workflow.md owns proof workflow selection
+// upstream implementation path_resolution.rs resolves selected environment and Lean file paths
 // downstream design ../../../../../documents/tools/lean_proof_env.md documents the CLI and native configuration boundary
 // downstream test ../tests/lean_proof_env_native.rs validates the shared API
 // downstream implementation ../../../../../tests/agent_tools/test_lean_proof_env.py validates the selected native CLI
 // @dependency-end
 
 use serde::Serialize;
-use std::env;
 use std::fs;
 use std::io;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
+
+use crate::path_resolution::resolve_non_strict;
 
 pub const SELECTOR: &str = "lean-proof-env";
 pub const DEFAULT_PACKAGE_NAME: &str = "agent_canon_lean_proof_env";
@@ -113,7 +115,7 @@ pub fn run(args: &[String]) -> i32 {
 
 /// Plan or execute the selected native Lake and Lean operations.
 pub fn build_result(args: &LeanProofEnvArgs) -> Result<LeanProofEnvResult, String> {
-    let env_dir = resolve_path(&args.env_dir).map_err(|error| error.to_string())?;
+    let env_dir = resolve_non_strict(&args.env_dir)?;
     if args.action == "check-file" && args.lean_file.is_none() {
         return Err("--lean-file is required for check-file".to_owned());
     }
@@ -194,10 +196,10 @@ pub fn build_result(args: &LeanProofEnvArgs) -> Result<LeanProofEnvResult, Strin
             .lean_file
             .as_deref()
             .expect("check-file path was validated above");
-        lean_files.push(resolve_path(path).map_err(|error| error.to_string())?);
+        lean_files.push(resolve_non_strict(path)?);
     }
 
-    let lake = ["lake".to_owned(), format!("+{selected_toolchain}")];
+    let lake = vec!["lake".to_owned(), format!("+{selected_toolchain}")];
     let mut commands: Vec<Vec<String>> = Vec::new();
     if !configured {
         commands.push(
@@ -645,36 +647,6 @@ fn manifest_mathlib_revision(path: &Path) -> Option<String> {
 
 fn read_text(path: &Path) -> io::Result<String> {
     fs::read_to_string(path)
-}
-
-fn resolve_path(path: &Path) -> io::Result<PathBuf> {
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        env::current_dir()?.join(path)
-    };
-    let mut resolved = PathBuf::new();
-    for component in absolute.components() {
-        match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if let Ok(canonicalized) = fs::canonicalize(&resolved) {
-                    resolved = canonicalized;
-                }
-                if !resolved.pop() && !resolved.has_root() {
-                    resolved.push(component.as_os_str());
-                }
-            }
-            Component::Normal(_) => {
-                resolved.push(component.as_os_str());
-                if let Ok(canonicalized) = fs::canonicalize(&resolved) {
-                    resolved = canonicalized;
-                }
-            }
-            _ => resolved.push(component.as_os_str()),
-        }
-    }
-    Ok(resolved)
 }
 
 fn shell_join(parts: &[String]) -> String {

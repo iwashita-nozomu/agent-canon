@@ -42,6 +42,9 @@ with log_path.open("a+", encoding="utf-8") as stream:
     call_number = sum(1 for _ in stream) + 1
     stream.seek(0, 2)
     stream.write(json.dumps(command) + chr(10))
+cwd_log = Path(os.environ["LAKE_CWD_LOG"])
+with cwd_log.open("a", encoding="utf-8") as stream:
+    stream.write(str(Path.cwd()) + chr(10))
 returncode = int(os.environ.get("LAKE_RETURN_CODE", "0"))
 if int(os.environ.get("LAKE_FAIL_AT", "-1")) == call_number:
     returncode = 17
@@ -78,6 +81,7 @@ sys.exit(returncode)
     return {
         "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
         "LAKE_CALL_LOG": str(call_log),
+        "LAKE_CWD_LOG": str(tmp_path / "lake-cwds.txt"),
         "LAKE_MATHLIB_REVISION": MATHLIB_REVISION,
     }
 
@@ -87,6 +91,13 @@ def provider_calls(provider: dict[str, str]) -> list[tuple[str, ...]]:
     if not path.exists():
         return []
     return [tuple(json.loads(line)) for line in path.read_text().splitlines()]
+
+
+def provider_cwds(provider: dict[str, str]) -> list[str]:
+    path = Path(provider["LAKE_CWD_LOG"])
+    if not path.exists():
+        return []
+    return path.read_text().splitlines()
 
 
 def run_cli(
@@ -150,6 +161,84 @@ def test_dry_run_neither_initializes_nor_writes_probes(
     assert result["commands"][0] == (
         f"lake +{TOOLCHAIN} init agent_canon_lean_proof_env math"
     )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="fixture requires Unix symbolic links")
+def test_dangling_env_directory_link_resolves_during_dry_run_without_writes(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "missing-parent" / "missing-suffix" / "env"
+    link = tmp_path / "env-link"
+    link.symlink_to(target, target_is_directory=True)
+    provider = install_fake_lake(tmp_path)
+
+    completed = run_cli(
+        *arguments(link, "init", execute=False, toolchain=TOOLCHAIN), env=provider
+    )
+    result = result_payload(completed)
+
+    assert completed.returncode == 0
+    assert result["env_dir"] == str(target.resolve())
+    assert result["status"] == "dry_run"
+    assert not target.exists()
+    assert link.is_symlink()
+    assert provider_calls(provider) == []
+    assert provider_cwds(provider) == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="fixture requires Unix symbolic links")
+def test_dangling_env_directory_link_executes_lake_in_the_resolved_directory(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "missing-parent" / "missing-suffix" / "env"
+    link = tmp_path / "env-link"
+    link.symlink_to(target, target_is_directory=True)
+    provider = install_fake_lake(tmp_path)
+
+    completed = run_cli(*arguments(link, "init", toolchain=TOOLCHAIN), env=provider)
+    result = result_payload(completed)
+    resolved = str(target.resolve())
+
+    assert completed.returncode == 0
+    assert result["env_dir"] == resolved
+    assert result["status"] == "initialized"
+    assert provider_cwds(provider) == [resolved, resolved, resolved]
+    assert (target / "lakefile.toml").is_file()
+    assert link.is_symlink()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="fixture requires Unix symbolic links")
+def test_dangling_lean_file_link_uses_its_resolved_missing_target(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "package"
+    root.mkdir()
+    (root / "lakefile.toml").write_text("project-owned\n", encoding="utf-8")
+    (root / "lean-toolchain").write_text(
+        "project-selected-toolchain\n", encoding="utf-8"
+    )
+    target = tmp_path / "missing-source-directory" / "proof.lean"
+    link = tmp_path / "proof-link.lean"
+    link.symlink_to(target)
+    provider = install_fake_lake(tmp_path)
+
+    completed = run_cli(
+        *arguments(root, "check-file"),
+        "--lean-toolchain",
+        "project-selected-toolchain",
+        "--lean-file",
+        str(link),
+        env=provider,
+    )
+    result = result_payload(completed)
+    calls = provider_calls(provider)
+    resolved = str(target.resolve())
+
+    assert completed.returncode == 0
+    assert result["lean_file"] == resolved
+    assert calls[-1][-1] == resolved
+    assert link.is_symlink()
+    assert not target.parent.exists()
 
 
 @pytest.mark.skipif(
