@@ -93,9 +93,9 @@ mod tool_drift;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, generated_completeness, native_release, run_evaluation,
-    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
-    tool_proof_coverage, work_log,
+    catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
+    run_evaluation, stablehlo_value_closure, template_bundle, theorem_graph_board,
+    theorem_graph_circularity_check, tool_proof_coverage, work_log,
 };
 use std::env;
 
@@ -125,6 +125,7 @@ Commands:
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
   work-log [--report-dir PATH|--run-id ID] --message TEXT [options]
   numeric-performance [--input <path|->] [--format json]
+  compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
@@ -204,6 +205,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "numeric-performance" {
         std::process::exit(numeric_performance::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "compare-agent-run-paths" {
+        std::process::exit(compare_agent_run_paths::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
