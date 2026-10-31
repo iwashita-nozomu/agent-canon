@@ -9,7 +9,7 @@ downstream design CODEX_WORKFLOW.md conditional phase selection
 downstream design ROOT_IMPLEMENTATION.md implementation decisions
 downstream design ROOT_EXECUTION.md execution and checkout decisions
 downstream design ROOT_DELIVERY.md writing and delivery decisions
-downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verification
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs structural verification
 @dependency-end
 -->
 
@@ -59,7 +59,7 @@ The reader map is neither a startup packet nor an execution checklist.
 | workflow family and role candidates | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml` | `check_agent_runtime_alignment.py` |
 | AgentCanon source publication | [agents/skills/agent-canon-update.md](../skills/agent-canon-update.md) | repository-topic-clone and PR checks |
-| entrypoint responsibility grammar | [documents/design/entrypoint-owner-map.md](../../documents/design/entrypoint-owner-map.md) | `check_entrypoint_owner_map.py` |
+| entrypoint responsibility grammar | [documents/design/entrypoint-owner-map.md](../../documents/design/entrypoint-owner-map.md) | `agent-canon docs check-entrypoints` |
 | implementation decision precedence | [engineering principles](../../documents/conventions/software-engineering-principles.md) | selected implementation/review evidence |
 
 ## Task Entry
