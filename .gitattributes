@@ -14,6 +14,7 @@ bootstrap/container/image/dependencies.toml text eol=lf
 
 # Frozen Python JSON goldens are byte-hashed by native tests; preserve LF bytes on every host.
 tests/fixtures/update_lifecycle/*_python_golden.json text eol=lf
+tests/fixtures/owner_guarantee/python_golden.json text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
