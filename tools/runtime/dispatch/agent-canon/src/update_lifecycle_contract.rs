@@ -10,6 +10,7 @@
 // downstream test ../tests/update_lifecycle_pr_native.rs freezes the native PR lifecycle APIs against CPython outputs
 // downstream test ../tests/update_lifecycle_publication_native.rs freezes publication readback receipts and transitions
 // downstream test ../tests/update_lifecycle_queue_native.rs freezes queue keys, receipts, and replay behavior
+// downstream test ../tests/update_lifecycle_frontier_native.rs freezes ordered frontier validation and transitions
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -98,6 +99,7 @@ const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
 const QUEUE_RECEIPT_SCHEMA: &str = "agent-canon.queue-receipt.v1";
+const DEPENDENCY_FRONTIER_SCHEMA: &str = "agent-canon.dependency-frontier.v1";
 const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
@@ -195,6 +197,12 @@ pub struct RecordBindingIdentity {
     pub input_digest: String,
     pub tool_id: String,
     pub tool_version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceMainReadbackIdentity {
+    pub commit_sha: String,
+    pub tree_sha: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -346,6 +354,16 @@ fn positive_integer(
         Ok(())
     } else {
         Err(fail("lifecycle:integer_invalid", field))
+    }
+}
+
+fn frontier_queue_number_matches(value: &JsonValue, expected: u16) -> bool {
+    match value {
+        JsonValue::Number(number) if number.is_f64() => number.as_f64().is_some_and(|number| {
+            number.partial_cmp(&f64::from(expected)) == Some(std::cmp::Ordering::Equal)
+        }),
+        JsonValue::Number(number) => number.to_string() == expected.to_string(),
+        _ => false,
     }
 }
 
@@ -2543,6 +2561,452 @@ pub fn validate_immutable_replay(
         return Err(fail("input_identity_mismatch", field));
     }
     Ok(())
+}
+
+pub fn frontier_key(
+    source_namespace: &str,
+    binding: &JsonValue,
+    publication_identity: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let publication = validate_source_publication_identity(
+        publication_identity,
+        "frontier_key.publication_identity",
+    )?;
+    let binding_map = mapping(&checked_binding, "binding")?;
+    let publication_map = mapping(&publication, "frontier_key.publication_identity")?;
+    let body = format!(
+        "{}|{}|{}|{}|{}|{}",
+        source_namespace,
+        required_string(binding_map, "candidate_sha", "binding")?,
+        required_string(binding_map, "tree_sha", "binding")?,
+        required_string(binding_map, "input_digest", "binding")?,
+        required_string(
+            publication_map,
+            "merge_commit_sha",
+            "frontier_key.publication_identity",
+        )?,
+        required_string(
+            publication_map,
+            "merge_tree_sha",
+            "frontier_key.publication_identity",
+        )?,
+    );
+    let digest = Sha256::digest(body.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(format!("frontier-key:{digest}"))
+}
+
+pub fn validate_dependency_frontier(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let frontier = mapping(value, "dependency_frontier")?;
+    let fields = [
+        "schema",
+        "frontier_id",
+        "binding",
+        "frontier_state",
+        "queue_receipt_id",
+        "source_namespace",
+        "source_main_rebind_receipt_id",
+        "source_main_rebind_evidence_ref",
+        "source_main_readback_evidence_ref",
+        "source_publication_identity",
+        "ordered_predecessor_evidence",
+        "frontier_key",
+        "preceding_frontier_evidence_id",
+        "acceptance_evidence_ref",
+        "parent_projection_evidence_ref",
+    ];
+    exact_keys(frontier, &fields, &[], "dependency_frontier")?;
+    if frontier.get("schema").and_then(JsonValue::as_str) != Some(DEPENDENCY_FRONTIER_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", DEPENDENCY_FRONTIER_SCHEMA));
+    }
+    let frontier_id = pattern_value(
+        required_value(frontier, "frontier_id", "dependency_frontier")?,
+        "dependency_frontier.frontier_id",
+        valid_hash_id,
+    )?;
+    if !frontier_id.starts_with("frontier:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "dependency_frontier.frontier_id",
+        ));
+    }
+    let binding =
+        validate_record_binding(required_value(frontier, "binding", "dependency_frontier")?)?;
+    let state = one_of(
+        required_value(frontier, "frontier_state", "dependency_frontier")?,
+        &["pending", "accepted", "failed"],
+        "dependency_frontier.frontier_state",
+    )?;
+    let queue_id = pattern_value(
+        required_value(frontier, "queue_receipt_id", "dependency_frontier")?,
+        "dependency_frontier.queue_receipt_id",
+        valid_hash_id,
+    )?;
+    if !queue_id.starts_with("queue:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "dependency_frontier.queue_receipt_id",
+        ));
+    }
+    let source_namespace = string_value(
+        required_value(frontier, "source_namespace", "dependency_frontier")?,
+        "dependency_frontier.source_namespace",
+    )?;
+    if !Path::new(&source_namespace).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "dependency_frontier.source_namespace",
+        ));
+    }
+    let rebind_id = pattern_value(
+        required_value(
+            frontier,
+            "source_main_rebind_receipt_id",
+            "dependency_frontier",
+        )?,
+        "dependency_frontier.source_main_rebind_receipt_id",
+        valid_hash_id,
+    )?;
+    if !rebind_id.starts_with("rebind:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "dependency_frontier.source_main_rebind_receipt_id",
+        ));
+    }
+    pattern_value(
+        required_value(
+            frontier,
+            "source_main_rebind_evidence_ref",
+            "dependency_frontier",
+        )?,
+        "dependency_frontier.source_main_rebind_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    pattern_value(
+        required_value(
+            frontier,
+            "source_main_readback_evidence_ref",
+            "dependency_frontier",
+        )?,
+        "dependency_frontier.source_main_readback_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    let publication = validate_source_publication_identity(
+        required_value(
+            frontier,
+            "source_publication_identity",
+            "dependency_frontier",
+        )?,
+        "dependency_frontier.source_publication_identity",
+    )?;
+    let predecessors_field = "dependency_frontier.ordered_predecessor_evidence";
+    let predecessors = required_value(
+        frontier,
+        "ordered_predecessor_evidence",
+        "dependency_frontier",
+    )?
+    .as_array()
+    .ok_or_else(|| fail("lifecycle:sequence_required", predecessors_field))?;
+    if predecessors.len() != 2 {
+        return Err(fail("frontier:predecessor_order_invalid", ""));
+    }
+    for (index, (item, (queue_number, source_pr))) in predecessors
+        .iter()
+        .zip([(388_u16, "#388"), (389_u16, "#389")])
+        .enumerate()
+    {
+        let item_field = format!("{predecessors_field}[{index}]");
+        let record = mapping(item, &item_field)?;
+        let required = ["queue_number", "source_pr", "publication_evidence_id"];
+        let optional: &[&str] = if queue_number == 389 {
+            &["source_pr_sha"]
+        } else {
+            &[]
+        };
+        exact_keys(record, &required, optional, &item_field)?;
+        if !frontier_queue_number_matches(
+            required_value(record, "queue_number", &item_field)?,
+            queue_number,
+        ) || required_value(record, "source_pr", &item_field)?.as_str() != Some(source_pr)
+        {
+            return Err(fail("frontier:predecessor_order_invalid", ""));
+        }
+        pattern_value(
+            required_value(record, "publication_evidence_id", &item_field)?,
+            &format!("{item_field}.publication_evidence_id"),
+            valid_evidence_ref,
+        )?;
+        if queue_number == 389 {
+            pattern_value(
+                record.get("source_pr_sha").unwrap_or(&JsonValue::Null),
+                "dependency_frontier.ordered_predecessor_evidence[1].source_pr_sha",
+                |text| lower_hex(text, 40),
+            )?;
+        }
+    }
+    let expected_key = frontier_key(&source_namespace, &binding, &publication)?;
+    if required_value(frontier, "frontier_key", "dependency_frontier")?.as_str()
+        != Some(expected_key.as_str())
+    {
+        return Err(fail("frontier:key_mismatch", ""));
+    }
+    let preceding = required_value(
+        frontier,
+        "preceding_frontier_evidence_id",
+        "dependency_frontier",
+    )?;
+    let acceptance = required_value(frontier, "acceptance_evidence_ref", "dependency_frontier")?;
+    match state.as_str() {
+        "pending" if !acceptance.is_null() || !preceding.is_null() => {
+            return Err(fail("frontier:pending_evidence_forbidden", ""));
+        }
+        "accepted" => {
+            pattern_value(
+                acceptance,
+                "dependency_frontier.acceptance_evidence_ref",
+                valid_evidence_ref,
+            )?;
+            pattern_value(
+                preceding,
+                "dependency_frontier.preceding_frontier_evidence_id",
+                valid_evidence_ref,
+            )?;
+        }
+        "failed" if !acceptance.is_null() => {
+            pattern_value(
+                acceptance,
+                "dependency_frontier.acceptance_evidence_ref",
+                valid_evidence_ref,
+            )?;
+        }
+        _ => {}
+    }
+    if !required_value(
+        frontier,
+        "parent_projection_evidence_ref",
+        "dependency_frontier",
+    )?
+    .is_null()
+    {
+        return Err(fail("frontier:parent_projection_before_acceptance", ""));
+    }
+    canonical_clone(value)
+}
+
+pub fn materialize_dependency_frontier(
+    binding: &JsonValue,
+    queue_receipt: &JsonValue,
+    rebind_receipt: &JsonValue,
+    source_main_readback_evidence_ref: &str,
+    ordered_predecessor_evidence: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let queue = validate_queue_receipt(queue_receipt)?;
+    let rebind = validate_source_main_rebind_receipt(rebind_receipt)?;
+    let queue_map = mapping(&queue, "queue_receipt")?;
+    let rebind_map = mapping(&rebind, "source_main_rebind_receipt")?;
+    same_binding(
+        &checked_binding,
+        required_value(queue_map, "binding", "queue_receipt")?,
+        "dependency_frontier.queue",
+    )?;
+    same_binding(
+        &checked_binding,
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        "dependency_frontier.rebind",
+    )?;
+    if required_string(queue_map, "state", "queue_receipt")? != "accepted" {
+        return Err(fail("frontier:queue_not_accepted", ""));
+    }
+    if required_value(queue_map, "source_main_rebind_receipt_id", "queue_receipt")?
+        != required_value(
+            rebind_map,
+            "rebind_receipt_id",
+            "source_main_rebind_receipt",
+        )?
+    {
+        return Err(fail("frontier:rebind_mismatch", ""));
+    }
+    let publication = validate_source_publication_identity(
+        required_value(queue_map, "source_publication_identity", "queue_receipt")?,
+        "dependency_frontier.queue.source_publication_identity",
+    )?;
+    let source_namespace = required_string(queue_map, "source_namespace", "queue_receipt")?;
+    let key = frontier_key(&source_namespace, &checked_binding, &publication)?;
+    let frontier_id_hex = Sha256::digest(key.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let rebind_binding = mapping(
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        "binding",
+    )?;
+    let frontier = serde_json::json!({
+        "schema": DEPENDENCY_FRONTIER_SCHEMA,
+        "frontier_id": format!("frontier:{frontier_id_hex}"),
+        "binding": checked_binding,
+        "frontier_state": "pending",
+        "queue_receipt_id": required_value(queue_map, "queue_receipt_id", "queue_receipt")?,
+        "source_namespace": source_namespace,
+        "source_main_rebind_receipt_id": required_value(rebind_map, "rebind_receipt_id", "source_main_rebind_receipt")?,
+        "source_main_rebind_evidence_ref": required_value(rebind_binding, "evidence_ref", "binding")?,
+        "source_main_readback_evidence_ref": source_main_readback_evidence_ref,
+        "source_publication_identity": publication,
+        "ordered_predecessor_evidence": ordered_predecessor_evidence,
+        "frontier_key": key,
+        "preceding_frontier_evidence_id": null,
+        "acceptance_evidence_ref": null,
+        "parent_projection_evidence_ref": null,
+    });
+    validate_dependency_frontier(&frontier)
+}
+
+pub fn validate_dependency_frontier_transition(
+    pending: &JsonValue,
+    accepted: &JsonValue,
+    queue_receipt: &JsonValue,
+    rebind_receipt: &JsonValue,
+    origin_main_readback: &SourceMainReadbackIdentity,
+    ordered_oracle: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let before = validate_dependency_frontier(pending)?;
+    let after = validate_dependency_frontier(accepted)?;
+    let queue = validate_queue_receipt(queue_receipt)?;
+    let rebind = validate_source_main_rebind_receipt(rebind_receipt)?;
+    let before_map = mapping(&before, "dependency_frontier")?;
+    let after_map = mapping(&after, "dependency_frontier")?;
+    let queue_map = mapping(&queue, "queue_receipt")?;
+    let rebind_map = mapping(&rebind, "source_main_rebind_receipt")?;
+    if required_string(before_map, "frontier_state", "dependency_frontier")? != "pending"
+        || required_string(after_map, "frontier_state", "dependency_frontier")? != "accepted"
+    {
+        return Err(fail("frontier:transition_invalid", ""));
+    }
+    same_binding(
+        required_value(before_map, "binding", "dependency_frontier")?,
+        required_value(after_map, "binding", "dependency_frontier")?,
+        "dependency_frontier",
+    )?;
+    for field in [
+        "frontier_id",
+        "queue_receipt_id",
+        "source_namespace",
+        "source_main_rebind_receipt_id",
+        "source_main_rebind_evidence_ref",
+        "source_main_readback_evidence_ref",
+        "source_publication_identity",
+        "ordered_predecessor_evidence",
+        "frontier_key",
+        "parent_projection_evidence_ref",
+    ] {
+        if required_value(before_map, field, "dependency_frontier")?
+            != required_value(after_map, field, "dependency_frontier")?
+        {
+            return Err(fail("frontier:immutable_field_changed", field));
+        }
+    }
+    let before_binding = mapping(
+        required_value(before_map, "binding", "dependency_frontier")?,
+        "binding",
+    )?;
+    if required_value(
+        after_map,
+        "preceding_frontier_evidence_id",
+        "dependency_frontier",
+    )? != required_value(before_binding, "evidence_ref", "binding")?
+    {
+        return Err(fail("frontier:preceding_evidence_mismatch", ""));
+    }
+    if required_string(queue_map, "state", "queue_receipt")? != "accepted"
+        || required_value(queue_map, "queue_receipt_id", "queue_receipt")?
+            != required_value(after_map, "queue_receipt_id", "dependency_frontier")?
+    {
+        return Err(fail("frontier:queue_not_accepted", ""));
+    }
+    same_binding(
+        required_value(queue_map, "binding", "queue_receipt")?,
+        required_value(after_map, "binding", "dependency_frontier")?,
+        "dependency_frontier.queue",
+    )?;
+    if required_value(
+        rebind_map,
+        "rebind_receipt_id",
+        "source_main_rebind_receipt",
+    )? != required_value(
+        after_map,
+        "source_main_rebind_receipt_id",
+        "dependency_frontier",
+    )? {
+        return Err(fail("frontier:rebind_mismatch", ""));
+    }
+    let rebind_binding = mapping(
+        required_value(rebind_map, "binding", "source_main_rebind_receipt")?,
+        "binding",
+    )?;
+    if required_value(rebind_binding, "evidence_ref", "binding")?
+        != required_value(
+            after_map,
+            "source_main_rebind_evidence_ref",
+            "dependency_frontier",
+        )?
+    {
+        return Err(fail("frontier:rebind_evidence_mismatch", ""));
+    }
+    let publication = mapping(
+        required_value(
+            after_map,
+            "source_publication_identity",
+            "dependency_frontier",
+        )?,
+        "dependency_frontier.source_publication_identity",
+    )?;
+    let origin_main_commit_sha = pattern_value(
+        &JsonValue::String(origin_main_readback.commit_sha.clone()),
+        "dependency_frontier.origin_main_readback.commit_sha",
+        |text| lower_hex(text, 40),
+    )?;
+    let origin_main_tree_sha = pattern_value(
+        &JsonValue::String(origin_main_readback.tree_sha.clone()),
+        "dependency_frontier.origin_main_readback.tree_sha",
+        |text| lower_hex(text, 40),
+    )?;
+    if required_string(
+        publication,
+        "merge_commit_sha",
+        "dependency_frontier.source_publication_identity",
+    )? != origin_main_commit_sha
+        || required_string(
+            publication,
+            "merge_tree_sha",
+            "dependency_frontier.source_publication_identity",
+        )? != origin_main_tree_sha
+    {
+        return Err(fail("frontier:origin_main_readback_mismatch", ""));
+    }
+    let transaction_id = after_binding_transaction(&after)?;
+    let expected_oracle = serde_json::json!([
+        "source_pr:#388",
+        "source_pr:#389",
+        format!("transaction:{transaction_id}"),
+    ]);
+    if ordered_oracle != &expected_oracle {
+        return Err(fail("frontier:ordered_oracle_mismatch", ""));
+    }
+    Ok(after)
+}
+
+pub fn after_binding_transaction(frontier: &JsonValue) -> Result<String, LifecycleContractError> {
+    let frontier = mapping(frontier, "dependency_frontier")?;
+    let binding = mapping(
+        required_value(frontier, "binding", "dependency_frontier")?,
+        "dependency_frontier.binding",
+    )?;
+    required_string(binding, "transaction_id", "dependency_frontier.binding")
 }
 
 fn validate_remote_git_identity(
