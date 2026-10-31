@@ -7,6 +7,7 @@
 // upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
@@ -35,6 +36,7 @@
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // @dependency-end
 
+mod check_algorithm_config_partition;
 mod check_merge_structure;
 pub mod classify_path_risk;
 mod config;
@@ -93,6 +95,7 @@ Commands:
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
@@ -288,6 +291,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "python-algorithm-contract-check" {
         std::process::exit(python_algorithm_contract::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-algorithm-config-partition" {
+        std::process::exit(check_algorithm_config_partition::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "helper-function-inventory" {
