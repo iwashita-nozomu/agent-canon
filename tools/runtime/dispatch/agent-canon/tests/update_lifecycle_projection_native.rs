@@ -8,7 +8,8 @@
 
 use agent_canon::artifacts::artifact_identity::canonical_json_bytes;
 use agent_canon::update_lifecycle_contract::{
-    materialize_source_projection_packet, validate_source_projection_packet, LifecycleContractError,
+    materialize_source_projection_packet, validate_source_projection_packet,
+    LifecycleContractError, SourceProjectionPacketInput,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -40,16 +41,16 @@ fn invoke(api: &str, input: &Value) -> Result<Value, LifecycleContractError> {
             let acceptance_evidence_ref = field(input, "acceptance_evidence_ref")
                 .as_str()
                 .expect("materializer acceptance evidence input is text");
-            materialize_source_projection_packet(
-                field(input, "binding"),
-                field(input, "source_main_rebind_receipt"),
-                field(input, "candidate_cas_receipt"),
-                field(input, "pull_request_lifecycle"),
-                field(input, "publication_readback_receipt"),
-                gates,
-                predecessors,
+            materialize_source_projection_packet(&SourceProjectionPacketInput {
+                binding: field(input, "binding"),
+                source_main_rebind_receipt: field(input, "source_main_rebind_receipt"),
+                candidate_cas_receipt: field(input, "candidate_cas_receipt"),
+                pull_request_lifecycle: field(input, "pull_request_lifecycle"),
+                publication_readback_receipt: field(input, "publication_readback_receipt"),
+                source_gate_verdicts: gates,
+                ordered_predecessor_evidence: predecessors,
                 acceptance_evidence_ref,
-            )
+            })
         }
         other => panic!("unmapped frozen source projection API {other}"),
     }

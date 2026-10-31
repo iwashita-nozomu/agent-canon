@@ -331,6 +331,18 @@ pub struct CloseAgentToolCallInput<'a> {
     pub reservation_leak: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct SourceProjectionPacketInput<'a> {
+    pub binding: &'a JsonValue,
+    pub source_main_rebind_receipt: &'a JsonValue,
+    pub candidate_cas_receipt: &'a JsonValue,
+    pub pull_request_lifecycle: &'a JsonValue,
+    pub publication_readback_receipt: &'a JsonValue,
+    pub source_gate_verdicts: &'a [JsonValue],
+    pub ordered_predecessor_evidence: &'a [JsonValue],
+    pub acceptance_evidence_ref: &'a str,
+}
+
 fn fail(code: &str, detail: &str) -> LifecycleContractError {
     LifecycleContractError::new(code, detail)
 }
@@ -972,48 +984,41 @@ pub fn validate_source_projection_packet(
 
 /// Build a source projection packet from already-materialized lifecycle receipts.
 pub fn materialize_source_projection_packet(
-    binding: &JsonValue,
-    source_main_rebind_receipt: &JsonValue,
-    candidate_cas_receipt: &JsonValue,
-    pull_request_lifecycle: &JsonValue,
-    publication_readback_receipt: &JsonValue,
-    source_gate_verdicts: &[JsonValue],
-    ordered_predecessor_evidence: &[JsonValue],
-    acceptance_evidence_ref: &str,
+    input: &SourceProjectionPacketInput<'_>,
 ) -> Result<JsonValue, LifecycleContractError> {
     let mut packet = JsonMap::new();
     packet.insert(
         "schema".to_owned(),
         JsonValue::String(SOURCE_PROJECTION_PACKET_SCHEMA.to_owned()),
     );
-    packet.insert("binding".to_owned(), binding.clone());
+    packet.insert("binding".to_owned(), input.binding.clone());
     packet.insert(
         "source_main_rebind_receipt".to_owned(),
-        source_main_rebind_receipt.clone(),
+        input.source_main_rebind_receipt.clone(),
     );
     packet.insert(
         "candidate_cas_receipt".to_owned(),
-        candidate_cas_receipt.clone(),
+        input.candidate_cas_receipt.clone(),
     );
     packet.insert(
         "pull_request_lifecycle".to_owned(),
-        pull_request_lifecycle.clone(),
+        input.pull_request_lifecycle.clone(),
     );
     packet.insert(
         "publication_readback_receipt".to_owned(),
-        publication_readback_receipt.clone(),
+        input.publication_readback_receipt.clone(),
     );
     packet.insert(
         "source_gate_verdicts".to_owned(),
-        JsonValue::Array(source_gate_verdicts.to_vec()),
+        JsonValue::Array(input.source_gate_verdicts.to_vec()),
     );
     packet.insert(
         "ordered_predecessor_evidence".to_owned(),
-        JsonValue::Array(ordered_predecessor_evidence.to_vec()),
+        JsonValue::Array(input.ordered_predecessor_evidence.to_vec()),
     );
     packet.insert(
         "acceptance_evidence_ref".to_owned(),
-        JsonValue::String(acceptance_evidence_ref.to_owned()),
+        JsonValue::String(input.acceptance_evidence_ref.to_owned()),
     );
     validate_source_projection_packet(&JsonValue::Object(packet))
 }
