@@ -4,7 +4,7 @@
 # responsibility Runs integrated backlog-review scans across root and AgentCanon scopes.
 # upstream implementation ../../runtime/dispatch/agent-canon/src/file_surface_inventory.rs writes inventory reports
 # upstream implementation ../../analysis/dependencies/run_repo_dependency_review.sh validates dependency manifests
-# upstream implementation ../../analysis/dependencies/scip_index.py projects native SCIP impact evidence
+# upstream implementation ../../runtime/dispatch/agent-canon/src/scip_index.rs projects native SCIP impact evidence
 # upstream implementation ../../validation/code/oop/python/readability.py writes Python OOP readability reports
 # upstream implementation ../../validation/code/oop/cpp/readability.py writes C++ OOP readability reports
 # downstream design ../../README.md documents the review backlog scan entrypoint
@@ -376,8 +376,7 @@ run_scope_checks() {
         record_command \
           "code-dependencies:$scope_name" \
           "$scip_output" \
-          python3 "$TOOL_DIR/analysis/dependencies/scip_index.py" \
-            query \
+          "$AGENT_CANON_SOURCE_ROOT/tools/bin/agent-canon" scip-index query \
             --root "$scope_root" \
             --runtime-root "$RUNTIME_ROOT" \
             "${index_args[@]}" \

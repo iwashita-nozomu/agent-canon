@@ -40,5 +40,8 @@ lsp-server = "=0.10.0"
 tar = { version = "=0.4.46", default-features = false }
 zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2"] }
 
+scip = "=0.10.0"
+protobuf = "=3.7.2"
+
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.30.1", default-features = false, features = ["user"] }
