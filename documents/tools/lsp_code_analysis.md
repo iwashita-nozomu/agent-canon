@@ -6,9 +6,7 @@ upstream design ../structured-analysis/code-analysis.md structured-analysis boun
 upstream design ../design/dependency-manifest-design.md dependency evidence separation
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs owns the native API, process lifecycle, and report
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_search.rs consumes selected native facts for code-deps
-downstream implementation ../../tools/analysis/dependencies/git_dependency_diff_summary.py retains its Python language-mapper caller
-downstream implementation ../../tools/analysis/code/lsp_code_analysis.py supplies the Python language_for_path helper for that caller
-downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies golden behavior
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/git_dependency_diff_summary.rs reuses the native language mapper
 downstream test ../../tools/runtime/dispatch/agent-canon/tests/lsp_code_analysis_native.rs verifies the native provider
 @dependency-end
 -->
@@ -23,7 +21,7 @@ cache、ambient PATH discovery は持ちません。
 ## Commands
 
 ```bash
-tools/bin/agent-canon lsp-code-analysis analyze \
+agent-canon lsp-code-analysis analyze \
   --root . --files python/example.py --format json
 ```
 
@@ -74,11 +72,10 @@ deterministic relation に正規化します。
 ## Consumer boundary
 
 Native callers use this library API for one-shot analysis and receive unfiltered facts.
-`tools/bin/agent-canon agent-search --providers code-deps` invokes this API in-process
+`agent-canon agent-search --providers code-deps` invokes this API in-process
 only when selected, then filters facts under the Search owner's Unicode case-folded literal
 query contract and returns an independent provider result. LSP failures remain failures,
-without AST heuristics or fallback to another provider. The separate Python Git-diff
-language-mapper caller continues using its existing helper until its own native migration;
-this LSP CLI does not provide a Python shim or fallback. Generic text search, the header
+without AST heuristics or fallback to another provider. The native Git-diff summary
+reuses `language_for_path` for its source-language selection. Generic text search, the header
 dependency graph, and manifest evidence stay with their respective owners; LSP edges and
 manifest edges remain distinct.
