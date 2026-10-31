@@ -17,6 +17,7 @@
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
@@ -33,6 +34,7 @@
 // @dependency-end
 
 mod check_merge_structure;
+pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
@@ -82,6 +84,7 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format|check-bootstrap> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
@@ -162,6 +165,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "classify-path-risk" {
+        std::process::exit(classify_path_risk::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "lsp-code-analysis" {
