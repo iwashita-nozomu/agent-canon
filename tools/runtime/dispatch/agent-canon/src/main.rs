@@ -38,6 +38,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // @dependency-end
@@ -126,6 +127,7 @@ Commands:
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
@@ -230,6 +232,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
         std::process::exit(semantic_responsibility::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::lean_proof_env::SELECTOR {
+        std::process::exit(agent_canon::lean_proof_env::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {

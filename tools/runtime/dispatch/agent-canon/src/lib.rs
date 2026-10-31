@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP analysis, theorem-board, private feedback, artifact, catalog, and proof APIs.
+//! Shared AgentCanon runtime, LSP, theorem-board, artifact, catalog, path-resolution, proof environment, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
@@ -14,6 +14,8 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
+// upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
+// downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
@@ -27,6 +29,7 @@
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
+// downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
@@ -37,8 +40,10 @@ pub mod catalog;
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
+pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod path_expansion;
+pub mod path_resolution;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
