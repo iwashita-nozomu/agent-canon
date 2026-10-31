@@ -28,6 +28,8 @@ pub const SCHEMA: &str = "agent_canon.git_dependency_diff_summary.v2";
 const GIT_RENAME_OR_COPY_FIELD_COUNT: usize = 3;
 const GIT_NUMSTAT_FIELD_COUNT: usize = 3;
 
+pub type NumstatByPath = BTreeMap<OsString, (Option<i64>, Option<i64>, bool)>;
+
 static NEXT_REPORT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -75,6 +77,7 @@ impl DiffSpec {
 #[derive(Debug, Clone)]
 struct DiffArtifacts {
     rows: Vec<ChangedPath>,
+    report_dir: PathBuf,
     changed_files_path: PathBuf,
     git_stat_path: PathBuf,
 }
@@ -204,9 +207,7 @@ fn parse_numstat_fields(
     Ok((path, Some(additions), Some(deletions), false))
 }
 
-pub fn parse_numstat(
-    output: &str,
-) -> Result<BTreeMap<OsString, (Option<i64>, Option<i64>, bool)>, String> {
+pub fn parse_numstat(output: &str) -> Result<NumstatByPath, String> {
     let mut stats = BTreeMap::new();
     for line in output.lines().filter(|line| !python_strip(line).is_empty()) {
         let fields = line.split('\t').collect::<Vec<_>>();
@@ -244,9 +245,7 @@ pub fn current_numstat_path(path: &str) -> String {
         .unwrap_or_else(|| path.to_string())
 }
 
-pub fn parse_numstat_z(
-    output: &[u8],
-) -> Result<BTreeMap<OsString, (Option<i64>, Option<i64>, bool)>, String> {
+pub fn parse_numstat_z(output: &[u8]) -> Result<NumstatByPath, String> {
     let fields = output.split(|byte| *byte == 0).collect::<Vec<_>>();
     let mut stats = BTreeMap::new();
     let mut index = 0;
@@ -556,6 +555,7 @@ fn write_diff_artifacts(
     let git_stat_path = write_text(boundary, &report_dir.join("git_stat.txt"), &git_stat)?;
     Ok(DiffArtifacts {
         rows,
+        report_dir: report_dir.to_path_buf(),
         changed_files_path,
         git_stat_path,
     })
@@ -644,9 +644,8 @@ fn scip_impact(
 
 fn run_dependency_review(
     root: &Path,
-    report_dir: &Path,
+    diff_artifacts: &DiffArtifacts,
     dependency_dir: &Path,
-    changed_files_path: &Path,
     skip: bool,
     strict: bool,
     boundary: &RuntimeArtifactBoundary,
@@ -679,7 +678,10 @@ fn run_dependency_review(
         "--report-dir".to_string(),
         dependency_dir.to_string_lossy().into_owned(),
         "--search-hits-file".to_string(),
-        changed_files_path.to_string_lossy().into_owned(),
+        diff_artifacts
+            .changed_files_path
+            .to_string_lossy()
+            .into_owned(),
     ];
     if strict {
         command.push("--fail-missing".to_string());
@@ -687,8 +689,12 @@ fn run_dependency_review(
     let record = run_capture(
         root,
         &command,
-        &report_dir.join("dependency_review.stdout.txt"),
-        &report_dir.join("dependency_review.stderr.txt"),
+        &diff_artifacts
+            .report_dir
+            .join("dependency_review.stdout.txt"),
+        &diff_artifacts
+            .report_dir
+            .join("dependency_review.stderr.txt"),
         boundary,
         environment,
     )?;
@@ -915,7 +921,7 @@ fn emit(summary: &Value, format: &str) -> Result<String, String> {
                     .unwrap_or_default()
                     .to_string()
             };
-            Ok(vec![
+            Ok([
                 format!(
                     "GIT_DEPENDENCY_DIFF_SUMMARY={}",
                     summary["status"].as_str().unwrap_or_default()
@@ -1145,9 +1151,8 @@ fn execute(
     )?;
     let (dependency_commands, dependency_status) = run_dependency_review(
         &root,
-        &report_dir,
+        &diff_artifacts,
         &dependency_dir,
-        &diff_artifacts.changed_files_path,
         options.skip_dependency_review,
         options.strict_dependency_review,
         &boundary,

@@ -24,9 +24,7 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::Command;
 
 pub const DEFAULT_RESULT_LIMIT: usize = 200;
 pub const MAX_RESULT_LIMIT: usize = 1000;
@@ -1424,7 +1422,7 @@ pub fn run(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use protobuf::{Message as _, MessageField};
+    use protobuf::MessageField;
     use scip::types::Metadata;
     use std::cell::RefCell;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1648,14 +1646,15 @@ mod tests {
             vec!["cpp".to_string(), "scip".to_string()]
         );
         let commands = commands.borrow();
-        assert!(commands[0].contains(&format!("--compdb-path={}", compile_database)));
-        assert!(commands[0].contains(&format!("--index-output-path={output}")));
+        assert!(commands[0].contains(&format!("--compdb-path={}", compile_database.display())));
+        assert!(commands[0].contains(&format!("--index-output-path={}", output.display())));
         assert!(commands[0].contains(&format!(
             "--supplementary-output-dir={}",
             output
                 .parent()
                 .unwrap()
                 .join("scip-clang-supplementary-output")
+                .display()
         )));
         assert_eq!(commands[1][1], "stats");
         assert_eq!(commands[1][2], "--from");
