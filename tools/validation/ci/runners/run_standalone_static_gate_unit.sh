@@ -184,7 +184,7 @@ run_contracts() {
     tests/agent_tools/test_prose_reasoning_graph.py::ProseReasoningGraphTest::test_missing_dependency_annotation_is_not_a_blocker
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-catalog
   "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" tool-proof-coverage
-  python3 "${TOOLS_ROOT}/validation/semantic/responsibility/responsibility_scope.py"
+  "${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" responsibility-scope --root "${ROOT}"
   PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
     python3 "${ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
   python3 "${TOOLS_ROOT}/validation/semantic/convention/check_convention_compliance.py" \

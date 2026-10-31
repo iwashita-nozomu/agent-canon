@@ -39,7 +39,7 @@ catalog/materializer owner（`agents/skills/catalog.yaml`、`tools/agent/skills/
 ## Purpose and Target State
 
 cleanup は `tree -a -J --noreport` を構造観測として取得し、source、view、generated、
-project、personal の境界、依存 closure、責務単位、候補 path、実装 owner、検証、rollback（`tools/validation/semantic/responsibility/responsibility_scope.py`）、
+project、personal の境界、依存 closure、責務単位、候補 path、実装 owner、検証、rollback（`tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs`）、
 handoff（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）を一つの unit record にまとめます。到達状態は、各 unit が一つの replaceable
 responsibility と一つの一次 owner を持ち、必要な specialist dispatch と統合後の
 再レビューが readback できる状態です。
@@ -233,7 +233,7 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 
 | clause | implementation owner | target | reverse readback |
 | --- | --- | --- | --- |
-| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/validation/semantic/structure/repo_structure_contract.py`, `tools/validation/semantic/responsibility/responsibility_scope.py` | tree snapshot と owner/surface classification |
+| RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/validation/semantic/structure/repo_structure_contract.py`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
 | RC-02 dependency closure and unit schema | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) unit schema, dependency graph | unit fields、closure、handoff readback |
 | RC-03 environment route | `environment-cleanup` | [agents/skills/dependency-design.md](../../agents/skills/dependency-design.md), [agents/skills/environment-maintenance.md](../../agents/skills/environment-maintenance.md) | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md), [agents/skills/refactor-loop.md](../../agents/skills/refactor-loop.md), [agents/skills/change-review.md](../../agents/skills/change-review.md) | impact、refactor、review の連続 evidence |

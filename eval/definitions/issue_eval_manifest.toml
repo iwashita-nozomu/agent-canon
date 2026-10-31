@@ -26,7 +26,7 @@ forbidden_route = [
   "add helper-like function with only unrelated boundary evidence",
 ]
 linked_rules = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
   "tools/runtime/authority/task_authority.py",
 ]
 

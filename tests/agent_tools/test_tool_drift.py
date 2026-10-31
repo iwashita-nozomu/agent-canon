@@ -519,7 +519,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# responsibility Prechecks edit-time risk class.",
                     "# upstream design ../../../../agents/COMMUNICATION_PROTOCOL.md protocol",
                     "# upstream design ../../../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../../../tools/validation/semantic/responsibility/responsibility_scope.py scope",
+                    "# upstream design ../../../../tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs scope",
                     "# upstream design ../../../README.md tool entrypoints",
                     "# upstream design ../../../../documents/tools/README.md user-facing routes",
                     "# upstream implementation ../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
@@ -531,7 +531,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "agents/COMMUNICATION_PROTOCOL.md",
             "agents/skills/codex-task-workflow.md",
-            "tools/validation/semantic/responsibility/responsibility_scope.py",
+            "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
             "tools/README.md",
             "documents/tools/README.md",
             "tests/agent_tools/test_tool_rejection_preflight.py",
@@ -550,6 +550,20 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                             "@dependency-end",
                             "-->",
                             snippet,
+                            "",
+                        ]
+                    ),
+                )
+            elif relative.endswith(".rs"):
+                self.write_file(
+                    root,
+                    relative,
+                    "\n".join(
+                        [
+                            "// @dependency-start",
+                            "// responsibility Provides a native scope fixture.",
+                            "// upstream design README.md fixture anchor",
+                            "// @dependency-end",
                             "",
                         ]
                     ),
