@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
@@ -66,15 +66,13 @@ fn python_executable() -> PathBuf {
 }
 
 fn fake_server(directory: &TestDirectory, mode: &str, exit_code: i32) -> PathBuf {
-    directory.write(
-        "fake_lsp.py",
-        r#"
+    let script = r#"
 import json
 import sys
 import time
 
-mode = sys.argv[1]
-exit_code = int(sys.argv[2])
+mode = __FAKE_SERVER_MODE__
+exit_code = __FAKE_SERVER_EXIT_CODE__
 
 def read_message():
     headers = {}
@@ -178,8 +176,13 @@ while True:
         if mode == "exit-nonzero":
             sys.exit(exit_code)
         break
-"#,
+"#
+    .replace(
+        "__FAKE_SERVER_MODE__",
+        &serde_json::to_string(mode).expect("serialize fake-server mode"),
     )
+    .replace("__FAKE_SERVER_EXIT_CODE__", &exit_code.to_string());
+    directory.write("fake_lsp.py", script.as_bytes())
 }
 
 fn fake_spec(
@@ -190,12 +193,7 @@ fn fake_spec(
 ) -> LspServerSpec {
     let script = fake_server(directory, mode, exit_code);
     let mut command = vec![python_executable().to_string_lossy().into_owned()];
-    command.extend([
-        "-u".to_owned(),
-        script.to_string_lossy().into_owned(),
-        mode.to_owned(),
-        exit_code.to_string(),
-    ]);
+    command.extend(["-u".to_owned(), script.to_string_lossy().into_owned()]);
     LspServerSpec::caller_override(language, command).expect("fake server command is absolute")
 }
 
@@ -423,11 +421,12 @@ fn references_use_each_symbol_selection_position() {
     let source = directory.write("main.py", "\n\n\n\n\n");
     let report = analyze_python(&directory, &source, "references", Duration::from_secs(2));
     assert_eq!(report.status, "complete");
-    let references = report
-        .relations
+    let references = report.as_json(&directory.0)["relations"]
+        .as_array()
+        .unwrap()
         .iter()
-        .filter(|relation| relation.orientation == "reference")
-        .map(|relation| relation.position.as_ref().unwrap().as_json())
+        .filter(|relation| relation["orientation"] == "reference")
+        .map(|relation| relation["position"].clone())
         .collect::<Vec<_>>();
     assert_eq!(
         references,
@@ -572,11 +571,7 @@ fn native_cli_text_format_keeps_the_status_marker() {
     directory.write("main.py", "x = 1\n");
     let server = fake_server(&directory, "standard", 0);
     let python = python_executable();
-    let override_value = format!(
-        "python={} -u {} standard 0",
-        python.display(),
-        server.display()
-    );
+    let override_value = format!("python={} -u {}", python.display(), server.display());
     let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
         .args([
             "lsp-code-analysis",
@@ -735,11 +730,7 @@ fn outside_symbol_information_fails_as_point_lsp_report() {
     directory.write("main.py", "def main():\n    return 1\n");
     let server = fake_server(&directory, "outside-symbol", 0);
     let python = python_executable();
-    let override_value = format!(
-        "python={} -u {} outside-symbol 0",
-        python.display(),
-        server.display()
-    );
+    let override_value = format!("python={} -u {}", python.display(), server.display());
     let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
         .args([
             "lsp-code-analysis",
