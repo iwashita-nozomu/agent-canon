@@ -4,6 +4,7 @@
 // upstream design ../../../../../documents/design/dependency-manifest-design.md manifest grammar and selected analysis route
 // upstream implementation dependency_manifest.rs owns per-file dependency edge parsing and path diagnostics
 // downstream implementation main.rs exposes the check-dependency-headers command
+// downstream implementation responsibility_scope.rs reuses Python-compatible path glob matching
 // downstream implementation ../../../../../tests/agent_tools/test_check_dependency_headers.py verifies native CLI behavior
 // @dependency-end
 
@@ -399,7 +400,7 @@ fn matches_declared_surface(relative: &str, patterns: &[String]) -> bool {
     })
 }
 
-fn fnmatch_case(value: &str, pattern: &str) -> bool {
+pub(crate) fn fnmatch_case(value: &str, pattern: &str) -> bool {
     let value = value.chars().collect::<Vec<_>>();
     let pattern = pattern.chars().collect::<Vec<_>>();
     let mut cache = HashMap::new();

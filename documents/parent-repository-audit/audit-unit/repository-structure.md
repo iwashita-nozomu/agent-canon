@@ -34,13 +34,13 @@ external source clone 内部は親 tree に混ぜず、generated report を sour
 - `documents/structure/repo-structure-contract.toml`
 - `responsibility-scope.toml`
 - `tools/validation/semantic/structure/repo_structure_contract.py`
-- `tools/validation/semantic/responsibility/responsibility_scope.py`
+- `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs`
 - `tools/analysis/code/parent_repository_audit.py list`
 
 ## Repair Route
 
 owner skill は `structure-refactor`、主 tool は `repo_structure_contract.py` と
-`responsibility_scope.py`。missing/kind mismatch は structure contract を修正し、一般
+`tools/bin/agent-canon responsibility-scope`。missing/kind mismatch は structure contract を修正し、一般
 path owner の判断は responsibility scope に追加して readback します。audit unit の
 path pattern や all-tracked fallback は作りません。
 

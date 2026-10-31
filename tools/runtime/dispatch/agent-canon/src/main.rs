@@ -11,9 +11,13 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
+// downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
+// downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
@@ -35,9 +39,11 @@ mod docs;
 mod entrypoint_owner_map;
 mod file_surface_inventory;
 mod graph;
+pub mod graph_client;
 mod jit_ir_to_lean;
 mod migration_audit;
 mod notebook_quality;
+mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -47,15 +53,20 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
+mod run_log_contract;
 mod rust_migration_plan;
 mod semantic_index;
+mod semantic_responsibility;
 pub mod skill_document_reader;
 mod skill_projection_registry;
+pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
@@ -75,14 +86,19 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  numeric-performance [--input <path|->] [--format json]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
+  check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
+  check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -118,12 +134,24 @@ fn main() {
         return;
     }
 
+    if args.len() >= 2 && args[1] == "numeric-performance" {
+        std::process::exit(numeric_performance::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "tool-drift" {
+        std::process::exit(tool_drift::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
         std::process::exit(tool_proof_coverage::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-run-log-contract" {
+        std::process::exit(run_log_contract::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
@@ -137,6 +165,10 @@ fn main() {
         )
     {
         std::process::exit(rule_inventory::run(&args[1], &args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
+        std::process::exit(semantic_responsibility::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
@@ -153,6 +185,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "surface-manifest" {
         std::process::exit(surface_manifest::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == responsibility_scope::SELECTOR {
+        std::process::exit(responsibility_scope::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
@@ -241,6 +277,9 @@ fn main() {
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
 }
+
+#[cfg(test)]
+mod source_dependency_tests;
 
 #[cfg(test)]
 mod runtime_boundary {

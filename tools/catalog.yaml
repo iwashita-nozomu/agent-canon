@@ -4,7 +4,7 @@
 # upstream design README.md shared tool family ownership
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
 # downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates this catalog
-# downstream implementation validation/semantic/tools/tool_drift.py checks catalog drift contracts
+# downstream implementation runtime/dispatch/agent-canon/src/tool_drift.rs checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
 # @dependency-end
@@ -276,6 +276,24 @@ entries:
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
 
+  - id: numeric-performance
+    summary: Classifies post-run numerical performance observations using task-owned mathematical evidence.
+    path: tools/runtime/dispatch/agent-canon/src/numeric_performance.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon numeric-performance
+    dispatch: {argv: ["tools/bin/agent-canon", "numeric-performance"]}
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/experiments/experiment-critical-review.md
+    tests:
+      - tests/agent_tools/test_numeric_performance.py
+      - tests/agent_tools/test_numeric_performance_routing.py
+
   - id: tool-catalog
     summary: Validates the structured tool catalog and renders the tool crosswalk.
     path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
@@ -296,15 +314,15 @@ entries:
 
   - id: tool-drift
     summary: Checks dependency-manifest trace links between tools, workflows, and docs.
-    path: tools/validation/semantic/tools/tool_drift.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/tools/tool_drift.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/tools/tool_drift.py"]}
+    command: tools/bin/agent-canon tool-drift --root <repo-root>
+    dispatch: {argv: ["tools/bin/agent-canon", "tool-drift", "--root", "<repo-root>"]}
     writes: false
     default_wiring:
-      ci: false
+      ci: true
       pr_check: false
     docs:
       - tools/README.md
@@ -347,13 +365,13 @@ entries:
       - tests/agent_tools/test_checkout_identity.py
 
   - id: responsibility-scope
-    summary: Validates responsibility scopes, owner classes, and protecting tool coverage.
-    path: tools/validation/semantic/responsibility/responsibility_scope.py
+    summary: Validates responsibility scopes, owner classes, protecting tool coverage, and planned path owners.
+    path: tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/responsibility/responsibility_scope.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/responsibility_scope.py"]}
+    command: tools/bin/agent-canon responsibility-scope
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "responsibility-scope"]}
     writes: false
     default_wiring:
       ci: true
@@ -1306,12 +1324,12 @@ entries:
   - id: check-semantic-responsibility-contract
     public: true
     summary: Validates semantic responsibility contract schema, identity, and references.
-    path: tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/semantic_responsibility.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/responsibility/check_semantic_responsibility_contract.py"]}
+    command: tools/bin/agent-canon check-semantic-responsibility-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-semantic-responsibility-contract"]}
     writes: false
     default_wiring:
       ci: false
@@ -1319,7 +1337,7 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
-      - documents/tools/check_semantic_responsibility_contract.md
+      - documents/tools/semantic_responsibility.md
       - documents/design/semantic-responsibility-contract.md
     tests:
       - tests/agent_tools/test_check_semantic_responsibility_contract.py
@@ -1877,12 +1895,12 @@ entries:
 
   - id: check-run-log-contract
     summary: Checks that run-log summaries resolve from amp.Info and avoid direct writer surfaces.
-    path: tools/validation/semantic/logging/check_run_log_contract.py
+    path: tools/runtime/dispatch/agent-canon/src/run_log_contract.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/logging/check_run_log_contract.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/logging/check_run_log_contract.py"]}
+    command: tools/bin/agent-canon check-run-log-contract
+    dispatch: {argv: ["tools/bin/agent-canon", "check-run-log-contract"]}
     writes: false
     default_wiring:
       ci: false
