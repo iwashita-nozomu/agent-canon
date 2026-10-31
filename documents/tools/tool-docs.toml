@@ -145,10 +145,18 @@ summary = "Dependency manifest graph Markdown, DOT, and HTML renderer documentat
 [[tool]]
 id = "git-dependency-diff-summary"
 classification = "public"
-tool = "tools/analysis/dependencies/git_dependency_diff_summary.py"
+tool = "tools/runtime/dispatch/agent-canon/src/git_dependency_diff_summary.rs"
 doc = "documents/tools/git_dependency_diff_summary.md"
-language = "python"
+language = "rust"
 summary = "Git diff, optional SCIP impact, and dependency-header expansion summary documentation."
+
+[[tool]]
+id = "scip-index"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/scip_index.rs"
+doc = "documents/tools/scip_index.md"
+language = "rust"
+summary = "Native SCIP index writing and bounded standard-index query documentation."
 
 [[tool]]
 id = "check-semantic-responsibility-contract"

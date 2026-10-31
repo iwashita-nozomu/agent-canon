@@ -32,6 +32,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
+// upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // @dependency-end
 
 mod check_merge_structure;
@@ -102,6 +103,8 @@ Commands:
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
   lsp-code-analysis analyze [--root ROOT] [--files FILES...] [--server LANGUAGE=COMMAND] [--timeout SECONDS] [--format json|text]
+  scip-index <index|query> [options]
+  git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
@@ -179,6 +182,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "lsp-code-analysis" {
         std::process::exit(agent_canon::lsp_code_analysis::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "scip-index" {
+        std::process::exit(agent_canon::scip_index::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "git-dependency-diff-summary" {
+        std::process::exit(agent_canon::git_dependency_diff_summary::run(&args[2..]));
     }
 
     if args.len() >= 2

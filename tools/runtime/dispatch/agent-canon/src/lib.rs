@@ -12,6 +12,8 @@
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
+// downstream implementation python_cli_integer.rs parses Python-compatible integer options
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
@@ -19,6 +21,8 @@
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
 // downstream implementation lsp_code_analysis.rs owns the reusable native LSP analysis API
+// downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
+// downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
@@ -31,12 +35,16 @@ pub mod catalog;
 // API uses only the newline and source-offset helpers from this owner.
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
+pub mod git_dependency_diff_summary;
 pub mod lsp_code_analysis;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
+pub(crate) mod python_cli_integer;
+pub(crate) mod python_text;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
+pub mod scip_index;
 pub mod theorem_graph_board;
 pub mod tool_proof_coverage;
