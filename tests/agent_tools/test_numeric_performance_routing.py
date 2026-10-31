@@ -126,7 +126,13 @@ def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:
     start = catalog.index("  - id: computational-optimization")
     end = catalog.index("  - id: adaptive-improvement-loop", start)
     computational = catalog[start:end]
-    assert "numeric_performance.py --input <post-run-observations.json>" in computational
+    tools = (PROJECT_ROOT / "tools/catalog.yaml").read_text(encoding="utf-8")
+    start_tool = tools.index("  - id: numeric-performance\n")
+    end_tool = tools.index("\n  - id:", start_tool + 1)
+    classifier = tools[start_tool:end_tool]
+    assert "command: tools/bin/agent-canon numeric-performance" in classifier
+    assert "ci: false" in classifier
+    assert "pr_check: false" in classifier
     assert '["solver", "performance"]' in computational
     assert '["iterative", "algorithm", "performance"]' in computational
     assert '["performance"]' not in computational
@@ -134,7 +140,7 @@ def test_catalog_exposes_only_narrow_numeric_performance_route() -> None:
     optimization = (PROJECT_ROOT / "agents/skills/computational-optimization.md").read_text(
         encoding="utf-8"
     )
-    assert "numeric_performance.py" in optimization
+    assert "tools/bin/agent-canon numeric-performance --input <post-run-observations.json>" in optimization
 
 
 def test_numeric_solver_performance_trigger_is_not_generic() -> None:
