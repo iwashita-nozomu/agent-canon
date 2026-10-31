@@ -198,6 +198,7 @@ const CLEANUP_PROOF_SCHEMA: &str = "agent-canon.cleanup-proof.v1";
 const CLOSE_AGENT_TOOL_CALL_SCHEMA: &str = "agent-canon.close-agent-tool-call.v1";
 const CLOSE_AGENT_ARGS_SCHEMA: &str = "agent-canon.close-agent.args.v1";
 const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
+const SOURCE_PROJECTION_PACKET_SCHEMA: &str = "agent-canon.source-projection-packet.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
 const PR_STATES: &[&str] = &[
@@ -328,6 +329,18 @@ pub struct CloseAgentToolCallInput<'a> {
     pub completed_but_open: bool,
     pub unknown_descendants: bool,
     pub reservation_leak: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SourceProjectionPacketInput<'a> {
+    pub binding: &'a JsonValue,
+    pub source_main_rebind_receipt: &'a JsonValue,
+    pub candidate_cas_receipt: &'a JsonValue,
+    pub pull_request_lifecycle: &'a JsonValue,
+    pub publication_readback_receipt: &'a JsonValue,
+    pub source_gate_verdicts: &'a [JsonValue],
+    pub ordered_predecessor_evidence: &'a [JsonValue],
+    pub acceptance_evidence_ref: &'a str,
 }
 
 fn fail(code: &str, detail: &str) -> LifecycleContractError {
@@ -781,6 +794,233 @@ pub fn binding_identity(
 ) -> Result<RecordBindingIdentity, LifecycleContractError> {
     let binding = validate_record_binding(value)?;
     binding_identity_from_validated(&binding)
+}
+
+/// Validate the immutable packet consumed by the source projection stage.
+pub fn validate_source_projection_packet(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let packet = mapping(value, "source_projection_packet")?;
+    exact_keys(
+        packet,
+        &[
+            "schema",
+            "binding",
+            "source_main_rebind_receipt",
+            "candidate_cas_receipt",
+            "pull_request_lifecycle",
+            "publication_readback_receipt",
+            "source_gate_verdicts",
+            "ordered_predecessor_evidence",
+            "acceptance_evidence_ref",
+        ],
+        &[],
+        "source_projection_packet",
+    )?;
+    if packet.get("schema").and_then(JsonValue::as_str) != Some(SOURCE_PROJECTION_PACKET_SCHEMA) {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            SOURCE_PROJECTION_PACKET_SCHEMA,
+        ));
+    }
+
+    let binding = validate_record_binding(required_value(
+        packet,
+        "binding",
+        "source_projection_packet",
+    )?)?;
+    let rebind = validate_source_main_rebind_receipt(required_value(
+        packet,
+        "source_main_rebind_receipt",
+        "source_projection_packet",
+    )?)?;
+    let cas = validate_candidate_cas_receipt(required_value(
+        packet,
+        "candidate_cas_receipt",
+        "source_projection_packet",
+    )?)?;
+    let lifecycle = validate_candidate_cas_pr_transition(
+        &cas,
+        required_value(packet, "pull_request_lifecycle", "source_projection_packet")?,
+    )?;
+    let readback = validate_publication_readback_transition(
+        &cas,
+        &lifecycle,
+        required_value(
+            packet,
+            "publication_readback_receipt",
+            "source_projection_packet",
+        )?,
+    )?;
+    let gates_value = required_value(packet, "source_gate_verdicts", "source_projection_packet")?;
+    let gates = gates_value.as_array().ok_or_else(|| {
+        fail(
+            "lifecycle:sequence_required",
+            "source_projection_packet.source_gate_verdicts",
+        )
+    })?;
+    let source_gates = validate_gate_chain(gates, Some(&["G1", "G2", "G3"]), true)?;
+
+    for (field, record) in [
+        ("rebind", &rebind),
+        ("cas", &cas),
+        ("pr", &lifecycle),
+        ("readback", &readback),
+    ] {
+        let record = mapping(record, field)?;
+        same_binding(
+            &binding,
+            required_value(record, "binding", field)?,
+            &format!("source_projection_packet.{field}"),
+        )?;
+    }
+    validate_candidate_cas_rebind_transition(&rebind, &cas)?;
+
+    let packet_binding_identity = binding_identity(&binding)?;
+    for gate in &source_gates {
+        let gate = mapping(gate, "gate_verdict")?;
+        let gate_binding = required_value(gate, "binding", "gate_verdict")?;
+        if binding_identity(gate_binding)? != packet_binding_identity {
+            return Err(fail("lifecycle:gate_identity_mismatch", ""));
+        }
+    }
+
+    let g3 = source_gates
+        .get(2)
+        .expect("the validated G1-G2-G3 chain contains G3");
+    let g3 = mapping(g3, "gate_verdict")?;
+    let g3_inputs = required_value(g3, "ordered_input_evidence_refs", "gate_verdict")?
+        .as_array()
+        .expect("validated gate input evidence is an array");
+    let cas_map = mapping(&cas, "candidate_cas_receipt")?;
+    let cas_binding = mapping(
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.binding",
+    )?;
+    let cas_evidence =
+        required_value(cas_binding, "evidence_ref", "candidate_cas_receipt.binding")?;
+    if !g3_inputs.contains(cas_evidence) {
+        return Err(fail("lifecycle:gate_predecessor_mismatch", "G3"));
+    }
+
+    let readback = mapping(&readback, "publication_readback_receipt")?;
+    let rebind = mapping(&rebind, "source_main_rebind_receipt")?;
+    if required_value(
+        readback,
+        "rebind_receipt_evidence_id",
+        "publication_readback_receipt",
+    )? != required_value(rebind, "rebind_receipt_id", "source_main_rebind_receipt")?
+    {
+        return Err(fail(
+            "lifecycle:rebind_mismatch",
+            "source_projection_packet",
+        ));
+    }
+
+    let predecessors_value = required_value(
+        packet,
+        "ordered_predecessor_evidence",
+        "source_projection_packet",
+    )?;
+    let predecessors = predecessors_value.as_array().ok_or_else(|| {
+        fail(
+            "lifecycle:sequence_required",
+            "source_projection_packet.ordered_predecessor_evidence",
+        )
+    })?;
+    if predecessors.len() != 2 {
+        return Err(fail("frontier:predecessor_order_invalid", ""));
+    }
+    for (index, (value, (expected_number, expected_pr))) in predecessors
+        .iter()
+        .zip([(388, "#388"), (389, "#389")])
+        .enumerate()
+    {
+        let field = format!("source_projection_packet.ordered_predecessor_evidence[{index}]");
+        let item = mapping(value, &field)?;
+        let optional = if index == 1 {
+            &["source_pr_sha"][..]
+        } else {
+            &[][..]
+        };
+        exact_keys(
+            item,
+            &["queue_number", "source_pr", "publication_evidence_id"],
+            optional,
+            &field,
+        )?;
+        if !frontier_queue_number_matches(
+            required_value(item, "queue_number", &field)?,
+            expected_number,
+        ) || required_value(item, "source_pr", &field)?.as_str() != Some(expected_pr)
+        {
+            return Err(fail("frontier:predecessor_order_invalid", ""));
+        }
+        pattern_value(
+            required_value(item, "publication_evidence_id", &field)?,
+            &format!("{field}.publication_evidence_id"),
+            valid_evidence_ref,
+        )?;
+        if index == 1 {
+            let missing = JsonValue::Null;
+            pattern_value(
+                item.get("source_pr_sha").unwrap_or(&missing),
+                "source_projection_packet.ordered_predecessor_evidence[1].source_pr_sha",
+                |text| lower_hex(text, 40),
+            )?;
+        }
+    }
+    pattern_value(
+        required_value(
+            packet,
+            "acceptance_evidence_ref",
+            "source_projection_packet",
+        )?,
+        "source_projection_packet.acceptance_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    canonical_clone(value)
+}
+
+/// Build a source projection packet from already-materialized lifecycle receipts.
+pub fn materialize_source_projection_packet(
+    input: &SourceProjectionPacketInput<'_>,
+) -> Result<JsonValue, LifecycleContractError> {
+    let mut packet = JsonMap::new();
+    packet.insert(
+        "schema".to_owned(),
+        JsonValue::String(SOURCE_PROJECTION_PACKET_SCHEMA.to_owned()),
+    );
+    packet.insert("binding".to_owned(), input.binding.clone());
+    packet.insert(
+        "source_main_rebind_receipt".to_owned(),
+        input.source_main_rebind_receipt.clone(),
+    );
+    packet.insert(
+        "candidate_cas_receipt".to_owned(),
+        input.candidate_cas_receipt.clone(),
+    );
+    packet.insert(
+        "pull_request_lifecycle".to_owned(),
+        input.pull_request_lifecycle.clone(),
+    );
+    packet.insert(
+        "publication_readback_receipt".to_owned(),
+        input.publication_readback_receipt.clone(),
+    );
+    packet.insert(
+        "source_gate_verdicts".to_owned(),
+        JsonValue::Array(input.source_gate_verdicts.to_vec()),
+    );
+    packet.insert(
+        "ordered_predecessor_evidence".to_owned(),
+        JsonValue::Array(input.ordered_predecessor_evidence.to_vec()),
+    );
+    packet.insert(
+        "acceptance_evidence_ref".to_owned(),
+        JsonValue::String(input.acceptance_evidence_ref.to_owned()),
+    );
+    validate_source_projection_packet(&JsonValue::Object(packet))
 }
 
 #[derive(Clone, Copy)]
