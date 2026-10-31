@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests SOLID-sensitive Python evidence coverage checks.
-# upstream implementation ../../tools/validation/semantic/code/check_solid_evidence.py evidence coverage checker
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_solid_evidence.rs evidence coverage checker
 # upstream implementation ../../tools/validation/code/oop/shared/readability_core.py emits scanned_paths in OOP reports
 # upstream design ../../documents/conventions/coding-conventions-python.md SOLID evidence route policy
 # @dependency-end
@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -18,17 +19,24 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CHECKER = PROJECT_ROOT / "tools" / "validation" / "semantic" / "code" / "check_solid_evidence.py"
-OOP_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+CHECKER_SELECTOR = "check-solid-evidence"
+OOP_ANALYZER = (
+    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
+)
 
 
 class CheckSolidEvidenceTest(unittest.TestCase):
     """Validate SOLID-sensitive evidence coverage behavior."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker in a temporary root."""
+        """Run the checker through the explicitly selected native CLI."""
+        if AGENT_CANON_CLI is None:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
-            [sys.executable, str(CHECKER), "--root", str(root), *args],
+            [AGENT_CANON_CLI, CHECKER_SELECTOR, "--root", str(root), *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -86,7 +94,10 @@ class CheckSolidEvidenceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("SOLID_EVIDENCE=fail", result.stdout)
-            self.assertIn("SOLID_EVIDENCE_SENSITIVE_CHANGE=python/model.py:1:class_boundary:CustomerRecord", result.stdout)
+            self.assertIn(
+                "SOLID_EVIDENCE_SENSITIVE_CHANGE=python/model.py:1:class_boundary:CustomerRecord",
+                result.stdout,
+            )
             self.assertIn("missing-oop-readability-evidence", result.stdout)
 
     def test_evidence_must_cover_sensitive_path(self) -> None:
@@ -98,7 +109,9 @@ class CheckSolidEvidenceTest(unittest.TestCase):
             source.write_text("class CustomerRecord:\n    pass\n", encoding="utf-8")
             report = self.write_json_evidence(root, ["python/other.py"])
 
-            result = self.run_checker(root, "python/model.py", "--evidence", str(report))
+            result = self.run_checker(
+                root, "python/model.py", "--evidence", str(report)
+            )
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("missing-path-coverage", result.stdout)
@@ -112,7 +125,9 @@ class CheckSolidEvidenceTest(unittest.TestCase):
             source.write_text("class CustomerRecord:\n    pass\n", encoding="utf-8")
             report = self.write_json_evidence(root, ["python/model.py"])
 
-            result = self.run_checker(root, "python/model.py", "--evidence", str(report))
+            result = self.run_checker(
+                root, "python/model.py", "--evidence", str(report)
+            )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("SOLID_EVIDENCE=pass", result.stdout)
@@ -156,10 +171,21 @@ class CheckSolidEvidenceTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
-            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
-            subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"], cwd=root, check=True
+            )
             subprocess.run(["git", "add", "python/model.py"], cwd=root, check=True)
-            subprocess.run(["git", "commit", "-m", "initial"], cwd=root, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "initial"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
             source.write_text(
                 "class CustomerRecord:\n    pass\n\nVALUE = 2\n",
                 encoding="utf-8",
