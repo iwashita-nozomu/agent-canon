@@ -2,14 +2,14 @@
 @dependency-start
 contract reference
 responsibility Documents Git diff summary usage with optional SCIP impact and dependency-header evidence.
-upstream implementation ../../tools/analysis/dependencies/git_dependency_diff_summary.py summarizes Git diffs.
-upstream implementation ../../tools/analysis/dependencies/scip_index.py projects standard SCIP facts.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/git_dependency_diff_summary.rs summarizes Git diffs.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs projects standard SCIP facts.
 upstream implementation ../../tools/analysis/dependencies/run_repo_dependency_review.sh expands dependency-header graph evidence.
-downstream implementation ../../tests/agent_tools/test_git_dependency_diff_summary.py tests CLI behavior.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/git_dependency_diff_summary_native.rs tests CLI behavior.
 @dependency-end
 -->
 
-# git_dependency_diff_summary.py
+# git-dependency-diff-summary
 
 Use this tool to summarize Git changes alongside dependency-header evidence and,
 when selected, a bounded projection from a native SCIP index.
@@ -26,7 +26,7 @@ environment file. C/C++ indexing consumes the compile database selected by the
 project build owner. Rust currently has no selected producer because the pinned
 rust-analyzer SCIP command has not been qualified.
 
-    python3 tools/analysis/dependencies/scip_index.py index \
+    tools/bin/agent-canon scip-index index \
       --root . \
       --runtime-root /external/runtime \
       --language python \
@@ -35,12 +35,12 @@ rust-analyzer SCIP command has not been qualified.
       --python-environment <project-owned-environment.json> \
       --output scip/<run-id>/python/index.scip
 
-    python3 tools/analysis/dependencies/git_dependency_diff_summary.py \
+    tools/bin/agent-canon git-dependency-diff-summary \
       --root . \
       --base origin/main \
       --head HEAD \
       --runtime-root /external/runtime \
-      --scip-index scip/<run-id>/rust/index.scip \
+      --scip-index scip/<run-id>/python/index.scip \
       --report-dir reports/dependency-review/git-diff-summary \
       --format markdown
 

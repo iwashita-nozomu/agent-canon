@@ -238,7 +238,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "accepted_with_reason explicit_approval_evidence\n"
     ),
     "agents/skills/dependency-analysis.md": (
-        "scip_index.py\n"
+        "agent-canon scip-index query\n"
         "Before closeout, run "
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
