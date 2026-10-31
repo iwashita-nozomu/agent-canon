@@ -605,7 +605,7 @@ fn parse_similar_design_args(raw: &[String]) -> Result<SimilarDesignParse, Strin
                         parsed.minimum = parse_python_float(&value).ok_or_else(|| {
                             format!(
                                 "argument --min: invalid float value: {}",
-                                rustpython_ast::Constant::Str(value.clone()).to_string()
+                                rustpython_ast::Constant::Str(value.clone())
                             )
                         })?;
                     }
