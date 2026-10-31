@@ -8,7 +8,7 @@
 # upstream design ../../../../documents/conventions/coding-conventions-house-style.md source definition ordering
 # upstream design ../../../../.codex/README.md Codex runtime hook behavior summary
 # upstream design ../../../catalog.yaml structured tool catalog
-# upstream implementation ../tools/tool_drift.py validates tool/convention drift
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
 # upstream implementation ../skills/check_skill_frontmatter.py validates runtime skill frontmatter
 # downstream implementation ../../ci/runners/run_all_checks.sh runs convention compliance gate
@@ -133,7 +133,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "tool_convention_drift": (
-        "tools/validation/semantic/tools/tool_drift.py",
+        "tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (

@@ -11,6 +11,8 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
+// downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
@@ -36,9 +38,11 @@ mod dependency_manifest;
 mod docs;
 mod file_surface_inventory;
 mod graph;
+pub mod graph_client;
 mod jit_ir_to_lean;
 mod migration_audit;
 mod notebook_quality;
+mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -56,9 +60,11 @@ mod semantic_index;
 mod semantic_responsibility;
 pub mod skill_document_reader;
 mod skill_projection_registry;
+pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
@@ -81,7 +87,9 @@ Commands:
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  numeric-performance [--input <path|->] [--format json]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
@@ -124,8 +132,16 @@ fn main() {
         return;
     }
 
+    if args.len() >= 2 && args[1] == "numeric-performance" {
+        std::process::exit(numeric_performance::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool-drift" {
+        std::process::exit(tool_drift::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-proof-coverage" {
@@ -259,6 +275,9 @@ fn main() {
     eprintln!("Run 'agent-canon --help' for usage.");
     std::process::exit(2);
 }
+
+#[cfg(test)]
+mod source_dependency_tests;
 
 #[cfg(test)]
 mod runtime_boundary {
