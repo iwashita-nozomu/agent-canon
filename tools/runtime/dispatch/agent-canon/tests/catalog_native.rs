@@ -247,6 +247,56 @@ classification = "internal"
     root
 }
 
+fn native_cli_wiring_root(catalog_selector: &str, shell_source: &str) -> TempRoot {
+    let root = valid_tool_catalog_root();
+    let native_path = "tools/runtime/dispatch/agent-canon/src/demo_tool.rs";
+    let native_doc = "documents/tools/demo_tool.md";
+    root.write(native_path, "// native fixture\n");
+    root.write(native_doc, "# Native demo\n");
+
+    let catalog_path = root.path().join("tools/catalog.yaml");
+    let catalog = fs::read_to_string(catalog_path).unwrap();
+    let native_entry_route = format!(
+        "    path: {native_path}\n    command: tools/bin/agent-canon {catalog_selector}\n    dispatch: {{argv: [\"tools/bin/agent-canon\", \"{catalog_selector}\"]}}\n"
+    );
+    let catalog = catalog
+        .replace("    path: tools/demo-tool.py\n", &native_entry_route)
+        .replace(
+            "    docs: [documents/tools/demo-tool.md]\n",
+            &format!("    docs: [{native_doc}]\n"),
+        )
+        .replace(
+            "    default_wiring: {ci: false, pr_check: false}",
+            "    default_wiring: {ci: true, pr_check: false}",
+        );
+    assert!(catalog.contains(native_path));
+    assert!(catalog.contains(catalog_selector));
+    root.write("tools/catalog.yaml", &catalog);
+
+    let tool_docs_path = root.path().join("documents/tools/tool-docs.toml");
+    let tool_docs = fs::read_to_string(tool_docs_path).unwrap();
+    let tool_docs = tool_docs
+        .replace("tools/demo-tool.py", native_path)
+        .replace("documents/tools/demo-tool.md", native_doc);
+    root.write("documents/tools/tool-docs.toml", &tool_docs);
+    root.write(
+        "tools/validation/ci/runners/run_all_checks.sh",
+        shell_source,
+    );
+    root
+}
+
+fn native_wiring_is_unreferenced(root: &TempRoot) -> bool {
+    validate_catalog(root.path())
+        .findings
+        .iter()
+        .any(|finding| {
+            finding.check == "default_wiring"
+                && finding.path == "tools/runtime/dispatch/agent-canon/src/demo_tool.rs"
+                && finding.detail == "wired-entry-not-referenced"
+        })
+}
+
 #[test]
 fn catalog_validation_and_report_rendering_match_native_records() {
     let root = valid_tool_catalog_root();
@@ -397,6 +447,50 @@ fn default_reference_pattern_excludes_test_paths_and_keeps_tool_paths() {
             .collect::<Vec<_>>(),
         vec!["tools/runtime/manifest/uncataloged.py"]
     );
+}
+
+#[test]
+fn native_default_wiring_recognizes_catalogued_wrapper_command() {
+    let root = native_cli_wiring_root(
+        "native-check",
+        "if run_agent_canon native-check --root .; then\n  :\nfi\n",
+    );
+    assert!(
+        !native_wiring_is_unreferenced(&root),
+        "the catalogued native selector is invoked through the CI wrapper"
+    );
+}
+
+#[test]
+fn native_default_wiring_recognizes_direct_catalogued_cli_command() {
+    let root = native_cli_wiring_root(
+        "native-check",
+        "if tools/bin/agent-canon native-check --root .; then\n  :\nfi\n",
+    );
+    assert!(
+        !native_wiring_is_unreferenced(&root),
+        "the catalogued native selector is invoked through the CLI"
+    );
+}
+
+#[test]
+fn native_default_wiring_reports_missing_and_misbound_calls() {
+    let missing = native_cli_wiring_root("native-check", "echo no native check call\n");
+    assert!(native_wiring_is_unreferenced(&missing));
+
+    let misbound = native_cli_wiring_root(
+        "native-check",
+        "if run_agent_canon different-check --root .; then\n  :\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&misbound));
+}
+
+#[test]
+fn native_default_wiring_does_not_accept_a_comment_as_a_call() {
+    let native_path = "tools/runtime/dispatch/agent-canon/src/demo_tool.rs";
+    let comment = format!("# if run_agent_canon native-check --root . {native_path}\n");
+    let root = native_cli_wiring_root("native-check", &comment);
+    assert!(native_wiring_is_unreferenced(&root));
 }
 
 #[test]

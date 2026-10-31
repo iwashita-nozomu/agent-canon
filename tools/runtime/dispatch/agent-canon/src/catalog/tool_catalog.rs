@@ -478,6 +478,10 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
         Ok(text) => text,
         Err(path) => return vec![Finding::new("default_wiring", path, "read-failed")],
     };
+    let command_text = match read_existing_text(root, &DEFAULT_COMMAND_SOURCES) {
+        Ok(text) => text,
+        Err(path) => return vec![Finding::new("default_wiring", path, "read-failed")],
+    };
     for path in referenced {
         if !catalog_paths.contains(&path) {
             findings.push(Finding::new(
@@ -497,7 +501,17 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or(&path);
-        if !default_text.contains(&path) && !default_text.contains(basename) {
+        let wired = if Path::new(&path)
+            .extension()
+            .and_then(|value| value.to_str())
+            == Some("rs")
+        {
+            native_cli_dispatch(entry)
+                .is_some_and(|argv| native_cli_invocation_is_referenced(&command_text, &argv))
+        } else {
+            default_text.contains(&path) || default_text.contains(basename)
+        };
+        if !wired {
             findings.push(Finding::new(
                 "default_wiring",
                 &path,
@@ -506,6 +520,62 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
         }
     }
     findings
+}
+
+fn native_cli_dispatch(entry: &Yaml) -> Option<Vec<String>> {
+    let dispatch = mapping_value(entry, "dispatch")?;
+    let argv = string_list(mapping_value(dispatch, "argv"));
+    (argv.len() >= 2 && argv[0].as_str() == "tools/bin/agent-canon").then_some(argv)
+}
+
+// Only a command-position wrapper/direct invocation proves native default wiring.
+fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
+    let (Some(executable), Some(selector)) = (argv.first(), argv.get(1)) else {
+        return false;
+    };
+    if executable.as_str() != "tools/bin/agent-canon" {
+        return false;
+    }
+    let Ok(executable_tokens) = rust_tokens(executable) else {
+        return false;
+    };
+    let Ok(selector_tokens) = rust_tokens(selector) else {
+        return false;
+    };
+    if selector_tokens.is_empty() {
+        return false;
+    }
+    let executable_values = executable_tokens
+        .iter()
+        .map(|token| token.value.clone())
+        .collect::<Vec<_>>();
+    let selector_values = selector_tokens
+        .iter()
+        .map(|token| token.value.clone())
+        .collect::<Vec<_>>();
+    let wrapper_values = vec!["run_agent_canon".to_owned()];
+
+    text.lines().any(|line| {
+        let Ok(tokens) = rust_tokens(line) else {
+            return false;
+        };
+        let matches_invocation = |prefix: &[String], conditional: bool| {
+            let leader_length = if conditional { 1 } else { 0 };
+            let mut expected =
+                Vec::with_capacity(leader_length + prefix.len() + selector_values.len());
+            if conditional {
+                expected.push("if".to_owned());
+            }
+            expected.extend(prefix.iter().cloned());
+            expected.extend(selector_values.iter().cloned());
+            let expected = expected.iter().map(String::as_str).collect::<Vec<_>>();
+            token_sequence_matches(&tokens, &expected).contains(&0)
+        };
+        matches_invocation(&wrapper_values, false)
+            || matches_invocation(&wrapper_values, true)
+            || matches_invocation(&executable_values, false)
+            || matches_invocation(&executable_values, true)
+    })
 }
 
 fn check_catalog_docs(root: &Path) -> Vec<Finding> {
