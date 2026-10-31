@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py manages the ignored log archive clone
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines repo keys and archive mount paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents archive branch and push policy
+# upstream design ../../documents/design/runtime-log-repository-lifecycle-correspondence.json records selected root validation commands
 # upstream design ../../agents/COMMUNICATION_PROTOCOL.md source-bound runtime-event communication and checkpoint contract
 # @dependency-end
 
@@ -2018,6 +2019,17 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             / "runtime-log-repository-lifecycle-correspondence.json"
         )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        bootstrap_check = [
+            "tools/bin/agent-canon",
+            "docs",
+            "check-bootstrap",
+            "--root",
+            ".",
+        ]
+        self.assertIn(
+            bootstrap_check, [route["argv"] for route in manifest["validation_route"]]
+        )
+        self.assertTrue((PROJECT_ROOT / bootstrap_check[0]).is_file())
         targets = {item["path"] for item in manifest["implementation_targets"]}
         for target in targets:
             self.assertTrue((PROJECT_ROOT / target).exists(), target)

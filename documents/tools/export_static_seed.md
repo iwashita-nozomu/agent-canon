@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents deterministic static-seed export and source-free consumer validation commands.
 upstream implementation ../../tools/runtime/source/export_static_seed.py owns producer export.
-upstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py owns source-free consumer validation.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs `docs check-bootstrap` owns source-free consumer validation.
 upstream design ../contracts/static-seed-export.md owns seed content and consumer boundaries.
 upstream design ../contracts/static-seed-allowlist.toml owns the sole exact-path allowlist.
 downstream implementation ../../tests/agent_tools/test_export_static_seed.py exercises producer export.
@@ -49,7 +49,7 @@ runtime/updater surface、network/secret marker、未解決 Codex role reference
 export 結果または consumer migration fixture から AgentCanon source を隠した状態で実行します。
 
 ```bash
-python3 tools/validation/documentation/checks/check_bootstrap_docs.py \
+tools/bin/agent-canon docs check-bootstrap \
   --root /tmp/agent-canon-static-seed \
   --static-seed-consumer
 ```
