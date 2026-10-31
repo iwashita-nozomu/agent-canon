@@ -4,7 +4,7 @@
 // responsibility Builds board-level route summaries for formal-proof theorem graphs.
 // upstream design ../../../../../agents/skills/formal-proof-workflow.md problem-level board passes
 // upstream design ../../../../../agents/skills/algorithm-proof-exploration.md route-row batch selection
-// upstream implementation ../../../../analysis/proof/theorem_graph_circularity_check.py theorem-edge reachability policy
+// upstream implementation theorem_graph_circularity_check.rs theorem-edge reachability policy
 // downstream implementation lib.rs exposes the theorem-board API
 // downstream implementation main.rs dispatches the native theorem-board command
 // downstream test ../tests/theorem_graph_board_native.rs preserves theorem-board input/output contracts

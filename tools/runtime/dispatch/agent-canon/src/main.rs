@@ -18,6 +18,8 @@
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
+// downstream implementation stablehlo_value_closure.rs exposes scoped SSA dependency closure APIs
+// downstream implementation theorem_graph_circularity_check.rs validates theorem graph proof frontiers
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
@@ -78,7 +80,10 @@ mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, run_evaluation, theorem_graph_board, tool_proof_coverage};
+use agent_canon::{
+    catalog, run_evaluation, stablehlo_value_closure, theorem_graph_board,
+    theorem_graph_circularity_check, tool_proof_coverage,
+};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -101,6 +106,8 @@ Commands:
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
+  stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
+  theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
   numeric-performance [--input <path|->] [--format json]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
@@ -159,6 +166,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "numeric-performance" {
         std::process::exit(numeric_performance::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
+        std::process::exit(stablehlo_value_closure::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
+        std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
