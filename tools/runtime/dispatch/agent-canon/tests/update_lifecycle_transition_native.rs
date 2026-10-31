@@ -135,9 +135,9 @@ fn platform_independent_transition_cases_match_frozen_cpython() {
             !matches!(
                 case.name.as_str(),
                 "valid-queue_enqueued"
-                    | "valid-frontier_accepted"
+                    | "valid-source_main_readback"
                     | "valid-cleanup_proven"
-                    | "valid-nested_lifecycle_cleanup"
+                    | "valid-reservations_released"
                     | "queue-notaccepted"
                     | "frontier-notaccepted"
             )
@@ -191,7 +191,9 @@ fn nested_cleanup_transition_accepts_a_host_absolute_path() {
     let mut case = golden
         .cases
         .iter()
-        .find(|case| case.name == "valid-nested_lifecycle_cleanup")
+        .find(|case| {
+            case.current_state == "cleanup_proven" && case.next_state == "nested_lifecycle_cleanup"
+        })
         .expect("valid nested-cleanup transition fixture is present")
         .clone();
     let path = std::env::current_dir()
