@@ -103,12 +103,9 @@ pub(crate) enum SearchPathPlatform {
 
 impl SearchPathPlatform {
     fn native() -> Self {
-        #[cfg(windows)]
-        {
+        if cfg!(windows) {
             Self::Windows
-        }
-        #[cfg(not(windows))]
-        {
+        } else {
             Self::Posix
         }
     }
@@ -483,25 +480,18 @@ fn windows_path_join(first: &str, second: &str) -> String {
         }
         root = second_root;
         path = second_path;
+    } else if !second_drive.is_empty() && !second_drive.eq_ignore_ascii_case(&drive) {
+        drive = second_drive;
+        root = second_root;
+        path = second_path;
     } else {
         if !second_drive.is_empty() {
-            if !second_drive.eq_ignore_ascii_case(&drive) {
-                drive = second_drive;
-                root = second_root;
-                path = second_path;
-            } else {
-                drive = second_drive;
-                if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
-                    path.push('\\');
-                }
-                path.push_str(&second_path);
-            }
-        } else {
-            if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
-                path.push('\\');
-            }
-            path.push_str(&second_path);
+            drive = second_drive;
         }
+        if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
+            path.push('\\');
+        }
+        path.push_str(&second_path);
     }
     if !path.is_empty()
         && root.is_empty()
@@ -599,9 +589,8 @@ fn native_home_lookup(request: HomeLookupRequest) -> Result<Option<PathBuf>, Str
             HomeLookupRequest::CurrentUser => User::from_uid(Uid::current()),
             HomeLookupRequest::NamedUser(username) => User::from_name(&username),
         };
-        return user
-            .map(|user| user.map(|user| user.dir))
-            .map_err(|error| error.to_string());
+        user.map(|user| user.map(|user| user.dir))
+            .map_err(|error| error.to_string())
     }
     #[cfg(not(unix))]
     {

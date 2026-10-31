@@ -264,7 +264,6 @@ fn windows_home_expansion_matches_profile_fallback_and_sibling_rules() {
         home_drive: Some(OsString::from("D:")),
         home_path: Some(OsString::from(r"\Profiles\ignored")),
         user_name: Some(OsString::from("alice")),
-        ..SearchPathEnvironment::default()
     };
     assert_eq!(
         expand_user_path_with(
