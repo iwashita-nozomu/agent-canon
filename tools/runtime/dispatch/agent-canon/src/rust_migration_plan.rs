@@ -325,7 +325,6 @@ fn family_for(path: &str) -> &'static str {
     if path.starts_with("tools/runtime/manifest/")
         || path.ends_with("/skill_projection_registry.py")
         || path.ends_with("/skill_route_catalog.py")
-        || path.ends_with("/tool_path_policy.py")
         || path.ends_with("/dependency_manifest.rs")
     {
         return "catalog-foundation";
