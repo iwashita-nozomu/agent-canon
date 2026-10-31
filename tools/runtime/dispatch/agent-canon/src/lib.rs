@@ -19,6 +19,7 @@
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
+// downstream implementation compare_agent_run_paths.rs owns the run-path comparison API
 // downstream implementation template_bundle.rs owns native template package operations
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
@@ -49,6 +50,7 @@ pub mod artifacts;
 pub mod authority;
 pub mod catalog;
 pub mod code_template_rendering;
+pub mod compare_agent_run_paths;
 pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
