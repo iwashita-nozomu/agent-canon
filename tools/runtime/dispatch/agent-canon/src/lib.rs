@@ -10,6 +10,7 @@
 // upstream implementation private_feedback.rs owns private feedback storage using the shared boundary
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
+// upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -26,6 +27,7 @@ pub mod artifacts;
 pub mod catalog;
 pub mod code_template_rendering;
 pub mod entrypoint_composer;
+pub mod environment_dependencies;
 pub mod native_release;
 pub mod private_feedback;
 pub mod runtime_boundary;
