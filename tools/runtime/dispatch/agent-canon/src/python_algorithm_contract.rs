@@ -464,12 +464,7 @@ fn excluded_directory(root: &Path, path: &Path, excludes: &[String]) -> bool {
     excluded_with_globs(root, path, excludes, false)
 }
 
-fn excluded_with_globs(
-    root: &Path,
-    path: &Path,
-    excludes: &[String],
-    match_globs: bool,
-) -> bool {
+fn excluded_with_globs(root: &Path, path: &Path, excludes: &[String], match_globs: bool) -> bool {
     let relative = path.strip_prefix(root).unwrap_or(path);
     if relative
         .components()
