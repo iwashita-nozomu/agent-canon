@@ -7,7 +7,7 @@
 // downstream implementation main.rs exposes the native GraphClient API to in-process callers
 // downstream implementation ../../../../analysis/dependencies/graph_client.py retains the Python compatibility adapter during caller migration
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
-// downstream implementation ../../../../analysis/search/search.py consumes selected source-derived dependency facts
+// downstream implementation agent_search.rs consumes selected source-derived dependency facts
 // downstream implementation source_dependency_tests.rs verifies source and persisted client behavior
 // @dependency-end
 
