@@ -13,6 +13,7 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
+// downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
@@ -90,9 +91,9 @@ mod tool_drift;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, native_release, run_evaluation, stablehlo_value_closure,
-    template_bundle, theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage,
-    work_log,
+    catalog, entrypoint_composer, generated_completeness, native_release, run_evaluation,
+    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
+    tool_proof_coverage, work_log,
 };
 use std::env;
 
@@ -111,6 +112,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
+  materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
@@ -192,6 +194,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == generated_completeness::SELECTOR {
+        std::process::exit(generated_completeness::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "numeric-performance" {

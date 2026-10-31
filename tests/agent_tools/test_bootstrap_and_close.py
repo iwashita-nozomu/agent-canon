@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests run bootstrap and close behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream test ../../tests/fixtures/generated_completeness/closeout_g1_g2.json freezes the G1/G2 closeout bundle.
 # upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization under test
 # upstream implementation ../../tools/agent/orchestration/tool_calls.py owns typed lifecycle tool calls under test
 # upstream implementation ../../tools/agent/orchestration/team_config.py owns team configuration under test
@@ -32,13 +33,15 @@ from unittest.mock import patch
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
-
-from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
-    GENERATED_COMPLETENESS_CHECK_IDS,
-    materialize_generated_completeness_receipt,
+G2_CLOSEOUT_FIXTURE = (
+    PROJECT_ROOT
+    / "tests"
+    / "fixtures"
+    / "generated_completeness"
+    / "closeout_g1_g2.json"
 )
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
     default_quality_check_agent_types,
     unique_codex_agents_for_roles,
@@ -154,37 +157,11 @@ U2_ACTIVE_DESIGN_PACKET = selected_active_design_packet("u2")
 
 def update_lifecycle_closeout_fixture() -> dict[str, object]:
     """Return one valid six-gate nested-lifecycle closeout artifact."""
-    binding: dict[str, object] = {
-        "transaction_id": "tx:" + "1" * 64,
-        "snapshot_id": "snapshot:" + "2" * 64,
-        "candidate_sha": "3" * 40,
-        "tree_sha": "4" * 40,
-        "input_digest": "sha256:" + "5" * 64,
-        "tool_id": "update-lifecycle-closeout",
-        "tool_version": "test.v1",
-        "evidence_ref": "evidence:" + "6" * 64,
-        "evidence_digest": "sha256:" + "7" * 64,
-        "timing": {
-            "started_at": "2026-07-18T00:00:00Z",
-            "finished_at": "2026-07-18T00:00:00Z",
-            "last_attempt_at": "2026-07-18T00:00:00Z",
-            "duration_ms": 0,
-            "attempt": 1,
-            "replayed": False,
-        },
-    }
-    seed_ref = "evidence:" + "8" * 64
-    gates: list[dict[str, object]] = []
+    bundle = json.loads(G2_CLOSEOUT_FIXTURE.read_text(encoding="utf-8"))
+    context = bundle["contexts"][0]
+    binding = deepcopy(context["binding"])
+    gates: list[dict[str, object]] = deepcopy(context["gate_verdicts"])
     gate_contracts = {
-        "G1": (
-            "source_correctness",
-            PROJECT_ROOT
-            / "tools"
-            / "repository"
-            / "github"
-            / "publication_integrator.py",
-            "resolve_publication_eligibility",
-        ),
         "G3": (
             "pr_identity_cas",
             PROJECT_ROOT / "tools" / "repository" / "github" / "github_publish.py",
@@ -209,12 +186,11 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             "integrate_publication",
         ),
     }
-    for index, gate_id in enumerate(("G1", "G3", "G4", "G5"), 1):
+    for index, gate_id in enumerate(("G3", "G4", "G5"), 2):
         evidence_refs = [
             cast("dict[str, object]", gate["binding"])["evidence_ref"] for gate in gates
         ]
         ordered_inputs = {
-            "G1": [seed_ref],
             "G3": evidence_refs[:2],
             "G4": evidence_refs[2:3],
             "G5": evidence_refs[3:4],
@@ -230,18 +206,6 @@ def update_lifecycle_closeout_fixture() -> dict[str, object]:
             verdict="pass",
         )
         gates.append(gate)
-        if gate_id == "G1":
-            gates.append(
-                materialize_generated_completeness_receipt(
-                    g1_gate=gate,
-                    candidate_sha=str(binding["candidate_sha"]),
-                    tree_sha=str(binding["tree_sha"]),
-                    check_results=[
-                        {"check_id": check_id, "status": "pass"}
-                        for check_id in GENERATED_COMPLETENESS_CHECK_IDS
-                    ],
-                )
-            )
     handback: dict[str, object] = {
         "schema": "agent-canon.durable-handback.v1",
         "binding": binding,
