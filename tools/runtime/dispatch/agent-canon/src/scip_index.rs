@@ -792,6 +792,7 @@ fn scip_range(occurrence: &Occurrence) -> Option<Value> {
                     "end": {"line": range.end_line, "character": range.end_character}
                 }));
             }
+            _ => {}
         }
     }
     match occurrence.range.as_slice() {
@@ -1287,7 +1288,7 @@ fn parse_cli(args: &[String]) -> Result<CliOperation, String> {
             "--symbol" => symbols.push(value),
             "--limit" => {
                 limit = crate::python_cli_integer::parse(&value)
-                    .map_err(|_| format!("invalid int value: '{value}'"))?;
+                    .ok_or_else(|| format!("invalid int value: '{value}'"))?;
             }
             _ => unreachable!("matched SCIP option remains handled"),
         }

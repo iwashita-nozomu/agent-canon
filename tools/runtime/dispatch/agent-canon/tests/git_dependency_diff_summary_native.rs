@@ -7,11 +7,14 @@
 // @dependency-end
 
 use agent_canon::git_dependency_diff_summary::{
-    changed_file_list, parse_name_status, parse_name_status_z, parse_numstat, parse_numstat_z,
-    scip_target_paths, ChangedPath,
+    changed_file_list, collect_changed_paths, parse_name_status, parse_name_status_z,
+    parse_numstat, parse_numstat_z, scip_target_paths, ChangedPath, DiffSpec,
 };
 use serde_json::Value;
+use std::ffi::{OsStr, OsString};
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -78,6 +81,17 @@ fn commit_paths(root: &Path, message: &str, paths: &[&str]) {
     assert!(git(root, &["commit", "-m", message]).status.success());
 }
 
+#[cfg(unix)]
+fn add_native_path(root: &Path, path: &OsStr) {
+    let output = Command::new("git")
+        .args(["add", "--"])
+        .arg(path)
+        .current_dir(root)
+        .output()
+        .expect("Git can add a native path");
+    assert!(output.status.success(), "Git adds the native path");
+}
+
 fn summary_cli(fixture: &Fixture, extra: &[&str]) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
     command.args([
@@ -102,8 +116,8 @@ fn summary_json(output: &Output) -> Value {
 fn changed(status: &str, path: &str, old_path: Option<&str>) -> ChangedPath {
     ChangedPath {
         status: status.to_string(),
-        path: path.to_string(),
-        old_path: old_path.map(str::to_string),
+        path: OsString::from(path),
+        old_path: old_path.map(OsString::from),
         additions: None,
         deletions: None,
         binary: false,
@@ -116,10 +130,10 @@ fn parse_name_status_keeps_rename_source() {
     let rows = parse_name_status("M\talpha.py\nR100\told.py\tnew.py\n");
 
     assert_eq!(rows[0].status, "M");
-    assert_eq!(rows[0].path, "alpha.py");
+    assert_eq!(rows[0].path, OsString::from("alpha.py"));
     assert_eq!(rows[1].status, "R100");
-    assert_eq!(rows[1].old_path.as_deref(), Some("old.py"));
-    assert_eq!(rows[1].path, "new.py");
+    assert_eq!(rows[1].old_path.as_deref(), Some(OsStr::new("old.py")));
+    assert_eq!(rows[1].path, OsString::from("new.py"));
 }
 
 #[test]
@@ -127,7 +141,7 @@ fn parse_name_status_z_preserves_tab_in_path() {
     let rows = parse_name_status_z(b"M\0tab\tname.py\0");
 
     assert_eq!(rows[0].status, "M");
-    assert_eq!(rows[0].path, "tab\tname.py");
+    assert_eq!(rows[0].path, OsString::from("tab\tname.py"));
 }
 
 #[test]
@@ -135,9 +149,18 @@ fn parse_numstat_handles_binary_rows() {
     let stats = parse_numstat("3\t4\talpha.py\n-\t-\timage.bin\n1\t0\told.py => new.py\n")
         .expect("valid Git text numstat parses");
 
-    assert_eq!(stats["alpha.py"], (Some(3), Some(4), false));
-    assert_eq!(stats["image.bin"], (None, None, true));
-    assert_eq!(stats["new.py"], (Some(1), Some(0), false));
+    assert_eq!(
+        stats.get(&OsString::from("alpha.py")).copied(),
+        Some((Some(3), Some(4), false))
+    );
+    assert_eq!(
+        stats.get(&OsString::from("image.bin")).copied(),
+        Some((None, None, true))
+    );
+    assert_eq!(
+        stats.get(&OsString::from("new.py")).copied(),
+        Some((Some(1), Some(0), false))
+    );
 }
 
 #[test]
@@ -145,8 +168,11 @@ fn parse_numstat_z_keys_renames_by_current_path() {
     let stats = parse_numstat_z(b"1\t0\t\0old.py\0new.py\0")
         .expect("valid NUL-delimited rename numstat parses");
 
-    assert_eq!(stats["new.py"], (Some(1), Some(0), false));
-    assert!(!stats.contains_key("old.py"));
+    assert_eq!(
+        stats.get(&OsString::from("new.py")).copied(),
+        Some((Some(1), Some(0), false))
+    );
+    assert!(!stats.contains_key(&OsString::from("old.py")));
 }
 
 #[test]
@@ -154,7 +180,10 @@ fn parse_numstat_z_preserves_tab_in_path() {
     let stats = parse_numstat_z(b"2\t1\ttab\tname.py\0")
         .expect("valid NUL-delimited tab path numstat parses");
 
-    assert_eq!(stats["tab\tname.py"], (Some(2), Some(1), false));
+    assert_eq!(
+        stats.get(&OsString::from("tab\tname.py")).copied(),
+        Some((Some(2), Some(1), false))
+    );
 }
 
 #[test]
@@ -163,7 +192,7 @@ fn changed_file_list_includes_rename_source() {
 
     assert_eq!(
         changed_file_list(&rows),
-        vec!["new.py".to_string(), "old.py".to_string()]
+        vec![OsString::from("new.py"), OsString::from("old.py")]
     );
 }
 
@@ -181,13 +210,13 @@ fn scip_targets_include_recognized_old_and_new_source_suffixes() {
     assert_eq!(
         scip_target_paths(&rows),
         vec![
-            "current.rs".to_string(),
-            "include/native.hxx".to_string(),
-            "main.rs".to_string(),
-            "native.cxx".to_string(),
-            "old.py".to_string(),
-            "previous.rs".to_string(),
-            "typing.pyi".to_string(),
+            OsString::from("current.rs"),
+            OsString::from("include/native.hxx"),
+            OsString::from("main.rs"),
+            OsString::from("native.cxx"),
+            OsString::from("old.py"),
+            OsString::from("previous.rs"),
+            OsString::from("typing.pyi"),
         ]
     );
 }
@@ -298,4 +327,82 @@ fn cli_preserves_tab_path_stats() {
     assert_eq!(row["path"], "tab\tname.py");
     assert_eq!(row["additions"], 1);
     assert_eq!(row["deletions"], 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn nul_parsers_preserve_invalid_utf8_rename_identity_and_numstat_key() {
+    let old_path = OsString::from_vec(b"old-\xff.py".to_vec());
+    let current_path = OsString::from_vec(b"new-\xfe.py".to_vec());
+    let mut names = b"R100\0".to_vec();
+    names.extend_from_slice(old_path.as_bytes());
+    names.push(0);
+    names.extend_from_slice(current_path.as_bytes());
+    names.push(0);
+
+    let rows = parse_name_status_z(&names);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, "R100");
+    assert_eq!(
+        rows[0].old_path.as_deref().unwrap().as_bytes(),
+        old_path.as_bytes()
+    );
+    assert_eq!(rows[0].path.as_bytes(), current_path.as_bytes());
+
+    let mut numstat = b"3\t1\t\0".to_vec();
+    numstat.extend_from_slice(old_path.as_bytes());
+    numstat.push(0);
+    numstat.extend_from_slice(current_path.as_bytes());
+    numstat.push(0);
+    let stats = parse_numstat_z(&numstat).expect("NUL numstat retains raw rename paths");
+
+    assert_eq!(
+        stats.get(&current_path).copied(),
+        Some((Some(3), Some(1), false))
+    );
+    assert!(!stats.contains_key(&old_path));
+}
+
+#[cfg(unix)]
+#[test]
+fn cli_fails_at_changed_file_utf8_boundary_before_report_or_provider_writes() {
+    let fixture = Fixture::new();
+    let source = fixture.source();
+    init_repository(&source);
+    let raw_path = OsString::from_vec(b"tracked-\xff.py".to_vec());
+    fs::write(source.join(&raw_path), "before\n").unwrap();
+    add_native_path(&source, &raw_path);
+    assert!(git(&source, &["commit", "-m", "initial"]).status.success());
+    fs::write(source.join(&raw_path), "after\n").unwrap();
+
+    let rows = collect_changed_paths(
+        &source,
+        &DiffSpec {
+            base: "HEAD".to_string(),
+            head: String::new(),
+            paths: Vec::new(),
+        },
+    )
+    .expect("Git paths retain native bytes through diff and numstat matching");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].path.as_bytes(), raw_path.as_bytes());
+    assert!(rows[0].exists_in_worktree);
+    assert_eq!((rows[0].additions, rows[0].deletions), (Some(1), Some(1)));
+    assert_eq!(changed_file_list(&rows), vec![raw_path.clone()]);
+    assert_eq!(scip_target_paths(&rows), vec![raw_path]);
+
+    let output = summary_cli(&fixture, &["--format", "json"]);
+
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("GIT_DEPENDENCY_DIFF_SUMMARY=fail"));
+    assert!(stderr.contains("GIT_DEPENDENCY_DIFF_SUMMARY_ERROR="));
+    assert!(output.stdout.is_empty());
+    assert!(fixture.report().is_dir());
+    assert!(!fixture.report().join("changed_files.txt").exists());
+    assert!(!fixture.report().join("git_stat.txt").exists());
+    assert!(!fixture.report().join("scip_impact.json").exists());
+    assert!(!fixture.report().join("dependency-review").exists());
+    assert!(!fixture.report().join("summary.json").exists());
+    assert!(!fixture.report().join("summary.md").exists());
 }

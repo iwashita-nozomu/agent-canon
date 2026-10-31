@@ -13,12 +13,14 @@ use crate::python_text::python_strip;
 use crate::runtime_boundary::{root_capability_environment, RuntimeArtifactBoundary};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::SystemTime;
+use std::time::{SystemTime, UNIX_EPOCH};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -36,11 +38,11 @@ pub struct CommandRecord {
     pub stderr_path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangedPath {
     pub status: String,
-    pub path: String,
-    pub old_path: Option<String>,
+    pub path: OsString,
+    pub old_path: Option<OsString>,
     pub additions: Option<i64>,
     pub deletions: Option<i64>,
     pub binary: bool,
@@ -100,8 +102,8 @@ pub fn parse_name_status(output: &str) -> Vec<ChangedPath> {
         {
             rows.push(ChangedPath {
                 status: status.to_string(),
-                old_path: Some(fields[1].to_string()),
-                path: fields[2].to_string(),
+                old_path: Some(OsString::from(fields[1])),
+                path: OsString::from(fields[2]),
                 additions: None,
                 deletions: None,
                 binary: false,
@@ -110,7 +112,7 @@ pub fn parse_name_status(output: &str) -> Vec<ChangedPath> {
         } else if fields.len() >= 2 {
             rows.push(ChangedPath {
                 status: status.to_string(),
-                path: fields[1].to_string(),
+                path: OsString::from(fields[1]),
                 old_path: None,
                 additions: None,
                 deletions: None,
@@ -122,8 +124,20 @@ pub fn parse_name_status(output: &str) -> Vec<ChangedPath> {
     rows
 }
 
-fn decode_git_path(value: &[u8]) -> String {
+fn decode_git_status(value: &[u8]) -> String {
     String::from_utf8_lossy(value).into_owned()
+}
+
+fn decode_git_path(value: &[u8]) -> OsString {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStringExt;
+        OsString::from_vec(value.to_vec())
+    }
+    #[cfg(not(unix))]
+    {
+        String::from_utf8_lossy(value).into_owned().into()
+    }
 }
 
 pub fn parse_name_status_z(output: &[u8]) -> Vec<ChangedPath> {
@@ -136,7 +150,7 @@ pub fn parse_name_status_z(output: &[u8]) -> Vec<ChangedPath> {
         if raw_status.is_empty() {
             continue;
         }
-        let status = decode_git_path(raw_status);
+        let status = decode_git_status(raw_status);
         if index >= fields.len() {
             break;
         }
@@ -175,8 +189,8 @@ pub fn parse_name_status_z(output: &[u8]) -> Vec<ChangedPath> {
 fn parse_numstat_fields(
     additions: &str,
     deletions: &str,
-    path: String,
-) -> Result<(String, Option<i64>, Option<i64>, bool), String> {
+    path: OsString,
+) -> Result<(OsString, Option<i64>, Option<i64>, bool), String> {
     let binary = additions == "-" || deletions == "-";
     if binary {
         return Ok((path, None, None, true));
@@ -192,7 +206,7 @@ fn parse_numstat_fields(
 
 pub fn parse_numstat(
     output: &str,
-) -> Result<BTreeMap<String, (Option<i64>, Option<i64>, bool)>, String> {
+) -> Result<BTreeMap<OsString, (Option<i64>, Option<i64>, bool)>, String> {
     let mut stats = BTreeMap::new();
     for line in output.lines().filter(|line| !python_strip(line).is_empty()) {
         let fields = line.split('\t').collect::<Vec<_>>();
@@ -202,7 +216,9 @@ pub fn parse_numstat(
         let (path, additions, deletions, binary) = parse_numstat_fields(
             fields[0],
             fields[1],
-            current_numstat_path(fields.last().copied().unwrap_or_default()),
+            OsString::from(current_numstat_path(
+                fields.last().copied().unwrap_or_default(),
+            )),
         )?;
         stats.insert(path, (additions, deletions, binary));
     }
@@ -230,7 +246,7 @@ pub fn current_numstat_path(path: &str) -> String {
 
 pub fn parse_numstat_z(
     output: &[u8],
-) -> Result<BTreeMap<String, (Option<i64>, Option<i64>, bool)>, String> {
+) -> Result<BTreeMap<OsString, (Option<i64>, Option<i64>, bool)>, String> {
     let fields = output.split(|byte| *byte == 0).collect::<Vec<_>>();
     let mut stats = BTreeMap::new();
     let mut index = 0;
@@ -240,23 +256,27 @@ pub fn parse_numstat_z(
         if header.is_empty() {
             continue;
         }
-        let header = decode_git_path(header);
         let parts = header
-            .splitn(GIT_NUMSTAT_FIELD_COUNT, '\t')
+            .splitn(GIT_NUMSTAT_FIELD_COUNT, |byte| *byte == b'\t')
             .collect::<Vec<_>>();
         if parts.len() < GIT_NUMSTAT_FIELD_COUNT {
             continue;
         }
-        let mut path = parts[2].to_string();
+        let additions = std::str::from_utf8(parts[0])
+            .map_err(|error| format!("invalid Git numstat additions: {error}"))?;
+        let deletions = std::str::from_utf8(parts[1])
+            .map_err(|error| format!("invalid Git numstat deletions: {error}"))?;
+        let mut path = parts[2];
         if path.is_empty() {
             if index + 1 >= fields.len() {
                 continue;
             }
             index += 1;
-            path = decode_git_path(fields[index]);
+            path = fields[index];
             index += 1;
         }
-        let (path, additions, deletions, binary) = parse_numstat_fields(parts[0], parts[1], path)?;
+        let (path, additions, deletions, binary) =
+            parse_numstat_fields(additions, deletions, decode_git_path(path))?;
         stats.insert(path, (additions, deletions, binary));
     }
     Ok(stats)
@@ -302,7 +322,7 @@ fn git_diff_args(diff: &DiffSpec) -> Vec<String> {
     diff.git_args()
 }
 
-fn untracked_paths(root: &Path, paths: &[String]) -> Result<Vec<String>, String> {
+fn untracked_paths(root: &Path, paths: &[String]) -> Result<Vec<OsString>, String> {
     let mut args = vec![
         "ls-files".to_string(),
         "--others".to_string(),
@@ -313,12 +333,19 @@ fn untracked_paths(root: &Path, paths: &[String]) -> Result<Vec<String>, String>
     Ok(git_stdout(root, &args)?
         .lines()
         .filter(|line| !python_strip(line).is_empty())
-        .map(str::to_string)
+        .map(OsString::from)
         .collect())
 }
 
-fn is_file_in_worktree(root: &Path, path: &str) -> bool {
+fn is_file_in_worktree(root: &Path, path: &OsStr) -> bool {
     fs::metadata(root.join(path)).is_ok_and(|metadata| metadata.is_file())
+}
+
+fn path_order(left: &OsStr, right: &OsStr) -> Ordering {
+    match (left.to_str(), right.to_str()) {
+        (Some(left), Some(right)) => left.cmp(right),
+        _ => left.cmp(right),
+    }
 }
 
 pub fn collect_changed_paths(root: &Path, diff: &DiffSpec) -> Result<Vec<ChangedPath>, String> {
@@ -339,7 +366,7 @@ pub fn collect_changed_paths(root: &Path, diff: &DiffSpec) -> Result<Vec<Changed
     numstat_args.extend(suffix);
     let numstat = parse_numstat_z(&git_stdout_bytes(root, &numstat_args)?)?;
     let mut merged = Vec::new();
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeSet::<OsString>::new();
     for row in rows {
         let (additions, deletions, binary) = numstat
             .get(&row.path)
@@ -372,11 +399,13 @@ pub fn collect_changed_paths(root: &Path, diff: &DiffSpec) -> Result<Vec<Changed
             });
         }
     }
-    merged.sort_by(|left, right| (&left.path, &left.status).cmp(&(&right.path, &right.status)));
+    merged.sort_by(|left, right| {
+        path_order(&left.path, &right.path).then_with(|| left.status.cmp(&right.status))
+    });
     Ok(merged)
 }
 
-pub fn changed_file_list(rows: &[ChangedPath]) -> Vec<String> {
+pub fn changed_file_list(rows: &[ChangedPath]) -> Vec<OsString> {
     let mut paths = BTreeSet::new();
     for row in rows {
         paths.insert(row.path.clone());
@@ -384,10 +413,12 @@ pub fn changed_file_list(rows: &[ChangedPath]) -> Vec<String> {
             paths.insert(old_path.clone());
         }
     }
-    paths.into_iter().collect()
+    let mut paths = paths.into_iter().collect::<Vec<_>>();
+    paths.sort_by(|left, right| path_order(left, right));
+    paths
 }
 
-pub fn scip_target_paths(rows: &[ChangedPath]) -> Vec<String> {
+pub fn scip_target_paths(rows: &[ChangedPath]) -> Vec<OsString> {
     let mut candidates = BTreeSet::new();
     for row in rows {
         for path in std::iter::once(&row.path).chain(row.old_path.iter()) {
@@ -396,7 +427,9 @@ pub fn scip_target_paths(rows: &[ChangedPath]) -> Vec<String> {
             }
         }
     }
-    candidates.into_iter().collect()
+    let mut candidates = candidates.into_iter().collect::<Vec<_>>();
+    candidates.sort_by(|left, right| path_order(left, right));
+    candidates
 }
 
 fn source_repository_root() -> Result<PathBuf, String> {
@@ -478,6 +511,28 @@ fn command_value(record: &CommandRecord) -> Value {
     serde_json::to_value(record).unwrap_or(Value::Null)
 }
 
+fn git_path_utf8<'a>(path: &'a OsStr, label: &str) -> Result<&'a str, String> {
+    path.to_str()
+        .ok_or_else(|| format!("{label} contains a path that is not valid UTF-8"))
+}
+
+fn changed_path_value(row: &ChangedPath) -> Result<Value, String> {
+    let path = git_path_utf8(&row.path, "changed path")?;
+    let old_path = match row.old_path.as_deref() {
+        Some(path) => Some(git_path_utf8(path, "previous changed path")?),
+        None => None,
+    };
+    Ok(json!({
+        "status": row.status,
+        "path": path,
+        "old_path": old_path,
+        "additions": row.additions,
+        "deletions": row.deletions,
+        "binary": row.binary,
+        "exists_in_worktree": row.exists_in_worktree
+    }))
+}
+
 fn write_diff_artifacts(
     root: &Path,
     report_dir: &Path,
@@ -486,6 +541,10 @@ fn write_diff_artifacts(
 ) -> Result<DiffArtifacts, String> {
     let rows = collect_changed_paths(root, diff)?;
     let changed_paths = changed_file_list(&rows);
+    let changed_paths = changed_paths
+        .iter()
+        .map(|path| git_path_utf8(path, "changed_files.txt"))
+        .collect::<Result<Vec<_>, _>>()?;
     let changed_files_path = write_text(
         boundary,
         &report_dir.join("changed_files.txt"),
@@ -565,7 +624,10 @@ fn scip_impact(
         ]);
     }
     for path in target_paths {
-        command.extend(["--path".to_string(), path]);
+        command.extend([
+            "--path".to_string(),
+            git_path_utf8(&path, "SCIP target path")?.to_string(),
+        ]);
     }
     let record = run_capture(
         root,
@@ -772,8 +834,8 @@ fn build_summary(
         nonempty_line_count(&dependency_dir.join("dependency_edit_scope.txt"))?;
     let serialized_rows = rows
         .iter()
-        .map(|row| serde_json::to_value(row).unwrap_or(Value::Null))
-        .collect::<Vec<_>>();
+        .map(|row| changed_path_value(row))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut summary = json!({
         "schema": SCHEMA,
         "status": if dependency_artifacts.status_code == 0 {"pass"} else {"fail"},
