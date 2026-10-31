@@ -1,123 +1,125 @@
 // @dependency-start
 // contract test
-// responsibility Verifies native lifecycle binding identity and gate-verdict mechanics against the old owner contract.
+// responsibility Verifies native lifecycle binding identity and gate-verdict mechanics against frozen Python output.
 // upstream implementation ../src/update_lifecycle_contract.rs owns the native pure API
 // upstream implementation ../src/artifacts/artifact_identity.rs owns canonical JSON bytes
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns lifecycle identity semantics
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py preserves gate replay and distinctness oracle purpose
+// downstream test ../../../../../tests/fixtures/update_lifecycle/gates_python_golden.json preserves frozen Python bytes, digests, and failure codes
 // @dependency-end
 
+use agent_canon::artifacts::artifact_identity::canonical_json_bytes;
 use agent_canon::update_lifecycle_contract::{
     binding_identity, materialize_gate_verdict, validate_gate_chain, validate_gate_verdict,
     validate_record_binding, GateVerdictInput, LifecycleContractError, RecordBindingIdentity,
     TRANSACTION_STATES,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
 
-fn binding() -> Value {
-    json!({
-        "transaction_id": format!("tx:{}", "1".repeat(64)),
-        "snapshot_id": format!("snapshot:{}", "2".repeat(64)),
-        "candidate_sha": "3".repeat(40),
-        "tree_sha": "4".repeat(40),
-        "input_digest": format!("sha256:{}", "5".repeat(64)),
-        "tool_id": "publication-integrator",
-        "tool_version": "test.v1",
-        "evidence_ref": format!("evidence:{}", "6".repeat(64)),
-        "evidence_digest": format!("sha256:{}", "7".repeat(64)),
-        "timing": {
-            "started_at": "2026-07-18T00:00:00Z",
-            "finished_at": "2026-07-18T00:00:00Z",
-            "last_attempt_at": "2026-07-18T00:00:00Z",
-            "duration_ms": 0,
-            "attempt": 1,
-            "replayed": false
+const PYTHON_GOLDEN: &str =
+    include_str!("../../../../../tests/fixtures/update_lifecycle/gates_python_golden.json");
+
+fn gate_input(value: &Value) -> GateVerdictInput {
+    let refs = value["ordered_input_evidence_refs"]
+        .as_array()
+        .expect("golden gate refs")
+        .iter()
+        .map(|reference| {
+            reference
+                .as_str()
+                .expect("golden ref is a string")
+                .to_string()
+        })
+        .collect();
+    GateVerdictInput {
+        binding: value["binding"].clone(),
+        gate_id: value["gate_id"]
+            .as_str()
+            .expect("golden gate id")
+            .to_string(),
+        ordered_input_evidence_refs: refs,
+        invariant: value["invariant"]
+            .as_str()
+            .expect("golden invariant")
+            .to_string(),
+        output_digest: value["output_digest"]
+            .as_str()
+            .expect("golden output digest")
+            .to_string(),
+        owner: value["owner"].as_str().expect("golden owner").to_string(),
+        verdict: value["verdict"]
+            .as_str()
+            .expect("golden verdict")
+            .to_string(),
+        retry_reason: value["retry_reason"].as_str().map(str::to_string),
+        next_checkpoint: value["next_checkpoint"].as_str().map(str::to_string),
+    }
+}
+
+fn negative_result(case: &Value) -> Result<Value, LifecycleContractError> {
+    let name = case["name"].as_str().expect("golden negative name");
+    let input = &case["input"];
+    match name {
+        "order" | "identity" | "predecessor" | "not_passed" => {
+            let gates = input.as_array().expect("golden chain input");
+            let expected = case["kwargs"]
+                .get("expected_gate_ids")
+                .and_then(Value::as_array)
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|value| value.as_str().expect("gate id string").to_string())
+                        .collect::<Vec<_>>()
+                });
+            let expected_refs = expected
+                .as_ref()
+                .map(|values| values.iter().map(String::as_str).collect::<Vec<_>>());
+            let require_pass = case["kwargs"]
+                .get("require_pass")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            validate_gate_chain(gates, expected_refs.as_deref(), require_pass)
+                .map(serde_json::Value::Array)
         }
-    })
-}
-
-fn owner_for(gate_id: &str) -> &'static str {
-    match gate_id {
-        "G1" => "/repo/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
-        "G2" => "/repo/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
-        "G3" => "/repo/tools/repository/github/github_publish.py#materialize_pr_identity_gate",
-        "G4" => "/repo/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
-        "G5" => "/repo/tools/repository/github/publication_integrator.py#integrate_publication",
-        "G6" => "/repo/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
-        _ => panic!("test requested an unknown gate"),
+        "owner" => validate_gate_verdict(input),
+        "bool_not_int" | "unknown_binding_key" => validate_record_binding(input),
+        other => panic!("unrecognized frozen negative case {other}"),
     }
 }
 
-fn invariant_for(gate_id: &str) -> &'static str {
-    match gate_id {
-        "G1" => "source_correctness",
-        "G2" => "generated_completeness",
-        "G3" => "pr_identity_cas",
-        "G4" => "standalone_source_branch_integrity",
-        "G5" => "remote_publication_readback",
-        "G6" => "nested_lifecycle_cleanup",
-        _ => panic!("test requested an unknown gate"),
-    }
-}
-
-fn materialize(binding: &Value, gate_id: &str, refs: &[String], verdict: &str) -> Value {
-    materialize_gate_verdict(&GateVerdictInput {
-        binding: binding.clone(),
-        gate_id: gate_id.to_string(),
-        ordered_input_evidence_refs: refs.to_vec(),
-        invariant: invariant_for(gate_id).to_string(),
-        output_digest: format!("sha256:{}", "a".repeat(64)),
-        owner: owner_for(gate_id).to_string(),
-        verdict: verdict.to_string(),
-        retry_reason: if verdict == "retry" {
-            Some("retry after rebase".to_string())
-        } else {
-            None
-        },
-        next_checkpoint: None,
-    })
-    .unwrap()
-}
-
-fn evidence_ref(gate: &Value) -> String {
-    gate["binding"]["evidence_ref"]
-        .as_str()
-        .unwrap()
-        .to_string()
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 #[test]
-fn transaction_state_vocabulary_and_binding_projection_are_stable() {
+fn frozen_python_gate_bytes_states_and_error_codes_match_native_api() {
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).expect("frozen Python fixture JSON");
     assert_eq!(
-        TRANSACTION_STATES,
-        [
-            "created",
-            "prepared",
-            "generated",
-            "gates_ready",
-            "reviewed",
-            "pr_open",
-            "pr_merged",
-            "source_main_readback",
-            "queue_enqueued",
-            "frontier_accepted",
-            "remote_readback",
-            "durable_handback",
-            "descendants_closed",
-            "reservations_released",
-            "cleanup_proven",
-            "nested_lifecycle_cleanup",
-            "closed",
-            "failed",
-            "successor_required",
-        ]
-        .as_slice()
+        golden["source"].as_str(),
+        Some("e0ab183ecf880969a8c2e677efb6fe75facec942")
     );
-    let input = binding();
-    let checked = validate_record_binding(&input).unwrap();
-    assert_eq!(checked, input);
+    assert!(golden["python"]
+        .as_str()
+        .is_some_and(|value| value.starts_with("3.12.")));
+
+    let expected_states = golden["transaction_states"]
+        .as_array()
+        .expect("golden state list")
+        .iter()
+        .map(|value| value.as_str().expect("state string"))
+        .collect::<Vec<_>>();
+    assert_eq!(TRANSACTION_STATES, expected_states.as_slice());
+
+    let gate_cases = golden["gates"].as_array().expect("golden gate cases");
+    assert_eq!(gate_cases.len(), 6);
+    let first_binding = &gate_cases[0]["input"]["binding"];
+    validate_record_binding(first_binding).expect("frozen binding validates");
     assert_eq!(
-        binding_identity(&checked).unwrap(),
+        binding_identity(first_binding).unwrap(),
         RecordBindingIdentity {
             transaction_id: format!("tx:{}", "1".repeat(64)),
             snapshot_id: format!("snapshot:{}", "2".repeat(64)),
@@ -128,138 +130,119 @@ fn transaction_state_vocabulary_and_binding_projection_are_stable() {
             tool_version: "test.v1".to_string(),
         }
     );
-}
 
-#[test]
-fn binding_validation_keeps_exact_field_and_python_integer_boundaries() {
-    let mut extra = binding();
-    extra["extra"] = json!("forbidden");
-    let error = validate_record_binding(&extra).unwrap_err();
-    assert_eq!(error.code, "lifecycle:field_forbidden");
-    assert_eq!(error.detail, "binding:extra");
-
-    let mut boolean_attempt = binding();
-    boolean_attempt["timing"]["attempt"] = Value::Bool(true);
-    let error = validate_record_binding(&boolean_attempt).unwrap_err();
-    assert_eq!(error.code, "lifecycle:integer_invalid");
-    assert_eq!(error.detail, "binding.timing.attempt");
-
-    let mut bad_candidate = binding();
-    bad_candidate["candidate_sha"] = json!("3".repeat(39));
-    let error = validate_record_binding(&bad_candidate).unwrap_err();
-    assert_eq!(error.code, "lifecycle:identity_invalid");
-    assert_eq!(error.detail, "binding.candidate_sha");
-}
-
-#[test]
-fn binding_time_validation_accepts_existing_iso_forms() {
-    for timestamp in [
-        "2026-07-18",
-        "20260718T000000",
-        "2026-W29-6T00:00:00Z",
-        "2026-07-18T00:00:00.123456789+00:00",
-        "2026-07-18 00:00:00",
-    ] {
-        let mut input = binding();
-        input["timing"]["started_at"] = json!(timestamp);
-        assert!(validate_record_binding(&input).is_ok(), "{timestamp}");
+    let mut outputs = Vec::with_capacity(gate_cases.len());
+    for case in gate_cases {
+        let output = materialize_gate_verdict(&gate_input(&case["input"]))
+            .expect("native gate materializes");
+        assert_eq!(output, case["output"], "gate {}", case["input"]["gate_id"]);
+        let canonical = canonical_json_bytes(&output).expect("native canonical serializer");
+        let expected_bytes = case["canonical_utf8"]
+            .as_str()
+            .expect("frozen canonical UTF-8 bytes");
+        assert_eq!(canonical.as_slice(), expected_bytes.as_bytes());
+        assert_eq!(
+            sha256_hex(&canonical),
+            case["sha256"].as_str().expect("frozen output digest")
+        );
+        outputs.push(output);
     }
-    let mut invalid = binding();
-    invalid["timing"]["started_at"] = json!("2026-02-30T00:00:00Z");
-    let error = validate_record_binding(&invalid).unwrap_err();
-    assert_eq!(error.code, "lifecycle:timestamp_invalid");
-    assert_eq!(error.detail, "binding.timing.started_at");
-}
 
-#[test]
-fn binding_time_validation_preserves_existing_isoformat_forms() {
-    for timestamp in [
-        "2026-07-18",
-        "20260718T000000",
-        "2026-W29-6T00:00:00Z",
-        "2026-07-18T00:00:00.123456789+00:00",
-        "2026-07-18 00:00:00",
-    ] {
-        let mut input = binding();
-        input["timing"]["started_at"] = json!(timestamp);
-        assert!(validate_record_binding(&input).is_ok(), "{timestamp}");
+    let expected_gate_ids = ["G1", "G2", "G3", "G4", "G5", "G6"];
+    let chain = validate_gate_chain(&outputs, Some(&expected_gate_ids), true)
+        .expect("frozen six-gate chain validates");
+    assert_eq!(chain, outputs);
+
+    let negatives = golden["negative_cases"]
+        .as_array()
+        .expect("frozen negative cases");
+    assert_eq!(negatives.len(), 7);
+    for case in negatives {
+        let error = negative_result(case).expect_err(case["name"].as_str().expect("negative name"));
+        assert_eq!(error.code, case["code"].as_str().expect("error code"));
+        assert_eq!(error.detail, case["detail"].as_str().expect("error detail"));
     }
-    let mut invalid = binding();
-    invalid["timing"]["started_at"] = json!("2026-02-30T00:00:00Z");
-    let error = validate_record_binding(&invalid).unwrap_err();
-    assert_eq!(error.code, "lifecycle:timestamp_invalid");
-    assert_eq!(error.detail, "binding.timing.started_at");
 }
 
 #[test]
 fn gate_identity_is_distinct_and_replay_stable() {
-    let binding = binding();
+    let binding = gate_input_binding();
     let seed = format!("evidence:{}", "8".repeat(64));
     let gates = [
-        materialize(&binding, "G1", std::slice::from_ref(&seed), "pass"),
-        materialize(&binding, "G3", std::slice::from_ref(&seed), "pass"),
-        materialize(&binding, "G5", std::slice::from_ref(&seed), "pass"),
+        materialize_gate_verdict(&make_gate_input(
+            &binding,
+            "G1",
+            std::slice::from_ref(&seed),
+        ))
+        .unwrap(),
+        materialize_gate_verdict(&make_gate_input(
+            &binding,
+            "G3",
+            std::slice::from_ref(&seed),
+        ))
+        .unwrap(),
+        materialize_gate_verdict(&make_gate_input(
+            &binding,
+            "G5",
+            std::slice::from_ref(&seed),
+        ))
+        .unwrap(),
     ];
-    let replay = materialize(&binding, "G3", std::slice::from_ref(&seed), "pass");
-    let refs = gates.iter().map(evidence_ref).collect::<Vec<_>>();
+    let replay = materialize_gate_verdict(&make_gate_input(
+        &binding,
+        "G3",
+        std::slice::from_ref(&seed),
+    ))
+    .unwrap();
+    let refs = gates
+        .iter()
+        .map(|gate| gate["binding"]["evidence_ref"].as_str().unwrap())
+        .collect::<Vec<_>>();
     assert_eq!(
         refs.iter().collect::<std::collections::BTreeSet<_>>().len(),
         3
     );
-    assert_eq!(evidence_ref(&replay), refs[1]);
-    for gate in &gates {
-        validate_gate_verdict(gate).unwrap();
+    assert_eq!(replay["binding"]["evidence_ref"].as_str(), Some(refs[1]));
+}
+
+fn gate_input_binding() -> Value {
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).expect("frozen Python fixture JSON");
+    golden["gates"][0]["input"]["binding"].clone()
+}
+
+fn make_gate_input(binding: &Value, gate_id: &str, refs: &[String]) -> GateVerdictInput {
+    let (invariant, owner) = match gate_id {
+        "G1" => ("source_correctness", "/fixture/tools/repository/github/publication_integrator.py#resolve_publication_eligibility"),
+        "G3" => ("pr_identity_cas", "/fixture/tools/repository/github/publication_integrator.py#resolve_publication_authority"),
+        "G5" => ("remote_publication_readback", "/fixture/tools/repository/github/publication_integrator.py#integrate_publication"),
+        _ => panic!("unexpected replay gate"),
+    };
+    GateVerdictInput {
+        binding: binding.clone(),
+        gate_id: gate_id.to_string(),
+        ordered_input_evidence_refs: refs.to_vec(),
+        invariant: invariant.to_string(),
+        output_digest: format!("sha256:{}", "a".repeat(64)),
+        owner: owner.to_string(),
+        verdict: "pass".to_string(),
+        retry_reason: None,
+        next_checkpoint: None,
     }
 }
 
 #[test]
-fn gate_chain_preserves_predecessor_and_identity_invariants() {
-    let binding = binding();
-    let seed = format!("evidence:{}", "8".repeat(64));
-    let g1 = materialize(&binding, "G1", std::slice::from_ref(&seed), "pass");
-    let g1_ref = evidence_ref(&g1);
-    let g2 = materialize(&binding, "G2", std::slice::from_ref(&g1_ref), "pass");
-    let g2_ref = evidence_ref(&g2);
-    let g3 = materialize(&binding, "G3", &[g1_ref.clone(), g2_ref.clone()], "pass");
-    let g3_ref = evidence_ref(&g3);
-    let g4 = materialize(&binding, "G4", std::slice::from_ref(&g3_ref), "pass");
-    let g4_ref = evidence_ref(&g4);
-    let g5 = materialize(&binding, "G5", std::slice::from_ref(&g4_ref), "pass");
-    let g5_ref = evidence_ref(&g5);
-    let g6 = materialize(
-        &binding,
-        "G6",
-        &[g1_ref, g2_ref, g3_ref, g4_ref, g5_ref],
-        "pass",
-    );
-    let chain = vec![g1.clone(), g2, g3, g4, g5, g6];
-    assert!(validate_gate_chain(&chain, Some(&["G1", "G2", "G3", "G4", "G5", "G6"]), true).is_ok());
-
-    let mut wrong_predecessor = chain.clone();
-    wrong_predecessor[1]["ordered_input_evidence_refs"] =
-        json!([format!("evidence:{}", "9".repeat(64))]);
-    let error = validate_gate_chain(&wrong_predecessor[..2], None, true).unwrap_err();
-    assert_eq!(error.code, "lifecycle:gate_predecessor_mismatch");
-
-    let mut wrong_identity = chain[..2].to_vec();
-    wrong_identity[1]["binding"]["candidate_sha"] = json!("f".repeat(40));
-    let error = validate_gate_chain(&wrong_identity, None, true).unwrap_err();
-    assert_eq!(error.code, "lifecycle:gate_identity_mismatch");
-
-    let error = validate_gate_chain(&chain, Some(&["G2", "G1"]), true).unwrap_err();
-    assert_eq!(error.code, "lifecycle:gate_order_invalid");
-}
-
-#[test]
-fn gate_verdict_retry_fields_keep_existing_failure_semantics() {
-    let binding = binding();
-    let seed = format!("evidence:{}", "8".repeat(64));
-    let retry = materialize(&binding, "G1", std::slice::from_ref(&seed), "retry");
-    assert_eq!(retry["verdict"], "retry");
-    assert_eq!(retry["retry_reason"], "retry after rebase");
-    let mut invalid = retry;
-    invalid["retry_reason"] = Value::Null;
-    let error = validate_gate_verdict(&invalid).unwrap_err();
-    assert_eq!(error.code, "lifecycle:string_invalid");
-    assert_eq!(error.detail, "gate_verdict.retry_reason");
+fn lifecycle_datetime_parser_keeps_python_owner_input_forms() {
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).expect("frozen Python fixture JSON");
+    let binding = &golden["gates"][0]["input"]["binding"];
+    for timestamp in [
+        "2026-07-18",
+        "20260718T000000",
+        "2026-W29-6T00:00:00Z",
+        "2026-07-18T00:00:00.123456789+00:00",
+        "2026-07-18 00:00:00",
+    ] {
+        let mut candidate = binding.clone();
+        candidate["timing"]["started_at"] = serde_json::json!(timestamp);
+        assert!(validate_record_binding(&candidate).is_ok(), "{timestamp}");
+    }
 }
