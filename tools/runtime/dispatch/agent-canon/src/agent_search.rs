@@ -16,9 +16,12 @@ use agent_canon::lsp_code_analysis::{
     self, LanguageId, LspServerSpec, DEFAULT_TIMEOUT as LSP_DEFAULT_TIMEOUT,
 };
 use icu_casemap::CaseMapper;
+#[cfg(unix)]
+use nix::unistd::{Uid, User};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -46,6 +49,76 @@ Options:
   --top N              per-file Git limit and semantic top-k (default: 12)
   --format FORMAT      output format: text or json (default: text)
   -h, --help           show this help message";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SearchInputError {
+    Validation(String),
+    UnresolvedHome,
+    HomeLookup(String),
+}
+
+impl SearchInputError {
+    pub(crate) fn message(&self) -> String {
+        match self {
+            Self::Validation(message) => message.clone(),
+            Self::UnresolvedHome => "Could not determine home directory.".to_string(),
+            Self::HomeLookup(message) => format!("home-directory-lookup-failed:{message}"),
+        }
+    }
+
+    pub(crate) fn exit_code(&self) -> i32 {
+        match self {
+            Self::Validation(_) => 2,
+            Self::UnresolvedHome | Self::HomeLookup(_) => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SearchPathEnvironment {
+    pub(crate) home: Option<OsString>,
+    pub(crate) user_profile: Option<OsString>,
+    pub(crate) home_drive: Option<OsString>,
+    pub(crate) home_path: Option<OsString>,
+    pub(crate) user_name: Option<OsString>,
+}
+
+impl SearchPathEnvironment {
+    fn from_process() -> Self {
+        Self {
+            home: std::env::var_os("HOME"),
+            user_profile: std::env::var_os("USERPROFILE"),
+            home_drive: std::env::var_os("HOMEDRIVE"),
+            home_path: std::env::var_os("HOMEPATH"),
+            user_name: std::env::var_os("USERNAME"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SearchPathPlatform {
+    Posix,
+    Windows,
+}
+
+impl SearchPathPlatform {
+    fn native() -> Self {
+        #[cfg(windows)]
+        {
+            Self::Windows
+        }
+        #[cfg(not(windows))]
+        {
+            Self::Posix
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum HomeLookupRequest {
+    CurrentUser,
+    NamedUser(String),
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct SearchRequest {
@@ -127,7 +200,7 @@ enum OutputFormat {
     Json,
 }
 
-struct CliArgs {
+pub(crate) struct CliArgs {
     root: PathBuf,
     query: String,
     query_file: Option<PathBuf>,
@@ -145,7 +218,7 @@ struct CliArgs {
 }
 
 impl CliArgs {
-    fn parse(args: &[String]) -> Result<Self, String> {
+    pub(crate) fn parse(args: &[String]) -> Result<Self, String> {
         let mut parsed = Self {
             root: std::env::current_dir().map_err(|error| error.to_string())?,
             query: String::new(),
@@ -264,78 +337,350 @@ impl CliArgs {
 }
 
 fn resolve_path(path: &Path) -> Result<PathBuf, String> {
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .map_err(|error| error.to_string())?
-            .join(path)
-    };
-    Ok(fs::canonicalize(&absolute).unwrap_or(absolute))
+    crate::semantic_responsibility::resolve_non_strict(path)
 }
 
-fn expand_user_path(path: &Path) -> PathBuf {
-    let value = path.to_string_lossy();
-    if value == "~" {
-        return std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| path.to_path_buf());
+fn unresolved_home() -> SearchInputError {
+    SearchInputError::UnresolvedHome
+}
+
+fn lookup_home_directory<F>(
+    request: HomeLookupRequest,
+    lookup: &mut F,
+) -> Result<PathBuf, SearchInputError>
+where
+    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
+{
+    match lookup(request) {
+        Ok(Some(home)) => Ok(home),
+        Ok(None) => Err(unresolved_home()),
+        Err(error) => Err(SearchInputError::HomeLookup(error)),
     }
-    if let Some(suffix) = value.strip_prefix("~/") {
-        if let Some(home) = std::env::var_os("HOME") {
-            return PathBuf::from(home).join(suffix);
+}
+
+pub(crate) fn expand_user_path_with<F>(
+    path: &Path,
+    platform: SearchPathPlatform,
+    environment: &SearchPathEnvironment,
+    mut home_lookup: F,
+) -> Result<PathBuf, SearchInputError>
+where
+    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
+{
+    let Some(value) = path.to_str() else {
+        return Ok(path.to_path_buf());
+    };
+    let Some((username, suffix)) = tilde_path_parts(value, platform) else {
+        return Ok(path.to_path_buf());
+    };
+
+    match platform {
+        SearchPathPlatform::Posix => {
+            let home = if username.is_empty() {
+                match &environment.home {
+                    Some(home) => PathBuf::from(home),
+                    None => {
+                        lookup_home_directory(HomeLookupRequest::CurrentUser, &mut home_lookup)?
+                    }
+                }
+            } else {
+                lookup_home_directory(
+                    HomeLookupRequest::NamedUser(username.to_string()),
+                    &mut home_lookup,
+                )?
+            };
+            let suffix = suffix.trim_start_matches('/');
+            if suffix.is_empty() {
+                Ok(home)
+            } else {
+                Ok(home.join(suffix))
+            }
+        }
+        SearchPathPlatform::Windows => {
+            let mut home = windows_current_home(environment)?;
+            if !username.is_empty() {
+                let current_user = environment.user_name.as_deref().and_then(OsStr::to_str);
+                if current_user != Some(username) {
+                    let (parent, basename) = windows_path_split(&home);
+                    if current_user != Some(basename.as_str()) {
+                        return Err(unresolved_home());
+                    }
+                    home = windows_path_join(&parent, username);
+                }
+            }
+            if suffix.is_empty() {
+                Ok(PathBuf::from(home))
+            } else {
+                Ok(PathBuf::from(windows_path_join(&home, suffix)))
+            }
         }
     }
-    path.to_path_buf()
+}
+
+fn tilde_path_parts(value: &str, platform: SearchPathPlatform) -> Option<(&str, &str)> {
+    if !value.starts_with('~') {
+        return None;
+    }
+    match platform {
+        SearchPathPlatform::Posix if value.starts_with('/') => return None,
+        SearchPathPlatform::Windows if windows_path_is_anchored(value) => return None,
+        _ => {}
+    }
+    let suffix = &value[1..];
+    let separator = |character| match platform {
+        SearchPathPlatform::Posix => character == '/',
+        SearchPathPlatform::Windows => matches!(character, '/' | '\\'),
+    };
+    let Some((index, character)) = suffix
+        .char_indices()
+        .find(|(_, character)| separator(*character))
+    else {
+        return Some((suffix, ""));
+    };
+    let username = &suffix[..index];
+    let suffix_start = index + character.len_utf8();
+    let suffix = &suffix[suffix_start..];
+    let suffix = match platform {
+        SearchPathPlatform::Posix => suffix.trim_start_matches('/'),
+        SearchPathPlatform::Windows => suffix.trim_start_matches(['/', '\\']),
+    };
+    Some((username, suffix))
+}
+
+fn windows_path_is_anchored(value: &str) -> bool {
+    if value.starts_with('\\') || value.starts_with('/') {
+        return true;
+    }
+    let mut characters = value.chars();
+    characters.next();
+    characters.next() == Some(':')
+}
+
+fn windows_current_home(environment: &SearchPathEnvironment) -> Result<String, SearchInputError> {
+    if let Some(user_profile) = &environment.user_profile {
+        return user_profile
+            .to_str()
+            .map(str::to_owned)
+            .ok_or_else(unresolved_home);
+    }
+    let Some(home_path) = &environment.home_path else {
+        return Err(unresolved_home());
+    };
+    let home_path = home_path.to_str().ok_or_else(unresolved_home)?;
+    let home_drive = match environment.home_drive.as_deref() {
+        Some(home_drive) => home_drive.to_str().ok_or_else(unresolved_home)?,
+        None => "",
+    };
+    Ok(windows_path_join(home_drive, home_path))
+}
+
+fn windows_path_join(first: &str, second: &str) -> String {
+    let (mut drive, mut root, mut path) = windows_splitroot(first);
+    let (second_drive, second_root, second_path) = windows_splitroot(second);
+    if !second_root.is_empty() {
+        if !second_drive.is_empty() || drive.is_empty() {
+            drive = second_drive;
+        }
+        root = second_root;
+        path = second_path;
+    } else {
+        if !second_drive.is_empty() {
+            if !second_drive.eq_ignore_ascii_case(&drive) {
+                drive = second_drive;
+                root = second_root;
+                path = second_path;
+            } else {
+                drive = second_drive;
+                if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
+                    path.push('\\');
+                }
+                path.push_str(&second_path);
+            }
+        } else {
+            if !path.is_empty() && !path.ends_with('\\') && !path.ends_with('/') {
+                path.push('\\');
+            }
+            path.push_str(&second_path);
+        }
+    }
+    if !path.is_empty()
+        && root.is_empty()
+        && !drive.is_empty()
+        && !drive.ends_with(':')
+        && !drive.ends_with('\\')
+        && !drive.ends_with('/')
+    {
+        drive.push('\\');
+    }
+    format_windows_path(&drive, &root, &path)
+}
+
+fn windows_splitroot(path: &str) -> (String, String, String) {
+    let normalized = path.replace('/', "\\");
+    if normalized.starts_with("\\\\") {
+        let unc_prefix = "\\\\?\\UNC\\";
+        let start = if normalized
+            .get(..unc_prefix.len())
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(unc_prefix))
+        {
+            unc_prefix.len()
+        } else {
+            2
+        };
+        let Some(first_separator) = normalized[start..].find('\\').map(|index| start + index)
+        else {
+            return (path.to_string(), String::new(), String::new());
+        };
+        let Some(second_separator) = normalized[first_separator + 1..]
+            .find('\\')
+            .map(|index| first_separator + 1 + index)
+        else {
+            return (path.to_string(), String::new(), String::new());
+        };
+        return (
+            path[..second_separator].to_string(),
+            path[second_separator..second_separator + 1].to_string(),
+            path[second_separator + 1..].to_string(),
+        );
+    }
+    if path.starts_with('\\') || path.starts_with('/') {
+        return (String::new(), path[..1].to_string(), path[1..].to_string());
+    }
+    let mut characters = path.char_indices();
+    let Some((_, _)) = characters.next() else {
+        return (String::new(), String::new(), String::new());
+    };
+    let Some((colon_index, ':')) = characters.next() else {
+        return (String::new(), String::new(), path.to_string());
+    };
+    let drive_end = colon_index + 1;
+    let after_drive = &path[drive_end..];
+    if after_drive.starts_with('\\') || after_drive.starts_with('/') {
+        let root_end = drive_end + 1;
+        (
+            path[..drive_end].to_string(),
+            path[drive_end..root_end].to_string(),
+            path[root_end..].to_string(),
+        )
+    } else {
+        (
+            path[..drive_end].to_string(),
+            String::new(),
+            after_drive.to_string(),
+        )
+    }
+}
+
+fn windows_path_split(path: &str) -> (String, String) {
+    let (drive, root, tail) = windows_splitroot(path);
+    let split_at = tail
+        .char_indices()
+        .filter(|(_, character)| matches!(character, '\\' | '/'))
+        .map(|(index, character)| index + character.len_utf8())
+        .next_back()
+        .unwrap_or(0);
+    let head = tail[..split_at].trim_end_matches(['\\', '/']);
+    let directory = if head.is_empty() {
+        format!("{drive}{root}")
+    } else {
+        format!("{drive}{root}{head}")
+    };
+    (directory, tail[split_at..].to_string())
+}
+
+fn format_windows_path(drive: &str, root: &str, path: &str) -> String {
+    format!("{drive}{root}{path}")
+}
+
+fn native_home_lookup(request: HomeLookupRequest) -> Result<Option<PathBuf>, String> {
+    #[cfg(unix)]
+    {
+        let user = match request {
+            HomeLookupRequest::CurrentUser => User::from_uid(Uid::current()),
+            HomeLookupRequest::NamedUser(username) => User::from_name(&username),
+        };
+        return user
+            .map(|user| user.map(|user| user.dir))
+            .map_err(|error| error.to_string());
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = request;
+        Ok(None)
+    }
 }
 
 fn normalize_universal_newlines(text: &str) -> String {
     text.replace("\r\n", "\n").replace('\r', "\n")
 }
 
-fn query_text_from_args(args: &CliArgs) -> Result<(String, Option<PathBuf>, bool), String> {
+fn query_text_from_args<R, F>(
+    args: &CliArgs,
+    environment: &SearchPathEnvironment,
+    platform: SearchPathPlatform,
+    mut home_lookup: F,
+    stdin: &mut R,
+) -> Result<(String, Option<PathBuf>, bool), SearchInputError>
+where
+    R: Read,
+    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
+{
     if args.query_file.is_some() && args.query_stdin {
-        return Err("query-file-and-query-stdin-are-mutually-exclusive".to_string());
+        return Err(SearchInputError::Validation(
+            "query-file-and-query-stdin-are-mutually-exclusive".to_string(),
+        ));
     }
     let inline_query = if args.purpose.is_empty() {
         &args.query
     } else {
         &args.purpose
     };
-    if !inline_query.trim().is_empty() {
+    if !crate::python_text::python_strip(inline_query).is_empty() {
         return Ok((inline_query.clone(), None, false));
     }
     if let Some(path) = &args.query_file {
-        let query_file = resolve_path(&expand_user_path(path))?;
-        let bytes = fs::read(&query_file)
-            .map_err(|_| format!("query-file-read-failed:{}", query_file.display()))?;
-        let query = String::from_utf8(bytes)
-            .map_err(|_| format!("query-file-decode-failed:{}", query_file.display()))?;
+        let expanded = expand_user_path_with(path, platform, environment, &mut home_lookup)?;
+        let query_file = resolve_path(&expanded).map_err(SearchInputError::Validation)?;
+        let bytes = fs::read(&query_file).map_err(|_| {
+            SearchInputError::Validation(format!("query-file-read-failed:{}", query_file.display()))
+        })?;
+        let query = String::from_utf8(bytes).map_err(|_| {
+            SearchInputError::Validation(format!(
+                "query-file-decode-failed:{}",
+                query_file.display()
+            ))
+        })?;
         let query = normalize_universal_newlines(&query);
-        if query.trim().is_empty() {
-            return Err("query-or-purpose-required".to_string());
+        if crate::python_text::python_strip(&query).is_empty() {
+            return Err(SearchInputError::Validation(
+                "query-or-purpose-required".to_string(),
+            ));
         }
         return Ok((query, Some(query_file), false));
     }
     if args.query_stdin {
         let mut query = String::new();
-        io::stdin()
-            .read_to_string(&mut query)
-            .map_err(|error| format!("query-stdin-read-failed:{error}"))?;
+        stdin.read_to_string(&mut query).map_err(|error| {
+            SearchInputError::Validation(format!("query-stdin-read-failed:{error}"))
+        })?;
         let query = normalize_universal_newlines(&query);
-        if query.trim().is_empty() {
-            return Err("query-or-purpose-required".to_string());
+        if crate::python_text::python_strip(&query).is_empty() {
+            return Err(SearchInputError::Validation(
+                "query-or-purpose-required".to_string(),
+            ));
         }
         return Ok((query, None, true));
     }
-    Err("query-or-purpose-required".to_string())
+    Err(SearchInputError::Validation(
+        "query-or-purpose-required".to_string(),
+    ))
 }
 
-fn selected_providers(raw: &str) -> Result<Vec<String>, String> {
+pub(crate) fn selected_providers(raw: &str) -> Result<Vec<String>, String> {
     let mut names = Vec::new();
     for part in raw
         .split(',')
-        .map(str::trim)
+        .map(crate::python_text::python_strip)
         .filter(|part| !part.is_empty())
     {
         if !names.iter().any(|name| name == part) {
@@ -356,12 +701,35 @@ fn selected_providers(raw: &str) -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-fn build_request(args: CliArgs) -> Result<SearchRequest, String> {
-    let (query, query_file, query_stdin) = query_text_from_args(&args)?;
+fn build_request(args: CliArgs) -> Result<SearchRequest, SearchInputError> {
+    let environment = SearchPathEnvironment::from_process();
+    let mut stdin = io::stdin();
+    build_request_with_environment(
+        args,
+        &environment,
+        SearchPathPlatform::native(),
+        native_home_lookup,
+        &mut stdin,
+    )
+}
+
+pub(crate) fn build_request_with_environment<R, F>(
+    args: CliArgs,
+    environment: &SearchPathEnvironment,
+    platform: SearchPathPlatform,
+    home_lookup: F,
+    stdin: &mut R,
+) -> Result<SearchRequest, SearchInputError>
+where
+    R: Read,
+    F: FnMut(HomeLookupRequest) -> Result<Option<PathBuf>, String>,
+{
+    let (query, query_file, query_stdin) =
+        query_text_from_args(&args, environment, platform, home_lookup, stdin)?;
     Ok(SearchRequest {
-        root: resolve_path(&args.root)?,
+        root: resolve_path(&args.root).map_err(SearchInputError::Validation)?,
         query,
-        providers: selected_providers(&args.providers)?,
+        providers: selected_providers(&args.providers).map_err(SearchInputError::Validation)?,
         surfaces: args.surfaces,
         excludes: args.excludes,
         query_file,
@@ -718,8 +1086,8 @@ pub fn run(args: &[String]) -> i32 {
         Ok(request) => request,
         Err(error) => {
             eprintln!("AGENT_SEARCH=fail");
-            eprintln!("AGENT_SEARCH_ERROR={error}");
-            return 2;
+            eprintln!("AGENT_SEARCH_ERROR={}", error.message());
+            return error.exit_code();
         }
     };
     let report = run_search(&request);

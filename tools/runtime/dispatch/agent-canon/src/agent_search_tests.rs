@@ -7,11 +7,18 @@
 // upstream implementation semantic_index/mod.rs owns semantic retrieval
 // @dependency-end
 
-use crate::agent_search::{run_search_with_lsp_overrides, SearchRequest};
+use crate::agent_search::{
+    build_request_with_environment, expand_user_path_with, run_search_with_lsp_overrides,
+    selected_providers, CliArgs, HomeLookupRequest, SearchInputError, SearchPathEnvironment,
+    SearchPathPlatform, SearchRequest,
+};
+use crate::python_text::python_strip;
 use agent_canon::lsp_code_analysis::{LanguageId, LspServerSpec};
 use serde_json::json;
 use std::collections::BTreeMap;
+use std::ffi::OsString;
 use std::fs;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -86,6 +93,316 @@ fn request(root: &Path, query: &str, provider: &str) -> SearchRequest {
         case_sensitive: false,
         top: 12,
     }
+}
+
+fn cli_args(root: &Path, options: &[&str]) -> CliArgs {
+    let mut args = vec!["--root".to_string(), root.to_string_lossy().into_owned()];
+    args.extend(options.iter().map(|value| value.to_string()));
+    CliArgs::parse(&args).expect("search fixture arguments parse")
+}
+
+#[test]
+fn query_file_uses_injected_current_home_and_keeps_raw_query_text() {
+    let fixture = Fixture::new();
+    let home = fixture.0.join("home/current");
+    let query_path = fixture.write(
+        "home/current/patterns.txt",
+        "\u{001f} alpha|beta \u{001f}\n",
+    );
+    let environment = SearchPathEnvironment {
+        home: Some(home.into_os_string()),
+        ..SearchPathEnvironment::default()
+    };
+    let args = cli_args(
+        Path::new("~literal-search-root"),
+        &["--query-file", "~/patterns.txt", "--providers", "text"],
+    );
+    let mut stdin = Cursor::new(Vec::<u8>::new());
+    let report = build_request_with_environment(
+        args,
+        &environment,
+        SearchPathPlatform::Posix,
+        |_| panic!("present HOME must take precedence over account lookup"),
+        &mut stdin,
+    )
+    .unwrap();
+
+    assert_eq!(report.query, "\u{001f} alpha|beta \u{001f}\n");
+    assert_eq!(
+        report.query_file,
+        Some(crate::semantic_responsibility::resolve_non_strict(&query_path).unwrap())
+    );
+    assert_eq!(
+        report.root,
+        crate::semantic_responsibility::resolve_non_strict(Path::new("~literal-search-root"))
+            .unwrap()
+    );
+}
+
+#[test]
+fn posix_home_lookup_uses_injected_current_and_named_accounts() {
+    let fixture = Fixture::new();
+    let current_home = fixture.0.join("homes/current");
+    let named_home = fixture.0.join("homes/alice");
+    let current_query = fixture.write("homes/current/current.txt", "current query\n");
+    let named_query = fixture.write("homes/alice/named.txt", " named query \n");
+    let environment = SearchPathEnvironment::default();
+
+    let current_args = cli_args(
+        &fixture.0,
+        &["--query-file", "~/current.txt", "--providers", "text"],
+    );
+    let mut current_stdin = Cursor::new(Vec::<u8>::new());
+    let mut current_requests = Vec::new();
+    let current_request = build_request_with_environment(
+        current_args,
+        &environment,
+        SearchPathPlatform::Posix,
+        |request| {
+            current_requests.push(request.clone());
+            match request {
+                HomeLookupRequest::CurrentUser => Ok(Some(current_home.clone())),
+                HomeLookupRequest::NamedUser(_) => panic!("current-user lookup was requested"),
+            }
+        },
+        &mut current_stdin,
+    )
+    .unwrap();
+    assert_eq!(current_request.query, "current query\n");
+    assert_eq!(
+        current_request.query_file,
+        Some(crate::semantic_responsibility::resolve_non_strict(&current_query).unwrap())
+    );
+    assert_eq!(current_requests, vec![HomeLookupRequest::CurrentUser]);
+
+    let named_args = cli_args(
+        &fixture.0,
+        &["--query-file", "~alice/named.txt", "--providers", "text"],
+    );
+    let environment_with_other_home = SearchPathEnvironment {
+        home: Some(fixture.0.join("homes/ignored").into_os_string()),
+        ..SearchPathEnvironment::default()
+    };
+    let mut named_stdin = Cursor::new(Vec::<u8>::new());
+    let mut named_requests = Vec::new();
+    let named_request = build_request_with_environment(
+        named_args,
+        &environment_with_other_home,
+        SearchPathPlatform::Posix,
+        |request| {
+            named_requests.push(request.clone());
+            match request {
+                HomeLookupRequest::NamedUser(username) if username == "alice" => {
+                    Ok(Some(named_home.clone()))
+                }
+                _ => panic!("named-user lookup must request alice"),
+            }
+        },
+        &mut named_stdin,
+    )
+    .unwrap();
+    assert_eq!(named_request.query, " named query \n");
+    assert_eq!(
+        named_request.query_file,
+        Some(crate::semantic_responsibility::resolve_non_strict(&named_query).unwrap())
+    );
+    assert_eq!(
+        named_requests,
+        vec![HomeLookupRequest::NamedUser("alice".to_string())]
+    );
+}
+
+#[test]
+fn posix_empty_home_is_present_and_does_not_trigger_account_lookup() {
+    let environment = SearchPathEnvironment {
+        home: Some(OsString::new()),
+        ..SearchPathEnvironment::default()
+    };
+    let expanded = expand_user_path_with(
+        Path::new("~/query.txt"),
+        SearchPathPlatform::Posix,
+        &environment,
+        |_| panic!("present empty HOME must take precedence over account lookup"),
+    )
+    .unwrap();
+
+    assert_eq!(expanded, PathBuf::from("query.txt"));
+}
+
+#[test]
+fn unresolved_home_keeps_the_runtime_error_category_and_exit_code() {
+    let fixture = Fixture::new();
+    let args = cli_args(
+        &fixture.0,
+        &[
+            "--query-file",
+            "~agentcanon_no_such_user_7f2a/query.txt",
+            "--providers",
+            "text",
+        ],
+    );
+    let mut stdin = Cursor::new(Vec::<u8>::new());
+    let error = build_request_with_environment(
+        args,
+        &SearchPathEnvironment::default(),
+        SearchPathPlatform::Posix,
+        |_| Ok(None),
+        &mut stdin,
+    )
+    .unwrap_err();
+
+    assert_eq!(error, SearchInputError::UnresolvedHome);
+    assert_eq!(error.message(), "Could not determine home directory.");
+    assert_eq!(error.exit_code(), 1);
+}
+
+#[test]
+fn windows_home_expansion_matches_profile_fallback_and_sibling_rules() {
+    let profile = SearchPathEnvironment {
+        home: Some(OsString::from(r"D:\Home\ignored")),
+        user_profile: Some(OsString::from(r"C:\Users\alice")),
+        home_drive: Some(OsString::from("D:")),
+        home_path: Some(OsString::from(r"\Profiles\ignored")),
+        user_name: Some(OsString::from("alice")),
+        ..SearchPathEnvironment::default()
+    };
+    assert_eq!(
+        expand_user_path_with(
+            Path::new(r"~\queries\patterns.txt"),
+            SearchPathPlatform::Windows,
+            &profile,
+            |_| { panic!("Windows home expansion uses the profile environment") }
+        )
+        .unwrap(),
+        PathBuf::from(r"C:\Users\alice\queries\patterns.txt")
+    );
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~bob/queries/patterns.txt"),
+            SearchPathPlatform::Windows,
+            &profile,
+            |_| panic!("Windows named-user expansion uses the profile heuristic"),
+        )
+        .unwrap(),
+        PathBuf::from(r"C:\Users\bob\queries\patterns.txt")
+    );
+
+    let fallback = SearchPathEnvironment {
+        home_drive: Some(OsString::from("C:")),
+        home_path: Some(OsString::from(r"\Users\alice")),
+        user_name: Some(OsString::from("alice")),
+        ..SearchPathEnvironment::default()
+    };
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~/patterns.txt"),
+            SearchPathPlatform::Windows,
+            &fallback,
+            |_| panic!("Windows environment fallback does not query an account database"),
+        )
+        .unwrap(),
+        PathBuf::from(r"C:\Users\alice\patterns.txt")
+    );
+
+    let missing_drive = SearchPathEnvironment {
+        home_path: Some(OsString::from(r"\Users\alice")),
+        user_name: Some(OsString::from("alice")),
+        ..SearchPathEnvironment::default()
+    };
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~/patterns.txt"),
+            SearchPathPlatform::Windows,
+            &missing_drive,
+            |_| panic!("HOMEDRIVE is optional when HOMEPATH is present"),
+        )
+        .unwrap(),
+        PathBuf::from(r"\Users\alice\patterns.txt")
+    );
+
+    let mismatch = SearchPathEnvironment {
+        user_profile: Some(OsString::from(r"C:\Profiles\service")),
+        user_name: Some(OsString::from("alice")),
+        ..SearchPathEnvironment::default()
+    };
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~bob/patterns.txt"),
+            SearchPathPlatform::Windows,
+            &mismatch,
+            |_| panic!("Windows named-user expansion uses the profile heuristic"),
+        )
+        .unwrap_err(),
+        SearchInputError::UnresolvedHome
+    );
+
+    let empty_profile = SearchPathEnvironment {
+        user_profile: Some(OsString::new()),
+        home_drive: Some(OsString::from("C:")),
+        home_path: Some(OsString::from(r"\Users\alice")),
+        ..SearchPathEnvironment::default()
+    };
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~"),
+            SearchPathPlatform::Windows,
+            &empty_profile,
+            |_| { panic!("present USERPROFILE takes precedence even when empty") }
+        )
+        .unwrap(),
+        PathBuf::new()
+    );
+
+    assert_eq!(
+        expand_user_path_with(
+            Path::new("~"),
+            SearchPathPlatform::Windows,
+            &SearchPathEnvironment::default(),
+            |_| panic!("missing USERPROFILE and HOMEPATH do not query a user database"),
+        )
+        .unwrap_err(),
+        SearchInputError::UnresolvedHome
+    );
+}
+
+#[test]
+fn search_uses_python_whitespace_without_stripping_nonblank_queries() {
+    assert!(python_strip("\u{001f}\u{001f}").is_empty());
+    assert_eq!(
+        selected_providers("\u{001f}text\u{001f}").unwrap(),
+        vec!["text".to_string()]
+    );
+
+    let fixture = Fixture::new();
+    let raw_query = " \u{001f}alpha\u{001f} ";
+    let args = cli_args(&fixture.0, &["--query", raw_query, "--providers", "text"]);
+    let mut stdin = Cursor::new(Vec::<u8>::new());
+    let request = build_request_with_environment(
+        args,
+        &SearchPathEnvironment::default(),
+        SearchPathPlatform::Posix,
+        |_| panic!("inline query does not request home lookup"),
+        &mut stdin,
+    )
+    .unwrap();
+    assert_eq!(request.query, raw_query);
+
+    let control_query = "\u{001f}";
+    let args = cli_args(
+        &fixture.0,
+        &["--query", control_query, "--providers", "text"],
+    );
+    let mut stdin = Cursor::new(Vec::<u8>::new());
+    let error = build_request_with_environment(
+        args,
+        &SearchPathEnvironment::default(),
+        SearchPathPlatform::Posix,
+        |_| panic!("blank query fails before provider dispatch"),
+        &mut stdin,
+    )
+    .unwrap_err();
+    assert_eq!(error.message(), "query-or-purpose-required");
+    assert_eq!(error.exit_code(), 2);
 }
 
 fn python_executable() -> PathBuf {
