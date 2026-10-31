@@ -375,6 +375,7 @@ where
         SearchPathPlatform::Posix => {
             let home = if username.is_empty() {
                 match &environment.home {
+                    Some(home) if home.is_empty() => PathBuf::from("/"),
                     Some(home) => PathBuf::from(home),
                     None => {
                         lookup_home_directory(HomeLookupRequest::CurrentUser, &mut home_lookup)?

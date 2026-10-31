@@ -213,20 +213,21 @@ fn posix_home_lookup_uses_injected_current_and_named_accounts() {
 }
 
 #[test]
-fn posix_empty_home_is_present_and_does_not_trigger_account_lookup() {
+fn posix_empty_home_expands_to_root_without_account_lookup() {
     let environment = SearchPathEnvironment {
         home: Some(OsString::new()),
         ..SearchPathEnvironment::default()
     };
-    let expanded = expand_user_path_with(
-        Path::new("~/query.txt"),
-        SearchPathPlatform::Posix,
-        &environment,
-        |_| panic!("present empty HOME must take precedence over account lookup"),
-    )
-    .unwrap();
-
-    assert_eq!(expanded, PathBuf::from("query.txt"));
+    for (query_path, expected) in [("~", "/"), ("~/query.txt", "/query.txt")] {
+        let expanded = expand_user_path_with(
+            Path::new(query_path),
+            SearchPathPlatform::Posix,
+            &environment,
+            |_| panic!("present empty HOME must take precedence over account lookup"),
+        )
+        .unwrap();
+        assert_eq!(expanded, PathBuf::from(expected), "input: {query_path}");
+    }
 }
 
 #[test]
