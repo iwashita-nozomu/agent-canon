@@ -57,8 +57,8 @@ tuning a numerical method.
    numerical trajectory and algorithmic work from execution cost such as compile,
    per-iteration, transfer, or synchronization time. Total time alone cannot
    attribute a regression. When diagnosing iterative-solver performance, use the
-   existing [`numeric_performance.py`](../../tools/analysis/numerical/numeric_performance.py)
-   producer and follow its current input and output contract; do not recreate its
+   existing [`numeric-performance`](../../tools/runtime/dispatch/agent-canon/src/numeric_performance.rs)
+   command (`tools/bin/agent-canon numeric-performance --input <post-run-observations.json> --format json`) and follow its current input and output contract; do not recreate its
    schema or infer a systems-level cause from prose alone. This comparison is not
    required for ordinary numerical correctness work.
 

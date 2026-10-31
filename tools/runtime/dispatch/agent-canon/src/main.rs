@@ -41,6 +41,7 @@ pub mod graph_client;
 mod jit_ir_to_lean;
 mod migration_audit;
 mod notebook_quality;
+mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
@@ -86,6 +87,7 @@ Commands:
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
+  numeric-performance [--input <path|->] [--format json]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
@@ -128,6 +130,10 @@ fn main() {
             option_env!("AGENT_CANON_RELEASE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
         );
         return;
+    }
+
+    if args.len() >= 2 && args[1] == "numeric-performance" {
+        std::process::exit(numeric_performance::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
