@@ -68,7 +68,10 @@ class LogSurfaceInventoryTest(unittest.TestCase):
                 encoding="utf-8",
             )
             shell = root / "tools" / "sample.sh"
-            shell.write_text("echo TOOL_STATUS=pass\n", encoding="utf-8")
+            shell.write_text(
+                "echo TOOL_STATUS=pass\n\u001f echo CONTROL_SHELL=1\n",
+                encoding="utf-8",
+            )
             github_shell = root / ".github" / "scripts" / "sample.sh"
             github_shell.parent.mkdir(parents=True)
             github_shell.write_text(
@@ -85,7 +88,10 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             )
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
-                'fn main() {\n    println!("RUST_TOOL_STATUS=pass");\n}\n',
+                'fn main() {\n'
+                '    println!("RUST_TOOL_STATUS=pass");\n'
+                '\u001f println!("CONTROL_RUST=1");\n'
+                '}\n',
                 encoding="utf-8",
             )
             skill = root / "agents" / "skills" / "sample.md"
@@ -113,8 +119,10 @@ class LogSurfaceInventoryTest(unittest.TestCase):
         self.assertIn("status", fields)
         self.assertIn("hook_run_id", fields)
         self.assertIn("TOOL_STATUS", fields)
+        self.assertIn("CONTROL_SHELL", fields)
         self.assertIn("GITHUB_SCRIPT_STATUS", fields)
         self.assertIn("RUST_TOOL_STATUS", fields)
+        self.assertIn("CONTROL_RUST", fields)
         self.assertIn("SKILL_RESULT", fields)
 
     def test_baseline_check_detects_and_accepts_regenerated_inventory(self) -> None:

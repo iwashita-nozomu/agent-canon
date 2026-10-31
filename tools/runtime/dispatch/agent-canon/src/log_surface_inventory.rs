@@ -463,8 +463,10 @@ impl ShellLogSurfaceScanner {
     pub fn scan(&self, text: &str) -> Vec<FieldRecord> {
         let mut records = Vec::new();
         let regex = SHELL_ECHO_RE.get_or_init(|| {
-            Regex::new(r"^\s*(?:echo|printf)\s+(?:--\s+)?(?P<value>.+)$")
-                .expect("shell output regex is valid")
+            Regex::new(
+                r"^[\s\x1c-\x1f]*(?:echo|printf)[\s\x1c-\x1f]+(?:--[\s\x1c-\x1f]+)?(?P<value>.+)$",
+            )
+            .expect("shell output regex is valid")
         });
         for (index, line) in python_split_lines(text).into_iter().enumerate() {
             let Some(captures) = regex.captures(line) else {
@@ -503,7 +505,7 @@ impl RustLogSurfaceScanner {
     pub fn scan(&self, text: &str) -> Vec<FieldRecord> {
         let mut records = Vec::new();
         let regex = RUST_PRINT_RE.get_or_init(|| {
-            Regex::new(r#"^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)"#)
+            Regex::new(r#"^[\s\x1c-\x1f]*(?:e?println)[\s\x1c-\x1f]*![\s\x1c-\x1f]*\([\s\x1c-\x1f]*"(?P<value>[^"]*)"#)
                 .expect("Rust output regex is valid")
         });
         for (index, line) in python_split_lines(text).into_iter().enumerate() {
