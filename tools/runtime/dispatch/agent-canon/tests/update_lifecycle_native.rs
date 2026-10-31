@@ -132,10 +132,18 @@ fn frozen_python_gate_bytes_states_and_error_codes_match_native_api() {
     );
 
     let mut outputs = Vec::with_capacity(gate_cases.len());
+    let mut expected_gate_ids = Vec::with_capacity(gate_cases.len());
     for case in gate_cases {
-        let output = materialize_gate_verdict(&gate_input(&case["input"]))
-            .expect("native gate materializes");
-        assert_eq!(output, case["output"], "gate {}", case["input"]["gate_id"]);
+        let input = &case["input"];
+        expected_gate_ids.push(
+            input["gate_id"]
+                .as_str()
+                .expect("golden gate id")
+                .to_string(),
+        );
+        let output =
+            materialize_gate_verdict(&gate_input(input)).expect("native gate materializes");
+        assert_eq!(output, case["output"], "gate {}", input["gate_id"]);
         let canonical = canonical_json_bytes(&output).expect("native canonical serializer");
         let expected_bytes = case["canonical_utf8"]
             .as_str()
@@ -147,9 +155,11 @@ fn frozen_python_gate_bytes_states_and_error_codes_match_native_api() {
         );
         outputs.push(output);
     }
-
-    let expected_gate_ids = ["G1", "G2", "G3", "G4", "G5", "G6"];
-    let chain = validate_gate_chain(&outputs, Some(&expected_gate_ids), true)
+    let expected_gate_refs = expected_gate_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let chain = validate_gate_chain(&outputs, Some(&expected_gate_refs), true)
         .expect("frozen six-gate chain validates");
     assert_eq!(chain, outputs);
 
@@ -166,35 +176,13 @@ fn frozen_python_gate_bytes_states_and_error_codes_match_native_api() {
 
 #[test]
 fn gate_identity_is_distinct_and_replay_stable() {
-    let binding = gate_input_binding();
-    let seed = format!("evidence:{}", "8".repeat(64));
-    let gates = [
-        materialize_gate_verdict(&make_gate_input(
-            &binding,
-            "G1",
-            std::slice::from_ref(&seed),
-        ))
-        .unwrap(),
-        materialize_gate_verdict(&make_gate_input(
-            &binding,
-            "G3",
-            std::slice::from_ref(&seed),
-        ))
-        .unwrap(),
-        materialize_gate_verdict(&make_gate_input(
-            &binding,
-            "G5",
-            std::slice::from_ref(&seed),
-        ))
-        .unwrap(),
-    ];
-    let replay = materialize_gate_verdict(&make_gate_input(
-        &binding,
-        "G3",
-        std::slice::from_ref(&seed),
-    ))
-    .unwrap();
-    let refs = gates
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).expect("frozen Python fixture JSON");
+    let gates = golden["gates"].as_array().expect("golden gate cases");
+    let g1 = materialize_gate_verdict(&gate_input(&gates[0]["input"])).unwrap();
+    let g3 = materialize_gate_verdict(&gate_input(&gates[2]["input"])).unwrap();
+    let g5 = materialize_gate_verdict(&gate_input(&gates[4]["input"])).unwrap();
+    let replay = materialize_gate_verdict(&gate_input(&gates[2]["input"])).unwrap();
+    let refs = [&g1, &g3, &g5]
         .iter()
         .map(|gate| gate["binding"]["evidence_ref"].as_str().unwrap())
         .collect::<Vec<_>>();
@@ -203,31 +191,6 @@ fn gate_identity_is_distinct_and_replay_stable() {
         3
     );
     assert_eq!(replay["binding"]["evidence_ref"].as_str(), Some(refs[1]));
-}
-
-fn gate_input_binding() -> Value {
-    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).expect("frozen Python fixture JSON");
-    golden["gates"][0]["input"]["binding"].clone()
-}
-
-fn make_gate_input(binding: &Value, gate_id: &str, refs: &[String]) -> GateVerdictInput {
-    let (invariant, owner) = match gate_id {
-        "G1" => ("source_correctness", "/fixture/tools/repository/github/publication_integrator.py#resolve_publication_eligibility"),
-        "G3" => ("pr_identity_cas", "/fixture/tools/repository/github/publication_integrator.py#resolve_publication_authority"),
-        "G5" => ("remote_publication_readback", "/fixture/tools/repository/github/publication_integrator.py#integrate_publication"),
-        _ => panic!("unexpected replay gate"),
-    };
-    GateVerdictInput {
-        binding: binding.clone(),
-        gate_id: gate_id.to_string(),
-        ordered_input_evidence_refs: refs.to_vec(),
-        invariant: invariant.to_string(),
-        output_digest: format!("sha256:{}", "a".repeat(64)),
-        owner: owner.to_string(),
-        verdict: "pass".to_string(),
-        retry_reason: None,
-        next_checkpoint: None,
-    }
 }
 
 #[test]
@@ -245,4 +208,9 @@ fn lifecycle_datetime_parser_keeps_python_owner_input_forms() {
         candidate["timing"]["started_at"] = serde_json::json!(timestamp);
         assert!(validate_record_binding(&candidate).is_ok(), "{timestamp}");
     }
+    let mut invalid = binding.clone();
+    invalid["timing"]["started_at"] = serde_json::json!("2026-02-30T00:00:00Z");
+    let error = validate_record_binding(&invalid).unwrap_err();
+    assert_eq!(error.code, "lifecycle:timestamp_invalid");
+    assert_eq!(error.detail, "binding.timing.started_at");
 }
