@@ -7,6 +7,7 @@
 // upstream implementation ../src/environment_dependencies.rs owns verified executable receipts
 // @dependency-end
 
+use agent_canon::lsp_code_analysis::file_uri;
 use protobuf::{EnumOrUnknown, Message, MessageField};
 use scip::types::occurrence::Typed_range;
 use scip::types::{
@@ -67,32 +68,6 @@ impl Drop for Fixture {
     }
 }
 
-fn project_root_metadata(path: &Path) -> String {
-    #[cfg(windows)]
-    {
-        path.to_str()
-            .expect("canonical Windows fixture path is Unicode")
-            .to_owned()
-    }
-    #[cfg(not(windows))]
-    {
-        file_uri(path)
-    }
-}
-
-#[cfg(not(windows))]
-fn file_uri(path: &Path) -> String {
-    let mut encoded = String::new();
-    for byte in path.to_string_lossy().as_bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(*byte, b'/' | b'-' | b'.' | b'_' | b'~') {
-            encoded.push(char::from(*byte));
-        } else {
-            encoded.push_str(&format!("%{byte:02X}"));
-        }
-    }
-    format!("file://{encoded}")
-}
-
 fn typed_occurrence(symbol: &str, roles: i32, start: i32, end: i32) -> Occurrence {
     let mut range = SingleLineRange::new();
     range.line = 1;
@@ -139,7 +114,7 @@ fn index_bytes(
     documents: Vec<Document>,
     external_symbols: Vec<SymbolInformation>,
 ) -> Vec<u8> {
-    index_bytes_with_project_root(project_root_metadata(root), documents, external_symbols)
+    index_bytes_with_project_root(file_uri(root), documents, external_symbols)
 }
 
 fn index_bytes_with_project_root(
@@ -396,14 +371,11 @@ fn query_rejects_project_root_that_escapes_through_missing_suffix_components() {
     let source_contents_before = fs::read(&source_file).unwrap();
     let source_before = files_below(&fixture.source());
     let runtime_index = fixture.runtime().join("outside-root.scip");
-    let unresolved_project_root = fixture
-        .source()
-        .join("missing-subdirectory")
-        .join("..")
-        .join("..")
-        .join("outside")
-        .join("missing");
-    let index = index_bytes(&unresolved_project_root, Vec::new(), Vec::new());
+    let unresolved_project_root = format!(
+        "{}/missing-subdirectory/../../outside/missing",
+        file_uri(&fixture.source())
+    );
+    let index = index_bytes_with_project_root(unresolved_project_root, Vec::new(), Vec::new());
     fixture.write_index("outside-root.scip", &index);
     let runtime_before = files_below(&fixture.runtime());
 
@@ -422,24 +394,30 @@ fn query_rejects_project_root_that_escapes_through_missing_suffix_components() {
 
 #[cfg(windows)]
 #[test]
-fn query_preserves_legacy_rejection_of_drive_file_uri_project_roots() {
+fn query_accepts_standard_drive_file_uri_project_roots() {
     let fixture = Fixture::new();
     fixture.write_source("api.py", "def api(): pass\n");
     let source_before = files_below(&fixture.source());
     let runtime_index = fixture.runtime().join("drive-uri.scip");
-    let index = index_bytes_with_project_root(
-        "file:///C:/scip-project/outside".to_string(),
-        Vec::new(),
-        Vec::new(),
-    );
+    let project_root = file_uri(&fixture.source());
+    let drive_path = project_root
+        .strip_prefix("file:///")
+        .expect("standard local file URI");
+    assert!(drive_path.as_bytes()[0].is_ascii_alphabetic());
+    assert_eq!(drive_path.as_bytes()[1], b':');
+    let index = index_bytes_with_project_root(project_root, Vec::new(), Vec::new());
     fixture.write_index("drive-uri.scip", &index);
     let runtime_before = files_below(&fixture.runtime());
 
     let output = query_cli(&fixture, &["drive-uri.scip"], &["."], &[]);
 
-    assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("SCIP project root is not absolute"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let payload = json_output(&output);
+    assert_eq!(payload["index_refs"][0]["project_root"], ".");
     assert_eq!(files_below(&fixture.source()), source_before);
     assert_eq!(files_below(&fixture.runtime()), runtime_before);
     assert_eq!(fs::read(&runtime_index).unwrap(), index);

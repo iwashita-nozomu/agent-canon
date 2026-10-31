@@ -682,35 +682,6 @@ fn uri_components(value: &str) -> (&str, &str, &str) {
     (path, query, fragment)
 }
 
-fn percent_decode(value: &str) -> String {
-    fn hex_value(byte: u8) -> Option<u8> {
-        match byte {
-            b'0'..=b'9' => Some(byte - b'0'),
-            b'a'..=b'f' => Some(byte - b'a' + 10),
-            b'A'..=b'F' => Some(byte - b'A' + 10),
-            _ => None,
-        }
-    }
-
-    let bytes = value.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            if let (Some(high), Some(low)) =
-                (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
-            {
-                decoded.push((high << 4) | low);
-                index += 3;
-                continue;
-            }
-        }
-        decoded.push(bytes[index]);
-        index += 1;
-    }
-    String::from_utf8_lossy(&decoded).into_owned()
-}
-
 fn index_project_root(value: &str) -> Result<PathBuf, ScipError> {
     if value.is_empty() {
         return Err(ScipError::failure(
@@ -747,11 +718,15 @@ fn index_project_root(value: &str) -> Result<PathBuf, ScipError> {
             } else {
                 path.to_string()
             };
-            percent_decode(&path_text)
+            path_text
         }
         None => value.to_string(),
     };
-    let path = PathBuf::from(path_text);
+    let path = if uri_scheme(value).is_some() {
+        crate::lsp_code_analysis::uri_path_buf(&path_text)
+    } else {
+        PathBuf::from(path_text)
+    };
     if !path.is_absolute() {
         return Err(ScipError::failure(format!(
             "SCIP project root is not absolute: {value}"
