@@ -1,0 +1,3352 @@
+{
+  "source": "d4de7a7b1289ec7c29ca2efa3047f54291ad224d",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "cases": [
+    {
+      "name": "valid-materializer",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 7,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":7,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "ce23c5b8ecd90dac2cc59895735f12640ba75cef4a5400af03e9f60bf24556c7"
+    },
+    {
+      "name": "valid-validator",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 7,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":7,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "ce23c5b8ecd90dac2cc59895735f12640ba75cef4a5400af03e9f60bf24556c7"
+    },
+    {
+      "name": "valid-transition",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 7,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":7,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "ce23c5b8ecd90dac2cc59895735f12640ba75cef4a5400af03e9f60bf24556c7"
+    },
+    {
+      "name": "lowercase-merged",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "merged",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 7,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":7,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "ce23c5b8ecd90dac2cc59895735f12640ba75cef4a5400af03e9f60bf24556c7"
+    },
+    {
+      "name": "missing-schema",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "publication_readback_receipt:schema"
+      }
+    },
+    {
+      "name": "extra",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1",
+          "unknown": 1
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:field_forbidden",
+        "detail": "publication_readback_receipt:unknown"
+      }
+    },
+    {
+      "name": "wrong-prefix",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "cas:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "publication_readback_receipt.readback_receipt_id"
+      }
+    },
+    {
+      "name": "nonrecomputed-id",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:0000000000000000000000000000000000000000000000000000000000000000",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 7,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:0000000000000000000000000000000000000000000000000000000000000000",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":7,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:0000000000000000000000000000000000000000000000000000000000000000\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "9ac221badc6ece8e681a678a92be85ffcc7817a09437cb6fd90b15e485ef304d"
+    },
+    {
+      "name": "number-bool",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": true,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "publication_readback_receipt.pr_identity.number"
+      }
+    },
+    {
+      "name": "number-huge",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 1000000000000000000000000000000,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "candidate_identity": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/topic",
+          "head_repo_name": "repo",
+          "head_repo_owner": "owner",
+          "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+          "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "number": 1000000000000000000000000000000,
+          "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "canonical_utf8": "{\"authoritative_readback_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"candidate_identity\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/topic\",\"head_repo_name\":\"repo\",\"head_repo_owner\":\"owner\",\"head_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"merge_cas_base_sha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"merge_cas_base_tree_sha\":\"dddddddddddddddddddddddddddddddddddddddd\",\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"number\":1000000000000000000000000000000,\"post_merge_base_ref_sha\":\"1111111111111111111111111111111111111111\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"}",
+      "sha256": "42212c8978a67b4237990cf95053c714bc40b45a1c8c6a52fa8d2362dc80ae18"
+    },
+    {
+      "name": "remote",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "upstream"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:publication_remote_identity_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "head",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "0000000000000000000000000000000000000000",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:publication_candidate_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "merge-tree",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "bad",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "publication_readback_receipt.pr_identity.merge_tree_sha"
+      }
+    },
+    {
+      "name": "evidence",
+      "api": "validate_publication_readback_receipt",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "bad",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "publication_readback_receipt.publication_evidence_ref"
+      }
+    },
+    {
+      "name": "materializer-unmerged",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "OPEN",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:pr_not_merged",
+        "detail": ""
+      }
+    },
+    {
+      "name": "materializer-head-repo",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "foreign/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:authoritative_pr_readback_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "materializer-cas-base",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "0000000000000000000000000000000000000000",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:authoritative_pr_readback_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "materializer-head",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "0000000000000000000000000000000000000000",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:authoritative_pr_readback_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "materializer-no-number",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "1111111111111111111111111111111111111111"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "authoritative_pr_readback.number"
+      }
+    },
+    {
+      "name": "materializer-bad-merge",
+      "api": "materialize_publication_readback_receipt",
+      "args": [],
+      "kwargs": {
+        "candidate_cas_receipt": {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        "pull_request_lifecycle": {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        "authoritative_pr_readback": {
+          "number": 7,
+          "state": "MERGED",
+          "baseRefName": "main",
+          "baseRefOid": "1111111111111111111111111111111111111111",
+          "mergeCasBaseOid": "cccccccccccccccccccccccccccccccccccccccc",
+          "mergeCasBaseTreeOid": "dddddddddddddddddddddddddddddddddddddddd",
+          "headRefName": "topic",
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "headRepository": {
+            "nameWithOwner": "owner/repo"
+          },
+          "mergeCommit": {
+            "oid": "bad"
+          },
+          "mergeTreeOid": "2222222222222222222222222222222222222222"
+        }
+      },
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "authoritative_pr_readback.mergeCommit.oid"
+      }
+    },
+    {
+      "name": "transition-predecessor",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:0000000000000000000000000000000000000000000000000000000000000000",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:predecessor_mismatch",
+        "detail": "publication_readback"
+      }
+    },
+    {
+      "name": "transition-rebind",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:0000000000000000000000000000000000000000000000000000000000000000",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:rebind_mismatch",
+        "detail": "publication_readback"
+      }
+    },
+    {
+      "name": "transition-cas-base",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "0000000000000000000000000000000000000000",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:cas_base_identity_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "transition-head-ref",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/other",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:publication_remote_identity_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "transition-notmerged",
+      "api": "validate_publication_readback_transition",
+      "args": [
+        {
+          "schema": "agent-canon.candidate-cas-receipt.v1",
+          "cas_receipt_id": "cas:9999999999999999999999999999999999999999999999999999999999999999",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "cas_base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "cas_evidence_ref": "evidence:8888888888888888888888888888888888888888888888888888888888888888",
+          "cas_stage": "cas"
+        },
+        {
+          "base_identity": {
+            "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "ref": "refs/heads/main",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "dddddddddddddddddddddddddddddddddddddddd"
+          },
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "evidence_ref": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "viewer:test",
+            "assumption_forbidden": true,
+            "authority_source": "verified gh repository metadata",
+            "permission_evidence_id": "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "agents/skills/pr-processing.md",
+            "contract_delta": "Typed lifecycle",
+            "evidence_refs": [
+              "evidence:23db6e9dbedd76b29948b10e872900f4a2c784d56918c1d91ad064adb274af23"
+            ],
+            "intent": "Typed lifecycle",
+            "problem": "typed PR lifecycle"
+          },
+          "remote_identity": {
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "ref": "refs/heads/topic",
+            "remote_name": "origin",
+            "repo_name": "repo",
+            "repo_owner": "owner",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "url_digest": "sha256:5e3b615ab5d3d787151824babfdca219391d98fcf438be21f388ce612e7ed503"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "ready",
+          "user_identity": {
+            "actor_id": "viewer:test",
+            "display_name": "GitHub authenticated viewer"
+          }
+        },
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:pr_not_merged",
+        "detail": ""
+      }
+    }
+  ]
+}

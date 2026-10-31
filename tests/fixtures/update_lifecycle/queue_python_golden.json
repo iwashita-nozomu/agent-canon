@@ -1,0 +1,1222 @@
+{
+  "source": "961707ef56a57f99a8809e7ef689eab9fadca3ba",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "platform": "linux",
+  "cases": [
+    {
+      "name": "projection",
+      "api": "source_publication_identity",
+      "args": [
+        {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+        "merge_commit_sha": "1111111111111111111111111111111111111111",
+        "merge_tree_sha": "2222222222222222222222222222222222222222",
+        "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89"
+      },
+      "canonical_utf8": "{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"}",
+      "sha256": "6e0d05add6b0ed25925bd7b24143094c8e0fb3fbcbb8ea431f1946724b380e21"
+    },
+    {
+      "name": "key",
+      "api": "queue_once_key",
+      "args": [
+        "/canonical/source",
+        {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89"
+        }
+      ],
+      "kwargs": {},
+      "output": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+      "canonical_utf8": "\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\"",
+      "sha256": "485a0a50f3b836d2a7087b943b1e35b2e62e44045a0e73991432368d7537524b"
+    },
+    {
+      "name": "key-unescaped-namespace",
+      "api": "queue_once_key",
+      "args": [
+        "/canonical/source|literal",
+        {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89"
+        }
+      ],
+      "kwargs": {},
+      "output": "queue-key:fd1412114b28ce57ed10afb194ad7db4c2e01e87088b3dd520cc3d5271b3679c",
+      "canonical_utf8": "\"queue-key:fd1412114b28ce57ed10afb194ad7db4c2e01e87088b3dd520cc3d5271b3679c\"",
+      "sha256": "48039659e0d56942af5e70e65953db5fcc086fdfb99f35a1ce153f4cb0b09be3"
+    },
+    {
+      "name": "key-relative-namespace-is-not-validated-here",
+      "api": "queue_once_key",
+      "args": [
+        "relative",
+        {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        {
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89"
+        }
+      ],
+      "kwargs": {},
+      "output": "queue-key:039e1afcda28078302d855c481931a324e74f41f1e2ac4d79f906e50e83580f1",
+      "canonical_utf8": "\"queue-key:039e1afcda28078302d855c481931a324e74f41f1e2ac4d79f906e50e83580f1\"",
+      "sha256": "c4b59bc94d8a3011ce6a158359c3e8fe9aa5f1bb20a1ccc2d4374550a8a2021d"
+    },
+    {
+      "name": "materialize-accepted",
+      "api": "materialize_queue_receipt",
+      "args": [],
+      "kwargs": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "source_namespace": "/canonical/source",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "publication_readback_receipt": {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        },
+        "state": "accepted"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+        "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+        "schema": "agent-canon.queue-receipt.v1",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_namespace": "/canonical/source",
+        "source_publication_identity": {
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+        },
+        "state": "accepted"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"enqueue_once_key\":\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\",\"queue_receipt_id\":\"queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e\",\"schema\":\"agent-canon.queue-receipt.v1\",\"source_main_readback_evidence_ref\":\"evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_main_rebind_receipt_id\":\"rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"source_namespace\":\"/canonical/source\",\"source_publication_identity\":{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"},\"state\":\"accepted\"}",
+      "sha256": "f90c9a2e716d1542c0d84d4245fe8e2ad1a04b2e35892c5dbcd882957735ed13"
+    },
+    {
+      "name": "materialize-retry_pending",
+      "api": "materialize_queue_receipt",
+      "args": [],
+      "kwargs": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "source_namespace": "/canonical/source",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "publication_readback_receipt": {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        },
+        "state": "retry_pending"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+        "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+        "schema": "agent-canon.queue-receipt.v1",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_namespace": "/canonical/source",
+        "source_publication_identity": {
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+        },
+        "state": "retry_pending"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"enqueue_once_key\":\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\",\"queue_receipt_id\":\"queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e\",\"schema\":\"agent-canon.queue-receipt.v1\",\"source_main_readback_evidence_ref\":\"evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_main_rebind_receipt_id\":\"rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"source_namespace\":\"/canonical/source\",\"source_publication_identity\":{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"},\"state\":\"retry_pending\"}",
+      "sha256": "b0e8c5690f803048b06c89e5a0e3a0883aeabb0296bcd44a4c4c0d48bb532035"
+    },
+    {
+      "name": "materialize-failed",
+      "api": "materialize_queue_receipt",
+      "args": [],
+      "kwargs": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "source_namespace": "/canonical/source",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "publication_readback_receipt": {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        },
+        "state": "failed"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+        "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+        "schema": "agent-canon.queue-receipt.v1",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_namespace": "/canonical/source",
+        "source_publication_identity": {
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+        },
+        "state": "failed"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"enqueue_once_key\":\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\",\"queue_receipt_id\":\"queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e\",\"schema\":\"agent-canon.queue-receipt.v1\",\"source_main_readback_evidence_ref\":\"evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_main_rebind_receipt_id\":\"rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"source_namespace\":\"/canonical/source\",\"source_publication_identity\":{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"},\"state\":\"failed\"}",
+      "sha256": "3bec43b96b6e7716e3b7509967a39ec11097629f0e027e0f450b4718d744a50f"
+    },
+    {
+      "name": "validate",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+        "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+        "schema": "agent-canon.queue-receipt.v1",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_namespace": "/canonical/source",
+        "source_publication_identity": {
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+        },
+        "state": "accepted"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"enqueue_once_key\":\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\",\"queue_receipt_id\":\"queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e\",\"schema\":\"agent-canon.queue-receipt.v1\",\"source_main_readback_evidence_ref\":\"evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_main_rebind_receipt_id\":\"rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"source_namespace\":\"/canonical/source\",\"source_publication_identity\":{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"},\"state\":\"accepted\"}",
+      "sha256": "f90c9a2e716d1542c0d84d4245fe8e2ad1a04b2e35892c5dbcd882957735ed13"
+    },
+    {
+      "name": "wrong-key",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:0000000000000000000000000000000000000000000000000000000000000000",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:queue_key_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "wrong-id-prefix",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "cas:0000000000000000000000000000000000000000000000000000000000000000",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "queue_receipt.queue_receipt_id"
+      }
+    },
+    {
+      "name": "shape-only-id",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:0000000000000000000000000000000000000000000000000000000000000000",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "output": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+        "queue_receipt_id": "queue:0000000000000000000000000000000000000000000000000000000000000000",
+        "schema": "agent-canon.queue-receipt.v1",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_namespace": "/canonical/source",
+        "source_publication_identity": {
+          "merge_commit_sha": "1111111111111111111111111111111111111111",
+          "merge_tree_sha": "2222222222222222222222222222222222222222",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+        },
+        "state": "accepted"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"evidence_digest\":\"sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"input_digest\":\"sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3\",\"snapshot_id\":\"snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-10-31T10:35:44.103251Z\",\"last_attempt_at\":\"2026-10-31T10:35:44.103251Z\",\"replayed\":false,\"started_at\":\"2026-10-31T10:35:44.103251Z\"},\"tool_id\":\"github-publish\",\"tool_version\":\"agent-canon.pull-request-lifecycle.v1\",\"transaction_id\":\"tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"enqueue_once_key\":\"queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf\",\"queue_receipt_id\":\"queue:0000000000000000000000000000000000000000000000000000000000000000\",\"schema\":\"agent-canon.queue-receipt.v1\",\"source_main_readback_evidence_ref\":\"evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"source_main_rebind_receipt_id\":\"rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"source_namespace\":\"/canonical/source\",\"source_publication_identity\":{\"merge_commit_sha\":\"1111111111111111111111111111111111111111\",\"merge_tree_sha\":\"2222222222222222222222222222222222222222\",\"publication_evidence_ref\":\"evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89\",\"readback_receipt_id\":\"publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986\"},\"state\":\"accepted\"}",
+      "sha256": "f2f0c35064871ace4a929dc2d40e976073761ef01fbc77e6669dd51258a3b6f1"
+    },
+    {
+      "name": "relative",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "relative",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:path_not_absolute",
+        "detail": "queue_receipt.source_namespace"
+      }
+    },
+    {
+      "name": "empty",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:string_invalid",
+        "detail": "queue_receipt.source_namespace"
+      }
+    },
+    {
+      "name": "rebind",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "cas:0000000000000000000000000000000000000000000000000000000000000000",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "queue_receipt.source_main_rebind_receipt_id"
+      }
+    },
+    {
+      "name": "state",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "unknown"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:enum_invalid",
+        "detail": "queue_receipt.state"
+      }
+    },
+    {
+      "name": "publication",
+      "api": "validate_queue_receipt",
+      "args": [
+        {
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "enqueue_once_key": "queue-key:f30865361ff6dcb545a2bc5a782d0e69e6db97787cd6449cd0996e0314740daf",
+          "queue_receipt_id": "queue:37dd3fe600fd5b11dc5401961b3458f0d873fb577d3e0536f26f6b31e61f435e",
+          "schema": "agent-canon.queue-receipt.v1",
+          "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_namespace": "/canonical/source",
+          "source_publication_identity": {
+            "merge_commit_sha": "bad",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986"
+          },
+          "state": "accepted"
+        }
+      ],
+      "kwargs": {},
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "queue_receipt.source_publication_identity.merge_commit_sha"
+      }
+    },
+    {
+      "name": "relative-materializer",
+      "api": "materialize_queue_receipt",
+      "args": [],
+      "kwargs": {
+        "binding": {
+          "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+          "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-10-31T10:35:44.103251Z",
+            "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+            "replayed": false,
+            "started_at": "2026-10-31T10:35:44.103251Z"
+          },
+          "tool_id": "github-publish",
+          "tool_version": "agent-canon.pull-request-lifecycle.v1",
+          "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "source_namespace": "relative",
+        "source_main_rebind_receipt_id": "rebind:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_main_readback_evidence_ref": "evidence:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "publication_readback_receipt": {
+          "authoritative_readback_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "binding": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "evidence_digest": "sha256:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+            "input_digest": "sha256:dc7b2a1a6e364c2dced1ea02f47630c7903837ab240dcedfd515727afb3b2ea3",
+            "snapshot_id": "snapshot:3d958da0d2fcb71809b3c7a2e1a50e703d39a969e663f9d58470a63d3df4f3f6",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-10-31T10:35:44.103251Z",
+              "last_attempt_at": "2026-10-31T10:35:44.103251Z",
+              "replayed": false,
+              "started_at": "2026-10-31T10:35:44.103251Z"
+            },
+            "tool_id": "github-publish",
+            "tool_version": "agent-canon.pull-request-lifecycle.v1",
+            "transaction_id": "tx:a93ec1dba1f35155ac516c39bf463eccc86e460c1fb3e2b241136cad7925d1ee",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "candidate_identity": {
+            "candidate_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "pr_identity": {
+            "base_ref": "refs/heads/main",
+            "head_ref": "refs/heads/topic",
+            "head_repo_name": "repo",
+            "head_repo_owner": "owner",
+            "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "merge_cas_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+            "merge_cas_base_tree_sha": "dddddddddddddddddddddddddddddddddddddddd",
+            "merge_commit_sha": "1111111111111111111111111111111111111111",
+            "merge_tree_sha": "2222222222222222222222222222222222222222",
+            "number": 7,
+            "post_merge_base_ref_sha": "1111111111111111111111111111111111111111",
+            "remote_name": "origin"
+          },
+          "predecessor_evidence_id": "evidence:478bd80ec530f56db568e0fa821c65f38650f34aa5155f445097b197361a4643",
+          "publication_evidence_ref": "evidence:bbcf0f8d3b9c5c98bdb5100eeaae5ae133ed2737edb8cbbf55f0cfb6c8771e89",
+          "readback_receipt_id": "publication-readback:45340a5251e453b7debe44bb5eb114f45cc4d86bc8177cc551f04eb631f07986",
+          "readback_stage": "publication_readback",
+          "rebind_receipt_evidence_id": "rebind:a4413973434a4116cb5950fd030446e2be969993593d56952f1426ae64813044",
+          "schema": "agent-canon.publication-readback-receipt.v1"
+        },
+        "state": "accepted"
+      },
+      "error": {
+        "code": "lifecycle:path_not_absolute",
+        "detail": "queue_receipt.source_namespace"
+      }
+    },
+    {
+      "name": "replay-timing-only",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {
+            "timing": {
+              "attempt": 1
+            }
+          },
+          "value": 1
+        },
+        {
+          "binding": {
+            "timing": {
+              "attempt": 99
+            }
+          },
+          "value": 1
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "output": null,
+      "canonical_utf8": "null",
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "replay-int-float",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {},
+          "value": 1
+        },
+        {
+          "binding": {},
+          "value": 1.0
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "error": {
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    },
+    {
+      "name": "replay-int-bool",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {},
+          "value": 1
+        },
+        {
+          "binding": {},
+          "value": true
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "output": null,
+      "canonical_utf8": "null",
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "replay-nested-numeric",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {},
+          "value": [
+            {
+              "x": 0
+            }
+          ]
+        },
+        {
+          "binding": {},
+          "value": [
+            {
+              "x": false
+            }
+          ]
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "output": null,
+      "canonical_utf8": "null",
+      "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+    },
+    {
+      "name": "replay-changed",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {},
+          "value": "1"
+        },
+        {
+          "binding": {},
+          "value": 1
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "error": {
+        "code": "input_identity_mismatch",
+        "detail": "test-replay"
+      }
+    },
+    {
+      "name": "replay-missing-binding",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "value": 1
+        },
+        {
+          "binding": {},
+          "value": 1
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "error": {
+        "code": "lifecycle:mapping_required",
+        "detail": "test-replay.binding"
+      }
+    },
+    {
+      "name": "replay-binding-extra",
+      "api": "validate_immutable_replay",
+      "args": [
+        {
+          "binding": {
+            "x": 1
+          }
+        },
+        {
+          "binding": {
+            "x": 2
+          }
+        }
+      ],
+      "kwargs": {
+        "field": "test-replay"
+      },
+      "error": {
+        "code": "input_identity_mismatch",
+        "detail": "test-replay"
+      }
+    }
+  ]
+}
