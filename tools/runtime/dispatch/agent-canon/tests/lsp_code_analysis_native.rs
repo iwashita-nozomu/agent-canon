@@ -28,6 +28,7 @@ impl TestDirectory {
             NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&path).expect("create LSP test directory");
+        let path = fs::canonicalize(path).expect("resolve physical LSP test directory");
         Self(path)
     }
 

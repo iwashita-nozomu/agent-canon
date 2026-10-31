@@ -373,6 +373,7 @@ mod dependency_selection_tests {
                 NEXT_ROOT.fetch_add(1, Ordering::Relaxed)
             ));
             fs::create_dir(&path).expect("create dependency-selection fixture");
+            let path = fs::canonicalize(path).expect("resolve dependency-selection fixture");
             Self(path)
         }
 
