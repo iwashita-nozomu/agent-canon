@@ -239,7 +239,7 @@ fn frontier_materialization_accepts_a_host_absolute_namespace() {
         .get("queue_receipt")
         .expect("queue receipt input is present")
         .clone();
-    let publication = &queue["source_publication_identity"];
+    let publication = queue["source_publication_identity"].clone();
     queue["source_namespace"] = Value::String(namespace.clone());
     let queue_body = format!(
         "{}|{}|{}|{}|{}|{}",
