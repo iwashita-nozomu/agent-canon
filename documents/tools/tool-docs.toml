@@ -185,9 +185,9 @@ summary = "Generic repository topic checkout lifecycle and reconstructibility cl
 [[tool]]
 id = "compose-consumer-entrypoint"
 classification = "public"
-tool = "tools/agent/templates/entrypoint_composer.py"
+tool = "tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs"
 doc = "documents/tools/entrypoint_composer.md"
-language = "python"
+language = "rust"
 summary = "Deterministic source-to-consumer root AGENTS.md composition documentation."
 
 [[tool]]

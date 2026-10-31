@@ -2,10 +2,10 @@
 # contract configuration
 # responsibility Builds and packages the native AgentCanon CLI for supported host platforms.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/Cargo.toml native executable crate
-# upstream implementation ../../tools/agent/templates/template_bundle.py source-bound archive producer
-# upstream implementation ../../tools/repository/github/native_release.py verified draft publication
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs source-bound archive producer
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/native_release.rs verified draft publication
 # downstream implementation ../../tests/agent_tools/test_native_cli_distribution.py source-free package smoke
-# downstream implementation ../../tests/agent_tools/test_native_release.py integrity and recovery contracts
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/native_release_native.rs integrity and recovery contracts
 # @dependency-end
 
 name: AgentCanon native CLI
@@ -54,19 +54,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
-      - name: Test release integrity and recovery with the standard library
-        run: python -S -m unittest -v tests.agent_tools.test_native_release
-
       - name: Select the matrix and validate publication input
         id: plan
         env:
           PUBLISH_REQUEST: ${{ inputs.publish_release }}
           RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-prepare
           MATRIX_JSON: >-
             {
               "include": [
@@ -103,36 +96,18 @@ jobs:
               ]
             }
         run: |
-          python - <<'PY'
-          import json
-          import os
-          import pathlib
-          from tools.agent.templates.template_bundle import native_release_version
-          from tools.repository.github.native_release import require_mainline_source
-
-          matrix = json.loads(os.environ["MATRIX_JSON"])
-          version = native_release_version(pathlib.Path.cwd(), "HEAD")
-          tagged = os.environ["GITHUB_REF"].startswith("refs/tags/v")
-          main_push = os.environ["GITHUB_EVENT_NAME"] == "push" and os.environ["GITHUB_REF"] == "refs/heads/main"
-          publish = main_push or (os.environ["GITHUB_EVENT_NAME"] == "push" and tagged) or os.environ.get("PUBLISH_REQUEST") == "true"
-          tag = "v" + version if main_push else os.environ.get("RELEASE_TAG_INPUT") or (os.environ["GITHUB_REF_NAME"] if tagged else "")
-          if not publish:
-              tag = ""
-          if publish:
-              require_mainline_source(pathlib.Path.cwd(), "HEAD")
-          if publish and tag != "v" + version:
-              raise SystemExit("release tag must match source release version v" + version)
-          outputs = {
-              "matrix": json.dumps(matrix, separators=(",", ":")),
-              "targets": json.dumps([row["target"] for row in matrix["include"]]),
-              "version": version,
-              "tag": tag,
-              "publish": str(publish).lower(),
-          }
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              for key, value in outputs.items():
-                  print(f"{key}={value}", file=output)
-          PY
+          set -euo pipefail
+          cargo run --locked \
+            --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
+            -- native-release prepare \
+            --source-root "$GITHUB_WORKSPACE" \
+            --source-ref HEAD \
+            --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" \
+            --ref-name "$GITHUB_REF_NAME" \
+            --publish-request "$PUBLISH_REQUEST" \
+            --release-tag "$RELEASE_TAG_INPUT" \
+            --matrix-json "$MATRIX_JSON"
 
   build:
     name: ${{ matrix.target }}
@@ -187,17 +162,18 @@ jobs:
       - name: Package and smoke the source-free archives
         shell: bash
         env:
+          AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}
           CARGO_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-${{ matrix.target }}
           PACKAGE_DIR: ${{ runner.temp }}/agent-canon-native-package
           VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
-          python tools/agent/templates/template_bundle.py native-package \
+          "$CARGO_TARGET_DIR/release/$EXECUTABLE" template-bundle native-package \
             --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
             --binary "$CARGO_TARGET_DIR/release/$EXECUTABLE" --target "$TARGET" \
             --output "$PACKAGE_DIR" \
             --toolchain "rustc=$(rustc -V); cargo=$(cargo -V); rustflags=$RUSTFLAGS"
-          python tools/agent/templates/template_bundle.py native-verify \
+          "$CARGO_TARGET_DIR/release/$EXECUTABLE" template-bundle native-verify \
             --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
             --root "$PACKAGE_DIR" --target "$TARGET"
           python tests/agent_tools/test_native_cli_distribution.py \
@@ -207,6 +183,7 @@ jobs:
         if: matrix.target == 'x86_64-pc-windows-msvc'
         shell: bash
         env:
+          AGENT_CANON_RUNTIME_ROOT: ${{ runner.temp }}
           CARGO_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-${{ matrix.target }}
           PACKAGE_DIR: ${{ runner.temp }}/agent-canon-native-package
           REBUILD_TARGET_DIR: ${{ runner.temp }}/agent-canon-cargo-rebuild-${{ matrix.target }}
@@ -218,34 +195,20 @@ jobs:
           cargo build --locked --release \
             --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
             --target-dir "$REBUILD_TARGET_DIR" 2>&1 | tee -a "$RUNNER_TEMP/native-checks.log"
-          python tools/agent/templates/template_bundle.py native-package \
+          "$CARGO_TARGET_DIR/release/$EXECUTABLE" template-bundle native-package \
             --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
             --binary "$REBUILD_TARGET_DIR/release/$EXECUTABLE" --target "$TARGET" \
             --output "$REBUILD_PACKAGE_DIR" \
             --toolchain "rustc=$(rustc -V); cargo=$(cargo -V); rustflags=$RUSTFLAGS"
-          python tools/agent/templates/template_bundle.py native-verify \
+          "$CARGO_TARGET_DIR/release/$EXECUTABLE" template-bundle native-verify \
             --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
             --root "$REBUILD_PACKAGE_DIR" --target "$TARGET"
-          python - <<'PY' 2>&1 | tee -a "$RUNNER_TEMP/native-checks.log"
-          import hashlib
-          import os
-          from pathlib import Path
-
-          original = Path(os.environ["CARGO_TARGET_DIR"]) / "release" / os.environ["EXECUTABLE"]
-          rebuilt = Path(os.environ["REBUILD_TARGET_DIR"]) / "release" / os.environ["EXECUTABLE"]
-          pairs = [(original, rebuilt)]
-          packages = Path(os.environ["PACKAGE_DIR"])
-          rebuilt_packages = Path(os.environ["REBUILD_PACKAGE_DIR"])
-          names = {path.name for path in packages.iterdir()}
-          if names != {path.name for path in rebuilt_packages.iterdir()}:
-              raise SystemExit("rebuilt package file set differs")
-          pairs.extend((packages / name, rebuilt_packages / name) for name in sorted(names))
-          for first, second in pairs:
-              content = first.read_bytes()
-              if content != second.read_bytes():
-                  raise SystemExit("independent rebuild differs: " + first.name)
-              print("reproduced " + hashlib.sha256(content).hexdigest() + "  " + first.name)
-          PY
+          "$CARGO_TARGET_DIR/release/$EXECUTABLE" native-release compare-reproducible \
+            --binary "$CARGO_TARGET_DIR/release/$EXECUTABLE" \
+            --rebuilt-binary "$REBUILD_TARGET_DIR/release/$EXECUTABLE" \
+            --packages "$PACKAGE_DIR" \
+            --rebuilt-packages "$REBUILD_PACKAGE_DIR" \
+            2>&1 | tee -a "$RUNNER_TEMP/native-checks.log"
 
       - name: Upload check output
         if: always()
@@ -302,30 +265,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
       - name: Select retained native artifacts by ID
         id: artifacts
         env:
           TARGETS_JSON: ${{ needs.prepare.outputs.targets }}
         run: |
-          python - <<'PY'
-          import json
-          import os
-          import subprocess
-          from tools.repository.github.native_release import select_native_artifacts
-
-          endpoint = f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}/artifacts?per_page=100"
-          pages = json.loads(subprocess.check_output(["gh", "api", endpoint, "--paginate", "--slurp"], text=True))
-          artifacts = [row for page in pages for row in page["artifacts"]]
-          selected = select_native_artifacts(artifacts, json.loads(os.environ["TARGETS_JSON"]))
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              print("ids=" + ",".join(str(row["artifact_id"]) for row in selected), file=output)
-          print(json.dumps(selected))
-          PY
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/agent-canon-native-publish-cargo"
+          cargo run --locked \
+            --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml \
+            -- native-release select-artifacts \
+            --repo "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --targets-json "$TARGETS_JSON"
 
       - name: Download the verified platform archives
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
@@ -340,15 +292,12 @@ jobs:
           TARGETS_JSON: ${{ needs.prepare.outputs.targets }}
         run: |
           set -euo pipefail
-          mapfile -t targets < <(python -c 'import json, os; print("\n".join(json.loads(os.environ["TARGETS_JSON"])))')
-          target_args=()
-          for target in "${targets[@]}"; do
-            target_args+=(--target "$target")
-          done
-          python tools/repository/github/native_release.py \
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/agent-canon-native-publish-cargo"
+          "$CARGO_TARGET_DIR/debug/agent-canon" native-release publish \
             --source-root "$GITHUB_WORKSPACE" --source-ref HEAD \
             --artifacts "$RUNNER_TEMP/agent-canon-native-release" \
-            --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" "${target_args[@]}" \
+            --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" \
+            --targets-json "$TARGETS_JSON" \
             > "$RUNNER_TEMP/native-publication.json"
           cat "$RUNNER_TEMP/native-publication.json"
 
