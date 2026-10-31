@@ -330,7 +330,14 @@ fn resolve_with_missing(path: &Path) -> Result<PathBuf> {
 }
 
 fn posix_path(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    #[cfg(windows)]
+    {
+        path.to_string_lossy().replace('\\', "/")
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_string_lossy().into_owned()
+    }
 }
 
 fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {

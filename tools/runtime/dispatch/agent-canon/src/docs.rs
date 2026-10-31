@@ -622,7 +622,14 @@ fn normalize_repo_absolute_link(root: &Path, target: &Path) -> Option<PathBuf> {
 
 fn relative_link_target(source: &Path, target: &Path) -> Option<String> {
     let relative = pathdiff::diff_paths(target, source.parent()?)?;
-    Some(relative.to_string_lossy().replace('\\', "/"))
+    #[cfg(windows)]
+    {
+        Some(relative.to_string_lossy().replace('\\', "/"))
+    }
+    #[cfg(not(windows))]
+    {
+        Some(relative.to_string_lossy().into_owned())
+    }
 }
 
 fn append_link_anchor(path: String, anchor: &str) -> String {
@@ -1727,6 +1734,38 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&source).expect("source remains unchanged during planning"),
             "[unique](topic.md#part)\n[ambiguous](same.md)\n[external](https://example.test/x)\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn link_rewrite_preserves_literal_backslash_path_components() {
+        let temporary = DocsTemporaryDirectory::create("links-backslash-component")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        let target = root.join("docs\\x/guide.md");
+        fs::create_dir_all(target.parent().expect("target has a parent"))
+            .expect("literal-backslash directory is created");
+        fs::write(&target, "# Guide\n").expect("target is written");
+        let source = write_link_fixture(
+            &root,
+            "index.md",
+            &format!("[guide]({})\n", target.display()),
+        );
+
+        let planned = planned_link_rewrites(&root, &["index.md".to_string()])
+            .expect("link rewrite planning succeeds");
+
+        assert_eq!(
+            planned.get(&source).map(String::as_str),
+            Some("[guide](docs\\x/guide.md)\n")
+        );
+        assert_eq!(
+            fs::read_to_string(&source).expect("planning does not mutate source"),
+            format!("[guide]({})\n", target.display())
         );
     }
 }

@@ -80,6 +80,25 @@ fn source_capability_binds_root_and_exact_allowed_subtree() {
     assert!(capability.assert_allowed(&outside).is_err());
 }
 
+#[cfg(unix)]
+#[test]
+fn posix_backslash_filename_does_not_alias_a_slash_allowed_subtree() {
+    let root = TempRoot::new();
+    let slash_path = root.write("docs/x/guide.md", "slash path\n");
+    let backslash_component = root.write("docs\\x/guide.md", "backslash path\n");
+    let capability = capability(&root.0, &["docs/x"]);
+
+    assert!(capability.assert_allowed(&slash_path).is_ok());
+    assert!(capability.assert_allowed(&backslash_component).is_err());
+    assert!(capability
+        .write_text(&backslash_component, "must remain\n")
+        .is_err());
+    assert_eq!(
+        fs::read_to_string(&backslash_component).unwrap(),
+        "backslash path\n"
+    );
+}
+
 #[test]
 fn source_capability_writes_only_the_approved_file() {
     let root = TempRoot::new();
