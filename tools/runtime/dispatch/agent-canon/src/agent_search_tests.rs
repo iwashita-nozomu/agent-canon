@@ -2,6 +2,7 @@
 // contract test
 // responsibility Tests source context, LSP failures, provider composition, and Unicode case-folding.
 // upstream implementation agent_search.rs routes provider requests
+// upstream implementation lib.rs exposes shared user-home path expansion
 // upstream implementation graph_client.rs owns source-derived dependency context
 // upstream implementation ../lsp_code_analysis.rs owns bounded LSP analysis
 // upstream implementation semantic_index/mod.rs owns semantic retrieval
@@ -9,8 +10,8 @@
 
 use crate::agent_search::{
     build_request_with_environment, expand_user_path_with, run_search_with_lsp_overrides,
-    selected_providers, CliArgs, HomeLookupRequest, SearchInputError, SearchPathEnvironment,
-    SearchPathPlatform, SearchRequest,
+    selected_providers, CliArgs, HomeLookupRequest, PathExpansionError, SearchInputError,
+    SearchPathEnvironment, SearchPathPlatform, SearchRequest,
 };
 use crate::python_text::python_strip;
 use agent_canon::lsp_code_analysis::{LanguageId, LspServerSpec};
@@ -333,7 +334,7 @@ fn windows_home_expansion_matches_profile_fallback_and_sibling_rules() {
             |_| panic!("Windows named-user expansion uses the profile heuristic"),
         )
         .unwrap_err(),
-        SearchInputError::UnresolvedHome
+        PathExpansionError::UnresolvedHome
     );
 
     let empty_profile = SearchPathEnvironment {
@@ -361,7 +362,7 @@ fn windows_home_expansion_matches_profile_fallback_and_sibling_rules() {
             |_| panic!("missing USERPROFILE and HOMEPATH do not query a user database"),
         )
         .unwrap_err(),
-        SearchInputError::UnresolvedHome
+        PathExpansionError::UnresolvedHome
     );
 }
 

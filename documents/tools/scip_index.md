@@ -3,13 +3,13 @@
 contract reference
 responsibility Documents the native SCIP index and bounded query API.
 upstream design ../../agents/skills/dependency-analysis.md selects optional repository-wide symbol/reference evidence.
-upstream implementation ../../tools/analysis/dependencies/scip_index.py owns native index/read/query operations.
-upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py confines index outputs to the external runtime.
-downstream implementation ../../tests/agent_tools/test_scip_index.py verifies output and query behavior.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs owns native index/read/query operations.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs confines index outputs to the external runtime.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/scip_index_native.rs verifies output and query behavior.
 @dependency-end
 -->
 
-# scip_index.py
+# scip-index
 
 Use this tool only when repository-wide symbol or reference evidence can change
 the edit scope. It writes the standard SCIP protobuf artifact and projects a
@@ -28,7 +28,7 @@ Every index write requires an explicit external runtime root and an output path
 beneath that root. The output file is named index.scip. The selected project
 owner supplies the language inputs:
 
-    python3 tools/analysis/dependencies/scip_index.py index \
+    tools/bin/agent-canon scip-index index \
       --root <project-root> \
       --runtime-root <external-runtime-root> \
       --language python \
@@ -44,7 +44,7 @@ an unsupported-language result.
 
 For C and C++, select the project build owner's compile database:
 
-    python3 tools/analysis/dependencies/scip_index.py index \
+    tools/bin/agent-canon scip-index index \
       --root <project-root> \
       --runtime-root <external-runtime-root> \
       --language cpp \
@@ -55,9 +55,9 @@ The current scip-clang v0.4.0 release provides an x86_64 Linux binary. The
 indexer consumes the supplied JSON compilation database; this API does not
 reconstruct compiler flags or build inputs.
 
-The generic scip 0.10.0 CLI reads and validates index artifacts. The index
-command uses its stats output; query uses print --json. These are native SCIP
-readbacks, not an AgentCanon graph schema.
+The native command parses standard `index.scip` bytes through the official SCIP
+SDK. Index writing also uses the generic scip 0.10.0 CLI stats command as a
+provider readback. These are SCIP artifacts, not an AgentCanon graph schema.
 
 Rust currently has no selected producer. The SCIP subcommand in the pinned
 rust-analyzer is unstable and has not been qualified here; a Rust index request
@@ -69,7 +69,7 @@ Pass an index path from the same external runtime root. Paths can name a file or
 a directory; symbol queries use the exact SCIP symbol string.
 Repeat --index once per selected language/module artifact.
 
-    python3 tools/analysis/dependencies/scip_index.py query \
+    tools/bin/agent-canon scip-index query \
       --root <project-root> \
       --runtime-root <external-runtime-root> \
       --index scip/<run-id>/python/index.scip \
@@ -92,7 +92,7 @@ that target unindexed. Neither result is complete shell coverage.
 
 SCIP indexing is not a default gate for small documentation/configuration
 changes, direct point-LSP queries, or tasks whose owner is already known.
-Point LSP analysis and diagnostics remain with lsp_code_analysis.py. The
+Point LSP analysis and diagnostics remain with `agent-canon lsp-code-analysis analyze`. The
 dependency-header graph remains a separate evidence source.
 
 scip-python 0.6.6 currently emits unspecified SymbolInformation kinds, so
