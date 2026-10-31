@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1413,29 +1414,43 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
         ),
         encoding="utf-8",
     )
+    docker = tmp_path / "docker-with-copy-up"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        "args=()\n"
+        'for argument in "$@"; do\n'
+        '  if [[ "$argument" == *,volume-nocopy ]]; then\n'
+        "    argument=${argument%,volume-nocopy}\n"
+        "  fi\n"
+        '  args+=("$argument")\n'
+        "done\n"
+        f'exec {shlex.quote(str(ROOT / "tests/bootstrap/fake_docker.py"))} "${{args[@]}}"\n',
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
     result = subprocess.run(
         [
-            str(ROOT / "tests/bootstrap/fake_docker.py"),
-            "run",
-            "--rm",
-            "--mount",
-            f"type=volume,src={volume_name},dst=/var/lib/agent-canon",
-            "--mount",
-            f"type=bind,src={legacy},dst=/var/lib/agent-canon-legacy-state,readonly",
-            "--env",
-            "AGENT_CANON_VOLUME_UID=1000",
-            "--env",
-            "AGENT_CANON_VOLUME_GID=1000",
-            "--env",
-            f"AGENT_CANON_VOLUME_DIGEST={control_digest}",
-            "image",
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(docker)!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
         ],
         check=False,
         capture_output=True,
         text=True,
         env={**os.environ, "FAKE_DOCKER_STATE": str(state_path)},
     )
-    assert result.returncode == 1
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["code"] == "state_volume_init_failed"
+    assert "Docker exit 48" in json.loads(result.stderr)["detail"]
     volume_root = tmp_path / f".fake-volume-{volume_name}"
     assert (volume_root / "runtime").is_dir()
     assert not (volume_root / ".agent-canon-controller-volume-v1").exists()
@@ -1444,7 +1459,7 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
 def test_fake_volume_initializer_preserves_readonly_legacy_source(
     tmp_path: Path,
 ) -> None:
-    """Fake volume initialization copies legacy input without mutating it."""
+    """The actual initializer copies legacy input without mutating it."""
     legacy = tmp_path / "legacy-state"
     legacy.mkdir()
     (legacy / "state.json").write_text('{"legacy":true}\n', encoding="utf-8")
@@ -1472,23 +1487,20 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(
         ),
         encoding="utf-8",
     )
-    fake = ROOT / "tests/bootstrap/fake_docker.py"
     result = subprocess.run(
         [
-            str(fake),
-            "run",
-            "--rm",
-            "--mount",
-            f"type=volume,src={volume_name},dst=/var/lib/agent-canon,volume-nocopy",
-            "--mount",
-            f"type=bind,src={legacy},dst=/var/lib/agent-canon-legacy-state,readonly",
-            "--env",
-            "AGENT_CANON_VOLUME_UID=1000",
-            "--env",
-            "AGENT_CANON_VOLUME_GID=1000",
-            "--env",
-            f"AGENT_CANON_VOLUME_DIGEST={control_digest}",
-            "image",
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
         ],
         check=False,
         capture_output=True,
@@ -1635,6 +1647,143 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
     assert state["volumes"][volume_name]["GID"] == os.getgid()
 
 
+def test_fake_healthy_marked_volume_reuses_without_recursive_normalization(
+    tmp_path: Path,
+) -> None:
+    """The actual shell trusts healthy managed roots without walking descendants."""
+    control = tmp_path / "control"
+    legacy = tmp_path / "legacy-state"
+    control.mkdir()
+    legacy.mkdir()
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    volume_root = tmp_path / f".fake-volume-{volume_name}"
+    managed = (
+        volume_root,
+        volume_root / "runtime",
+        volume_root / "runtime" / "receipts",
+        volume_root / "runtime" / "generations",
+        volume_root / "runtime" / "tasks",
+        volume_root / "runtime" / "spool",
+        volume_root / "runtime" / "spool" / "private-feedback",
+        volume_root / "exchange",
+        volume_root / "spool",
+        volume_root / "archive",
+        volume_root / "cache",
+        volume_root / "codex-home",
+        volume_root / "private-log",
+    )
+    for directory in managed:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    cached_child = volume_root / "cache" / "cargo" / "objects"
+    task_child = volume_root / "runtime" / "tasks" / "task-1"
+    cached_child.mkdir(parents=True)
+    task_child.mkdir(parents=True)
+    (cached_child / "payload").write_text("cached\n", encoding="utf-8")
+    (task_child / "payload").write_text("task\n", encoding="utf-8")
+    cached_child.parent.chmod(0o750)
+    cached_child.chmod(0o750)
+    task_child.chmod(0o750)
+    for directory in managed:
+        directory.chmod(0o700)
+
+    marker = volume_root / ".agent-canon-controller-volume-v1"
+    marker.write_text(
+        f"agent-canon-controller-volume/v1\n{control_digest}\n", encoding="utf-8"
+    )
+    marker.chmod(0o600)
+    state_path = tmp_path / "docker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "images": {},
+                "containers": {},
+                "volumes": {
+                    volume_name: {
+                        "Name": volume_name,
+                        "Labels": {
+                            "io.agent-canon.runtime": "shared-v1",
+                            "io.agent-canon.control-root-digest": control_digest,
+                            "io.agent-canon.state": "controller-v1",
+                        },
+                        "Mountpoint": str(volume_root),
+                    }
+                },
+                "next": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    wrapper_bin = tmp_path / "wrappers"
+    wrapper_bin.mkdir()
+    trace = tmp_path / "recursive-operations.log"
+    for command in ("find", "chown"):
+        executable = shutil.which(command)
+        assert executable is not None
+        if command == "find":
+            trace_case = (
+                'case "$*" in *"-exec chmod 700"*) '
+                "printf 'recursive-find\\n' >> "
+                f"{shlex.quote(str(trace))};; esac\n"
+            )
+        else:
+            trace_case = (
+                'case " $* " in *" -R "*) '
+                "printf 'recursive-chown\\n' >> "
+                f"{shlex.quote(str(trace))};; esac\n"
+            )
+        wrapper = wrapper_bin / command
+        wrapper.write_text(
+            "#!/bin/sh\n" + trace_case + f'exec {shlex.quote(executable)} "$@"\n',
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o755)
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {str(ADAPTER)!r}; "
+                f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
+                f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
+                f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "FAKE_DOCKER_STATE": str(state_path),
+            "FAKE_DOCKER_VOLUME_INIT_TRACE": str(trace),
+            "PATH": f"{wrapper_bin}{os.pathsep}{os.environ['PATH']}",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not trace.exists()
+    assert cached_child.stat().st_mode & 0o777 == 0o750
+    assert task_child.stat().st_mode & 0o777 == 0o750
+    assert (cached_child / "payload").read_text(encoding="utf-8") == "cached\n"
+    assert (task_child / "payload").read_text(encoding="utf-8") == "task\n"
+    for directory in managed:
+        assert directory.stat().st_mode & 0o777 == 0o700
+    assert marker.stat().st_mode & 0o777 == 0o600
+    volume_state = json.loads(state_path.read_text(encoding="utf-8"))["volumes"][
+        volume_name
+    ]
+    assert volume_state["UID"] == os.getuid()
+    assert volume_state["GID"] == os.getgid()
+    assert volume_state["Mode"] == "0700"
+
+
 def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
     """A marked volume with an invalid marker fails without creating paths."""
     control = tmp_path / "control"
@@ -1700,6 +1849,7 @@ def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
     assert marker.read_text(encoding="utf-8") == (
         "agent-canon-controller-volume/v1\nwrong-digest\n"
     )
+    assert not list(volume_root.glob(".agent-canon-marker-check.*"))
     assert not (volume_root / "exchange").exists()
     assert not (volume_root / "private-log").exists()
 

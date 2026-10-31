@@ -7,6 +7,7 @@ import json
 import hashlib
 import fcntl
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -803,9 +804,8 @@ def main(argv: list[str]) -> int:
         save(state)
         return 0
     if argv[:1] == ["run"]:
-        # The real initializer is a short-lived container that prepares the
-        # named controller-state volume.  Model its one-time legacy copy and
-        # return without retaining a task container.
+        # Map the initializer's validated mounts to test-owned paths and execute
+        # its captured shell body without retaining a task container.
         if "--mount" not in argv:
             return 2
         copy_environment = {}
@@ -1124,40 +1124,36 @@ def main(argv: list[str]) -> int:
         volume_name = ""
         volume_nocopy = False
         legacy_source = ""
+        legacy_readonly = False
         for index, item in enumerate(argv):
             if item != "--mount" or index + 1 >= len(argv):
                 continue
-            values = dict(
-                part.split("=", 1) for part in argv[index + 1].split(",") if "=" in part
-            )
+            mount = argv[index + 1]
+            mount_parts = mount.split(",")
+            values = dict(part.split("=", 1) for part in mount_parts if "=" in part)
             if (
                 values.get("type") == "volume"
                 and values.get("dst") == "/var/lib/agent-canon"
             ):
                 volume_name = values.get("src", "")
-                volume_nocopy = "volume-nocopy" in argv[index + 1].split(",")
+                volume_nocopy = "volume-nocopy" in mount_parts
             if (
                 values.get("type") == "bind"
                 and values.get("dst") == "/var/lib/agent-canon-legacy-state"
             ):
                 legacy_source = values.get("src", "")
+                legacy_readonly = "readonly" in mount_parts
         if not volume_name:
             return 2
+
         backing = volume_path(volume_name)
         backing.mkdir(parents=True, exist_ok=True)
-        runtime_backing = backing / "runtime"
-        legacy = Path(legacy_source) if legacy_source else None
         marker = backing / ".agent-canon-controller-volume-v1"
         if not volume_nocopy and not marker.exists():
-            runtime_backing.mkdir(parents=True, exist_ok=True)
-        digest = next(
-            (
-                item.split("=", 1)[1]
-                for item in argv
-                if item.startswith("AGENT_CANON_VOLUME_DIGEST=")
-            ),
-            "",
-        )
+            # Model Docker's image copy-up so the actual initializer rejects it.
+            (backing / "runtime").mkdir(parents=True, exist_ok=True)
+
+        digest = copy_environment.get("AGENT_CANON_VOLUME_DIGEST", "")
         if os.environ.get(
             "FAKE_DOCKER_FAIL_STATE_VOLUME_INIT_ONCE"
         ) == "1" and not state.get("_state_volume_init_failed_once"):
@@ -1165,164 +1161,71 @@ def main(argv: list[str]) -> int:
             save(state)
             return 1
 
-        def same_tree(source: Path, destination: Path) -> bool:
-            source_files = sorted(
-                item.relative_to(source).as_posix()
-                for item in source.rglob("*")
-                if not item.is_dir()
-            )
-            destination_files = sorted(
-                item.relative_to(destination).as_posix()
-                for item in destination.rglob("*")
-                if not item.is_dir()
-            )
-            if source_files != destination_files:
-                return False
-            return all(
-                (source / relative).is_file()
-                and not (source / relative).is_symlink()
-                and (destination / relative).is_file()
-                and not (destination / relative).is_symlink()
-                and (source / relative).read_bytes()
-                == (destination / relative).read_bytes()
-                for relative in source_files
-            )
-
-        def migrate_file(source: Path, destination: Path) -> bool:
-            if destination.exists():
-                return (
-                    destination.is_file()
-                    and not destination.is_symlink()
-                    and source.read_bytes() == destination.read_bytes()
-                )
-            shutil.copy2(source, destination)
-            return True
-
-        def migrate_tree(source: Path, destination: Path) -> bool:
-            if destination.exists():
-                return (
-                    destination.is_dir()
-                    and not destination.is_symlink()
-                    and same_tree(source, destination)
-                )
-            shutil.copytree(source, destination)
-            return True
-
-        marked = marker.exists()
-        if marker.is_symlink() or (
-            marked
-            and marker.read_text(encoding="utf-8")
-            != f"agent-canon-controller-volume/v1\n{digest}\n"
-        ):
+        try:
+            entrypoint_index = argv.index("--entrypoint")
+            command_index = argv.index("-c", entrypoint_index + 2)
+            shell_script = argv[command_index + 1]
+        except (ValueError, IndexError):
+            # The copy-up regression sends no shell command and must still fail.
             return 1
-        if not marked and any(backing.iterdir()):
-            return 1
-        if marked:
-            legacy_source_sync = backing / "source-sync.json"
-            if legacy_source_sync.is_file() or legacy_source_sync.is_symlink():
-                legacy_source_sync.unlink()
-        if not marked and legacy is not None and legacy.is_dir():
-            runtime_backing.mkdir(parents=True, exist_ok=True)
-            for name in ("state.json", "owner.json"):
-                source = legacy / name
-                if source.exists() and (
-                    not source.is_file()
-                    or source.is_symlink()
-                    or not migrate_file(source, runtime_backing / name)
-                ):
-                    return 1
-            for name in ("receipts", "generations", "tasks"):
-                source = legacy / name
-                destination = runtime_backing / name
-                if source.exists() and (
-                    not source.is_dir()
-                    or source.is_symlink()
-                    or not migrate_tree(source, destination)
-                ):
-                    return 1
-            for name in ("spool", "archive", "cache", "codex-home"):
-                source = legacy / name
-                destination = backing / name
-                if source.exists() and (
-                    not source.is_dir()
-                    or source.is_symlink()
-                    or not migrate_tree(source, destination)
-                ):
-                    return 1
-            marker.write_text(
-                f"agent-canon-controller-volume/v1\n{digest}\n", encoding="utf-8"
-            )
+
+        def option_value(name: str) -> str:
+            try:
+                index = argv.index(name)
+            except ValueError:
+                return ""
+            return argv[index + 1] if index + 1 < len(argv) else ""
+
         if (
-            marker.read_text(encoding="utf-8")
-            != f"agent-canon-controller-volume/v1\n{digest}\n"
+            argv[entrypoint_index + 1] != "/bin/sh"
+            or "--read-only" not in argv
+            or option_value("--user") != "0:0"
+            or option_value("--network") != "none"
+            or option_value("--tmpfs") != "/tmp"
+            or not legacy_source
+            or not legacy_readonly
         ):
+            return 2
+
+        root_assignment = "root=/var/lib/agent-canon\n"
+        legacy_assignment = "legacy=/var/lib/agent-canon-legacy-state\n"
+        if (
+            shell_script.count(root_assignment) != 1
+            or shell_script.count(legacy_assignment) != 1
+        ):
+            return 2
+        shell_script = shell_script.replace(
+            root_assignment, f"root={shlex.quote(str(backing))}\n", 1
+        )
+        shell_script = shell_script.replace(
+            legacy_assignment,
+            f"legacy={shlex.quote(legacy_source)}\n",
+            1,
+        )
+
+        shell_environment = {**os.environ, **copy_environment}
+        result = subprocess.run(
+            ["/bin/sh", "-c", shell_script],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=shell_environment,
+        )
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        if result.returncode != 0:
+            return result.returncode
+
+        expected_readback = f"marker\t{digest}\ncontent\tok"
+        if result.stdout.rstrip("\n") != expected_readback:
             return 1
-        if not marked and legacy is not None and legacy.is_dir():
-            for name in ("state.json", "owner.json"):
-                source = legacy / name
-                if source.exists() and (
-                    not (runtime_backing / name).is_file()
-                    or source.read_bytes() != (runtime_backing / name).read_bytes()
-                ):
-                    return 1
-            for name in ("receipts", "generations", "tasks"):
-                source = legacy / name
-                if source.exists() and (
-                    not (runtime_backing / name).is_dir()
-                    or not same_tree(source, runtime_backing / name)
-                ):
-                    return 1
-            for name in ("spool", "archive", "cache", "codex-home"):
-                source = legacy / name
-                if source.exists() and (
-                    not (backing / name).is_dir()
-                    or not same_tree(source, backing / name)
-                ):
-                    return 1
-        required_dirs = [
-            runtime_backing,
-            runtime_backing / "receipts",
-            runtime_backing / "generations",
-            runtime_backing / "tasks",
-            backing / "spool",
-            backing / "archive",
-            backing / "cache",
-            backing / "codex-home",
-        ]
-        for directory in required_dirs:
-            if marked and (not directory.is_dir() or directory.is_symlink()):
-                return 1
-            directory.mkdir(parents=True, exist_ok=True)
-        (runtime_backing / "spool" / "private-feedback").mkdir(
-            parents=True, exist_ok=True
-        )
-        for directory in (backing / "exchange", backing / "private-log"):
-            if marked and (directory.exists() or directory.is_symlink()):
-                if not directory.is_dir() or directory.is_symlink():
-                    return 1
-            directory.mkdir(parents=True, exist_ok=True)
-        uid_value = int(
-            next(
-                item.split("=", 1)[1]
-                for item in argv
-                if item.startswith("AGENT_CANON_VOLUME_UID=")
-            )
-        )
-        gid_value = int(
-            next(
-                item.split("=", 1)[1]
-                for item in argv
-                if item.startswith("AGENT_CANON_VOLUME_GID=")
-            )
-        )
-        for directory in [backing, *backing.rglob("*")]:
-            if directory.is_dir() and not directory.is_symlink():
-                directory.chmod(0o700)
-        marker.chmod(0o600)
-        state["volumes"][volume_name]["UID"] = uid_value
-        state["volumes"][volume_name]["GID"] = gid_value
-        state["volumes"][volume_name]["Mode"] = "0700"
-        print(f"marker\t{digest}\ncontent\tok")
+
+        uid_value = int(copy_environment["AGENT_CANON_VOLUME_UID"])
+        gid_value = int(copy_environment["AGENT_CANON_VOLUME_GID"])
+        volume_state = state["volumes"][volume_name]
+        volume_state["UID"] = uid_value
+        volume_state["GID"] = gid_value
+        volume_state["Mode"] = "0700"
         save(state)
         return 0
     if argv[:1] == ["start"]:
