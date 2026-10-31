@@ -290,7 +290,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "entrypoint responsibility grammar",
                     "documents/design/entrypoint-owner-map.md",
-                    "check_entrypoint_owner_map.py",
+                    "agent-canon docs check-entrypoints",
                 ),
                 (
                     "bootstrap, image, and resident container",
