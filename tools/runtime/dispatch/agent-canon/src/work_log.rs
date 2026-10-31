@@ -16,7 +16,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use time::{Duration, OffsetDateTime};
+use time::{OffsetDateTime, UtcOffset};
 
 pub const SELECTOR: &str = "work-log";
 
@@ -985,16 +985,20 @@ fn resolve_active_report_dir(
     Ok(Some(report_dir))
 }
 
-fn python_timestamp_jst() -> String {
-    let timestamp = OffsetDateTime::now_utc() + Duration::hours(9);
-    format!(
+fn python_timestamp_jst() -> Result<String, String> {
+    // Match Python's host-local datetime.now() while retaining its literal suffix.
+    let now = OffsetDateTime::now_utc();
+    let local_offset = UtcOffset::local_offset_at(now)
+        .map_err(|error| format!("cannot determine local UTC offset: {error}"))?;
+    let timestamp = now.to_offset(local_offset);
+    Ok(format!(
         "{:04}-{:02}-{:02} {:02}:{:02} JST",
         timestamp.year(),
         timestamp.month() as u8,
         timestamp.day(),
         timestamp.hour(),
         timestamp.minute()
-    )
+    ))
 }
 
 #[derive(Default)]
@@ -1185,15 +1189,10 @@ fn run_with_args(args: WorkLogArgs) -> Result<(), String> {
         format!(" | next: {}", args.next)
     };
     let message = args.message.expect("required CLI argument is validated");
+    let timestamp = python_timestamp_jst()?;
     let entry = format!(
         "`{} | {} | {}{}{}{}{}`",
-        python_timestamp_jst(),
-        args.kind,
-        message,
-        clause_suffix,
-        design_suffix,
-        ref_suffix,
-        next_suffix
+        timestamp, args.kind, message, clause_suffix, design_suffix, ref_suffix, next_suffix
     );
     let work_log_path = append_work_entry(&report_dir, &entry, runtime_root)?;
     println!("WORK_LOG={}", work_log_path.display());
