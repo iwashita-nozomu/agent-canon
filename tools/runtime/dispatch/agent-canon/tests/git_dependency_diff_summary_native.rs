@@ -7,9 +7,11 @@
 // @dependency-end
 
 use agent_canon::git_dependency_diff_summary::{
-    changed_file_list, collect_changed_paths, parse_name_status, parse_name_status_z,
-    parse_numstat, parse_numstat_z, scip_target_paths, ChangedPath, DiffSpec,
+    changed_file_list, parse_name_status, parse_name_status_z, parse_numstat, parse_numstat_z,
+    scip_target_paths, ChangedPath,
 };
+#[cfg(unix)]
+use agent_canon::git_dependency_diff_summary::{collect_changed_paths, DiffSpec};
 use serde_json::Value;
 use std::ffi::{OsStr, OsString};
 use std::fs;
