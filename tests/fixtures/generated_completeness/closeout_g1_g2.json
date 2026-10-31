@@ -1,0 +1,97 @@
+{
+  "source": "293eb89abbe5f3ae34d1369f53d9bb769cad8096",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "contexts": [
+    {
+      "fixture": "tests/agent_tools/test_bootstrap_and_close.py::update_lifecycle_closeout_fixture",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source",
+      "binding": {
+        "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+        "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "tool_id": "update-lifecycle-closeout",
+        "tool_version": "test.v1",
+        "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+        "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "timing": {
+          "started_at": "2026-07-18T00:00:00Z",
+          "finished_at": "2026-07-18T00:00:00Z",
+          "last_attempt_at": "2026-07-18T00:00:00Z",
+          "duration_ms": 0,
+          "attempt": 1,
+          "replayed": false
+        }
+      },
+      "gate_verdicts": [
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6",
+            "evidence_ref": "evidence:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "update-lifecycle-closeout",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "output_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:b5f4f00c9f91e09d84ce9b6627b5639625a48503117eba30edbed71c2e3547dd",
+            "evidence_ref": "evidence:b5f4f00c9f91e09d84ce9b6627b5639625a48503117eba30edbed71c2e3547dd",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "update-lifecycle-closeout",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6"
+          ],
+          "output_digest": "sha256:6f7ec54633a97291eef5cef519fce2159e8eaff1b13e101e51f50e8a854bcd40",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"update-lifecycle-closeout\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_verdicts\":[{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6\",\"evidence_ref\":\"evidence:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"update-lifecycle-closeout\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G1\",\"invariant\":\"source_correctness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:8888888888888888888888888888888888888888888888888888888888888888\"],\"output_digest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"},{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:b5f4f00c9f91e09d84ce9b6627b5639625a48503117eba30edbed71c2e3547dd\",\"evidence_ref\":\"evidence:b5f4f00c9f91e09d84ce9b6627b5639625a48503117eba30edbed71c2e3547dd\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"update-lifecycle-closeout\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G2\",\"invariant\":\"generated_completeness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:054f5d238c80f3316e5eac70bd60d8d608d9e5d3a76f772d901cfed76f5676e6\"],\"output_digest\":\"sha256:6f7ec54633a97291eef5cef519fce2159e8eaff1b13e101e51f50e8a854bcd40\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}],\"source_root\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g2-packet-oracle-2vxffdp9/source\"}",
+      "sha256": "7ff2f1c5f31b67f922e6691478b33d7bf1aed2e4cc45a819acc1fd10cec4756c"
+    }
+  ]
+}
