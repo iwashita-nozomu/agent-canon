@@ -4,8 +4,8 @@
 # upstream design documents/design/responsibility-scope-management.md scope ownership policy
 # upstream design documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design tools/catalog.yaml protecting tool ownership
-# downstream implementation tools/validation/semantic/responsibility/responsibility_scope.py validates this manifest
-# downstream implementation tools/validation/semantic/tools/tool_drift.py checks scope/tool trace links
+# downstream implementation tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs validates this manifest
+# downstream implementation tools/runtime/dispatch/agent-canon/src/tool_drift.rs checks scope/tool trace links
 # @dependency-end
 
 catalog_kind = "agent_canon_responsibility_scope"
@@ -102,8 +102,8 @@ exclude_paths = [
   "tools/runtime/archive/runtime_log_paths.py",
 ]
 protecting_tools = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
-  "tools/validation/semantic/tools/tool_drift.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
+  "tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
 ]
 issues = []
 
@@ -122,7 +122,7 @@ exclude_paths = [
   "tests/agent_tools/test_runtime_log_paths.py",
 ]
 protecting_tools = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
   "tools/validation/ci/runners/run_all_checks.sh",
 ]
 issues = []
@@ -158,7 +158,7 @@ exclude_paths = [
 ]
 protecting_tools = [
   "tools/runtime/dispatch/agent-canon/src/dependency_headers.rs",
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
 ]
 issues = []
 
@@ -184,7 +184,7 @@ paths = [
   "vendor/**",
 ]
 protecting_tools = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
 ]
 issues = []
 
@@ -197,6 +197,6 @@ paths = [
   "experiments/**",
 ]
 protecting_tools = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
 ]
 issues = []

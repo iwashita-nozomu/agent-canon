@@ -11,6 +11,7 @@
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
+// upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
@@ -21,6 +22,7 @@
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
+pub mod environment_dependencies;
 pub mod private_feedback;
 pub mod runtime_boundary;
 pub mod tool_proof_coverage;

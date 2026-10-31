@@ -26,7 +26,7 @@ forbidden_route = [
   "add helper-like function with only unrelated boundary evidence",
 ]
 linked_rules = [
-  "tools/validation/semantic/responsibility/responsibility_scope.py",
+  "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
   "tools/runtime/authority/task_authority.py",
 ]
 
@@ -293,15 +293,15 @@ protects = [
   "tool docs and catalog drift are visible before PR closeout",
 ]
 expected_route = [
-  "run tool_catalog.py and tool_drift.py",
+  "run the native tool-catalog and tool-drift commands",
   "add tests when catalog schema expectations change",
 ]
 forbidden_route = [
   "add tool catalog rows without machine validation",
 ]
 linked_rules = [
-  "tools/runtime/manifest/tool_catalog.py",
-  "tools/validation/semantic/tools/tool_drift.py",
+  "tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs",
+  "tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
   "tests/agent_tools/test_tool_catalog.py",
 ]
 
