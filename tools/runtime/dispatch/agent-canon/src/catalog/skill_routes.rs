@@ -1017,7 +1017,7 @@ fn validate_catalog_schemas_with(
         .arg(&config)
         .args(&documents)
         .current_dir(&root);
-    let yaml_output = yaml.output().map_err(|error| {
+    let yaml_output = execute(&mut yaml).map_err(|error| {
         CapabilityRootError::new(format!("catalog-validator-execution:yamllint:{error}"))
     })?;
     if !yaml_output.status.success() {
