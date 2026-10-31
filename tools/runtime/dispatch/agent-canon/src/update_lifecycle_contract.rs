@@ -9,13 +9,16 @@
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
 // downstream test ../tests/update_lifecycle_pr_native.rs freezes the native PR lifecycle APIs against CPython outputs
 // downstream test ../tests/update_lifecycle_publication_native.rs freezes publication readback receipts and transitions
+// downstream test ../tests/update_lifecycle_queue_native.rs freezes queue keys, receipts, and replay behavior
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
+use crate::python_json::python_json_equal_after_float_rejection;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::path::Path;
 
 pub const TRANSACTION_STATES: &[&str] = &[
     "created",
@@ -94,6 +97,7 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
 const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
+const QUEUE_RECEIPT_SCHEMA: &str = "agent-canon.queue-receipt.v1";
 const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
@@ -2282,6 +2286,263 @@ pub fn materialize_publication_readback_receipt(
         "readback_stage": "publication_readback",
     });
     validate_publication_readback_transition(&cas, &lifecycle, &receipt)
+}
+
+pub fn source_publication_identity(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let readback = validate_publication_readback_receipt(value)?;
+    let readback_map = mapping(&readback, "publication_readback_receipt")?;
+    let pr = mapping(
+        required_value(readback_map, "pr_identity", "publication_readback_receipt")?,
+        "publication_readback_receipt.pr_identity",
+    )?;
+    let mut identity = JsonMap::new();
+    for (field, source, parent) in [
+        (
+            "readback_receipt_id",
+            readback_map,
+            "publication_readback_receipt",
+        ),
+        (
+            "merge_commit_sha",
+            pr,
+            "publication_readback_receipt.pr_identity",
+        ),
+        (
+            "merge_tree_sha",
+            pr,
+            "publication_readback_receipt.pr_identity",
+        ),
+        (
+            "publication_evidence_ref",
+            readback_map,
+            "publication_readback_receipt",
+        ),
+    ] {
+        identity.insert(
+            field.to_owned(),
+            required_value(source, field, parent)?.clone(),
+        );
+    }
+    Ok(JsonValue::Object(identity))
+}
+
+fn validate_source_publication_identity(
+    value: &JsonValue,
+    field: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let identity = mapping(value, field)?;
+    exact_keys(
+        identity,
+        &[
+            "readback_receipt_id",
+            "merge_commit_sha",
+            "merge_tree_sha",
+            "publication_evidence_ref",
+        ],
+        &[],
+        field,
+    )?;
+    let readback_id = pattern_value(
+        required_value(identity, "readback_receipt_id", field)?,
+        &format!("{field}.readback_receipt_id"),
+        valid_hash_id,
+    )?;
+    if !readback_id.starts_with("publication-readback:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            &format!("{field}.readback_receipt_id"),
+        ));
+    }
+    for key in ["merge_commit_sha", "merge_tree_sha"] {
+        pattern_value(
+            required_value(identity, key, field)?,
+            &format!("{field}.{key}"),
+            |text| lower_hex(text, 40),
+        )?;
+    }
+    pattern_value(
+        required_value(identity, "publication_evidence_ref", field)?,
+        &format!("{field}.publication_evidence_ref"),
+        valid_evidence_ref,
+    )?;
+    canonical_clone(value)
+}
+
+pub fn queue_once_key(
+    source_namespace: &str,
+    binding: &JsonValue,
+    publication_identity: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let publication = validate_source_publication_identity(
+        publication_identity,
+        "queue_once_key.publication_identity",
+    )?;
+    let binding = mapping(&checked_binding, "binding")?;
+    let publication = mapping(&publication, "queue_once_key.publication_identity")?;
+    let body = format!(
+        "{}|{}|{}|{}|{}|{}",
+        source_namespace,
+        required_string(binding, "candidate_sha", "binding")?,
+        required_string(binding, "tree_sha", "binding")?,
+        required_string(binding, "input_digest", "binding")?,
+        required_string(
+            publication,
+            "merge_commit_sha",
+            "queue_once_key.publication_identity",
+        )?,
+        required_string(
+            publication,
+            "merge_tree_sha",
+            "queue_once_key.publication_identity",
+        )?,
+    );
+    let digest = Sha256::digest(body.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Ok(format!("queue-key:{digest}"))
+}
+
+pub fn validate_queue_receipt(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "queue_receipt")?;
+    let fields = [
+        "schema",
+        "queue_receipt_id",
+        "binding",
+        "source_namespace",
+        "source_main_rebind_receipt_id",
+        "source_main_readback_evidence_ref",
+        "source_publication_identity",
+        "enqueue_once_key",
+        "state",
+    ];
+    exact_keys(receipt, &fields, &[], "queue_receipt")?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(QUEUE_RECEIPT_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", QUEUE_RECEIPT_SCHEMA));
+    }
+    let queue_id = pattern_value(
+        required_value(receipt, "queue_receipt_id", "queue_receipt")?,
+        "queue_receipt.queue_receipt_id",
+        valid_hash_id,
+    )?;
+    if !queue_id.starts_with("queue:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "queue_receipt.queue_receipt_id",
+        ));
+    }
+    let binding = validate_record_binding(required_value(receipt, "binding", "queue_receipt")?)?;
+    let source_namespace = string_value(
+        required_value(receipt, "source_namespace", "queue_receipt")?,
+        "queue_receipt.source_namespace",
+    )?;
+    if !Path::new(&source_namespace).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "queue_receipt.source_namespace",
+        ));
+    }
+    let rebind_id = pattern_value(
+        required_value(receipt, "source_main_rebind_receipt_id", "queue_receipt")?,
+        "queue_receipt.source_main_rebind_receipt_id",
+        valid_hash_id,
+    )?;
+    if !rebind_id.starts_with("rebind:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "queue_receipt.source_main_rebind_receipt_id",
+        ));
+    }
+    pattern_value(
+        required_value(
+            receipt,
+            "source_main_readback_evidence_ref",
+            "queue_receipt",
+        )?,
+        "queue_receipt.source_main_readback_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    let publication = validate_source_publication_identity(
+        required_value(receipt, "source_publication_identity", "queue_receipt")?,
+        "queue_receipt.source_publication_identity",
+    )?;
+    let expected_key = queue_once_key(&source_namespace, &binding, &publication)?;
+    if required_value(receipt, "enqueue_once_key", "queue_receipt")?.as_str()
+        != Some(expected_key.as_str())
+    {
+        return Err(fail("lifecycle:queue_key_mismatch", ""));
+    }
+    one_of(
+        required_value(receipt, "state", "queue_receipt")?,
+        &["accepted", "retry_pending", "failed"],
+        "queue_receipt.state",
+    )?;
+    canonical_clone(value)
+}
+
+pub fn materialize_queue_receipt(
+    binding: &JsonValue,
+    source_namespace: &str,
+    source_main_rebind_receipt_id: &str,
+    source_main_readback_evidence_ref: &str,
+    publication_readback_receipt: &JsonValue,
+    state: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let publication = source_publication_identity(publication_readback_receipt)?;
+    let enqueue_once_key = queue_once_key(source_namespace, &checked_binding, &publication)?;
+    let receipt_digest = Sha256::digest(enqueue_once_key.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let receipt = serde_json::json!({
+        "schema": QUEUE_RECEIPT_SCHEMA,
+        "queue_receipt_id": format!("queue:{receipt_digest}"),
+        "binding": checked_binding,
+        "source_namespace": source_namespace,
+        "source_main_rebind_receipt_id": source_main_rebind_receipt_id,
+        "source_main_readback_evidence_ref": source_main_readback_evidence_ref,
+        "source_publication_identity": publication,
+        "enqueue_once_key": enqueue_once_key,
+        "state": state,
+    });
+    validate_queue_receipt(&receipt)
+}
+
+fn immutable_replay_record(
+    value: &JsonValue,
+    field: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    mapping(value, field)?;
+    let mut cloned = canonical_clone(value)?;
+    let mut binding = {
+        let record = mapping(&cloned, field)?;
+        mapping(
+            record.get("binding").unwrap_or(&JsonValue::Null),
+            &format!("{field}.binding"),
+        )?
+        .clone()
+    };
+    binding.remove("timing");
+    let record = cloned
+        .as_object_mut()
+        .ok_or_else(|| fail("lifecycle:mapping_required", field))?;
+    record.insert("binding".to_owned(), JsonValue::Object(binding));
+    Ok(cloned)
+}
+
+pub fn validate_immutable_replay(
+    existing: &JsonValue,
+    requested: &JsonValue,
+    field: &str,
+) -> Result<(), LifecycleContractError> {
+    let existing = immutable_replay_record(existing, field)?;
+    let requested = immutable_replay_record(requested, field)?;
+    if !python_json_equal_after_float_rejection(&existing, &requested) {
+        return Err(fail("input_identity_mismatch", field));
+    }
+    Ok(())
 }
 
 fn validate_remote_git_identity(
