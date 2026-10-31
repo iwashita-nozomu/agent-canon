@@ -47,7 +47,7 @@ path: eval/producers/evaluate_agent_run.py
 path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
-path: tools/validation/semantic/tools/tool_drift.py
+path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
 path: tools/validation/ci/checks/check_github_workflows.py
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
@@ -116,13 +116,13 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ),
     "documents/design/responsibility-scope-management.md": "agent-canon responsibility-scope\n",
     "documents/tools/README.md": (
-        "tool_catalog.rs tool_drift.py notebook-quality "
+        "tool_catalog.rs tool_drift.rs notebook-quality "
         "tool_rejection_preflight.py agent-canon responsibility-scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
-        "tool_catalog.rs tool_drift.py notebook-quality "
+        "tool_catalog.rs tool_drift.rs notebook-quality "
         "agent-canon docs render-runtime-profile agent-canon docs check "
         "tool_rejection_preflight.py "
         "agent-canon responsibility-scope responsibility-scope.toml protecting tools\n"
@@ -272,7 +272,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "run_python_quality_checks.sh "
         "check_convention_compliance.py "
         "check_skill_frontmatter.py "
-        "tool_catalog.rs tool_drift.py notebook-quality "
+        "tool_catalog.rs tool_drift.rs notebook-quality "
         "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),

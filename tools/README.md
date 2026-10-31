@@ -121,7 +121,7 @@ catalog/checker owners rather than adding a second README registry.
 | Need | Owner command |
 | --- | --- |
 | catalog shape and docs wiring | `tools/bin/agent-canon tool-catalog` |
-| tool/workflow drift | `python3 tools/validation/semantic/tools/tool_drift.py` |
+| tool/workflow drift | `tools/bin/agent-canon tool-drift --root .` |
 | responsibility scope | `tools/bin/agent-canon responsibility-scope --root .` |
 | runtime artifact boundary | `python3 tools/runtime/artifacts/generated_artifact_guard.py` |
 | archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
