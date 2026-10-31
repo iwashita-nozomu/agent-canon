@@ -4,6 +4,7 @@
 // upstream implementation authority/mod.rs owns control-parent attestation
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes
 // upstream implementation git_dependency_diff_summary.rs owns selected-root Git readback
+// upstream implementation python_text.rs owns Python-compatible output trimming
 // upstream implementation runtime_boundary.rs owns confined atomic writes and no-follow replay reads
 // upstream implementation update_lifecycle_contract.rs owns G1/G2 validation, receipt mechanics, and immutable replay
 // downstream implementation main.rs routes the materialize-agent-canon-pr-g2 command
@@ -16,6 +17,7 @@
 use crate::artifacts::artifact_identity::canonical_json_bytes;
 use crate::authority::{AttestationRequest, NonEmptyTrimmedString, Nonce128, ParentRootAttestor};
 use crate::git_dependency_diff_summary::git_stdout;
+use crate::python_text::python_strip;
 use crate::runtime_boundary::RuntimeArtifactBoundary;
 use crate::update_lifecycle_contract::{
     materialize_gate_verdict, validate_gate_chain, validate_gate_verdict,
@@ -449,7 +451,12 @@ fn execute(options: CliOptions) -> Result<(JsonValue, PathBuf), CliError> {
         &["rev-parse".to_string(), "HEAD^{tree}".to_string()],
     )
     .map_err(CliError::failure)?;
-    let receipt = make_g2_receipt(&g1_gate, &git_head, &git_tree, source_root_string)?;
+    let receipt = make_g2_receipt(
+        &g1_gate,
+        python_strip(&git_head),
+        python_strip(&git_tree),
+        source_root_string,
+    )?;
     let persisted = persist_g2_receipt(&runtime, &output_path, &display_path, &receipt)?;
     Ok((persisted, display_path))
 }
