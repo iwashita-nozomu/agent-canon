@@ -6,7 +6,6 @@
 // upstream implementation python_ast.rs shares Python newline normalization and source offsets
 // upstream implementation catalog/path_policy.rs filters retired tool paths
 // upstream implementation ../../../../../bootstrap/container/image/dependencies.toml pins the public JSON-RPC transport runtime
-// downstream implementation ../../../../../tests/agent_tools/test_lsp_code_analysis.py preserves live Python callers and old assertions
 // downstream implementation ../tests/lsp_code_analysis_native.rs verifies native protocol and report behavior
 // @dependency-end
 //! Bounded, one-shot LSP code analysis with no persistent index or fallback provider.
