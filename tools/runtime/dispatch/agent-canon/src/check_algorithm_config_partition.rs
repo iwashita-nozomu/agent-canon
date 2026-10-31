@@ -10,8 +10,8 @@
 
 use crate::python_ast::{line_at_offset, normalize_python_newlines};
 use rustpython_ast::{Ranged, Visitor};
-use rustpython_parser::{Parse, ast};
-use serde_json::{Value, json};
+use rustpython_parser::{ast, Parse};
+use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
