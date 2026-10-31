@@ -1,0 +1,1359 @@
+{
+  "source": "e0ab183ecf880969a8c2e677efb6fe75facec942",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "transaction_states": [
+    "created",
+    "prepared",
+    "generated",
+    "gates_ready",
+    "reviewed",
+    "pr_open",
+    "pr_merged",
+    "source_main_readback",
+    "queue_enqueued",
+    "frontier_accepted",
+    "remote_readback",
+    "durable_handback",
+    "descendants_closed",
+    "reservations_released",
+    "cleanup_proven",
+    "nested_lifecycle_cleanup",
+    "closed",
+    "failed",
+    "successor_required"
+  ],
+  "gates": [
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G1",
+        "ordered_input_evidence_refs": [
+          "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+        ],
+        "invariant": "source_correctness",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G1",
+        "invariant": "source_correctness",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba\",\"evidence_ref\":\"evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G1\",\"invariant\":\"source_correctness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:8888888888888888888888888888888888888888888888888888888888888888\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "adfae93e91b8eb3167e7bb9dfe97fb27a20299d70c36a449dd75963dd603e56b"
+    },
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G2",
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba"
+        ],
+        "invariant": "generated_completeness",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+          "evidence_ref": "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G2",
+        "invariant": "generated_completeness",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3\",\"evidence_ref\":\"evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G2\",\"invariant\":\"generated_completeness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "ef1e57b1040770502a621af306208ddd2a96df71dffe2b0bd1a57ba6d8696354"
+    },
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G3",
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+        ],
+        "invariant": "pr_identity_cas",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+          "evidence_ref": "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G3",
+        "invariant": "pr_identity_cas",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40\",\"evidence_ref\":\"evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G3\",\"invariant\":\"pr_identity_cas\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba\",\"evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "ac2cce42412a809bab657d7481343af295f6e2bbdc8b015a99c140251b4b9839"
+    },
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G4",
+        "ordered_input_evidence_refs": [
+          "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+        ],
+        "invariant": "standalone_source_branch_integrity",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+          "evidence_ref": "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G4",
+        "invariant": "standalone_source_branch_integrity",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd\",\"evidence_ref\":\"evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G4\",\"invariant\":\"standalone_source_branch_integrity\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "96ecd68f32d3927b19531d3c493651f139c916ffda65bbbbcd070e8ea02a8225"
+    },
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G5",
+        "ordered_input_evidence_refs": [
+          "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+        ],
+        "invariant": "remote_publication_readback",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+          "evidence_ref": "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G5",
+        "invariant": "remote_publication_readback",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a\",\"evidence_ref\":\"evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G5\",\"invariant\":\"remote_publication_readback\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "d33005984e30b6b13a5e822f80759a4600c54dc68291bd4f1f4478453fd3d43a"
+    },
+    {
+      "input": {
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "gate_id": "G6",
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+          "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+          "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+          "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+        ],
+        "invariant": "nested_lifecycle_cleanup",
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+        "verdict": "pass",
+        "retry_reason": null,
+        "next_checkpoint": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+          "evidence_ref": "evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G6",
+        "invariant": "nested_lifecycle_cleanup",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+          "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+          "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+          "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812\",\"evidence_ref\":\"evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"gate_id\":\"G6\",\"invariant\":\"nested_lifecycle_cleanup\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba\",\"evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3\",\"evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40\",\"evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd\",\"evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a\"],\"output_digest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"owner\":\"/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}",
+      "sha256": "4f2a50251b158fc0a3391bc7c8837d23dcdefcc03ea7ff49164ab468b62624ce"
+    }
+  ],
+  "negative_cases": [
+    {
+      "name": "order",
+      "input": [
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "evidence_ref": "evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G6",
+          "invariant": "nested_lifecycle_cleanup",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "evidence_ref": "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G5",
+          "invariant": "remote_publication_readback",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence_ref": "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G4",
+          "invariant": "standalone_source_branch_integrity",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence_ref": "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G3",
+          "invariant": "pr_identity_cas",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence_ref": "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "kwargs": {
+        "expected_gate_ids": [
+          "G1",
+          "G2",
+          "G3",
+          "G4",
+          "G5",
+          "G6"
+        ]
+      },
+      "code": "lifecycle:gate_order_invalid",
+      "detail": ""
+    },
+    {
+      "name": "identity",
+      "input": [
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evidence_digest": "sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence_ref": "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence_ref": "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G3",
+          "invariant": "pr_identity_cas",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence_ref": "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G4",
+          "invariant": "standalone_source_branch_integrity",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "evidence_ref": "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G5",
+          "invariant": "remote_publication_readback",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "evidence_ref": "evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G6",
+          "invariant": "nested_lifecycle_cleanup",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "kwargs": {},
+      "code": "lifecycle:gate_identity_mismatch",
+      "detail": ""
+    },
+    {
+      "name": "predecessor",
+      "input": [
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence_ref": "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence_ref": "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G3",
+          "invariant": "pr_identity_cas",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence_ref": "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G4",
+          "invariant": "standalone_source_branch_integrity",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "evidence_ref": "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G5",
+          "invariant": "remote_publication_readback",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "evidence_ref": "evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G6",
+          "invariant": "nested_lifecycle_cleanup",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "kwargs": {},
+      "code": "lifecycle:gate_predecessor_mismatch",
+      "detail": "G2"
+    },
+    {
+      "name": "not_passed",
+      "input": [
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence_ref": "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "fail"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence_ref": "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G3",
+          "invariant": "pr_identity_cas",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#resolve_publication_authority",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence_ref": "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G4",
+          "invariant": "standalone_source_branch_integrity",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/workspace/repository_topic_clone.py#_ensure_branch",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "evidence_ref": "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G5",
+          "invariant": "remote_publication_readback",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/repository/github/publication_integrator.py#integrate_publication",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "3333333333333333333333333333333333333333",
+            "evidence_digest": "sha256:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "evidence_ref": "evidence:63c3d9b9f0a6b5657a0e41ef85212352e02945dcaacc4c08ae45a41c487cb812",
+            "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-07-18T00:00:00Z",
+              "last_attempt_at": "2026-07-18T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-07-18T00:00:00Z"
+            },
+            "tool_id": "publication-integrator",
+            "tool_version": "test.v1",
+            "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+            "tree_sha": "4444444444444444444444444444444444444444"
+          },
+          "gate_id": "G6",
+          "invariant": "nested_lifecycle_cleanup",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+            "evidence:21f0053695d4cc4a3d370d0f4c6b92a607ea8ad35741b593e48ec442a24129a3",
+            "evidence:42800155832ec38eb0d27167dbd1a0ff94c2e32badee3b38e071eb0b3f0fbb40",
+            "evidence:6a6f151899036e5b42fe54fa3eb372520fee7a34a43bc3c16e7017ed89f518cd",
+            "evidence:ddcfb4e2314e630c0a06c6cd0489b8df8807730cc2457792befa99ca1f5dec8a"
+          ],
+          "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "owner": "/fixture/agent-canon/tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "kwargs": {},
+      "code": "lifecycle:gate_not_passed",
+      "detail": ""
+    },
+    {
+      "name": "owner",
+      "input": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "evidence_ref": "evidence:9157d90872f4833f15e6a0fc16b9fecbf46afbebf9e849199f79d67ed806a3ba",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "gate_id": "G1",
+        "invariant": "source_correctness",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:8888888888888888888888888888888888888888888888888888888888888888"
+        ],
+        "output_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "owner": "/fixture/other#wrong",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      },
+      "kwargs": {},
+      "code": "lifecycle:gate_owner_mismatch",
+      "detail": "G1"
+    },
+    {
+      "name": "bool_not_int",
+      "input": {
+        "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+        "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "tool_id": "publication-integrator",
+        "tool_version": "test.v1",
+        "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+        "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "timing": {
+          "started_at": "2026-07-18T00:00:00Z",
+          "finished_at": "2026-07-18T00:00:00Z",
+          "last_attempt_at": "2026-07-18T00:00:00Z",
+          "duration_ms": 0,
+          "attempt": true,
+          "replayed": false
+        }
+      },
+      "kwargs": {},
+      "code": "lifecycle:integer_invalid",
+      "detail": "binding.timing.attempt"
+    },
+    {
+      "name": "unknown_binding_key",
+      "input": {
+        "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+        "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+        "candidate_sha": "3333333333333333333333333333333333333333",
+        "tree_sha": "4444444444444444444444444444444444444444",
+        "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "tool_id": "publication-integrator",
+        "tool_version": "test.v1",
+        "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+        "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "timing": {
+          "started_at": "2026-07-18T00:00:00Z",
+          "finished_at": "2026-07-18T00:00:00Z",
+          "last_attempt_at": "2026-07-18T00:00:00Z",
+          "duration_ms": 0,
+          "attempt": 1,
+          "replayed": false
+        },
+        "extra": 1
+      },
+      "kwargs": {},
+      "code": "lifecycle:field_forbidden",
+      "detail": "binding:extra"
+    }
+  ]
+}
