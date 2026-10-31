@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-import json
-import hashlib
 import fcntl
+import hashlib
+import json
 import os
 import shlex
 import shutil
