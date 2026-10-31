@@ -8,6 +8,7 @@
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation report_artifact_checks.rs routes the generated-artifact-guard CLI
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -71,6 +72,7 @@ mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod python_text;
+mod report_artifact_checks;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -110,6 +112,7 @@ Commands:
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
@@ -241,6 +244,12 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "git-dependency-diff-summary" {
         std::process::exit(agent_canon::git_dependency_diff_summary::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == report_artifact_checks::GENERATED_ARTIFACT_GUARD_SELECTOR {
+        std::process::exit(report_artifact_checks::run_generated_artifact_guard(
+            &args[2..],
+        ));
     }
 
     if args.len() >= 2

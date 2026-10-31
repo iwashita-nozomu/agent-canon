@@ -7,7 +7,7 @@
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
-# upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects regenerated report leftovers before PR check pass
 # upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
@@ -299,7 +299,7 @@ run_pr_project_quality_boundary
 echo ""
 
 echo "6b️⃣  generated artifact guard"
-python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
+run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"
 echo ""
 
 emit_generated_completeness_receipt
