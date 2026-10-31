@@ -29,6 +29,7 @@ use regex::{Captures, Regex};
 use rustpython_literal::format::Case as FloatFormatCase;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{self, Write};
@@ -680,7 +681,7 @@ fn similar_design_runtime_error(message: impl std::fmt::Display) -> i32 {
 fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String, String> {
     let mut files = Vec::new();
     collect_redundant_markdown_files(design_dir, &mut files)?;
-    files.sort();
+    files.sort_by(|left, right| similarity_path_order(left, right));
 
     let mut normalized = Vec::with_capacity(files.len());
     for path in &files {
@@ -706,8 +707,8 @@ fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String
         right
             .0
             .total_cmp(&left.0)
-            .then_with(|| right.1.cmp(left.1))
-            .then_with(|| right.2.cmp(left.2))
+            .then_with(|| similarity_path_order(right.1, left.1))
+            .then_with(|| similarity_path_order(right.2, left.2))
     });
 
     let threshold = crate::python_json::python_float(minimum);
@@ -731,13 +732,42 @@ fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String
     Ok(format!("{}\n", lines.join("\n")))
 }
 
+fn similarity_path_order(left: &Path, right: &Path) -> Ordering {
+    #[cfg(windows)]
+    {
+        static CASE_MAPPER: OnceLock<icu_casemap::CaseMapper> = OnceLock::new();
+        let case_mapper = CASE_MAPPER.get_or_init(icu_casemap::CaseMapper::new);
+        let mut left_components = left.components();
+        let mut right_components = right.components();
+        loop {
+            match (left_components.next(), right_components.next()) {
+                (Some(left), Some(right)) => {
+                    let left = case_mapper.fold_string(&left.as_os_str().to_string_lossy());
+                    let right = case_mapper.fold_string(&right.as_os_str().to_string_lossy());
+                    let order = left.cmp(&right);
+                    if !order.is_eq() {
+                        return order;
+                    }
+                }
+                (Some(_), None) => return Ordering::Greater,
+                (None, Some(_)) => return Ordering::Less,
+                (None, None) => return Ordering::Equal,
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        left.cmp(right)
+    }
+}
+
 fn normalize_similar_design_text(text: &str) -> String {
     let without_fences = CODE_FENCE_PATTERN.replace_all(text, "");
     let without_link_destinations = MARKDOWN_LINK_PATTERN.replace_all(&without_fences, "$1");
     let punctuation_normalized = without_link_destinations
         .chars()
         .map(|character| {
-            if matches!(character, '#' | '>' | '*' | '-' | '[' | ']') || character == 0x60 as char {
+            if matches!(character, '#' | '>' | '*' | '-') || character == 0x60 as char {
                 ' '
             } else {
                 character

@@ -90,6 +90,72 @@ fn native_similarity_cli_matches_frozen_unicode_float_oracle() {
 }
 
 #[test]
+fn native_similarity_preserves_unlisted_bracket_punctuation() {
+    // The captured CPython CLI oracle kept brackets in normalized text, yielding 0.8
+    // similarity and no report pair at the 0.85 threshold.
+    let temp = TempRoot::new();
+    let source = temp.source();
+    let runtime = temp.runtime();
+    write(&source.join("documents/design/a.md"), "[todo]");
+    write(&source.join("documents/design/b.md"), "todo");
+
+    let output = run_native(
+        &source,
+        &runtime,
+        &["--min", "0.85", "--output", "report.txt"],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!(
+            "Report written to {}\n",
+            runtime.join("report.txt").display()
+        )
+    );
+    assert_eq!(
+        fs::read_to_string(runtime.join("report.txt")).expect("frozen-oracle report exists"),
+        "No similar design files found with threshold >= 0.85\n"
+    );
+}
+
+#[test]
+fn native_similarity_path_order_matches_python_path_models() {
+    // These expected orientations were produced by the captured PurePosixPath and
+    // PureWindowsPath comparison models. They are not a Windows filesystem run.
+    let temp = TempRoot::new();
+    let source = temp.source();
+    let runtime = temp.runtime();
+    let design_root = source.join("documents/design");
+    for name in ["B.md", "a.md", "c.md"] {
+        write(&design_root.join(name), "identical content");
+    }
+    let before = snapshot(&source);
+
+    let output = run_native(&source, &runtime, &["--min", "1", "--output", "report.txt"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let pairs: [(&str, &str); 3] = if cfg!(windows) {
+        [("B.md", "c.md"), ("a.md", "c.md"), ("a.md", "B.md")]
+    } else {
+        [("a.md", "c.md"), ("B.md", "c.md"), ("B.md", "a.md")]
+    };
+    let mut expected = "Similar design file pairs (threshold >= 1.0)\n".to_owned();
+    for (first, second) in pairs {
+        expected.push_str(&format!(
+            "1.000  {}  {}\n",
+            design_root.join(first).display(),
+            design_root.join(second).display()
+        ));
+    }
+    assert_eq!(
+        fs::read_to_string(runtime.join("report.txt")).expect("ordered report exists"),
+        expected
+    );
+    assert_eq!(snapshot(&source), before, "source tree stays unchanged");
+}
+
+#[test]
 fn native_similarity_default_report_is_run_scoped_in_external_runtime() {
     let temp = TempRoot::new();
     let source = temp.source();
