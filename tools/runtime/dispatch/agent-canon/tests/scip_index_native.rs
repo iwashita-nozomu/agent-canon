@@ -67,6 +67,20 @@ impl Drop for Fixture {
     }
 }
 
+fn project_root_metadata(path: &Path) -> String {
+    #[cfg(windows)]
+    {
+        path.to_str()
+            .expect("canonical Windows fixture path is Unicode")
+            .to_owned()
+    }
+    #[cfg(not(windows))]
+    {
+        file_uri(path)
+    }
+}
+
+#[cfg(not(windows))]
 fn file_uri(path: &Path) -> String {
     let mut encoded = String::new();
     for byte in path.to_string_lossy().as_bytes() {
@@ -125,8 +139,16 @@ fn index_bytes(
     documents: Vec<Document>,
     external_symbols: Vec<SymbolInformation>,
 ) -> Vec<u8> {
+    index_bytes_with_project_root(project_root_metadata(root), documents, external_symbols)
+}
+
+fn index_bytes_with_project_root(
+    project_root: String,
+    documents: Vec<Document>,
+    external_symbols: Vec<SymbolInformation>,
+) -> Vec<u8> {
     let mut metadata = Metadata::new();
-    metadata.project_root = file_uri(root);
+    metadata.project_root = project_root;
     metadata.tool_info = MessageField::some(ToolInfo {
         name: "fixture-indexer".to_string(),
         version: "1.2.3".to_string(),
@@ -396,6 +418,31 @@ fn query_rejects_project_root_that_escapes_through_missing_suffix_components() {
     assert_eq!(files_below(&fixture.runtime()), runtime_before);
     assert_eq!(fs::read(&runtime_index).unwrap(), index);
     assert!(!fixture.0.join("outside").exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn query_preserves_legacy_rejection_of_drive_file_uri_project_roots() {
+    let fixture = Fixture::new();
+    fixture.write_source("api.py", "def api(): pass\n");
+    let source_before = files_below(&fixture.source());
+    let runtime_index = fixture.runtime().join("drive-uri.scip");
+    let index = index_bytes_with_project_root(
+        "file:///C:/scip-project/outside".to_string(),
+        Vec::new(),
+        Vec::new(),
+    );
+    fixture.write_index("drive-uri.scip", &index);
+    let runtime_before = files_below(&fixture.runtime());
+
+    let output = query_cli(&fixture, &["drive-uri.scip"], &["."], &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("SCIP project root is not absolute"));
+    assert_eq!(files_below(&fixture.source()), source_before);
+    assert_eq!(files_below(&fixture.runtime()), runtime_before);
+    assert_eq!(fs::read(&runtime_index).unwrap(), index);
 }
 
 #[test]
