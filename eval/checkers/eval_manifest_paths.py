@@ -4,7 +4,6 @@
 # responsibility Resolves canonical and legacy eval manifest source paths.
 # upstream design ../../eval/README.md evidence directory ownership
 # upstream design ../../eval/definitions/README.md canonical eval manifest source
-# downstream implementation ../producers/evaluate_agent_run.py resolves behavior eval manifests
 # downstream implementation ../producers/evaluate_workflow_selection.py resolves workflow selection manifests
 # downstream implementation ./eval_accumulation_check.py resolves eval family registries
 # downstream implementation ../producers/run_accumulated_agent_evals.py resolves producer manifests

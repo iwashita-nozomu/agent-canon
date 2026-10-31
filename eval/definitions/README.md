@@ -3,7 +3,7 @@
 contract data
 responsibility Documents active AgentCanon eval definitions and accumulation.
 upstream design ../../agents/canonical/skills.md skill canon registry
-downstream implementation ../producers/evaluate_agent_run.py runs behavior evals
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs runs behavior evals
 downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
 downstream implementation ../checkers/eval_accumulation_check.py validates accumulated result evidence
 downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
