@@ -272,41 +272,188 @@ fn dsv_envelope_apis_match_all_frozen_cpython_values_bytes_and_errors() {
     assert_eq!(rejected, 26);
 }
 
+enum SupplementalPayload {
+    Text(JsonString),
+    Bytes(Vec<u8>),
+}
+
+enum SupplementalExpected {
+    Canonical {
+        bytes: String,
+        sha256: &'static str,
+    },
+    Lifecycle {
+        message: &'static str,
+        code: &'static str,
+        detail: &'static str,
+    },
+    ArtifactIdentity {
+        message: &'static str,
+        code: &'static str,
+        detail: &'static str,
+    },
+    UnicodeEncode(&'static str),
+}
+
 #[test]
-fn raw_surrogate_pair_remains_distinct_from_an_escaped_json_pair() {
-    let prefix = r#"{"schema":"agent-canon.decision-sufficiency.v1","value":""#;
+fn supplemental_cpython_surrogate_cases_match_exact_outputs_and_errors() {
+    // This frozen supplement comes from the independent CPython 3.12.3 probe.
+    // The 40-case fixture remains unchanged; these inputs distinguish raw code points
+    // from JSON escape sequences and exercise the supported bytes decoders.
+    let prefix = r#"{"schema":"agent-canon.decision-sufficiency.v1","x":""#;
     let suffix = r#""}"#;
-    let mut raw_codepoints = JsonString::from_text(prefix).0;
-    raw_codepoints.extend([0xd800, 0xdc00]);
-    raw_codepoints.extend(JsonString::from_text(suffix).0);
-    let raw_text = JsonString(raw_codepoints);
-
-    let error = match parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Text(&raw_text))
-    {
-        Ok(_) => panic!("raw adjacent surrogate code points cannot be UTF-8 canonicalized"),
-        Err(error) => error,
+    let text_with_codepoints = |middle: &[u32], tail: &str| {
+        let mut codepoints = JsonString::from_text(prefix).0;
+        codepoints.extend_from_slice(middle);
+        codepoints.extend(JsonString::from_text(tail).0);
+        JsonString(codepoints)
     };
-    let position = prefix.chars().count();
-    assert_eq!(
-        error,
-        DecisionSufficiencyEnvelopeError::UnicodeEncodeError {
-            message: format!(
-                "'utf-8' codec can't encode character '\\ud800' in position {position}: surrogates not allowed"
-            ),
-        }
+    let escaped_pair_text = {
+        let mut text = prefix.to_owned();
+        text.push_str("\\ud800\\udc00");
+        text.push_str(suffix);
+        JsonString::from_text(&text)
+    };
+    let pair = [0xd800, 0xdc00];
+    let raw_pair_text = text_with_codepoints(&pair, suffix);
+    let separated_text = text_with_codepoints(&[0xd800, u32::from(b'a'), 0xdc00], suffix);
+    let float_before_pair_text = text_with_codepoints(&pair, r#"","y":1.5}"#);
+    let utf16_raw_pair = decode_hex(
+        "7b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c002200780022003a00220000d800dc22007d00",
     );
-
-    let escaped_text = JsonString::from_text(
-        r#"{"schema":"agent-canon.decision-sufficiency.v1","value":"\ud800\udc00"}"#,
+    let utf32_raw_pair = decode_hex(
+        "7b00000022000000730000006300000068000000650000006d00000061000000220000003a000000220000006100000067000000650000006e000000740000002d00000063000000610000006e0000006f0000006e0000002e0000006400000065000000630000006900000073000000690000006f0000006e0000002d00000073000000750000006600000066000000690000006300000069000000650000006e00000063000000790000002e0000007600000031000000220000002c0000002200000078000000220000003a0000002200000000d8000000dc0000220000007d000000",
     );
-    let packet = parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Text(&escaped_text))
-        .expect("escaped high/low pair decodes as one Unicode scalar");
-    let bytes = serialize_decision_sufficiency_verdict(&packet)
-        .expect("decoded Unicode scalar is valid canonical UTF-8");
     let scalar = char::from_u32(0x1_0000).expect("expected supplementary scalar");
-    assert_eq!(
-        bytes,
-        format!(r#"{{"schema":"agent-canon.decision-sufficiency.v1","value":"{scalar}"}}"#)
-            .as_bytes()
-    );
+    let expected_canonical =
+        format!(r#"{{"schema":"agent-canon.decision-sufficiency.v1","x":"{scalar}"}}"#);
+    let pair_error =
+        "'utf-8' codec can't encode characters in position 53-54: surrogates not allowed";
+    let cases = vec![
+        (
+            "escaped-pair-text",
+            SupplementalPayload::Text(escaped_pair_text),
+            SupplementalExpected::Canonical {
+                bytes: expected_canonical.clone(),
+                sha256: "bb2ca31448ab6c6ed9b5e8a4fab4bdbfba5696e928ae788d8ce4e14a12794c3d",
+            },
+        ),
+        (
+            "raw-pair-text",
+            SupplementalPayload::Text(raw_pair_text),
+            SupplementalExpected::UnicodeEncode(pair_error),
+        ),
+        (
+            "raw-pair-utf8",
+            SupplementalPayload::Bytes(decode_hex(
+                "7b22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631222c2278223a22eda080edb080227d",
+            )),
+            SupplementalExpected::UnicodeEncode(pair_error),
+        ),
+        (
+            "raw-pair-utf32le",
+            SupplementalPayload::Bytes(utf32_raw_pair),
+            SupplementalExpected::UnicodeEncode(pair_error),
+        ),
+        (
+            "raw-pair-utf16le",
+            SupplementalPayload::Bytes(utf16_raw_pair),
+            SupplementalExpected::Canonical {
+                bytes: expected_canonical.clone(),
+                sha256: "bb2ca31448ab6c6ed9b5e8a4fab4bdbfba5696e928ae788d8ce4e14a12794c3d",
+            },
+        ),
+        (
+            "separated-raw-surrogates",
+            SupplementalPayload::Text(separated_text),
+            SupplementalExpected::UnicodeEncode(
+                "'utf-8' codec can't encode character '\\ud800' in position 53: surrogates not allowed",
+            ),
+        ),
+        (
+            "wrong-schema-before-pair",
+            SupplementalPayload::Bytes(decode_hex(
+                "7b22736368656d61223a22626164222c2278223a22eda080edb080227d",
+            )),
+            SupplementalExpected::Lifecycle {
+                message: "decision_sufficiency:envelope_schema_invalid",
+                code: "decision_sufficiency:envelope_schema_invalid",
+                detail: "",
+            },
+        ),
+        (
+            "float-before-pair",
+            SupplementalPayload::Text(float_before_pair_text),
+            SupplementalExpected::ArtifactIdentity {
+                message: "artifact_identity:float_forbidden",
+                code: "artifact_identity:float_forbidden",
+                detail: "",
+            },
+        ),
+    ];
+    assert_eq!(cases.len(), 8);
+
+    let mut accepted = 0;
+    let mut rejected = 0;
+    for (name, payload, expected) in cases {
+        let actual = match payload {
+            SupplementalPayload::Text(text) => {
+                parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Text(&text))
+            }
+            SupplementalPayload::Bytes(bytes) => {
+                parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Bytes(&bytes))
+            }
+        };
+        match (actual, expected) {
+            (Ok(packet), SupplementalExpected::Canonical { bytes, sha256 }) => {
+                accepted += 1;
+                let canonical = match serialize_decision_sufficiency_verdict(&packet) {
+                    Ok(value) => value,
+                    Err(error) => panic!("canonical serialization failed for {name}: {error}"),
+                };
+                assert_eq!(canonical, bytes.as_bytes(), "canonical bytes for {name}");
+                assert_eq!(
+                    sha256_hex(&canonical),
+                    sha256,
+                    "canonical digest for {name}"
+                );
+            }
+            (
+                Err(DecisionSufficiencyEnvelopeError::UnicodeEncodeError { message }),
+                SupplementalExpected::UnicodeEncode(expected),
+            ) => {
+                rejected += 1;
+                assert_eq!(message, expected, "UnicodeEncodeError message for {name}");
+            }
+            (
+                Err(DecisionSufficiencyEnvelopeError::Lifecycle(error)),
+                SupplementalExpected::Lifecycle {
+                    message,
+                    code,
+                    detail,
+                },
+            ) => {
+                rejected += 1;
+                assert_eq!(error.to_string(), message, "lifecycle message for {name}");
+                assert_eq!(error.code, code, "lifecycle error code for {name}");
+                assert_eq!(error.detail, detail, "lifecycle error detail for {name}");
+            }
+            (
+                Err(DecisionSufficiencyEnvelopeError::ArtifactIdentity(error)),
+                SupplementalExpected::ArtifactIdentity {
+                    message,
+                    code,
+                    detail,
+                },
+            ) => {
+                rejected += 1;
+                assert_eq!(error.to_string(), message, "artifact message for {name}");
+                assert_eq!(error.code, code, "artifact error code for {name}");
+                assert_eq!(error.detail, detail, "artifact error detail for {name}");
+            }
+            _ => panic!("result or exception class differs for {name}"),
+        }
+    }
+    assert_eq!(accepted, 2);
+    assert_eq!(rejected, 6);
 }

@@ -923,10 +923,10 @@ pub(crate) fn contains_float(value: &JsonValue) -> bool {
     false
 }
 
-/// Find the first lone surrogate in Python's sorted compact non-ASCII JSON text.
-pub(crate) fn canonical_utf8_surrogate_position(
+/// Find the first contiguous surrogate run in Python's sorted compact non-ASCII JSON text.
+pub(crate) fn canonical_utf8_surrogate_range(
     value: &JsonValue,
-) -> Result<Option<(usize, u32)>, String> {
+) -> Result<Option<(usize, usize, u32)>, String> {
     enum Action<'a> {
         Value(&'a JsonValue),
         String(&'a JsonString),
@@ -940,9 +940,22 @@ pub(crate) fn canonical_utf8_surrogate_position(
             Action::Text(text) => position += text.len(),
             Action::String(value) => {
                 position += 1;
-                for &codepoint in &value.0 {
+                let mut index = 0;
+                while index < value.0.len() {
+                    let codepoint = value.0[index];
                     match codepoint {
-                        0xd800..=0xdfff => return Ok(Some((position, codepoint))),
+                        0xd800..=0xdfff => {
+                            let start = position;
+                            while value
+                                .0
+                                .get(index + 1)
+                                .is_some_and(|next| (0xd800..=0xdfff).contains(next))
+                            {
+                                index += 1;
+                                position += 1;
+                            }
+                            return Ok(Some((start, position, codepoint)));
+                        }
                         0x08 | 0x09 | 0x0a | 0x0c | 0x0d | 0x22 | 0x5c => position += 2,
                         0x00..=0x1f => position += 6,
                         0x20..=0x10_ffff => position += 1,
@@ -952,6 +965,7 @@ pub(crate) fn canonical_utf8_surrogate_position(
                             ))
                         }
                     }
+                    index += 1;
                 }
                 position += 1;
             }

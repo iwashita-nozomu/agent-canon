@@ -13,7 +13,7 @@
 
 use crate::artifacts::artifact_identity::{canonical_json_bytes, ArtifactIdentityError};
 use crate::python_json::{
-    canonical_utf8_surrogate_position, contains_float, parse_json, parse_json_bytes,
+    canonical_utf8_surrogate_range, contains_float, parse_json, parse_json_bytes,
     parse_json_python_string, to_serde_json_value, JsonString as PythonJsonString,
     JsonValue as PythonJsonValue,
 };
@@ -681,15 +681,20 @@ fn dsv_canonical_json_bytes(
             },
         ));
     }
-    if let Some((position, codepoint)) =
-        canonical_utf8_surrogate_position(value).map_err(dsv_artifact_json_invalid)?
+    if let Some((start, end, codepoint)) =
+        canonical_utf8_surrogate_range(value).map_err(dsv_artifact_json_invalid)?
     {
-        let escaped = format!("\\u{codepoint:04x}");
-        return Err(DecisionSufficiencyEnvelopeError::UnicodeEncodeError {
-            message: format!(
-                "'utf-8' codec can't encode character '{escaped}' in position {position}: surrogates not allowed"
-            ),
-        });
+        let message = if start == end {
+            let escaped = format!("\\u{codepoint:04x}");
+            format!(
+                "'utf-8' codec can't encode character '{escaped}' in position {start}: surrogates not allowed"
+            )
+        } else {
+            format!(
+                "'utf-8' codec can't encode characters in position {start}-{end}: surrogates not allowed"
+            )
+        };
+        return Err(DecisionSufficiencyEnvelopeError::UnicodeEncodeError { message });
     }
     let serde_value = to_serde_json_value(value).map_err(dsv_artifact_json_invalid)?;
     canonical_json_bytes(&serde_value).map_err(DecisionSufficiencyEnvelopeError::ArtifactIdentity)
