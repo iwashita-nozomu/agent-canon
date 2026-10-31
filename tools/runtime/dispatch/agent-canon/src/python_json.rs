@@ -279,17 +279,17 @@ fn detect_json_byte_encoding(bytes: &[u8]) -> (JsonByteEncoding, usize) {
 }
 
 fn decode_utf16_surrogatepass(bytes: &[u8], little_endian: bool) -> Result<Vec<u32>, String> {
-    if !bytes.len().is_multiple_of(2) {
+    let (chunks, remainder) = bytes.as_chunks::<2>();
+    if !remainder.is_empty() {
         return Err("truncated UTF-16 code unit".to_owned());
     }
-    let units = bytes
-        .chunks_exact(2)
-        .map(|chunk| {
-            let pair = [chunk[0], chunk[1]];
+    let units = chunks
+        .iter()
+        .map(|pair| {
             if little_endian {
-                u16::from_le_bytes(pair)
+                u16::from_le_bytes(*pair)
             } else {
-                u16::from_be_bytes(pair)
+                u16::from_be_bytes(*pair)
             }
         })
         .collect::<Vec<_>>();
@@ -315,16 +315,16 @@ fn decode_utf16_surrogatepass(bytes: &[u8], little_endian: bool) -> Result<Vec<u
 }
 
 fn decode_utf32_surrogatepass(bytes: &[u8], little_endian: bool) -> Result<Vec<u32>, String> {
-    if !bytes.len().is_multiple_of(4) {
+    let (chunks, remainder) = bytes.as_chunks::<4>();
+    if !remainder.is_empty() {
         return Err("truncated UTF-32 code unit".to_owned());
     }
-    let mut codepoints = Vec::with_capacity(bytes.len() / 4);
-    for chunk in bytes.chunks_exact(4) {
-        let word = [chunk[0], chunk[1], chunk[2], chunk[3]];
+    let mut codepoints = Vec::with_capacity(chunks.len());
+    for word in chunks {
         let codepoint = if little_endian {
-            u32::from_le_bytes(word)
+            u32::from_le_bytes(*word)
         } else {
-            u32::from_be_bytes(word)
+            u32::from_be_bytes(*word)
         };
         if codepoint > 0x10_ffff {
             return Err("invalid UTF-32 code point".to_owned());
