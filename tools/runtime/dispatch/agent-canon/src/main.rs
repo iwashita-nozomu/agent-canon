@@ -4,11 +4,10 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
+// upstream implementation lib.rs exposes report_artifact_checks.rs and shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation docs.rs routes unified documentation formatting and checks
-// downstream implementation report_artifact_checks.rs routes the generated-artifact-guard CLI
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -72,7 +71,6 @@ mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
 mod python_text;
-mod report_artifact_checks;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -91,8 +89,9 @@ mod tool_drift;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, entrypoint_composer, native_release, run_evaluation, stablehlo_value_closure,
-    template_bundle, theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage,
+    catalog, entrypoint_composer, native_release, report_artifact_checks, run_evaluation,
+    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
+    tool_proof_coverage,
 };
 use std::env;
 
