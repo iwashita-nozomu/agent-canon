@@ -101,8 +101,10 @@ fn g2_materializer_matches_all_frozen_python_cases() {
 #[cfg(target_os = "linux")]
 mod runtime_boundary_tests {
     use super::*;
+    use agent_canon::generated_completeness::SELECTOR;
     use agent_canon::runtime_boundary::RuntimeArtifactBoundary;
     use agent_canon::update_lifecycle_contract::{materialize_gate_verdict, GateVerdictInput};
+    use serde_json::json;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::{Command, Output};
