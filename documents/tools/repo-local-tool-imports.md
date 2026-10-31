@@ -58,7 +58,7 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/audit/audit_logger.py` | `tools/audit/logging/audit_logger.py` | Promoted as portable audit JSONL writer. |
 | `scripts/jsonl_to_md.sh` | `tools/analysis/documents/formatting/jsonl_to_md.py` | Reimplemented as Python CLI for testability. |
 | `scripts/hlo/summarize_hlo_jsonl.py` | `tools/analysis/hlo/summarization/summarize_hlo_jsonl.py` | Promoted as HLO JSONL summary helper. |
-| `scripts/tools/create_design_template.py` | `tools/validation/documentation/authoring/create_design_template.py` | Promoted as design-doc helper. |
+| `scripts/tools/create_design_template.py` | `tools/validation/documentation/authoring/create_design_template.py` | Retired as superseded by the canonical [design document template](../../templates/documents/design-document.template.md). |
 | `scripts/tools/find_redundant_designs.py` | `tools/analysis/documents/analysis/find_redundant_designs.py` | Promoted as an external-runtime document consolidation helper; deletion requires an explicit mutation capability. |
 | `scripts/tools/find_similar_designs.py` | `tools/analysis/documents/analysis/find_similar_designs.py` | Promoted as an external-runtime design similarity helper. |
 | `scripts/tools/organize_designs.py` | `tools/validation/documentation/authoring/organize_designs.py` | Promoted as a read-only organization planner; source apply requires an explicit mutation capability. |
