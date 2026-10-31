@@ -184,6 +184,15 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         target.write_text(text, encoding="utf-8")
         self.assertIn("command-recipe", self._rules(root))
 
+    def test_rejects_procedure_prefixed_with_python_control_whitespace(self) -> None:
+        root = self._fixture()
+        target = root / "AGENTS.md"
+        target.write_text(
+            target.read_text(encoding="utf-8") + "\n\x1f1. Do X\n",
+            encoding="utf-8",
+        )
+        self.assertIn("ordered-procedure", self._rules(root))
+
     def test_rejects_missing_owner_row(self) -> None:
         root = self._fixture()
         target = root / "agents/canonical/SOURCE_ROUTING.md"
@@ -222,8 +231,16 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         optional = "agents/canonical/SOURCE_ROUTING.md"
         self.assertIn(f"]({optional})", entry)
         self.assertNotIn("public skill registry", entry)
-        _result, payload = self._report(REPOSITORY_ROOT)
-        self.assertNotIn(optional, payload["checked"])
+        root = self._fixture()
+        manifest = root / MARKER_MANIFEST_PATH
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            + '\n[[contracts]]\nid = "optional-map"\n'
+            + f'[[contracts.surfaces]]\npath = "{optional}"\n'
+            + 'markers = ["owner map"]\n',
+            encoding="utf-8",
+        )
+        self.assertNotIn("delegated-marker-surface", self._rules(root))
         self.assertTrue((REPOSITORY_ROOT / optional).is_file())
 
     def test_rejects_operational_marker_surface(self) -> None:

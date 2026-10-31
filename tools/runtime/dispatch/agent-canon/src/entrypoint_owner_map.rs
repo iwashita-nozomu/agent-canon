@@ -130,21 +130,21 @@ struct Patterns {
 fn patterns() -> &'static Patterns {
     static PATTERNS: OnceLock<Patterns> = OnceLock::new();
     PATTERNS.get_or_init(|| Patterns {
-        h1: Regex::new(r"^#\s+\S").expect("static H1 expression"),
-        h2: Regex::new(r"^##\s+\S").expect("static H2 expression"),
-        nested_heading: Regex::new(r"^#{3,}\s+\S").expect("static nested heading expression"),
-        fence: Regex::new(r"^\s*(?:```|~~~)").expect("static fence expression"),
-        ordered_procedure: Regex::new(r"^\s*\d+[.)]\s+\S")
+        h1: Regex::new(r"^#[\s\x1c-\x1f]+[^\s\x1c-\x1f]").expect("static H1 expression"),
+        h2: Regex::new(r"^##[\s\x1c-\x1f]+[^\s\x1c-\x1f]").expect("static H2 expression"),
+        nested_heading: Regex::new(r"^#{3,}[\s\x1c-\x1f]+[^\s\x1c-\x1f]").expect("static nested heading expression"),
+        fence: Regex::new(r"^[\s\x1c-\x1f]*(?:```|~~~)").expect("static fence expression"),
+        ordered_procedure: Regex::new(r"^[\s\x1c-\x1f]*\d+[.)][\s\x1c-\x1f]+[^\s\x1c-\x1f]")
             .expect("static ordered procedure expression"),
         direct_command: Regex::new(
-            r"^\s*(?:python(?:3(?:\.\d+)?)?|bash|sh|git|make|cargo|npm|npx|docker|tools/[A-Za-z0-9_./-]+|PYTHONPATH=\S+|AGENT_CANON_[A-Z0-9_]+=\S+)(?:\s|$)",
+            r"^[\s\x1c-\x1f]*(?:python(?:3(?:\.\d+)?)?|bash|sh|git|make|cargo|npm|npx|docker|tools/[A-Za-z0-9_./-]+|PYTHONPATH=[^\s\x1c-\x1f]+|AGENT_CANON_[A-Z0-9_]+=[^\s\x1c-\x1f]+)(?:[\s\x1c-\x1f]|$)",
         )
         .expect("static direct command expression"),
         bullet_command: Regex::new(
-            r"^\s*[-*]\s+(?:`)?(?:python(?:3(?:\.\d+)?)?|bash|sh|git|make|cargo|npm|npx|docker|tools/[A-Za-z0-9_./-]+|PYTHONPATH=\S+|AGENT_CANON_[A-Z0-9_]+=\S+)(?:`|\s|$)",
+            r"^[\s\x1c-\x1f]*[-*][\s\x1c-\x1f]+(?:`)?(?:python(?:3(?:\.\d+)?)?|bash|sh|git|make|cargo|npm|npx|docker|tools/[A-Za-z0-9_./-]+|PYTHONPATH=[^\s\x1c-\x1f]+|AGENT_CANON_[A-Z0-9_]+=[^\s\x1c-\x1f]+)(?:`|[\s\x1c-\x1f]|$)",
         )
         .expect("static bullet command expression"),
-        owner_link: Regex::new(r"\]\(([^\s)]+)\)")
+        owner_link: Regex::new(r"\]\(([^\s\x1c-\x1f)]+)\)")
             .expect("static inline owner link expression"),
     })
 }
