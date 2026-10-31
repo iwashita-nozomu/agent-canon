@@ -26,6 +26,26 @@ use std::process::{Command, ExitStatus, Stdio};
 
 pub const DEFAULT_TOP: usize = 12;
 pub const PROVIDERS: &[&str] = &["text", "semantic", "tool", "header-deps", "code-deps"];
+const HELP: &str = "Usage: agent-canon agent-search [options]
+
+Route an explicit repository search to independent providers.
+
+Options:
+  --root PATH          repository root (default: current directory)
+  --query TEXT         query text or Git pattern
+  --query-file PATH    read query text from a file
+  --query-stdin        read query text from standard input
+  --purpose TEXT       search purpose; takes precedence over --query
+  --providers LIST     comma-separated providers (default: text)
+                       text, semantic, tool, header-deps, code-deps
+  --surface PATH       selected repository surface; repeatable
+  --exclude PATH       excluded path; repeatable
+  --regex              use Git extended regex for text/catalog providers
+  --word-regexp        use Git whole-word matching for text/catalog providers
+  --case-sensitive     use case-sensitive Git matching
+  --top N              per-file Git limit and semantic top-k (default: 12)
+  --format FORMAT      output format: text or json (default: text)
+  -h, --help           show this help message";
 
 #[derive(Debug, Clone)]
 pub(crate) struct SearchRequest {
