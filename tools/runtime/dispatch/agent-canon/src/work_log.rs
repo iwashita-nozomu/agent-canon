@@ -8,8 +8,7 @@
 // @dependency-end
 
 use crate::python_json::{
-    canonical_json_ascii_bytes, parse_json, JsonArray, JsonNumber, JsonObject, JsonString,
-    JsonValue,
+    canonical_json_ascii_bytes, parse_json, JsonNumber, JsonObject, JsonString, JsonValue,
 };
 use crate::runtime_boundary::{RuntimeArtifactBoundary, RuntimeDirectory};
 use sha2::{Digest, Sha256};
