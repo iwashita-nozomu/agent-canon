@@ -12,6 +12,7 @@
 // @dependency-end
 
 use crate::python_cli_integer::{is_argparse_negative_number, parse as parse_python_cli_integer};
+use crate::python_text::python_strip;
 use regex::Regex;
 use rustpython_ast::bigint::BigInt;
 use serde::Serialize;
@@ -944,15 +945,6 @@ fn is_python_line_break(character: char) -> bool {
             | '\u{2028}'
             | '\u{2029}'
     )
-}
-
-fn python_strip(value: &str) -> &str {
-    value.trim_matches(is_python_whitespace)
-}
-
-fn is_python_whitespace(character: char) -> bool {
-    character.is_whitespace()
-        || matches!(character, '\u{001c}' | '\u{001d}' | '\u{001e}' | '\u{001f}')
 }
 
 fn render_text(report: &NotebookReport) -> String {

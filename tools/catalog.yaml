@@ -1111,12 +1111,12 @@ entries:
 
   - id: agent-search
     summary: Routes explicit text, semantic-index, tool-catalog, dependency, or LSP searches to separate native owners.
-    path: tools/analysis/search/search.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_search.rs
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/analysis/search/search.py --query "<literal>" --providers text
-    dispatch: {argv: ["python3", "tools/analysis/search/search.py", "--query", "<literal>", "--providers", "text"]}
+    command: tools/bin/agent-canon agent-search --query "<literal>" --providers text
+    dispatch: {argv: ["tools/bin/agent-canon", "agent-search", "--query", "<literal>", "--providers", "text"]}
     writes: false
     default_wiring:
       ci: false
@@ -1127,6 +1127,7 @@ entries:
       - documents/tools/search-coordination.md
     tests:
       - tests/agent_tools/test_search.py
+      - tools/runtime/dispatch/agent-canon/src/agent_search_tests.rs
 
   - id: lsp-code-analysis
     public: true

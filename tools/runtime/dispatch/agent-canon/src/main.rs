@@ -14,6 +14,7 @@
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation agent_search.rs routes explicit repository-search provider requests
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
@@ -25,6 +26,7 @@
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
+// downstream implementation python_text.rs shares Python-compatible Unicode string trimming
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
 // downstream implementation surface_manifest.rs provides native source classification snapshots
 // downstream implementation file_surface_inventory.rs preserves Git file-surface inventory and explicit report outputs
@@ -37,6 +39,7 @@
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // @dependency-end
 
+mod agent_search;
 mod check_algorithm_config_partition;
 mod check_merge_structure;
 mod check_solid_evidence;
@@ -61,6 +64,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -89,6 +93,7 @@ Commands:
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
+  agent-search [search options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format> [paths...]
@@ -257,6 +262,10 @@ fn main() {
         std::process::exit(graph::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "agent-search" {
+        std::process::exit(agent_search::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "jit-ir-to-lean" {
         std::process::exit(jit_ir_to_lean::run(&args[2..]));
     }
@@ -362,3 +371,6 @@ mod runtime_boundary {
         }
     }
 }
+
+#[cfg(test)]
+mod agent_search_tests;
