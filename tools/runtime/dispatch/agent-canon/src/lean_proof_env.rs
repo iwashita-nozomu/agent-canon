@@ -680,7 +680,9 @@ fn shell_quote(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{counterexample_text, run_command, shell_join, write_generated};
+    #[cfg(unix)]
+    use super::run_command;
+    use super::{counterexample_text, shell_join, write_generated};
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
