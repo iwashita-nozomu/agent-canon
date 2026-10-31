@@ -118,7 +118,7 @@ unit receipt の集約は、`failed|deferred` を failed、`blocked` を blocked
 
 変更後は少なくとも次を確認します。
 
-1. `responsibility_scope.py` が全 tracked path に owner 1 件を与える。
+1. `tools/bin/agent-canon responsibility-scope` が全 tracked path に owner 1 件を与える。
 2. 空の ownership glob は no-match failure にならない。
 3. unowned tracked path と overlapping ownership は fail する。
 4. structure contract は path/kind だけを保持し owner/category を持たない。

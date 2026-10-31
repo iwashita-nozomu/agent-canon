@@ -4,22 +4,26 @@ contract reference
 responsibility Documents the canonical LSP 3.17 code-analysis command, transport boundary, and report.
 upstream design ../structured-analysis/code-analysis.md structured-analysis boundary
 upstream design ../design/dependency-manifest-design.md dependency evidence separation
-downstream implementation ../../tools/analysis/code/lsp_code_analysis.py owns process lifecycle and report
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs owns the native API, process lifecycle, and report
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/agent_search.rs consumes selected native facts for code-deps
+downstream implementation ../../tools/analysis/dependencies/git_dependency_diff_summary.py retains its Python language-mapper caller
+downstream implementation ../../tools/analysis/code/lsp_code_analysis.py supplies the Python language_for_path helper for that caller
 downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies golden behavior
+downstream test ../../tools/runtime/dispatch/agent-canon/tests/lsp_code_analysis_native.rs verifies the native provider
 @dependency-end
 -->
 
 # LSP Code Analysis
 
-`lsp_code_analysis.py` は AgentCanon の standalone code analysis command です。LSP 3.17
-JSON-RPC を一回の session として起動し、結果を
+`lsp_code_analysis.rs` は登録された `lsp-code-analysis` CLI と再利用可能な
+library API の実装 owner です。LSP 3.17 JSON-RPC を一回の session として起動し、結果を
 `agent-canon.lsp-code-analysis.v1` JSON に正規化します。index、persistent
 cache、ambient PATH discovery は持ちません。
 
 ## Commands
 
 ```bash
-python3 tools/analysis/code/lsp_code_analysis.py analyze \
+tools/bin/agent-canon lsp-code-analysis analyze \
   --root . --files python/example.py --format json
 ```
 
@@ -36,13 +40,10 @@ ambient discovery は使いません。`--server LANGUAGE=/absolute/executable .
 Python、C/C++、Bash、Rust はそれぞれ `pyright-langserver --stdio`、
 `clangd-18`、`bash-language-server start`、`rust-analyzer` です。
 
-JSON-RPC stream framing と request correlation は public
-`python-lsp-jsonrpc` の `JsonRpcStreamReader`、`JsonRpcStreamWriter`、`Endpoint` が
-担当します。shared image dependency manifest は Ubuntu package
-`python3-pylsp-jsonrpc` version `1.1.2-1` を宣言します。この宣言は特定の runtime
-image に package が既に展開済みであることを示すものではありません。adapter は
-既存の verified server process とその stdio を library に渡し、request timeout、
-child cleanup、report と root-bound result validation を維持します。
+JSON-RPC framing と request correlation は既存の `lsp-server` 0.10.0
+`Message::read` / `Message::write` と `ReqQueue` が担当します。LSP owner はその
+library を verified server child の stdin/stdout pipes に接続し、stderr drain、
+request timeout、process/thread cleanup、report と root-bound result validation を維持します。
 
 required `documentSymbolProvider` が提供されない、reader error が adapter に届く、
 request timeout が発生する、または server process が異常終了する場合、report は
@@ -72,8 +73,12 @@ deterministic relation に正規化します。
 
 ## Consumer boundary
 
-`tools/bin/agent-canon agent-search --providers code-deps` は選択された場合だけ native
-in-process LSP API に一回限りの analysis を依頼し、その report を独立して返します。LSP failure は failure
-のまま返し、AST heuristic や別 provider への fallback は行いません。汎用 text
-search、header dependency graph、manifest evidence はそれぞれの owner を選択し、
-LSP edge と manifest edge の意味を混同しません。
+Native callers use this library API for one-shot analysis and receive unfiltered facts.
+`tools/bin/agent-canon agent-search --providers code-deps` invokes this API in-process
+only when selected, then filters facts under the Search owner's Unicode case-folded literal
+query contract and returns an independent provider result. LSP failures remain failures,
+without AST heuristics or fallback to another provider. The separate Python Git-diff
+language-mapper caller continues using its existing helper until its own native migration;
+this LSP CLI does not provide a Python shim or fallback. Generic text search, the header
+dependency graph, and manifest evidence stay with their respective owners; LSP edges and
+manifest edges remain distinct.
