@@ -190,16 +190,30 @@ impl JsonNumber {
 }
 
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {
-    JsonParser::new(input).parse()
+    JsonParser::new(input.as_bytes()).parse()
 }
 
-fn append_unicode_escape(value: &mut String, codepoint: u32) {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    value.push('\\');
-    value.push('u');
-    for shift in [12, 8, 4, 0] {
-        value.push(HEX[((codepoint >> shift) & 0xf) as usize] as char);
+fn append_wtf8(codepoint: u32, output: &mut Vec<u8>) -> Result<(), String> {
+    match codepoint {
+        0x00..=0x7f => output.push(codepoint as u8),
+        0x80..=0x7ff => {
+            output.push((0xc0 | (codepoint >> 6)) as u8);
+            output.push((0x80 | (codepoint & 0x3f)) as u8);
+        }
+        0x800..=0xffff => {
+            output.push((0xe0 | (codepoint >> 12)) as u8);
+            output.push((0x80 | ((codepoint >> 6) & 0x3f)) as u8);
+            output.push((0x80 | (codepoint & 0x3f)) as u8);
+        }
+        0x1_0000..=0x10_ffff => {
+            output.push((0xf0 | (codepoint >> 18)) as u8);
+            output.push((0x80 | ((codepoint >> 12) & 0x3f)) as u8);
+            output.push((0x80 | ((codepoint >> 6) & 0x3f)) as u8);
+            output.push((0x80 | (codepoint & 0x3f)) as u8);
+        }
+        _ => return Err("JSON string contains an invalid code point".to_owned()),
     }
+    Ok(())
 }
 
 /// Parse Python JSON text represented by code points, including lone surrogates.
@@ -207,34 +221,11 @@ pub fn parse_json_python_string(value: &JsonString) -> Result<JsonValue, String>
     if let Some(text) = value.to_text() {
         return parse_json(&text);
     }
-    let mut text = String::with_capacity(value.0.len());
-    let mut in_string = false;
-    let mut escaped = false;
+    let mut bytes = Vec::new();
     for &codepoint in &value.0 {
-        if (0xd800..=0xdfff).contains(&codepoint) {
-            if in_string && escaped {
-                return Err("invalid JSON escape".to_owned());
-            }
-            append_unicode_escape(&mut text, codepoint);
-            continue;
-        }
-        let Some(character) = char::from_u32(codepoint) else {
-            return Err("JSON string contains an invalid code point".to_owned());
-        };
-        text.push(character);
-        if in_string {
-            if escaped {
-                escaped = false;
-            } else if character == '\\' {
-                escaped = true;
-            } else if character == '"' {
-                in_string = false;
-            }
-        } else if character == '"' {
-            in_string = true;
-        }
+        append_wtf8(codepoint, &mut bytes)?;
     }
-    parse_json(&text)
+    JsonParser::new(&bytes).parse()
 }
 
 #[derive(Clone, Copy)]
@@ -419,18 +410,13 @@ impl JsonFrame {
 }
 
 struct JsonParser<'a> {
-    input: &'a str,
     bytes: &'a [u8],
     index: usize,
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(input: &'a str) -> Self {
-        Self {
-            input,
-            bytes: input.as_bytes(),
-            index: 0,
-        }
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, index: 0 }
     }
 
     fn parse(mut self) -> Result<JsonValue, String> {
@@ -603,7 +589,7 @@ impl<'a> JsonParser<'a> {
                 self.consume_literal("Infinity")?;
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::INFINITY))))
             }
-            Some(b'-') if self.input[self.index..].starts_with("-Infinity") => {
+            Some(b'-') if self.bytes[self.index..].starts_with(b"-Infinity") => {
                 self.consume_literal("-Infinity")?;
                 Ok(Some(JsonValue::Number(JsonNumber::Float(
                     f64::NEG_INFINITY,
@@ -622,8 +608,9 @@ impl<'a> JsonParser<'a> {
             match self.bytes[self.index] {
                 b'"' => {
                     self.index += 1;
-                    // This scan only finds the token boundary; serde_json decodes the escapes.
-                    return serde_json::from_str::<JsonString>(&self.input[start..self.index])
+                    // The byte visitor preserves raw WTF-8 surrogate code points while decoding
+                    // escaped surrogate pairs according to JSON string semantics.
+                    return serde_json::from_slice::<JsonString>(&self.bytes[start..self.index])
                         .map_err(|error| error.to_string());
                 }
                 b'\\' => self.index = (self.index + 2).min(self.bytes.len()),
@@ -677,7 +664,10 @@ impl<'a> JsonParser<'a> {
                 self.index += 1;
             }
         }
-        let raw = &self.input[start..self.index];
+        // A numeric token contains only ASCII bytes, even when the surrounding JSON string
+        // payload uses WTF-8 to represent Python surrogate code points.
+        let raw = std::str::from_utf8(&self.bytes[start..self.index])
+            .map_err(|error| error.to_string())?;
         if !is_float && raw == "-0" {
             Ok(JsonValue::Number(JsonNumber::Integer("0".to_owned())))
         } else {
@@ -686,7 +676,7 @@ impl<'a> JsonParser<'a> {
     }
 
     fn consume_literal(&mut self, literal: &str) -> Result<(), String> {
-        if self.input[self.index..].starts_with(literal) {
+        if self.bytes[self.index..].starts_with(literal.as_bytes()) {
             self.index += literal.len();
             Ok(())
         } else {

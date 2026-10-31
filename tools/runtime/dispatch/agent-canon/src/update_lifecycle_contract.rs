@@ -639,7 +639,7 @@ pub fn binding_identity(
     binding_identity_from_validated(&binding)
 }
 
-fn dsv_envelope(value: &PythonJsonValue) -> Result<(), DsvEnvelopeError> {
+fn dsv_envelope(value: &PythonJsonValue) -> Result<(), DecisionSufficiencyEnvelopeError> {
     let PythonJsonValue::Object(object) = value else {
         return Err(fail("lifecycle:mapping_required", "decision_sufficiency_packet").into());
     };
@@ -659,58 +659,66 @@ fn dsv_envelope(value: &PythonJsonValue) -> Result<(), DsvEnvelopeError> {
     Ok(())
 }
 
-fn dsv_json_invalid() -> DsvEnvelopeError {
+fn dsv_json_invalid() -> DecisionSufficiencyEnvelopeError {
     fail("decision_sufficiency:envelope_json_invalid", "").into()
 }
 
-fn dsv_artifact_json_invalid(detail: String) -> DsvEnvelopeError {
-    DsvEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
+fn dsv_artifact_json_invalid(detail: String) -> DecisionSufficiencyEnvelopeError {
+    DecisionSufficiencyEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
         code: "artifact_identity:json_invalid",
         detail,
     })
 }
 
-fn dsv_canonical_json_bytes(value: &PythonJsonValue) -> Result<Vec<u8>, DsvEnvelopeError> {
+fn dsv_canonical_json_bytes(
+    value: &PythonJsonValue,
+) -> Result<Vec<u8>, DecisionSufficiencyEnvelopeError> {
     if contains_float(value) {
-        return Err(DsvEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
-            code: "artifact_identity:float_forbidden",
-            detail: String::new(),
-        }));
+        return Err(DecisionSufficiencyEnvelopeError::ArtifactIdentity(
+            ArtifactIdentityError {
+                code: "artifact_identity:float_forbidden",
+                detail: String::new(),
+            },
+        ));
     }
     if let Some((position, codepoint)) =
         canonical_utf8_surrogate_position(value).map_err(dsv_artifact_json_invalid)?
     {
         let escaped = format!("\\u{codepoint:04x}");
-        return Err(DsvEnvelopeError::UnicodeEncodeError {
+        return Err(DecisionSufficiencyEnvelopeError::UnicodeEncodeError {
             message: format!(
                 "'utf-8' codec can't encode character '{escaped}' in position {position}: surrogates not allowed"
             ),
         });
     }
     let serde_value = to_serde_json_value(value).map_err(dsv_artifact_json_invalid)?;
-    canonical_json_bytes(&serde_value).map_err(DsvEnvelopeError::ArtifactIdentity)
+    canonical_json_bytes(&serde_value).map_err(DecisionSufficiencyEnvelopeError::ArtifactIdentity)
 }
 
-fn clone_dsv_envelope(value: &PythonJsonValue) -> Result<PythonJsonValue, DsvEnvelopeError> {
+fn clone_dsv_envelope(
+    value: &PythonJsonValue,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
     let bytes = dsv_canonical_json_bytes(value)?;
     parse_json_bytes(&bytes).map_err(|_| dsv_json_invalid())
 }
 
-fn parse_dsv_mapping(value: &PythonJsonValue) -> Result<PythonJsonValue, DsvEnvelopeError> {
+fn parse_dsv_mapping(
+    value: &PythonJsonValue,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
     dsv_envelope(value)?;
     clone_dsv_envelope(value)
 }
 
 pub fn parse_decision_sufficiency_verdict(
-    payload: DsvEnvelopeInput<'_>,
-) -> Result<PythonJsonValue, DsvEnvelopeError> {
+    payload: DecisionSufficiencyInput<'_>,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
     match payload {
-        DsvEnvelopeInput::Mapping(value) => parse_dsv_mapping(value),
-        DsvEnvelopeInput::Text(value) => {
+        DecisionSufficiencyInput::Mapping(value) => parse_dsv_mapping(value),
+        DecisionSufficiencyInput::Text(value) => {
             let parsed = parse_json_python_string(value).map_err(|_| dsv_json_invalid())?;
             parse_dsv_mapping(&parsed)
         }
-        DsvEnvelopeInput::Bytes(value) => {
+        DecisionSufficiencyInput::Bytes(value) => {
             let parsed = parse_json_bytes(value).map_err(|_| dsv_json_invalid())?;
             parse_dsv_mapping(&parsed)
         }
@@ -719,15 +727,15 @@ pub fn parse_decision_sufficiency_verdict(
 
 pub fn serialize_decision_sufficiency_verdict(
     packet: &PythonJsonValue,
-) -> Result<Vec<u8>, DsvEnvelopeError> {
+) -> Result<Vec<u8>, DecisionSufficiencyEnvelopeError> {
     dsv_envelope(packet)?;
     dsv_canonical_json_bytes(packet)
 }
 
 pub fn import_decision_sufficiency_verdict(
-    payload: DsvEnvelopeInput<'_>,
+    payload: DecisionSufficiencyInput<'_>,
     expected_digest: Option<&str>,
-) -> Result<PythonJsonValue, DsvEnvelopeError> {
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
     let packet = parse_decision_sufficiency_verdict(payload)?;
     let bytes = dsv_canonical_json_bytes(&packet)?;
     let digest = Sha256::digest(bytes)

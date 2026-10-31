@@ -7,10 +7,11 @@
 // upstream test ../../../../../tests/fixtures/update_lifecycle/dsv_python_golden.json freezes the independent old-Python oracle.
 // @dependency-end
 
-use agent_canon::python_json::{parse_json, JsonValue};
+use agent_canon::python_json::{parse_json, JsonString, JsonValue};
 use agent_canon::update_lifecycle_contract::{
     import_decision_sufficiency_verdict, parse_decision_sufficiency_verdict,
-    serialize_decision_sufficiency_verdict, DecisionSufficiencyEnvelopeError, DsvEnvelopeInput,
+    serialize_decision_sufficiency_verdict, DecisionSufficiencyEnvelopeError,
+    DecisionSufficiencyInput,
 };
 use sha2::{Digest, Sha256};
 
@@ -81,7 +82,7 @@ fn sha256_hex(value: &[u8]) -> String {
 }
 
 fn invoke_payload(
-    payload: DsvEnvelopeInput<'_>,
+    payload: DecisionSufficiencyInput<'_>,
     api: &str,
     expected_digest: Option<&str>,
 ) -> Result<ActualOutput, DecisionSufficiencyEnvelopeError> {
@@ -110,7 +111,11 @@ fn invoke(case: &JsonValue) -> Result<ActualOutput, DecisionSufficiencyEnvelopeE
             match kind.as_str() {
                 "mapping" => {
                     let value = object_get(payload, "value").expect("mapping payload exists");
-                    invoke_payload(DsvEnvelopeInput::Mapping(value), &api, expected_digest)
+                    invoke_payload(
+                        DecisionSufficiencyInput::Mapping(value),
+                        &api,
+                        expected_digest,
+                    )
                 }
                 "text" => {
                     let JsonValue::String(value) =
@@ -118,11 +123,15 @@ fn invoke(case: &JsonValue) -> Result<ActualOutput, DecisionSufficiencyEnvelopeE
                     else {
                         panic!("text payload is a Python string value");
                     };
-                    invoke_payload(DsvEnvelopeInput::Text(value), &api, expected_digest)
+                    invoke_payload(DecisionSufficiencyInput::Text(value), &api, expected_digest)
                 }
                 "bytes" => {
                     let bytes = decode_hex(&text_field(payload, "hex"));
-                    invoke_payload(DsvEnvelopeInput::Bytes(&bytes), &api, expected_digest)
+                    invoke_payload(
+                        DecisionSufficiencyInput::Bytes(&bytes),
+                        &api,
+                        expected_digest,
+                    )
                 }
                 kind => panic!("unmapped DSV payload kind {kind}"),
             }
@@ -261,4 +270,43 @@ fn dsv_envelope_apis_match_all_frozen_cpython_values_bytes_and_errors() {
     }
     assert_eq!(accepted, 14);
     assert_eq!(rejected, 26);
+}
+
+#[test]
+fn raw_surrogate_pair_remains_distinct_from_an_escaped_json_pair() {
+    let prefix = r#"{"schema":"agent-canon.decision-sufficiency.v1","value":""#;
+    let suffix = r#""}"#;
+    let mut raw_codepoints = JsonString::from_text(prefix).0;
+    raw_codepoints.extend([0xd800, 0xdc00]);
+    raw_codepoints.extend(JsonString::from_text(suffix).0);
+    let raw_text = JsonString(raw_codepoints);
+
+    let error = match parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Text(&raw_text))
+    {
+        Ok(_) => panic!("raw adjacent surrogate code points cannot be UTF-8 canonicalized"),
+        Err(error) => error,
+    };
+    let position = prefix.chars().count();
+    assert_eq!(
+        error,
+        DecisionSufficiencyEnvelopeError::UnicodeEncodeError {
+            message: format!(
+                "'utf-8' codec can't encode character '\\ud800' in position {position}: surrogates not allowed"
+            ),
+        }
+    );
+
+    let escaped_text = JsonString::from_text(
+        r#"{"schema":"agent-canon.decision-sufficiency.v1","value":"\ud800\udc00"}"#,
+    );
+    let packet = parse_decision_sufficiency_verdict(DecisionSufficiencyInput::Text(&escaped_text))
+        .expect("escaped high/low pair decodes as one Unicode scalar");
+    let bytes = serialize_decision_sufficiency_verdict(&packet)
+        .expect("decoded Unicode scalar is valid canonical UTF-8");
+    let scalar = char::from_u32(0x1_0000).expect("expected supplementary scalar");
+    assert_eq!(
+        bytes,
+        format!(r#"{{"schema":"agent-canon.decision-sufficiency.v1","value":"{scalar}"}}"#)
+            .as_bytes()
+    );
 }
