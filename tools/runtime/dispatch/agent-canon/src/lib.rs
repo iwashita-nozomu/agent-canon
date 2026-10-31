@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, evaluation, Template, theorem-board, artifact, and proof APIs.
+//! Shared AgentCanon runtime, LSP, Template, release, artifact, catalog, path-resolution, proof environment, theorem, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
@@ -16,9 +16,12 @@
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
 // downstream implementation template_bundle.rs owns native template package operations
+// upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
+// downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
+// downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
@@ -27,6 +30,7 @@
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
 // downstream test template_tests.rs validates native Template APIs
+// downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
@@ -38,11 +42,14 @@ pub mod entrypoint_composer;
 // API uses only the newline and source-offset helpers from this owner.
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
+pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod native_release;
+pub mod path_resolution;
 pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
+pub mod python_json;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
