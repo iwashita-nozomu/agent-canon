@@ -41,7 +41,7 @@ The main tool growth was in `/mnt/l/workspace/jax_solver_util/scripts/`.
 
 This document is the historical import-disposition ledger. The live
 machine-readable AgentCanon tool registry is `tools/catalog.yaml`, validated by
-`tool_catalog.rs` and cross-checked by `tool_drift.py`.
+`tool_catalog.rs` and cross-checked by `tool_drift.rs`.
 When a tool is promoted, left in the source repository, deleted, or converted
 into a compatibility wrapper, update both this ledger and the corresponding
 catalog entry. The catalog entry must also classify the imported tool with

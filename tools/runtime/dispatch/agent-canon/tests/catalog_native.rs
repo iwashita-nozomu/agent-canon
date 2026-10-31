@@ -73,6 +73,37 @@ fn run_native_cli(root: &Path, args: &[&str]) -> Output {
         .expect("native catalog CLI starts")
 }
 
+fn shared_graph_dispatch_source(status_handler: &str, duplicate_build: bool) -> String {
+    let duplicate_build_arm = if duplicate_build {
+        "        \"build\" => build_graph_with_failure(args),\n"
+    } else {
+        ""
+    };
+    r#"fn dispatch_command(command: &str, args: &GraphArgs) -> Result<Value, GraphError> {
+    match command {
+        "build" => build_graph_with_failure(args),
+        "status" => __STATUS_HANDLER__,
+        "query" => query_graph(args),
+        "context" => context_graph(args),
+__DUPLICATE_BUILD_ARM__        _ => Err(GraphError::Usage(format!("unknown graph command {command}"))),
+    }
+}
+
+pub(crate) fn invoke(root: &Path, command: &str, options: &[String]) -> Result<Value, GraphError> {
+    let parsed = parse_args(options)?;
+    dispatch_command(command, &parsed)
+}
+
+pub(crate) fn run(args: &[String]) -> i32 {
+    let parsed = parse_args(args)?;
+    let result = dispatch_command(command, &parsed);
+    emit(&result)
+}
+"#
+    .replace("__STATUS_HANDLER__", status_handler)
+    .replace("__DUPLICATE_BUILD_ARM__", duplicate_build_arm)
+}
+
 #[test]
 fn retired_path_policy_keeps_legacy_lexical_rules() {
     assert_eq!(
@@ -970,5 +1001,87 @@ fn main() {
     let multi_document = extract_public_surface(root.path());
     assert!(multi_document.findings.iter().any(|finding| {
         finding.path == "tools/catalog.yaml" && finding.detail.starts_with("yaml-parse-failed:")
+    }));
+}
+
+#[test]
+fn public_surface_extractor_binds_shared_graph_dispatch_and_rejects_bad_arms() {
+    let root = TempRoot::new("public-surface-shared-dispatch");
+    root.write(
+        "tools/runtime/dispatch/agent-canon/src/main.rs",
+        r#"mod graph;
+fn main() {
+    if args.len() >= 2 && args[1] == "graph" { std::process::exit(graph::run(&args[2..])); }
+}
+"#,
+    );
+    root.write(
+        "tools/runtime/dispatch/agent-canon/src/graph.rs",
+        &shared_graph_dispatch_source("read_graph_status(args)", false),
+    );
+    root.write(
+        "agents/canonical/CLI_ENTRYPOINTS.md",
+        "graph build\ngraph status\ngraph query\ngraph context\n",
+    );
+    root.write(
+        "tools/catalog.yaml",
+        "entries:\n  - id: demo-tool\n    public: true\n    command: tools/demo_tool.py\n",
+    );
+    root.write(
+        "agents/skills/catalog.yaml",
+        "skill_families:\n  - id: demo-skill\n    canonical_doc: agents/skills/demo-skill.md\n",
+    );
+
+    let report = extract_public_surface(root.path());
+    assert!(report.findings.is_empty(), "{:#?}", report.findings);
+    assert_eq!(report.rows.len(), 6);
+    for (operation, source_line) in [("build", 3), ("status", 4), ("query", 5), ("context", 6)] {
+        let row = report
+            .rows
+            .iter()
+            .find(|row| row.surface_id == format!("cli:graph {operation}"))
+            .expect("shared graph operation is reported");
+        assert_eq!(
+            row.source_span.path,
+            "tools/runtime/dispatch/agent-canon/src/graph.rs"
+        );
+        assert_eq!(row.source_span.start_line, source_line);
+        assert!(row.source_span.start_column > 0);
+        assert_eq!(
+            row.secondary_spans
+                .iter()
+                .filter(|span| span.path == row.source_span.path)
+                .count(),
+            2,
+            "both CLI and in-process calls bind graph {operation}"
+        );
+        assert!(row
+            .secondary_spans
+            .iter()
+            .any(|span| span.path == "tools/runtime/dispatch/agent-canon/src/main.rs"));
+        assert!(row
+            .secondary_spans
+            .iter()
+            .any(|span| span.path == "agents/canonical/CLI_ENTRYPOINTS.md"));
+    }
+
+    root.write(
+        "tools/runtime/dispatch/agent-canon/src/graph.rs",
+        &shared_graph_dispatch_source("read_graph_status(args)", true),
+    );
+    let duplicate = extract_public_surface(root.path());
+    assert!(duplicate.findings.iter().any(|finding| {
+        finding.path == "tools/runtime/dispatch/agent-canon/src/graph.rs"
+            && finding.detail == "rust_dispatch_ambiguous:build"
+    }));
+
+    root.write(
+        "tools/runtime/dispatch/agent-canon/src/graph.rs",
+        &shared_graph_dispatch_source("build_graph_with_failure(args)", false),
+    );
+    let misbound = extract_public_surface(root.path());
+    assert!(misbound.findings.iter().any(|finding| {
+        finding.path == "tools/runtime/dispatch/agent-canon/src/graph.rs"
+            && finding.detail == "rust_dispatch_invalid:status"
     }));
 }
