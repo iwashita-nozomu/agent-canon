@@ -205,15 +205,15 @@ default_wiring_docs:
 
 entries:
   - id: audit-and-fix-links
-    summary: Compatibility wrapper for the canonical Rust Markdown link checker; source apply requires an explicit mutation capability.
-    path: tools/validation/documentation/checks/audit_and_fix_links.py
+    summary: Native Rust Markdown link audit; source apply requires an exact mutation capability.
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
-    role: compatibility
-    status: compatibility_wrapper
+    role: docs
+    status: maintainer_only
     audience: maintainer
-    placement: compatibility_wrapper
-    command: python3 tools/validation/documentation/checks/audit_and_fix_links.py --check
-    dispatch: {argv: ["python3", "tools/validation/documentation/checks/audit_and_fix_links.py", "--check"]}
+    placement: workflow_helper
+    command: tools/bin/agent-canon docs links
+    dispatch: {argv: ["tools/bin/agent-canon", "docs", "links"]}
     writes: true
     default_wiring:
       ci: false
@@ -222,17 +222,18 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/tools/test_audit_and_fix_links.py
+      - tools/runtime/dispatch/agent-canon/tests/source_mutation_native.rs
 
   - id: find-redundant-designs
     summary: Finds exact duplicate design documents and writes an external runtime report.
-    path: tools/analysis/documents/analysis/find_redundant_designs.py
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
     role: docs
     status: maintainer_only
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/analysis/documents/analysis/find_redundant_designs.py --runtime-root <external-runtime>
-    dispatch: {argv: ["python3", "tools/analysis/documents/analysis/find_redundant_designs.py", "--runtime-root", "<external-runtime>"]}
+    command: tools/bin/agent-canon docs find-redundant-designs --runtime-root <external-runtime>
+    dispatch: {argv: ["tools/bin/agent-canon", "docs", "find-redundant-designs", "--runtime-root", "<external-runtime>"]}
     writes: true
     default_wiring:
       ci: false
@@ -241,25 +242,40 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
+      - tools/runtime/dispatch/agent-canon/tests/design_duplicates_native.rs
 
   - id: find-similar-designs
-    summary: Finds similar design documents and writes an external runtime report.
-    path: tools/analysis/documents/analysis/find_similar_designs.py
+    summary: Compares design Markdown with CPython-compatible sequence matching and writes an external runtime report.
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
     role: docs
     status: maintainer_only
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/analysis/documents/analysis/find_similar_designs.py --runtime-root <external-runtime>
-    dispatch: {argv: ["python3", "tools/analysis/documents/analysis/find_similar_designs.py", "--runtime-root", "<external-runtime>"]}
+    command: tools/bin/agent-canon docs find-similar-designs --runtime-root <external-runtime>
+    dispatch:
+      runtime: rust
+      argv: ["tools/bin/agent-canon", "docs", "find-similar-designs", "--runtime-root", "<external-runtime>"]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
       pr_check: false
     docs:
-      - documents/tools/README.md
+      - documents/tools/agent-canon.md
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
+      - tools/runtime/dispatch/agent-canon/tests/design_similarity_native.rs
 
   - id: organize-designs
     summary: Plans design-document organization and requires an explicit mutation capability to apply it.

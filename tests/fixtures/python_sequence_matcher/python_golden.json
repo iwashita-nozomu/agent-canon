@@ -1,0 +1,661 @@
+{
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "provider": "stdlib difflib.SequenceMatcher; no custom junk; Unicode str inputs",
+  "cases": [
+    {
+      "name": "empty-true",
+      "a": "",
+      "b": "",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "empty-false",
+      "a": "",
+      "b": "",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "left-empty-true",
+      "a": "",
+      "b": "abc",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "left-empty-false",
+      "a": "",
+      "b": "abc",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "right-empty-true",
+      "a": "abc",
+      "b": "",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          3,
+          0,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "right-empty-false",
+      "a": "abc",
+      "b": "",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          3,
+          0,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "identical-true",
+      "a": "abc",
+      "b": "abc",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          3
+        ],
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "identical-false",
+      "a": "abc",
+      "b": "abc",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          3
+        ],
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "different-true",
+      "a": "abc",
+      "b": "xyz",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "different-false",
+      "a": "abc",
+      "b": "xyz",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "split-true",
+      "a": "abxcd",
+      "b": "abcd",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          3,
+          2,
+          2
+        ],
+        [
+          5,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.8888888888888888,
+      "ratio_bits_hex": "3fec71c71c71c71c"
+    },
+    {
+      "name": "split-false",
+      "a": "abxcd",
+      "b": "abcd",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          3,
+          2,
+          2
+        ],
+        [
+          5,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.8888888888888888,
+      "ratio_bits_hex": "3fec71c71c71c71c"
+    },
+    {
+      "name": "tie-true",
+      "a": "abxxab",
+      "b": "xxabxx",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          2,
+          4
+        ],
+        [
+          6,
+          6,
+          0
+        ]
+      ],
+      "ratio": 0.6666666666666666,
+      "ratio_bits_hex": "3fe5555555555555"
+    },
+    {
+      "name": "tie-false",
+      "a": "abxxab",
+      "b": "xxabxx",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          2,
+          4
+        ],
+        [
+          6,
+          6,
+          0
+        ]
+      ],
+      "ratio": 0.6666666666666666,
+      "ratio_bits_hex": "3fe5555555555555"
+    },
+    {
+      "name": "asymmetric-true",
+      "a": "tide",
+      "b": "diet",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          1
+        ],
+        [
+          4,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.25,
+      "ratio_bits_hex": "3fd0000000000000"
+    },
+    {
+      "name": "asymmetric-false",
+      "a": "tide",
+      "b": "diet",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          1
+        ],
+        [
+          4,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.25,
+      "ratio_bits_hex": "3fd0000000000000"
+    },
+    {
+      "name": "asymmetric-reverse-true",
+      "a": "diet",
+      "b": "tide",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          4,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.5,
+      "ratio_bits_hex": "3fe0000000000000"
+    },
+    {
+      "name": "asymmetric-reverse-false",
+      "a": "diet",
+      "b": "tide",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          2,
+          1
+        ],
+        [
+          2,
+          3,
+          1
+        ],
+        [
+          4,
+          4,
+          0
+        ]
+      ],
+      "ratio": 0.5,
+      "ratio_bits_hex": "3fe0000000000000"
+    },
+    {
+      "name": "unicode-true",
+      "a": "\u65e5\u672c\u8a9e\ud83d\ude42abc",
+      "b": "\u65e5\u672c\ud83d\ude42xbc",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          3,
+          2,
+          1
+        ],
+        [
+          5,
+          4,
+          2
+        ],
+        [
+          7,
+          6,
+          0
+        ]
+      ],
+      "ratio": 0.7692307692307693,
+      "ratio_bits_hex": "3fe89d89d89d89d9"
+    },
+    {
+      "name": "unicode-false",
+      "a": "\u65e5\u672c\u8a9e\ud83d\ude42abc",
+      "b": "\u65e5\u672c\ud83d\ude42xbc",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          3,
+          2,
+          1
+        ],
+        [
+          5,
+          4,
+          2
+        ],
+        [
+          7,
+          6,
+          0
+        ]
+      ],
+      "ratio": 0.7692307692307693,
+      "ratio_bits_hex": "3fe89d89d89d89d9"
+    },
+    {
+      "name": "combining-true",
+      "a": "a\u0301b",
+      "b": "ab\u0301",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.6666666666666666,
+      "ratio_bits_hex": "3fe5555555555555"
+    },
+    {
+      "name": "combining-false",
+      "a": "a\u0301b",
+      "b": "ab\u0301",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          2,
+          1
+        ],
+        [
+          3,
+          3,
+          0
+        ]
+      ],
+      "ratio": 0.6666666666666666,
+      "ratio_bits_hex": "3fe5555555555555"
+    },
+    {
+      "name": "all-popular-true",
+      "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          300
+        ],
+        [
+          300,
+          300,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "all-popular-false",
+      "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          0,
+          300
+        ],
+        [
+          300,
+          300,
+          0
+        ]
+      ],
+      "ratio": 1.0,
+      "ratio_bits_hex": "3ff0000000000000"
+    },
+    {
+      "name": "autojunk-199-true",
+      "a": "xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "yaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          1,
+          1,
+          198
+        ],
+        [
+          199,
+          199,
+          0
+        ]
+      ],
+      "ratio": 0.9949748743718593,
+      "ratio_bits_hex": "3fefd6d58c389a5f"
+    },
+    {
+      "name": "autojunk-199-false",
+      "a": "xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "yaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          1,
+          1,
+          198
+        ],
+        [
+          199,
+          199,
+          0
+        ]
+      ],
+      "ratio": 0.9949748743718593,
+      "ratio_bits_hex": "3fefd6d58c389a5f"
+    },
+    {
+      "name": "autojunk-200-true",
+      "a": "xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "yaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          200,
+          200,
+          0
+        ]
+      ],
+      "ratio": 0.0,
+      "ratio_bits_hex": "0000000000000000"
+    },
+    {
+      "name": "autojunk-200-false",
+      "a": "xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "yaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          1,
+          1,
+          199
+        ],
+        [
+          200,
+          200,
+          0
+        ]
+      ],
+      "ratio": 0.995,
+      "ratio_bits_hex": "3fefd70a3d70a3d7"
+    },
+    {
+      "name": "rare-anchor-true",
+      "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          250,
+          250,
+          251
+        ],
+        [
+          501,
+          501,
+          0
+        ]
+      ],
+      "ratio": 0.500998003992016,
+      "ratio_bits_hex": "3fe0082cf750393b"
+    },
+    {
+      "name": "rare-anchor-false",
+      "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          250,
+          250,
+          251
+        ],
+        [
+          501,
+          501,
+          0
+        ]
+      ],
+      "ratio": 0.500998003992016,
+      "ratio_bits_hex": "3fe0082cf750393b"
+    },
+    {
+      "name": "repeated-ties-true",
+      "a": "abcabcxyzabc",
+      "b": "xyzabcabcabc",
+      "autojunk": true,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          6
+        ],
+        [
+          9,
+          9,
+          3
+        ],
+        [
+          12,
+          12,
+          0
+        ]
+      ],
+      "ratio": 0.75,
+      "ratio_bits_hex": "3fe8000000000000"
+    },
+    {
+      "name": "repeated-ties-false",
+      "a": "abcabcxyzabc",
+      "b": "xyzabcabcabc",
+      "autojunk": false,
+      "matching_blocks": [
+        [
+          0,
+          3,
+          6
+        ],
+        [
+          9,
+          9,
+          3
+        ],
+        [
+          12,
+          12,
+          0
+        ]
+      ],
+      "ratio": 0.75,
+      "ratio_bits_hex": "3fe8000000000000"
+    }
+  ]
+}
