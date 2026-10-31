@@ -1904,12 +1904,12 @@ entries:
 
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
-    path: tools/validation/semantic/code/check_solid_evidence.py
+    path: tools/runtime/dispatch/agent-canon/src/check_solid_evidence.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--changed", "--evidence", "<oop-readability-report>"]}
+    command: tools/bin/agent-canon check-solid-evidence --changed --evidence <oop-readability-report>
+    dispatch: {argv: ["tools/bin/agent-canon", "check-solid-evidence", "--changed", "--evidence", "<oop-readability-report>"]}
     writes: false
     default_wiring:
       ci: false
