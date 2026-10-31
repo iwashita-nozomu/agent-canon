@@ -4,7 +4,8 @@ contract design
 responsibility Documents the jax_util algorithm module contract and its single AgentCanon checker route.
 upstream design ../algorithm-implementation-boundary.md algorithm boundary policy
 upstream design ../../conventions/coding-conventions-python.md Python implementation policy
-downstream implementation ../../../tools/validation/semantic/algorithm/check_algorithm_config_partition.py checks config ownership
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/check_algorithm_config_partition.rs checks config ownership
+downstream implementation ../../../tests/agent_tools/test_check_algorithm_config_partition.py preserves config ownership behavior oracles through the native CLI
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs owns the single algorithm contract checker
 downstream implementation ../../../tools/catalog.yaml records the canonical checker and capability surface
 downstream implementation ../../../tools/validation/ci/runners/run_all_checks.sh invokes the canonical checker in CI
@@ -17,7 +18,7 @@ downstream implementation ../../../tools/validation/ci/runners/run_all_checks.sh
 その契約を検査する AgentCanon の単一 route の設計正本です。対象は
 public surface、callable `Algorithm`、nested ownership、`Info` の concrete schema、
 診断 artifact、CI route です。config の初期化時／実行時 ownership は
-`check_algorithm_config_partition.py` の責務として、この統合の対象外にします。
+`check-algorithm-config-partition` の独立した責務として、この統合の対象外にします。
 
 ## 設計構造契約
 
@@ -377,8 +378,8 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
    path/line readback を追加する。contract findings と parse errors の status/count を
    JSON/text の両方で一致させる。
 8. 現行 Rust 固有の legacy stopping findings と callable `Algorithm` finding は削除せず、
-   catalog の single capability に含める。`check_algorithm_config_partition.py` の config
-   ownership finding は別 tool として残し、この route に再実装しない。
+   catalog の single capability に含める。`check-algorithm-config-partition` の config
+   ownership finding は別の Rust tool として残し、この route に再実装しない。
 
 ## Retire set と downstream closure
 
@@ -399,10 +400,10 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | tool docs | [tools/README.md](../../../tools/README.md) の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
 | provenance | [documents/tools/repo-local-tool-imports.md](../../tools/repo-local-tool-imports.md) の nested checker rows | 現行 capability から削除または retired record に明示更新 |
 
-`tools/validation/semantic/algorithm/check_algorithm_config_partition.py` と
-`tests/agent_tools/test_check_algorithm_config_partition.py` は retire set に含めない。
-この二つは同じ design owner を参照するが、config partition の独立した public route と
-finding schema を持つためである。
+旧 Python implementation `tools/validation/semantic/algorithm/check_algorithm_config_partition.py`
+は native Rust owner への移行後に retire し、専用 test file は native CLI を呼ぶ
+behavior oracle として残す。この config partition checker は同じ design owner を参照するが、
+独立した command route と finding schema を持つため、algorithm module checker に統合しない。
 
 ## Migration order / implementation trace
 
