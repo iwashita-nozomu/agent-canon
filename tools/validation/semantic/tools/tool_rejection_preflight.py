@@ -188,7 +188,7 @@ PYTHON_GATE_TEMPLATES = (
     GateTemplate(
         gate="solid_evidence_gate",
         command_template=(
-            "python3 tools/validation/semantic/code/check_solid_evidence.py --root . {path} "
+            "tools/bin/agent-canon check-solid-evidence --root . {path} "
             "--evidence <oop-readability-report>"
         ),
         handoff=(
