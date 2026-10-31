@@ -225,12 +225,32 @@ fn relative_files(root: &Path, files: &[PathBuf]) -> Vec<String> {
     files
         .iter()
         .map(|path| {
-            path.strip_prefix(root)
+            let relative = path
+                .strip_prefix(root)
                 .expect("discovered file is root-relative")
                 .to_string_lossy()
-                .into_owned()
+                .into_owned();
+            if cfg!(windows) {
+                relative.replace('\\', "/")
+            } else {
+                relative
+            }
         })
         .collect()
+}
+
+fn quote_shell_word(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+fn server_override(python: &Path, server: &Path) -> String {
+    let python = python.to_str().expect("Python executable path is UTF-8");
+    let server = server.to_str().expect("fake-server path is UTF-8");
+    format!(
+        "python={} -u {}",
+        quote_shell_word(python),
+        quote_shell_word(server)
+    )
 }
 
 #[test]
@@ -572,7 +592,7 @@ fn native_cli_text_format_keeps_the_status_marker() {
     directory.write("main.py", "x = 1\n");
     let server = fake_server(&directory, "standard", 0);
     let python = python_executable();
-    let override_value = format!("python={} -u {}", python.display(), server.display());
+    let override_value = server_override(&python, &server);
     let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
         .args([
             "lsp-code-analysis",
@@ -731,7 +751,7 @@ fn outside_symbol_information_fails_as_point_lsp_report() {
     directory.write("main.py", "def main():\n    return 1\n");
     let server = fake_server(&directory, "outside-symbol", 0);
     let python = python_executable();
-    let override_value = format!("python={} -u {}", python.display(), server.display());
+    let override_value = server_override(&python, &server);
     let output = Command::new(env!("CARGO_BIN_EXE_agent-canon"))
         .args([
             "lsp-code-analysis",
