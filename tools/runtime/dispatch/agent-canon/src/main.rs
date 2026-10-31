@@ -21,6 +21,7 @@
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
+// downstream implementation check_solid_evidence.rs validates SOLID evidence coverage for Python changes
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
@@ -37,6 +38,7 @@
 
 mod check_algorithm_config_partition;
 mod check_merge_structure;
+mod check_solid_evidence;
 pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
@@ -108,6 +110,7 @@ Commands:
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
+  check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -194,6 +197,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == semantic_responsibility::SELECTOR {
         std::process::exit(semantic_responsibility::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {
+        std::process::exit(check_solid_evidence::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
