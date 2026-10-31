@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests scoped StableHLO SSA dependency closure tracing.
-# upstream implementation ../../tools/analysis/proof/stablehlo_value_closure.py traces scoped value dependencies.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/stablehlo_value_closure.rs traces scoped value dependencies.
 # upstream design ../../documents/tools/stablehlo_value_closure.md defines the tool contract.
 # @dependency-end
 
@@ -9,39 +9,49 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
+import json
+import os
+import subprocess
 from pathlib import Path
-from typing import Protocol, cast
+from typing import cast
+
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+def _run_native(
+    tmp_path: Path,
+    ir: dict[str, object],
+    *,
+    value: str,
+    function: str = "main",
+    region_id: str = "",
+) -> dict[str, object]:
+    assert AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+    executable = Path(AGENT_CANON_CLI)
+    assert executable.is_absolute() and executable.is_file() and os.access(executable, os.X_OK)
+    ir_path = tmp_path / "operational-ir.json"
+    ir_path.write_text(json.dumps(ir), encoding="utf-8")
+    arguments = [
+        str(executable),
+        "stablehlo-value-closure",
+        "--ir",
+        str(ir_path),
+        "--function",
+        function,
+        "--value",
+        value,
+        "--max-nodes",
+        "32",
+        "--format",
+        "json",
+    ]
+    if region_id:
+        arguments.extend(["--region-id", region_id])
+    result = subprocess.run(arguments, check=True, capture_output=True, text=True)
+    return cast(dict[str, object], json.loads(result.stdout))
 
 
-class _ClosureModule(Protocol):
-    def load_operational_ir(self, path: Path) -> dict[str, object]: ...
-
-    def trace_closure(
-        self,
-        ir: dict[str, object],
-        root: object,
-        max_nodes: int,
-    ) -> dict[str, object]: ...
-
-    ScopedValue: type
-
-
-def _load_module() -> _ClosureModule:
-    tool_path = Path(__file__).resolve().parents[2] / "tools/analysis/proof/stablehlo_value_closure.py"
-    spec = importlib.util.spec_from_file_location("_agent_canon_test_stablehlo_value_closure", tool_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return cast(_ClosureModule, module)
-
-
-def test_closure_keeps_callee_constants_scoped_to_callee() -> None:
+def test_closure_keeps_callee_constants_scoped_to_callee(tmp_path: Path) -> None:
     """Trace callee constants without crossing same-name caller constants."""
-    tool = _load_module()
     ir = {
         "schema": "agent-canon.thin-operational-ir.v2",
         "functions": [
@@ -101,23 +111,29 @@ def test_closure_keeps_callee_constants_scoped_to_callee() -> None:
         ],
     }
 
-    report = tool.trace_closure(ir, tool.ScopedValue("main", "r_main", "%out"), 32)
+    report = _run_native(tmp_path, ir, value="%out")
     op_ids = {row["op_id"] for row in cast(list[dict[str, object]], report["ops"])}
     assert "m1" in op_ids
     assert "c0" in op_ids
     assert "m0" not in op_ids
 
 
-def test_while_operands_ignore_region_argument_aliases() -> None:
+def test_while_operands_ignore_region_argument_aliases(tmp_path: Path) -> None:
     """Treat StableHLO while operands as incoming values, not region aliases."""
-    tool = _load_module()
     op = "%r:2 = stablehlo.while(%iterArg = %x, %iterArg_0 = %y) : tensor<f32>, tensor<f32>"
-    assert tool.operand_names(op, ["%r#0", "%r#1", "%r"]) == ["%x", "%y"]
+    ir = {
+        "schema": "agent-canon.thin-operational-ir.v2",
+        "functions": [{"name": "main", "signature": "func.func public @main() {", "body_region_id": "r_main"}],
+        "regions": [{"region_id": "r_main", "op_ids": ["while"]}],
+        "ops": [{"op_id": "while", "kind": "Primitive", "opcode": "stablehlo.while", "function": "main", "region_id": "r_main", "line": 1, "text": op}],
+    }
+    report = _run_native(tmp_path, ir, value="%r#0")
+    operation = cast(list[dict[str, object]], report["ops"])[0]
+    assert operation["operand_names"] == ["%x", "%y"]
 
 
-def test_closure_reports_constant_payloads_and_convert_ops() -> None:
+def test_closure_reports_constant_payloads_and_convert_ops(tmp_path: Path) -> None:
     """Report machine-readable constant payloads and scalar convert rows."""
-    tool = _load_module()
     ir = {
         "schema": "agent-canon.thin-operational-ir.v2",
         "functions": [
@@ -152,7 +168,7 @@ def test_closure_reports_constant_payloads_and_convert_ops() -> None:
         ],
     }
 
-    report = tool.trace_closure(ir, tool.ScopedValue("main", "r_main", "%out"), 32)
+    report = _run_native(tmp_path, ir, value="%out")
 
     constants = cast(list[dict[str, object]], report["constant_payloads"])
     converts = cast(list[dict[str, object]], report["convert_ops"])

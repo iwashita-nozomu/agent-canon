@@ -23,4 +23,6 @@ pub mod catalog;
 pub mod environment_dependencies;
 pub mod private_feedback;
 pub mod runtime_boundary;
+pub mod stablehlo_value_closure;
+pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;

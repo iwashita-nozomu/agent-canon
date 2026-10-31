@@ -4,7 +4,7 @@
 # responsibility Builds board-level route summaries for formal-proof theorem graphs.
 # upstream design ../../../.codex/personal/skills/formal-proof-workflow/SKILL.md requires problem-level board passes.
 # upstream design ../../../.codex/personal/skills/algorithm-proof-exploration/SKILL.md requires route-row batch selection.
-# upstream implementation theorem_graph_circularity_check.py validates circularity and forbidden reachability.
+# upstream implementation ../../runtime/dispatch/agent-canon/src/theorem_graph_circularity_check.rs validates circularity and forbidden reachability.
 # @dependency-end
 
 """Summarize theorem-graph route rows as a whole-theorem frontier board.
