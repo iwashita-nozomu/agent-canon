@@ -450,12 +450,25 @@ entries:
   - id: classify-path-risk
     public: true
     summary: Classifies changed paths into runtime profiles and targeted validation checks.
-    path: tools/validation/semantic/path/classify_path_risk.py
+    path: tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/path/classify_path_risk.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/path/classify_path_risk.py"]}
+    command: tools/bin/agent-canon classify-path-risk
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, classify-path-risk]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
     writes: false
     default_wiring:
       ci: false
@@ -2204,13 +2217,14 @@ entries:
       - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: evaluate-agent-run
-    summary: Evaluates an agent run bundle for workflow and evidence completeness.
-    path: eval/producers/evaluate_agent_run.py
-    family: agent_tools
+    public: true
+    summary: Evaluates a run bundle using its selected role outputs and records native agent feedback.
+    path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
+    family: root
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_agent_run.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_agent_run.py"]}
+    command: tools/bin/agent-canon run-evaluation --report-dir <report-dir>
+    dispatch: {argv: ["tools/bin/agent-canon", "run-evaluation", "--report-dir", "<report-dir>"]}
     writes: true
     default_wiring:
       ci: false
@@ -2218,8 +2232,10 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/run_evaluation.md
     tests:
       - tests/agent_tools/test_evaluate_agent_run.py
+      - tools/runtime/dispatch/agent-canon/tests/run_evaluation_native.rs
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.

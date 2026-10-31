@@ -10,6 +10,7 @@
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
+// downstream implementation run_evaluation.rs scores and reports one agent run bundle
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
@@ -18,6 +19,7 @@
 // downstream implementation stablehlo_value_closure.rs exposes scoped SSA dependency closure APIs
 // downstream implementation theorem_graph_circularity_check.rs validates theorem graph proof frontiers
 // downstream implementation migration_audit.rs validates migration boundaries
+// downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
@@ -34,6 +36,7 @@
 // @dependency-end
 
 mod check_merge_structure;
+pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
@@ -73,7 +76,7 @@ mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, tool_proof_coverage};
+use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -85,9 +88,11 @@ Commands:
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  run-evaluation (--run-id ID|--report-dir PATH) [options]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
@@ -140,6 +145,10 @@ fn main() {
         return;
     }
 
+    if args.len() >= 2 && args[1] == "run-evaluation" {
+        std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "numeric-performance" {
         std::process::exit(numeric_performance::run(&args[2..]));
     }
@@ -170,6 +179,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "classify-path-risk" {
+        std::process::exit(classify_path_risk::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "lsp-code-analysis" {
