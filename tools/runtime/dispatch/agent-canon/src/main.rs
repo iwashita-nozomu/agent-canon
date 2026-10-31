@@ -10,6 +10,7 @@
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
+// downstream implementation run_evaluation.rs scores and reports one agent run bundle
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
@@ -28,6 +29,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // @dependency-end
 
 mod check_merge_structure;
@@ -67,7 +69,7 @@ mod tool_drift;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
-use agent_canon::{catalog, tool_proof_coverage};
+use agent_canon::{catalog, run_evaluation, tool_proof_coverage};
 use std::env;
 
 const HELP: &str = "AgentCanon's native command line interface.
@@ -82,6 +84,7 @@ Commands:
   docs <check|format> [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
+  run-evaluation (--run-id ID|--report-dir PATH) [options]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
@@ -92,6 +95,7 @@ Commands:
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   check-run-log-contract [paths...] [--root <repo-root>] [--exclude PATTERN]... [--format text|json] [--fail-on-finding]
   skill-document-reader <index|chunk|admit> [options]
+  lsp-code-analysis analyze [--root ROOT] [--files FILES...] [--server LANGUAGE=COMMAND] [--timeout SECONDS] [--format json|text]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
@@ -131,6 +135,10 @@ fn main() {
         return;
     }
 
+    if args.len() >= 2 && args[1] == "run-evaluation" {
+        std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "numeric-performance" {
         std::process::exit(numeric_performance::run(&args[2..]));
     }
@@ -153,6 +161,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "skill-document-reader" {
         std::process::exit(skill_document_reader::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "lsp-code-analysis" {
+        std::process::exit(agent_canon::lsp_code_analysis::run(&args[2..]));
     }
 
     if args.len() >= 2

@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests test evaluate agent run behavior.
 # upstream design ../../agents/skills/agent-learning.md agent feedback workflow
-# upstream implementation ../../eval/producers/evaluate_agent_run.py evaluates run bundles
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs evaluates run bundles
 # downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes agent evaluation status
 # @dependency-end
 
@@ -11,52 +11,77 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Protocol, cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py"
+SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 MONITOR_SCRIPT = (
     PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
 )
-RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
+
+
+READY_REQUIRED_OUTPUTS = (
+    "user_request_contract.md",
+    "schedule.md",
+    "work_log.md",
+    "workflow_monitoring.md",
+    "change_review.md",
+    "final_review.md",
+    "verification.txt",
+    "closeout_gate.md",
+    "retrospective.md",
 )
 
 
-class EvaluateAgentRunModule(Protocol):
-    """Loaded evaluate_agent_run constants used by regression tests."""
+def write_team_manifest(
+    report_dir: Path,
+    required_outputs: tuple[str, ...] = READY_REQUIRED_OUTPUTS,
+    artifacts: tuple[str, ...] | None = None,
+) -> None:
+    """Write the current run-local artifact selection and materialization record."""
+    materialized = artifacts if artifacts is not None else required_outputs
+    lines = [
+        "run:",
+        "  id: unit-test-run",
+        "  task: native-evaluation-fixture",
+        "roles:",
+        "  - id: evaluator",
+        "    required_outputs:",
+        *(f"      - {name}" for name in required_outputs),
+        "artifacts:",
+        "  - team_manifest.yaml",
+        *(f"  - {name}" for name in materialized),
+    ]
+    write_lines(report_dir / "team_manifest.yaml", lines)
 
-    VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES: frozenset[str]
-    VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES: frozenset[str]
 
-
-def load_evaluate_module() -> EvaluateAgentRunModule:
-    """Load evaluate_agent_run.py for constant-level regression checks."""
-    sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-    try:
-        spec = importlib.util.spec_from_file_location("evaluate_agent_run", SCRIPT)
-        if spec is None or spec.loader is None:
-            raise AssertionError("failed to load evaluate_agent_run module spec")
-        module = importlib.util.module_from_spec(spec)
-        prior_module = sys.modules.get(spec.name)
-        sys.modules[spec.name] = module
-        try:
-            spec.loader.exec_module(module)
-            return cast(EvaluateAgentRunModule, module)
-        finally:
-            if prior_module is None:
-                sys.modules.pop(spec.name, None)
-            else:
-                sys.modules[spec.name] = prior_module
-    finally:
-        sys.path.pop(0)
+def write_evaluation(report_dir: Path) -> tuple[subprocess.CompletedProcess[str], str]:
+    """Run the native evaluator and return its externally written report."""
+    runtime = external_runtime(report_dir)
+    result = subprocess.run(
+        [
+            str(SCRIPT),
+            "run-evaluation",
+            "--report-dir",
+            str(report_dir),
+            "--write",
+            "--runtime-root",
+            str(runtime),
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    report_path = runtime / "agent_evaluation.md"
+    return result, report_path.read_text(
+        encoding="utf-8"
+    ) if report_path.is_file() else ""
 
 
 def write_lines(path: Path, lines: list[str]) -> None:
@@ -276,6 +301,7 @@ def write_ready_run(report_dir: Path) -> None:
     write_workflow_monitoring(report_dir)
     write_child_execution_receipts(report_dir)
     write_review_closeout_artifacts(report_dir)
+    write_team_manifest(report_dir)
 
 
 def external_runtime(root: Path) -> Path:
@@ -288,20 +314,142 @@ def external_runtime(root: Path) -> Path:
 class EvaluateAgentRunTest(unittest.TestCase):
     """Verify the run evaluation helper."""
 
-    def test_validation_failure_taxonomy_comes_from_runtime_inventory(self) -> None:
-        """Validation-failure slugs should be owned by the JSON inventory."""
-        data = json.loads(RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8"))
-        response = data["validation_failure_response"]
-        module = load_evaluate_module()
+    def test_native_evaluator_cli_replaces_the_python_producer(self) -> None:
+        """The registered native command has a help surface and no Python producer source."""
+        result = subprocess.run(
+            [str(SCRIPT), "run-evaluation", "--help"],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("usage: agent-canon run-evaluation", result.stdout)
+        self.assertFalse(
+            (PROJECT_ROOT / "eval" / "producers" / "evaluate_agent_run.py").exists()
+        )
 
-        self.assertEqual(
-            module.VALIDATION_FAILURE_CAUSE_CLASSIFICATION_VALUES,
-            frozenset(response["cause_classes"]),
-        )
-        self.assertEqual(
-            module.VALIDATION_FAILURE_INTENT_PRESERVATION_VALUES,
-            frozenset(response["intent_preservation"]),
-        )
+    def test_selected_and_unselected_planning_artifacts_keep_fixed_scores(self) -> None:
+        """Only manifest-required schedule/work-log files affect these criteria."""
+        for case, schedule_state in (
+            ("unselected_absent", "absent"),
+            ("unselected_malformed", "malformed"),
+        ):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp_dir:
+                report_dir = Path(tmp_dir) / "run"
+                write_ready_run(report_dir)
+                selected = tuple(
+                    name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md"
+                )
+                write_team_manifest(report_dir, selected)
+                (report_dir / "schedule.md").unlink()
+                if schedule_state == "malformed":
+                    (report_dir / "schedule.md").write_text(
+                        "not a schedule", encoding="utf-8"
+                    )
+                result, report = write_evaluation(report_dir)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(
+                    "| planned_work_and_chronology | 10 | 10 | pass |", report
+                )
+                self.assertIn("| artifact_completeness | 8 | 8 | pass |", report)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "selected-missing"
+            write_ready_run(report_dir)
+            (report_dir / "schedule.md").unlink()
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
+            self.assertIn("| artifact_completeness | 0 | 8 | revise |", report)
+
+    def test_selected_schedule_missing_from_materialization_fails(self) -> None:
+        """A selected file must be listed as materialized as well as exist on disk."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            materialized = tuple(
+                name for name in READY_REQUIRED_OUTPUTS if name != "schedule.md"
+            )
+            write_team_manifest(report_dir, READY_REQUIRED_OUTPUTS, materialized)
+            self.assertTrue((report_dir / "schedule.md").is_file())
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
+            self.assertIn("| artifact_completeness | 0 | 8 | revise |", report)
+
+    def test_empty_planning_selection_is_neutral_only_for_planning(self) -> None:
+        """No selected schedule/work log earns 10 points while other criteria still run."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            write_ready_run(report_dir)
+            selected = tuple(
+                name
+                for name in READY_REQUIRED_OUTPUTS
+                if name not in {"schedule.md", "work_log.md"}
+            )
+            write_team_manifest(report_dir, selected)
+            (report_dir / "schedule.md").unlink()
+            (report_dir / "work_log.md").unlink()
+            result, report = write_evaluation(report_dir)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("| planned_work_and_chronology | 10 | 10 | pass |", report)
+            self.assertIn("| artifact_completeness | 8 | 8 | pass |", report)
+            self.assertIn("| request_traceability |", report)
+            self.assertIn("| workflow_monitoring |", report)
+
+    def test_unknown_or_invalid_selection_is_a_revise_blocker(self) -> None:
+        """Missing selection metadata is never interpreted as an empty output set."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "missing"
+            write_ready_run(report_dir)
+            (report_dir / "team_manifest.yaml").unlink()
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
+            self.assertIn("| artifact_completeness | 0 | 8 | revise |", report)
+            self.assertIn("team_manifest.yaml", report)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "invalid"
+            write_ready_run(report_dir)
+            write_lines(
+                report_dir / "team_manifest.yaml",
+                [
+                    "run:",
+                    "  id: invalid",
+                    "roles:",
+                    "  - id: evaluator",
+                    "artifacts:",
+                    "  - schedule.md",
+                ],
+            )
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("required_outputs", report)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
+
+    def test_selected_missing_and_empty_work_log_keep_existing_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "missing"
+            write_ready_run(report_dir)
+            (report_dir / "work_log.md").unlink()
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
+            self.assertIn("work_log.md:missing", report)
+            self.assertIn("| artifact_completeness | 0 | 8 | revise |", report)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_dir = Path(tmp_dir) / "empty"
+            write_ready_run(report_dir)
+            (report_dir / "work_log.md").write_text(
+                "# Work Log\n## Entries\nNo bullets here.\n", encoding="utf-8"
+            )
+            result, report = write_evaluation(report_dir)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("work_log.md:entries_empty", report)
+            self.assertIn("| planned_work_and_chronology | 0 | 10 | revise |", report)
 
     def test_evaluate_rejects_forged_child_execution_declaration(self) -> None:
         """Literal child markers cannot replace hashed spawn/mutation/close receipts."""
@@ -314,7 +462,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 encoding="utf-8",
             )
             result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--report-dir", str(report_dir)],
+                [str(SCRIPT), "run-evaluation", "--report-dir", str(report_dir)],
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -332,8 +480,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                     "--write",
@@ -386,6 +534,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "generated_role_view_v1 profile-attribution topology_derived_v1 "
                     "declared_team_peak_plus_nested_reservations_v1 requested_capacity_loader "
                     "model-capacity thread-capacity",
+                    "--behavior-event",
+                    "execution_path_comparison_not_required reason=unit-test-single-route",
                     "--decision",
                     "skill_improvement_decision=recorded",
                     "--decision",
@@ -414,8 +564,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -450,8 +600,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -484,8 +634,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
                 result = subprocess.run(
                     [
-                        sys.executable,
                         str(SCRIPT),
+                        "run-evaluation",
                         "--report-dir",
                         str(report_dir),
                     ],
@@ -512,8 +662,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                     "--write",
@@ -549,8 +699,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -577,8 +727,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -608,8 +758,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -650,8 +800,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -692,8 +842,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -723,8 +873,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -759,8 +909,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -792,8 +942,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -828,8 +978,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -861,8 +1011,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -901,8 +1051,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -944,8 +1094,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -984,8 +1134,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1015,8 +1165,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1049,8 +1199,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1090,8 +1240,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1134,8 +1284,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1169,8 +1319,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1208,8 +1358,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1255,8 +1405,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
                 result = subprocess.run(
                     [
-                        sys.executable,
                         str(SCRIPT),
+                        "run-evaluation",
                         "--report-dir",
                         str(report_dir),
                     ],
@@ -1296,8 +1446,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1342,8 +1492,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -1370,8 +1520,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
                     str(SCRIPT),
+                    "run-evaluation",
                     "--report-dir",
                     str(report_dir),
                     "--write",
