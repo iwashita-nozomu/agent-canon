@@ -825,14 +825,11 @@ else
       copy_directory "$legacy/$directory" "$root/$directory"
     fi
   done
-  marker_tmp="$marker.$$"
+  marker_tmp=$(mktemp "$root/.agent-canon-controller-volume-v1.XXXXXX")
   printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
   mv -f "$marker_tmp" "$marker"
 fi
-marker_tmp="$root/.agent-canon-marker-check.$$"
-printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" > "$marker_tmp"
-cmp -s "$marker" "$marker_tmp" || exit 50
-rm -f "$marker_tmp"
+printf "agent-canon-controller-volume/v1\\n%s\\n" "$digest" | cmp -s "$marker" - || exit 50
 if [ -f "$root/source-sync.json" ] || [ -L "$root/source-sync.json" ]; then
   rm -f "$root/source-sync.json"
 fi
@@ -865,7 +862,22 @@ for directory in "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime
     [ -d "$directory" ] && [ ! -L "$directory" ] || exit 59
   fi
 done
-mkdir -p "$runtime/spool/private-feedback"
+runtime_spool="$runtime/spool"
+if [ "$marked" = 0 ]; then
+  mkdir -p "$runtime_spool"
+elif [ -e "$runtime_spool" ] || [ -L "$runtime_spool" ]; then
+  [ -d "$runtime_spool" ] && [ ! -L "$runtime_spool" ] || exit 59
+else
+  mkdir -p "$runtime_spool"
+fi
+private_feedback="$runtime_spool/private-feedback"
+if [ "$marked" = 0 ]; then
+  mkdir -p "$private_feedback"
+elif [ -e "$private_feedback" ] || [ -L "$private_feedback" ]; then
+  [ -d "$private_feedback" ] && [ ! -L "$private_feedback" ] || exit 59
+else
+  mkdir -p "$private_feedback"
+fi
 for directory in "$root/exchange" "$root/private-log"; do
   if [ "$marked" = 0 ]; then
     mkdir -p "$directory"
@@ -875,15 +887,32 @@ for directory in "$root/exchange" "$root/private-log"; do
     mkdir -p "$directory"
   fi
 done
+if [ "$marked" = 1 ]; then
+  healthy=1
+  for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$runtime/spool" "$private_feedback" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
+    if [ "$(stat -c "%a:%u:%g" "$directory" 2>/dev/null || true)" != "700:$uid_value:$gid_value" ]; then
+      healthy=0
+      break
+    fi
+  done
+  if [ "$healthy" = 1 ] && [ "$(stat -c "%a:%u:%g" "$marker" 2>/dev/null || true)" = "600:$uid_value:$gid_value" ]; then
+    write_probe=$(mktemp "$root/.agent-canon-volume-write.XXXXXX") || exit 62
+    printf "write\n" > "$write_probe"
+    [ "$(cat "$write_probe")" = "write" ] || exit 62
+    rm -f "$write_probe"
+    printf "marker\\t%s\\ncontent\\tok\\n" "$digest"
+    exit 0
+  fi
+fi
 chown -R "$uid_value:$gid_value" "$root"
 find "$root" -type d -exec chmod 700 {} +
 chmod 600 "$marker"
 chown "$uid_value:$gid_value" "$marker"
-for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
+for directory in "$root" "$runtime" "$runtime/receipts" "$runtime/generations" "$runtime/tasks" "$runtime/spool" "$private_feedback" "$root/exchange" "$root/spool" "$root/archive" "$root/cache" "$root/codex-home" "$root/private-log"; do
   [ "$(stat -c "%a:%u:%g" "$directory")" = "700:$uid_value:$gid_value" ] || exit 60
 done
 [ "$(stat -c "%a:%u:%g" "$marker")" = "600:$uid_value:$gid_value" ] || exit 61
-write_probe="$root/.agent-canon-volume-write.$$"
+write_probe=$(mktemp "$root/.agent-canon-volume-write.XXXXXX") || exit 62
 printf "write\n" > "$write_probe"
 [ "$(cat "$write_probe")" = "write" ] || exit 62
 rm -f "$write_probe"
