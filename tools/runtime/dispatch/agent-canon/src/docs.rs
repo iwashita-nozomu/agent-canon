@@ -681,7 +681,13 @@ fn similar_design_runtime_error(message: impl std::fmt::Display) -> i32 {
 fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String, String> {
     let mut files = Vec::new();
     collect_redundant_markdown_files(design_dir, &mut files)?;
-    files.sort_by(|left, right| similarity_path_order(left, right));
+    #[cfg(windows)]
+    let case_mapper = icu_casemap::CaseMapper::new();
+    #[cfg(windows)]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right, &case_mapper);
+    #[cfg(not(windows))]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right);
+    files.sort_by(|left, right| path_order(left, right));
 
     let mut normalized = Vec::with_capacity(files.len());
     for path in &files {
@@ -707,8 +713,8 @@ fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String
         right
             .0
             .total_cmp(&left.0)
-            .then_with(|| similarity_path_order(right.1, left.1))
-            .then_with(|| similarity_path_order(right.2, left.2))
+            .then_with(|| path_order(right.1, left.1))
+            .then_with(|| path_order(right.2, left.2))
     });
 
     let threshold = crate::python_json::python_float(minimum);
@@ -732,33 +738,38 @@ fn build_similar_design_report(design_dir: &Path, minimum: f64) -> Result<String
     Ok(format!("{}\n", lines.join("\n")))
 }
 
-fn similarity_path_order(left: &Path, right: &Path) -> Ordering {
-    #[cfg(windows)]
-    {
-        static CASE_MAPPER: OnceLock<icu_casemap::CaseMapper> = OnceLock::new();
-        let case_mapper = CASE_MAPPER.get_or_init(icu_casemap::CaseMapper::new);
-        let mut left_components = left.components();
-        let mut right_components = right.components();
-        loop {
-            match (left_components.next(), right_components.next()) {
-                (Some(left), Some(right)) => {
-                    let left = case_mapper.fold_string(&left.as_os_str().to_string_lossy());
-                    let right = case_mapper.fold_string(&right.as_os_str().to_string_lossy());
-                    let order = left.cmp(&right);
-                    if !order.is_eq() {
-                        return order;
-                    }
+#[cfg(windows)]
+fn similarity_path_order(
+    left: &Path,
+    right: &Path,
+    case_mapper: &icu_casemap::CaseMapper,
+) -> Ordering {
+    // pathlib 3.12 uses str.lower() for Windows path comparison, in the root locale.
+    let root_locale = Default::default();
+    let mut left_components = left.components();
+    let mut right_components = right.components();
+    loop {
+        match (left_components.next(), right_components.next()) {
+            (Some(left), Some(right)) => {
+                let left = case_mapper
+                    .lowercase_to_string(&left.as_os_str().to_string_lossy(), &root_locale);
+                let right = case_mapper
+                    .lowercase_to_string(&right.as_os_str().to_string_lossy(), &root_locale);
+                let order = left.cmp(&right);
+                if !order.is_eq() {
+                    return order;
                 }
-                (Some(_), None) => return Ordering::Greater,
-                (None, Some(_)) => return Ordering::Less,
-                (None, None) => return Ordering::Equal,
             }
+            (Some(_), None) => return Ordering::Greater,
+            (None, Some(_)) => return Ordering::Less,
+            (None, None) => return Ordering::Equal,
         }
     }
-    #[cfg(not(windows))]
-    {
-        left.cmp(right)
-    }
+}
+
+#[cfg(not(windows))]
+fn similarity_path_order(left: &Path, right: &Path) -> Ordering {
+    left.cmp(right)
 }
 
 fn normalize_similar_design_text(text: &str) -> String {

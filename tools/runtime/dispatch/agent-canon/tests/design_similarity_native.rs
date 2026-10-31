@@ -156,6 +156,37 @@ fn native_similarity_path_order_matches_python_path_models() {
 }
 
 #[test]
+fn native_similarity_path_order_uses_python_lowercase_not_casefold() {
+    // Python 3.12 pathlib.lower() keeps sharp-s distinct from "ss". This expected
+    // vector comes from PureWindowsPath comparison, not a Windows filesystem run.
+    let temp = TempRoot::new();
+    let source = temp.source();
+    let runtime = temp.runtime();
+    let design_root = source.join("documents/design");
+    for name in ["ß.md", "ss.md", "S.md"] {
+        write(&design_root.join(name), "identical content");
+    }
+    let before = snapshot(&source);
+
+    let output = run_native(&source, &runtime, &["--min", "1", "--output", "report.txt"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let mut expected = "Similar design file pairs (threshold >= 1.0)\n".to_owned();
+    for (first, second) in [("ss.md", "ß.md"), ("S.md", "ß.md"), ("S.md", "ss.md")] {
+        expected.push_str(&format!(
+            "1.000  {}  {}\n",
+            design_root.join(first).display(),
+            design_root.join(second).display()
+        ));
+    }
+    assert_eq!(
+        fs::read_to_string(runtime.join("report.txt")).expect("lowercase report exists"),
+        expected
+    );
+    assert_eq!(snapshot(&source), before, "source tree stays unchanged");
+}
+
+#[test]
 fn native_similarity_default_report_is_run_scoped_in_external_runtime() {
     let temp = TempRoot::new();
     let source = temp.source();
