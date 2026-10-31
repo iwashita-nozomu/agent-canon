@@ -880,8 +880,9 @@ pub fn validate_source_projection_packet(
     let g3_inputs = required_value(g3, "ordered_input_evidence_refs", "gate_verdict")?
         .as_array()
         .expect("validated gate input evidence is an array");
+    let cas_map = mapping(&cas, "candidate_cas_receipt")?;
     let cas_binding = mapping(
-        required_value(&cas, "binding", "candidate_cas_receipt")?,
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
         "candidate_cas_receipt.binding",
     )?;
     let cas_evidence =
@@ -918,7 +919,7 @@ pub fn validate_source_projection_packet(
     if predecessors.len() != 2 {
         return Err(fail("frontier:predecessor_order_invalid", ""));
     }
-    for (index, (value, expected_number, expected_pr)) in predecessors
+    for (index, (value, (expected_number, expected_pr))) in predecessors
         .iter()
         .zip([(388, "#388"), (389, "#389")])
         .enumerate()
