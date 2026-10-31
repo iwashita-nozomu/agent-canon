@@ -97,7 +97,7 @@ Validate the selected owner rather than every tool family:
 ```bash
 tools/bin/agent-canon tool-catalog
 python3 tools/validation/semantic/convention/check_convention_compliance.py
-python3 tools/validation/documentation/checks/check_bootstrap_docs.py --root .
+tools/bin/agent-canon docs check-bootstrap --root .
 ```
 
 Container behavior is validated with `bootstrap.sh install -> start -> target
