@@ -96,7 +96,7 @@ enum PythonMembership {
 
 impl PythonMembership {
     fn from_or_default(value: Option<&Value>, field: &str) -> Result<Self, String> {
-        let Some(value) = value.filter(|value| value_truthy(*value)) else {
+        let Some(value) = value.filter(|value| value_truthy(value)) else {
             return Ok(Self::Empty);
         };
         match value {
@@ -315,7 +315,7 @@ fn first_nonempty(object: &Map<String, Value>, names: &[&str]) -> String {
         .find_map(|name| {
             object
                 .get(*name)
-                .filter(|value| value_truthy(*value))
+                .filter(|value| value_truthy(value))
                 .map(value_string)
         })
         .unwrap_or_default()
@@ -359,12 +359,12 @@ fn field_string_list_alias(
 ) -> Result<Option<Vec<String>>, String> {
     let selected = object
         .get(first)
-        .filter(|value| value_truthy(*value))
+        .filter(|value| value_truthy(value))
         .map(|value| (first, value))
         .or_else(|| {
             object
                 .get(second)
-                .filter(|value| value_truthy(*value))
+                .filter(|value| value_truthy(value))
                 .map(|value| (second, value))
         });
     selected
@@ -496,14 +496,14 @@ fn scalar_dtype(tensor_type: &str) -> String {
         .to_string()
 }
 
-fn function_map<'a>(ir: &'a OperationalIr) -> HashMap<&'a str, &'a FunctionRecord> {
+fn function_map(ir: &OperationalIr) -> HashMap<&str, &FunctionRecord> {
     ir.functions
         .iter()
         .map(|function| (function.name.as_str(), function))
         .collect()
 }
 
-fn region_map<'a>(ir: &'a OperationalIr) -> HashMap<&'a str, &'a RegionRecord> {
+fn region_map(ir: &OperationalIr) -> HashMap<&str, &RegionRecord> {
     ir.regions
         .iter()
         .map(|region| (region.region_id.as_str(), region))

@@ -205,11 +205,7 @@ fn is_active_proof_edge(edge: &Edge) -> bool {
             .any(|term| edge.status.contains(*term))
 }
 
-fn node_string<'a>(
-    nodes: &'a HashMap<String, Map<String, Value>>,
-    node_id: &str,
-    key: &str,
-) -> String {
+fn node_string(nodes: &HashMap<String, Map<String, Value>>, node_id: &str, key: &str) -> String {
     nodes
         .get(node_id)
         .map(|node| field(node, key, ""))
@@ -398,28 +394,35 @@ fn leaf_paths(
     leaves
 }
 
+struct ForbiddenReachabilityPolicy<'a> {
+    allowed_edge_kinds: &'a HashSet<String>,
+    forbidden_node_kinds: &'a HashSet<String>,
+    forbidden_status_terms: &'a HashSet<String>,
+    allowed_node_kinds: &'a HashSet<String>,
+    allowed_statuses: &'a HashSet<String>,
+    allowed_status_prefixes: &'a HashSet<String>,
+}
+
 fn node_is_forbidden_reachable(
     node: Option<&Map<String, Value>>,
-    forbidden_node_kinds: &HashSet<String>,
-    forbidden_status_terms: &HashSet<String>,
-    allowed_node_kinds: &HashSet<String>,
-    allowed_statuses: &HashSet<String>,
-    allowed_status_prefixes: &HashSet<String>,
+    policy: &ForbiddenReachabilityPolicy<'_>,
 ) -> bool {
     let kind = node.map(|node| field(node, "kind", "")).unwrap_or_default();
     let status = node
         .map(|node| field(node, "status", ""))
         .unwrap_or_default();
-    if allowed_node_kinds.contains(&kind)
-        || allowed_statuses.contains(&status)
-        || allowed_status_prefixes
+    if policy.allowed_node_kinds.contains(&kind)
+        || policy.allowed_statuses.contains(&status)
+        || policy
+            .allowed_status_prefixes
             .iter()
             .any(|prefix| !prefix.is_empty() && status.starts_with(prefix.as_str()))
     {
         return false;
     }
-    forbidden_node_kinds.contains(&kind)
-        || forbidden_status_terms
+    policy.forbidden_node_kinds.contains(&kind)
+        || policy
+            .forbidden_status_terms
             .iter()
             .any(|term| !term.is_empty() && status.contains(term.as_str()))
 }
@@ -427,12 +430,7 @@ fn node_is_forbidden_reachable(
 fn forbidden_reachable_nodes(
     start: &str,
     index: &GraphIndex,
-    allowed_edge_kinds: &HashSet<String>,
-    forbidden_node_kinds: &HashSet<String>,
-    forbidden_status_terms: &HashSet<String>,
-    allowed_node_kinds: &HashSet<String>,
-    allowed_statuses: &HashSet<String>,
-    allowed_status_prefixes: &HashSet<String>,
+    policy: &ForbiddenReachabilityPolicy<'_>,
 ) -> Vec<PathFinding> {
     let mut findings = vec![];
     let mut queue = VecDeque::from([(
@@ -442,21 +440,12 @@ fn forbidden_reachable_nodes(
     )]);
     let mut seen_edges = HashSet::new();
     while let Some((node_id, path, edge_kinds)) = queue.pop_front() {
-        if node_id != start
-            && node_is_forbidden_reachable(
-                index.nodes.get(&node_id),
-                forbidden_node_kinds,
-                forbidden_status_terms,
-                allowed_node_kinds,
-                allowed_statuses,
-                allowed_status_prefixes,
-            )
-        {
+        if node_id != start && node_is_forbidden_reachable(index.nodes.get(&node_id), policy) {
             findings.push((node_id.clone(), path.clone(), edge_kinds.clone()));
         }
         if let Some(edges) = index.outgoing.get(&node_id) {
             for edge in edges {
-                if !allowed_edge_kinds.contains(&edge.kind)
+                if !policy.allowed_edge_kinds.contains(&edge.kind)
                     || !seen_edges.insert((node_id.clone(), edge.kind.clone(), edge.target.clone()))
                     || path.contains(&edge.target)
                 {
@@ -584,37 +573,41 @@ fn check_forbidden_reachability(
         if allowed_edges.is_empty() {
             continue;
         }
-        let check_findings: Vec<_> = forbidden_reachable_nodes(
-            &start,
-            &index,
-            &allowed_edges,
-            &string_set(check.get("forbidden_node_kinds")),
-            &string_set(check.get("forbidden_status_terms")),
-            &string_set(check.get("allowed_node_kinds")),
-            &string_set(check.get("allowed_statuses")),
-            &string_set(check.get("allowed_status_prefixes")),
-        )
-        .into_iter()
-        .map(|(reached, path, edge_kinds)| {
-            let node = index.nodes.get(&reached);
-            ReachabilityFinding {
-                check_id: check_id.clone(),
-                start: start.clone(),
-                reached_kind: node.map(|node| field(node, "kind", "")).unwrap_or_default(),
-                reached_status: node
-                    .map(|node| field(node, "status", ""))
-                    .unwrap_or_default(),
-                reached_origin: node
-                    .map(|node| field(node, "origin", ""))
-                    .unwrap_or_default(),
-                reached,
-                path,
-                edge_kinds,
-                severity: field(check, "severity", "forbidden_reachability"),
-                explanation: field(check, "explanation", ""),
-            }
-        })
-        .collect();
+        let forbidden_node_kinds = string_set(check.get("forbidden_node_kinds"));
+        let forbidden_status_terms = string_set(check.get("forbidden_status_terms"));
+        let allowed_node_kinds = string_set(check.get("allowed_node_kinds"));
+        let allowed_statuses = string_set(check.get("allowed_statuses"));
+        let allowed_status_prefixes = string_set(check.get("allowed_status_prefixes"));
+        let policy = ForbiddenReachabilityPolicy {
+            allowed_edge_kinds: &allowed_edges,
+            forbidden_node_kinds: &forbidden_node_kinds,
+            forbidden_status_terms: &forbidden_status_terms,
+            allowed_node_kinds: &allowed_node_kinds,
+            allowed_statuses: &allowed_statuses,
+            allowed_status_prefixes: &allowed_status_prefixes,
+        };
+        let check_findings: Vec<_> = forbidden_reachable_nodes(&start, &index, &policy)
+            .into_iter()
+            .map(|(reached, path, edge_kinds)| {
+                let node = index.nodes.get(&reached);
+                ReachabilityFinding {
+                    check_id: check_id.clone(),
+                    start: start.clone(),
+                    reached_kind: node.map(|node| field(node, "kind", "")).unwrap_or_default(),
+                    reached_status: node
+                        .map(|node| field(node, "status", ""))
+                        .unwrap_or_default(),
+                    reached_origin: node
+                        .map(|node| field(node, "origin", ""))
+                        .unwrap_or_default(),
+                    reached,
+                    path,
+                    edge_kinds,
+                    severity: field(check, "severity", "forbidden_reachability"),
+                    explanation: field(check, "explanation", ""),
+                }
+            })
+            .collect();
         if check_findings.is_empty() {
             passed.push(check_id);
         } else {
