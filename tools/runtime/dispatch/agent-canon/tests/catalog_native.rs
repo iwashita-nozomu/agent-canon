@@ -247,7 +247,9 @@ classification = "internal"
     root
 }
 
-fn native_cli_wiring_root(catalog_selector: &str, shell_source: &str) -> TempRoot {
+fn native_cli_wiring_root(dispatch_args: &[&str], shell_source: &str) -> TempRoot {
+    assert!(dispatch_args.len() >= 2);
+    assert_eq!(dispatch_args[0], "tools/bin/agent-canon");
     let root = valid_tool_catalog_root();
     let native_path = "tools/runtime/dispatch/agent-canon/src/demo_tool.rs";
     let native_doc = "documents/tools/demo_tool.md";
@@ -256,8 +258,14 @@ fn native_cli_wiring_root(catalog_selector: &str, shell_source: &str) -> TempRoo
 
     let catalog_path = root.path().join("tools/catalog.yaml");
     let catalog = fs::read_to_string(catalog_path).unwrap();
+    let command = dispatch_args[1..].join(" ");
+    let dispatch_argv = dispatch_args
+        .iter()
+        .map(|argument| format!("\"{argument}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
     let native_entry_route = format!(
-        "    path: {native_path}\n    command: tools/bin/agent-canon {catalog_selector}\n    dispatch: {{argv: [\"tools/bin/agent-canon\", \"{catalog_selector}\"]}}\n"
+        "    path: {native_path}\n    command: tools/bin/agent-canon {command}\n    dispatch: {{argv: [{dispatch_argv}]}}\n"
     );
     let catalog = catalog
         .replace("    path: tools/demo-tool.py\n", &native_entry_route)
@@ -270,7 +278,7 @@ fn native_cli_wiring_root(catalog_selector: &str, shell_source: &str) -> TempRoo
             "    default_wiring: {ci: true, pr_check: false}",
         );
     assert!(catalog.contains(native_path));
-    assert!(catalog.contains(catalog_selector));
+    assert!(catalog.contains(&command));
     root.write("tools/catalog.yaml", &catalog);
 
     let tool_docs_path = root.path().join("documents/tools/tool-docs.toml");
@@ -452,7 +460,7 @@ fn default_reference_pattern_excludes_test_paths_and_keeps_tool_paths() {
 #[test]
 fn native_default_wiring_recognizes_catalogued_wrapper_command() {
     let root = native_cli_wiring_root(
-        "native-check",
+        &["tools/bin/agent-canon", "native-check"],
         "if run_agent_canon native-check --root .; then\n  :\nfi\n",
     );
     assert!(
@@ -464,7 +472,7 @@ fn native_default_wiring_recognizes_catalogued_wrapper_command() {
 #[test]
 fn native_default_wiring_recognizes_direct_catalogued_cli_command() {
     let root = native_cli_wiring_root(
-        "native-check",
+        &["tools/bin/agent-canon", "native-check"],
         "if tools/bin/agent-canon native-check --root .; then\n  :\nfi\n",
     );
     assert!(
@@ -475,11 +483,12 @@ fn native_default_wiring_recognizes_direct_catalogued_cli_command() {
 
 #[test]
 fn native_default_wiring_reports_missing_and_misbound_calls() {
-    let missing = native_cli_wiring_root("native-check", "echo no native check call\n");
+    let dispatch = &["tools/bin/agent-canon", "native-check"];
+    let missing = native_cli_wiring_root(dispatch, "echo no native check call\n");
     assert!(native_wiring_is_unreferenced(&missing));
 
     let misbound = native_cli_wiring_root(
-        "native-check",
+        dispatch,
         "if run_agent_canon different-check --root .; then\n  :\nfi\n",
     );
     assert!(native_wiring_is_unreferenced(&misbound));
@@ -489,8 +498,30 @@ fn native_default_wiring_reports_missing_and_misbound_calls() {
 fn native_default_wiring_does_not_accept_a_comment_as_a_call() {
     let native_path = "tools/runtime/dispatch/agent-canon/src/demo_tool.rs";
     let comment = format!("# if run_agent_canon native-check --root . {native_path}\n");
-    let root = native_cli_wiring_root("native-check", &comment);
+    let root = native_cli_wiring_root(&["tools/bin/agent-canon", "native-check"], &comment);
     assert!(native_wiring_is_unreferenced(&root));
+}
+
+#[test]
+fn native_default_wiring_requires_static_dispatch_flags_and_keeps_quotes() {
+    let dispatch = &["tools/bin/agent-canon", "notebook-quality", "--all"];
+    let wired = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon \"notebook-quality\" \"--all\" --root \"$ROOT\"; then\n  :\nfi\n",
+    );
+    assert!(!native_wiring_is_unreferenced(&wired));
+
+    let missing_flag = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon notebook-quality --root \"$ROOT\"; then\n  :\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&missing_flag));
+
+    let misbound_flag = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon notebook-quality --changed; then\n  :\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&misbound_flag));
 }
 
 #[test]

@@ -530,52 +530,115 @@ fn native_cli_dispatch(entry: &Yaml) -> Option<Vec<String>> {
 
 // Only a command-position wrapper/direct invocation proves native default wiring.
 fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
-    let (Some(executable), Some(selector)) = (argv.first(), argv.get(1)) else {
+    let Some(executable) = argv.first() else {
         return false;
     };
     if executable.as_str() != "tools/bin/agent-canon" {
         return false;
     }
-    let Ok(executable_tokens) = rust_tokens(executable) else {
-        return false;
-    };
-    let Ok(selector_tokens) = rust_tokens(selector) else {
-        return false;
-    };
-    if selector_tokens.is_empty() {
+    let executable_forms = dispatch_argument_token_forms(executable);
+    let wrapper_forms = dispatch_argument_token_forms("run_agent_canon");
+    if executable_forms.is_empty() || wrapper_forms.is_empty() {
         return false;
     }
-    let executable_values = executable_tokens
-        .iter()
-        .map(|token| token.value.clone())
-        .collect::<Vec<_>>();
-    let selector_values = selector_tokens
-        .iter()
-        .map(|token| token.value.clone())
-        .collect::<Vec<_>>();
-    let wrapper_values = vec!["run_agent_canon".to_owned()];
 
     text.lines().any(|line| {
         let Ok(tokens) = rust_tokens(line) else {
             return false;
         };
-        let matches_invocation = |prefix: &[String], conditional: bool| {
-            let leader_length = if conditional { 1 } else { 0 };
-            let mut expected =
-                Vec::with_capacity(leader_length + prefix.len() + selector_values.len());
-            if conditional {
-                expected.push("if".to_owned());
-            }
-            expected.extend(prefix.iter().cloned());
-            expected.extend(selector_values.iter().cloned());
-            let expected = expected.iter().map(String::as_str).collect::<Vec<_>>();
-            token_sequence_matches(&tokens, &expected).contains(&0)
-        };
-        matches_invocation(&wrapper_values, false)
-            || matches_invocation(&wrapper_values, true)
-            || matches_invocation(&executable_values, false)
-            || matches_invocation(&executable_values, true)
+        let mut command_starts = Vec::new();
+        if tokens.first().is_some_and(|token| token.value == "if") {
+            command_starts.push(1);
+        }
+        command_starts.push(0);
+        command_starts.into_iter().any(|start| {
+            wrapper_forms
+                .iter()
+                .chain(executable_forms.iter())
+                .any(|form| {
+                    token_sequence_matches_at(&tokens, start, form)
+                        && dispatch_arguments_are_referenced(
+                            &tokens,
+                            start + form.len(),
+                            argv.get(1..).unwrap_or_default(),
+                        )
+                })
+        })
     })
+}
+
+fn token_sequence_matches_at(tokens: &[RustToken], start: usize, values: &[String]) -> bool {
+    let values = values.iter().map(String::as_str).collect::<Vec<_>>();
+    token_sequence_matches(tokens, &values).contains(&start)
+}
+
+fn dispatch_argument_token_forms(argument: &str) -> Vec<Vec<String>> {
+    // Preserve token boundaries and escapes for unquoted and common quoted shell words.
+    let mut sources = vec![argument.to_owned()];
+    let escaped_double_quoted = argument
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('$', "\\$");
+    sources.push(format!("\"{escaped_double_quoted}\""));
+    if !argument.contains('\'') {
+        sources.push(format!("'{argument}'"));
+    }
+    let mut forms = Vec::new();
+    for source in sources {
+        let Ok(tokens) = rust_tokens(&source) else {
+            continue;
+        };
+        let values = tokens
+            .into_iter()
+            .map(|token| token.value)
+            .collect::<Vec<_>>();
+        if !values.is_empty() && !forms.contains(&values) {
+            forms.push(values);
+        }
+    }
+    forms
+}
+
+fn is_dispatch_placeholder(argument: &str) -> bool {
+    argument.contains('<') || argument.contains('>')
+}
+
+fn dispatch_arguments_are_referenced(
+    tokens: &[RustToken],
+    mut position: usize,
+    arguments: &[String],
+) -> bool {
+    let mut may_skip_tokens = false;
+    for argument in arguments {
+        if is_dispatch_placeholder(argument) {
+            // Caller values may vary; fixed dispatch arguments still match in order.
+            may_skip_tokens = true;
+            continue;
+        }
+        let forms = dispatch_argument_token_forms(argument);
+        if forms.is_empty() {
+            return false;
+        }
+        let matched = if may_skip_tokens {
+            (position..tokens.len()).find_map(|start| {
+                forms
+                    .iter()
+                    .find(|form| token_sequence_matches_at(tokens, start, form))
+                    .map(|form| (start, form.len()))
+            })
+        } else {
+            forms
+                .iter()
+                .find(|form| token_sequence_matches_at(tokens, position, form))
+                .map(|form| (position, form.len()))
+        };
+        let Some((start, length)) = matched else {
+            return false;
+        };
+        position = start + length;
+        may_skip_tokens = false;
+    }
+    true
 }
 
 fn check_catalog_docs(root: &Path) -> Vec<Finding> {
