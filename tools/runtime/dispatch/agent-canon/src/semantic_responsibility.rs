@@ -978,6 +978,6 @@ fn empty_or_missing(value: Option<&ContractValue>) -> bool {
     value.is_none_or(ContractValue::is_empty_string)
 }
 
-fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
     agent_canon::path_resolution::resolve_non_strict(path)
 }
