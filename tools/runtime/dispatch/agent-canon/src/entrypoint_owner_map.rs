@@ -265,8 +265,6 @@ fn parse_args(args: &[String]) -> Result<ParseResult, String> {
                     args[index + 1..].join(" ")
                 ));
             }
-        } else if token.starts_with('-') {
-            return Err(format!("unrecognized arguments: {token}"));
         } else {
             return Err(format!("unrecognized arguments: {token}"));
         }
