@@ -12,22 +12,28 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
 AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
-def _run_native(
+
+def _run_native_result(
     tmp_path: Path,
     ir: dict[str, object],
     *,
     value: str,
     function: str = "main",
     region_id: str = "",
-) -> dict[str, object]:
+) -> subprocess.CompletedProcess[str]:
     assert AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
     executable = Path(AGENT_CANON_CLI)
-    assert executable.is_absolute() and executable.is_file() and os.access(executable, os.X_OK)
+    assert (
+        executable.is_absolute()
+        and executable.is_file()
+        and os.access(executable, os.X_OK)
+    )
     ir_path = tmp_path / "operational-ir.json"
     ir_path.write_text(json.dumps(ir), encoding="utf-8")
     arguments = [
@@ -46,7 +52,23 @@ def _run_native(
     ]
     if region_id:
         arguments.extend(["--region-id", region_id])
-    result = subprocess.run(arguments, check=True, capture_output=True, text=True)
+    return subprocess.run(
+        arguments, check=False, capture_output=True, text=True
+    )
+
+
+def _run_native(
+    tmp_path: Path,
+    ir: dict[str, object],
+    *,
+    value: str,
+    function: str = "main",
+    region_id: str = "",
+) -> dict[str, object]:
+    result = _run_native_result(
+        tmp_path, ir, value=value, function=function, region_id=region_id
+    )
+    assert result.returncode == 0, result.stderr
     return cast(dict[str, object], json.loads(result.stdout))
 
 
@@ -200,3 +222,41 @@ def test_closure_reports_constant_payloads_and_convert_ops(tmp_path: Path) -> No
             "text": "%out = stablehlo.convert %cst : (tensor<f64>) -> tensor<f32>",
         }
     ]
+
+
+def test_numeric_result_name_fields_are_rejected_without_iterating_them(
+    tmp_path: Path,
+) -> None:
+    """Match Python list(int) rejection, including values too large to expand."""
+    for invalid_names in (2, 18_446_744_073_709_551_615):
+        assert not isinstance(invalid_names, Iterable)
+
+        ir = {
+            "schema": "agent-canon.thin-operational-ir.v2",
+            "functions": [
+                {
+                    "name": "main",
+                    "signature": "func.func public @main() -> tensor<f32> {",
+                    "body_region_id": "r_main",
+                },
+            ],
+            "regions": [{"region_id": "r_main", "op_ids": ["constant"]}],
+            "ops": [
+                {
+                    "op_id": "constant",
+                    "kind": "Primitive",
+                    "opcode": "stablehlo.constant",
+                    "function": "main",
+                    "region_id": "r_main",
+                    "line": 1,
+                    "result_names": invalid_names,
+                    "text": "%out = stablehlo.constant dense<1.0> : tensor<f32>",
+                }
+            ],
+        }
+
+        result = _run_native_result(tmp_path, ir, value="%out")
+
+        assert result.returncode != 0
+        assert "result_names" in result.stderr
+        assert "expected an iterable value" in result.stderr

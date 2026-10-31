@@ -83,7 +83,42 @@ struct FunctionRecord {
 struct RegionRecord {
     region_id: String,
     parent_op_id: String,
-    op_ids: Vec<String>,
+    op_ids: PythonMembership,
+}
+
+#[derive(Clone, Debug)]
+enum PythonMembership {
+    Empty,
+    Sequence(Vec<Value>),
+    String(String),
+    ObjectKeys(HashSet<String>),
+}
+
+impl PythonMembership {
+    fn from_or_default(value: Option<&Value>, field: &str) -> Result<Self, String> {
+        let Some(value) = value.filter(|value| value_truthy(*value)) else {
+            return Ok(Self::Empty);
+        };
+        match value {
+            Value::Array(items) => Ok(Self::Sequence(items.clone())),
+            Value::String(text) => Ok(Self::String(text.clone())),
+            Value::Object(object) => Ok(Self::ObjectKeys(object.keys().cloned().collect())),
+            Value::Number(_) => Err(format!("{field}: expected an iterable value, got number")),
+            Value::Bool(_) => Err(format!("{field}: expected an iterable value, got boolean")),
+            Value::Null => Ok(Self::Empty),
+        }
+    }
+
+    fn contains(&self, item: &str) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Sequence(items) => items
+                .iter()
+                .any(|value| value == &Value::String(item.into())),
+            Self::String(text) => text.contains(item),
+            Self::ObjectKeys(keys) => keys.contains(item),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -198,31 +233,36 @@ pub fn parse_operational_ir(value: &Value) -> Result<OperationalIr, String> {
         .filter_map(Value::as_object)
         .map(|function| {
             let argument_names = if let Some(names) = function.get("argument_names") {
-                field_string_list(Some(names))
+                field_string_list(Some(names), "argument_names")?
             } else if let Some(names) = function.get("argumentNames") {
-                field_string_list(Some(names))
+                field_string_list(Some(names), "argumentNames")?
             } else {
                 function_argument_names(&field_string(function, &["signature"]))
             };
-            FunctionRecord {
+            Ok(FunctionRecord {
                 name: field_string(function, &["name"]),
                 body_region_id: first_nonempty(function, &["body_region_id", "bodyRegionId"]),
                 argument_names,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     let regions = object
         .get("regions")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .filter_map(Value::as_object)
-        .map(|region| RegionRecord {
-            region_id: field_string(region, &["region_id", "regionId"]),
-            parent_op_id: field_string(region, &["parent_op_id", "parentOpId"]),
-            op_ids: field_string_list(region.get("op_ids").or_else(|| region.get("opIds"))),
+        .map(|region| {
+            Ok(RegionRecord {
+                region_id: field_string(region, &["region_id", "regionId"]),
+                parent_op_id: field_string(region, &["parent_op_id", "parentOpId"]),
+                op_ids: PythonMembership::from_or_default(
+                    region.get("op_ids").or_else(|| region.get("opIds")),
+                    "op_ids",
+                )?,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     let ops = object
         .get("ops")
         .and_then(Value::as_array)
@@ -230,7 +270,7 @@ pub fn parse_operational_ir(value: &Value) -> Result<OperationalIr, String> {
         .flatten()
         .filter_map(Value::as_object)
         .map(parse_operation)
-        .collect();
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(OperationalIr {
         functions,
         regions,
@@ -238,15 +278,15 @@ pub fn parse_operational_ir(value: &Value) -> Result<OperationalIr, String> {
     })
 }
 
-fn parse_operation(raw: &Map<String, Value>) -> Operation {
+fn parse_operation(raw: &Map<String, Value>) -> Result<Operation, String> {
     let text = field_string(raw, &["text"]);
-    let result_names = field_string_list_alias(raw, "result_names", "resultNames")
+    let result_names = field_string_list_alias(raw, "result_names", "resultNames")?
         .filter(|items| !items.is_empty())
         .unwrap_or_else(|| result_names(&text));
-    let operand_names = field_string_list_alias(raw, "operand_names", "operandNames")
+    let operand_names = field_string_list_alias(raw, "operand_names", "operandNames")?
         .filter(|items| !items.is_empty())
         .unwrap_or_else(|| operand_names(&text, &result_names));
-    Operation {
+    Ok(Operation {
         op_id: first_nonempty(raw, &["op_id", "opId"]),
         kind: first_nonempty(raw, &["kind"]),
         opcode: first_nonempty(raw, &["opcode"]),
@@ -258,7 +298,7 @@ fn parse_operation(raw: &Map<String, Value>) -> Operation {
         text,
         result_names,
         operand_names,
-    }
+    })
 }
 
 fn field_string(object: &Map<String, Value>, names: &[&str]) -> String {
@@ -316,25 +356,38 @@ fn field_string_list_alias(
     object: &Map<String, Value>,
     first: &str,
     second: &str,
-) -> Option<Vec<String>> {
-    object
+) -> Result<Option<Vec<String>>, String> {
+    let selected = object
         .get(first)
         .filter(|value| value_truthy(*value))
-        .or_else(|| object.get(second).filter(|value| value_truthy(*value)))
-        .map(|value| field_string_list(Some(value)))
+        .map(|value| (first, value))
+        .or_else(|| {
+            object
+                .get(second)
+                .filter(|value| value_truthy(*value))
+                .map(|value| (second, value))
+        });
+    selected
+        .map(|(field, value)| field_string_list(Some(value), field))
+        .transpose()
 }
 
-fn field_string_list(value: Option<&Value>) -> Vec<String> {
+fn field_string_list(value: Option<&Value>, field: &str) -> Result<Vec<String>, String> {
     match value {
-        Some(Value::Array(items)) => items.iter().map(value_string).collect(),
-        Some(Value::String(text)) => text.chars().map(|ch| ch.to_string()).collect(),
-        Some(Value::Object(object)) => object.keys().cloned().collect(),
-        Some(Value::Number(number)) => number
-            .as_u64()
-            .map(|count| (0..count).map(|index| index.to_string()).collect())
-            .unwrap_or_default(),
-        Some(Value::Bool(true)) => vec![],
-        _ => vec![],
+        Some(Value::Array(items)) => items
+            .iter()
+            .map(|item| {
+                item.as_str()
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| format!("{field}: expected string items in iterable value"))
+            })
+            .collect(),
+        Some(Value::String(text)) => Ok(text.chars().map(|ch| ch.to_string()).collect()),
+        Some(Value::Object(object)) => Ok(object.keys().cloned().collect()),
+        Some(Value::Number(_)) => Err(format!("{field}: expected an iterable value, got number")),
+        Some(Value::Bool(_)) => Err(format!("{field}: expected an iterable value, got boolean")),
+        Some(Value::Null) => Err(format!("{field}: expected an iterable value, got null")),
+        None => Ok(vec![]),
     }
 }
 
@@ -495,7 +548,7 @@ fn region_ancestors<'a>(
         }
         current = regions
             .values()
-            .find(|region| region.op_ids.iter().any(|op_id| op_id == parent_op_id))
+            .find(|region| region.op_ids.contains(parent_op_id))
             .map(|region| region.region_id.clone())
             .unwrap_or_default();
     }
