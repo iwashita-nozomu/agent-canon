@@ -2,6 +2,7 @@
 // contract test
 // responsibility Verifies bounded SCIP queries from official generated Index bytes and the native index command's status/artifact boundary.
 // upstream implementation ../src/scip_index.rs owns SCIP producer and query behavior
+// upstream implementation ../src/path_resolution.rs owns non-strict project-root resolution
 // upstream implementation ../src/runtime_boundary.rs owns external artifact paths
 // upstream implementation ../src/environment_dependencies.rs owns verified executable receipts
 // @dependency-end
@@ -363,6 +364,38 @@ fn query_marks_unindexed_target_without_claiming_no_references() {
     assert_eq!(payload["definitions"], serde_json::json!([]));
     assert_eq!(payload["references"], serde_json::json!([]));
     assert_eq!(payload["capabilities"]["target_paths"], "partial");
+}
+
+#[test]
+fn query_rejects_project_root_that_escapes_through_missing_suffix_components() {
+    let fixture = Fixture::new();
+    fixture.write_source("api.py", "def api(): pass\n");
+    let source_file = fixture.source().join("api.py");
+    let source_contents_before = fs::read(&source_file).unwrap();
+    let source_before = files_below(&fixture.source());
+    let runtime_index = fixture.runtime().join("outside-root.scip");
+    let unresolved_project_root = fixture
+        .source()
+        .join("missing-subdirectory")
+        .join("..")
+        .join("..")
+        .join("outside")
+        .join("missing");
+    let index = index_bytes(&unresolved_project_root, Vec::new(), Vec::new());
+    fixture.write_index("outside-root.scip", &index);
+    let runtime_before = files_below(&fixture.runtime());
+
+    let output = query_cli(&fixture, &["outside-root.scip"], &["."], &[]);
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("SCIP project root is outside requested root"));
+    assert_eq!(files_below(&fixture.source()), source_before);
+    assert_eq!(fs::read(&source_file).unwrap(), source_contents_before);
+    assert_eq!(files_below(&fixture.runtime()), runtime_before);
+    assert_eq!(fs::read(&runtime_index).unwrap(), index);
+    assert!(!fixture.0.join("outside").exists());
 }
 
 #[test]

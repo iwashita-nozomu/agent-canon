@@ -3,6 +3,7 @@
 // responsibility Verifies native SCIP producers, writes external index artifacts, and projects bounded facts from official SCIP indexes.
 // upstream implementation environment_dependencies.rs owns verified executable resolution
 // upstream implementation path_expansion.rs owns Python-compatible user-home expansion
+// upstream implementation path_resolution.rs owns non-strict path resolution
 // upstream implementation runtime_boundary.rs owns external artifact paths and root capabilities
 // downstream implementation git_dependency_diff_summary.rs consumes bounded SCIP impact
 // downstream design ../../../../../documents/tools/scip_index.md documents the native command
@@ -758,7 +759,7 @@ fn index_project_root(value: &str) -> Result<PathBuf, ScipError> {
             "SCIP project root is not absolute: {value}"
         )));
     }
-    Ok(fs::canonicalize(&path).unwrap_or(path))
+    crate::path_resolution::resolve_non_strict(&path).map_err(ScipError::failure)
 }
 
 fn relative_source_path(value: &str) -> Result<String, ScipError> {
