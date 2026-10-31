@@ -395,7 +395,7 @@ artifact は空 arrays を含み、下流が text の exit status だけに依�
 | CI route | `tools/validation/ci/runners/run_all_checks.sh` の Python nested invocation と header | `${CANON_BIN} python-algorithm-contract-check --root "$WORKSPACE_ROOT" python` に置換 |
 | catalog | `check-algorithm-module-public-surface` entry | 削除。Rust entry に capability を統合 |
 | catalog | `check-algorithm-module-nested-contract` entry | 削除。Rust entry の `default_wiring.ci` を `true` に変更 |
-| runtime inventory | `tools/runtime/archive/log_surface_inventory.py` | 必要時にcurrent sourceの項目一覧を取得する。logs/log archive は保持 |
+| runtime inventory | `tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs` | 必要時にcurrent sourceの項目一覧を取得する。logs/log archive は保持 |
 | tool docs | [documents/tools/README.md](../../tools/README.md) の二つの Python bullet | canonical Rust bullet 一つへ統合 |
 | tool docs | [tools/README.md](../../../tools/README.md) の nested checker bullet | 削除し Rust CLI entry を唯一の案内にする |
 | provenance | [documents/tools/repo-local-tool-imports.md](../../tools/repo-local-tool-imports.md) の nested checker rows | 現行 capability から削除または retired record に明示更新 |

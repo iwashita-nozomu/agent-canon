@@ -125,6 +125,14 @@ no-follow handling, locks, and authenticated handoffs to avoid that work.
 replace all guarantees of `parent_root_side_effects.py` and
 `runtime_artifacts.py`.
 
+The native parent-root authority accepts an explicit `AttestationRequest`.
+`ParentRootAttestor::attest` validates only that request; it does not construct
+child identity bindings or consume an environment token. A caller that chooses
+the child path must populate the token, purpose, and source/clone and marker
+bindings, then call `reattest_child`. `AGENT_CANON_SOURCE_ROOT` identifies the
+runtime source checkout and is not a substitute for the request's authenticated
+`source_root`. Parent-only writers retain their explicit parent-root request.
+
 ## Dependency Order
 
 The planner applies these responsibility prerequisites to the discovered

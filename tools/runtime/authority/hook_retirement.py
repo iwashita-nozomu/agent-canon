@@ -126,8 +126,8 @@ RETIRED_CHILD_TOMBSTONES: tuple[RetiredChildTombstone, ...] = (
     ),
     _row(
         "log_surface_inventory_guard.py",
-        "tools/runtime/archive/log_surface_inventory.py",
-        "command-only:python3 tools/runtime/archive/log_surface_inventory.py --root .",
+        "tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs",
+        "command-only:tools/bin/agent-canon log-surface-inventory",
         "explicit inventory request",
         "telemetry inventory is an on-demand projection",
     ),
