@@ -7,7 +7,7 @@ upstream design ../../agents/internal-routines/design-implementation-corresponde
 upstream implementation ../../agents/model_profiles.toml canonical role/profile registry
 upstream implementation ../../tools/agent/orchestration/model_profile_registry.py role materializer
 downstream implementation ../../tools/runtime/source/export_static_seed.py exact-byte exporter
-downstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py source-free checker
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs source-free docs check-bootstrap checker
 downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py committed-role evaluator
 @dependency-end
 -->
@@ -177,7 +177,7 @@ no-updater/no-import/no-secret behavior.
 - `agents/model_profiles.toml#role_instruction_templates`, `#model_profiles`
 - `tools/agent/orchestration/model_profile_registry.py#RoleInstructionClause`, `#ConsumerStaticClauseProjection`, `#StaticObligation`, `#STATIC_OBLIGATION_TABLE`, `#generate_role_views`, `#_render_role_view`, `#write_role_views`
 - `tools/runtime/source/export_static_seed.py#_validate_content`, `#load_export_plan`, `#_validate_codex_config`
-- `tools/validation/documentation/checks/check_bootstrap_docs.py#iter_static_seed_consumer_findings`
+- `tools/runtime/dispatch/agent-canon/src/docs.rs#iter_static_seed_consumer_findings`
 - `eval/producers/evaluate_codex_agent_roles.py#evaluate_generated_role_projection`, `#evaluate_static_agent_configs`
 - `tests/agent_tools/test_model_profile_registry.py#typed obligation projection`
 - `tests/agent_tools/test_evaluate_codex_agent_roles.py#committed consumer-static evaluator`, `#pre-change live golden for all 35 roles`

@@ -2,7 +2,7 @@
 @dependency-start
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
-upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check and format.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, and check-bootstrap.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs implements docs check-entrypoints.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/config.rs implements the lifecycle-only TOML context projection
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
@@ -45,6 +45,7 @@ tools/bin/agent-canon docs -h
 tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
+tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
 tools/bin/agent-canon test-design check <test-paths...>
 agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
@@ -62,6 +63,12 @@ command checks the repository documentation targets used by the shared docs
 gate.
 
 If the command contract is unclear, run `tools/bin/agent-canon docs -h` first.
+
+`docs check-bootstrap` validates bootstrap-facing documentation and can validate
+an exported static seed or source-hidden consumer root with
+`--static-seed-consumer`. It reads the selected root and emits the existing
+bootstrap-check findings and pass/fail markers without resolving an AgentCanon
+source checkout.
 
 `test-design check` reports missing oracle, brittle coupling, exact
 mock/output/prose assertions, time coupling, unseeded randomness, and
