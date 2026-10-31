@@ -7,6 +7,8 @@
 
 use agent_canon::source_mutation::SourceMutationCapability;
 use std::fs;
+#[cfg(unix)]
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -56,6 +58,20 @@ fn capability(root: &Path, allowed_paths: &[&str]) -> SourceMutationCapability {
         Some(&serde_json::to_string(&json).expect("capability serializes")),
     )
     .expect("exact capability parses")
+}
+
+#[cfg(unix)]
+fn invalid_byte_path_is_unsupported(error: &io::Error) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        // macOS reports EILSEQ (92) when its filesystem rejects raw path bytes.
+        error.raw_os_error() == Some(92)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = error;
+        false
+    }
 }
 
 #[test]
@@ -111,9 +127,21 @@ fn posix_replacement_character_grant_does_not_alias_invalid_utf8_component() {
         .join("docs")
         .join(std::ffi::OsString::from_vec(vec![0xff]))
         .join("guide.md");
-    fs::create_dir_all(invalid.parent().expect("invalid-byte fixture has parent"))
-        .expect("invalid-byte fixture directory is created");
-    fs::write(&invalid, "invalid-byte subtree remains\n").expect("invalid-byte fixture is written");
+    let invalid_parent = invalid.parent().expect("invalid-byte fixture has parent");
+    if let Err(error) = fs::create_dir_all(invalid_parent) {
+        if invalid_byte_path_is_unsupported(&error) {
+            eprintln!("filesystem-bound invalid-byte write oracle unavailable: EILSEQ");
+            return;
+        }
+        panic!("invalid-byte fixture directory is created: {error}");
+    }
+    if let Err(error) = fs::write(&invalid, "invalid-byte subtree remains\n") {
+        if invalid_byte_path_is_unsupported(&error) {
+            eprintln!("filesystem-bound invalid-byte write oracle unavailable: EILSEQ");
+            return;
+        }
+        panic!("invalid-byte fixture is written: {error}");
+    }
     let capability = capability(&root.0, &["docs/�"]);
 
     assert!(capability.assert_allowed(&valid).is_ok());

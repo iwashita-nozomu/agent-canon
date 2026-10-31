@@ -100,9 +100,7 @@ impl SourceMutationCapability {
                 path.display()
             ))
         })?;
-        if !self.allowed_paths.iter().any(|allowed| {
-            allowed.as_os_str().is_empty() || relative == allowed || relative.starts_with(allowed)
-        }) {
+        if !relative_path_is_allowed(relative, &self.allowed_paths) {
             return Err(SourceMutationError::new(format!(
                 "mutation target is outside allowed_paths: {}",
                 relative.display()
@@ -163,6 +161,12 @@ impl SourceMutationCapability {
             ))
         })
     }
+}
+
+fn relative_path_is_allowed(relative: &Path, allowed_paths: &[PathBuf]) -> bool {
+    allowed_paths.iter().any(|allowed| {
+        allowed.as_os_str().is_empty() || relative == allowed || relative.starts_with(allowed)
+    })
 }
 
 fn reject_unknown_fields(object: &Map<String, Value>) -> Result<()> {
@@ -370,4 +374,30 @@ fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
         }
     }
     Ok(directory)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn allowed_path_comparison_keeps_invalid_utf8_component_identity() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let allowed = PathBuf::from("docs").join("�");
+        let valid_target = allowed.join("guide.md");
+        let invalid_target = PathBuf::from("docs")
+            .join(std::ffi::OsString::from_vec(vec![0xff]))
+            .join("guide.md");
+
+        assert!(relative_path_is_allowed(
+            &valid_target,
+            std::slice::from_ref(&allowed)
+        ));
+        assert!(!relative_path_is_allowed(
+            &invalid_target,
+            std::slice::from_ref(&allowed)
+        ));
+    }
 }
