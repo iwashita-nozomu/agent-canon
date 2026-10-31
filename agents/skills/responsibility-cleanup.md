@@ -46,7 +46,7 @@ not a required batch:
 ```bash
 tree -a -J --noreport
 python3 tools/validation/semantic/structure/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml
-python3 tools/validation/semantic/responsibility/responsibility_scope.py --root .
+tools/bin/agent-canon responsibility-scope --root .
 python3 tools/agent/skills/skill_dependency_map.py check --root .
 ```
 

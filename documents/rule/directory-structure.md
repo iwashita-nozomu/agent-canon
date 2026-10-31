@@ -6,7 +6,7 @@ upstream design ./README.md document rule canon index
 upstream design ../design/README.md design canon reader route
 upstream design ../structure/repo-structure-contract.toml machine validator companion
 downstream implementation ../../tools/validation/semantic/structure/repo_structure_contract.py expected tree validation
-downstream implementation ../../tools/validation/semantic/responsibility/responsibility_scope.py responsibility validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs responsibility validation
 @dependency-end
 -->
 
@@ -68,4 +68,4 @@ checker は作りません。参照経路があることは到達可能性の根
 ## 更新と検証
 
 責任境界、reader route、source/evidence、downstream consumer のいずれかが変わったときに、この規約と該当 directory README を見直します。
-配置の整合性は `repo_structure_contract.py`、責任の重複は `responsibility_scope.py` で確認します。
+配置の整合性は `repo_structure_contract.py`、責任の重複は `tools/bin/agent-canon responsibility-scope` で確認します。
