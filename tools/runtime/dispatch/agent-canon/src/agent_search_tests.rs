@@ -148,11 +148,11 @@ while True:
     elif method == "exit":
         break
 "#;
+    let serialized_symbols = serde_json::to_string(symbols).expect("fixture symbols serialize");
+    let python_symbols_string =
+        serde_json::to_string(&serialized_symbols).expect("fixture JSON string serializes");
     let script = script
-        .replace(
-            "__SYMBOLS__",
-            &serde_json::to_string(symbols).expect("fixture symbols serialize"),
-        )
+        .replace("__SYMBOLS__", &python_symbols_string)
         .replace(
             "__MISSING_SYMBOLS__",
             if missing_symbols { "True" } else { "False" },
