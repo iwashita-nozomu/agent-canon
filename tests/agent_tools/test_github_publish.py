@@ -20,19 +20,24 @@ import json
 import sys
 import tempfile
 import unittest
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.repository.github import github_publish  # noqa: E402
 from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
+    GATE_CONTRACTS,
+    SourceProjectionGateOwnerApis,
+    materialize_fresh_clone_source_projection_packet,
     materialize_gate_verdict,
     materialize_source_main_rebind_receipt,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
+    validate_source_projection_packet,
 )  # noqa: E402
 from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
@@ -300,6 +305,81 @@ class GithubPublishTest(unittest.TestCase):
             ],
         )
         return rebind, cas, [g1, g2]
+
+    def test_fresh_clone_source_projection_uses_declared_g1_and_real_owner_callbacks(
+        self,
+    ) -> None:
+        """Fresh-clone aggregation forwards G1/G2/G3 through their owner APIs."""
+        callback_order: list[str] = []
+        g2_input_gates: list[Mapping[str, object]] = []
+        g2_check_results: list[Mapping[str, object]] = []
+        g3_upstream_gates: list[tuple[Mapping[str, object], ...]] = []
+
+        def materialize_g2(
+            *,
+            g1_gate: Mapping[str, object],
+            candidate_sha: str,
+            tree_sha: str,
+            check_results: Sequence[Mapping[str, object]],
+        ) -> dict[str, object]:
+            callback_order.append("G2")
+            g2_input_gates.append(g1_gate)
+            g2_check_results.extend(check_results)
+            return materialize_generated_completeness_receipt(
+                g1_gate=g1_gate,
+                candidate_sha=candidate_sha,
+                tree_sha=tree_sha,
+                check_results=check_results,
+            )
+
+        def materialize_g3(
+            lifecycle: Mapping[str, object],
+            candidate_cas_receipt: Mapping[str, object],
+            source_main_rebind_receipt: Mapping[str, object],
+            upstream_gate_verdicts: Sequence[Mapping[str, object]],
+        ) -> dict[str, object]:
+            callback_order.append("G3")
+            g3_upstream_gates.append(tuple(upstream_gate_verdicts))
+            return github_publish.materialize_pr_identity_gate(
+                lifecycle,
+                candidate_cas_receipt,
+                source_main_rebind_receipt,
+                upstream_gate_verdicts,
+            )
+
+        gate_owner_apis = SourceProjectionGateOwnerApis(
+            generated_completeness_check_ids=GENERATED_COMPLETENESS_CHECK_IDS,
+            materialize_generated_completeness_receipt=materialize_g2,
+            materialize_pr_identity_gate=materialize_g3,
+        )
+        packet = materialize_fresh_clone_source_projection_packet(
+            candidate_sha=CANDIDATE_SHA,
+            candidate_tree_sha=CANDIDATE_TREE,
+            publication_sha=MERGE_SHA,
+            publication_tree_sha=MERGE_TREE,
+            gate_owner_apis=gate_owner_apis,
+        )
+
+        gates = cast(list[dict[str, object]], packet["source_gate_verdicts"])
+        self.assertEqual([gate["gate_id"] for gate in gates], ["G1", "G2", "G3"])
+        self.assertEqual(callback_order, ["G2", "G3"])
+        self.assertEqual(g2_input_gates, [gates[0]])
+        self.assertEqual(
+            [result["check_id"] for result in g2_check_results],
+            list(GENERATED_COMPLETENESS_CHECK_IDS),
+        )
+        self.assertEqual(
+            [result["status"] for result in g2_check_results],
+            ["pass"] * len(GENERATED_COMPLETENESS_CHECK_IDS),
+        )
+        self.assertEqual(g3_upstream_gates, [(gates[0], gates[1])])
+
+        declared_owner = cast(tuple[str, ...], GATE_CONTRACTS["G1"]["owners"])[0]
+        owner_path, owner_symbol = declared_owner.split("#", maxsplit=1)
+        self.assertEqual(
+            gates[0]["owner"], f"{(PROJECT_ROOT / owner_path).resolve()}#{owner_symbol}"
+        )
+        self.assertEqual(validate_source_projection_packet(packet), packet)
 
     def test_normalized_repo_slug_accepts_common_github_urls(self) -> None:
         """Remote URL parsing should support ssh, https, and owner/name."""
