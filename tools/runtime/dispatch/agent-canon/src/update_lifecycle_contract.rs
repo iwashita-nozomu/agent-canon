@@ -11,9 +11,10 @@
 // downstream test ../tests/update_lifecycle_publication_native.rs freezes publication readback receipts and transitions
 // downstream test ../tests/update_lifecycle_queue_native.rs freezes queue keys, receipts, and replay behavior
 // downstream test ../tests/update_lifecycle_frontier_native.rs freezes ordered frontier validation and transitions
+// downstream test ../tests/update_lifecycle_terminal_native.rs freezes closeout receipts, cleanup, and token hashes
 // @dependency-end
 
-use crate::artifacts::artifact_identity::canonical_json_bytes;
+use crate::artifacts::artifact_identity::{canonical_body_sha256, canonical_json_bytes};
 use crate::python_json::python_json_equal_after_float_rejection;
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -100,6 +101,12 @@ const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
 const QUEUE_RECEIPT_SCHEMA: &str = "agent-canon.queue-receipt.v1";
 const DEPENDENCY_FRONTIER_SCHEMA: &str = "agent-canon.dependency-frontier.v1";
+const DURABLE_HANDBACK_SCHEMA: &str = "agent-canon.durable-handback.v1";
+const DESCENDANT_CLOSE_RECEIPT_SCHEMA: &str = "agent-canon.descendant-close-receipt.v1";
+const RESERVATION_RELEASE_RECEIPT_SCHEMA: &str = "agent-canon.reservation-release-receipt.v1";
+const CLEANUP_PROOF_SCHEMA: &str = "agent-canon.cleanup-proof.v1";
+const CLOSE_AGENT_TOOL_CALL_SCHEMA: &str = "agent-canon.close-agent-tool-call.v1";
+const CLOSE_AGENT_ARGS_SCHEMA: &str = "agent-canon.close-agent.args.v1";
 const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
@@ -216,6 +223,21 @@ pub struct GateVerdictInput {
     pub verdict: String,
     pub retry_reason: Option<String>,
     pub next_checkpoint: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CloseAgentToolCallInput<'a> {
+    pub binding: &'a JsonValue,
+    pub run_id: &'a str,
+    pub agent_id: &'a str,
+    pub gate_verdicts: &'a [JsonValue],
+    pub cleanup_proof: &'a JsonValue,
+    pub durable_handback: &'a JsonValue,
+    pub descendants_closed_evidence_ref: &'a str,
+    pub reservations_released_evidence_ref: &'a str,
+    pub completed_but_open: bool,
+    pub unknown_descendants: bool,
+    pub reservation_leak: bool,
 }
 
 fn fail(code: &str, detail: &str) -> LifecycleContractError {
@@ -3007,6 +3029,693 @@ pub fn after_binding_transaction(frontier: &JsonValue) -> Result<String, Lifecyc
         "dependency_frontier.binding",
     )?;
     required_string(binding, "transaction_id", "dependency_frontier.binding")
+}
+
+pub fn validate_durable_handback(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let handback = mapping(value, "durable_handback")?;
+    exact_keys(
+        handback,
+        &[
+            "schema",
+            "binding",
+            "agent_id",
+            "descendant_ids",
+            "reservation_ids",
+            "evidence_ref",
+            "state",
+        ],
+        &[],
+        "durable_handback",
+    )?;
+    if handback.get("schema").and_then(JsonValue::as_str) != Some(DURABLE_HANDBACK_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", DURABLE_HANDBACK_SCHEMA));
+    }
+    validate_record_binding(required_value(handback, "binding", "durable_handback")?)?;
+    let agent_id = string_value(
+        required_value(handback, "agent_id", "durable_handback")?,
+        "durable_handback.agent_id",
+    )?;
+    if !agent_id.starts_with("agent:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "durable_handback.agent_id",
+        ));
+    }
+    let descendants = string_list(
+        required_value(handback, "descendant_ids", "durable_handback")?,
+        "durable_handback.descendant_ids",
+        false,
+        true,
+        None,
+    )?;
+    let reservations = string_list(
+        required_value(handback, "reservation_ids", "durable_handback")?,
+        "durable_handback.reservation_ids",
+        false,
+        true,
+        None,
+    )?;
+    if descendants.iter().any(|item| !item.starts_with("agent:")) {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "durable_handback.descendant_ids",
+        ));
+    }
+    if reservations
+        .iter()
+        .any(|item| !item.starts_with("reservation:"))
+    {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "durable_handback.reservation_ids",
+        ));
+    }
+    pattern_value(
+        required_value(handback, "evidence_ref", "durable_handback")?,
+        "durable_handback.evidence_ref",
+        valid_evidence_ref,
+    )?;
+    if required_value(handback, "state", "durable_handback")?.as_str() != Some("durable_handback") {
+        return Err(fail("lifecycle:state_invalid", "durable_handback"));
+    }
+    canonical_clone(value)
+}
+
+pub fn validate_descendant_close_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "descendant_close_receipt")?;
+    exact_keys(
+        receipt,
+        &[
+            "schema",
+            "binding",
+            "agent_id",
+            "state",
+            "durable_handback_evidence_ref",
+            "evidence_ref",
+        ],
+        &[],
+        "descendant_close_receipt",
+    )?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(DESCENDANT_CLOSE_RECEIPT_SCHEMA) {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            DESCENDANT_CLOSE_RECEIPT_SCHEMA,
+        ));
+    }
+    validate_record_binding(required_value(
+        receipt,
+        "binding",
+        "descendant_close_receipt",
+    )?)?;
+    let agent_id = string_value(
+        required_value(receipt, "agent_id", "descendant_close_receipt")?,
+        "descendant_close_receipt.agent_id",
+    )?;
+    if !agent_id.starts_with("agent:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "descendant_close_receipt.agent_id",
+        ));
+    }
+    if required_value(receipt, "state", "descendant_close_receipt")?.as_str() != Some("closed") {
+        return Err(fail("close_agent:descendant_not_closed", ""));
+    }
+    pattern_value(
+        required_value(
+            receipt,
+            "durable_handback_evidence_ref",
+            "descendant_close_receipt",
+        )?,
+        "descendant_close_receipt.durable_handback_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    pattern_value(
+        required_value(receipt, "evidence_ref", "descendant_close_receipt")?,
+        "descendant_close_receipt.evidence_ref",
+        valid_evidence_ref,
+    )?;
+    canonical_clone(value)
+}
+
+pub fn materialize_descendant_close_receipt(
+    binding: &JsonValue,
+    durable_handback: &JsonValue,
+    agent_id: &str,
+    evidence_ref: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let handback = validate_durable_handback(durable_handback)?;
+    let handback_map = mapping(&handback, "durable_handback")?;
+    same_binding(
+        &checked_binding,
+        required_value(handback_map, "binding", "durable_handback")?,
+        "descendant_close",
+    )?;
+    let descendants = required_value(handback_map, "descendant_ids", "durable_handback")?
+        .as_array()
+        .expect("validated handback descendant IDs are a sequence");
+    if !descendants.contains(&JsonValue::String(agent_id.to_owned())) {
+        return Err(fail("close_agent:unknown_descendant", ""));
+    }
+    let receipt = serde_json::json!({
+        "schema": DESCENDANT_CLOSE_RECEIPT_SCHEMA,
+        "binding": checked_binding,
+        "agent_id": agent_id,
+        "state": "closed",
+        "durable_handback_evidence_ref": required_value(handback_map, "evidence_ref", "durable_handback")?,
+        "evidence_ref": evidence_ref,
+    });
+    validate_descendant_close_receipt(&receipt)
+}
+
+pub fn validate_reservation_release_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "reservation_release_receipt")?;
+    exact_keys(
+        receipt,
+        &[
+            "schema",
+            "binding",
+            "reservation_id",
+            "state",
+            "durable_handback_evidence_ref",
+            "evidence_ref",
+        ],
+        &[],
+        "reservation_release_receipt",
+    )?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(RESERVATION_RELEASE_RECEIPT_SCHEMA)
+    {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            RESERVATION_RELEASE_RECEIPT_SCHEMA,
+        ));
+    }
+    validate_record_binding(required_value(
+        receipt,
+        "binding",
+        "reservation_release_receipt",
+    )?)?;
+    let reservation_id = string_value(
+        required_value(receipt, "reservation_id", "reservation_release_receipt")?,
+        "reservation_release_receipt.reservation_id",
+    )?;
+    if !reservation_id.starts_with("reservation:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "reservation_release_receipt.reservation_id",
+        ));
+    }
+    if required_value(receipt, "state", "reservation_release_receipt")?.as_str() != Some("released")
+    {
+        return Err(fail("close_agent:reservation_leak", ""));
+    }
+    pattern_value(
+        required_value(
+            receipt,
+            "durable_handback_evidence_ref",
+            "reservation_release_receipt",
+        )?,
+        "reservation_release_receipt.durable_handback_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    pattern_value(
+        required_value(receipt, "evidence_ref", "reservation_release_receipt")?,
+        "reservation_release_receipt.evidence_ref",
+        valid_evidence_ref,
+    )?;
+    canonical_clone(value)
+}
+
+pub fn materialize_reservation_release_receipt(
+    binding: &JsonValue,
+    durable_handback: &JsonValue,
+    reservation_id: &str,
+    evidence_ref: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let handback = validate_durable_handback(durable_handback)?;
+    let handback_map = mapping(&handback, "durable_handback")?;
+    same_binding(
+        &checked_binding,
+        required_value(handback_map, "binding", "durable_handback")?,
+        "reservation_release",
+    )?;
+    let reservations = required_value(handback_map, "reservation_ids", "durable_handback")?
+        .as_array()
+        .expect("validated handback reservation IDs are a sequence");
+    if !reservations.contains(&JsonValue::String(reservation_id.to_owned())) {
+        return Err(fail("close_agent:reservation_leak", ""));
+    }
+    let receipt = serde_json::json!({
+        "schema": RESERVATION_RELEASE_RECEIPT_SCHEMA,
+        "binding": checked_binding,
+        "reservation_id": reservation_id,
+        "state": "released",
+        "durable_handback_evidence_ref": required_value(handback_map, "evidence_ref", "durable_handback")?,
+        "evidence_ref": evidence_ref,
+    });
+    validate_reservation_release_receipt(&receipt)
+}
+
+pub fn validate_cleanup_proof(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let proof = mapping(value, "cleanup_proof")?;
+    exact_keys(
+        proof,
+        &[
+            "schema",
+            "binding",
+            "remote_readback_evidence_ref",
+            "task_owned_paths",
+            "task_owned_state_before",
+            "task_owned_state_after",
+            "cleaned_paths",
+            "unknown_shared_state_before_digest",
+            "unknown_shared_state_after_digest",
+            "unknown_shared_state_unchanged_evidence_ref",
+            "evidence_ref",
+            "state",
+        ],
+        &[],
+        "cleanup_proof",
+    )?;
+    if proof.get("schema").and_then(JsonValue::as_str) != Some(CLEANUP_PROOF_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", CLEANUP_PROOF_SCHEMA));
+    }
+    validate_record_binding(required_value(proof, "binding", "cleanup_proof")?)?;
+    pattern_value(
+        required_value(proof, "remote_readback_evidence_ref", "cleanup_proof")?,
+        "cleanup_proof.remote_readback_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    let owned_paths = string_list(
+        required_value(proof, "task_owned_paths", "cleanup_proof")?,
+        "cleanup_proof.task_owned_paths",
+        false,
+        true,
+        None,
+    )?;
+    let cleaned_paths = string_list(
+        required_value(proof, "cleaned_paths", "cleanup_proof")?,
+        "cleanup_proof.cleaned_paths",
+        false,
+        true,
+        None,
+    )?;
+    if owned_paths
+        .iter()
+        .chain(&cleaned_paths)
+        .any(|path| !Path::new(path).is_absolute())
+    {
+        return Err(fail("lifecycle:path_not_absolute", "cleanup_proof"));
+    }
+    let owned_path_set = owned_paths.iter().cloned().collect::<BTreeSet<_>>();
+    if cleaned_paths
+        .iter()
+        .any(|path| !owned_path_set.contains(path))
+    {
+        return Err(fail("cleanup:non_task_owned_path", ""));
+    }
+    let before = mapping(
+        required_value(proof, "task_owned_state_before", "cleanup_proof")?,
+        "cleanup_proof.task_owned_state_before",
+    )?;
+    let after = mapping(
+        required_value(proof, "task_owned_state_after", "cleanup_proof")?,
+        "cleanup_proof.task_owned_state_after",
+    )?;
+    let expected_keys = owned_paths
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let before_keys = before.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    let after_keys = after.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    if before_keys != expected_keys || after_keys != expected_keys {
+        return Err(fail("cleanup:task_owned_state_incomplete", ""));
+    }
+    for path in &owned_paths {
+        string_value(
+            required_value(before, path, "cleanup_proof.task_owned_state_before")?,
+            &format!("cleanup_proof.task_owned_state_before.{path}"),
+        )?;
+        string_value(
+            required_value(after, path, "cleanup_proof.task_owned_state_after")?,
+            &format!("cleanup_proof.task_owned_state_after.{path}"),
+        )?;
+    }
+    let before_digest = pattern_value(
+        required_value(proof, "unknown_shared_state_before_digest", "cleanup_proof")?,
+        "cleanup_proof.unknown_shared_state_before_digest",
+        valid_sha256,
+    )?;
+    let after_digest = pattern_value(
+        required_value(proof, "unknown_shared_state_after_digest", "cleanup_proof")?,
+        "cleanup_proof.unknown_shared_state_after_digest",
+        valid_sha256,
+    )?;
+    if before_digest != after_digest {
+        return Err(fail("cleanup:unknown_shared_state_changed", ""));
+    }
+    pattern_value(
+        required_value(
+            proof,
+            "unknown_shared_state_unchanged_evidence_ref",
+            "cleanup_proof",
+        )?,
+        "cleanup_proof.unknown_shared_state_unchanged_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    pattern_value(
+        required_value(proof, "evidence_ref", "cleanup_proof")?,
+        "cleanup_proof.evidence_ref",
+        valid_evidence_ref,
+    )?;
+    if required_value(proof, "state", "cleanup_proof")?.as_str() != Some("cleanup_proven") {
+        return Err(fail("lifecycle:state_invalid", "cleanup_proof"));
+    }
+    canonical_clone(value)
+}
+
+fn validate_close_agent_gate_sequence(
+    values: &[JsonValue],
+    binding: &JsonValue,
+) -> Result<Vec<JsonValue>, LifecycleContractError> {
+    let gates = match validate_gate_chain(values, Some(GATE_IDS), true) {
+        Ok(gates) => gates,
+        Err(error)
+            if matches!(
+                error.code.as_str(),
+                "lifecycle:gate_order_invalid" | "lifecycle:gate_sequence_empty"
+            ) =>
+        {
+            return Err(fail("close_agent:all_six_gate_evidence_required", ""));
+        }
+        Err(error) => return Err(error),
+    };
+    for gate in &gates {
+        let gate = mapping(gate, "gate_verdict")?;
+        same_binding(
+            binding,
+            required_value(gate, "binding", "gate_verdict")?,
+            "close_agent.gates",
+        )?;
+    }
+    Ok(gates)
+}
+
+fn terminal_guard_boolean_matches(value: &JsonValue, expected: bool) -> bool {
+    if let JsonValue::Number(number) = value {
+        if number.is_f64() {
+            let expected_number = if expected { 1.0 } else { 0.0 };
+            return number.as_f64().is_some_and(|number| {
+                number.partial_cmp(&expected_number) == Some(std::cmp::Ordering::Equal)
+            });
+        }
+    }
+    python_json_equal_after_float_rejection(value, &JsonValue::Bool(expected))
+}
+
+fn terminal_guard_matches(guard: &JsonMap<String, JsonValue>) -> bool {
+    guard
+        .get("all_six_gates_pass")
+        .is_some_and(|value| terminal_guard_boolean_matches(value, true))
+        && guard.get("lifecycle_state").and_then(JsonValue::as_str) == Some("terminal")
+        && guard
+            .get("completed_but_open")
+            .is_some_and(|value| terminal_guard_boolean_matches(value, false))
+        && guard
+            .get("unknown_descendants")
+            .is_some_and(|value| terminal_guard_boolean_matches(value, false))
+        && guard
+            .get("reservation_leak")
+            .is_some_and(|value| terminal_guard_boolean_matches(value, false))
+        && guard
+            .get("remote_readback_before_cleanup")
+            .is_some_and(|value| terminal_guard_boolean_matches(value, true))
+        && guard
+            .get("identity_match")
+            .is_some_and(|value| terminal_guard_boolean_matches(value, true))
+}
+
+pub fn validate_close_agent_tool_call(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let token = mapping(value, "close_agent_tool_call")?;
+    exact_keys(
+        token,
+        &[
+            "schema",
+            "binding",
+            "tool_id",
+            "state",
+            "agent_id",
+            "args_schema",
+            "args",
+            "terminal_guard",
+            "token_id",
+            "token_body_sha256",
+        ],
+        &[],
+        "close_agent_tool_call",
+    )?;
+    if token.get("schema").and_then(JsonValue::as_str) != Some(CLOSE_AGENT_TOOL_CALL_SCHEMA) {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            CLOSE_AGENT_TOOL_CALL_SCHEMA,
+        ));
+    }
+    validate_record_binding(required_value(token, "binding", "close_agent_tool_call")?)?;
+    if required_value(token, "tool_id", "close_agent_tool_call")?.as_str() != Some("close_agent") {
+        return Err(fail("close_agent:tool_id_invalid", ""));
+    }
+    if required_value(token, "state", "close_agent_tool_call")?.as_str() != Some("terminal") {
+        return Err(fail("close_agent:not_terminal", ""));
+    }
+    let agent_id = string_value(
+        required_value(token, "agent_id", "close_agent_tool_call")?,
+        "close_agent_tool_call.agent_id",
+    )?;
+    if !agent_id.starts_with("agent:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "close_agent_tool_call.agent_id",
+        ));
+    }
+    if required_value(token, "args_schema", "close_agent_tool_call")?.as_str()
+        != Some(CLOSE_AGENT_ARGS_SCHEMA)
+    {
+        return Err(fail("close_agent:args_schema_invalid", ""));
+    }
+    let args = mapping(
+        required_value(token, "args", "close_agent_tool_call")?,
+        "close_agent_tool_call.args",
+    )?;
+    exact_keys(
+        args,
+        &[
+            "run_id",
+            "gate_verdict_evidence_refs",
+            "cleanup_proof_evidence_ref",
+            "durable_handback_evidence_ref",
+            "descendants_closed_evidence_ref",
+            "reservations_released_evidence_ref",
+        ],
+        &[],
+        "close_agent_tool_call.args",
+    )?;
+    string_value(
+        required_value(args, "run_id", "close_agent_tool_call.args")?,
+        "close_agent_tool_call.args.run_id",
+    )?;
+    let gate_refs = string_list(
+        required_value(
+            args,
+            "gate_verdict_evidence_refs",
+            "close_agent_tool_call.args",
+        )?,
+        "close_agent_tool_call.args.gate_verdict_evidence_refs",
+        true,
+        true,
+        Some(valid_evidence_ref),
+    )?;
+    if gate_refs.len() != GATE_IDS.len() {
+        return Err(fail("close_agent:all_six_gate_evidence_required", ""));
+    }
+    for field in [
+        "cleanup_proof_evidence_ref",
+        "durable_handback_evidence_ref",
+        "descendants_closed_evidence_ref",
+        "reservations_released_evidence_ref",
+    ] {
+        pattern_value(
+            required_value(args, field, "close_agent_tool_call.args")?,
+            &format!("close_agent_tool_call.args.{field}"),
+            valid_evidence_ref,
+        )?;
+    }
+    let guard = mapping(
+        required_value(token, "terminal_guard", "close_agent_tool_call")?,
+        "close_agent_tool_call.terminal_guard",
+    )?;
+    exact_keys(
+        guard,
+        &[
+            "all_six_gates_pass",
+            "lifecycle_state",
+            "completed_but_open",
+            "unknown_descendants",
+            "reservation_leak",
+            "remote_readback_before_cleanup",
+            "identity_match",
+        ],
+        &[],
+        "close_agent_tool_call.terminal_guard",
+    )?;
+    if !terminal_guard_matches(guard) {
+        if guard.get("completed_but_open").and_then(JsonValue::as_bool) == Some(true) {
+            return Err(fail("close_agent:completed_but_open", ""));
+        }
+        if guard
+            .get("unknown_descendants")
+            .and_then(JsonValue::as_bool)
+            == Some(true)
+        {
+            return Err(fail("close_agent:unknown_descendant", ""));
+        }
+        if guard.get("reservation_leak").and_then(JsonValue::as_bool) == Some(true) {
+            return Err(fail("close_agent:reservation_leak", ""));
+        }
+        if guard
+            .get("remote_readback_before_cleanup")
+            .and_then(JsonValue::as_bool)
+            != Some(true)
+        {
+            return Err(fail("close_agent:cleanup_before_remote_readback", ""));
+        }
+        return Err(fail("close_agent:terminal_guard_failed", ""));
+    }
+    let token_id = pattern_value(
+        required_value(token, "token_id", "close_agent_tool_call")?,
+        "close_agent_tool_call.token_id",
+        valid_hash_id,
+    )?;
+    if !token_id.starts_with("close-token:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "close_agent_tool_call.token_id",
+        ));
+    }
+    let mut token_id_body = token.clone();
+    token_id_body.remove("token_id");
+    token_id_body.remove("token_body_sha256");
+    let token_id_bytes = canonical_json_bytes(&JsonValue::Object(token_id_body))
+        .map_err(LifecycleContractError::from)?;
+    let token_id_digest = Sha256::digest(token_id_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if token_id != format!("close-token:{token_id_digest}") {
+        return Err(fail("close_agent:token_id_mismatch", ""));
+    }
+    let body_digest =
+        canonical_body_sha256(value, "token_body_sha256").map_err(LifecycleContractError::from)?;
+    let expected_body = format!("sha256:{body_digest}");
+    if required_value(token, "token_body_sha256", "close_agent_tool_call")?.as_str()
+        != Some(expected_body.as_str())
+    {
+        return Err(fail("close_agent:token_body_mismatch", ""));
+    }
+    canonical_clone(value)
+}
+
+pub fn materialize_close_agent_tool_call(
+    input: CloseAgentToolCallInput<'_>,
+) -> Result<JsonValue, LifecycleContractError> {
+    let CloseAgentToolCallInput {
+        binding,
+        run_id,
+        agent_id,
+        gate_verdicts,
+        cleanup_proof,
+        durable_handback,
+        descendants_closed_evidence_ref,
+        reservations_released_evidence_ref,
+        completed_but_open,
+        unknown_descendants,
+        reservation_leak,
+    } = input;
+    let checked_binding = validate_record_binding(binding)?;
+    let gates = validate_close_agent_gate_sequence(gate_verdicts, &checked_binding)?;
+    let proof = validate_cleanup_proof(cleanup_proof)?;
+    let handback = validate_durable_handback(durable_handback)?;
+    let proof_map = mapping(&proof, "cleanup_proof")?;
+    let handback_map = mapping(&handback, "durable_handback")?;
+    same_binding(
+        &checked_binding,
+        required_value(proof_map, "binding", "cleanup_proof")?,
+        "close_agent.cleanup_proof",
+    )?;
+    same_binding(
+        &checked_binding,
+        required_value(handback_map, "binding", "durable_handback")?,
+        "close_agent.durable_handback",
+    )?;
+    if required_value(proof_map, "remote_readback_evidence_ref", "cleanup_proof")?.is_null() {
+        return Err(fail("close_agent:cleanup_before_remote_readback", ""));
+    }
+    let mut gate_refs = Vec::with_capacity(gates.len());
+    for gate in &gates {
+        let gate = mapping(gate, "gate_verdict")?;
+        let gate_binding = mapping(required_value(gate, "binding", "gate_verdict")?, "binding")?;
+        gate_refs.push(required_value(gate_binding, "evidence_ref", "binding")?.clone());
+    }
+    let record = serde_json::json!({
+        "schema": CLOSE_AGENT_TOOL_CALL_SCHEMA,
+        "binding": checked_binding,
+        "tool_id": "close_agent",
+        "state": "terminal",
+        "agent_id": agent_id,
+        "args_schema": CLOSE_AGENT_ARGS_SCHEMA,
+        "args": {
+            "run_id": run_id,
+            "gate_verdict_evidence_refs": gate_refs,
+            "cleanup_proof_evidence_ref": required_value(proof_map, "evidence_ref", "cleanup_proof")?,
+            "durable_handback_evidence_ref": required_value(handback_map, "evidence_ref", "durable_handback")?,
+            "descendants_closed_evidence_ref": descendants_closed_evidence_ref,
+            "reservations_released_evidence_ref": reservations_released_evidence_ref,
+        },
+        "terminal_guard": {
+            "all_six_gates_pass": true,
+            "lifecycle_state": "terminal",
+            "completed_but_open": completed_but_open,
+            "unknown_descendants": unknown_descendants,
+            "reservation_leak": reservation_leak,
+            "remote_readback_before_cleanup": true,
+            "identity_match": true,
+        },
+    });
+    let token_id_bytes = canonical_json_bytes(&record).map_err(LifecycleContractError::from)?;
+    let token_id_digest = Sha256::digest(token_id_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let mut record = mapping(&record, "close_agent_tool_call")?.clone();
+    record.insert(
+        "token_id".to_owned(),
+        JsonValue::String(format!("close-token:{token_id_digest}")),
+    );
+    let record = JsonValue::Object(record);
+    let body_digest = canonical_body_sha256(&record, "token_body_sha256")
+        .map_err(LifecycleContractError::from)?;
+    let mut record = mapping(&record, "close_agent_tool_call")?.clone();
+    record.insert(
+        "token_body_sha256".to_owned(),
+        JsonValue::String(format!("sha256:{body_digest}")),
+    );
+    validate_close_agent_tool_call(&JsonValue::Object(record))
 }
 
 fn validate_remote_git_identity(
