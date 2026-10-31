@@ -6,7 +6,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
-// downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation lib.rs exposes the shared native docs command API
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
@@ -34,7 +34,6 @@ mod check_merge_structure;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
-mod docs;
 mod file_surface_inventory;
 mod graph;
 pub mod graph_client;
@@ -196,7 +195,7 @@ fn main() {
     if args.len() >= 2 && args[1] == "docs" {
         // Existing docs commands also run docs.rs post-format visualization
         // identity readback when a projection coverage marker is present.
-        std::process::exit(docs::run(&args[2..]));
+        std::process::exit(agent_canon::docs::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "codex-config" {

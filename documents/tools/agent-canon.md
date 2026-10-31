@@ -74,13 +74,15 @@ broad skill-selection prose or subagent fan-out.
 then runs the same adjacent `check` path. Math and Mermaid content is not
 rewritten by the checker; edit source deliberately and validate it with `check`.
 
-## Compatibility Entrypoints
+## Link repair and source mutation
 
-`python3 tools/validation/documentation/checks/audit_and_fix_links.py --check` is a compatibility spelling
-that forwards to the single canonical Rust route, `tools/bin/agent-canon docs
-check ...`; it does not create `reports/broken_links.txt`. Its `--apply` mode
-is source mutation and requires a typed `--mutation-capability-json` covering
-every file to be changed. Design duplicate/similarity/organization tools also
+`tools/bin/agent-canon docs links` is the native link audit route and does not
+create `reports/broken_links.txt`; without apply it runs the canonical docs check.
+The `--apply` mode requires
+`--mutation-capability-json` with exactly `allowed_paths`, `purpose`,
+and `authority` fields; every changed file must be within its allowed source
+paths. The optional `--check` flag runs the complete docs check after rewriting.
+Design duplicate/similarity/organization tools also
 require an explicit external `--runtime-root` (or the equivalent runtime
 capability) for reports; organization and deletion apply modes require the
 same explicit mutation capability. No documentation tool defaults output to
