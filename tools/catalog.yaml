@@ -1959,6 +1959,25 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs
       - tools/runtime/dispatch/agent-canon/tests/python_algorithm_contract_cli.rs
 
+  - id: check-algorithm-config-partition
+    summary: Checks InitializeConfig/SolveConfig field ownership and hidden runtime defaults with RustPython AST analysis.
+    path: tools/runtime/dispatch/agent-canon/src/check_algorithm_config_partition.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon check-algorithm-config-partition
+    dispatch: {argv: ["tools/bin/agent-canon", "check-algorithm-config-partition"]}
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - documents/tools/check_algorithm_config_partition.md
+      - documents/design/jax_util/algorithm_module_contract.md
+      - tools/validation/ci/runners/run_all_checks.sh
+    tests:
+      - tests/agent_tools/test_check_algorithm_config_partition.py
+
   - id: oop-python-readability
     public: true
     summary: Scores Python OOP readability risks.
