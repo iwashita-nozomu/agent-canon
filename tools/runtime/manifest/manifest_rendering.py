@@ -1027,7 +1027,7 @@ def manifest_run_lines(
             "    broad_cross_cutting_packet: available_not_default_read",
             "  implementation_gate_defaults:",
             "    implementation_surface_route_status: pending",
-            f"    implementation_surface_route_command: {public_command_for_spec(spec, ('python3', 'tools/analysis/search/search.py', '--query-file', '<request-or-design-question.txt>', '--providers', 'semantic', '--format', 'json'))!r}",
+            f"    implementation_surface_route_command: {public_command_for_spec(spec, ('tools/bin/agent-canon', 'agent-search', '--query-file', '<request-or-design-question.txt>', '--providers', 'semantic', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: optional_diagnostic",
             f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",

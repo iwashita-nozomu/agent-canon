@@ -509,14 +509,14 @@ entries:
   - id: lean-proof-env
     public: true
     summary: Creates and checks reusable Lean 4 proof environments with Mathlib/Aesop for formal-proof workflows.
-    path: tools/analysis/proof/lean_proof_env.py
+    path: tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/lean_proof_env.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/lean_proof_env.py"]}
+    command: tools/bin/agent-canon lean-proof-env
+    dispatch: {argv: ["tools/bin/agent-canon", "lean-proof-env"]}
     writes: true
     default_wiring:
       ci: false
@@ -529,6 +529,7 @@ entries:
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_lean_proof_env.py
+      - tools/runtime/dispatch/agent-canon/tests/lean_proof_env_native.rs
 
   - id: tool-proof-coverage
     public: true
@@ -1111,12 +1112,12 @@ entries:
 
   - id: agent-search
     summary: Routes explicit text, semantic-index, tool-catalog, dependency, or LSP searches to separate native owners.
-    path: tools/analysis/search/search.py
+    path: tools/runtime/dispatch/agent-canon/src/agent_search.rs
     family: agent_tools
     role: inventory
     status: canonical
-    command: python3 tools/analysis/search/search.py --query "<literal>" --providers text
-    dispatch: {argv: ["python3", "tools/analysis/search/search.py", "--query", "<literal>", "--providers", "text"]}
+    command: tools/bin/agent-canon agent-search --query "<literal>" --providers text
+    dispatch: {argv: ["tools/bin/agent-canon", "agent-search", "--query", "<literal>", "--providers", "text"]}
     writes: false
     default_wiring:
       ci: false
@@ -1127,6 +1128,7 @@ entries:
       - documents/tools/search-coordination.md
     tests:
       - tests/agent_tools/test_search.py
+      - tools/runtime/dispatch/agent-canon/src/agent_search_tests.rs
 
   - id: lsp-code-analysis
     public: true

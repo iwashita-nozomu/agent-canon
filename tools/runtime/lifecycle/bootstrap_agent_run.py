@@ -623,7 +623,7 @@ def emit_bootstrap_output(
     print(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
         + public_command_for_layout(
-            "python3 tools/analysis/search/search.py "
+            "tools/bin/agent-canon agent-search "
             "--query-file <request-or-design-question.txt> "
             "--providers semantic "
             "--format json",
