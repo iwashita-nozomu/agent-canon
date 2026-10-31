@@ -1,0 +1,42 @@
+[
+  {
+    "codepoint": "U+0345",
+    "old_exit": 0,
+    "old_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unicode-probe\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "old_stderr": "",
+    "native_exit": 0,
+    "native_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=no\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unknown\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "native_stderr": "",
+    "same": false
+  },
+  {
+    "codepoint": "U+05BF",
+    "old_exit": 0,
+    "old_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unicode-probe\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "old_stderr": "",
+    "native_exit": 0,
+    "native_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=no\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unknown\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "native_stderr": "",
+    "same": false
+  },
+  {
+    "codepoint": "U+0E31",
+    "old_exit": 0,
+    "old_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unicode-probe\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "old_stderr": "",
+    "native_exit": 0,
+    "native_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=no\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unknown\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "native_stderr": "",
+    "same": false
+  },
+  {
+    "codepoint": "U+0301",
+    "old_exit": 0,
+    "old_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unicode-probe\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "old_stderr": "",
+    "native_exit": 0,
+    "native_stdout": "RUN_PATH_COMPARISON=pass\nRUN_PATHS_DIFFER=yes\nBASELINE_EXECUTION_PATH=unknown\nCANDIDATE_EXECUTION_PATH=unicode-probe\nSELECTED_ROUTE_EFFICIENCY=efficient\nSELECTED_INEFFICIENT_ROUTE=no\nSTATIC_ANALYSIS_FEEDBACK=recorded\nNEXT_ACTION=record_comparison_and_continue\n",
+    "native_stderr": "",
+    "same": true
+  }
+]

@@ -10,7 +10,7 @@ upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
 downstream design skills/codex-task-workflow.md implementation stage and closeout flow.
 downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py creates optional run-bundle metadata.
 downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records actual behavior events.
-downstream implementation ../eval/checkers/compare_agent_run_paths.py compares expected and actual routes.
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/compare_agent_run_paths.rs compares expected and actual routes.
 @dependency-end
 -->
 
