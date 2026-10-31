@@ -20,3 +20,6 @@ tests/fixtures/design_similarity/float_python_golden.json text eol=lf
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
 tests/fixtures/nvidia/*.xml -diff
+
+# Frozen design-organizer oracle bytes are checked in on every host.
+tests/fixtures/design_organizer/python_golden.json text eol=lf
