@@ -3,14 +3,15 @@
 // contract implementation
 // responsibility Validates source mutation capabilities and writes or removes files only beneath their exact source-bound paths.
 // upstream implementation runtime_boundary.rs owns external runtime artifacts and intentionally rejects source writes
-// upstream design ../../../../../tools/analysis/documents/formatting/_runtime_output.py defines the existing capability JSON contract
-// downstream implementation docs.rs uses this capability for explicit link rewrites and duplicate-design deletion
+// upstream design ../../../../../documents/tools/agent-canon.md defines the explicit source mutation capability contract
+// downstream implementation docs.rs uses this capability for link rewrites, duplicate deletion, and organizer copies
 // downstream test ../tests/source_mutation_native.rs validates exact scope and no-follow writes/removals
 // @dependency-end
 
-use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
+use cap_fs_ext::{DirExt, FollowSymlinks, MetadataExt, OpenOptionsFollowExt, SystemTimeSpec};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs;
 use std::io::{self, Write};
@@ -162,6 +163,210 @@ impl SourceMutationCapability {
         })
     }
 
+    /// Copy one approved regular file or source symlink with copy2-style
+    /// content, permission, timestamp, and available extended-attribute data.
+    pub fn copy_file_with_metadata(&self, source: &Path, target: &Path) -> Result<()> {
+        let resolved_target = self.assert_allowed(target)?;
+        let target_relative = resolved_target
+            .strip_prefix(&self.source_root)
+            .map_err(|_| {
+                SourceMutationError::new(format!(
+                    "mutation target is outside source: {}",
+                    target.display()
+                ))
+            })?;
+        let (target_directory, target_name) =
+            open_file_parent_nofollow(&self.source_root, target_relative, true).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot create mutation parent for {}: {error}",
+                        target.display()
+                    ))
+                },
+            )?;
+
+        let source_candidate = if source.is_absolute() {
+            source.to_path_buf()
+        } else {
+            self.source_root.join(source)
+        };
+        let source_relative = source_candidate
+            .strip_prefix(&self.source_root)
+            .map_err(|_| {
+                SourceMutationError::new(format!(
+                    "copy source is outside source root: {}",
+                    source.display()
+                ))
+            })?;
+        let (source_directory, source_name) =
+            open_file_parent_nofollow(&self.source_root, source_relative, false).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot open copy source parent for {}: {error}",
+                        source.display()
+                    ))
+                },
+            )?;
+        let source_entry = source_directory
+            .symlink_metadata(&source_name)
+            .map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot inspect copy source {}: {error}",
+                    source.display()
+                ))
+            })?;
+        if source_entry.is_symlink() {
+            return copy_source_symlink(
+                &source_directory,
+                &source_name,
+                &target_directory,
+                &target_name,
+                source,
+                target,
+            );
+        }
+        if !source_entry.is_file() {
+            return Err(SourceMutationError::new(format!(
+                "copy source is not a regular file: {}",
+                source.display()
+            )));
+        }
+
+        let mut source_options = cap_std::fs::OpenOptions::new();
+        source_options.read(true);
+        source_options.follow(FollowSymlinks::No);
+        let mut source_file = source_directory
+            .open_with(&source_name, &source_options)
+            .map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot open copy source {}: {error}",
+                    source.display()
+                ))
+            })?;
+        let source_metadata = source_file.metadata().map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot inspect copy source {}: {error}",
+                source.display()
+            ))
+        })?;
+        if !source_metadata.is_file() {
+            return Err(SourceMutationError::new(format!(
+                "copy source is not a regular file: {}",
+                source.display()
+            )));
+        }
+
+        let existing_target = match target_directory.symlink_metadata(&target_name) {
+            Ok(metadata) if metadata.is_symlink() => {
+                return Err(SourceMutationError::new(format!(
+                    "mutation target contains symlink component: {}",
+                    target.display()
+                )))
+            }
+            Ok(metadata) if metadata.is_file() => true,
+            Ok(_) => {
+                return Err(SourceMutationError::new(format!(
+                    "copy target is not a regular file: {}",
+                    target.display()
+                )))
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+            Err(error) => {
+                return Err(SourceMutationError::new(format!(
+                    "cannot inspect copy target {}: {error}",
+                    target.display()
+                )))
+            }
+        };
+        let mut target_options = cap_std::fs::OpenOptions::new();
+        target_options.write(true);
+        target_options.follow(FollowSymlinks::No);
+        if !existing_target {
+            target_options.create(true);
+        }
+        let mut target_file = target_directory
+            .open_with(&target_name, &target_options)
+            .map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot open copy target {}: {error}",
+                    target.display()
+                ))
+            })?;
+        let target_metadata = target_file.metadata().map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot inspect copy target {}: {error}",
+                target.display()
+            ))
+        })?;
+        if same_file(&source_metadata, &target_metadata) {
+            return Err(SourceMutationError::new(format!(
+                "copy source and target are the same file: {} and {}",
+                source.display(),
+                target.display()
+            )));
+        }
+        target_file.set_len(0).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot truncate copy target {}: {error}",
+                target.display()
+            ))
+        })?;
+        io::copy(&mut source_file, &mut target_file).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot copy source {} to {}: {error}",
+                source.display(),
+                target.display()
+            ))
+        })?;
+
+        // copy2 reads source stat after copying bytes, then applies times,
+        // extended attributes, and mode in that order.
+        let source_metadata = source_file.metadata().map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot inspect copy source {}: {error}",
+                source.display()
+            ))
+        })?;
+        let source_atime = source_metadata.accessed().map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot read source access time {}: {error}",
+                source.display()
+            ))
+        })?;
+        let source_mtime = source_metadata.modified().map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot read source modification time {}: {error}",
+                source.display()
+            ))
+        })?;
+        set_open_file_times(&target_file, source_atime, source_mtime).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot copy file times to {}: {error}",
+                target.display()
+            ))
+        })?;
+        copy_regular_file_xattrs(&source_file, &target_file).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot copy extended attributes to {}: {error}",
+                target.display()
+            ))
+        })?;
+        target_file
+            .set_permissions(source_metadata.permissions())
+            .map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot copy file mode to {}: {error}",
+                    target.display()
+                ))
+            })?;
+        copy_regular_file_flags(&source_file, &target_file).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot copy file flags to {}: {error}",
+                target.display()
+            ))
+        })
+    }
+
     /// Revalidate and remove one approved file through its no-follow parent directory.
     pub fn remove_file(&self, path: &Path) -> Result<()> {
         let resolved = self.assert_allowed(path)?;
@@ -207,6 +412,529 @@ impl SourceMutationCapability {
             ))
         })
     }
+}
+
+fn copy_source_symlink(
+    source_directory: &cap_std::fs::Dir,
+    source_name: &OsStr,
+    target_directory: &cap_std::fs::Dir,
+    target_name: &OsStr,
+    source: &Path,
+    target: &Path,
+) -> Result<()> {
+    let link_text = source_directory.read_link(source_name).map_err(|error| {
+        SourceMutationError::new(format!(
+            "cannot read source symlink {}: {error}",
+            source.display()
+        ))
+    })?;
+    let source_metadata = source_directory
+        .symlink_metadata(source_name)
+        .map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot inspect source symlink {}: {error}",
+                source.display()
+            ))
+        })?;
+    #[cfg(windows)]
+    let create_link = target_directory.symlink_file(&link_text, target_name);
+    #[cfg(not(windows))]
+    let create_link = target_directory.symlink_contents(&link_text, target_name);
+    create_link.map_err(|error| {
+        SourceMutationError::new(format!(
+            "cannot copy source symlink {} to {}: {error}",
+            source.display(),
+            target.display()
+        ))
+    })?;
+
+    let source_atime = source_metadata.accessed().map_err(|error| {
+        SourceMutationError::new(format!(
+            "cannot read source symlink access time {}: {error}",
+            source.display()
+        ))
+    })?;
+    let source_mtime = source_metadata.modified().map_err(|error| {
+        SourceMutationError::new(format!(
+            "cannot read source symlink modification time {}: {error}",
+            source.display()
+        ))
+    })?;
+    target_directory
+        .set_symlink_times(
+            target_name,
+            Some(SystemTimeSpec::from(source_atime)),
+            Some(SystemTimeSpec::from(source_mtime)),
+        )
+        .map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot copy symlink times to {}: {error}",
+                target.display()
+            ))
+        })?;
+    copy_symlink_xattrs(source_directory, source_name, target_directory, target_name).map_err(
+        |error| {
+            SourceMutationError::new(format!(
+                "cannot copy symlink extended attributes to {}: {error}",
+                target.display()
+            ))
+        },
+    )?;
+    match target_directory.set_symlink_permissions(target_name, source_metadata.permissions()) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::Unsupported => {}
+        Err(error) => {
+            return Err(SourceMutationError::new(format!(
+                "cannot copy symlink mode to {}: {error}",
+                target.display()
+            )))
+        }
+    }
+    copy_symlink_flags(
+        source_directory,
+        source_name,
+        target_directory,
+        target_name,
+        target,
+    )
+    .map_err(|error| {
+        SourceMutationError::new(format!(
+            "cannot copy symlink flags to {}: {error}",
+            target.display()
+        ))
+    })
+}
+
+fn set_open_file_times(
+    target: &cap_std::fs::File,
+    atime: cap_std::time::SystemTime,
+    mtime: cap_std::time::SystemTime,
+) -> io::Result<()> {
+    let target = target.try_clone()?.into_std();
+    let times = std::fs::FileTimes::new()
+        .set_accessed(atime.into_std())
+        .set_modified(mtime.into_std());
+    target.set_times(times)
+}
+
+#[cfg(target_os = "linux")]
+fn copy_symlink_xattrs(
+    source_directory: &cap_std::fs::Dir,
+    source_name: &OsStr,
+    target_directory: &cap_std::fs::Dir,
+    target_name: &OsStr,
+) -> io::Result<()> {
+    use rustix::fs::{
+        lgetxattr, lgetxattr_query, llistxattr, llistxattr_query, lsetxattr, XattrFlags,
+    };
+    use std::os::unix::ffi::OsStrExt;
+
+    // Rustix's l* calls do not accept a directory fd. `/proc/self/fd/N`
+    // anchors the parent directory, and the validated basename remains the
+    // terminal no-follow component. Both Dir handles stay borrowed until all
+    // operations finish; if procfs is unavailable, propagate that error.
+    let source_path = anchored_symlink_xattr_path(source_directory, source_name)?;
+    let target_path = anchored_symlink_xattr_path(target_directory, target_name)?;
+    let names = match llistxattr_query(&source_path) {
+        Ok(length) => {
+            let mut buffer = vec![0; length];
+            let written = llistxattr(&source_path, &mut buffer).map_err(io::Error::from)?;
+            buffer.truncate(written);
+            buffer
+        }
+        Err(error) if ignored_xattr_error(error) => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+
+    for name in names
+        .split(|byte| *byte == 0)
+        .filter(|name| !name.is_empty())
+    {
+        let name = OsStr::from_bytes(name);
+        let value = match lgetxattr_query(&source_path, name) {
+            Ok(length) => {
+                let mut buffer = vec![0; length];
+                match lgetxattr(&source_path, name, &mut buffer) {
+                    Ok(written) => {
+                        buffer.truncate(written);
+                        buffer
+                    }
+                    Err(error) if ignored_xattr_error(error) => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) => return Err(error.into()),
+        };
+        match lsetxattr(&target_path, name, &value, XattrFlags::empty()) {
+            Ok(()) => {}
+            Err(error) if ignored_xattr_error(error) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn anchored_symlink_xattr_path(directory: &cap_std::fs::Dir, name: &OsStr) -> io::Result<PathBuf> {
+    use cap_std::io_lifetimes::AsRawFd;
+
+    let mut components = Path::new(name).components();
+    match components.next() {
+        Some(Component::Normal(component)) if component == name && components.next().is_none() => {}
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "symlink xattr name must be one directory entry",
+            ))
+        }
+    }
+    let mut path = PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd()));
+    path.push(name);
+    Ok(path)
+}
+
+#[cfg(target_os = "macos")]
+fn copy_symlink_xattrs(
+    source_directory: &cap_std::fs::Dir,
+    source_name: &OsStr,
+    target_directory: &cap_std::fs::Dir,
+    target_name: &OsStr,
+) -> io::Result<()> {
+    use rustix::fs::{openat, Mode, OFlags};
+
+    let link_flags = OFlags::SYMLINK | OFlags::RDONLY | OFlags::CLOEXEC;
+    let source = openat(source_directory, source_name, link_flags, Mode::empty())
+        .map_err(io::Error::from)?;
+    let target = openat(target_directory, target_name, link_flags, Mode::empty())
+        .map_err(io::Error::from)?;
+    copy_descriptor_xattrs(&source, &target)
+}
+
+#[cfg(windows)]
+fn copy_symlink_xattrs(
+    _source_directory: &cap_std::fs::Dir,
+    _source_name: &OsStr,
+    _target_directory: &cap_std::fs::Dir,
+    _target_name: &OsStr,
+) -> io::Result<()> {
+    // Windows does not expose Python os xattrs; the old route uses CopyFile2.
+    Ok(())
+}
+
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
+fn copy_symlink_xattrs(
+    _source_directory: &cap_std::fs::Dir,
+    _source_name: &OsStr,
+    _target_directory: &cap_std::fs::Dir,
+    _target_name: &OsStr,
+) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "safe descriptor-relative symlink xattr copy is unavailable on this target",
+    ))
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn copy_regular_file_xattrs(
+    source: &cap_std::fs::File,
+    target: &cap_std::fs::File,
+) -> io::Result<()> {
+    copy_descriptor_xattrs(source, target)
+}
+
+#[cfg(windows)]
+fn copy_regular_file_xattrs(
+    _source: &cap_std::fs::File,
+    _target: &cap_std::fs::File,
+) -> io::Result<()> {
+    // Windows does not expose Python os xattrs; the old route uses CopyFile2.
+    Ok(())
+}
+
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
+fn copy_regular_file_xattrs(
+    _source: &cap_std::fs::File,
+    _target: &cap_std::fs::File,
+) -> io::Result<()> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "safe descriptor-relative xattr copy is unavailable on this target",
+    ))
+}
+
+#[cfg(target_os = "macos")]
+fn copy_symlink_flags(
+    source_directory: &cap_std::fs::Dir,
+    source_name: &OsStr,
+    target_directory: &cap_std::fs::Dir,
+    target_name: &OsStr,
+    target: &Path,
+) -> io::Result<()> {
+    use cap_std::io_lifetimes::AsFd;
+    use rustix::fs::{openat, statat, AtFlags, Mode, OFlags};
+
+    let source_stat = statat(source_directory, source_name, AtFlags::SYMLINK_NOFOLLOW)?;
+    // O_SYMLINK opens the symlink itself; parent handle and final-link identity
+    // stay anchored across the borrowed fchflags call.
+    let target_link = openat(
+        target_directory,
+        target_name,
+        OFlags::SYMLINK | OFlags::RDONLY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )?;
+    match fchflags_borrowed_fd(target_link.as_fd(), source_stat.st_flags as u64) {
+        Ok(()) => Ok(()),
+        Err(error) if is_unsupported_file_flags(&error) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(any(
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+fn copy_symlink_flags(
+    source_directory: &cap_std::fs::Dir,
+    source_name: &OsStr,
+    _target_directory: &cap_std::fs::Dir,
+    _target_name: &OsStr,
+    source: &Path,
+) -> io::Result<()> {
+    use rustix::fs::{statat, AtFlags};
+
+    // The locked safe APIs can read BSD symlink flags but provide no anchored
+    // no-follow setter. Do not claim parity for a nonzero source flag.
+    let metadata = statat(source_directory, source_name, AtFlags::SYMLINK_NOFOLLOW)
+        .map_err(io::Error::from)?;
+    if metadata.st_flags != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            format!(
+                "source symlink flags cannot be copied safely: {}",
+                source.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", windows))]
+fn copy_symlink_flags(
+    _source_directory: &cap_std::fs::Dir,
+    _source_name: &OsStr,
+    _target_directory: &cap_std::fs::Dir,
+    _target_name: &OsStr,
+    _source: &Path,
+) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+fn copy_regular_file_flags(
+    source: &cap_std::fs::File,
+    target: &cap_std::fs::File,
+) -> io::Result<()> {
+    let source_stat = rustix::fs::fstat(source).map_err(io::Error::from)?;
+    let flags = source_stat.st_flags as u64;
+    let result = set_file_flags(target, flags);
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) if is_unsupported_file_flags(&error) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "openbsd"))]
+type NativeFileFlags = nix::libc::c_uint;
+
+#[cfg(any(target_os = "freebsd", target_os = "netbsd", target_os = "dragonfly"))]
+type NativeFileFlags = nix::libc::c_ulong;
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+fn set_file_flags(target: &cap_std::fs::File, flags: u64) -> io::Result<()> {
+    use cap_std::io_lifetimes::{AsFd, BorrowedFd};
+
+    let borrowed_fd: BorrowedFd<'_> = target.as_fd();
+    fchflags_borrowed_fd(borrowed_fd, flags)
+}
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+fn fchflags_borrowed_fd(
+    borrowed_fd: cap_std::io_lifetimes::BorrowedFd<'_>,
+    flags: u64,
+) -> io::Result<()> {
+    use cap_std::io_lifetimes::AsRawFd;
+
+    let flags = NativeFileFlags::try_from(flags)
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "file flags do not fit target"))?;
+    let raw_fd = borrowed_fd.as_raw_fd();
+    // SAFETY: fchflags has only this borrowed descriptor number and integer
+    // flags. The caller keeps the owner alive for the call; this wrapper does
+    // not own, close, retain, or store the descriptor and passes no pointers.
+    let result = unsafe { nix::libc::fchflags(raw_fd, flags) };
+    if result == -1 {
+        // Capture errno immediately after the sentinel return.
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
+fn is_unsupported_file_flags(error: &io::Error) -> bool {
+    let Some(error) = error.raw_os_error() else {
+        return false;
+    };
+    error == nix::libc::EOPNOTSUPP || error == nix::libc::ENOTSUP
+}
+
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+)))]
+fn copy_regular_file_flags(
+    _source: &cap_std::fs::File,
+    _target: &cap_std::fs::File,
+) -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn copy_descriptor_xattrs<Source, Target>(source: &Source, target: &Target) -> io::Result<()>
+where
+    Source: rustix::fd::AsFd,
+    Target: rustix::fd::AsFd,
+{
+    use rustix::fs::{
+        fgetxattr, fgetxattr_query, flistxattr, flistxattr_query, fsetxattr, XattrFlags,
+    };
+    use rustix::io::Errno;
+    use std::os::unix::ffi::OsStrExt;
+
+    let names = match flistxattr_query(source) {
+        Ok(length) => {
+            let mut buffer = vec![0; length];
+            let written = flistxattr(source, &mut buffer).map_err(io::Error::from)?;
+            buffer.truncate(written);
+            buffer
+        }
+        Err(error) if ignored_xattr_error(error) => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+
+    for name in names
+        .split(|byte| *byte == 0)
+        .filter(|name| !name.is_empty())
+    {
+        let name = OsStr::from_bytes(name);
+        let value = match fgetxattr_query(source, name) {
+            Ok(length) => {
+                let mut buffer = vec![0; length];
+                match fgetxattr(source, name, &mut buffer) {
+                    Ok(written) => {
+                        buffer.truncate(written);
+                        buffer
+                    }
+                    Err(error) if ignored_xattr_error(error) => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) => return Err(error.into()),
+        };
+        match fsetxattr(target, name, &value, XattrFlags::empty()) {
+            Ok(()) => {}
+            Err(error) if ignored_xattr_error(error) => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn ignored_xattr_error(error: rustix::io::Errno) -> bool {
+    use rustix::io::Errno;
+
+    error == Errno::PERM
+        || error == Errno::NOTSUP
+        || error == Errno::OPNOTSUPP
+        || error == Errno::NODATA
+        || error == Errno::INVAL
+        || error == Errno::ACCESS
+}
+
+fn open_file_parent_nofollow(
+    root: &Path,
+    relative: &Path,
+    create_missing: bool,
+) -> io::Result<(cap_std::fs::Dir, OsString)> {
+    let mut components = relative.components().collect::<Vec<_>>();
+    let Some(Component::Normal(name)) = components.pop() else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source mutation target must name a file",
+        ));
+    };
+    let parent = components
+        .into_iter()
+        .map(|component| match component {
+            Component::Normal(name) => Ok(name.to_os_string()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "unsafe source mutation parent path",
+            )),
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    let mut directory = open_root_nofollow(root)?;
+    for part in parent {
+        match directory.open_dir_nofollow(&part) {
+            Ok(child) => directory = child,
+            Err(error) if create_missing && error.kind() == io::ErrorKind::NotFound => {
+                match directory.create_dir(&part) {
+                    Ok(()) => {}
+                    Err(create_error) if create_error.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(create_error) => return Err(create_error),
+                }
+                directory = directory.open_dir_nofollow(&part)?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok((directory, name.to_os_string()))
+}
+
+fn same_file(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
+    left.dev() == right.dev() && left.ino() == right.ino()
 }
 
 fn relative_path_is_allowed(relative: &Path, allowed_paths: &[PathBuf]) -> bool {
