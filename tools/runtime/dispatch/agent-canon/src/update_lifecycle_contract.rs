@@ -89,6 +89,7 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
     "retry_reason",
     "next_checkpoint",
 ];
+pub const SOURCE_MAIN_REBIND_SCHEMA: &str = "agent-canon.source-main-rebind-receipt.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LifecycleContractError {
@@ -587,6 +588,241 @@ pub fn binding_identity(
 ) -> Result<RecordBindingIdentity, LifecycleContractError> {
     let binding = validate_record_binding(value)?;
     binding_identity_from_validated(&binding)
+}
+
+fn validate_remote_git_identity(
+    value: &JsonValue,
+    field: &str,
+) -> Result<(String, String, String), LifecycleContractError> {
+    let identity = mapping(value, field)?;
+    exact_keys(
+        identity,
+        &["remote", "ref", "commit_sha", "tree_sha"],
+        &[],
+        field,
+    )?;
+    let remote = required_string(identity, "remote", field)?;
+    let ref_name = required_string(identity, "ref", field)?;
+    if !ref_name.starts_with("refs/") {
+        return Err(fail("lifecycle:ref_invalid", &format!("{field}.ref")));
+    }
+    let commit_sha = pattern_value(
+        required_value(identity, "commit_sha", field)?,
+        &format!("{field}.commit_sha"),
+        |value| lower_hex(value, 40),
+    )?;
+    pattern_value(
+        required_value(identity, "tree_sha", field)?,
+        &format!("{field}.tree_sha"),
+        |value| lower_hex(value, 40),
+    )?;
+    Ok((remote, ref_name, commit_sha))
+}
+
+pub fn validate_source_main_rebind_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "source_main_rebind_receipt")?;
+    exact_keys(
+        receipt,
+        &[
+            "schema",
+            "rebind_receipt_id",
+            "binding",
+            "input_identity",
+            "old_base_identity",
+            "new_base_identity",
+            "origin_main_readback",
+        ],
+        &[],
+        "source_main_rebind_receipt",
+    )?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(SOURCE_MAIN_REBIND_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", SOURCE_MAIN_REBIND_SCHEMA));
+    }
+    // Like the Python validator, this checks the receipt ID shape but does not recompute it.
+    let rebind_id = pattern_value(
+        required_value(receipt, "rebind_receipt_id", "source_main_rebind_receipt")?,
+        "source_main_rebind_receipt.rebind_receipt_id",
+        valid_hash_id,
+    )?;
+    if !rebind_id.starts_with("rebind:") {
+        return Err(fail(
+            "lifecycle:identity_invalid",
+            "source_main_rebind_receipt.rebind_receipt_id",
+        ));
+    }
+
+    let binding = validate_record_binding(required_value(
+        receipt,
+        "binding",
+        "source_main_rebind_receipt",
+    )?)?;
+    let input_identity_field = "source_main_rebind_receipt.input_identity";
+    let input_identity = mapping(
+        required_value(receipt, "input_identity", "source_main_rebind_receipt")?,
+        input_identity_field,
+    )?;
+    exact_keys(
+        input_identity,
+        &["tool", "input_digest"],
+        &[],
+        input_identity_field,
+    )?;
+    if required_value(input_identity, "tool", input_identity_field)?.as_str() != Some("cmd_latest")
+    {
+        return Err(fail(
+            "lifecycle:tool_id_invalid",
+            "source_main_rebind_receipt.input_identity.tool",
+        ));
+    }
+    let input_digest = pattern_value(
+        required_value(input_identity, "input_digest", input_identity_field)?,
+        "source_main_rebind_receipt.input_identity.input_digest",
+        valid_sha256,
+    )?;
+    let binding_map = mapping(&binding, "binding")?;
+    let binding_input_digest = required_string(binding_map, "input_digest", "binding")?;
+    if input_digest != binding_input_digest {
+        return Err(fail(
+            "input_identity_mismatch",
+            "source_main_rebind_receipt.input_identity",
+        ));
+    }
+
+    let (old_remote, old_ref, _) = validate_remote_git_identity(
+        required_value(receipt, "old_base_identity", "source_main_rebind_receipt")?,
+        "source_main_rebind_receipt.old_base_identity",
+    )?;
+    let (new_remote, new_ref, new_commit_sha) = validate_remote_git_identity(
+        required_value(receipt, "new_base_identity", "source_main_rebind_receipt")?,
+        "source_main_rebind_receipt.new_base_identity",
+    )?;
+    for (field, remote, ref_name) in [
+        ("old_base_identity", old_remote.as_str(), old_ref.as_str()),
+        ("new_base_identity", new_remote.as_str(), new_ref.as_str()),
+    ] {
+        if remote != "origin" || ref_name != "refs/heads/main" {
+            return Err(fail("lifecycle:source_main_identity_invalid", field));
+        }
+    }
+
+    let readback_field = "source_main_rebind_receipt.origin_main_readback";
+    let readback = mapping(
+        required_value(
+            receipt,
+            "origin_main_readback",
+            "source_main_rebind_receipt",
+        )?,
+        readback_field,
+    )?;
+    exact_keys(
+        readback,
+        &["remote", "ref", "commit_sha", "command", "evidence_ref"],
+        &[],
+        readback_field,
+    )?;
+    let readback_remote = required_string(readback, "remote", readback_field)?;
+    let readback_ref = required_string(readback, "ref", readback_field)?;
+    let readback_commit_sha = pattern_value(
+        required_value(readback, "commit_sha", readback_field)?,
+        "source_main_rebind_receipt.origin_main_readback.commit_sha",
+        |value| lower_hex(value, 40),
+    )?;
+    if required_value(readback, "command", readback_field)?.as_str()
+        != Some("git ls-remote origin refs/heads/main")
+    {
+        return Err(LifecycleContractError::code(
+            "lifecycle:readback_command_invalid",
+        ));
+    }
+    pattern_value(
+        required_value(readback, "evidence_ref", readback_field)?,
+        "source_main_rebind_receipt.origin_main_readback.evidence_ref",
+        valid_evidence_ref,
+    )?;
+    if readback_remote != new_remote
+        || readback_ref != new_ref
+        || readback_commit_sha != new_commit_sha
+    {
+        return Err(LifecycleContractError::code(
+            "lifecycle:source_main_readback_mismatch",
+        ));
+    }
+    canonical_clone(value)
+}
+
+pub fn materialize_source_main_rebind_receipt(
+    binding: &JsonValue,
+    old_base_identity: &JsonValue,
+    new_base_identity: &JsonValue,
+    origin_main_readback_evidence_ref: &str,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_binding = validate_record_binding(binding)?;
+    let identity = binding_identity_from_validated(&checked_binding)?;
+    let old_base = mapping(old_base_identity, "old_base_identity")?;
+    let new_base = mapping(new_base_identity, "new_base_identity")?;
+    let input_identity = serde_json::json!({
+        "tool": "cmd_latest",
+        "input_digest": identity.input_digest.clone(),
+    });
+    let key = serde_json::json!({
+        "transaction_id": identity.transaction_id.clone(),
+        "snapshot_id": identity.snapshot_id.clone(),
+        "input_identity": input_identity.clone(),
+        "old_base_identity": JsonValue::Object((*old_base).clone()),
+        "new_base_identity": JsonValue::Object((*new_base).clone()),
+    });
+    let canonical = canonical_json_bytes(&key).map_err(LifecycleContractError::from)?;
+    let digest = Sha256::digest(canonical)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let mut readback = JsonMap::new();
+    readback.insert(
+        "remote".to_owned(),
+        required_value(new_base, "remote", "new_base_identity")?.clone(),
+    );
+    readback.insert(
+        "ref".to_owned(),
+        required_value(new_base, "ref", "new_base_identity")?.clone(),
+    );
+    readback.insert(
+        "commit_sha".to_owned(),
+        required_value(new_base, "commit_sha", "new_base_identity")?.clone(),
+    );
+    readback.insert(
+        "command".to_owned(),
+        JsonValue::String("git ls-remote origin refs/heads/main".to_owned()),
+    );
+    readback.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(origin_main_readback_evidence_ref.to_owned()),
+    );
+    let mut record = JsonMap::new();
+    record.insert(
+        "schema".to_owned(),
+        JsonValue::String(SOURCE_MAIN_REBIND_SCHEMA.to_owned()),
+    );
+    record.insert(
+        "rebind_receipt_id".to_owned(),
+        JsonValue::String(format!("rebind:{digest}")),
+    );
+    record.insert("binding".to_owned(), checked_binding);
+    record.insert("input_identity".to_owned(), input_identity);
+    record.insert(
+        "old_base_identity".to_owned(),
+        JsonValue::Object((*old_base).clone()),
+    );
+    record.insert(
+        "new_base_identity".to_owned(),
+        JsonValue::Object((*new_base).clone()),
+    );
+    record.insert(
+        "origin_main_readback".to_owned(),
+        JsonValue::Object(readback),
+    );
+    validate_source_main_rebind_receipt(&JsonValue::Object(record))
 }
 
 fn gate_contract(gate_id: &str) -> Option<(&'static str, &'static [&'static str])> {
