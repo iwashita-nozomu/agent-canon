@@ -95,7 +95,7 @@ fn route_board_preserves_active_reachability_classification_and_order() {
         vec!["backend", "implementation_extractor", "other", "sufficient"]
     );
     assert_eq!(summary.open_route_count, 3);
-    assert_eq!(summary.unknown_route_count, 1);
+    assert_eq!(summary.unknown_route_count, 0);
 
     let backend = route(&summary, "backend");
     assert_eq!((backend.total, backend.open, backend.unknown), (1, 1, 0));
@@ -103,6 +103,7 @@ fn route_board_preserves_active_reachability_classification_and_order() {
     assert_eq!(backend.open_nodes, vec!["backend".to_owned()]);
     let other = route(&summary, "other");
     assert_eq!((other.total, other.open, other.unknown), (2, 1, 1));
+    assert_eq!(other.verdict, "actionable_open");
     assert_eq!(other.open_nodes, vec!["other-open".to_owned()]);
     assert_eq!(other.unknown_nodes, vec!["unknown".to_owned()]);
     assert_eq!(
@@ -127,6 +128,7 @@ fn route_ties_choose_the_lexicographically_later_label() {
     assert_eq!(summary.routes.len(), 1);
     assert_eq!(summary.routes[0].route, "sufficient");
     assert_eq!(summary.routes[0].verdict, "needs_classification");
+    assert_eq!(summary.unknown_route_count, 1);
 }
 
 #[test]
@@ -134,7 +136,8 @@ fn missing_root_falls_back_to_all_nodes() {
     let graph = json!({
         "root": "absent",
         "nodes": [
-            {"id": "z", "kind": "lemma", "status": "unverified", "theorem": "reverse"},
+            {"id": "z", "kind": "lemma", "status": "open", "theorem": "reverse"},
+            {"id": "u", "kind": "lemma", "status": "unverified", "theorem": "algorithm"},
             {"id": "a", "kind": "formal_library", "status": ""}
         ],
         "edges": []
@@ -142,9 +145,15 @@ fn missing_root_falls_back_to_all_nodes() {
 
     let summary = board(&graph).unwrap();
 
-    assert_eq!(summary.reachable_nodes, 2);
+    assert_eq!(summary.reachable_nodes, 3);
     assert_eq!(summary.open_route_count, 1);
     assert_eq!(route(&summary, "reverse").open_nodes, vec!["z".to_owned()]);
+    let unverified = route(&summary, "algorithm_change");
+    assert_eq!(
+        (unverified.terminal, unverified.open, unverified.unknown),
+        (1, 0, 0)
+    );
+    assert_eq!(unverified.verdict, "closed");
     assert_eq!(route(&summary, "other").terminal, 1);
 }
 
