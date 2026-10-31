@@ -556,12 +556,14 @@ fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
                 .iter()
                 .chain(executable_forms.iter())
                 .any(|form| {
-                    token_sequence_matches_at(&tokens, start, form)
-                        && dispatch_arguments_are_referenced(
+                    dispatch_argument_matches_at(line, &tokens, start, form).is_some_and(|length| {
+                        dispatch_arguments_are_referenced(
+                            line,
                             &tokens,
-                            start + form.len(),
+                            start + length,
                             argv.get(1..).unwrap_or_default(),
                         )
+                    })
                 })
         })
     })
@@ -572,19 +574,27 @@ fn token_sequence_matches_at(tokens: &[RustToken], start: usize, values: &[Strin
     token_sequence_matches(tokens, &values).contains(&start)
 }
 
-fn dispatch_argument_token_forms(argument: &str) -> Vec<Vec<String>> {
-    // Preserve token boundaries and escapes for unquoted and common quoted shell words.
-    let mut sources = vec![argument.to_owned()];
+struct DispatchArgumentTokenForm {
+    values: Vec<String>,
+    quoted_source: Option<String>,
+}
+
+fn dispatch_argument_token_forms(argument: &str) -> Vec<DispatchArgumentTokenForm> {
+    let mut sources = vec![(argument.to_owned(), None)];
+    let escaped_backtick = format!("{}{}", char::from(92), char::from(96));
     let escaped_double_quoted = argument
         .replace('\\', "\\\\")
         .replace('"', "\\\"")
-        .replace('$', "\\$");
-    sources.push(format!("\"{escaped_double_quoted}\""));
+        .replace('$', "\\$")
+        .replace(char::from(96), &escaped_backtick);
+    let double_quoted = format!("\"{escaped_double_quoted}\"");
+    sources.push((double_quoted.clone(), Some(double_quoted)));
     if !argument.contains('\'') {
-        sources.push(format!("'{argument}'"));
+        let single_quoted = format!("'{argument}'");
+        sources.push((single_quoted.clone(), Some(single_quoted)));
     }
     let mut forms = Vec::new();
-    for source in sources {
+    for (source, quoted_source) in sources {
         let Ok(tokens) = rust_tokens(&source) else {
             continue;
         };
@@ -592,8 +602,17 @@ fn dispatch_argument_token_forms(argument: &str) -> Vec<Vec<String>> {
             .into_iter()
             .map(|token| token.value)
             .collect::<Vec<_>>();
-        if !values.is_empty() && !forms.contains(&values) {
-            forms.push(values);
+        if values.is_empty() {
+            continue;
+        }
+        if !forms.iter().any(|form: &DispatchArgumentTokenForm| {
+            form.values.as_slice() == values.as_slice()
+                && form.quoted_source.as_deref() == quoted_source.as_deref()
+        }) {
+            forms.push(DispatchArgumentTokenForm {
+                values,
+                quoted_source,
+            });
         }
     }
     forms
@@ -603,42 +622,170 @@ fn is_dispatch_placeholder(argument: &str) -> bool {
     argument.contains('<') || argument.contains('>')
 }
 
-fn dispatch_arguments_are_referenced(
-    tokens: &[RustToken],
-    mut position: usize,
-    arguments: &[String],
-) -> bool {
-    let mut may_skip_tokens = false;
-    for argument in arguments {
-        if is_dispatch_placeholder(argument) {
-            // Caller values may vary; fixed dispatch arguments still match in order.
-            may_skip_tokens = true;
+fn is_shell_control_operator(token: &RustToken) -> bool {
+    matches!(
+        token.value.as_str(),
+        ";" | "&" | "&&" | "|" | "||" | "(" | ")" | "<" | ">"
+    )
+}
+
+fn shell_token_is_unquoted(line: &str, token: &RustToken) -> bool {
+    let end = token.start_column.saturating_sub(1);
+    let mut single_quoted = false;
+    let mut double_quoted = false;
+    let mut escaped = false;
+    for character in line.chars().take(end) {
+        if escaped {
+            escaped = false;
             continue;
         }
-        let forms = dispatch_argument_token_forms(argument);
-        if forms.is_empty() {
-            return false;
+        if character == '\\' && !single_quoted {
+            escaped = true;
+            continue;
         }
-        let matched = if may_skip_tokens {
-            (position..tokens.len()).find_map(|start| {
-                forms
-                    .iter()
-                    .find(|form| token_sequence_matches_at(tokens, start, form))
-                    .map(|form| (start, form.len()))
-            })
-        } else {
-            forms
-                .iter()
-                .find(|form| token_sequence_matches_at(tokens, position, form))
-                .map(|form| (position, form.len()))
-        };
-        let Some((start, length)) = matched else {
-            return false;
-        };
-        position = start + length;
-        may_skip_tokens = false;
+        match character {
+            '\'' if !double_quoted => single_quoted = !single_quoted,
+            '"' if !single_quoted => double_quoted = !double_quoted,
+            _ => {}
+        }
     }
-    true
+    !single_quoted && !double_quoted && !escaped
+}
+
+fn shell_control_operator_is_active(line: &str, token: &RustToken) -> bool {
+    is_shell_control_operator(token) && shell_token_is_unquoted(line, token)
+}
+
+fn shell_comment_starts_at(line: &str, token: &RustToken) -> bool {
+    if token.value != "#" || !shell_token_is_unquoted(line, token) {
+        return false;
+    }
+    let start = token.start_column.saturating_sub(1);
+    start == 0
+        || line
+            .chars()
+            .nth(start - 1)
+            .is_some_and(|character| character.is_ascii_whitespace() || shell_separator(character))
+}
+
+fn shell_separator(character: char) -> bool {
+    character.is_ascii_whitespace() || matches!(character, ';' | '&' | '|' | '(' | ')' | '<' | '>')
+}
+
+fn shell_word_boundary_before(line: &str, token: &RustToken) -> bool {
+    let start = token.start_column.saturating_sub(1);
+    start == 0 || line.chars().nth(start - 1).is_some_and(shell_separator)
+}
+
+fn shell_word_boundary_after(line: &str, token: &RustToken) -> bool {
+    let end = token.end_column.saturating_sub(1);
+    line.chars().nth(end).is_none_or(shell_separator)
+}
+
+fn token_span_text(line: &str, first: &RustToken, last: &RustToken) -> String {
+    let start = first.start_column.saturating_sub(1);
+    let end = last.end_column.saturating_sub(1);
+    line.chars()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .collect()
+}
+
+fn shell_token_parts_are_adjacent(line: &str, left: &RustToken, right: &RustToken) -> bool {
+    let gap_start = left.end_column.saturating_sub(1);
+    let gap_end = right.start_column.saturating_sub(1);
+    gap_start <= gap_end
+        && !line
+            .chars()
+            .skip(gap_start)
+            .take(gap_end - gap_start)
+            .any(shell_separator)
+}
+
+fn dispatch_argument_matches_at(
+    line: &str,
+    tokens: &[RustToken],
+    start: usize,
+    form: &DispatchArgumentTokenForm,
+) -> Option<usize> {
+    if !token_sequence_matches_at(tokens, start, &form.values) {
+        return None;
+    }
+    let end = start + form.values.len() - 1;
+    if !shell_word_boundary_before(line, &tokens[start])
+        || !shell_word_boundary_after(line, &tokens[end])
+    {
+        return None;
+    }
+    if let Some(quoted_source) = &form.quoted_source {
+        let source = token_span_text(line, &tokens[start], &tokens[end]);
+        if source.as_str() != quoted_source.as_str() {
+            return None;
+        }
+    } else if tokens[start..end]
+        .windows(2)
+        .any(|pair| !shell_token_parts_are_adjacent(line, &pair[0], &pair[1]))
+    {
+        return None;
+    }
+    Some(form.values.len())
+}
+
+fn dispatch_arguments_are_referenced(
+    line: &str,
+    tokens: &[RustToken],
+    position: usize,
+    arguments: &[String],
+) -> bool {
+    dispatch_arguments_match_from(line, tokens, position, arguments, 0)
+}
+
+fn dispatch_arguments_match_from(
+    line: &str,
+    tokens: &[RustToken],
+    position: usize,
+    arguments: &[String],
+    argument_index: usize,
+) -> bool {
+    let Some(argument) = arguments.get(argument_index) else {
+        return true;
+    };
+    if is_dispatch_placeholder(argument) {
+        if argument_index + 1 == arguments.len() {
+            return true;
+        }
+        for next_position in position..=tokens.len() {
+            if next_position > position {
+                let previous = &tokens[next_position - 1];
+                if shell_control_operator_is_active(line, previous)
+                    || shell_comment_starts_at(line, previous)
+                {
+                    break;
+                }
+            }
+            if dispatch_arguments_match_from(
+                line,
+                tokens,
+                next_position,
+                arguments,
+                argument_index + 1,
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+    dispatch_argument_token_forms(argument).iter().any(|form| {
+        dispatch_argument_matches_at(line, tokens, position, form).is_some_and(|length| {
+            dispatch_arguments_match_from(
+                line,
+                tokens,
+                position + length,
+                arguments,
+                argument_index + 1,
+            )
+        })
+    })
 }
 
 fn check_catalog_docs(root: &Path) -> Vec<Finding> {

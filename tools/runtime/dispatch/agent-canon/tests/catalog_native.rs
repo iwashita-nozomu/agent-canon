@@ -305,6 +305,14 @@ fn native_wiring_is_unreferenced(root: &TempRoot) -> bool {
         })
 }
 
+fn native_notebook_all_flag_is_unreferenced(shell_source: &str) -> bool {
+    let root = native_cli_wiring_root(
+        &["tools/bin/agent-canon", "notebook-quality", "--all"],
+        shell_source,
+    );
+    native_wiring_is_unreferenced(&root)
+}
+
 #[test]
 fn catalog_validation_and_report_rendering_match_native_records() {
     let root = valid_tool_catalog_root();
@@ -505,6 +513,12 @@ fn native_default_wiring_does_not_accept_a_comment_as_a_call() {
 #[test]
 fn native_default_wiring_requires_static_dispatch_flags_and_keeps_quotes() {
     let dispatch = &["tools/bin/agent-canon", "notebook-quality", "--all"];
+    let unquoted = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon notebook-quality --all --root \"$ROOT\"; then\n  :\nfi\n",
+    );
+    assert!(!native_wiring_is_unreferenced(&unquoted));
+
     let wired = native_cli_wiring_root(
         dispatch,
         "if run_agent_canon \"notebook-quality\" \"--all\" --root \"$ROOT\"; then\n  :\nfi\n",
@@ -522,6 +536,84 @@ fn native_default_wiring_requires_static_dispatch_flags_and_keeps_quotes() {
         "if run_agent_canon notebook-quality --changed; then\n  :\nfi\n",
     );
     assert!(native_wiring_is_unreferenced(&misbound_flag));
+}
+
+#[test]
+fn native_default_wiring_preserves_placeholder_and_static_argument_order() {
+    let dispatch = &[
+        "tools/bin/agent-canon",
+        "native-check",
+        "--root",
+        "<repo-root>",
+        "--format",
+        "json",
+    ];
+    let ordered = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon native-check --root \"$ROOT\" --format json; then\n  :\nfi\n",
+    );
+    assert!(!native_wiring_is_unreferenced(&ordered));
+
+    let reordered = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon native-check --format json --root \"$ROOT\"; then\n  :\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&reordered));
+}
+
+#[test]
+fn native_default_wiring_does_not_find_static_args_after_command_separator() {
+    let dispatch = &[
+        "tools/bin/agent-canon",
+        "native-check",
+        "--root",
+        "<repo-root>",
+        "--format",
+        "json",
+    ];
+    let root = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon native-check --root \"$ROOT\"; then\n  echo --format json\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&root));
+}
+
+#[test]
+fn native_default_wiring_does_not_find_static_args_in_inline_comments() {
+    let dispatch = &[
+        "tools/bin/agent-canon",
+        "native-check",
+        "--root",
+        "<repo-root>",
+        "--format",
+        "json",
+    ];
+    let root = native_cli_wiring_root(
+        dispatch,
+        "if run_agent_canon native-check --root \"$ROOT\" # --format json\nthen\n  :\nfi\n",
+    );
+    assert!(native_wiring_is_unreferenced(&root));
+}
+
+#[test]
+fn native_default_wiring_rejects_equals_suffix_on_static_argument() {
+    assert!(native_notebook_all_flag_is_unreferenced(
+        "if run_agent_canon notebook-quality --all=false; then\n  :\nfi\n"
+    ));
+}
+
+#[test]
+fn native_default_wiring_rejects_hyphen_suffix_on_static_argument() {
+    assert!(native_notebook_all_flag_is_unreferenced(
+        "if run_agent_canon notebook-quality --all-incorrect; then\n  :\nfi\n"
+    ));
+}
+
+#[test]
+fn native_default_wiring_rejects_concatenated_quoted_static_argument() {
+    assert!(native_notebook_all_flag_is_unreferenced(
+        "if run_agent_canon notebook-quality \"--all\"suffix; then\n  :\nfi\n"
+    ));
 }
 
 #[test]
