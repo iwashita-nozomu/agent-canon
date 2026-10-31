@@ -1924,12 +1924,12 @@ entries:
 
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
-    path: tools/validation/semantic/code/check_solid_evidence.py
+    path: tools/runtime/dispatch/agent-canon/src/check_solid_evidence.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/code/check_solid_evidence.py --changed --evidence <oop-readability-report>
-    dispatch: {argv: ["python3", "tools/validation/semantic/code/check_solid_evidence.py", "--changed", "--evidence", "<oop-readability-report>"]}
+    command: tools/bin/agent-canon check-solid-evidence --changed --evidence <oop-readability-report>
+    dispatch: {argv: ["tools/bin/agent-canon", "check-solid-evidence", "--changed", "--evidence", "<oop-readability-report>"]}
     writes: false
     default_wiring:
       ci: false
@@ -1979,6 +1979,25 @@ entries:
     tests:
       - tools/runtime/dispatch/agent-canon/src/python_algorithm_contract.rs
       - tools/runtime/dispatch/agent-canon/tests/python_algorithm_contract_cli.rs
+
+  - id: check-algorithm-config-partition
+    summary: Checks InitializeConfig/SolveConfig field ownership and hidden runtime defaults with RustPython AST analysis.
+    path: tools/runtime/dispatch/agent-canon/src/check_algorithm_config_partition.rs
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon check-algorithm-config-partition
+    dispatch: {argv: ["tools/bin/agent-canon", "check-algorithm-config-partition"]}
+    writes: false
+    default_wiring:
+      ci: true
+      pr_check: false
+    docs:
+      - documents/tools/check_algorithm_config_partition.md
+      - documents/design/jax_util/algorithm_module_contract.md
+      - tools/validation/ci/runners/run_all_checks.sh
+    tests:
+      - tests/agent_tools/test_check_algorithm_config_partition.py
 
   - id: oop-python-readability
     public: true

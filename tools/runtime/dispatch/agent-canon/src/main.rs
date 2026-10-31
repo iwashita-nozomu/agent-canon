@@ -7,6 +7,7 @@
 // upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
@@ -20,6 +21,7 @@
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
+// downstream implementation check_solid_evidence.rs validates SOLID evidence coverage for Python changes
 // downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
@@ -35,7 +37,9 @@
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // @dependency-end
 
+mod check_algorithm_config_partition;
 mod check_merge_structure;
+mod check_solid_evidence;
 pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
@@ -92,6 +96,7 @@ Commands:
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
@@ -109,6 +114,7 @@ Commands:
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
+  check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
@@ -205,6 +211,10 @@ fn main() {
         std::process::exit(semantic_responsibility::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == check_solid_evidence::SELECTOR {
+        std::process::exit(check_solid_evidence::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }
@@ -297,6 +307,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "python-algorithm-contract-check" {
         std::process::exit(python_algorithm_contract::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-algorithm-config-partition" {
+        std::process::exit(check_algorithm_config_partition::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "helper-function-inventory" {

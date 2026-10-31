@@ -171,6 +171,7 @@ run_contracts() {
     tests.agent_tools.test_render_dependency_manifest_graph \
     tests.agent_tools.test_graph_client_source_projection \
     tests.tools.test_notebook_quality \
+    tests.agent_tools.test_check_solid_evidence \
     tests.agent_tools.test_check_semantic_responsibility_contract \
     tests.agent_tools.test_check_run_log_contract \
     tests.agent_tools.test_structured_document_inventory_cli \
@@ -179,6 +180,7 @@ run_contracts() {
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_convention_compliance \
     tests.agent_tools.test_check_dependency_headers \
+    tests.agent_tools.test_check_algorithm_config_partition \
     tests.agent_tools.test_tool_drift \
     tests/agent_tools/test_dependency_*.py
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \

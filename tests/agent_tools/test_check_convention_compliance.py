@@ -187,21 +187,21 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "$literature-survey $research-workflow research_driven_change selected.append\n"
     ),
     ".codex/agents/python_reviewer.toml": (
-        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "check-solid-evidence OOP readability report SOLID principle signal "
         "Single responsibility Open/closed Liskov substitution Interface segregation "
         "Dependency inversion path-covered\n"
     ),
     ".codex/agents/reviewer.toml": (
-        "check_solid_evidence.py OOP readability report SOLID principle signal "
+        "check-solid-evidence OOP readability report SOLID principle signal "
         "path-covered return revise\n"
     ),
     ".codex/agents/diff_triage_reviewer.toml": (
-        "python_reviewer check_solid_evidence.py OOP readability report "
+        "python_reviewer check-solid-evidence OOP readability report "
         "SOLID principle signal escalate\n"
     ),
     "agents/agents_config.json": (
         "python_reviewer OOP readability report SOLID principle signal "
-        "check_solid_evidence.py path-coverage\n"
+        "check-solid-evidence path-coverage\n"
     ),
     "agents/skills/mvp-skeleton.md": "mvp core loop vertical slice\n",
     "agents/TASK_WORKFLOWS.md": (
