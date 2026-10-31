@@ -200,7 +200,14 @@ fn platform_independent_frontier_cases_match_frozen_cpython() {
     let portable_cases = golden
         .cases
         .iter()
-        .filter(|case| matches!(case.name.as_str(), "key" | "transaction-id" | "missing"))
+        .filter(|case| {
+            matches!(
+                (case.name.as_str(), case.api.as_str()),
+                ("key", "frontier_key")
+                    | ("transaction-id", "after_binding_transaction")
+                    | ("missing", "validate_dependency_frontier")
+            )
+        })
         .collect::<Vec<_>>();
     assert_eq!(portable_cases.len(), 3);
     let mut accepted = 0;
