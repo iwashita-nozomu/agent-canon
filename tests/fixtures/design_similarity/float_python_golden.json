@@ -1,0 +1,90 @@
+{
+  "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/source/tools/analysis/documents/analysis/find_similar_designs.py",
+  "source_sha256": "16eb31387a66b223e98262a553ce19f1e49bcdb24fe4b489cc6d1151a2f8717e",
+  "cases": [
+    {
+      "name": "float-unicode-0",
+      "threshold_argument": "٠.٦",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/0/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/0/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/0/source/documents/design/b.md\n",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/0/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/0/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    },
+    {
+      "name": "float-unicode-1",
+      "threshold_argument": "०.६",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/1/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/1/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/1/source/documents/design/b.md\n",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/1/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/1/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    },
+    {
+      "name": "float-unicode-2",
+      "threshold_argument": "𝟘.𝟞",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/2/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/2/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/2/source/documents/design/b.md\n",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/2/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/2/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    },
+    {
+      "name": "float-unicode-3",
+      "threshold_argument": "0_0.6",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/3/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/3/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/3/source/documents/design/b.md\n",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/3/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/3/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    },
+    {
+      "name": "float-unicode-4",
+      "threshold_argument": "\u001c0.6\u001c",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\nfind_similar_designs.py: error: argument --min: invalid float value: '\\x1c0.6\\x1c'\n",
+      "report": null,
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/4/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/4/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    },
+    {
+      "name": "float-unicode-5",
+      "threshold_argument": " ٠.٦ ",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/5/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/5/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/5/source/documents/design/b.md\n",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/5/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-cli-supplemental-oracles-6ih8ipj9/5/runtime",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      }
+    }
+  ]
+}

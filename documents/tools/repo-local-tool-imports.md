@@ -59,8 +59,8 @@ legacy subtree wording is unrelated to tool import disposition.
 | `scripts/jsonl_to_md.sh` | `tools/analysis/documents/formatting/jsonl_to_md.py` | Reimplemented as Python CLI for testability. |
 | `scripts/hlo/summarize_hlo_jsonl.py` | `tools/analysis/hlo/summarization/summarize_hlo_jsonl.py` | Promoted as HLO JSONL summary helper. |
 | `scripts/tools/create_design_template.py` | `tools/validation/documentation/authoring/create_design_template.py` | Retired as superseded by the canonical [design document template](../../templates/documents/design-document.template.md). |
-| `scripts/tools/find_redundant_designs.py` | `tools/analysis/documents/analysis/find_redundant_designs.py` | Promoted as an external-runtime document consolidation helper; deletion requires an explicit mutation capability. |
-| `scripts/tools/find_similar_designs.py` | `tools/analysis/documents/analysis/find_similar_designs.py` | Promoted as an external-runtime design similarity helper. |
+| `scripts/tools/find_redundant_designs.py` | `tools/bin/agent-canon docs find-redundant-designs` | Reimplemented as the native exact duplicate-design route; reports use an external runtime and deletion requires an explicit mutation capability. |
+| `scripts/tools/find_similar_designs.py` | `tools/bin/agent-canon docs find-similar-designs` | Reimplemented in the native docs owner with the shared SequenceMatcher and external runtime report boundary. |
 | `scripts/tools/organize_designs.py` | `tools/validation/documentation/authoring/organize_designs.py` | Promoted as a read-only organization planner; source apply requires an explicit mutation capability. |
 | `scripts/read_conventions.sh` and `scripts/view_conventions.sh` | `tools/bin/agent-canon oop-python-rule-inventory`, `tools/bin/agent-canon oop-cpp-rule-inventory` | Reimplemented as repo-neutral, language-specific OOP rule inventories instead of project-root convention viewers. |
 | `scripts/restructure_code_review_skill.py` | Source repository only | Not promoted because it rewrites one historical skill layout. AgentCanon legacy tool storage is retired. |

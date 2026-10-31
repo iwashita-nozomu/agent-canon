@@ -7,7 +7,7 @@
 // upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
-// downstream implementation docs.rs routes unified documentation formatting and checks
+// downstream implementation lib.rs exposes the shared native docs command API
 // downstream implementation check_algorithm_config_partition.rs checks algorithm config ownership and default policy
 // downstream implementation config.rs applies managed Codex context defaults while preserving TOML values
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
@@ -55,8 +55,6 @@ pub mod classify_path_risk;
 mod config;
 mod dependency_headers;
 mod dependency_manifest;
-mod docs;
-mod entrypoint_owner_map;
 mod file_surface_inventory;
 mod graph;
 pub mod graph_client;
@@ -110,7 +108,7 @@ Commands:
   agent-search [search options]
   check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
-  docs <check|format|check-bootstrap|check-entrypoints> [options] [paths...]
+  docs <check|format|find-redundant-designs|find-similar-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
@@ -311,7 +309,7 @@ fn main() {
     if args.len() >= 2 && args[1] == "docs" {
         // Existing docs commands also run docs.rs post-format visualization
         // identity readback when a projection coverage marker is present.
-        std::process::exit(docs::run(&args[2..]));
+        std::process::exit(agent_canon::docs::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "codex-config" {

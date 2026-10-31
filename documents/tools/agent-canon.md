@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents the unified Rust docs formatter and checker.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements docs check, format, and check-bootstrap.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs implements the native exact duplicate-design route.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs implements docs check-entrypoints.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/config.rs implements the lifecycle-only TOML context projection
 downstream design ../../agents/skills/md-style-check.md routes Markdown style work to this tool.
@@ -45,6 +46,7 @@ examples in a compact text block.
 tools/bin/agent-canon docs -h
 tools/bin/agent-canon docs check <paths...>
 tools/bin/agent-canon docs format <paths...>
+tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--delete] [--mutation-capability-json <json>] [--runtime-root <path>] [--output <path>]
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
 tools/bin/agent-canon test-design check <test-paths...>
@@ -90,14 +92,19 @@ required owner rows and destinations, and marker ownership. It uses the same
 `--root` and `--format text|json` shape as the retired checker while keeping
 entrypoint grammar in its dedicated native owner.
 
-## Compatibility Entrypoints
+## Link repair and source mutation
 
-`python3 tools/validation/documentation/checks/audit_and_fix_links.py --check` is a compatibility spelling
-that forwards to the single canonical Rust route, `tools/bin/agent-canon docs
-check ...`; it does not create `reports/broken_links.txt`. Its `--apply` mode
-is source mutation and requires a typed `--mutation-capability-json` covering
-every file to be changed. Design duplicate/similarity/organization tools also
-require an explicit external `--runtime-root` (or the equivalent runtime
-capability) for reports; organization and deletion apply modes require the
-same explicit mutation capability. No documentation tool defaults output to
-the source checkout.
+`tools/bin/agent-canon docs links` is the native link audit route and does not
+create `reports/broken_links.txt`; without apply it runs the canonical docs check.
+The `--apply` mode requires
+`--mutation-capability-json` with exactly `allowed_paths`, `purpose`,
+and `authority` fields; every changed file must be within its allowed source
+paths. The optional `--check` flag runs the complete docs check after rewriting.
+`docs find-redundant-designs` detects exact duplicates natively and requires an
+explicit external `--runtime-root` (or the equivalent runtime environment) for
+its report. Its `--delete` mode requires an explicit source mutation capability;
+all deletion grants and the external report destination are admitted before
+source files are removed. `docs find-similar-designs` compares design Markdown
+with the native SequenceMatcher owner and writes its report to the external
+runtime. Organization remains a Python planner; apply requires its explicit
+mutation capability. No documentation tool defaults output to the source checkout.

@@ -1,10 +1,10 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, Template, release, artifact, catalog, parent-root authority, proof, and evaluation APIs.
+//! Shared AgentCanon runtime, LSP, Template, release, docs, source mutation, artifact, catalog, parent-root authority, proof, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
-// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, Template/release, catalog, and proof APIs.
+// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, Template/release, docs/link repair, source mutation, catalog, and proof APIs.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust implementation ownership
 // upstream implementation runtime_boundary.rs owns external runtime and restricted spool capabilities
 // upstream implementation runtime_boundary.rs owns external artifact I/O capabilities
@@ -16,6 +16,9 @@
 // downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
 // downstream implementation task_close.rs consumes the task-close terminal predicates
+// upstream implementation docs.rs owns Markdown checks, formatting, and link repair
+// downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
+// upstream implementation source_mutation.rs owns exact-path source mutation capabilities
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -23,6 +26,7 @@
 // downstream implementation template_bundle.rs owns native template package operations
 // downstream implementation python_text.rs shares Python-compatible Unicode whitespace semantics
 // downstream implementation python_cli_integer.rs parses Python-compatible integer options
+// downstream implementation python_cli_options.rs resolves Python-compatible long-option prefixes
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
@@ -30,6 +34,7 @@
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
+// downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -53,7 +58,9 @@ pub mod authority;
 pub mod catalog;
 pub mod code_template_rendering;
 pub mod compare_agent_run_paths;
+pub mod docs;
 pub mod entrypoint_composer;
+pub(crate) mod entrypoint_owner_map;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
@@ -70,12 +77,15 @@ pub mod private_feedback;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
+pub(crate) mod python_cli_options;
 pub mod python_json;
+pub mod python_sequence_matcher;
 pub(crate) mod python_text;
 pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
+pub mod source_mutation;
 pub mod stablehlo_value_closure;
 pub mod task_close;
 pub mod template_bundle;
