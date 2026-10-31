@@ -32,6 +32,7 @@ struct GoldenCase {
     args: Vec<Value>,
     #[serde(default)]
     kwargs: Value,
+    #[serde(default, deserialize_with = "deserialize_present_json")]
     output: Option<Value>,
     canonical_utf8: Option<String>,
     sha256: Option<String>,
@@ -42,6 +43,13 @@ struct GoldenCase {
 struct GoldenError {
     code: String,
     detail: String,
+}
+
+fn deserialize_present_json<'de, D>(deserializer: D) -> Result<Option<Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Value::deserialize(deserializer).map(Some)
 }
 
 fn invoke(case: &GoldenCase) -> Result<Value, LifecycleContractError> {
