@@ -12,6 +12,9 @@ tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
 # The dependency-plan golden binds to these tracked manifest bytes on every host.
 bootstrap/container/image/dependencies.toml text eol=lf
 
+# This frozen oracle binds its exact UTF-8 bytes on every host.
+tests/fixtures/owner_guarantee/python_golden.json text eol=lf
+
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
