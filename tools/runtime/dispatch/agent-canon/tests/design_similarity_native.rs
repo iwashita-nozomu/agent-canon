@@ -157,13 +157,13 @@ fn native_similarity_path_order_matches_python_path_models() {
 
 #[test]
 fn native_similarity_path_order_uses_python_lowercase_not_casefold() {
-    // Python 3.12 pathlib.lower() keeps sharp-s distinct from "ss". This expected
-    // vector comes from PureWindowsPath comparison, not a Windows filesystem run.
+    // These names stay distinct on case-insensitive filesystems. Captured Python
+    // path models use lower(), so sharp-s sorts after "ssb" rather than folding to "ssa".
     let temp = TempRoot::new();
     let source = temp.source();
     let runtime = temp.runtime();
     let design_root = source.join("documents/design");
-    for name in ["ß.md", "ss.md", "S.md"] {
+    for name in ["ßa.md", "ssb.md", "S.md"] {
         write(&design_root.join(name), "identical content");
     }
     let before = snapshot(&source);
@@ -172,7 +172,7 @@ fn native_similarity_path_order_uses_python_lowercase_not_casefold() {
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stderr.is_empty());
     let mut expected = "Similar design file pairs (threshold >= 1.0)\n".to_owned();
-    for (first, second) in [("ss.md", "ß.md"), ("S.md", "ß.md"), ("S.md", "ss.md")] {
+    for (first, second) in [("ssb.md", "ßa.md"), ("S.md", "ßa.md"), ("S.md", "ssb.md")] {
         expected.push_str(&format!(
             "1.000  {}  {}\n",
             design_root.join(first).display(),
