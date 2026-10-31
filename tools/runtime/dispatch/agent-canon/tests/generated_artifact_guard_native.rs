@@ -7,8 +7,11 @@
 // @dependency-end
 
 use serde_json::Value;
+#[cfg(unix)]
 use std::ffi::OsString;
 use std::fs;
+use std::io;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -18,6 +21,23 @@ const PYTHON_ORACLE: &str =
     include_str!("../../../../../tests/fixtures/generated_artifact_guard/python_golden.json");
 
 static NEXT_DIRECTORY: AtomicU64 = AtomicU64::new(0);
+
+const PORTABLE_ORACLE_CASES: &[&str] = &[
+    "tracked-generated-report",
+    "untracked-generated-report",
+    "ignored-generated-report",
+    "mixed-tracked-untracked-ignored",
+    "allowed-current-run-bundle",
+    "plain-non-git-root",
+    "default-cwd-root",
+    "help",
+    "invalid-argument",
+];
+const POSIX_SPECIAL_FILENAME_CASES: &[&str] = &[
+    "literal-posix-backslash",
+    "newline-filename",
+    "raw-byte-filename",
+];
 
 struct Fixture(PathBuf);
 
@@ -62,16 +82,66 @@ fn decode_hex(value: &str) -> Vec<u8> {
         .collect()
 }
 
+#[cfg(unix)]
 fn path_from_bytes(path: &[u8]) -> PathBuf {
     PathBuf::from(OsString::from_vec(path.to_vec()))
 }
 
-fn git(root: &Path, args: &[&str]) -> Output {
-    Command::new("git")
-        .args(args)
+#[cfg(not(unix))]
+fn path_from_bytes(path: &[u8]) -> PathBuf {
+    PathBuf::from(std::str::from_utf8(path).expect("portable fixture path is UTF-8"))
+}
+
+fn empty_global_git_config(root: &Path) -> PathBuf {
+    let path = root.join(".agent-canon-test-empty-global-gitconfig");
+    fs::write(&path, b"").expect("write empty global Git config");
+    path
+}
+
+fn fixture_command(root: &Path, program: &str) -> Command {
+    let global_config = empty_global_git_config(root);
+    let mut command = Command::new(program);
+    command
         .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .current_dir(root)
+        .env("GIT_CONFIG_GLOBAL", global_config)
+        .current_dir(root);
+    command
+}
+
+#[cfg(unix)]
+fn unavailable_by_platform(_case_name: &str) -> Option<&'static str> {
+    None
+}
+
+#[cfg(not(unix))]
+fn unavailable_by_platform(case_name: &str) -> Option<&'static str> {
+    match case_name {
+        "raw-byte-filename" => Some("non-Unix OsString cannot preserve a POSIX raw-byte filename"),
+        #[cfg(windows)]
+        "literal-posix-backslash" => {
+            Some("Windows treats backslash as a path separator, not a filename byte")
+        }
+        _ => None,
+    }
+}
+
+fn known_filesystem_unavailable(case_name: &str, error: &io::Error) -> Option<&'static str> {
+    #[cfg(target_os = "macos")]
+    if case_name == "raw-byte-filename" && error.raw_os_error() == Some(92) {
+        return Some("filesystem rejected raw filename bytes with EILSEQ (92)");
+    }
+    #[cfg(windows)]
+    if case_name == "newline-filename" && error.raw_os_error() == Some(123) {
+        return Some("Windows rejected the newline filename with ERROR_INVALID_NAME (123)");
+    }
+    let _ = case_name;
+    let _ = error;
+    None
+}
+
+fn git(root: &Path, args: &[&str]) -> Output {
+    fixture_command(root, "git")
+        .args(args)
         .output()
         .expect("Git fixture command runs")
 }
@@ -93,7 +163,7 @@ fn write_ignore_patterns(root: &Path, patterns: &[Value]) {
     fs::write(root.join(".gitignore"), contents).expect("write Git ignore fixture");
 }
 
-fn prepare_fixture(case: &Value, root: &Path) {
+fn prepare_fixture(case: &Value, root: &Path) -> Result<(), io::Error> {
     if case["name"] != "plain-non-git-root" {
         initialize_repository(root);
     }
@@ -115,15 +185,11 @@ fn prepare_fixture(case: &Value, root: &Path) {
         let path = root.join(path_from_bytes(&path_bytes));
         fs::create_dir_all(path.parent().expect("fixture file has a parent"))
             .expect("create generated artifact parent");
-        fs::write(&path, b"generated artifact fixture\n")
-            .expect("write generated artifact fixture");
+        fs::write(&path, b"generated artifact fixture\n")?;
         if fixture_file["declared_state"] == "tracked" {
-            let output = Command::new("git")
+            let output = fixture_command(root, "git")
                 .args(["add", "-f", "--"])
                 .arg(path_from_bytes(&path_bytes))
-                .env("GIT_CONFIG_NOSYSTEM", "1")
-                .env("GIT_CONFIG_GLOBAL", "/dev/null")
-                .current_dir(root)
                 .output()
                 .expect("Git can stage the tracked fixture");
             assert!(
@@ -133,10 +199,11 @@ fn prepare_fixture(case: &Value, root: &Path) {
             );
         }
     }
+    Ok(())
 }
 
 fn run_native_guard(root: &Path, name: &str) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
+    let mut command = fixture_command(root, env!("CARGO_BIN_EXE_agent-canon"));
     command.arg("generated-artifact-guard");
     match name {
         "default-cwd-root" => {}
@@ -151,9 +218,6 @@ fn run_native_guard(root: &Path, name: &str) -> Output {
         }
     }
     command
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .current_dir(root)
         .output()
         .expect("native generated artifact guard runs")
 }
@@ -186,10 +250,23 @@ fn native_cli_matches_all_frozen_python_oracle_cases() {
         .expect("frozen Python oracle has cases");
     assert_eq!(cases.len(), 12, "all frozen old CLI cases remain covered");
 
+    let mut executed = Vec::new();
+    let mut unavailable = Vec::new();
     for case in cases {
         let name = case["name"].as_str().expect("case has a name");
+        if let Some(reason) = unavailable_by_platform(name) {
+            unavailable.push((name.to_string(), reason.to_string()));
+            continue;
+        }
+
         let fixture = Fixture::new(name);
-        prepare_fixture(case, fixture.root());
+        if let Err(error) = prepare_fixture(case, fixture.root()) {
+            if let Some(reason) = known_filesystem_unavailable(name, &error) {
+                unavailable.push((name.to_string(), reason.to_string()));
+                continue;
+            }
+            panic!("fixture setup failed for {name}: {error}");
+        }
         let output = run_native_guard(fixture.root(), name);
 
         let expected_exit = i32::try_from(
@@ -228,9 +305,33 @@ fn native_cli_matches_all_frozen_python_oracle_cases() {
         );
         assert_eq!(output.stdout, expected_stdout, "case {name} stdout");
         assert_eq!(output.stderr, expected_stderr, "case {name} stderr");
+        executed.push(name);
+    }
+
+    assert!(
+        PORTABLE_ORACLE_CASES
+            .iter()
+            .all(|expected| executed.contains(expected)),
+        "portable cases must execute; executed={executed:?}, unavailable={unavailable:?}"
+    );
+    assert!(
+        executed.len() >= PORTABLE_ORACLE_CASES.len(),
+        "at least nine portable oracle cases must execute"
+    );
+    assert_eq!(
+        executed.len() + unavailable.len(),
+        cases.len(),
+        "every frozen case is executed or has an explicit platform/filesystem reason: {unavailable:?}"
+    );
+    assert!(unavailable
+        .iter()
+        .all(|(name, _)| { POSIX_SPECIAL_FILENAME_CASES.contains(&name.as_str()) }));
+    for (name, reason) in unavailable {
+        eprintln!("generated artifact oracle case unavailable: {name}: {reason}");
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn invalid_git_path_sorting_matches_python_surrogateescape_order() {
     let fixture = Fixture::new("surrogateescape-sort");
@@ -238,12 +339,18 @@ fn invalid_git_path_sorting_matches_python_surrogateescape_order() {
 
     let invalid_path = b"reports/dependency-review/run/same-\xff.tsv";
     let astral_path = "reports/dependency-review/run/same-𐀀.tsv".as_bytes();
-    for path_bytes in [invalid_path.as_slice(), astral_path] {
-        let path = fixture.root().join(path_from_bytes(path_bytes));
-        fs::create_dir_all(path.parent().expect("fixture file has a parent"))
-            .expect("create generated artifact parent");
-        fs::write(path, b"generated artifact fixture\n").expect("write generated artifact fixture");
+    let invalid_file = fixture.root().join(path_from_bytes(invalid_path));
+    fs::create_dir_all(invalid_file.parent().expect("fixture file has a parent"))
+        .expect("create generated artifact parent");
+    if let Err(error) = fs::write(&invalid_file, b"generated artifact fixture\n") {
+        if let Some(reason) = known_filesystem_unavailable("raw-byte-filename", &error) {
+            eprintln!("surrogateescape sort case unavailable: {reason}");
+            return;
+        }
+        panic!("raw-byte sort fixture setup failed: {error}");
     }
+    let astral_file = fixture.root().join(path_from_bytes(astral_path));
+    fs::write(astral_file, b"generated artifact fixture\n").expect("write astral-Unicode fixture");
 
     let output = run_native_guard(fixture.root(), "surrogateescape-sort");
     let mut expected = b"GENERATED_ARTIFACT_GUARD=fail\nGENERATED_ARTIFACT_BLOCKERS=generated_report_artifact_untracked_left_in_tree:reports/dependency-review/run/same-\xff.tsv|generated_report_artifact_untracked_left_in_tree:reports/dependency-review/run/same-"
