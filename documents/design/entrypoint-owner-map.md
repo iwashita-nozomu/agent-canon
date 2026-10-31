@@ -7,7 +7,7 @@ downstream design ../../AGENTS.md source entrypoint
 downstream design ../../ROOT_AGENTS.md portable common base
 downstream design ../../agents/canonical/SOURCE_ROUTING.md source owner selection
 downstream design ../../.github/AGENTS.md GitHub subtree overlay
-downstream implementation ../../tools/agent/templates/entrypoint_composer.py consumer root composition
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs consumer root composition
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs structural verification
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py entrypoint regression
@@ -159,12 +159,12 @@ savings, speed, compliance frequency, all-run coverage, or deployment to consume
 
 ## Consumer root composition
 
-The existing `entrypoint_composer.py` retains its public API and exact base/specific
-byte handling. It atomically publishes only a coherent regular-file output with
-managed source-commit, byte-count, digest and separator markers. New outputs or valid
-managed replacements are allowed; unmarked/corrupt output, directories and symlinks
-are preserved as typed failures. No recursive expansion, source AGENTS import, new
-loader, live projection, or alternate singular `AGENT.md` alias is added.
+The native `compose-consumer-entrypoint` command preserves exact base/specific byte
+handling. It atomically publishes only a coherent regular-file output with managed
+source-commit, byte-count, digest and separator markers. New outputs or valid managed
+replacements are allowed; unmarked/corrupt output, directories and symlinks are
+preserved as typed failures. No recursive expansion, source AGENTS import, new loader,
+live projection, or alternate singular `AGENT.md` alias is added.
 
 ## Template boundary
 
