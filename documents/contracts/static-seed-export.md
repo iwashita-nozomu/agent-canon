@@ -7,7 +7,7 @@ upstream design ./README.md parent-repository contract index
 upstream design ./static-seed-allowlist.toml sole exact-path allowlist for default consumers
 downstream design ./template-bootstrap.md default source-free bootstrap contract
 downstream implementation ../../tools/runtime/source/export_static_seed.py committed-tree exporter
-downstream implementation ../../tools/validation/documentation/checks/check_bootstrap_docs.py source-free consumer structure checker
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs `docs check-bootstrap` source-free consumer structure checker
 downstream design ../tools/export_static_seed.md maintainer commands and failure semantics
 downstream implementation ../../tests/agent_tools/test_export_static_seed.py producer determinism and exclusion tests
 downstream implementation ../../tests/tools/test_check_bootstrap_docs.py source-hidden consumer and bootstrap regression tests
@@ -109,7 +109,7 @@ worktree dirty state、remote state、environment-specific path、乱数は出�
 export 後または consumer migration fixture では、AgentCanon source を不可視化して次を実行します。
 
 ```bash
-python3 tools/validation/documentation/checks/check_bootstrap_docs.py \
+tools/bin/agent-canon docs check-bootstrap \
   --root <export-or-consumer-root> \
   --static-seed-consumer
 ```
