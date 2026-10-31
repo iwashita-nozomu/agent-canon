@@ -14,6 +14,7 @@
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
+// downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
@@ -50,6 +51,7 @@ pub mod catalog;
 pub mod code_template_rendering;
 pub mod docs;
 pub mod entrypoint_composer;
+pub(crate) mod entrypoint_owner_map;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
