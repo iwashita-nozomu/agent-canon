@@ -214,3 +214,42 @@ fn lifecycle_datetime_parser_keeps_python_owner_input_forms() {
     assert_eq!(error.code, "lifecycle:timestamp_invalid");
     assert_eq!(error.detail, "binding.timing.started_at");
 }
+
+#[test]
+fn gate_chain_and_retry_options_preserve_the_owner_contract() {
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).unwrap();
+    let valid = golden["gates"][0]["output"].clone();
+
+    let mut failed = valid.clone();
+    failed["verdict"] = serde_json::json!("fail");
+    let chain = vec![failed.clone()];
+    assert_eq!(
+        validate_gate_chain(&chain, Some(&["G1"]), false).unwrap(),
+        chain
+    );
+    let error = validate_gate_chain(&[failed], Some(&["G1"]), true).unwrap_err();
+    assert_eq!(error.code, "lifecycle:gate_not_passed");
+    assert!(error.detail.is_empty());
+
+    let mut duplicated = valid.clone();
+    let reference = duplicated["ordered_input_evidence_refs"][0].clone();
+    duplicated["ordered_input_evidence_refs"] = serde_json::json!([reference, reference]);
+    let error = validate_gate_verdict(&duplicated).unwrap_err();
+    assert_eq!(error.code, "lifecycle:duplicate_value");
+    assert_eq!(error.detail, "gate_verdict.ordered_input_evidence_refs");
+
+    let mut retry = valid.clone();
+    retry["verdict"] = serde_json::json!("retry");
+    retry["retry_reason"] = serde_json::json!("owner-selected retry");
+    assert_eq!(validate_gate_verdict(&retry).unwrap(), retry);
+    retry["retry_reason"] = Value::Null;
+    let error = validate_gate_verdict(&retry).unwrap_err();
+    assert_eq!(error.code, "lifecycle:string_invalid");
+    assert_eq!(error.detail, "gate_verdict.retry_reason");
+
+    let mut nonretry = valid;
+    nonretry["retry_reason"] = serde_json::json!("unexpected reason");
+    let error = validate_gate_verdict(&nonretry).unwrap_err();
+    assert_eq!(error.code, "lifecycle:retry_reason_forbidden");
+    assert_eq!(error.detail, "gate_verdict");
+}
