@@ -7,7 +7,7 @@
 # downstream implementation ./test_live_projection_authority.py validates live projection authority
 # downstream design ./lean-proof-dependencies.toml pins the native proof toolchain
 # downstream implementation ../../tools/analysis/dependencies/dependency_plan.py installs the selected proof profile dependencies
-# downstream implementation ../../tools/analysis/proof/lean_proof_env.py runs native Lean checks
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs runs native Lean checks
 # @dependency-end
 
 set -euo pipefail
@@ -38,7 +38,7 @@ TEST_NODE="${SOURCE_IMAGE}/tests/bootstrap/test_live_projection_authority.py::te
 LEAN_PROOF_COMMAND='
 set -euo pipefail
 
-tool=/opt/agent-canon/source/tools/analysis/proof/lean_proof_env.py
+tool=/opt/agent-canon/source/tools/bin/agent-canon
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:?}"
 # The installer anchors receipts to a Git workspace; the disposable container owns it.
 workspace="$(mktemp -d /tmp/agent-canon-lean-workspace.XXXXXX)"
@@ -75,15 +75,15 @@ printf "%s\n" \
   "example : False := by trivial" \
   > "${fixtures}/counterexample-type-error.lean"
 
-python3 "${tool}" all-smoke \
+"${tool}" lean-proof-env all-smoke \
   --env-dir "${env_dir}" \
   --lean-toolchain "leanprover/lean4:v4.30.0" \
   --execute --format json
-python3 "${tool}" check-file \
+"${tool}" lean-proof-env check-file \
   --env-dir "${env_dir}" \
   --lean-file "${fixtures}/positive.lean" \
   --execute --format json
-python3 "${tool}" check-file \
+"${tool}" lean-proof-env check-file \
   --env-dir "${env_dir}" \
   --lean-file "${fixtures}/guarded-negative.lean" \
   --execute --format json
@@ -92,7 +92,7 @@ expect_lean_failure() {
   local source_file="$1"
   local result_file="$2"
   local status
-  if python3 "${tool}" check-file \
+  if "${tool}" lean-proof-env check-file \
     --env-dir "${env_dir}" \
     --lean-file "${source_file}" \
     --execute --format json > "${result_file}" 2>&1; then

@@ -311,8 +311,8 @@ AREA_DATA: tuple[AreaData, ...] = (
         "Route exact text and explicit semantic, catalog, dependency, or code queries to their owning provider.",
         "select_search_provider",
         (
-            'python3 tools/analysis/search/search.py --query "<git-pattern>" --providers text --regex',
-            'python3 tools/analysis/search/search.py --purpose "<goal>" --providers semantic',
+            'tools/bin/agent-canon agent-search --query "<git-pattern>" --providers text --regex',
+            'tools/bin/agent-canon agent-search --purpose "<goal>" --providers semantic',
         ),
         (
             "vector_search.py",

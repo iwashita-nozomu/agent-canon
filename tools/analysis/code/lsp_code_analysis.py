@@ -7,7 +7,6 @@
 # upstream implementation ../../../bootstrap/container/image/dependencies.toml pins the public JSON-RPC transport runtime
 # upstream implementation ../../runtime/authority/tool_path_policy.py filters retired tool paths
 # downstream implementation ../../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
-# downstream implementation ../search/search.py consumes in-memory code-deps facts
 # @dependency-end
 """Bounded LSP 3.17 code-analysis adapter.
 

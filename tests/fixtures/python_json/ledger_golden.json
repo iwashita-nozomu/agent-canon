@@ -1,0 +1,30 @@
+{
+  "source_owner": "tools/runtime/archive/work_log.py:ledger_snapshot_digest",
+  "python_version": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "cases": [
+    {
+      "name": "nested_order",
+      "input_json": "{\"z\":[{\"b\":2,\"a\":1}],\"a\":\"\u6f22\u5b57\ud83d\ude00\"}",
+      "canonical_ascii": "{\"a\":\"\\u6f22\\u5b57\\ud83d\\ude00\",\"z\":[{\"a\":1,\"b\":2}]}",
+      "sha256": "3111c594c2b1b8c13b3f05d23d83ce7b73acca02730fc3c84ae930f3a5508d2e"
+    },
+    {
+      "name": "numbers",
+      "input_json": "[1234567890123456789012345678901234567890,-0,1.0,-0.0,1e-5,1e-4,1e15,1e16,1.2345678901234567,1e309,-1e309,NaN,Infinity,-Infinity]",
+      "canonical_ascii": "[1234567890123456789012345678901234567890,0,1.0,-0.0,1e-05,0.0001,1000000000000000.0,1e+16,1.2345678901234567,Infinity,-Infinity,NaN,Infinity,-Infinity]",
+      "sha256": "dc0cc218a329f34a6311a888cc2e40f604ca34fab988d6a77cdd83c34899eed3"
+    },
+    {
+      "name": "unicode",
+      "input_json": "{\"\ud800\udc00\":\"\\ud800\",\"\\udfff\":\"\\u007f\\u0001\\b\\t\\n\\f\\r\\\"\\\\\"}",
+      "canonical_ascii": "{\"\\udfff\":\"\\u007f\\u0001\\b\\t\\n\\f\\r\\\"\\\\\",\"\\ud800\\udc00\":\"\\ud800\"}",
+      "sha256": "d2f3bfa7babd983495d454ab2706c31f07dc5ee6b536e5227210554ce29031f2"
+    },
+    {
+      "name": "duplicate_keys",
+      "input_json": "{\"z\":1,\"a\":2,\"z\":3}",
+      "canonical_ascii": "{\"a\":2,\"z\":3}",
+      "sha256": "d3dc3816f88fd392624f6f51b180ebf90cc9d32c14c5d1462c67a3e7cbd39a80"
+    }
+  ]
+}
