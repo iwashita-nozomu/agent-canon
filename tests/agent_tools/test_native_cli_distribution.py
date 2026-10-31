@@ -20,7 +20,9 @@ import tarfile
 import tempfile
 import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 try:
     import pytest
@@ -28,6 +30,28 @@ except ImportError:
     pytest = None  # type: ignore[assignment]
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@contextmanager
+def package_smoke_directory(parent: Path) -> Iterator[str]:
+    """Release an executed Windows image before removing its owned fixture."""
+    directory = tempfile.TemporaryDirectory(prefix="agent-canon-consumer-", dir=parent)
+    try:
+        yield directory.name
+    finally:
+        deadline = time.monotonic() + 2.0
+        while True:
+            try:
+                directory.cleanup()
+                break
+            except PermissionError as error:
+                if (
+                    os.name != "nt"
+                    or error.winerror != 32
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.05)
 
 
 def test_source_wrapper_execs_native_candidate_and_preserves_exit_status(
@@ -87,9 +111,7 @@ def _smoke_package(package_dir: Path, target: str, version: str) -> None:
         if hashlib.sha256(archive_path.read_bytes()).hexdigest() != row[0]:
             raise AssertionError(f"archive checksum mismatch: {archive_path}")
 
-        with tempfile.TemporaryDirectory(
-            prefix="agent-canon-consumer-", dir=package_dir.parent
-        ) as temp_name:
+        with package_smoke_directory(package_dir.parent) as temp_name:
             temporary = Path(temp_name)
             if archive_path.name.endswith(".zip"):
                 with zipfile.ZipFile(archive_path) as archive:
