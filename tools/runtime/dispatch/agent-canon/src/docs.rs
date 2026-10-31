@@ -1447,10 +1447,10 @@ fn build_redundant_design_report(
 
 fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     let include = |path: &Path| !redundant_markdown_name_is_excluded(path);
-    collect_markdown_files(root, files, &include)
+    collect_markdown_tree(root, files, &include)
 }
 
-fn collect_markdown_files<F>(
+fn collect_markdown_tree<F>(
     root: &Path,
     files: &mut Vec<PathBuf>,
     include: &F,
@@ -1468,7 +1468,7 @@ where
             .file_type()
             .map_err(|error| format!("cannot inspect design path {}: {error}", path.display()))?;
         if file_type.is_dir() {
-            collect_markdown_files(&path, files, include)?;
+            collect_markdown_tree(&path, files, include)?;
             continue;
         }
         let is_markdown = path.extension().is_some_and(|extension| {
@@ -1496,7 +1496,7 @@ fn redundant_markdown_name_is_excluded(path: &Path) -> bool {
 fn collect_organizer_markdown_files(root: &Path) -> Result<Vec<PathBuf>, String> {
     let include_all = |_path: &Path| true;
     let mut files = Vec::new();
-    collect_markdown_files(root, &mut files, &include_all)?;
+    collect_markdown_tree(root, &mut files, &include_all)?;
     files.retain(|path| {
         let has_templates_component = path
             .components()

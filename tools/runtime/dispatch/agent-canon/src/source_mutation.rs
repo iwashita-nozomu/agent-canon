@@ -577,7 +577,7 @@ fn copy_symlink_xattrs(
 
 #[cfg(target_os = "linux")]
 fn anchored_symlink_xattr_path(directory: &cap_std::fs::Dir, name: &OsStr) -> io::Result<PathBuf> {
-    use cap_std::io_lifetimes::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     let mut components = Path::new(name).components();
     match components.next() {
@@ -669,7 +669,7 @@ fn copy_symlink_flags(
     source_name: &OsStr,
     target_directory: &cap_std::fs::Dir,
     target_name: &OsStr,
-    target: &Path,
+    _target: &Path,
 ) -> io::Result<()> {
     use cap_std::io_lifetimes::AsFd;
     use rustix::fs::{openat, statat, AtFlags, Mode, OFlags};
@@ -784,7 +784,7 @@ fn fchflags_borrowed_fd(
     borrowed_fd: cap_std::io_lifetimes::BorrowedFd<'_>,
     flags: u64,
 ) -> io::Result<()> {
-    use cap_std::io_lifetimes::AsRawFd;
+    use std::os::fd::AsRawFd;
 
     let flags = NativeFileFlags::try_from(flags)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "file flags do not fit target"))?;
@@ -838,7 +838,6 @@ where
     use rustix::fs::{
         fgetxattr, fgetxattr_query, flistxattr, flistxattr_query, fsetxattr, XattrFlags,
     };
-    use rustix::io::Errno;
     use std::os::unix::ffi::OsStrExt;
 
     let names = match flistxattr_query(source) {
