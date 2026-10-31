@@ -588,12 +588,19 @@ fn run_command(parts: &[String], cwd: &Path) -> io::Result<CommandResult> {
             "native command must not be empty",
         ));
     };
+    let command = shell_join(parts);
     let output = Command::new(program)
         .args(arguments)
         .current_dir(cwd)
-        .output()?;
+        .output()
+        .map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("failed to execute native command {command}: {error}"),
+            )
+        })?;
     Ok(CommandResult {
-        command: shell_join(parts),
+        command,
         returncode: process_returncode(output.status),
         stdout: normalize_text_output(
             String::from_utf8(output.stdout)
