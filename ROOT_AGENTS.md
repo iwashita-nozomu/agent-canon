@@ -5,7 +5,7 @@
 contract agent-runtime
 responsibility Provides the portable minimum shared by source and consumer roots.
 upstream design documents/design/entrypoint-owner-map.md reading and composition boundary
-downstream implementation tools/agent/templates/entrypoint_composer.py consumer composition
+downstream implementation tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs consumer composition
 @dependency-end
 -->
 
