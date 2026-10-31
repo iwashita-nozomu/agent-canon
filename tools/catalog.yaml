@@ -509,14 +509,14 @@ entries:
   - id: lean-proof-env
     public: true
     summary: Creates and checks reusable Lean 4 proof environments with Mathlib/Aesop for formal-proof workflows.
-    path: tools/analysis/proof/lean_proof_env.py
+    path: tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: skill
     placement: skill_helper
-    command: python3 tools/analysis/proof/lean_proof_env.py
-    dispatch: {argv: ["python3", "tools/analysis/proof/lean_proof_env.py"]}
+    command: tools/bin/agent-canon lean-proof-env
+    dispatch: {argv: ["tools/bin/agent-canon", "lean-proof-env"]}
     writes: true
     default_wiring:
       ci: false
@@ -529,6 +529,7 @@ entries:
       - agents/skills/formal-proof-workflow.md
     tests:
       - tests/agent_tools/test_lean_proof_env.py
+      - tools/runtime/dispatch/agent-canon/tests/lean_proof_env_native.rs
 
   - id: tool-proof-coverage
     public: true

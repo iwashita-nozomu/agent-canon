@@ -110,7 +110,7 @@ new lemmas. Verification authority remains with the target checker command
 reported in the plan, for example:
 
 ```bash
-python3 tools/analysis/proof/lean_proof_env.py check-file \
+tools/bin/agent-canon lean-proof-env check-file \
   --env-dir "$RUNTIME_ROOT/tasks/formal-proof/lean-proof-env" \
   --lean-file "$RUNTIME_ROOT/tasks/formal-proof/spd/spd_quadratic_form_positive.lean" \
   --execute
