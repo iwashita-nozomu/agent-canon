@@ -619,7 +619,7 @@ Code dependency evidence remains separate from dependency-manifest validation.
 producer and projects bounded definitions, references, and explicitly declared
 implementation relationships through the official SCIP SDK. Point LSP
 analysis and diagnostics remain owned by
-`lsp_code_analysis.py analyze` and are not repository-wide SCIP indexing.
+`agent-canon lsp-code-analysis analyze` and are not repository-wide SCIP indexing.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
 Keep the evidence meanings separate: SCIP records indexed symbol occurrences,
 while header dependency evidence answers which design, implementation,
