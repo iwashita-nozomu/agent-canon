@@ -1385,8 +1385,9 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
     tmp_path: Path,
 ) -> None:
     """A fresh volume copy-up leaves an unmarked runtime and fails closed."""
-    legacy = tmp_path / "legacy-state"
-    legacy.mkdir()
+    runtime_root = tmp_path / "runtime"
+    legacy = runtime_root / "container-state"
+    legacy.mkdir(parents=True)
     control = tmp_path / "control"
     control.mkdir()
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
@@ -1436,7 +1437,7 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
                 f"AGENT_CANON_DOCKER_CMD={str(docker)!r}; "
                 f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
                 f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
-                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime_root)!r}; "
                 f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
                 f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
                 "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
@@ -1458,9 +1459,10 @@ def test_fake_volume_initializer_rejects_image_copy_up_without_nocopy(
 def test_fake_volume_initializer_preserves_readonly_legacy_source(
     tmp_path: Path,
 ) -> None:
-    """The actual initializer copies legacy input without mutating it."""
-    legacy = tmp_path / "legacy-state"
-    legacy.mkdir()
+    """The actual shell helper reads the legacy bind without mutating it."""
+    runtime_root = tmp_path / "runtime"
+    legacy = runtime_root / "container-state"
+    legacy.mkdir(parents=True)
     (legacy / "state.json").write_text('{"legacy":true}\n', encoding="utf-8")
     (legacy / "state.json").chmod(0o400)
     legacy.chmod(0o500)
@@ -1474,18 +1476,13 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(
             {
                 "images": {},
                 "containers": {},
-                "volumes": {
-                    volume_name: {
-                        "Name": volume_name,
-                        "Labels": {},
-                        "Mountpoint": str(tmp_path / f".fake-volume-{volume_name}"),
-                    }
-                },
+                "volumes": {},
                 "next": 1,
             }
         ),
         encoding="utf-8",
     )
+    # Isolate the helper's read-only import; the caller's later cleanup is separate.
     result = subprocess.run(
         [
             "bash",
@@ -1495,9 +1492,10 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(
                 f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
                 f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
                 f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
-                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime_root)!r}; "
                 f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
                 f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
+                "_agent_canon_drop_legacy_controller_state() { :; }; "
                 "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
             ),
         ],
@@ -1527,7 +1525,8 @@ def test_fake_volume_initializer_preserves_readonly_legacy_source(
 
 def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> None:
     """A marked volume is adopted without comparing evolved host legacy state."""
-    legacy = tmp_path / "legacy-state"
+    runtime_root = tmp_path / "runtime"
+    legacy = runtime_root / "container-state"
     (legacy / "receipts").mkdir(parents=True)
     (legacy / "receipts" / "old.json").write_text("host-only\n", encoding="utf-8")
     (legacy / "spool").mkdir()
@@ -1608,7 +1607,7 @@ def test_fake_marked_volume_adopts_divergent_legacy_state(tmp_path: Path) -> Non
                 f"AGENT_CANON_DOCKER_CMD={str(ROOT / 'tests/bootstrap/fake_docker.py')!r}; "
                 f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
                 f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
-                f"AGENT_CANON_RUNTIME_ROOT={str(legacy)!r}; "
+                f"AGENT_CANON_RUNTIME_ROOT={str(runtime_root)!r}; "
                 f"AGENT_CANON_STATE_ROOT={str(legacy)!r}; "
                 f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
                 "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
@@ -1787,8 +1786,10 @@ def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
     """A marked volume with an invalid marker fails without creating paths."""
     control = tmp_path / "control"
     runtime = tmp_path / "runtime"
+    state_root = runtime / "container-state"
     control.mkdir()
     runtime.mkdir()
+    state_root.mkdir()
     control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     volume_name = f"agent-canon-runtime-{control_digest}"
     volume_root = tmp_path / f".fake-volume-{volume_name}"
@@ -1833,7 +1834,7 @@ def test_fake_marked_volume_rejects_invalid_marker(tmp_path: Path) -> None:
                 f"FAKE_DOCKER_STATE={str(state_path)!r}; export FAKE_DOCKER_STATE; "
                 f"AGENT_CANON_CONTROL_ROOT={str(control)!r}; "
                 f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
-                f"AGENT_CANON_STATE_ROOT={str(runtime)!r}; "
+                f"AGENT_CANON_STATE_ROOT={str(state_root)!r}; "
                 f"AGENT_CANON_STATE_VOLUME_NAME={volume_name!r}; "
                 "AGENT_CANON_IMAGE_REF=image; _agent_canon_init_state_volume"
             ),
