@@ -1107,7 +1107,9 @@ mod validator_tests {
             "schemas/agent-canon/skill-dependencies.schema.json",
             "schemas/agent-canon/tool-catalog.schema.json",
         ];
-        for round in calls.chunks_exact(4) {
+        let (rounds, remainder) = calls.as_chunks::<4>();
+        assert!(remainder.is_empty());
+        for round in rounds {
             assert_eq!(round[0].0, "yamllint");
             let mut yaml_args = vec![
                 "--strict".into(),
