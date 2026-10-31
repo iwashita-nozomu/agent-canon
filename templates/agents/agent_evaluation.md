@@ -5,7 +5,7 @@
 contract template
 responsibility Documents Agent Evaluation for this repository.
 upstream design ../../documents/runtime/task-contract-observation.md defines contract coverage and archive routing
-downstream implementation ../../eval/producers/evaluate_agent_run.py generates concrete evaluations
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs generates concrete evaluations
 downstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py produces current-run contract coverage evidence
 downstream implementation ../../tools/runtime/lifecycle/task_close.py enforces pass status before user completion
 @dependency-end
