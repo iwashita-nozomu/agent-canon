@@ -108,7 +108,7 @@ impl SequenceMatcher {
     /// Return Python's `2.0 * matches / (len(a) + len(b))` binary64 ratio.
     pub fn ratio(&self) -> f64 {
         let matches = self
-            .matching_blocks()
+            .get_matching_blocks()
             .iter()
             .map(|block| block.size)
             .sum::<usize>();
