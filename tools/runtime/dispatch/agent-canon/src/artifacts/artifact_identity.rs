@@ -129,6 +129,97 @@ pub fn canonical_json_bytes<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
     })
 }
 
+/// Serialize the same sorted JSON model as [`canonical_json_bytes`] while
+/// escaping every non-ASCII scalar as Python's `json.dumps(...,
+/// ensure_ascii=True)` does.
+///
+/// This preserves the artifact identity contract (including its float
+/// rejection) and provides the byte form used by the dependency receipt
+/// fingerprints. The existing non-ASCII-emitting function remains unchanged.
+pub fn canonical_json_ascii_bytes<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
+    let value = serde_json::to_value(value).map_err(|error| {
+        if error.to_string().contains("key must be a string") {
+            ArtifactIdentityError::new("artifact_identity:non_string_key")
+        } else {
+            ArtifactIdentityError::with_detail("artifact_identity:json_invalid", error.to_string())
+        }
+    })?;
+    reject_noncanonical_json(&value)?;
+    let encoded = serde_json::to_vec(&value).map_err(|error| {
+        ArtifactIdentityError::with_detail("artifact_identity:json_invalid", error.to_string())
+    })?;
+    escape_non_ascii_json(&encoded)
+}
+
+fn escape_non_ascii_json(encoded: &[u8]) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(encoded.len());
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut cursor = 0;
+    while cursor < encoded.len() {
+        let byte = encoded[cursor];
+        if !in_string {
+            if byte >= 0x80 {
+                return Err(ArtifactIdentityError::new("artifact_identity:json_invalid"));
+            }
+            output.push(byte);
+            if byte == b'"' {
+                in_string = true;
+            }
+            cursor += 1;
+            continue;
+        }
+        if escaped {
+            output.push(byte);
+            escaped = false;
+            cursor += 1;
+            continue;
+        }
+        match byte {
+            b'\\' => {
+                output.push(byte);
+                escaped = true;
+                cursor += 1;
+            }
+            b'"' => {
+                output.push(byte);
+                in_string = false;
+                cursor += 1;
+            }
+            0x7f => {
+                output.extend_from_slice(b"\\u007f");
+                cursor += 1;
+            }
+            0x80..=0xff => {
+                let text = std::str::from_utf8(&encoded[cursor..]).map_err(|error| {
+                    ArtifactIdentityError::with_detail(
+                        "artifact_identity:json_invalid",
+                        error.to_string(),
+                    )
+                })?;
+                let scalar = text
+                    .chars()
+                    .next()
+                    .ok_or_else(|| ArtifactIdentityError::new("artifact_identity:json_invalid"))?;
+                let mut utf16 = [0u16; 2];
+                let units = scalar.encode_utf16(&mut utf16);
+                for unit in units {
+                    output.extend_from_slice(format!("\\u{unit:04x}").as_bytes());
+                }
+                cursor += scalar.len_utf8();
+            }
+            _ => {
+                output.push(byte);
+                cursor += 1;
+            }
+        }
+    }
+    if in_string {
+        return Err(ArtifactIdentityError::new("artifact_identity:json_invalid"));
+    }
+    Ok(output)
+}
+
 pub fn canonical_body_sha256(record: &Value, hash_field: &str) -> Result<String> {
     let Value::Object(record) = record else {
         return Err(ArtifactIdentityError::new(
@@ -782,5 +873,20 @@ mod tests {
             ("a", Value::String("é".to_string())),
         ]);
         assert_eq!(canonical_json_bytes(&map).unwrap(), expected);
+    }
+
+    #[test]
+    fn canonical_json_ascii_matches_python_ensure_ascii_bytes() {
+        let value = json!({"unicode": "é猫😀\u{007f}"});
+        assert_eq!(
+            canonical_json_ascii_bytes(&value).unwrap(),
+            br#"{"unicode":"\u00e9\u732b\ud83d\ude00\u007f"}"#
+        );
+        assert_eq!(
+            canonical_json_bytes(&value).unwrap(),
+            "{\"unicode\":\"é猫😀\u{007f}\"}".as_bytes()
+        );
+        let error = canonical_json_ascii_bytes(&json!({"value": 1.5})).unwrap_err();
+        assert_eq!(error.code, "artifact_identity:float_forbidden");
     }
 }

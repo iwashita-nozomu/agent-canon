@@ -11,6 +11,7 @@
 // upstream implementation private_feedback.rs owns private feedback storage using the shared boundary
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
+// upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
@@ -23,6 +24,7 @@
 
 pub mod artifacts;
 pub mod catalog;
+pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod private_feedback;
 pub mod report_artifact_checks;
