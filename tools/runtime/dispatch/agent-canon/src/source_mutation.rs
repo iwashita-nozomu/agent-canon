@@ -198,9 +198,6 @@ fn parse_allowed_paths(object: &Map<String, Value>, source_root: &Path) -> Resul
             || Path::new(item)
                 .components()
                 .any(|component| matches!(component, Component::Prefix(_) | Component::RootDir))
-            || item
-                .chars()
-                .any(|character| (character as u32) <= 0x1f || character == '\u{7f}')
             || cfg!(windows) && item.contains('\\')
         {
             return Err(SourceMutationError::new(format!(

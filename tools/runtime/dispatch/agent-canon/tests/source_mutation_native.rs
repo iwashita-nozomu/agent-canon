@@ -127,6 +127,26 @@ fn posix_replacement_character_grant_does_not_alias_invalid_utf8_component() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn posix_control_character_component_is_an_exact_valid_grant() {
+    let root = TempRoot::new();
+    let allowed = root.write("docs/a\u{1}b/guide.md", "before\n");
+    let different = root.write("docs/ab/guide.md", "different path\n");
+    let capability = capability(&root.0, &["docs/a\u{1}b"]);
+
+    assert!(capability.assert_allowed(&allowed).is_ok());
+    assert!(capability.assert_allowed(&different).is_err());
+    capability
+        .write_text(&allowed, "after\n")
+        .expect("valid control-character path is within its exact grant");
+    assert!(capability
+        .write_text(&different, "must remain denied\n")
+        .is_err());
+    assert_eq!(fs::read_to_string(&allowed).unwrap(), "after\n");
+    assert_eq!(fs::read_to_string(&different).unwrap(), "different path\n");
+}
+
 #[test]
 fn source_capability_writes_only_the_approved_file() {
     let root = TempRoot::new();
