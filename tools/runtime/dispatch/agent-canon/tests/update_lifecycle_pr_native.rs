@@ -114,3 +114,38 @@ fn pull_request_lifecycle_apis_match_frozen_cpython_records_hashes_and_errors() 
     assert_eq!(accepted, 18);
     assert_eq!(rejected, 17);
 }
+
+#[test]
+fn evidence_list_item_errors_precede_duplicate_detection() {
+    let golden: GoldenFile =
+        serde_json::from_str(GOLDEN).expect("frozen PR-lifecycle inputs parse");
+    let user_ready = golden
+        .cases
+        .iter()
+        .find(|case| case.name == "user-ready")
+        .expect("the frozen valid user record is available");
+    let mut lifecycle = user_ready.args[0].clone();
+    let valid_ref = lifecycle["pr_essence"]["evidence_refs"][0].clone();
+
+    lifecycle["pr_essence"]["evidence_refs"] =
+        serde_json::json!([valid_ref.clone(), valid_ref.clone(), "bad"]);
+    let combined_failure = validate_pull_request_lifecycle(&lifecycle)
+        .expect_err("all evidence refs are validated before duplicate detection");
+    assert_eq!(
+        combined_failure.code, "lifecycle:identity_invalid",
+        "a later malformed item precedes duplicate detection"
+    );
+    assert_eq!(
+        combined_failure.detail,
+        "pull_request_lifecycle.pr_essence.evidence_refs[2]"
+    );
+
+    lifecycle["pr_essence"]["evidence_refs"] = serde_json::json!([valid_ref.clone(), valid_ref]);
+    let duplicate_only = validate_pull_request_lifecycle(&lifecycle)
+        .expect_err("a duplicate list with otherwise valid items is rejected");
+    assert_eq!(duplicate_only.code, "lifecycle:duplicate_value");
+    assert_eq!(
+        duplicate_only.detail,
+        "pull_request_lifecycle.pr_essence.evidence_refs"
+    );
+}

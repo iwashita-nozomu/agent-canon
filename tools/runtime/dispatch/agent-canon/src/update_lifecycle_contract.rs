@@ -2113,17 +2113,19 @@ fn string_list(
         return Err(fail("lifecycle:sequence_empty", field));
     }
     let mut result = Vec::with_capacity(values.len());
-    let mut seen = BTreeSet::new();
     for (index, value) in values.iter().enumerate() {
         let item_field = format!("{field}[{index}]");
         let text = string_value(value, &item_field)?;
         if predicate.is_some_and(|predicate| !predicate(&text)) {
             return Err(fail("lifecycle:identity_invalid", &item_field));
         }
-        if unique && !seen.insert(text.clone()) {
+        result.push(text);
+    }
+    if unique {
+        let mut seen = BTreeSet::new();
+        if result.iter().any(|text| !seen.insert(text)) {
             return Err(fail("lifecycle:duplicate_value", field));
         }
-        result.push(text);
     }
     Ok(result)
 }
