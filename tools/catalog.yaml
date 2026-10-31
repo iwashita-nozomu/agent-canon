@@ -226,14 +226,14 @@ entries:
 
   - id: find-redundant-designs
     summary: Finds exact duplicate design documents and writes an external runtime report.
-    path: tools/analysis/documents/analysis/find_redundant_designs.py
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
     role: docs
     status: maintainer_only
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/analysis/documents/analysis/find_redundant_designs.py --runtime-root <external-runtime>
-    dispatch: {argv: ["python3", "tools/analysis/documents/analysis/find_redundant_designs.py", "--runtime-root", "<external-runtime>"]}
+    command: tools/bin/agent-canon docs find-redundant-designs --runtime-root <external-runtime>
+    dispatch: {argv: ["tools/bin/agent-canon", "docs", "find-redundant-designs", "--runtime-root", "<external-runtime>"]}
     writes: true
     default_wiring:
       ci: false
@@ -242,6 +242,7 @@ entries:
       - documents/tools/README.md
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
+      - tools/runtime/dispatch/agent-canon/tests/design_duplicates_native.rs
 
   - id: find-similar-designs
     summary: Finds similar design documents and writes an external runtime report.

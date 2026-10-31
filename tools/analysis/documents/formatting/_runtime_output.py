@@ -4,7 +4,6 @@
 # responsibility Provides the shared external-output and explicit source-mutation boundary for documentation tools.
 # upstream design ../../../../documents/design/agent-canon-bootstrap-tool-runtime.md runtime artifact and target mutation boundary
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py validates external runtime paths
-# downstream implementation ../analysis/find_redundant_designs.py consumes explicit mutation capability
 # downstream implementation ../analysis/find_similar_designs.py consumes external report output
 # downstream implementation ../../../validation/documentation/authoring/organize_designs.py consumes explicit mutation capability
 # downstream implementation ../../../runtime/dispatch/agent-canon/src/source_mutation.rs mirrors the capability contract for native docs writes

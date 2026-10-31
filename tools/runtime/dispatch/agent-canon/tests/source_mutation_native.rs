@@ -1,6 +1,6 @@
 // @dependency-start
 // contract test
-// responsibility Verifies source-root binding, exact allowed subtrees, and no-follow source writes.
+// responsibility Verifies source-root binding, exact allowed subtrees, and no-follow source writes/removals.
 // upstream implementation ../src/source_mutation.rs owns the explicit source-mutation capability
 // downstream implementation ../src/docs.rs uses the capability for native link rewrites
 // @dependency-end
@@ -191,6 +191,22 @@ fn source_capability_writes_only_the_approved_file() {
 }
 
 #[test]
+fn source_capability_removes_only_the_approved_file() {
+    let root = TempRoot::new();
+    let approved = root.write("docs/approved.md", "remove me\n");
+    let untouched = root.write("docs/untouched.md", "untouched\n");
+    let capability = capability(&root.0, &["docs/approved.md"]);
+
+    capability
+        .remove_file(&approved)
+        .expect("approved source file is removed");
+
+    assert!(!approved.exists());
+    assert!(capability.remove_file(&untouched).is_err());
+    assert_eq!(fs::read_to_string(&untouched).unwrap(), "untouched\n");
+}
+
+#[test]
 fn source_capability_rejects_malformed_fields_and_escaping_paths() {
     let root = TempRoot::new();
     for json in [
@@ -208,7 +224,7 @@ fn source_capability_rejects_malformed_fields_and_escaping_paths() {
 
 #[cfg(unix)]
 #[test]
-fn source_capability_rechecks_symlink_components_before_write() {
+fn source_capability_rechecks_symlink_components_before_write_or_remove() {
     use std::os::unix::fs::symlink;
 
     let root = TempRoot::new();
@@ -221,5 +237,10 @@ fn source_capability_rechecks_symlink_components_before_write() {
     assert!(capability
         .write_text(&guide, "must not follow link\n")
         .is_err());
+    assert!(capability.remove_file(&guide).is_err());
+    assert!(fs::symlink_metadata(&guide)
+        .expect("replacement symlink remains")
+        .file_type()
+        .is_symlink());
     assert_eq!(fs::read_to_string(&outside).unwrap(), "outside remains\n");
 }

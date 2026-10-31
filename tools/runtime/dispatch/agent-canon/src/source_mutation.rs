@@ -1,11 +1,11 @@
-//! Exact, caller-supplied capabilities for bounded source-file rewrites.
+//! Exact, caller-supplied capabilities for bounded source-file rewrites and removals.
 // @dependency-start
 // contract implementation
-// responsibility Validates source mutation capabilities and writes only beneath their exact source-bound paths.
+// responsibility Validates source mutation capabilities and writes or removes files only beneath their exact source-bound paths.
 // upstream implementation runtime_boundary.rs owns external runtime artifacts and intentionally rejects source writes
 // upstream design ../../../../../tools/analysis/documents/formatting/_runtime_output.py defines the existing capability JSON contract
-// downstream implementation docs.rs uses this capability for explicit link rewrites
-// downstream test ../tests/source_mutation_native.rs validates exact scope and no-follow writes
+// downstream implementation docs.rs uses this capability for explicit link rewrites and duplicate-design deletion
+// downstream test ../tests/source_mutation_native.rs validates exact scope and no-follow writes/removals
 // @dependency-end
 
 use cap_fs_ext::{DirExt, FollowSymlinks, OpenOptionsFollowExt};
@@ -157,6 +157,52 @@ impl SourceMutationCapability {
         file.write_all(text.as_bytes()).map_err(|error| {
             SourceMutationError::new(format!(
                 "cannot write mutation target {}: {error}",
+                path.display()
+            ))
+        })
+    }
+
+    /// Revalidate and remove one approved file through its no-follow parent directory.
+    pub fn remove_file(&self, path: &Path) -> Result<()> {
+        let resolved = self.assert_allowed(path)?;
+        let relative = resolved.strip_prefix(&self.source_root).map_err(|_| {
+            SourceMutationError::new(format!(
+                "mutation target is outside source: {}",
+                path.display()
+            ))
+        })?;
+        let components = relative.components().collect::<Vec<_>>();
+        let Some(Component::Normal(name)) = components.last() else {
+            return Err(SourceMutationError::new(format!(
+                "mutation target must name a source file: {}",
+                path.display()
+            )));
+        };
+        let mut directory = open_root_nofollow(&self.source_root).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot open mutation source root {}: {error}",
+                self.source_root.display()
+            ))
+        })?;
+        for component in &components[..components.len() - 1] {
+            let Component::Normal(component) = component else {
+                return Err(SourceMutationError::new(format!(
+                    "unsafe mutation target: {}",
+                    path.display()
+                )));
+            };
+            directory = directory.open_dir_nofollow(component).map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot open mutation parent for {}: {error}",
+                    path.display()
+                ))
+            })?;
+        }
+        // unlinkat-style removal does not follow a final symlink. The parent
+        // handle was opened descriptor-relatively without following links.
+        directory.remove_file(Path::new(name)).map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot remove mutation target {}: {error}",
                 path.display()
             ))
         })

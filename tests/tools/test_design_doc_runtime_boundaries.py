@@ -2,7 +2,8 @@
 # contract test
 # responsibility Verifies design-document analyzers keep reports external and source mutation explicit.
 # upstream implementation ../../tools/analysis/documents/formatting/_runtime_output.py shared runtime/mutation boundary
-# upstream implementation ../../tools/analysis/documents/analysis/find_redundant_designs.py exact duplicate analyzer
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs native exact duplicate analyzer
+# upstream evidence ../../tests/fixtures/design_duplicates/python_golden.json frozen Python duplicate CLI oracle
 # upstream implementation ../../tools/analysis/documents/analysis/find_similar_designs.py similarity analyzer
 # upstream implementation ../../tools/validation/documentation/authoring/organize_designs.py organization planner
 # downstream implementation ../../tests/agent_tools/test_source_runtime_side_effects.py source side-effect regression suite
@@ -17,12 +18,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.agent_tools.rust_cli_fixture import standalone_agent_canon
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON = standalone_agent_canon()
 SCRIPTS = {
-    "redundant": PROJECT_ROOT / "tools/analysis/documents/analysis/find_redundant_designs.py",
-    "similar": PROJECT_ROOT / "tools/analysis/documents/analysis/find_similar_designs.py",
-    "organize": PROJECT_ROOT / "tools/validation/documentation/authoring/organize_designs.py",
+    "similar": PROJECT_ROOT
+    / "tools/analysis/documents/analysis/find_similar_designs.py",
+    "organize": PROJECT_ROOT
+    / "tools/validation/documentation/authoring/organize_designs.py",
 }
+TOOLS = ("redundant", *SCRIPTS)
 
 
 class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
@@ -35,13 +41,16 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
 
     def run_tool(
         self,
-        script: Path,
+        tool: str,
         source: Path,
         runtime: Path | None,
         *extra: str,
     ) -> subprocess.CompletedProcess[str]:
         """Run one analyzer with a clean environment."""
-        command = ["python3", str(script), *extra]
+        if tool == "redundant":
+            command = [str(AGENT_CANON), "docs", "find-redundant-designs", *extra]
+        else:
+            command = ["python3", str(SCRIPTS[tool]), *extra]
         if runtime is not None:
             command.extend(["--runtime-root", str(runtime)])
         environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
@@ -60,33 +69,43 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as source_dir:
             source = Path(source_dir)
             self.write(source / "documents/design/a.md", "# A\n")
-            for script in SCRIPTS.values():
-                result = self.run_tool(script, source, None)
+            for tool in TOOLS:
+                result = self.run_tool(tool, source, None)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("explicit runtime root required", result.stderr)
             self.assertFalse((source / "reports").exists())
 
     def test_read_only_reports_are_external_and_source_is_unchanged(self) -> None:
         """External runtime output is used by all three read-only analyzers."""
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
             source = Path(source_dir)
             runtime = Path(runtime_dir)
             self.write(source / "documents/design/a.md", "# Shared\n`foo/bar.py`\n")
             self.write(source / "documents/design/b.md", "# Shared\n`foo/bar.py`\n")
             self.write(source / "documents/design/c.md", "# Other\n")
-            before = {path: path.read_bytes() for path in source.rglob("*") if path.is_file()}
-            for script in SCRIPTS.values():
-                result = self.run_tool(script, source, runtime)
+            before = {
+                path: path.read_bytes() for path in source.rglob("*") if path.is_file()
+            }
+            for tool in TOOLS:
+                result = self.run_tool(tool, source, runtime)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(str(runtime), result.stdout)
-            after = {path: path.read_bytes() for path in source.rglob("*") if path.is_file()}
+            after = {
+                path: path.read_bytes() for path in source.rglob("*") if path.is_file()
+            }
             self.assertEqual(before, after)
             self.assertFalse((source / "reports").exists())
             self.assertTrue(tuple(runtime.rglob("*.txt")))
 
     def test_similarity_report_contains_matching_design_pair(self) -> None:
         """The registered similarity route reports a matching design pair."""
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
             source = Path(source_dir)
             runtime = Path(runtime_dir)
             self.write(
@@ -97,10 +116,12 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
                 source / "documents/design/beta.md",
                 "# Shared design\nThe same contract and runtime boundary.\n",
             )
-            self.write(source / "documents/design/unrelated.md", "# Different\nUnique.\n")
+            self.write(
+                source / "documents/design/unrelated.md", "# Different\nUnique.\n"
+            )
 
             result = self.run_tool(
-                SCRIPTS["similar"],
+                "similar",
                 source,
                 runtime,
                 "--min",
@@ -118,11 +139,14 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
 
     def test_organize_apply_requires_capability(self) -> None:
         """The organization planner cannot mutate source implicitly."""
-        with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as runtime_dir:
+        with (
+            tempfile.TemporaryDirectory() as source_dir,
+            tempfile.TemporaryDirectory() as runtime_dir,
+        ):
             source = Path(source_dir)
             self.write(source / "documents/design/a.md", "# A\n`foo/bar.py`\n")
             result = self.run_tool(
-                SCRIPTS["organize"],
+                "organize",
                 source,
                 Path(runtime_dir),
                 "--apply",
@@ -143,7 +167,7 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
                 '"purpose":"test","authority":"issue-841"}'
             )
             result = self.run_tool(
-                SCRIPTS["redundant"],
+                "redundant",
                 source,
                 None,
                 "--delete",
@@ -163,7 +187,7 @@ class DesignDocumentRuntimeBoundaryTest(unittest.TestCase):
                 '"purpose":"test","authority":"issue-841"}'
             )
             result = self.run_tool(
-                SCRIPTS["organize"],
+                "organize",
                 source,
                 None,
                 "--apply",

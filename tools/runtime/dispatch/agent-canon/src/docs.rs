@@ -5,6 +5,7 @@
 // upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
 // upstream implementation source_mutation.rs owns explicit capability-bound source rewrites
+// upstream implementation path_resolution.rs owns non-strict design-root path resolution
 // downstream implementation entrypoint_owner_map.rs owns the root entrypoint grammar subcommand
 // upstream design ../../../../../documents/contracts/template-bootstrap.md default bootstrap doc contract
 // upstream design ../../../../../documents/contracts/static-seed-export.md source-free static-seed contract
@@ -14,12 +15,15 @@
 // downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
+// downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle
 // @dependency-end
 
+use crate::runtime_boundary::RuntimeArtifactBoundary;
 use crate::source_mutation::SourceMutationCapability;
 use regex::{Captures, Regex};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -30,6 +34,9 @@ use std::sync::OnceLock;
 use toml_edit::{DocumentMut, Item, TableLike};
 
 static DOCS_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+const REDUNDANT_DESIGN_PROGRAM: &str = "agent-canon docs find-redundant-designs";
+const REDUNDANT_DESIGN_USAGE: &str = "usage: agent-canon docs find-redundant-designs [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]";
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -187,6 +194,12 @@ struct WriteSummary {
 pub fn run(args: &[String]) -> i32 {
     if args
         .first()
+        .is_some_and(|argument| argument.as_str() == "find-redundant-designs")
+    {
+        return run_redundant_designs(&args[1..]);
+    }
+    if args
+        .first()
         .is_some_and(|argument| argument.as_str() == "check-entrypoints")
     {
         return crate::entrypoint_owner_map::run(&args[1..]);
@@ -225,6 +238,429 @@ fn run_parsed(args: Args) -> i32 {
         ),
         DocsCommand::RenderRuntimeProfile => render_runtime_profile_command(&root),
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RedundantDesignArgs {
+    design_root: PathBuf,
+    delete: bool,
+    mutation_capability_json: Option<String>,
+    runtime_root: Option<PathBuf>,
+    output: Option<PathBuf>,
+}
+
+enum RedundantDesignParse {
+    Run(RedundantDesignArgs),
+    Help,
+}
+
+fn run_redundant_designs(raw: &[String]) -> i32 {
+    let parsed = match parse_redundant_design_args(raw) {
+        Ok(RedundantDesignParse::Run(parsed)) => parsed,
+        Ok(RedundantDesignParse::Help) => {
+            print_redundant_design_help();
+            return 0;
+        }
+        Err(message) => return redundant_design_error(&message),
+    };
+
+    let current_dir = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            return redundant_design_runtime_error(format!("cannot resolve source root: {error}"));
+        }
+    };
+    let source_root = match fs::canonicalize(&current_dir) {
+        Ok(path) => path,
+        Err(error) => {
+            return redundant_design_runtime_error(format!(
+                "cannot resolve source root {}: {error}",
+                current_dir.display()
+            ));
+        }
+    };
+    let design_dir = match resolve_design_root(&parsed.design_root, &current_dir) {
+        Ok(path) => path,
+        Err(message) => return redundant_design_error(&message),
+    };
+    if !design_dir.is_dir() {
+        return redundant_design_error(format!(
+            "design root is not a directory: {}",
+            design_dir.display()
+        ));
+    }
+
+    let capability = if parsed.delete {
+        match SourceMutationCapability::from_json(
+            &source_root,
+            parsed.mutation_capability_json.as_deref(),
+        ) {
+            Ok(capability) => Some(capability),
+            Err(error) => return redundant_design_runtime_error(error.to_string()),
+        }
+    } else {
+        None
+    };
+
+    let (report, deletions) =
+        match build_redundant_design_report(&design_dir, parsed.delete, capability.as_ref()) {
+            Ok(result) => result,
+            Err(error) => return redundant_design_runtime_error(error),
+        };
+
+    let boundary = match RuntimeArtifactBoundary::for_source(
+        &source_root,
+        parsed.runtime_root.as_deref(),
+        true,
+    ) {
+        Ok(boundary) => boundary,
+        Err(error) => return redundant_design_runtime_error(error),
+    };
+    let target = match admit_redundant_report_target(&boundary, parsed.output.as_deref()) {
+        Ok(target) => target,
+        Err(error) => return redundant_design_runtime_error(error),
+    };
+
+    if let Some(capability) = capability.as_ref() {
+        for path in &deletions {
+            if let Err(error) = capability.remove_file(path) {
+                return redundant_design_runtime_error(error.to_string());
+            }
+        }
+    }
+
+    let relative_target = match target.strip_prefix(boundary.root()) {
+        Ok(path) => path,
+        Err(_) => {
+            return redundant_design_runtime_error(format!(
+                "path escapes runtime root: {}",
+                target.display()
+            ));
+        }
+    };
+    if let Err(error) = boundary.atomic_write_text(relative_target, &report, 0o600) {
+        return redundant_design_runtime_error(error);
+    }
+    println!("Report written to {}", target.display());
+    0
+}
+
+fn parse_redundant_design_args(raw: &[String]) -> Result<RedundantDesignParse, String> {
+    let mut parsed = RedundantDesignArgs {
+        design_root: PathBuf::from("documents/design"),
+        delete: false,
+        mutation_capability_json: None,
+        runtime_root: None,
+        output: None,
+    };
+    let mut index = 0;
+    let mut unrecognized = Vec::new();
+    while index < raw.len() {
+        let argument = raw[index].as_str();
+        if matches!(argument, "-h" | "--help") {
+            return Ok(RedundantDesignParse::Help);
+        }
+        if argument == "--delete" {
+            parsed.delete = true;
+            index += 1;
+            continue;
+        }
+
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        let option_slot = match option {
+            "--design-root" => Some(0),
+            "--mutation-capability-json" => Some(1),
+            "--runtime-root" => Some(2),
+            "--output" => Some(3),
+            _ => None,
+        };
+        let Some(option_slot) = option_slot else {
+            unrecognized.push(argument.to_string());
+            index += 1;
+            continue;
+        };
+        let value = match inline_value {
+            Some(value) => value.to_string(),
+            None => {
+                let Some(value) = raw.get(index + 1) else {
+                    return Err(format!(
+                        "argument {}: expected one argument",
+                        match option_slot {
+                            0 => "--design-root",
+                            1 => "--mutation-capability-json",
+                            2 => "--runtime-root",
+                            _ => "--output",
+                        }
+                    ));
+                };
+                index += 1;
+                value.clone()
+            }
+        };
+        match option_slot {
+            0 => parsed.design_root = PathBuf::from(value),
+            1 => parsed.mutation_capability_json = Some(value),
+            2 => parsed.runtime_root = Some(PathBuf::from(value)),
+            _ => parsed.output = Some(PathBuf::from(value)),
+        }
+        index += 1;
+    }
+    if unrecognized.is_empty() {
+        Ok(RedundantDesignParse::Run(parsed))
+    } else {
+        Err(format!(
+            "unrecognized arguments: {}",
+            unrecognized.join(" ")
+        ))
+    }
+}
+
+fn print_redundant_design_help() {
+    println!("{REDUNDANT_DESIGN_USAGE}");
+    println!("\nDetect exact-duplicate design documents.\n");
+    println!("options:");
+    println!("  -h, --help            show this help message and exit");
+    println!("  --design-root DESIGN_ROOT");
+    println!("                        Read-only design root (defaults to documents/design).");
+    println!("  --delete              Delete redundant source files; requires an explicit mutation capability.");
+    println!("  --mutation-capability-json MUTATION_CAPABILITY_JSON");
+    println!("                        Exact typed source mutation capability JSON.");
+    println!("  --runtime-root RUNTIME_ROOT");
+    println!("                        External runtime root (or AGENT_CANON_RUNTIME_ROOT); never source-local.");
+    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file is created under the runtime root.");
+}
+
+fn redundant_design_error(message: impl std::fmt::Display) -> i32 {
+    eprintln!("{REDUNDANT_DESIGN_USAGE}");
+    eprintln!("{REDUNDANT_DESIGN_PROGRAM}: error: {message}");
+    2
+}
+
+fn redundant_design_runtime_error(message: impl std::fmt::Display) -> i32 {
+    redundant_design_error(format!("runtime_or_mutation_error: {message}"))
+}
+
+fn resolve_design_root(raw: &Path, current_dir: &Path) -> Result<PathBuf, String> {
+    let expanded = expand_design_home(raw)?;
+    let absolute = if expanded.is_absolute() {
+        expanded
+    } else {
+        current_dir.join(expanded)
+    };
+    crate::path_resolution::resolve_non_strict(&absolute)
+        .map_err(|error| format!("cannot resolve design root {}: {error}", absolute.display()))
+}
+
+fn expand_design_home(path: &Path) -> Result<PathBuf, String> {
+    let Some(value) = path.to_str() else {
+        return Ok(path.to_path_buf());
+    };
+    let suffix = if value == "~" {
+        Some("")
+    } else if let Some(suffix) = value.strip_prefix("~/") {
+        Some(suffix)
+    } else if cfg!(windows) {
+        value.strip_prefix("~\\")
+    } else {
+        None
+    };
+    if suffix.is_none() && value.starts_with('~') {
+        return Err(format!("cannot expand design root: {}", path.display()));
+    }
+    match suffix {
+        Some(suffix) => {
+            #[cfg(windows)]
+            let home = std::env::var_os("USERPROFILE");
+            #[cfg(not(windows))]
+            let home = std::env::var_os("HOME");
+            let home =
+                home.ok_or_else(|| "home directory unavailable for design root".to_string())?;
+            Ok(PathBuf::from(home).join(suffix.trim_start_matches(['/', '\\'])))
+        }
+        None => Ok(path.to_path_buf()),
+    }
+}
+
+fn build_redundant_design_report(
+    design_dir: &Path,
+    delete: bool,
+    capability: Option<&SourceMutationCapability>,
+) -> Result<(String, Vec<PathBuf>), String> {
+    let mut groups = Vec::<(String, Vec<PathBuf>)>::new();
+    let mut group_indexes = HashMap::<String, usize>::new();
+    let mut files = Vec::new();
+    collect_redundant_markdown_files(design_dir, &mut files)?;
+    files.sort();
+    for path in files {
+        let text = fs::read_to_string(&path)
+            .map_err(|_| format!("cannot read design document: {}", path.display()))?;
+        let digest = normalized_design_sha(&text);
+        let group_index = match group_indexes.get(&digest) {
+            Some(index) => *index,
+            None => {
+                let index = groups.len();
+                groups.push((digest.clone(), Vec::new()));
+                group_indexes.insert(digest, index);
+                index
+            }
+        };
+        groups[group_index].1.push(path);
+    }
+
+    let mut lines = Vec::new();
+    let mut deletions = Vec::new();
+    for (_, paths) in &groups {
+        if paths.len() <= 1 {
+            continue;
+        }
+        lines.push("DUP_GROUP:".to_string());
+        for path in paths {
+            lines.push(format!("  {}", path.display()));
+        }
+        let canonical = choose_redundant_canonical(paths, design_dir);
+        lines.push(format!("  KEEP: {}", canonical.display()));
+        for path in paths {
+            if path == &canonical {
+                continue;
+            }
+            lines.push(format!("  DELETE: {}", path.display()));
+            deletions.push(path.clone());
+        }
+        lines.push(String::new());
+    }
+    if lines.is_empty() {
+        lines.push("No exact-duplicate design files found.".to_string());
+    }
+
+    if delete {
+        let capability = capability.ok_or_else(|| {
+            "--delete requires --mutation-capability-json; analysis is read-only by default"
+                .to_string()
+        })?;
+        for path in &deletions {
+            capability
+                .assert_allowed(path)
+                .map_err(|error| error.to_string())?;
+        }
+        lines.extend([String::new(), "DELETED:".to_string()]);
+        lines.extend(deletions.iter().map(|path| path.display().to_string()));
+    }
+    Ok((format!("{}\n", lines.join("\n")), deletions))
+}
+
+fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let entries = fs::read_dir(root)
+        .map_err(|error| format!("cannot read design root {}: {error}", root.display()))?;
+    for entry in entries {
+        let entry = entry
+            .map_err(|error| format!("cannot read design root {}: {error}", root.display()))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("cannot inspect design path {}: {error}", path.display()))?;
+        if file_type.is_dir() {
+            collect_redundant_markdown_files(&path, files)?;
+            continue;
+        }
+        let is_markdown = path.extension().is_some_and(|extension| {
+            let extension = extension.to_string_lossy();
+            if cfg!(windows) {
+                extension.eq_ignore_ascii_case("md")
+            } else {
+                extension == "md"
+            }
+        });
+        let excluded_name = path.file_name().is_some_and(|name| {
+            let name = name.to_string_lossy();
+            name.to_lowercase().contains("template") || name.ends_with(".bak")
+        });
+        if is_markdown && !excluded_name && path.is_file() {
+            files.push(path);
+        }
+    }
+    Ok(())
+}
+
+fn normalized_design_sha(text: &str) -> String {
+    let normalized = text
+        .split(crate::python_text::is_python_whitespace)
+        .filter(|piece| !piece.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("{:x}", Sha256::digest(normalized.as_bytes()))
+}
+
+fn choose_redundant_canonical(paths: &[PathBuf], design_dir: &Path) -> PathBuf {
+    let has_nested = paths.iter().any(|path| {
+        path.strip_prefix(design_dir)
+            .is_ok_and(|relative| relative.components().count() >= 2)
+    });
+    paths
+        .iter()
+        .filter(|path| {
+            !has_nested
+                || path
+                    .strip_prefix(design_dir)
+                    .is_ok_and(|relative| relative.components().count() >= 2)
+        })
+        .min_by_key(|path| {
+            let relative = path
+                .strip_prefix(design_dir)
+                .expect("design document is beneath its root");
+            (relative.components().count(), redundant_as_posix(relative))
+        })
+        .expect("duplicate group contains at least two paths")
+        .clone()
+}
+
+fn redundant_as_posix(path: &Path) -> String {
+    let value = path.to_string_lossy();
+    if cfg!(windows) {
+        value.replace('\\', "/")
+    } else {
+        value.into_owned()
+    }
+}
+
+fn admit_redundant_report_target(
+    boundary: &RuntimeArtifactBoundary,
+    output: Option<&Path>,
+) -> Result<PathBuf, String> {
+    if let Some(output) = output {
+        let target = boundary.resolve(output)?;
+        if target.file_name().is_none() {
+            return Err("output must name a file".to_string());
+        }
+        let parent = target
+            .parent()
+            .ok_or_else(|| "output must name a file".to_string())?;
+        let relative_parent = parent
+            .strip_prefix(boundary.root())
+            .map_err(|_| format!("path escapes runtime root: {}", target.display()))?;
+        boundary.ensure_directory(if relative_parent.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            relative_parent
+        })?;
+        return Ok(target);
+    }
+
+    boundary.ensure_directory(Path::new("tasks/redundant-designs"))?;
+    let mut random = [0u8; 16];
+    getrandom::getrandom(&mut random)
+        .map_err(|error| format!("cannot create unique report directory: {error}"))?;
+    let run_name = format!(
+        "run-{}",
+        random
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let run_dir =
+        boundary.ensure_directory(&Path::new("tasks/redundant-designs").join(run_name))?;
+    Ok(run_dir.join("redundant_designs.txt"))
 }
 
 impl Args {
@@ -608,6 +1044,7 @@ fn usage_text() -> &'static str {
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
+  find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   links                   check Markdown links; --apply requires an exact source mutation capability\n\
   check-entrypoints       check the finite root entrypoint owner-map contract\n\
   check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\
