@@ -7,7 +7,6 @@
 // @dependency-end
 
 use serde_json::Value;
-#[cfg(unix)]
 use std::ffi::OsString;
 use std::fs;
 use std::io;
@@ -202,9 +201,14 @@ fn prepare_fixture(case: &Value, root: &Path) -> Result<(), io::Error> {
     Ok(())
 }
 
-fn run_native_guard(root: &Path, name: &str) -> Output {
+fn native_guard_command(root: &Path) -> Command {
     let mut command = fixture_command(root, env!("CARGO_BIN_EXE_agent-canon"));
     command.arg("generated-artifact-guard");
+    command
+}
+
+fn run_native_guard(root: &Path, name: &str) -> Output {
+    let mut command = native_guard_command(root);
     match name {
         "default-cwd-root" => {}
         "help" => {
@@ -362,4 +366,48 @@ fn invalid_git_path_sorting_matches_python_surrogateescape_order() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(output.stdout, expected);
     assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn native_cli_accepts_unambiguous_argparse_long_option_prefixes() {
+    let fixture = Fixture::new("argparse-option-prefixes");
+    initialize_repository(fixture.root());
+
+    let canonical_root = run_native_guard(fixture.root(), "explicit-root");
+    let mut short_root_command = native_guard_command(fixture.root());
+    let short_root_output = short_root_command
+        .arg("--r")
+        .arg(fixture.root())
+        .output()
+        .expect("native guard accepts the shortest root prefix");
+    assert_eq!(
+        short_root_output.status.code(),
+        canonical_root.status.code()
+    );
+    assert_eq!(short_root_output.stdout, canonical_root.stdout);
+    assert_eq!(short_root_output.stderr, canonical_root.stderr);
+
+    let mut inline_root = OsString::from("--roo=");
+    inline_root.push(fixture.root().as_os_str());
+    let mut inline_command = native_guard_command(fixture.root());
+    let inline_root_output = inline_command
+        .arg(inline_root)
+        .output()
+        .expect("native guard accepts an abbreviated root option with an inline value");
+    assert_eq!(
+        inline_root_output.status.code(),
+        canonical_root.status.code()
+    );
+    assert_eq!(inline_root_output.stdout, canonical_root.stdout);
+    assert_eq!(inline_root_output.stderr, canonical_root.stderr);
+
+    let full_help = run_native_guard(fixture.root(), "help");
+    let mut abbreviated_help = native_guard_command(fixture.root());
+    let abbreviated_help = abbreviated_help
+        .arg("--he")
+        .output()
+        .expect("native guard accepts an unambiguous help prefix");
+    assert_eq!(abbreviated_help.status.code(), full_help.status.code());
+    assert_eq!(abbreviated_help.stdout, full_help.stdout);
+    assert_eq!(abbreviated_help.stderr, full_help.stderr);
 }

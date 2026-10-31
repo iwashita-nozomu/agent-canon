@@ -40,6 +40,10 @@ const GENERATED_ARTIFACT_ROOTS: &[&[u8]] = &[
 ];
 const GENERATED_ARTIFACT_FILE_SUFFIXES: [&[u8]; 3] = [b".json", b".patch", b".txt"];
 
+fn is_unambiguous_long_option_prefix(argument: &str, option: &str) -> bool {
+    argument.len() > 2 && option.starts_with(argument)
+}
+
 #[derive(Clone, Copy)]
 enum GeneratedArtifactState {
     Tracked,
@@ -264,13 +268,23 @@ pub fn run_generated_artifact_guard(args: &[String]) -> i32 {
     let mut index = 0;
     while index < args.len() {
         let argument = args[index].as_str();
-        if argument == "-h" || argument == "--help" {
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        if argument == "-h"
+            || (inline_value.is_none() && is_unambiguous_long_option_prefix(option, "--help"))
+        {
             let _ = io::stdout()
                 .lock()
                 .write_all(&generated_artifact_guard_help());
             return 0;
         }
-        if argument == "--root" {
+        if is_unambiguous_long_option_prefix(option, "--root") {
+            if let Some(value) = inline_value {
+                root = Some(PathBuf::from(if value.is_empty() { "." } else { value }));
+                index += 1;
+                continue;
+            }
             let Some(value) = args.get(index + 1) else {
                 return write_generated_artifact_argument_error(
                     "argument --root: expected one argument",
@@ -287,11 +301,6 @@ pub fn run_generated_artifact_guard(args: &[String]) -> i32 {
                 value.as_str()
             }));
             index += 2;
-            continue;
-        }
-        if let Some(value) = argument.strip_prefix("--root=") {
-            root = Some(PathBuf::from(if value.is_empty() { "." } else { value }));
-            index += 1;
             continue;
         }
         unrecognized.push(argument);
