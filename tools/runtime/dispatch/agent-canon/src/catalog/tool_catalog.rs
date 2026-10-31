@@ -479,6 +479,10 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
         Ok(text) => text,
         Err(path) => return vec![Finding::new("default_wiring", path, "read-failed")],
     };
+    let command_text = match read_existing_text(root, &DEFAULT_COMMAND_SOURCES) {
+        Ok(text) => text,
+        Err(path) => return vec![Finding::new("default_wiring", path, "read-failed")],
+    };
     for path in referenced {
         if !catalog_paths.contains(&path) {
             findings.push(Finding::new(
@@ -498,7 +502,17 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or(&path);
-        if !default_text.contains(&path) && !default_text.contains(basename) {
+        let wired = if Path::new(&path)
+            .extension()
+            .and_then(|value| value.to_str())
+            == Some("rs")
+        {
+            native_cli_dispatch(entry)
+                .is_some_and(|argv| native_cli_invocation_is_referenced(&command_text, &argv))
+        } else {
+            default_text.contains(&path) || default_text.contains(basename)
+        };
+        if !wired {
             findings.push(Finding::new(
                 "default_wiring",
                 &path,
@@ -507,6 +521,272 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
         }
     }
     findings
+}
+
+fn native_cli_dispatch(entry: &Yaml) -> Option<Vec<String>> {
+    let dispatch = mapping_value(entry, "dispatch")?;
+    let argv = string_list(mapping_value(dispatch, "argv"));
+    (argv.len() >= 2 && argv[0].as_str() == "tools/bin/agent-canon").then_some(argv)
+}
+
+// Only a command-position wrapper/direct invocation proves native default wiring.
+fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
+    let Some(executable) = argv.first() else {
+        return false;
+    };
+    if executable.as_str() != "tools/bin/agent-canon" {
+        return false;
+    }
+    let executable_forms = dispatch_argument_token_forms(executable);
+    let wrapper_forms = dispatch_argument_token_forms("run_agent_canon");
+    if executable_forms.is_empty() || wrapper_forms.is_empty() {
+        return false;
+    }
+
+    text.lines().any(|line| {
+        let Ok(tokens) = rust_tokens(line) else {
+            return false;
+        };
+        let mut command_starts = Vec::new();
+        if tokens.first().is_some_and(|token| token.value == "if") {
+            command_starts.push(1);
+        }
+        command_starts.push(0);
+        command_starts.into_iter().any(|start| {
+            wrapper_forms
+                .iter()
+                .chain(executable_forms.iter())
+                .any(|form| {
+                    dispatch_argument_matches_at(line, &tokens, start, form).is_some_and(|length| {
+                        dispatch_arguments_are_referenced(
+                            line,
+                            &tokens,
+                            start + length,
+                            argv.get(1..).unwrap_or_default(),
+                        )
+                    })
+                })
+        })
+    })
+}
+
+fn token_sequence_matches_at(tokens: &[RustToken], start: usize, values: &[String]) -> bool {
+    let values = values.iter().map(String::as_str).collect::<Vec<_>>();
+    token_sequence_matches(tokens, &values).contains(&start)
+}
+
+struct DispatchArgumentTokenForm {
+    values: Vec<String>,
+    quoted_source: Option<String>,
+}
+
+fn dispatch_argument_token_forms(argument: &str) -> Vec<DispatchArgumentTokenForm> {
+    let mut sources = vec![(argument.to_owned(), None)];
+    let escaped_backtick = format!("{}{}", char::from(92), char::from(96));
+    let escaped_double_quoted = argument
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('$', "\\$")
+        .replace(char::from(96), &escaped_backtick);
+    let double_quoted = format!("\"{escaped_double_quoted}\"");
+    sources.push((double_quoted.clone(), Some(double_quoted)));
+    if !argument.contains('\'') {
+        let single_quoted = format!("'{argument}'");
+        sources.push((single_quoted.clone(), Some(single_quoted)));
+    }
+    let mut forms = Vec::new();
+    for (source, quoted_source) in sources {
+        let Ok(tokens) = rust_tokens(&source) else {
+            continue;
+        };
+        let values = tokens
+            .into_iter()
+            .map(|token| token.value)
+            .collect::<Vec<_>>();
+        if values.is_empty() {
+            continue;
+        }
+        if !forms.iter().any(|form: &DispatchArgumentTokenForm| {
+            form.values.as_slice() == values.as_slice()
+                && form.quoted_source.as_deref() == quoted_source.as_deref()
+        }) {
+            forms.push(DispatchArgumentTokenForm {
+                values,
+                quoted_source,
+            });
+        }
+    }
+    forms
+}
+
+fn is_dispatch_placeholder(argument: &str) -> bool {
+    argument.contains('<') || argument.contains('>')
+}
+
+fn is_shell_control_operator(token: &RustToken) -> bool {
+    matches!(
+        token.value.as_str(),
+        ";" | "&" | "&&" | "|" | "||" | "(" | ")" | "<" | ">"
+    )
+}
+
+fn shell_token_is_unquoted(line: &str, token: &RustToken) -> bool {
+    let end = token.start_column.saturating_sub(1);
+    let mut single_quoted = false;
+    let mut double_quoted = false;
+    let mut escaped = false;
+    for character in line.chars().take(end) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if character == '\\' && !single_quoted {
+            escaped = true;
+            continue;
+        }
+        match character {
+            '\'' if !double_quoted => single_quoted = !single_quoted,
+            '"' if !single_quoted => double_quoted = !double_quoted,
+            _ => {}
+        }
+    }
+    !single_quoted && !double_quoted && !escaped
+}
+
+fn shell_control_operator_is_active(line: &str, token: &RustToken) -> bool {
+    is_shell_control_operator(token) && shell_token_is_unquoted(line, token)
+}
+
+fn shell_comment_starts_at(line: &str, token: &RustToken) -> bool {
+    if token.value != "#" || !shell_token_is_unquoted(line, token) {
+        return false;
+    }
+    let start = token.start_column.saturating_sub(1);
+    start == 0
+        || line
+            .chars()
+            .nth(start - 1)
+            .is_some_and(|character| character.is_ascii_whitespace() || shell_separator(character))
+}
+
+fn shell_separator(character: char) -> bool {
+    character.is_ascii_whitespace() || matches!(character, ';' | '&' | '|' | '(' | ')' | '<' | '>')
+}
+
+fn shell_word_boundary_before(line: &str, token: &RustToken) -> bool {
+    let start = token.start_column.saturating_sub(1);
+    start == 0 || line.chars().nth(start - 1).is_some_and(shell_separator)
+}
+
+fn shell_word_boundary_after(line: &str, token: &RustToken) -> bool {
+    let end = token.end_column.saturating_sub(1);
+    line.chars().nth(end).is_none_or(shell_separator)
+}
+
+fn token_span_text(line: &str, first: &RustToken, last: &RustToken) -> String {
+    let start = first.start_column.saturating_sub(1);
+    let end = last.end_column.saturating_sub(1);
+    line.chars()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .collect()
+}
+
+fn shell_token_parts_are_adjacent(line: &str, left: &RustToken, right: &RustToken) -> bool {
+    let gap_start = left.end_column.saturating_sub(1);
+    let gap_end = right.start_column.saturating_sub(1);
+    gap_start <= gap_end
+        && !line
+            .chars()
+            .skip(gap_start)
+            .take(gap_end - gap_start)
+            .any(shell_separator)
+}
+
+fn dispatch_argument_matches_at(
+    line: &str,
+    tokens: &[RustToken],
+    start: usize,
+    form: &DispatchArgumentTokenForm,
+) -> Option<usize> {
+    if !token_sequence_matches_at(tokens, start, &form.values) {
+        return None;
+    }
+    let end = start + form.values.len() - 1;
+    if !shell_word_boundary_before(line, &tokens[start])
+        || !shell_word_boundary_after(line, &tokens[end])
+    {
+        return None;
+    }
+    if let Some(quoted_source) = &form.quoted_source {
+        let source = token_span_text(line, &tokens[start], &tokens[end]);
+        if source.as_str() != quoted_source.as_str() {
+            return None;
+        }
+    } else if tokens[start..end]
+        .windows(2)
+        .any(|pair| !shell_token_parts_are_adjacent(line, &pair[0], &pair[1]))
+    {
+        return None;
+    }
+    Some(form.values.len())
+}
+
+fn dispatch_arguments_are_referenced(
+    line: &str,
+    tokens: &[RustToken],
+    position: usize,
+    arguments: &[String],
+) -> bool {
+    dispatch_arguments_match_from(line, tokens, position, arguments, 0)
+}
+
+fn dispatch_arguments_match_from(
+    line: &str,
+    tokens: &[RustToken],
+    position: usize,
+    arguments: &[String],
+    argument_index: usize,
+) -> bool {
+    let Some(argument) = arguments.get(argument_index) else {
+        return true;
+    };
+    if is_dispatch_placeholder(argument) {
+        if argument_index + 1 == arguments.len() {
+            return true;
+        }
+        for next_position in position..=tokens.len() {
+            if next_position > position {
+                let previous = &tokens[next_position - 1];
+                if shell_control_operator_is_active(line, previous)
+                    || shell_comment_starts_at(line, previous)
+                {
+                    break;
+                }
+            }
+            if dispatch_arguments_match_from(
+                line,
+                tokens,
+                next_position,
+                arguments,
+                argument_index + 1,
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+    dispatch_argument_token_forms(argument).iter().any(|form| {
+        dispatch_argument_matches_at(line, tokens, position, form).is_some_and(|length| {
+            dispatch_arguments_match_from(
+                line,
+                tokens,
+                position + length,
+                arguments,
+                argument_index + 1,
+            )
+        })
+    })
 }
 
 fn check_catalog_docs(root: &Path) -> Vec<Finding> {

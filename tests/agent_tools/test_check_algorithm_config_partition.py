@@ -1,31 +1,44 @@
 # @dependency-start
 # contract test
 # responsibility Tests algorithm config partition checker behavior.
-# upstream implementation ../../tools/validation/semantic/algorithm/check_algorithm_config_partition.py checker
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_algorithm_config_partition.rs native checker
 # upstream design ../../documents/design/jax_util/algorithm_module_contract.md config contract
+# upstream design ../../documents/tools/check_algorithm_config_partition.md command contract
 # @dependency-end
 """Tests for the algorithm config partition checker."""
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "validation" / "semantic" / "algorithm" / "check_algorithm_config_partition.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
     """Verify InitializeConfig/SolveConfig ownership checks."""
 
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the checker against a temporary root."""
+        """Run the native checker against a temporary root."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
-            [sys.executable, str(TOOL), "--root", str(root), "--format", "json", *args],
+            [
+                AGENT_CANON_CLI,
+                "check-algorithm-config-partition",
+                "--root",
+                str(root),
+                "--format",
+                "json",
+                *args,
+            ],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -92,7 +105,9 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["findings"], 1)
-            self.assertEqual(payload["findings"][0]["expected_owner"], "InitializeConfig")
+            self.assertEqual(
+                payload["findings"][0]["expected_owner"], "InitializeConfig"
+            )
 
     def test_child_initialize_config_in_solve_config_is_flagged(self) -> None:
         """Child InitializeConfig cannot be changed by a solve-time config."""
@@ -289,7 +304,9 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["runtime_default_errors"], 1)
-            self.assertEqual(payload["default_findings"][0]["kind"], "keyword-parameter-default")
+            self.assertEqual(
+                payload["default_findings"][0]["kind"], "keyword-parameter-default"
+            )
 
     def test_config_default_is_warning_not_runtime_error(self) -> None:
         """Config-owned defaults are visible migration targets, not hidden runtime defaults."""
@@ -337,7 +354,9 @@ class CheckAlgorithmConfigPartitionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["summary"]["runtime_default_errors"], 1)
-            self.assertEqual(payload["default_findings"][0]["kind"], "mapping-get-default")
+            self.assertEqual(
+                payload["default_findings"][0]["kind"], "mapping-get-default"
+            )
 
     def test_non_amp_config_named_constructor_is_not_flagged_by_suffix(self) -> None:
         """Only amp-derived config constructors should be detected as config defaults."""
