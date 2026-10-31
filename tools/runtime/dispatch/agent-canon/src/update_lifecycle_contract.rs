@@ -8,6 +8,7 @@
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
 // downstream test ../tests/update_lifecycle_records_native.rs freezes snapshot, evidence, and checkpoint record validation
+// downstream test ../tests/update_lifecycle_transaction_native.rs freezes update transaction validation
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -58,6 +59,25 @@ const CHECKPOINT_IDS: &[&str] = &[
     "G6",
     "nested_lifecycle_cleanup",
 ];
+const STATE_CHECKPOINT_PREFIX: &[(&str, usize)] = &[
+    ("created", 0),
+    ("prepared", 1),
+    ("generated", 2),
+    ("gates_ready", 4),
+    ("reviewed", 4),
+    ("pr_open", 5),
+    ("pr_merged", 5),
+    ("source_main_readback", 6),
+    ("queue_enqueued", 7),
+    ("frontier_accepted", 9),
+    ("remote_readback", 11),
+    ("durable_handback", 12),
+    ("descendants_closed", 13),
+    ("reservations_released", 14),
+    ("cleanup_proven", 15),
+    ("nested_lifecycle_cleanup", 17),
+    ("closed", CHECKPOINT_IDS.len()),
+];
 const BINDING_FIELDS: &[&str] = &[
     "transaction_id",
     "snapshot_id",
@@ -96,6 +116,7 @@ const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
 const SNAPSHOT_SCHEMA: &str = "agent-canon.snapshot.v1";
 const EVIDENCE_IDENTITY_SCHEMA: &str = "agent-canon.evidence-identity.v1";
 const CHECKPOINT_RECEIPT_SCHEMA: &str = "agent-canon.checkpoint-receipt.v1";
+const UPDATE_TRANSACTION_SCHEMA: &str = "agent-canon.update-transaction.v1";
 pub const SOURCE_MAIN_REBIND_SCHEMA: &str = "agent-canon.source-main-rebind-receipt.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -691,6 +712,239 @@ pub fn validate_checkpoint_receipt(value: &JsonValue) -> Result<JsonValue, Lifec
             "lifecycle:failure_code_forbidden",
             "checkpoint_receipt",
         ));
+    }
+    canonical_clone(value)
+}
+
+pub fn validate_update_transaction(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let transaction = mapping(value, "update_transaction")?;
+    exact_keys(
+        transaction,
+        &[
+            "schema",
+            "binding",
+            "state",
+            "checkpoints",
+            "first_missing_checkpoint",
+            "gate_verdict_evidence_refs",
+            "queue_receipt_id",
+            "frontier_id",
+            "successor_transaction_id",
+            "source_main_rebind_receipt_id",
+        ],
+        &[],
+        "update_transaction",
+    )?;
+    if transaction.get("schema").and_then(JsonValue::as_str) != Some(UPDATE_TRANSACTION_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", UPDATE_TRANSACTION_SCHEMA));
+    }
+    let binding = validate_record_binding(required_value(
+        transaction,
+        "binding",
+        "update_transaction",
+    )?)?;
+    let state = one_of(
+        required_value(transaction, "state", "update_transaction")?,
+        TRANSACTION_STATES,
+        "update_transaction.state",
+    )?;
+    let checkpoint_values = required_value(transaction, "checkpoints", "update_transaction")?
+        .as_array()
+        .ok_or_else(|| {
+            fail(
+                "lifecycle:sequence_required",
+                "update_transaction.checkpoints",
+            )
+        })?;
+    let mut checkpoints = Vec::with_capacity(checkpoint_values.len());
+    for checkpoint in checkpoint_values {
+        checkpoints.push(validate_checkpoint_receipt(checkpoint)?);
+    }
+
+    let expected_binding_identity = binding_identity(&binding)?;
+    let mut seen = BTreeMap::new();
+    for receipt in checkpoints {
+        let receipt_map = mapping(&receipt, "checkpoint_receipt")?;
+        let receipt_binding = required_value(receipt_map, "binding", "checkpoint_receipt")?;
+        if binding_identity(receipt_binding)? != expected_binding_identity {
+            return Err(fail(
+                "input_identity_mismatch",
+                "update_transaction.checkpoints",
+            ));
+        }
+        let checkpoint_id = required_string(receipt_map, "checkpoint_id", "checkpoint_receipt")?;
+        if seen.contains_key(&checkpoint_id) {
+            return Err(fail("lifecycle:checkpoint_duplicate", &checkpoint_id));
+        }
+        seen.insert(checkpoint_id, receipt);
+    }
+
+    let passed = seen
+        .iter()
+        .filter_map(|(checkpoint_id, receipt)| {
+            matches!(
+                receipt.get("verdict").and_then(JsonValue::as_str),
+                Some("pass" | "skip")
+            )
+            .then_some(checkpoint_id.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    let passed_prefix = CHECKPOINT_IDS
+        .iter()
+        .take_while(|checkpoint_id| passed.contains(**checkpoint_id))
+        .count();
+    if CHECKPOINT_IDS
+        .iter()
+        .skip(passed_prefix + 1)
+        .any(|checkpoint_id| passed.contains(*checkpoint_id))
+    {
+        return Err(fail("lifecycle:checkpoint_out_of_order", ""));
+    }
+
+    let computed_missing = CHECKPOINT_IDS.iter().copied().find(|checkpoint_id| {
+        seen.get(*checkpoint_id).is_none_or(|receipt| {
+            !matches!(
+                receipt.get("verdict").and_then(JsonValue::as_str),
+                Some("pass" | "skip")
+            )
+        })
+    });
+    let computed_missing = computed_missing
+        .map(|checkpoint_id| JsonValue::String(checkpoint_id.to_owned()))
+        .unwrap_or(JsonValue::Null);
+    if required_value(
+        transaction,
+        "first_missing_checkpoint",
+        "update_transaction",
+    )? != &computed_missing
+    {
+        return Err(fail("lifecycle:first_missing_checkpoint_mismatch", ""));
+    }
+
+    let gate_refs = string_list(
+        required_value(
+            transaction,
+            "gate_verdict_evidence_refs",
+            "update_transaction",
+        )?,
+        "update_transaction.gate_verdict_evidence_refs",
+        false,
+        true,
+        Some(valid_evidence_ref),
+    )?;
+    let mut passed_gate_refs = Vec::new();
+    for gate_id in GATE_IDS {
+        if let Some(receipt) = seen.get(*gate_id) {
+            let receipt_map = mapping(receipt, "checkpoint_receipt")?;
+            if matches!(
+                required_value(receipt_map, "verdict", "checkpoint_receipt")?.as_str(),
+                Some("pass" | "skip")
+            ) {
+                let receipt_binding = mapping(
+                    required_value(receipt_map, "binding", "checkpoint_receipt")?,
+                    "binding",
+                )?;
+                passed_gate_refs.push(required_string(receipt_binding, "evidence_ref", "binding")?);
+            }
+        }
+    }
+    if gate_refs != passed_gate_refs {
+        return Err(fail("lifecycle:gate_evidence_mismatch", ""));
+    }
+
+    for (field, prefix) in [
+        ("queue_receipt_id", "queue:"),
+        ("frontier_id", "frontier:"),
+        ("successor_transaction_id", "tx:"),
+        ("source_main_rebind_receipt_id", "rebind:"),
+    ] {
+        let value = required_value(transaction, field, "update_transaction")?;
+        if !value.is_null() {
+            let error_field = format!("update_transaction.{field}");
+            let identity = pattern_value(value, &error_field, valid_hash_id)?;
+            if !identity.starts_with(prefix) {
+                return Err(fail("lifecycle:identity_invalid", &error_field));
+            }
+        }
+    }
+
+    let successor_transaction_id = required_value(
+        transaction,
+        "successor_transaction_id",
+        "update_transaction",
+    )?;
+    if state == "successor_required" && successor_transaction_id.is_null() {
+        return Err(fail("lifecycle:successor_missing", ""));
+    }
+    if state != "successor_required" && !successor_transaction_id.is_null() {
+        return Err(fail("lifecycle:successor_forbidden", ""));
+    }
+
+    if let Some((_, required_prefix)) = STATE_CHECKPOINT_PREFIX
+        .iter()
+        .find(|(prefix_state, _)| *prefix_state == state.as_str())
+    {
+        if passed_prefix != *required_prefix {
+            return Err(fail("lifecycle:state_checkpoint_mismatch", &state));
+        }
+    }
+
+    let source_main_rebind_receipt_id = required_value(
+        transaction,
+        "source_main_rebind_receipt_id",
+        "update_transaction",
+    )?;
+    if matches!(
+        state.as_str(),
+        "reviewed"
+            | "pr_open"
+            | "pr_merged"
+            | "source_main_readback"
+            | "queue_enqueued"
+            | "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && source_main_rebind_receipt_id.is_null()
+    {
+        return Err(fail("lifecycle:rebind_receipt_required", &state));
+    }
+
+    let queue_receipt_id = required_value(transaction, "queue_receipt_id", "update_transaction")?;
+    if matches!(
+        state.as_str(),
+        "queue_enqueued"
+            | "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && queue_receipt_id.is_null()
+    {
+        return Err(fail("lifecycle:queue_receipt_required", &state));
+    }
+
+    let frontier_id = required_value(transaction, "frontier_id", "update_transaction")?;
+    if matches!(
+        state.as_str(),
+        "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && frontier_id.is_null()
+    {
+        return Err(fail("lifecycle:frontier_required", &state));
     }
     canonical_clone(value)
 }
