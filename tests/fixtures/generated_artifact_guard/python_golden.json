@@ -1,0 +1,270 @@
+{
+  "schema": "agent-canon.generated-artifact-guard-python-oracle.v1",
+  "source": {
+    "module": "generated_artifact_guard_old_cli_oracle",
+    "file": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+    "source_sha256": "778fc112da4bd4d80fc2b8be5f4adf30d6bc180452307831683a889ffb1a3c5f"
+  },
+  "environment_policy": {
+    "network": "not used; child argv only invokes the local Python source and local git",
+    "credentials": "not copied to child environment",
+    "global_git_config": "disabled; GIT_CONFIG_NOSYSTEM=1 and GIT_CONFIG_GLOBAL=os.devnull",
+    "git_commits": "none; tracked fixtures are staged with git add, so no identity is needed"
+  },
+  "fixture_availability": {
+    "literal-posix-backslash": {
+      "attempted": true,
+      "filesystem_supported": true,
+      "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c69746572616c5c6261636b736c6173682e747376"
+    },
+    "newline-filename": {
+      "attempted": true,
+      "filesystem_supported": true,
+      "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c696e650a627265616b2e747376"
+    },
+    "raw-byte-filename": {
+      "attempted": true,
+      "filesystem_supported": true,
+      "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f7261772dff2e747376"
+    }
+  },
+  "cases": [
+    {
+      "name": "tracked-generated-report",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f6167656e742d72756e74696d652d64617368626f6172642f696e6465782e68746d6c",
+          "declared_state": "tracked"
+        }
+      ],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/tracked-generated-report"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/tracked-generated-report",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f747261636b65645f6c6566745f696e5f747265653a7265706f7274732f6167656e742d72756e74696d652d64617368626f6172642f696e6465782e68746d6c0a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "untracked-generated-report",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f646570656e64656e63795f67726170682e747376",
+          "declared_state": "untracked"
+        }
+      ],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/untracked-generated-report"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/untracked-generated-report",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f646570656e64656e63792d7265766965772f72756e2f646570656e64656e63795f67726170682e7473760a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "ignored-generated-report",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f6167656e742d6576616c2d72756e732f69676e6f7265642d72756e2f30312d726f6c652e7374646f75742e747874",
+          "declared_state": "ignored"
+        }
+      ],
+      "ignore_patterns_hex": [
+        "7265706f7274732f6167656e742d6576616c2d72756e732f69676e6f7265642d72756e2f0a"
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/ignored-generated-report"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/ignored-generated-report",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f69676e6f7265645f6c6566745f696e5f747265653a7265706f7274732f6167656e742d6576616c2d72756e732f69676e6f7265642d72756e2f30312d726f6c652e7374646f75742e7478740a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "mixed-tracked-untracked-ignored",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f686f6f6b732f63617074757265642e6a736f6e",
+          "declared_state": "tracked"
+        },
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f646570656e64656e63795f67726170682e747376",
+          "declared_state": "untracked"
+        },
+        {
+          "path_bytes_hex": "7265706f7274732f2e63616368652f69676e6f7265642d72756e2f7265706f72742e6a736f6e",
+          "declared_state": "ignored"
+        }
+      ],
+      "ignore_patterns_hex": [
+        "7265706f7274732f2e63616368652f69676e6f7265642d72756e2f0a"
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/mixed-tracked-untracked-ignored"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/mixed-tracked-untracked-ignored",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f69676e6f7265645f6c6566745f696e5f747265653a7265706f7274732f2e63616368652f69676e6f7265642d72756e2f7265706f72742e6a736f6e7c67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f646570656e64656e63792d7265766965772f72756e2f646570656e64656e63795f67726170682e7473767c67656e6572617465645f7265706f72745f61727469666163745f747261636b65645f6c6566745f696e5f747265653a7265706f7274732f686f6f6b732f63617074757265642e6a736f6e0a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "allowed-current-run-bundle",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f6167656e74732f72756e2d312f776f726b5f6c6f672e6d64",
+          "declared_state": "ignored"
+        }
+      ],
+      "ignore_patterns_hex": [
+        "7265706f7274732f6167656e74732f0a"
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/allowed-current-run-bundle"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/allowed-current-run-bundle",
+      "exit_code": 0,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d706173730a47454e4552415445445f41525449464143545f424c4f434b4552533d6e6f6e650a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "plain-non-git-root",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f6e6f2d7265706f7369746f72792e747376",
+          "declared_state": "untracked"
+        }
+      ],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/plain-non-git-root"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/plain-non-git-root",
+      "exit_code": 0,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d706173730a47454e4552415445445f41525449464143545f424c4f434b4552533d6e6f6e650a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "default-cwd-root",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f686f6f6b732f64656661756c742d6377642e6a736f6e",
+          "declared_state": "untracked"
+        }
+      ],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/default-cwd-root",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f686f6f6b732f64656661756c742d6377642e6a736f6e0a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "help",
+      "fixture_files": [],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--help"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/help",
+      "exit_code": 0,
+      "stdout_hex": "75736167653a2067656e6572617465645f61727469666163745f67756172642e7079205b2d685d205b2d2d726f6f7420524f4f545d0a0a4661696c207768656e206d656368616e6963616c6c7920726567656e657261746564207265706f7274206172746966616374732072656d61696e20696e2074686520747265652e0a0a6f7074696f6e733a0a20202d682c202d2d68656c7020202073686f7720746869732068656c70206d65737361676520616e6420657869740a20202d2d726f6f7420524f4f5420205265706f7369746f727920726f6f7420746f20696e73706563742e2044656661756c747320746f207468652063757272656e74206469726563746f72792e0a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "invalid-argument",
+      "fixture_files": [],
+      "ignore_patterns_hex": [],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--not-a-real-option"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/invalid-argument",
+      "exit_code": 2,
+      "stdout_hex": "",
+      "stderr_hex": "75736167653a2067656e6572617465645f61727469666163745f67756172642e7079205b2d685d205b2d2d726f6f7420524f4f545d0a67656e6572617465645f61727469666163745f67756172642e70793a206572726f723a20756e7265636f676e697a656420617267756d656e74733a202d2d6e6f742d612d7265616c2d6f7074696f6e0a"
+    },
+    {
+      "name": "literal-posix-backslash",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c69746572616c5c6261636b736c6173682e747376",
+          "declared_state": "untracked"
+        }
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/literal-posix-backslash-mvzhptzy"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/literal-posix-backslash-mvzhptzy",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c69746572616c5c6261636b736c6173682e7473760a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "newline-filename",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c696e650a627265616b2e747376",
+          "declared_state": "untracked"
+        }
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/newline-filename-5n1y8jdk"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/newline-filename-5n1y8jdk",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f646570656e64656e63792d7265766965772f72756e2f6c696e650a627265616b2e7473760a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    },
+    {
+      "name": "raw-byte-filename",
+      "fixture_files": [
+        {
+          "path_bytes_hex": "7265706f7274732f646570656e64656e63792d7265766965772f72756e2f7261772dff2e747376",
+          "declared_state": "untracked"
+        }
+      ],
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/source/tools/runtime/artifacts/generated_artifact_guard.py",
+        "--root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/raw-byte-filename-mosnubei"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/generated-guard-packet-oracle-wkyj170o/oracle-work/generated-artifact-oracle-x8ae4jqb/raw-byte-filename-mosnubei",
+      "exit_code": 1,
+      "stdout_hex": "47454e4552415445445f41525449464143545f47554152443d6661696c0a47454e4552415445445f41525449464143545f424c4f434b4552533d67656e6572617465645f7265706f72745f61727469666163745f756e747261636b65645f6c6566745f696e5f747265653a7265706f7274732f646570656e64656e63792d7265766965772f72756e2f7261772dff2e7473760a47454e4552415445445f41525449464143545f4e4558543d64656c6574655f726567656e6572617461626c655f7265706f72745f6f7574707574735f6f725f77726974655f64757261626c655f65766964656e63655f746f5f646f63756d656e74735f6167656e74735f6e6f7465735f776974685f646570656e64656e63795f6d616e69666573740a",
+      "stderr_hex": ""
+    }
+  ]
+}
