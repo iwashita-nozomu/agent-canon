@@ -471,7 +471,7 @@ def build_verification_commands(
         else:
             env_dir = "${AGENT_CANON_RUNTIME_ROOT}/tasks/formal-proof/lean-proof-env"
         return (
-            "python3 tools/analysis/proof/lean_proof_env.py check-file "
+            "tools/bin/agent-canon lean-proof-env check-file "
             f"--env-dir {env_dir} "
             f"--lean-file {shlex.quote(stub_path)} --execute",
         )

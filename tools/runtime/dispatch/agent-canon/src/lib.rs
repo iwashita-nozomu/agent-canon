@@ -1,6 +1,6 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, private feedback, artifact, catalog, and proof APIs.
+//! Shared AgentCanon runtime, private feedback, artifact, catalog, proof-environment, and proof-coverage APIs.
 
 // @dependency-start
 // contract implementation
@@ -11,16 +11,19 @@
 // upstream implementation artifacts/artifact_identity.rs owns artifact byte identity
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
+// downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // @dependency-end
 
 pub mod artifacts;
 pub mod catalog;
 pub mod environment_dependencies;
+pub mod lean_proof_env;
 pub mod private_feedback;
 pub mod runtime_boundary;
 pub mod tool_proof_coverage;
