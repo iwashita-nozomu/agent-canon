@@ -204,7 +204,7 @@ When behavior feedback/evaluation is selected, update the existing
 `workflow_monitoring.md` signals, interventions, decisions, and protocol feedback
 with their real outcomes. `--closeout-token-preset` only records established facts;
 it does not replace formatter/check, dependency, review, or finding evidence.
-An activated evaluation uses `evaluate_agent_run.py` and its behavior manifest;
+An activated evaluation uses `tools/bin/agent-canon run-evaluation` and its behavior manifest;
 only its actual result and resolved feedback establish evaluation completion.
 Reuse [agent-learning](../skills/agent-learning.md#reader-map) for private knowledge
 or behavior-learning decisions. Public failed verification stays in the saved topic
