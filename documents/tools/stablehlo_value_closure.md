@@ -1,17 +1,17 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents tools/analysis/proof/stablehlo_value_closure.py.
-upstream implementation ../../tools/analysis/proof/stablehlo_value_closure.py traces scoped StableHLO SSA dependencies.
+responsibility Documents the native StableHLO value-closure command.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/stablehlo_value_closure.rs traces scoped StableHLO SSA dependencies.
 upstream design jit_canonical_ir.md defines the JIT-canonical operational IR input.
 downstream design ../../agents/skills/formal-proof-workflow.md consumes scoped closure reports for proposition-tree proof search.
 @dependency-end
 -->
 
-# stablehlo_value_closure.py
+# StableHLO value closure
 
-`tools/analysis/proof/stablehlo_value_closure.py` traces the dependency closure of
-one StableHLO SSA value from a JIT-canonical operational IR file.
+`tools/bin/agent-canon stablehlo-value-closure` traces the dependency closure
+of one StableHLO SSA value from a JIT-canonical operational IR file.
 
 The tool keeps SSA names scoped by function and region. This is required for
 proof work because names such as `%cst` are reused in private functions and must
@@ -23,7 +23,7 @@ argument aliases.
 ## Command
 
 ```bash
-python3 tools/analysis/proof/stablehlo_value_closure.py \
+tools/bin/agent-canon stablehlo-value-closure \
   --ir lean/<topic>/<root>_jit_canonical_ir.json \
   --function main \
   --value '%276' \
