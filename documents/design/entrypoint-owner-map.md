@@ -8,7 +8,7 @@ downstream design ../../ROOT_AGENTS.md portable common base
 downstream design ../../agents/canonical/SOURCE_ROUTING.md source owner selection
 downstream design ../../.github/AGENTS.md GitHub subtree overlay
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs consumer root composition
-downstream implementation ../../tools/validation/semantic/entrypoint/check_entrypoint_owner_map.py structural verification
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/entrypoint_owner_map.rs structural verification
 downstream implementation ../../tools/validation/semantic/convention/convention_compliance_contracts.toml canonical marker ownership
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py entrypoint regression
 downstream implementation ../../tests/agent_tools/test_point_of_use_skill_routes.py conditional candidate regression
@@ -116,7 +116,7 @@ Runtime Contract Clauses. Its existing named anchors remain routing surfaces.
 
 ## Verification contract
 
-`check_entrypoint_owner_map.py` retains its title, per-surface ordered heading,
+`agent-canon docs check-entrypoints` retains its title, per-surface ordered heading,
 procedure-syntax, required-row, optional-map, and operational-marker ownership
 checks. It also verifies:
 
