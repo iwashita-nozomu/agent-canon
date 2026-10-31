@@ -105,7 +105,7 @@ license の `LICENSE` と、Rust crate については `tools/runtime/dispatch/a
 | `check-dependency-header-format` | `bash tools/validation/semantic/dependencies/check_dependency_header_format.sh` | selected path の manifest context projection を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-headers` | `tools/bin/agent-canon check-dependency-headers` | explicitly selected files の dependency manifest declaration と typed edge/path grammar を検証します。 | no | local: Apache-2.0 |
 | `check-dependency-graph` | `bash tools/analysis/dependencies/check_dependency_graph.sh` | dependency manifest graph、self reference、cycle、edit-scope expansion を検証します。 | no | local: Apache-2.0 |
-| `scip-index` | `python3 tools/analysis/dependencies/scip_index.py` | Runs a selected native SCIP indexer and projects bounded definitions, references, and implementations. | yes | local: Apache-2.0 |
+| `scip-index` | `tools/bin/agent-canon scip-index` | Runs a selected native SCIP indexer and projects bounded definitions, references, and implementations. | yes | local: Apache-2.0 |
 | `render-dependency-manifest-graph` | `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py` | canonical dependency query から TSV / Graph IR / Markdown / DOT / HTML projection を生成します。 | yes | local: Apache-2.0 |
 
 ## AgentCanon Runtime And Environment Tools
