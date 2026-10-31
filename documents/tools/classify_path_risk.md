@@ -2,31 +2,32 @@
 @dependency-start
 contract reference
 responsibility Documents path-risk classifier usage.
-upstream implementation ../../tools/validation/semantic/path/classify_path_risk.py classifies changed paths into runtime profiles.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs classifies changed paths into runtime profiles.
 upstream design ../runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
 downstream implementation ../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
 @dependency-end
 -->
 
-# classify_path_risk.py
+# classify_path_risk.rs
 
 Use this tool to turn a changed-path list into an active runtime profile and
 targeted validation route.
 
 ```bash
 git diff --name-only origin/main...HEAD > "${AGENT_CANON_RUNTIME_ROOT:?}/changed-paths.txt"
-python3 tools/validation/semantic/path/classify_path_risk.py \
+tools/bin/agent-canon classify-path-risk \
   --paths-file "${AGENT_CANON_RUNTIME_ROOT:?}/changed-paths.txt" \
   --format text
 ```
 
-The classifier is a direct CLI/test-owned surface. It does not require a
+The classifier is a direct native CLI/test-owned surface. It does not require a
 separate manual workflow wrapper.
 
 ## Standalone CI ownership
 
-[Static Gates](../../.github/workflows/agent-canon-static-gates.yml) runs on pull
-requests, main pushes, and manual dispatch. This classifier alone selects execution units;
+[Static Gates](../../.github/workflows/agent-canon-static-gates.yml) builds this
+source's native selector before the shared runtime starts, then runs on pull
+requests, main pushes, and manual dispatch. This selector alone selects execution units;
 [the unit runner](../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh)
 owns PR/manual commands. A selector failure fails the final `static-gates` job.
 
