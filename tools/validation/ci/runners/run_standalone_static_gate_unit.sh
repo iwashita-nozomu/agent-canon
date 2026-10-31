@@ -174,6 +174,7 @@ run_contracts() {
     tests.agent_tools.test_check_semantic_responsibility_contract \
     tests.agent_tools.test_check_run_log_contract \
     tests.agent_tools.test_structured_document_inventory_cli \
+    tests.agent_tools.test_classify_path_risk \
     tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_source_root_failure_lifecycle \
     tests.agent_tools.test_check_convention_compliance \
@@ -278,6 +279,7 @@ PY
 )
 
 run_workflow_container() {
+  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_standalone_static_gate_units.py \
     tests/tools/test_read_only_full_check.py \

@@ -451,12 +451,25 @@ entries:
   - id: classify-path-risk
     public: true
     summary: Classifies changed paths into runtime profiles and targeted validation checks.
-    path: tools/validation/semantic/path/classify_path_risk.py
+    path: tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/path/classify_path_risk.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/path/classify_path_risk.py"]}
+    command: tools/bin/agent-canon classify-path-risk
+    dispatch:
+      runtime: rust
+      argv: [tools/bin/agent-canon, classify-path-risk]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: inherited
+      stderr: inherited
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
+      output_root: none
+      written_paths: []
     writes: false
     default_wiring:
       ci: false
