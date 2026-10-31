@@ -285,3 +285,11 @@ tool = "tools/analysis/documents/extraction/extract_docx.py"
 doc = "documents/tools/extract_docx.md"
 language = "python"
 summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."
+
+[[tool]]
+id = "evaluate-agent-run"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/run_evaluation.rs"
+doc = "documents/tools/run_evaluation.md"
+language = "rust"
+summary = "Native agent run evaluation using selected run-bundle artifacts and fixed rubric scores."

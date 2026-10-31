@@ -2195,13 +2195,14 @@ entries:
       - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: evaluate-agent-run
-    summary: Evaluates an agent run bundle for workflow and evidence completeness.
-    path: eval/producers/evaluate_agent_run.py
-    family: agent_tools
+    public: true
+    summary: Evaluates a run bundle using its selected role outputs and records native agent feedback.
+    path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
+    family: root
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_agent_run.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_agent_run.py"]}
+    command: tools/bin/agent-canon run-evaluation --report-dir <report-dir>
+    dispatch: {argv: ["tools/bin/agent-canon", "run-evaluation", "--report-dir", "<report-dir>"]}
     writes: true
     default_wiring:
       ci: false
@@ -2209,8 +2210,10 @@ entries:
     docs:
       - tools/README.md
       - documents/tools/README.md
+      - documents/tools/run_evaluation.md
     tests:
       - tests/agent_tools/test_evaluate_agent_run.py
+      - tools/runtime/dispatch/agent-canon/tests/run_evaluation_native.rs
 
   - id: generate-agent-improvement-guide
     summary: Generates PR and push-time guidance from memory, eval, hook, and issue evidence.
