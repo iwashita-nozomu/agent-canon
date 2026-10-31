@@ -8,6 +8,7 @@
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
 // downstream test ../tests/update_lifecycle_pr_native.rs freezes the native PR lifecycle APIs against CPython outputs
+// downstream test ../tests/update_lifecycle_publication_native.rs freezes publication readback receipts and transitions
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -93,6 +94,7 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
 const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
+const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
 const PR_STATES: &[&str] = &[
@@ -684,6 +686,19 @@ const CANDIDATE_CAS_SPEC: CandidateStageSpec = CandidateStageSpec {
     stage_field: "cas_stage",
     stage_value: "cas",
     extra_fields: &["cas_base_identity", "cas_evidence_ref"],
+};
+const PUBLICATION_READBACK_SPEC: CandidateStageSpec = CandidateStageSpec {
+    field: "publication_readback_receipt",
+    schema: PUBLICATION_READBACK_SCHEMA,
+    receipt_id_field: "readback_receipt_id",
+    receipt_id_prefix: "publication-readback:",
+    stage_field: "readback_stage",
+    stage_value: "publication_readback",
+    extra_fields: &[
+        "pr_identity",
+        "publication_evidence_ref",
+        "authoritative_readback_digest",
+    ],
 };
 
 fn validate_candidate_identity(
@@ -1814,6 +1829,459 @@ pub fn validate_candidate_cas_pr_transition(
         return Err(fail("lifecycle:cas_base_identity_mismatch", ""));
     }
     Ok(checked_pr)
+}
+
+pub fn validate_publication_readback_receipt(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = validate_candidate_stage_receipt(value, PUBLICATION_READBACK_SPEC)?;
+    let receipt_map = mapping(&receipt, PUBLICATION_READBACK_SPEC.field)?;
+    let pr_field = "publication_readback_receipt.pr_identity";
+    let pr = mapping(
+        required_value(receipt_map, "pr_identity", PUBLICATION_READBACK_SPEC.field)?,
+        pr_field,
+    )?;
+    exact_keys(
+        pr,
+        &[
+            "number",
+            "remote_name",
+            "base_ref",
+            "head_ref",
+            "head_repo_owner",
+            "head_repo_name",
+            "post_merge_base_ref_sha",
+            "merge_cas_base_sha",
+            "merge_cas_base_tree_sha",
+            "head_sha",
+            "merge_commit_sha",
+            "merge_tree_sha",
+        ],
+        &[],
+        pr_field,
+    )?;
+    positive_integer(
+        required_value(pr, "number", pr_field)?,
+        "publication_readback_receipt.pr_identity.number",
+        false,
+    )?;
+    if required_value(pr, "remote_name", pr_field)?.as_str() != Some("origin")
+        || required_value(pr, "base_ref", pr_field)?.as_str() != Some("refs/heads/main")
+    {
+        return Err(fail("lifecycle:publication_remote_identity_mismatch", ""));
+    }
+    for field in ["head_ref", "head_repo_owner", "head_repo_name"] {
+        string_value(
+            required_value(pr, field, pr_field)?,
+            &format!("{pr_field}.{field}"),
+        )?;
+    }
+    for field in [
+        "post_merge_base_ref_sha",
+        "merge_cas_base_sha",
+        "merge_cas_base_tree_sha",
+        "head_sha",
+        "merge_commit_sha",
+        "merge_tree_sha",
+    ] {
+        pattern_value(
+            required_value(pr, field, pr_field)?,
+            &format!("{pr_field}.{field}"),
+            |text| lower_hex(text, 40),
+        )?;
+    }
+    let candidate = mapping(
+        required_value(
+            receipt_map,
+            "candidate_identity",
+            PUBLICATION_READBACK_SPEC.field,
+        )?,
+        "publication_readback_receipt.candidate_identity",
+    )?;
+    if required_value(pr, "head_sha", pr_field)?
+        != required_value(
+            candidate,
+            "candidate_sha",
+            "publication_readback_receipt.candidate_identity",
+        )?
+    {
+        return Err(fail("lifecycle:publication_candidate_mismatch", ""));
+    }
+    pattern_value(
+        required_value(
+            receipt_map,
+            "publication_evidence_ref",
+            PUBLICATION_READBACK_SPEC.field,
+        )?,
+        "publication_readback_receipt.publication_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    pattern_value(
+        required_value(
+            receipt_map,
+            "authoritative_readback_digest",
+            PUBLICATION_READBACK_SPEC.field,
+        )?,
+        "publication_readback_receipt.authoritative_readback_digest",
+        valid_sha256,
+    )?;
+    Ok(receipt)
+}
+
+pub fn validate_publication_readback_transition(
+    cas: &JsonValue,
+    pr_lifecycle: &JsonValue,
+    readback: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let checked_cas = validate_candidate_cas_receipt(cas)?;
+    let checked_pr = validate_pull_request_lifecycle(pr_lifecycle)?;
+    let checked_readback = validate_publication_readback_receipt(readback)?;
+    let cas_map = mapping(&checked_cas, "candidate_cas_receipt")?;
+    let pr_map = mapping(&checked_pr, "pull_request_lifecycle")?;
+    let readback_map = mapping(&checked_readback, "publication_readback_receipt")?;
+    if required_string(pr_map, "state", "pull_request_lifecycle")? != "merged" {
+        return Err(fail("lifecycle:pr_not_merged", ""));
+    }
+    same_binding(
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
+        required_value(pr_map, "binding", "pull_request_lifecycle")?,
+        "publication_readback.pr",
+    )?;
+    same_binding(
+        required_value(pr_map, "binding", "pull_request_lifecycle")?,
+        required_value(readback_map, "binding", "publication_readback_receipt")?,
+        "publication_readback",
+    )?;
+    if required_value(cas_map, "candidate_identity", "candidate_cas_receipt")?
+        != required_value(
+            readback_map,
+            "candidate_identity",
+            "publication_readback_receipt",
+        )?
+    {
+        return Err(fail(
+            "lifecycle:candidate_identity_mismatch",
+            "publication_readback",
+        ));
+    }
+    let cas_base = mapping(
+        required_value(cas_map, "cas_base_identity", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.cas_base_identity",
+    )?;
+    let pr_base = mapping(
+        required_value(pr_map, "base_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.base_identity",
+    )?;
+    let pr_head = mapping(
+        required_value(pr_map, "head_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.head_identity",
+    )?;
+    let readback_pr = mapping(
+        required_value(readback_map, "pr_identity", "publication_readback_receipt")?,
+        "publication_readback_receipt.pr_identity",
+    )?;
+    if required_value(
+        cas_base,
+        "commit_sha",
+        "candidate_cas_receipt.cas_base_identity",
+    )? != required_value(
+        pr_base,
+        "commit_sha",
+        "pull_request_lifecycle.base_identity",
+    )? || required_value(
+        cas_base,
+        "tree_sha",
+        "candidate_cas_receipt.cas_base_identity",
+    )? != required_value(pr_base, "tree_sha", "pull_request_lifecycle.base_identity")?
+        || required_value(
+            readback_pr,
+            "merge_cas_base_sha",
+            "publication_readback_receipt.pr_identity",
+        )? != required_value(
+            cas_base,
+            "commit_sha",
+            "candidate_cas_receipt.cas_base_identity",
+        )?
+        || required_value(
+            readback_pr,
+            "merge_cas_base_tree_sha",
+            "publication_readback_receipt.pr_identity",
+        )? != required_value(
+            cas_base,
+            "tree_sha",
+            "candidate_cas_receipt.cas_base_identity",
+        )?
+    {
+        return Err(fail("lifecycle:cas_base_identity_mismatch", ""));
+    }
+    if required_value(
+        readback_pr,
+        "head_sha",
+        "publication_readback_receipt.pr_identity",
+    )? != required_value(
+        pr_head,
+        "commit_sha",
+        "pull_request_lifecycle.head_identity",
+    )? {
+        return Err(fail("lifecycle:publication_head_identity_mismatch", ""));
+    }
+    let remote = mapping(
+        required_value(pr_map, "remote_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.remote_identity",
+    )?;
+    for (readback_field, identity, identity_field, identity_parent) in [
+        (
+            "remote_name",
+            remote,
+            "remote_name",
+            "pull_request_lifecycle.remote_identity",
+        ),
+        (
+            "base_ref",
+            pr_base,
+            "ref",
+            "pull_request_lifecycle.base_identity",
+        ),
+        (
+            "head_ref",
+            pr_head,
+            "ref",
+            "pull_request_lifecycle.head_identity",
+        ),
+        (
+            "head_repo_owner",
+            pr_head,
+            "repo_owner",
+            "pull_request_lifecycle.head_identity",
+        ),
+        (
+            "head_repo_name",
+            pr_head,
+            "repo_name",
+            "pull_request_lifecycle.head_identity",
+        ),
+    ] {
+        if required_value(
+            readback_pr,
+            readback_field,
+            "publication_readback_receipt.pr_identity",
+        )? != required_value(identity, identity_field, identity_parent)?
+        {
+            return Err(fail("lifecycle:publication_remote_identity_mismatch", ""));
+        }
+    }
+    let pr_binding = mapping(
+        required_value(pr_map, "binding", "pull_request_lifecycle")?,
+        "binding",
+    )?;
+    if required_value(
+        readback_map,
+        "predecessor_evidence_id",
+        "publication_readback_receipt",
+    )? != required_value(pr_binding, "evidence_ref", "binding")?
+    {
+        return Err(fail(
+            "lifecycle:predecessor_mismatch",
+            "publication_readback",
+        ));
+    }
+    if required_value(
+        readback_map,
+        "rebind_receipt_evidence_id",
+        "publication_readback_receipt",
+    )? != required_value(
+        cas_map,
+        "rebind_receipt_evidence_id",
+        "candidate_cas_receipt",
+    )? {
+        return Err(fail("lifecycle:rebind_mismatch", "publication_readback"));
+    }
+    Ok(checked_readback)
+}
+
+pub fn materialize_publication_readback_receipt(
+    candidate_cas_receipt: &JsonValue,
+    pull_request_lifecycle: &JsonValue,
+    authoritative_pr_readback: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let cas = validate_candidate_cas_receipt(candidate_cas_receipt)?;
+    let lifecycle = validate_candidate_cas_pr_transition(&cas, pull_request_lifecycle)?;
+    let lifecycle_map = mapping(&lifecycle, "pull_request_lifecycle")?;
+    if required_string(lifecycle_map, "state", "pull_request_lifecycle")? != "merged" {
+        return Err(fail("lifecycle:pr_not_merged", ""));
+    }
+    let readback = mapping(authoritative_pr_readback, "authoritative_pr_readback")?;
+    let pr_number = readback.get("number").unwrap_or(&JsonValue::Null);
+    positive_integer(pr_number, "authoritative_pr_readback.number", false)?;
+    if !readback
+        .get("state")
+        .and_then(JsonValue::as_str)
+        .is_some_and(|state| state.to_uppercase() == "MERGED")
+    {
+        return Err(fail("lifecycle:pr_not_merged", ""));
+    }
+    let cas_map = mapping(&cas, "candidate_cas_receipt")?;
+    let lifecycle_binding = mapping(
+        required_value(lifecycle_map, "binding", "pull_request_lifecycle")?,
+        "binding",
+    )?;
+    let candidate = required_value(cas_map, "candidate_identity", "candidate_cas_receipt")?;
+    let base = mapping(
+        required_value(lifecycle_map, "base_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.base_identity",
+    )?;
+    let head = mapping(
+        required_value(lifecycle_map, "head_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.head_identity",
+    )?;
+    let remote = mapping(
+        required_value(lifecycle_map, "remote_identity", "pull_request_lifecycle")?,
+        "pull_request_lifecycle.remote_identity",
+    )?;
+    let head_repository = mapping(
+        readback.get("headRepository").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.headRepository",
+    )?;
+    let head_repo = string_value(
+        head_repository
+            .get("nameWithOwner")
+            .unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.headRepository.nameWithOwner",
+    )?;
+    let expected_head_repo = format!(
+        "{}/{}",
+        required_string(head, "repo_owner", "pull_request_lifecycle.head_identity")?,
+        required_string(head, "repo_name", "pull_request_lifecycle.head_identity")?
+    );
+    let merge_commit = mapping(
+        readback.get("mergeCommit").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.mergeCommit",
+    )?;
+    let merge_commit_sha = pattern_value(
+        merge_commit.get("oid").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.mergeCommit.oid",
+        |text| lower_hex(text, 40),
+    )?;
+    let merge_tree_sha = pattern_value(
+        readback.get("mergeTreeOid").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.mergeTreeOid",
+        |text| lower_hex(text, 40),
+    )?;
+    let post_merge_base_ref_sha = pattern_value(
+        readback.get("baseRefOid").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.baseRefOid",
+        |text| lower_hex(text, 40),
+    )?;
+    let merge_cas_base_sha = pattern_value(
+        readback.get("mergeCasBaseOid").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.mergeCasBaseOid",
+        |text| lower_hex(text, 40),
+    )?;
+    let merge_cas_base_tree_sha = pattern_value(
+        readback
+            .get("mergeCasBaseTreeOid")
+            .unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.mergeCasBaseTreeOid",
+        |text| lower_hex(text, 40),
+    )?;
+    let head_sha = pattern_value(
+        readback.get("headRefOid").unwrap_or(&JsonValue::Null),
+        "authoritative_pr_readback.headRefOid",
+        |text| lower_hex(text, 40),
+    )?;
+    let base_ref = required_string(base, "ref", "pull_request_lifecycle.base_identity")?;
+    let head_ref = required_string(head, "ref", "pull_request_lifecycle.head_identity")?;
+    let expected_base_ref = base_ref.strip_prefix("refs/heads/").unwrap_or(&base_ref);
+    let expected_head_ref = head_ref.strip_prefix("refs/heads/").unwrap_or(&head_ref);
+    if readback.get("baseRefName").and_then(JsonValue::as_str) != Some(expected_base_ref)
+        || readback.get("headRefName").and_then(JsonValue::as_str) != Some(expected_head_ref)
+        || head_sha != required_string(head, "commit_sha", "pull_request_lifecycle.head_identity")?
+        || head_repo != expected_head_repo
+        || merge_cas_base_sha
+            != required_string(base, "commit_sha", "pull_request_lifecycle.base_identity")?
+        || merge_cas_base_tree_sha
+            != required_string(base, "tree_sha", "pull_request_lifecycle.base_identity")?
+    {
+        return Err(fail("lifecycle:authoritative_pr_readback_mismatch", ""));
+    }
+
+    let pr_identity = serde_json::json!({
+        "number": pr_number,
+        "remote_name": required_value(remote, "remote_name", "pull_request_lifecycle.remote_identity")?,
+        "base_ref": required_value(base, "ref", "pull_request_lifecycle.base_identity")?,
+        "head_ref": required_value(head, "ref", "pull_request_lifecycle.head_identity")?,
+        "head_repo_owner": required_value(head, "repo_owner", "pull_request_lifecycle.head_identity")?,
+        "head_repo_name": required_value(head, "repo_name", "pull_request_lifecycle.head_identity")?,
+        "post_merge_base_ref_sha": post_merge_base_ref_sha,
+        "merge_cas_base_sha": merge_cas_base_sha,
+        "merge_cas_base_tree_sha": merge_cas_base_tree_sha,
+        "head_sha": head_sha,
+        "merge_commit_sha": merge_commit_sha,
+        "merge_tree_sha": merge_tree_sha,
+    });
+    let pr_identity_bytes =
+        canonical_json_bytes(&pr_identity).map_err(LifecycleContractError::from)?;
+    let readback_digest_hex = Sha256::digest(pr_identity_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let authoritative_readback_digest = format!("sha256:{readback_digest_hex}");
+    let publication_evidence_ref = format!("evidence:{readback_digest_hex}");
+
+    let mut binding = lifecycle_binding.clone();
+    binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(publication_evidence_ref.clone()),
+    );
+    binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(authoritative_readback_digest.clone()),
+    );
+    let binding = JsonValue::Object(binding);
+    let identity = binding_identity(&binding)?;
+    let predecessor_evidence_id =
+        required_value(lifecycle_binding, "evidence_ref", "binding")?.clone();
+    let rebind_receipt_evidence_id = required_value(
+        cas_map,
+        "rebind_receipt_evidence_id",
+        "candidate_cas_receipt",
+    )?
+    .clone();
+    let key = serde_json::json!({
+        "binding_identity": [
+            identity.transaction_id,
+            identity.snapshot_id,
+            identity.candidate_sha,
+            identity.tree_sha,
+            identity.input_digest,
+            identity.tool_id,
+            identity.tool_version,
+        ],
+        "predecessor_evidence_id": predecessor_evidence_id,
+        "rebind_receipt_evidence_id": rebind_receipt_evidence_id,
+        "candidate_identity": candidate,
+        "pr_identity": pr_identity,
+        "publication_evidence_ref": publication_evidence_ref,
+        "authoritative_readback_digest": authoritative_readback_digest,
+    });
+    let key_bytes = canonical_json_bytes(&key).map_err(LifecycleContractError::from)?;
+    let receipt_id_hex = Sha256::digest(key_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let receipt = serde_json::json!({
+        "schema": PUBLICATION_READBACK_SCHEMA,
+        "readback_receipt_id": format!("publication-readback:{receipt_id_hex}"),
+        "binding": binding,
+        "predecessor_evidence_id": predecessor_evidence_id,
+        "rebind_receipt_evidence_id": rebind_receipt_evidence_id,
+        "candidate_identity": candidate,
+        "pr_identity": pr_identity,
+        "publication_evidence_ref": publication_evidence_ref,
+        "authoritative_readback_digest": authoritative_readback_digest,
+        "readback_stage": "publication_readback",
+    });
+    validate_publication_readback_transition(&cas, &lifecycle, &receipt)
 }
 
 fn validate_remote_git_identity(
