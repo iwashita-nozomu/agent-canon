@@ -14,7 +14,6 @@
 // @dependency-end
 
 use regex::Regex;
-use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -369,7 +368,9 @@ fn print_bootstrap_findings(title: &str, findings: &[String]) -> i32 {
 
 fn iter_bootstrap_doc_findings(root: &Path) -> Result<Vec<String>, String> {
     let project_name = read_project_name(root)?;
-    let check_derived_stale_strings = project_name.as_deref() != Some("project-template");
+    let check_derived_stale_strings = project_name
+        .as_deref()
+        .is_some_and(|name| name != "project-template");
     let default_consumer_docs = DEFAULT_CONSUMER_CONTRACT_DOCS
         .iter()
         .copied()

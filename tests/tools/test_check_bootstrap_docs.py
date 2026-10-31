@@ -154,6 +154,33 @@ class CheckBootstrapDocsTest(unittest.TestCase):
                 "stale template bootstrap text remains: project-template", result.stdout
             )
 
+    def test_stale_template_scan_requires_a_nonblank_string_project_name(self) -> None:
+        """Missing, non-project, non-string, and blank names are not derived names."""
+        project_files = (
+            None,
+            '[tool.other]\nname = "derived-project"\n',
+            "[project]\nname = 42\n",
+            '[project]\nname = "   "\n',
+        )
+        for pyproject in project_files:
+            with (
+                self.subTest(pyproject=pyproject),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
+                root = Path(tmp_dir)
+                self.write_minimal_bootstrap_docs(root)
+                self.write_file(
+                    root / "README.md",
+                    "docker build -t project-template -f docker/Dockerfile .\n",
+                )
+                if pyproject is not None:
+                    self.write_file(root / "pyproject.toml", pyproject)
+
+                result = self.run_cli(root)
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Bootstrap docs check passed", result.stdout)
+
     def test_rejects_symlinked_default_consumer_contract(self) -> None:
         """Default bootstrap docs must not resolve through a live source tree."""
         with tempfile.TemporaryDirectory() as tmp_dir:
