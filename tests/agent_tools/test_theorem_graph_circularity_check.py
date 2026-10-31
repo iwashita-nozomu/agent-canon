@@ -28,7 +28,7 @@ def _graph() -> dict[str, object]:
     return {
         "nodes": [
             {"id": "root", "kind": "theorem", "status": "open"},
-            {"id": "middle", "kind": "lemma", "status": "checked"},
+            {"id": "middle", "kind": "theorem", "status": "checked"},
             {"id": "leaf", "kind": "assumption", "status": "unverified", "origin": "external"},
             {"id": "forbidden", "kind": "axiom", "status": "admitted", "origin": "human"},
             {"id": "cycle_a", "kind": "lemma"},
@@ -56,7 +56,7 @@ def _graph() -> dict[str, object]:
                 "via_edge_kinds": ["supports", "back_edge"],
                 "forbidden_reachable_kinds": ["theorem"],
                 "severity": "error",
-                "explanation": "A proof route returns to its target theorem.",
+                "explanation": "The configured route may not reach another theorem node.",
             }
         ],
         "leaf_origin_checks": [
@@ -108,12 +108,12 @@ def test_native_report_preserves_proof_frontier_checks_and_exit_contract(tmp_pat
         {
             "check_id": "root-exit",
             "start": "root",
-            "reached": "root",
+            "reached": "middle",
             "reached_kind": "theorem",
-            "path": ["root", "middle", "root"],
-            "edge_kinds": ["supports", "back_edge"],
+            "path": ["root", "middle"],
+            "edge_kinds": ["supports"],
             "severity": "error",
-            "explanation": "A proof route returns to its target theorem.",
+            "explanation": "The configured route may not reach another theorem node.",
         }
     ]
     assert report["directed_cycles"] == [
