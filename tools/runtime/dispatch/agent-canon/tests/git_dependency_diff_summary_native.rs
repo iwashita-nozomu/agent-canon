@@ -305,7 +305,16 @@ fn cli_preserves_tab_path_stats() {
     let fixture = Fixture::new();
     init_repository(&fixture.source());
     let path = fixture.source().join("tab\tname.py");
-    fs::write(&path, "value = 1\n").unwrap();
+    if let Err(error) = fs::write(&path, "value = 1\n") {
+        #[cfg(target_os = "windows")]
+        if error.raw_os_error() == Some(123) {
+            println!(
+                "filesystem-bound CLI oracle unavailable: Windows rejected the tab filename (ERROR_INVALID_NAME, errno 123)"
+            );
+            return;
+        }
+        panic!("create tab-path Git fixture: {error}");
+    }
     commit_paths(&fixture.source(), "initial", &["tab\tname.py"]);
     fs::write(&path, "value = 1\nextra = 2\n").unwrap();
 
