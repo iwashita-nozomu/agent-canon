@@ -13,9 +13,8 @@
 
 use crate::artifacts::artifact_identity::{canonical_json_bytes, ArtifactIdentityError};
 use crate::python_json::{
-    canonical_utf8_surrogate_range, contains_float, parse_json, parse_json_bytes,
-    parse_json_python_string, to_serde_json_value, JsonString as PythonJsonString,
-    JsonValue as PythonJsonValue,
+    canonical_utf8_surrogate_range, contains_float, parse_json_bytes, parse_json_python_string,
+    to_serde_json_value, JsonString as PythonJsonString, JsonValue as PythonJsonValue,
 };
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
