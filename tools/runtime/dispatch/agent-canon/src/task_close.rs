@@ -270,7 +270,7 @@ fn object_list(value: Option<&SerdeValue>) -> Option<&Vec<SerdeValue>> {
     value.and_then(SerdeValue::as_array)
 }
 
-fn json_string<'a>(value: &'a JsonValue) -> Option<&'a JsonString> {
+fn json_string(value: &JsonValue) -> Option<&JsonString> {
     match value {
         JsonValue::String(value) => Some(value),
         _ => None,
@@ -522,9 +522,7 @@ fn validated_runtime_receipt(
     }) {
         return None;
     }
-    let Some(receipt_sha) = json_field(&raw, "receipt_sha256").and_then(json_string) else {
-        return None;
-    };
+    let receipt_sha = json_field(&raw, "receipt_sha256").and_then(json_string)?;
     if receipt_sha.contains_surrogate() {
         return None;
     }
@@ -546,7 +544,7 @@ fn validated_runtime_receipt(
     (digest == receipt_sha).then_some(raw)
 }
 
-fn object_list_from_custom<'a>(value: Option<&'a JsonValue>) -> Option<&'a [JsonValue]> {
+fn object_list_from_custom(value: Option<&JsonValue>) -> Option<&[JsonValue]> {
     value.and_then(json_array)
 }
 
@@ -595,7 +593,7 @@ pub fn child_closeout_evidence(
             || !json_field(&verifier, "status")
                 .and_then(json_string)
                 .is_some_and(|value| value.equals_text("pass"))
-            || !source_events.is_some_and(|values| !values.is_empty())
+            || source_events.is_none_or(|values| values.is_empty())
         {
             blockers.push("runtime_verifier_provenance_mismatch".to_owned());
         }
@@ -660,7 +658,7 @@ pub fn child_closeout_evidence(
                 .and_then(json_string)
                 .is_some_and(|value| value.equals_text("no_parent_mutation"))
             || !mutation_events.is_some_and(|values| values.is_empty())
-            || !source_events.is_some_and(|values| !values.is_empty())
+            || source_events.is_none_or(|values| values.is_empty())
             || ledger_ref.is_none()
             || !source_event_ids_are_strings
             || !source_event_ids_are_subset
@@ -1550,8 +1548,6 @@ fn check_task_close_with_context(
         &report_dir.join("user_request_contract.md"),
         "user_request_contract.md",
     )?;
-    let schedule_text =
-        read_required_text(&boundary, &report_dir.join("schedule.md"), "schedule.md")?;
     let work_log_text =
         read_required_text(&boundary, &report_dir.join("work_log.md"), "work_log.md")?;
     let agent_evaluation_text = read_required_text(
@@ -1651,7 +1647,7 @@ fn check_task_close_with_context(
         .transpose()?
         .unwrap_or(false);
     // The old owner disables parent projection checks for the standalone source tree.
-    let mut predicates = vec![
+    let predicates = vec![
         (
             "verification_status",
             status_is(&verification, "status", "pass"),
@@ -2458,7 +2454,7 @@ pub fn run_cli(args: &[String]) -> i32 {
         }
     };
     let workspace = match env::current_dir()
-        .and_then(|path| fs::canonicalize(path))
+        .and_then(fs::canonicalize)
         .map_err(|error| TaskCloseError::new(format!("current workspace is unavailable: {error}")))
     {
         Ok(path) => path,
