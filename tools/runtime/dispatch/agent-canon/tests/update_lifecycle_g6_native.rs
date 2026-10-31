@@ -8,9 +8,9 @@
 
 use agent_canon::agent_tool_calls::{
     materialize_close_agent_tool_call, CloseAgentLifecycleEvidence, CloseAgentLifecycleOwnerInput,
+    CloseAgentToolCallError,
 };
 use agent_canon::artifacts::artifact_identity::canonical_json_bytes;
-use agent_canon::update_lifecycle_contract::LifecycleContractError;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -124,7 +124,7 @@ fn apply_mutation(arguments: &mut Value, mutation: &Value) {
     }
 }
 
-fn invoke_g6(arguments: &Value, source_root: &str) -> Result<Value, LifecycleContractError> {
+fn invoke_g6(arguments: &Value, source_root: &str) -> Result<Value, CloseAgentToolCallError> {
     let evidence = &arguments["evidence"];
     let gate_verdicts = evidence["gate_verdicts"]
         .as_array()
@@ -145,6 +145,13 @@ fn invoke_g6(arguments: &Value, source_root: &str) -> Result<Value, LifecycleCon
                 .expect("fixture reservation receipts are an array"),
         },
     })
+}
+
+fn python_error_class(error: &CloseAgentToolCallError) -> &'static str {
+    match error {
+        CloseAgentToolCallError::LifecycleContract(_) => "LifecycleContractError",
+        CloseAgentToolCallError::ValueError(_) => "ValueError",
+    }
 }
 
 #[test]
@@ -196,6 +203,13 @@ fn direct_g6_owner_cases_match_frozen_python_outputs_bytes_hashes_and_errors() {
             }
             Err(actual) if !case["error"].is_null() => {
                 rejected += 1;
+                assert_eq!(
+                    python_error_class(&actual),
+                    case["error"]["exception_class"]
+                        .as_str()
+                        .expect("frozen direct error class is text"),
+                    "error class for {name}"
+                );
                 assert_eq!(
                     actual.to_string(),
                     case["error"]["message"]

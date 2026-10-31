@@ -19,6 +19,7 @@ use crate::update_lifecycle_contract::{
 use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::fmt;
 
 const G6_LOGICAL_OWNER_PATH: &str =
     "tools/agent/orchestration/tool_calls.py#materialize_close_agent_tool_call";
@@ -42,11 +43,38 @@ pub struct CloseAgentLifecycleOwnerInput<'a> {
     pub evidence: CloseAgentLifecycleEvidence<'a>,
 }
 
-fn close_agent_error(code: &str) -> LifecycleContractError {
-    LifecycleContractError {
-        code: code.to_owned(),
-        detail: String::new(),
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CloseAgentToolCallError {
+    LifecycleContract(LifecycleContractError),
+    ValueError(String),
+}
+
+impl fmt::Display for CloseAgentToolCallError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LifecycleContract(error) => fmt::Display::fmt(error, formatter),
+            Self::ValueError(message) => formatter.write_str(message),
+        }
     }
+}
+
+impl std::error::Error for CloseAgentToolCallError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::LifecycleContract(error) => Some(error),
+            Self::ValueError(_) => None,
+        }
+    }
+}
+
+impl From<LifecycleContractError> for CloseAgentToolCallError {
+    fn from(error: LifecycleContractError) -> Self {
+        Self::LifecycleContract(error)
+    }
+}
+
+fn close_agent_value_error(code: &str) -> CloseAgentToolCallError {
+    CloseAgentToolCallError::ValueError(code.to_owned())
 }
 
 fn canonical_sha256(value: &JsonValue) -> Result<String, LifecycleContractError> {
@@ -59,7 +87,7 @@ fn canonical_sha256(value: &JsonValue) -> Result<String, LifecycleContractError>
 
 pub fn materialize_close_agent_tool_call(
     input: CloseAgentLifecycleOwnerInput<'_>,
-) -> Result<JsonValue, LifecycleContractError> {
+) -> Result<JsonValue, CloseAgentToolCallError> {
     let handback = validate_durable_handback(input.evidence.durable_handback)?;
     let handback_binding = handback
         .get("binding")
@@ -100,7 +128,7 @@ pub fn materialize_close_agent_tool_call(
         })
         .collect::<BTreeSet<_>>();
     if observed_descendants != declared_descendants {
-        return Err(close_agent_error("close_agent:unknown_descendant"));
+        return Err(close_agent_value_error("close_agent:unknown_descendant"));
     }
 
     let declared_reservations = handback["reservation_ids"]
@@ -124,26 +152,30 @@ pub fn materialize_close_agent_tool_call(
         })
         .collect::<BTreeSet<_>>();
     if observed_reservations != declared_reservations {
-        return Err(close_agent_error("close_agent:reservation_leak"));
+        return Err(close_agent_value_error("close_agent:reservation_leak"));
     }
 
     let expected_identity = binding_identity(&checked_binding)?;
     if handback_binding != &checked_binding {
-        return Err(close_agent_error("close_agent:identity_mismatch"));
+        return Err(close_agent_value_error("close_agent:identity_mismatch"));
     }
     if handback["agent_id"].as_str() != Some(input.agent_id) {
-        return Err(close_agent_error("close_agent:agent_identity_mismatch"));
+        return Err(close_agent_value_error(
+            "close_agent:agent_identity_mismatch",
+        ));
     }
     let durable_handback_evidence_ref = handback["evidence_ref"]
         .as_str()
         .expect("validated durable handback evidence reference is text");
     for receipt in descendants.iter().chain(&reservations) {
         if binding_identity(&receipt["binding"])? != expected_identity {
-            return Err(close_agent_error("close_agent:identity_mismatch"));
+            return Err(close_agent_value_error("close_agent:identity_mismatch"));
         }
         if receipt["durable_handback_evidence_ref"].as_str() != Some(durable_handback_evidence_ref)
         {
-            return Err(close_agent_error("close_agent:durable_handback_mismatch"));
+            return Err(close_agent_value_error(
+                "close_agent:durable_handback_mismatch",
+            ));
         }
     }
 
@@ -158,7 +190,7 @@ pub fn materialize_close_agent_tool_call(
 
     let cleanup = validate_cleanup_proof(input.evidence.cleanup_proof)?;
     if binding_identity(&cleanup["binding"])? != expected_identity {
-        return Err(close_agent_error("close_agent:identity_mismatch"));
+        return Err(close_agent_value_error("close_agent:identity_mismatch"));
     }
     let gate_refs = gates
         .iter()
@@ -170,7 +202,7 @@ pub fn materialize_close_agent_tool_call(
         })
         .collect::<Vec<_>>();
     if cleanup["remote_readback_evidence_ref"].as_str() != gate_refs.get(4).map(String::as_str) {
-        return Err(close_agent_error(
+        return Err(close_agent_value_error(
             "close_agent:cleanup_before_remote_readback",
         ));
     }
