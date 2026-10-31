@@ -19,6 +19,7 @@
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
+// downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
 // downstream implementation work_log.rs owns the canonical run-local work log and semantic ledger
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
@@ -60,4 +61,5 @@ pub mod stablehlo_value_closure;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;
+pub mod update_lifecycle_contract;
 pub mod work_log;
