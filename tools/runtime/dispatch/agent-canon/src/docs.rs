@@ -4,6 +4,7 @@
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 // upstream design ../../../../../agents/skills/md-style-check.md Markdown style check skill contract
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.json canonical runtime profile inventory rendered by this module
+// upstream implementation source_mutation.rs owns explicit capability-bound source rewrites
 // upstream design ../../../../../documents/contracts/template-bootstrap.md default bootstrap doc contract
 // upstream design ../../../../../documents/contracts/static-seed-export.md source-free static-seed contract
 // upstream implementation python_cli_integer.rs shares argparse negative-number classification
@@ -11,9 +12,11 @@
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
 // downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
+// downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
 // @dependency-end
 
-use regex::Regex;
+use crate::source_mutation::SourceMutationCapability;
+use regex::{Captures, Regex};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -21,6 +24,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::LazyLock;
 use std::sync::OnceLock;
 use toml_edit::{DocumentMut, Item, TableLike};
 
@@ -38,6 +42,26 @@ const DEFAULT_DOC_TARGETS: &[&str] = &[
     ".codex/personal/skills",
     ".codex/README.md",
 ];
+
+const DEFAULT_LINK_AUDIT_TARGETS: &[&str] = &[
+    "README.md",
+    "QUICK_START.md",
+    "AGENTS.md",
+    "agents",
+    "documents",
+    "scripts",
+    ".github",
+    ".codex/personal/skills",
+    ".codex/README.md",
+];
+
+const LINK_SKIP_PARTS: &[&str] = &[".git", ".worktrees", "__pycache__", "Archive"];
+
+static MARKDOWN_LINK_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").expect("static Markdown link regex"));
+static EXTERNAL_LINK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^[a-zA-Z][a-zA-Z0-9+.-]*://").expect("static external link scheme regex")
+});
 
 const BOOTSTRAP_DOCS: &[&str] = &[
     "README.md",
@@ -132,12 +156,16 @@ struct Args {
     command: DocsCommand,
     root: PathBuf,
     paths: Vec<String>,
+    apply: bool,
+    check_after_apply: bool,
+    mutation_capability_json: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DocsCommand {
     Check,
     Format,
+    Links,
     RenderRuntimeProfile,
     Help,
 }
@@ -181,6 +209,13 @@ fn run_parsed(args: Args) -> i32 {
         }
         DocsCommand::Check => render_check(&root, &args.paths),
         DocsCommand::Format => render_format(&root, &args.paths),
+        DocsCommand::Links => run_link_audit(
+            &root,
+            &args.paths,
+            args.apply,
+            args.check_after_apply,
+            args.mutation_capability_json.as_deref(),
+        ),
         DocsCommand::RenderRuntimeProfile => render_runtime_profile_command(&root),
     }
 }
@@ -190,6 +225,7 @@ impl Args {
         let command = match args.first().map(|item| item.as_str()) {
             Some("check") => DocsCommand::Check,
             Some("format") => DocsCommand::Format,
+            Some("links") => DocsCommand::Links,
             Some("render-runtime-profile") => DocsCommand::RenderRuntimeProfile,
             Some("help") | Some("--help") | Some("-h") => DocsCommand::Help,
             Some(other) => return Err(format!("unknown docs command {other}")),
@@ -198,6 +234,9 @@ impl Args {
 
         let mut root = PathBuf::from(".");
         let mut paths = Vec::new();
+        let mut apply = false;
+        let mut check_after_apply = false;
+        let mut mutation_capability_json = None;
         let mut index = 1;
         while index < args.len() {
             match args[index].as_str() {
@@ -208,11 +247,29 @@ impl Args {
                     root = PathBuf::from(value);
                     index += 2;
                 }
+                "--apply" if command == DocsCommand::Links => {
+                    apply = true;
+                    index += 1;
+                }
+                "--check" if command == DocsCommand::Links => {
+                    check_after_apply = true;
+                    index += 1;
+                }
+                "--mutation-capability-json" if command == DocsCommand::Links => {
+                    let value = args
+                        .get(index + 1)
+                        .ok_or_else(|| "--mutation-capability-json requires a value".to_string())?;
+                    mutation_capability_json = Some(value.clone());
+                    index += 2;
+                }
                 "--help" | "-h" => {
                     return Ok(Self {
                         command: DocsCommand::Help,
                         root,
                         paths,
+                        apply,
+                        check_after_apply,
+                        mutation_capability_json,
                     });
                 }
                 value if value.starts_with("--") => {
@@ -229,6 +286,9 @@ impl Args {
             command,
             root,
             paths,
+            apply,
+            check_after_apply,
+            mutation_capability_json,
         })
     }
 }
@@ -541,16 +601,21 @@ fn usage_text() -> &'static str {
 commands:\n\
   check                   check Markdown lint, links, math, Mermaid, headings, and runtime-profile docs\n\
   format                  format Markdown, then run the adjacent docs check\n\
+  links                   check Markdown links; --apply requires an exact source mutation capability\n\
   check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\
   render-runtime-profile  render the runtime profile inventory\n\
   help, -h, --help        show this command contract\n\
 \n\
 options:\n\
   --root <repo-root>      repository root to evaluate; defaults to the current directory\n\
+  --apply                 rewrite uniquely resolved links (links only)\n\
+  --check                 run docs check after applying link rewrites (links only)\n\
+  --mutation-capability-json <json>  authorize exact source paths for links --apply\n\
 \n\
 examples:\n\
   tools/bin/agent-canon docs -h\n\
   tools/bin/agent-canon docs check documents/tools/agent-canon.md\n\
+  tools/bin/agent-canon docs links --apply --mutation-capability-json '<json>' documents/tools/agent-canon.md\n\
   tools/bin/agent-canon docs check-bootstrap --root .\n\
   tools/bin/agent-canon docs check-bootstrap --root <seed> --static-seed-consumer\n\
   tools/bin/agent-canon docs format README.md"
@@ -988,6 +1053,322 @@ fn render_format(root: &Path, raw_paths: &[String]) -> i32 {
         summary.changed_files, summary.changes
     );
     render_check(root, raw_paths)
+}
+
+fn run_link_audit(
+    root: &Path,
+    raw_paths: &[String],
+    apply: bool,
+    check_after_apply: bool,
+    mutation_capability_json: Option<&str>,
+) -> i32 {
+    let paths = if raw_paths.is_empty() {
+        DEFAULT_LINK_AUDIT_TARGETS
+            .iter()
+            .map(|path| path.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        raw_paths.to_vec()
+    };
+    if !apply {
+        if mutation_capability_json.is_some() {
+            eprintln!("docs links: --mutation-capability-json is valid only with --apply");
+            print_usage();
+            return 2;
+        }
+        return render_check(root, &paths);
+    }
+    let capability = match SourceMutationCapability::from_json(root, mutation_capability_json) {
+        Ok(capability) => capability,
+        Err(error) => {
+            eprintln!("mutation_capability_error: {error}");
+            print_usage();
+            return 2;
+        }
+    };
+    let changes = match planned_link_rewrites(root, &paths) {
+        Ok(changes) => changes,
+        Err(error) => {
+            eprintln!("docs links: {error}");
+            return 1;
+        }
+    };
+    // Validate every target before the first write, then the capability does
+    // another resolution and no-follow check at the actual write boundary.
+    let approved = match changes
+        .into_iter()
+        .map(|(path, contents)| {
+            capability
+                .assert_allowed(&path)
+                .map(|resolved| (resolved, contents))
+                .map_err(|error| format!("mutation_capability_error: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(approved) => approved,
+        Err(error) => {
+            eprintln!("{error}");
+            return 2;
+        }
+    };
+    for (path, contents) in &approved {
+        if let Err(error) = capability.write_text(path, contents) {
+            eprintln!("mutation_capability_error: {error}");
+            return 1;
+        }
+    }
+    println!("Applied link rewrites: {}", approved.len());
+    if check_after_apply {
+        render_check(root, &paths)
+    } else {
+        0
+    }
+}
+
+fn planned_link_rewrites(
+    root: &Path,
+    raw_paths: &[String],
+) -> Result<BTreeMap<PathBuf, String>, String> {
+    let name_index = link_name_index(root);
+    let mut changes = BTreeMap::new();
+    for markdown_file in link_markdown_files(root, raw_paths) {
+        let text = fs::read_to_string(&markdown_file)
+            .map_err(|error| format!("cannot read {}: {error}", markdown_file.display()))?;
+        let mut replacements = BTreeMap::new();
+        for (_label, target) in find_markdown_links(&text) {
+            let target = target.as_str();
+            if is_external_link_target(target) {
+                continue;
+            }
+            let (target_path, anchor) = split_link_anchor(target);
+            if let Some(resolved) = resolve_local_link_target(root, &markdown_file, target_path) {
+                if Path::new(target_path).is_absolute() && resolved.starts_with(root) {
+                    if let Some(relative) = relative_link_target(&markdown_file, &resolved) {
+                        replacements
+                            .insert(target.to_string(), append_link_anchor(relative, anchor));
+                    }
+                }
+                continue;
+            }
+            let basename = Path::new(target_path)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let candidates = name_index
+                .get(&basename)
+                .into_iter()
+                .flatten()
+                .filter(|candidate| !candidate.to_string_lossy().ends_with(".bak"))
+                .collect::<Vec<_>>();
+            if candidates.len() == 1 {
+                if let Some(relative) = relative_link_target(&markdown_file, candidates[0]) {
+                    replacements.insert(target.to_string(), append_link_anchor(relative, anchor));
+                }
+            }
+        }
+        let rewritten = replace_link_targets(&text, &replacements);
+        if rewritten != text {
+            changes.insert(markdown_file, rewritten);
+        }
+    }
+    Ok(changes)
+}
+
+fn find_markdown_links(text: &str) -> Vec<(String, String)> {
+    MARKDOWN_LINK_PATTERN
+        .captures_iter(text)
+        .map(|captures| {
+            (
+                captures
+                    .get(1)
+                    .map_or("", |capture| capture.as_str())
+                    .to_string(),
+                captures
+                    .get(2)
+                    .map_or("", |capture| capture.as_str())
+                    .to_string(),
+            )
+        })
+        .collect()
+}
+
+fn replace_link_targets(text: &str, replacements: &BTreeMap<String, String>) -> String {
+    MARKDOWN_LINK_PATTERN
+        .replace_all(text, |captures: &Captures<'_>| {
+            let label = captures.get(1).map_or("", |capture| capture.as_str());
+            let target = captures.get(2).map_or("", |capture| capture.as_str());
+            replacements.get(target).map_or_else(
+                || {
+                    captures
+                        .get(0)
+                        .map_or("", |capture| capture.as_str())
+                        .to_string()
+                },
+                |replacement| format!("[{label}]({replacement})"),
+            )
+        })
+        .into_owned()
+}
+
+fn link_markdown_files(root: &Path, raw_paths: &[String]) -> Vec<PathBuf> {
+    let targets = if raw_paths.is_empty() {
+        DEFAULT_LINK_AUDIT_TARGETS
+            .iter()
+            .map(|path| path.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        raw_paths.to_vec()
+    };
+    let mut files = BTreeSet::new();
+    for target in targets {
+        let path = normalize_input_path(root, &target);
+        let Ok(path) = fs::canonicalize(&path) else {
+            continue;
+        };
+        collect_link_markdown_target(&path, &mut files);
+    }
+    files.into_iter().collect()
+}
+
+fn collect_link_markdown_target(path: &Path, files: &mut BTreeSet<PathBuf>) {
+    if link_skip_path(path) {
+        return;
+    }
+    let Ok(lexical_metadata) = fs::symlink_metadata(path) else {
+        return;
+    };
+    if lexical_metadata.file_type().is_symlink() {
+        if fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
+            && path.extension().and_then(|extension| extension.to_str()) == Some("md")
+        {
+            files.insert(path.to_path_buf());
+        }
+        return;
+    }
+    if lexical_metadata.is_dir() {
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                collect_link_markdown_target(&entry.path(), files);
+            }
+        }
+    } else if lexical_metadata.is_file()
+        && path.extension().and_then(|extension| extension.to_str()) == Some("md")
+    {
+        files.insert(path.to_path_buf());
+    }
+}
+
+fn link_name_index(root: &Path) -> BTreeMap<String, Vec<PathBuf>> {
+    let mut paths = BTreeSet::new();
+    collect_link_files(root, &mut paths);
+    let mut names = BTreeMap::<String, Vec<PathBuf>>::new();
+    for path in paths {
+        if let Some(name) = path.file_name() {
+            names
+                .entry(name.to_string_lossy().into_owned())
+                .or_default()
+                .push(path);
+        }
+    }
+    names
+}
+
+fn collect_link_files(path: &Path, files: &mut BTreeSet<PathBuf>) {
+    if link_skip_path(path) {
+        return;
+    }
+    let Ok(lexical_metadata) = fs::symlink_metadata(path) else {
+        return;
+    };
+    if lexical_metadata.file_type().is_symlink() {
+        if fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
+            files.insert(path.to_path_buf());
+        }
+        return;
+    }
+    if lexical_metadata.is_dir() {
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                collect_link_files(&entry.path(), files);
+            }
+        }
+    } else if lexical_metadata.is_file() {
+        files.insert(path.to_path_buf());
+    }
+}
+
+fn link_skip_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        let part = component.as_os_str().to_string_lossy();
+        LINK_SKIP_PARTS.contains(&part.as_ref())
+    })
+}
+
+fn is_external_link_target(target: &str) -> bool {
+    EXTERNAL_LINK_PATTERN.is_match(target)
+        || target.starts_with("mailto:")
+        || target.starts_with('#')
+}
+
+fn split_link_anchor(target: &str) -> (&str, &str) {
+    target.split_once('#').unwrap_or((target, ""))
+}
+
+fn resolve_local_link_target(root: &Path, source: &Path, target_path: &str) -> Option<PathBuf> {
+    if target_path.is_empty() {
+        return None;
+    }
+    let target = Path::new(target_path);
+    if target.is_absolute() {
+        return normalize_repo_absolute_link(root, target);
+    }
+    fs::canonicalize(source.parent()?.join(target_path)).ok()
+}
+
+fn normalize_repo_absolute_link(root: &Path, target: &Path) -> Option<PathBuf> {
+    if !target.is_absolute() {
+        return None;
+    }
+    if target.exists() {
+        return Some(target.to_path_buf());
+    }
+    let root_name = root.file_name()?.to_string_lossy();
+    let parts = target
+        .components()
+        .map(|component| component.as_os_str().to_os_string())
+        .collect::<Vec<_>>();
+    for index in (0..parts.len()).rev() {
+        if parts[index].to_string_lossy() == root_name {
+            let mut candidate = root.to_path_buf();
+            for part in &parts[index + 1..] {
+                candidate.push(part);
+            }
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn relative_link_target(source: &Path, target: &Path) -> Option<String> {
+    let relative = pathdiff::diff_paths(target, source.parent()?)?;
+    #[cfg(windows)]
+    {
+        Some(relative.to_string_lossy().replace('\\', "/"))
+    }
+    #[cfg(not(windows))]
+    {
+        Some(relative.to_string_lossy().into_owned())
+    }
+}
+
+fn append_link_anchor(path: String, anchor: &str) -> String {
+    if anchor.is_empty() {
+        path
+    } else {
+        format!("{path}#{anchor}")
+    }
 }
 
 fn render_findings(findings: &[Finding], root: &Path) -> bool {
@@ -1910,6 +2291,8 @@ mod tests {
 
         assert!(usage.contains("docs check"));
         assert!(usage.contains("docs format"));
+        assert!(usage.contains("docs links"));
+        assert!(usage.contains("--mutation-capability-json"));
         assert!(usage.contains("docs check-bootstrap"));
     }
 
@@ -1926,5 +2309,195 @@ mod tests {
         assert_eq!(parsed.command, DocsCommand::Format);
         assert_eq!(parsed.root, PathBuf::from("/repo"));
         assert_eq!(parsed.paths, vec!["README.md"]);
+    }
+
+    #[test]
+    fn parses_link_apply_arguments_without_weakening_other_docs_commands() {
+        let args = vec![
+            "links".to_string(),
+            "--root".to_string(),
+            "/repo".to_string(),
+            "--apply".to_string(),
+            "--check".to_string(),
+            "--mutation-capability-json".to_string(),
+            "{\"allowed_paths\":[\"README.md\"],\"purpose\":\"test\",\"authority\":\"issue-1630\"}"
+                .to_string(),
+            "README.md".to_string(),
+        ];
+        let parsed = Args::parse(&args).expect("native link arguments parse");
+        assert_eq!(parsed.command, DocsCommand::Links);
+        assert_eq!(parsed.root, PathBuf::from("/repo"));
+        assert_eq!(parsed.paths, vec!["README.md"]);
+        assert!(parsed.apply);
+        assert!(parsed.check_after_apply);
+        assert!(parsed.mutation_capability_json.is_some());
+        assert!(Args::parse(&["check".to_string(), "--apply".to_string()]).is_err());
+    }
+
+    fn write_link_fixture(root: &Path, relative: &str, contents: &str) -> PathBuf {
+        let path = root.join(relative);
+        fs::create_dir_all(path.parent().expect("link fixture has a parent"))
+            .expect("link fixture parent is created");
+        fs::write(&path, contents).expect("link fixture is written");
+        path
+    }
+
+    #[test]
+    fn links_read_only_route_runs_docs_check_without_source_report() {
+        let temporary = DocsTemporaryDirectory::create("links-read-only")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+
+        assert_eq!(
+            run_link_audit(&root, &["missing.md".to_string()], false, false, None),
+            0
+        );
+        assert!(!root.join("reports").exists());
+    }
+
+    #[test]
+    fn links_apply_requires_capability_before_source_write() {
+        let temporary = DocsTemporaryDirectory::create("links-missing-capability")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        write_link_fixture(&root, "README.md", "# Root\n");
+        let guide = write_link_fixture(&root, "docs/guide.md", "[root](README.md)\n");
+        let before = fs::read(&guide).expect("guide bytes are captured");
+
+        assert_eq!(
+            run_link_audit(&root, &["docs/guide.md".to_string()], true, false, None),
+            2
+        );
+        assert_eq!(fs::read(guide).expect("guide remains readable"), before);
+        assert!(!root.join("reports").exists());
+    }
+
+    #[test]
+    fn links_apply_writes_only_exact_allowlisted_source_paths() {
+        let temporary =
+            DocsTemporaryDirectory::create("links-apply").expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        write_link_fixture(&root, "README.md", "# Root\n");
+        let guide = write_link_fixture(&root, "docs/guide.md", "[root](README.md#top)\n");
+        let untouched = write_link_fixture(&root, "docs/untouched.md", "# Untouched\n");
+        let capability = r#"{"allowed_paths":["docs/guide.md"],"purpose":"link-repair","authority":"issue-1630"}"#;
+
+        assert_eq!(
+            run_link_audit(
+                &root,
+                &["docs/guide.md".to_string()],
+                true,
+                false,
+                Some(capability)
+            ),
+            0
+        );
+        assert_eq!(
+            fs::read_to_string(&guide).expect("guide is readable"),
+            "[root](../README.md#top)\n"
+        );
+        assert_eq!(
+            fs::read_to_string(&untouched).expect("untouched source is readable"),
+            "# Untouched\n"
+        );
+        assert!(!root.join("reports").exists());
+    }
+
+    #[test]
+    fn links_apply_preflights_all_rewrites_before_writing_any_source() {
+        let temporary = DocsTemporaryDirectory::create("links-preflight")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        write_link_fixture(&root, "README.md", "# Root\n");
+        let allowed = write_link_fixture(&root, "docs/guide.md", "[root](README.md)\n");
+        let denied = write_link_fixture(&root, "docs/other.md", "[root](README.md)\n");
+        let before_allowed = fs::read(&allowed).expect("allowed file bytes are captured");
+        let before_denied = fs::read(&denied).expect("denied file bytes are captured");
+        let capability = r#"{"allowed_paths":["docs/guide.md"],"purpose":"link-repair","authority":"issue-1630"}"#;
+
+        assert_eq!(
+            run_link_audit(&root, &["docs".to_string()], true, false, Some(capability)),
+            2
+        );
+        assert_eq!(
+            fs::read(&allowed).expect("allowed file remains readable"),
+            before_allowed
+        );
+        assert_eq!(
+            fs::read(&denied).expect("denied file remains readable"),
+            before_denied
+        );
+    }
+
+    #[test]
+    fn link_rewrite_plans_unique_filename_targets_and_preserves_ambiguous_or_external_links() {
+        let temporary = DocsTemporaryDirectory::create("links-name-index")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        let source = write_link_fixture(
+            &root,
+            "docs/guide.md",
+            "[unique](topic.md#part)\n[ambiguous](same.md)\n[external](https://example.test/x)\n",
+        );
+        write_link_fixture(&root, "one/topic.md", "# Topic\n");
+        write_link_fixture(&root, "one/same.md", "# One\n");
+        write_link_fixture(&root, "two/same.md", "# Two\n");
+        let expected = "[unique](../one/topic.md#part)\n[ambiguous](same.md)\n[external](https://example.test/x)\n";
+
+        let planned = planned_link_rewrites(&root, &["docs/guide.md".to_string()])
+            .expect("link rewrite plan is read-only");
+
+        assert_eq!(planned.get(&source), Some(&expected.to_string()));
+        assert_eq!(
+            fs::read_to_string(&source).expect("source remains unchanged during planning"),
+            "[unique](topic.md#part)\n[ambiguous](same.md)\n[external](https://example.test/x)\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn link_rewrite_preserves_literal_backslash_path_components() {
+        let temporary = DocsTemporaryDirectory::create("links-backslash-component")
+            .expect("temporary docs root is created");
+        let root = temporary
+            .0
+            .canonicalize()
+            .expect("temporary docs root is canonical");
+        let target = root.join("docs\\x/guide.md");
+        fs::create_dir_all(target.parent().expect("target has a parent"))
+            .expect("literal-backslash directory is created");
+        fs::write(&target, "# Guide\n").expect("target is written");
+        let source = write_link_fixture(
+            &root,
+            "index.md",
+            &format!("[guide]({})\n", target.display()),
+        );
+
+        let planned = planned_link_rewrites(&root, &["index.md".to_string()])
+            .expect("link rewrite planning succeeds");
+
+        assert_eq!(
+            planned.get(&source).map(String::as_str),
+            Some("[guide](docs\\x/guide.md)\n")
+        );
+        assert_eq!(
+            fs::read_to_string(&source).expect("planning does not mutate source"),
+            format!("[guide]({})\n", target.display())
+        );
     }
 }

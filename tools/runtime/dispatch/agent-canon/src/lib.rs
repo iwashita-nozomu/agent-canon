@@ -1,10 +1,10 @@
 #![recursion_limit = "256"]
 
-//! Shared AgentCanon runtime, LSP, Template, release, artifact, catalog, parent-root authority, proof, and evaluation APIs.
+//! Shared AgentCanon runtime, LSP, Template, release, docs, source mutation, artifact, catalog, parent-root authority, proof, and evaluation APIs.
 
 // @dependency-start
 // contract implementation
-// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, Template/release, catalog, and proof APIs.
+// responsibility Exposes shared runtime, LSP, native evaluation, private feedback, artifact identity, parent-root authority, Template/release, docs/link repair, source mutation, catalog, and proof APIs.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust implementation ownership
 // upstream implementation runtime_boundary.rs owns external runtime and restricted spool capabilities
 // upstream implementation runtime_boundary.rs owns external artifact I/O capabilities
@@ -13,6 +13,8 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// upstream implementation docs.rs owns Markdown checks, formatting, and link repair
+// upstream implementation source_mutation.rs owns exact-path source mutation capabilities
 // downstream implementation code_template_rendering.rs owns code template rendering
 // downstream implementation entrypoint_composer.rs owns consumer entrypoint composition
 // downstream implementation native_release.rs owns source-bound native releases
@@ -46,6 +48,7 @@ pub mod artifacts;
 pub mod authority;
 pub mod catalog;
 pub mod code_template_rendering;
+pub mod docs;
 pub mod entrypoint_composer;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
@@ -68,6 +71,7 @@ pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
+pub mod source_mutation;
 pub mod stablehlo_value_closure;
 pub mod template_bundle;
 pub mod theorem_graph_board;
