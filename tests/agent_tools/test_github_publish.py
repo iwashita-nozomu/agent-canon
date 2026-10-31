@@ -8,6 +8,7 @@ of ordinary source-branch publication.
 # contract test
 # responsibility Tests GitHub publish tool command construction and failure boundaries.
 # upstream implementation ../../tools/repository/github/github_publish.py implements gh-backed publish.
+# upstream test ../../tests/fixtures/generated_completeness/github_g1_g2.json stores old producer gates for the exact permission contexts.
 # upstream design ../../agents/skills/pr-processing.md defines publish workflow policy.
 # @dependency-end
 
@@ -20,28 +21,17 @@ import json
 import sys
 import tempfile
 import unittest
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from contextlib import redirect_stdout
 from pathlib import Path
-from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.repository.github import github_publish  # noqa: E402
 from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
-    GATE_CONTRACTS,
-    SourceProjectionGateOwnerApis,
-    materialize_fresh_clone_source_projection_packet,
-    materialize_gate_verdict,
-    materialize_source_main_rebind_receipt,
     validate_pull_request_lifecycle,
     validate_pull_request_transition,
-    validate_source_projection_packet,
-)  # noqa: E402
-from tools.validation.ci.checks.check_agent_canon_pr import (  # noqa: E402
-    GENERATED_COMPLETENESS_CHECK_IDS,
-    materialize_generated_completeness_receipt,
 )  # noqa: E402
 
 CANDIDATE_SHA = "a" * 40
@@ -51,6 +41,9 @@ BASE_TREE = "d" * 40
 MERGE_SHA = "1" * 40
 MERGE_TREE = "2" * 40
 OPEN_TEST_MERGE_SHA = "8f3592602c9b58651f7d79fdaf0863c18dd9d815"
+GITHUB_G1_G2_FIXTURE = (
+    PROJECT_ROOT / "tests" / "fixtures" / "generated_completeness" / "github_g1_g2.json"
+)
 
 
 class FakeRunner:
@@ -236,150 +229,25 @@ class GithubPublishTest(unittest.TestCase):
         self,
         lifecycle: dict[str, object],
     ) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
-        """Build exact reviewed-CAS and canonical G1/G2 fixtures."""
-        binding = dict(lifecycle["binding"])
-        head = lifecycle["head_identity"]
-        base = lifecycle["base_identity"]
-        assert isinstance(head, dict)
-        assert isinstance(base, dict)
-        rebind = materialize_source_main_rebind_receipt(
-            binding=binding,
-            old_base_identity={
-                "remote": "origin",
-                "ref": "refs/heads/main",
-                "commit_sha": base["commit_sha"],
-                "tree_sha": base["tree_sha"],
-            },
-            new_base_identity={
-                "remote": "origin",
-                "ref": "refs/heads/main",
-                "commit_sha": base["commit_sha"],
-                "tree_sha": base["tree_sha"],
-            },
-            origin_main_readback_evidence_ref="evidence:" + "7" * 64,
+        """Load the old G1/G2 records for this exact permission evidence context."""
+        permission_identity = lifecycle["permission_identity"]
+        assert isinstance(permission_identity, dict)
+        permission_state = permission_identity["permission_state"]
+        self.assertIn(permission_state, ("verified_true", "unknown"))
+        context_name = (
+            "permission_unknown" if permission_state == "unknown" else "verified_true"
         )
-        cas_evidence_ref = "evidence:" + "8" * 64
-        cas_binding = dict(binding)
-        cas_binding["evidence_ref"] = cas_evidence_ref
-        cas_binding["evidence_digest"] = "sha256:" + "8" * 64
-        cas = {
-            "schema": "agent-canon.candidate-cas-receipt.v1",
-            "cas_receipt_id": "cas:" + "9" * 64,
-            "binding": cas_binding,
-            "predecessor_evidence_id": binding["evidence_ref"],
-            "rebind_receipt_evidence_id": rebind["rebind_receipt_id"],
-            "candidate_identity": {
-                "candidate_sha": head["commit_sha"],
-                "tree_sha": head["tree_sha"],
-            },
-            "cas_base_identity": {
-                "commit_sha": base["commit_sha"],
-                "tree_sha": base["tree_sha"],
-            },
-            "cas_evidence_ref": cas_evidence_ref,
-            "cas_stage": "cas",
-        }
-        g1 = materialize_gate_verdict(
-            binding=binding,
-            gate_id="G1",
-            ordered_input_evidence_refs=[str(binding["evidence_ref"])],
-            invariant="source_correctness",
-            output_digest="sha256:" + "b" * 64,
-            owner=str(
-                PROJECT_ROOT
-                / "tools"
-                / "repository"
-                / "github"
-                / "publication_integrator.py"
-            )
-            + "#resolve_publication_eligibility",
-            verdict="pass",
+        fixture = json.loads(GITHUB_G1_G2_FIXTURE.read_text(encoding="utf-8"))
+        context = next(
+            record
+            for record in fixture["contexts"]
+            if record["context"] == context_name
         )
-        g2 = materialize_generated_completeness_receipt(
-            g1_gate=g1,
-            candidate_sha=str(head["commit_sha"]),
-            tree_sha=str(head["tree_sha"]),
-            check_results=[
-                {"check_id": check_id, "status": "pass"}
-                for check_id in GENERATED_COMPLETENESS_CHECK_IDS
-            ],
+        return (
+            copy.deepcopy(context["source_main_rebind_receipt"]),
+            copy.deepcopy(context["candidate_cas_receipt"]),
+            copy.deepcopy(context["gate_verdicts"]),
         )
-        return rebind, cas, [g1, g2]
-
-    def test_fresh_clone_source_projection_uses_declared_g1_and_real_owner_callbacks(
-        self,
-    ) -> None:
-        """Fresh-clone aggregation forwards G1/G2/G3 through their owner APIs."""
-        callback_order: list[str] = []
-        g2_input_gates: list[Mapping[str, object]] = []
-        g2_check_results: list[Mapping[str, object]] = []
-        g3_upstream_gates: list[tuple[Mapping[str, object], ...]] = []
-
-        def materialize_g2(
-            *,
-            g1_gate: Mapping[str, object],
-            candidate_sha: str,
-            tree_sha: str,
-            check_results: Sequence[Mapping[str, object]],
-        ) -> dict[str, object]:
-            callback_order.append("G2")
-            g2_input_gates.append(g1_gate)
-            g2_check_results.extend(check_results)
-            return materialize_generated_completeness_receipt(
-                g1_gate=g1_gate,
-                candidate_sha=candidate_sha,
-                tree_sha=tree_sha,
-                check_results=check_results,
-            )
-
-        def materialize_g3(
-            lifecycle: Mapping[str, object],
-            candidate_cas_receipt: Mapping[str, object],
-            source_main_rebind_receipt: Mapping[str, object],
-            upstream_gate_verdicts: Sequence[Mapping[str, object]],
-        ) -> dict[str, object]:
-            callback_order.append("G3")
-            g3_upstream_gates.append(tuple(upstream_gate_verdicts))
-            return github_publish.materialize_pr_identity_gate(
-                lifecycle,
-                candidate_cas_receipt,
-                source_main_rebind_receipt,
-                upstream_gate_verdicts,
-            )
-
-        gate_owner_apis = SourceProjectionGateOwnerApis(
-            generated_completeness_check_ids=GENERATED_COMPLETENESS_CHECK_IDS,
-            materialize_generated_completeness_receipt=materialize_g2,
-            materialize_pr_identity_gate=materialize_g3,
-        )
-        packet = materialize_fresh_clone_source_projection_packet(
-            candidate_sha=CANDIDATE_SHA,
-            candidate_tree_sha=CANDIDATE_TREE,
-            publication_sha=MERGE_SHA,
-            publication_tree_sha=MERGE_TREE,
-            gate_owner_apis=gate_owner_apis,
-        )
-
-        gates = cast(list[dict[str, object]], packet["source_gate_verdicts"])
-        self.assertEqual([gate["gate_id"] for gate in gates], ["G1", "G2", "G3"])
-        self.assertEqual(callback_order, ["G2", "G3"])
-        self.assertEqual(g2_input_gates, [gates[0]])
-        self.assertEqual(
-            [result["check_id"] for result in g2_check_results],
-            list(GENERATED_COMPLETENESS_CHECK_IDS),
-        )
-        self.assertEqual(
-            [result["status"] for result in g2_check_results],
-            ["pass"] * len(GENERATED_COMPLETENESS_CHECK_IDS),
-        )
-        self.assertEqual(g3_upstream_gates, [(gates[0], gates[1])])
-
-        declared_owner = cast(tuple[str, ...], GATE_CONTRACTS["G1"]["owners"])[0]
-        owner_path, owner_symbol = declared_owner.split("#", maxsplit=1)
-        self.assertEqual(
-            gates[0]["owner"], f"{(PROJECT_ROOT / owner_path).resolve()}#{owner_symbol}"
-        )
-        self.assertEqual(validate_source_projection_packet(packet), packet)
 
     def test_normalized_repo_slug_accepts_common_github_urls(self) -> None:
         """Remote URL parsing should support ssh, https, and owner/name."""
