@@ -217,9 +217,9 @@ summary = "Formal proof scaffold planner documentation, including natural-langua
 [[tool]]
 id = "lean-proof-env"
 classification = "public"
-tool = "tools/analysis/proof/lean_proof_env.py"
+tool = "tools/runtime/dispatch/agent-canon/src/lean_proof_env.rs"
 doc = "documents/tools/lean_proof_env.md"
-language = "python"
+language = "rust"
 summary = "Lean Mathlib/Aesop proof environment setup and checker routing documentation."
 
 [[tool]]
