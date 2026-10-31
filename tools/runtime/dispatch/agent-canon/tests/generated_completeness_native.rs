@@ -271,21 +271,13 @@ mod runtime_boundary_tests {
         let fixture = Fixture::new();
         initialize_repository(&fixture, &fixture.control);
         initialize_repository(&fixture, &fixture.source);
-        fs::create_dir_all(
-            fixture
-                .source
-                .join("tools/validation/ci/checks")
-                .parent()
-                .expect("source owner directory has a parent"),
-        )
-        .expect("create logical G2 owner parent");
-        fs::write(
-            fixture
-                .source
-                .join("tools/validation/ci/checks/check_agent_canon_pr.py"),
-            b"# logical schema owner fixture\n",
-        )
-        .expect("write logical G2 owner fixture");
+        let logical_g2_owner = fixture
+            .source
+            .join("tools/validation/ci/checks/check_agent_canon_pr.py");
+        fs::create_dir_all(logical_g2_owner.parent().expect("G2 owner has a parent"))
+            .expect("create logical G2 owner parent");
+        fs::write(&logical_g2_owner, b"# logical schema owner fixture\n")
+            .expect("write logical G2 owner fixture");
         fs::create_dir_all(fixture.source.join("tools/repository/github"))
             .expect("create G1 owner parent");
         fs::write(
