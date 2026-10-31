@@ -60,6 +60,10 @@ runtime_schema:
     - id: rust-rust-migration-plan
       selector: rust-migration-plan
       path: tools/runtime/dispatch/agent-canon/src/rust_migration_plan.rs
+    - id: rust-native-release
+      selector: native-release
+      path: tools/runtime/dispatch/agent-canon/src/native_release.rs
+      writes: true
     - id: rust-docs
       selector: docs
       path: tools/runtime/dispatch/agent-canon/src/docs.rs
@@ -869,17 +873,17 @@ entries:
   - id: compose-consumer-entrypoint
     public: true
     summary: Composes a consumer-owned root AGENTS.md from the common ROOT_AGENTS.md base and specific instructions.
-    path: tools/agent/templates/entrypoint_composer.py
+    path: tools/runtime/dispatch/agent-canon/src/entrypoint_composer.rs
     family: agent_tools
     role: helper
     status: canonical
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/agent/templates/entrypoint_composer.py --base <ROOT_AGENTS.md> --specific <consumer-specific-file> --output <consumer-root-AGENTS.md>
+    command: tools/bin/agent-canon compose-consumer-entrypoint --base <ROOT_AGENTS.md> --specific <consumer-specific-file> --output <consumer-root-AGENTS.md>
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/templates/entrypoint_composer.py]
+      runtime: native
+      argv: [tools/bin/agent-canon, compose-consumer-entrypoint]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
@@ -899,19 +903,19 @@ entries:
       - documents/design/entrypoint-owner-map.md
       - ROOT_AGENTS.md
     tests:
-      - tests/agent_tools/test_entrypoint_composer.py
+      - tools/runtime/dispatch/agent-canon/src/template_tests.rs
 
   - id: template-bundle
     summary: Exports one canonical template profile to a fresh external directory.
-    path: tools/agent/templates/template_bundle.py
+    path: tools/runtime/dispatch/agent-canon/src/template_bundle.rs
     family: agent_tools
     role: helper
     status: canonical
-    command: bootstrap.sh template export --root <registered-root> --profile <profile> --output <runtime-relative-directory>
+    command: tools/bin/agent-canon template-bundle <export|verify|native-package|native-verify|native-version> [options]
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/agent/templates/template_bundle.py]
+      runtime: native
+      argv: [tools/bin/agent-canon, template-bundle]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
@@ -930,7 +934,9 @@ entries:
       - templates/README.md
       - documents/contracts/template-bundle-manifest.toml
     tests:
-      - tests/agent_tools/test_template_bundle.py
+      - tools/runtime/dispatch/agent-canon/src/template_tests.rs
+      - tools/runtime/dispatch/agent-canon/tests/native_release_native.rs
+      - tests/agent_tools/test_native_cli_distribution.py
 
   - id: create-experiment-topic
     public: true
