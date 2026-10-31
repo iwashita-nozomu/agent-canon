@@ -7,7 +7,8 @@
 # upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream implementation ../../../repository/workspace/parent_root_side_effects.py owns explicit control authentication and child execution
 # upstream implementation ../../../runtime/artifacts/runtime_artifacts.py owns PR scratch, archive, and receipt output boundaries
-# upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects regenerated report leftovers before PR check pass
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/generated_completeness.rs materializes the post-check G2 receipt
 # upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py Codex runtime role alignment eval
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
@@ -202,8 +203,8 @@ PY
 emit_generated_completeness_receipt() {
   local bundle="${AGENT_CANON_PR_GATE_BUNDLE:-}"
   local output="${AGENT_CANON_G2_OUTPUT:-}"
-  local command=(
-    python3 "${PR_AGENT_CANON_SOURCE_ROOT}/tools/validation/ci/checks/check_agent_canon_pr.py"
+  local args=(
+    materialize-agent-canon-pr-g2
     --g1-bundle "${bundle}"
     --source-root "${PR_AGENT_CANON_SOURCE_ROOT}"
     --control-parent-root "${AGENT_CANON_CONTROL_PARENT_ROOT}"
@@ -215,9 +216,9 @@ emit_generated_completeness_receipt() {
   fi
   if [[ -n "${output}" ]]; then
     output="$(runtime_boundary_path "${output}")"
-    command+=(--output "${output}")
+    args+=(--output "${output}")
   fi
-  "${command[@]}"
+  run_agent_canon "${args[@]}"
 }
 
 run_standalone_static_gate_ci() {
