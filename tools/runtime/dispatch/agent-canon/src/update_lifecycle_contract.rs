@@ -1,12 +1,13 @@
 // @dependency-start
 // contract implementation
-// responsibility Owns native immutable update-lifecycle record binding and gate-verdict mechanics.
+// responsibility Owns native immutable update-lifecycle records, binding, and gate-verdict mechanics.
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns update lifecycle meaning
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes and body hashes
 // upstream implementation ../../../../../tools/runtime/lifecycle/update_lifecycle_contract.py remains the full lifecycle owner until later slices migrate
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
+// downstream test ../tests/update_lifecycle_records_native.rs freezes snapshot, evidence, and checkpoint record validation
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;
@@ -92,6 +93,9 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
 const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
+const SNAPSHOT_SCHEMA: &str = "agent-canon.snapshot.v1";
+const EVIDENCE_IDENTITY_SCHEMA: &str = "agent-canon.evidence-identity.v1";
+const CHECKPOINT_RECEIPT_SCHEMA: &str = "agent-canon.checkpoint-receipt.v1";
 pub const SOURCE_MAIN_REBIND_SCHEMA: &str = "agent-canon.source-main-rebind-receipt.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -583,6 +587,111 @@ pub fn validate_record_binding(value: &JsonValue) -> Result<JsonValue, Lifecycle
         valid_sha256,
     )?;
     validate_timing(required_value(binding, "timing", "binding")?)?;
+    canonical_clone(value)
+}
+
+pub fn validate_snapshot(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let snapshot = mapping(value, "snapshot")?;
+    exact_keys(
+        snapshot,
+        &["schema", "binding", "source_namespace", "base_identity"],
+        &[],
+        "snapshot",
+    )?;
+    if snapshot.get("schema").and_then(JsonValue::as_str) != Some(SNAPSHOT_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", SNAPSHOT_SCHEMA));
+    }
+    validate_record_binding(required_value(snapshot, "binding", "snapshot")?)?;
+    let source_namespace = required_string(snapshot, "source_namespace", "snapshot")?;
+    if !std::path::Path::new(&source_namespace).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "snapshot.source_namespace",
+        ));
+    }
+    validate_remote_git_identity(
+        required_value(snapshot, "base_identity", "snapshot")?,
+        "snapshot.base_identity",
+    )?;
+    canonical_clone(value)
+}
+
+pub fn validate_evidence_identity(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let evidence = mapping(value, "evidence_identity")?;
+    exact_keys(
+        evidence,
+        &[
+            "schema",
+            "binding",
+            "producer_path",
+            "producer_symbol",
+            "observed_at",
+            "sequence",
+        ],
+        &[],
+        "evidence_identity",
+    )?;
+    if evidence.get("schema").and_then(JsonValue::as_str) != Some(EVIDENCE_IDENTITY_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", EVIDENCE_IDENTITY_SCHEMA));
+    }
+    validate_record_binding(required_value(evidence, "binding", "evidence_identity")?)?;
+    let producer_path = required_string(evidence, "producer_path", "evidence_identity")?;
+    if !std::path::Path::new(&producer_path).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "evidence_identity.producer_path",
+        ));
+    }
+    required_string(evidence, "producer_symbol", "evidence_identity")?;
+    rfc3339(
+        required_value(evidence, "observed_at", "evidence_identity")?,
+        "evidence_identity.observed_at",
+    )?;
+    positive_integer(
+        required_value(evidence, "sequence", "evidence_identity")?,
+        "evidence_identity.sequence",
+        false,
+    )?;
+    canonical_clone(value)
+}
+
+pub fn validate_checkpoint_receipt(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "checkpoint_receipt")?;
+    exact_keys(
+        receipt,
+        &[
+            "schema",
+            "binding",
+            "checkpoint_id",
+            "verdict",
+            "failure_code",
+        ],
+        &[],
+        "checkpoint_receipt",
+    )?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(CHECKPOINT_RECEIPT_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", CHECKPOINT_RECEIPT_SCHEMA));
+    }
+    validate_record_binding(required_value(receipt, "binding", "checkpoint_receipt")?)?;
+    one_of(
+        required_value(receipt, "checkpoint_id", "checkpoint_receipt")?,
+        CHECKPOINT_IDS,
+        "checkpoint_receipt.checkpoint_id",
+    )?;
+    let verdict = one_of(
+        required_value(receipt, "verdict", "checkpoint_receipt")?,
+        &["pass", "fail", "skip"],
+        "checkpoint_receipt.verdict",
+    )?;
+    let failure_code = required_value(receipt, "failure_code", "checkpoint_receipt")?;
+    if verdict == "fail" {
+        string_value(failure_code, "checkpoint_receipt.failure_code")?;
+    } else if !failure_code.is_null() {
+        return Err(fail(
+            "lifecycle:failure_code_forbidden",
+            "checkpoint_receipt",
+        ));
+    }
     canonical_clone(value)
 }
 
