@@ -349,7 +349,9 @@ fn resolve_path(path: &Path) -> PathBuf {
         if path.is_absolute() {
             path.to_path_buf()
         } else {
-            env::current_dir().unwrap_or_else(|_| PathBuf::from(".")) / path
+            env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(path)
         }
     })
 }
@@ -485,7 +487,8 @@ pub struct CodeSymbol {
 impl CodeSymbol {
     fn as_json(&self, root: &Path) -> Result<Value, LspAnalysisError> {
         Ok(json!({
-            "uri": uri_path(root, &self.uri)?,
+            "uri": uri_path(root, &self.uri)
+                .map_err(|error| LspAnalysisError::new(error.code, error.message))?,
             "name": self.name,
             "kind": self.kind,
             "range": self.range.as_json(),
@@ -530,7 +533,8 @@ pub struct CodeDiagnostic {
 impl CodeDiagnostic {
     fn as_json(&self, root: &Path) -> Result<Value, LspAnalysisError> {
         Ok(json!({
-            "uri": uri_path(root, &self.uri)?,
+            "uri": uri_path(root, &self.uri)
+                .map_err(|error| LspAnalysisError::new(error.code, error.message))?,
             "range": self.range.as_json(),
             "severity": self.severity,
             "code": self.code,
@@ -790,7 +794,7 @@ impl LspProcessSession {
             Err(error) => {
                 stop_child(&mut child);
                 drop(events);
-                join_when_done(reader_thread, reader_done);
+                join_when_done(reader_thread, &reader_done);
                 return Err(AnalysisFailure::new(
                     "server-unavailable",
                     format!("unable to start LSP stderr reader: {error}"),
@@ -871,12 +875,6 @@ impl LspProcessSession {
                 }
                 Ok(ReaderEvent::Message(Message::Request(request))) => {
                     self.handle_server_request(request)?;
-                }
-                Ok(ReaderEvent::Message(_)) => {
-                    return Err(AnalysisFailure::new(
-                        "protocol-violation",
-                        "unexpected LSP JSON-RPC message",
-                    ));
                 }
                 Ok(ReaderEvent::Closed) => {
                     return Err(AnalysisFailure::new(
@@ -1045,12 +1043,6 @@ impl LspProcessSession {
                     return Err(AnalysisFailure::new(
                         "protocol-violation",
                         "unexpected LSP response while draining notifications",
-                    ));
-                }
-                Ok(ReaderEvent::Message(_)) => {
-                    return Err(AnalysisFailure::new(
-                        "protocol-violation",
-                        "unexpected LSP JSON-RPC message",
                     ));
                 }
                 Ok(ReaderEvent::Closed) => {
@@ -1910,6 +1902,7 @@ fn flatten_symbols(raw: &Value, uri: &str) -> Result<Vec<CodeSymbol>, AnalysisFa
                     })
                 })
                 .transpose()?
+                .map(Vec::as_slice)
                 .unwrap_or(&[]);
             pending.extend(children.iter().rev());
         }
@@ -2441,6 +2434,7 @@ fn shell_words(value: &str) -> Result<Vec<String>, String> {
                 }
                 _ => current.push(character),
             },
+            Some(_) => unreachable!("quote state is set only to a single or double quote"),
             None => match character {
                 '\'' | '"' => {
                     quote = Some(character);
