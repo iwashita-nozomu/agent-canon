@@ -253,3 +253,25 @@ fn gate_chain_and_retry_options_preserve_the_owner_contract() {
     assert_eq!(error.code, "lifecycle:retry_reason_forbidden");
     assert_eq!(error.detail, "gate_verdict");
 }
+
+#[test]
+fn binding_timing_preserves_python_arbitrary_precision_integer_inputs() {
+    let golden: Value = serde_json::from_str(PYTHON_GOLDEN).unwrap();
+    let original = golden["gates"][0]["input"]["binding"].clone();
+    let huge: Value = serde_json::from_str("184467440737095516160000000000000000001").unwrap();
+    let mut binding = original.clone();
+    binding["timing"]["duration_ms"] = huge.clone();
+    binding["timing"]["attempt"] = huge;
+    assert_eq!(validate_record_binding(&binding).unwrap(), binding);
+    for invalid in [
+        serde_json::json!(-1),
+        serde_json::json!(1.0),
+        serde_json::json!(true),
+    ] {
+        let mut binding = original.clone();
+        binding["timing"]["attempt"] = invalid;
+        let error = validate_record_binding(&binding).unwrap_err();
+        assert_eq!(error.code, "lifecycle:integer_invalid");
+        assert_eq!(error.detail, "binding.timing.attempt");
+    }
+}

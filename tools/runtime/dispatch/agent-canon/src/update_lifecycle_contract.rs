@@ -272,15 +272,17 @@ fn positive_integer(
     field: &str,
     zero_allowed: bool,
 ) -> Result<(), LifecycleContractError> {
-    let integer = value
-        .as_i64()
-        .filter(|integer| *integer >= 0)
-        .map(|integer| integer as u64)
-        .or_else(|| value.as_u64())
-        .filter(|integer| if zero_allowed { true } else { *integer >= 1 });
-    integer
-        .map(|_| ())
-        .ok_or_else(|| fail("lifecycle:integer_invalid", field))
+    let number = value
+        .as_number()
+        .ok_or_else(|| fail("lifecycle:integer_invalid", field))?;
+    let text = number.to_string();
+    if text.bytes().all(|byte| byte.is_ascii_digit())
+        && (zero_allowed || text.bytes().any(|byte| byte != b'0'))
+    {
+        Ok(())
+    } else {
+        Err(fail("lifecycle:integer_invalid", field))
+    }
 }
 
 fn boolean_value(value: &JsonValue, field: &str) -> Result<(), LifecycleContractError> {
