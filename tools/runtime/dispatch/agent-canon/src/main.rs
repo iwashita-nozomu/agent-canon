@@ -17,6 +17,7 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
+// downstream implementation responsibility_scope.rs validates tracked-path owner coverage and planned path owners
 // downstream implementation python_ast.rs shares native Python AST helper behavior
 // downstream implementation python_cli_integer.rs shares Python-compatible CLI integer parsing
 // downstream implementation python_helper_function_inventory.rs inventories Python helper roles
@@ -50,6 +51,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
+mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
 mod run_log_contract;
@@ -82,6 +84,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   numeric-performance [--input <path|->] [--format json]
@@ -180,6 +183,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "surface-manifest" {
         std::process::exit(surface_manifest::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == responsibility_scope::SELECTOR {
+        std::process::exit(responsibility_scope::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
