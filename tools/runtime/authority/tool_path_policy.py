@@ -6,10 +6,8 @@
 # upstream design ../../catalog.yaml structured AgentCanon tool catalog
 # downstream implementation ../manifest/tool_catalog.py rejects retired legacy catalog paths
 # downstream implementation ../dispatch/agent-canon/src/tool_drift.rs detects orphaned retired legacy tool files
-# downstream implementation ../../analysis/code/lsp_code_analysis.py excludes retired legacy paths from bounded LSP discovery
 # downstream implementation ../../../tests/agent_tools/test_tool_catalog.py validates catalog findings
 # downstream implementation ../../../tests/agent_tools/test_tool_drift.py validates orphan detection
-# downstream implementation ../../../tests/agent_tools/test_lsp_code_analysis.py validates bounded LSP discovery
 # @dependency-end
 """Shared path policy for retired AgentCanon tool surfaces."""
 

@@ -5,7 +5,7 @@ responsibility Defines code dependency analysis scope for the structured analysi
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
 upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
-upstream implementation ../../tools/analysis/code/lsp_code_analysis.py extracts canonical LSP code facts
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs extracts canonical LSP code facts
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs owns optional native SCIP index/query evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end
@@ -29,7 +29,7 @@ SCIP query は external `index.scip` から bounded evidence を返すだけで�
 ## Scope
 
 Point code analysis uses LSP 3.17 JSON-RPC through
-`lsp_code_analysis.py analyze --format json`; it remains distinct from
+`agent-canon lsp-code-analysis analyze --format json`; it remains distinct from
 dependency-header evidence. Repository-wide symbol/reference evidence is an
 optional native SCIP index/query path selected through
 `agent-canon scip-index` and the bounded Change Impact consumer. This path is distinct
@@ -56,9 +56,9 @@ claim source freshness or call-graph completeness.
 ## Evidence And Assumption Ledger
 
 - Evidence sources: [documents/structured-analysis/code-analysis.md](code-analysis.md) owns this scope.
-- Evidence sources: `tools/analysis/code/lsp_code_analysis.py` owns the LSP adapter and report.
+- Evidence sources: `tools/runtime/dispatch/agent-canon/src/lsp_code_analysis.rs` owns the LSP adapter and report.
 - Evidence sources: `bootstrap/container/image/dependencies.toml` and [documents/design/dependency-manifest-design.md](../design/dependency-manifest-design.md) provide manifest, receipt, and live-verification evidence.
-- Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`,
+- Evidence sources: `tools/runtime/dispatch/agent-canon/tests/lsp_code_analysis_native.rs`,
   `tools/runtime/dispatch/agent-canon/tests/scip_index_native.rs`, `tests/agent_tools/test_search.py`, and
   `tools/runtime/dispatch/agent-canon/tests/git_dependency_diff_summary_native.rs` cover LSP protocol,
   SCIP index/query, consumer, and summary behavior.
