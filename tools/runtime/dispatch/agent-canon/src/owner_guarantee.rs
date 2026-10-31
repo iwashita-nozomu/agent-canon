@@ -9,7 +9,6 @@
 // @dependency-end
 
 use crate::python_json::{JsonArray, JsonObject, JsonString, JsonValue};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -204,7 +203,7 @@ fn check_fields(
     let allowed = allowed_fields
         .iter()
         .copied()
-        .map(|field| JsonString::from_text(field))
+        .map(JsonString::from_text)
         .collect::<BTreeSet<_>>();
     let actual = object
         .0
