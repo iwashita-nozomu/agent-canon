@@ -408,11 +408,7 @@ fn render_json(
 }
 
 fn render_json_string_array(values: &[&String]) -> Result<String, serde_json::Error> {
-    let values = values
-        .iter()
-        .map(|value| json_ensure_ascii(value.as_str()))
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(format!("[{}]", values.join(", ")))
+    json_ensure_ascii(&serde_json::to_string(values)?)
 }
 
 fn json_ensure_ascii(serialized: &str) -> Result<String, serde_json::Error> {
