@@ -153,3 +153,45 @@ fn run_path_comparison_matches_all_frozen_cpython_cli_cases() {
     assert_eq!(passed, 5);
     assert_eq!(failed, 5);
 }
+
+#[test]
+fn python_letter_number_boundary_accepts_combining_alphabetic_codepoint() {
+    let golden: Value = serde_json::from_str(include_str!(
+        "../../../../../tests/fixtures/compare_agent_run_paths/unicode_python_golden.json"
+    ))
+    .expect("frozen Unicode boundary probe parses");
+    let probes = golden
+        .as_array()
+        .expect("frozen Unicode boundary probes are an array");
+    let expected = probes
+        .iter()
+        .find(|probe| text(field(probe, "codepoint")) == "U+0345")
+        .expect("old Python U+0345 boundary result is frozen");
+    let codepoint = text(field(expected, "codepoint"));
+    let combining = char::from_u32(
+        u32::from_str_radix(&codepoint[2..], 16).expect("frozen code point is hexadecimal"),
+    )
+    .expect("frozen Unicode code point is valid");
+
+    let temporary = TempDirectory::new("unicode-u0345");
+    let baseline = write_run(&temporary.0, "baseline", None);
+    let candidate_text = format!(
+        "{combining}execution_path=unicode-probe route_efficiency=efficient static_analysis_feedback=recorded\n"
+    );
+    let candidate = write_run(&temporary.0, "candidate", Some(&candidate_text));
+    let comparison = compare_agent_run_paths(&baseline, &candidate)
+        .expect("frozen U+0345 monitoring text is valid UTF-8");
+
+    assert_eq!(
+        comparison.exit_code(),
+        field(expected, "old_exit")
+            .as_i64()
+            .expect("frozen old CLI exit is an integer") as i32
+    );
+    assert_eq!(
+        render_machine_status(&comparison),
+        text(field(expected, "old_stdout")),
+        "Python L/N/underscore boundary output"
+    );
+    assert_eq!(text(field(expected, "old_stderr")), "");
+}

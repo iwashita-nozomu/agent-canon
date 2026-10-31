@@ -9,11 +9,16 @@
 // @dependency-end
 
 use crate::path_resolution::resolve_non_strict;
+use regex::Regex;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 const INEFFICIENT_VALUES: &[&str] = &["inefficient", "wasteful", "avoidable", "slow_path"];
+static PYTHON_WORD_CHARACTER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\A[\p{L}\p{N}_]\z").expect("fixed Python word-character regex is valid")
+});
 const MONITORING_FILE: &str = "workflow_monitoring.md";
 const REPORT_OWNER: &str =
     "../../tools/runtime/dispatch/agent-canon/src/compare_agent_run_paths.rs";
@@ -114,7 +119,8 @@ fn read_run_path(label: &str, run_dir: PathBuf) -> io::Result<RunPath> {
 }
 
 fn python_word_character(character: char) -> bool {
-    character.is_alphanumeric() || character == '_'
+    let mut encoded = [0; 4];
+    PYTHON_WORD_CHARACTER.is_match(character.encode_utf8(&mut encoded))
 }
 
 fn token_character(character: char) -> bool {
