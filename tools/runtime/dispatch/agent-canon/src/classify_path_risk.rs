@@ -4,7 +4,9 @@
 // upstream design ../../../../../documents/runtime/runtime-profiles-and-check-matrix.md profile-based validation routing
 // upstream design ../../../../../documents/design/responsibility-rationale.md evidence-triggered validation selection
 // upstream design ../../../../../agents/TASK_WORKFLOWS.md risk-scaled workflow families
+// upstream implementation python_text.rs shares Python-compatible path-file line splitting
 // downstream design ../../../../../documents/tools/classify_path_risk.md path-risk classification usage
+// downstream implementation tool_rejection_preflight.rs reuses Python splitlines and JSON escaping
 // downstream implementation ../../../../../tests/agent_tools/test_classify_path_risk.py native selector behavior oracles
 // downstream implementation ../../../../../tests/tools/test_standalone_static_gate_units.py selector and CI ownership oracles
 // downstream implementation ../../../../../.github/workflows/agent-canon-static-gates.yml source-built unit selection
@@ -128,40 +130,8 @@ fn python_strip(value: &str) -> &str {
     })
 }
 
-fn python_splitlines(text: &str) -> Vec<&str> {
-    let mut lines = Vec::new();
-    let mut line_start = 0;
-    let mut characters = text.char_indices().peekable();
-    while let Some((index, character)) = characters.next() {
-        let end = if character == '\r' {
-            if characters.peek().is_some_and(|(_, next)| *next == '\n') {
-                let (newline_index, newline) = characters.next().expect("peeked newline");
-                newline_index + newline.len_utf8()
-            } else {
-                index + character.len_utf8()
-            }
-        } else if matches!(
-            character,
-            '\n' | '\u{000b}'
-                | '\u{000c}'
-                | '\u{001c}'
-                | '\u{001d}'
-                | '\u{001e}'
-                | '\u{0085}'
-                | '\u{2028}'
-                | '\u{2029}'
-        ) {
-            index + character.len_utf8()
-        } else {
-            continue;
-        };
-        lines.push(&text[line_start..index]);
-        line_start = end;
-    }
-    if line_start < text.len() {
-        lines.push(&text[line_start..]);
-    }
-    lines
+pub(crate) fn python_splitlines(text: &str) -> Vec<&str> {
+    crate::python_text::python_splitlines(text)
 }
 
 fn path_suffix(path: &str) -> &str {
@@ -413,7 +383,7 @@ fn render_json_string_array(values: &[&String]) -> Result<String, serde_json::Er
     json_ensure_ascii(&serde_json::to_string(values)?)
 }
 
-fn json_ensure_ascii(serialized: &str) -> Result<String, serde_json::Error> {
+pub(crate) fn json_ensure_ascii(serialized: &str) -> Result<String, serde_json::Error> {
     let mut output = String::with_capacity(serialized.len());
     for character in serialized.chars() {
         if character.is_ascii() {

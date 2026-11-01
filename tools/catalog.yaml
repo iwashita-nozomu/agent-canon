@@ -2276,12 +2276,12 @@ entries:
 
   - id: tool-rejection-preflight
     summary: Predicts edit-time responsibility, hook, tool, skill, protocol, and catalog rejection gates for handoff packets.
-    path: tools/validation/semantic/tools/tool_rejection_preflight.py
+    path: tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs
     family: agent_tools
     role: workflow
     status: canonical
-    command: python3 tools/validation/semantic/tools/tool_rejection_preflight.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/tools/tool_rejection_preflight.py"]}
+    command: tools/bin/agent-canon tool-rejection-preflight
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "tool-rejection-preflight"]}
     writes: false
     default_wiring:
       ci: false
@@ -2455,12 +2455,12 @@ entries:
 
   - id: compare-codex-token-footprints
     summary: Compares Codex session token footprints for efficiency review.
-    path: eval/checkers/compare_codex_token_footprints.py
+    path: tools/runtime/dispatch/agent-canon/src/token_footprints.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/compare_codex_token_footprints.py
-    dispatch: {argv: ["python3", "eval/checkers/compare_codex_token_footprints.py"]}
+    command: tools/bin/agent-canon compare-codex-token-footprints
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "compare-codex-token-footprints"]}
     writes: true
     default_wiring:
       ci: false

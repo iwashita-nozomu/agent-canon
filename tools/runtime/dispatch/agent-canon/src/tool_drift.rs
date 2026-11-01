@@ -178,11 +178,11 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "tool_rejection_preflight",
-        tool: "tools/validation/semantic/tools/tool_rejection_preflight.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs",
         links: &[
             direct_link("agents/COMMUNICATION_PROTOCOL.md"),
             direct_link("agents/skills/codex-task-workflow.md"),
-            direct_link("tools/validation/semantic/responsibility/responsibility_scope.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs"),
             direct_link("tools/README.md"),
             direct_link("documents/tools/README.md"),
             direct_link("tests/agent_tools/test_tool_rejection_preflight.py"),

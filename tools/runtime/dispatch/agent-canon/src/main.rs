@@ -46,8 +46,10 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation entrypoint_owner_map.rs checks root entrypoint owner-map contracts within docs
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
+// downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
+// downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
@@ -72,7 +74,7 @@ mod notebook_quality;
 mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
-mod python_cli_integer;
+use agent_canon::python_cli_integer;
 mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
@@ -80,7 +82,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
-mod python_text;
+use agent_canon::python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -94,7 +96,9 @@ pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+mod token_footprints;
 mod tool_drift;
+mod tool_rejection_preflight;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
@@ -131,6 +135,7 @@ Commands:
   generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
+  tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
@@ -139,6 +144,7 @@ Commands:
   work-log [--report-dir PATH|--run-id ID] --message TEXT [options]
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
+  compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
@@ -239,6 +245,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "compare-agent-run-paths" {
         std::process::exit(compare_agent_run_paths::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "compare-codex-token-footprints" {
+        std::process::exit(token_footprints::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
@@ -342,6 +352,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == responsibility_scope::SELECTOR {
         std::process::exit(responsibility_scope::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == tool_rejection_preflight::SELECTOR {
+        std::process::exit(tool_rejection_preflight::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
