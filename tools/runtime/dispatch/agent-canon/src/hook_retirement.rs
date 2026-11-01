@@ -12,13 +12,13 @@
 // @dependency-end
 //! Hook-retirement manifest, read-only caller audit, and native check command.
 
-use crate::python_json::{
-    canonical_json_ascii_bytes, canonical_json_ascii_bytes_reject_nonfinite, parse_json,
-    JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
-};
-use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
-use crate::python_text::python_splitlines;
 use crate::path_resolution::resolve_non_strict;
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
+use crate::python_json::{
+    canonical_json_ascii_bytes, canonical_json_ascii_bytes_reject_nonfinite, parse_json, JsonArray,
+    JsonNumber, JsonObject, JsonString, JsonValue,
+};
+use crate::python_text::python_splitlines;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeSet, HashSet};
@@ -704,7 +704,12 @@ pub fn contract_payload(root: &Path) -> JsonValue {
         ("schema", string_value(CALLER_AUDIT_SCHEMA)),
         (
             "retired_child_basenames",
-            value_array(child_basenames.iter().map(|value| string_value(value)).collect()),
+            value_array(
+                child_basenames
+                    .iter()
+                    .map(|value| string_value(value))
+                    .collect(),
+            ),
         ),
         (
             "moved_source_old_paths",
@@ -746,16 +751,23 @@ pub fn contract_payload(root: &Path) -> JsonValue {
         ),
         (
             "active_events",
-            value_array(active_events(root).into_iter().map(JsonValue::String).collect()),
+            value_array(
+                active_events(root)
+                    .into_iter()
+                    .map(JsonValue::String)
+                    .collect(),
+            ),
         ),
-        (
-            "inactive_events",
-            value_array(vec![string_value("Stop")]),
-        ),
+        ("inactive_events", value_array(vec![string_value("Stop")])),
         ("source_digest", string_value(&source_digest())),
         (
             "missing_files",
-            value_array(missing_files.drain(..).map(|value| string_value(&value)).collect()),
+            value_array(
+                missing_files
+                    .drain(..)
+                    .map(|value| string_value(&value))
+                    .collect(),
+            ),
         ),
         (
             "executable_references",
@@ -817,7 +829,13 @@ fn check_payload(payload: &JsonValue) -> Vec<&'static str> {
     let mut errors = Vec::new();
     let root = match payload {
         JsonValue::Object(root) => root,
-        _ => return vec!["retired_child_tombstones", "moved_source_absences", "retired_filenames"],
+        _ => {
+            return vec![
+                "retired_child_tombstones",
+                "moved_source_absences",
+                "retired_filenames",
+            ]
+        }
     };
     let children = as_array(object_value(root, "retired_child_tombstones"));
     let moved = as_array(object_value(root, "moved_source_absences"));
@@ -829,7 +847,10 @@ fn check_payload(payload: &JsonValue) -> Vec<&'static str> {
     }
     let retired_filename_count = as_object(object_value(root, "counts"))
         .and_then(|counts| object_value(counts, "retired_filenames"));
-    if !integer_matches(retired_filename_count, RETIRED_CHILD_TOMBSTONES.len() + MOVED_SOURCE_ABSENCES.len()) {
+    if !integer_matches(
+        retired_filename_count,
+        RETIRED_CHILD_TOMBSTONES.len() + MOVED_SOURCE_ABSENCES.len(),
+    ) {
         errors.push("retired_filenames");
     }
     if as_array(object_value(root, "missing_files")).is_some_and(|files| !files.0.is_empty()) {
@@ -842,9 +863,9 @@ fn check_payload(payload: &JsonValue) -> Vec<&'static str> {
     }
     let invalid_command = children.is_some_and(|rows| {
         rows.0.iter().any(|row| {
-            let Some(command) = as_text(as_object(Some(row)).and_then(|row| {
-                object_value(row, "command_or_skill")
-            })) else {
+            let Some(command) =
+                as_text(as_object(Some(row)).and_then(|row| object_value(row, "command_or_skill")))
+            else {
                 return true;
             };
             !regex_fullmatch(&COMMAND_RE, &command)
@@ -890,7 +911,8 @@ struct CliArgs {
 
 const USAGE: &str =
     "usage: agent-canon hook-retirement-check [-h] [--root ROOT] [--check] [--contract]\n";
-const HELP: &str = "usage: agent-canon hook-retirement-check [-h] [--root ROOT] [--check] [--contract]
+const HELP: &str =
+    "usage: agent-canon hook-retirement-check [-h] [--root ROOT] [--check] [--contract]
 
 Read the typed hook-retirement manifest and audit callers in the selected source root.
 
@@ -974,7 +996,10 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliArgs>, String> {
         index += 1;
     }
     if !unrecognized.is_empty() {
-        return Err(format!("unrecognized arguments: {}", unrecognized.join(" ")));
+        return Err(format!(
+            "unrecognized arguments: {}",
+            unrecognized.join(" ")
+        ));
     }
     Ok(Some(CliArgs { root, check }))
 }
@@ -1008,7 +1033,11 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
     let mut stdout = std::io::stdout().lock();
-    if stdout.write_all(&bytes).and_then(|()| stdout.write_all(b"\n")).is_err() {
+    if stdout
+        .write_all(&bytes)
+        .and_then(|()| stdout.write_all(b"\n"))
+        .is_err()
+    {
         return 1;
     }
     if options.check {
