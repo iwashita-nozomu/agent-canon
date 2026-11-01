@@ -165,6 +165,8 @@ fn materialize_git_recipe(root: &Path, case: &Value) {
         .expect("Git case has a setup recipe");
     assert!(recipe.starts_with("helpers.init_writer_git_repo:"));
     run_git_setup(root, &["init", "--quiet", "--initial-branch=fix/942"]);
+    run_git_setup(root, &["config", "user.name", "Test"]);
+    run_git_setup(root, &["config", "user.email", "test@example.invalid"]);
     fs::create_dir_all(root.join("src")).expect("source directory is created");
     fs::write(root.join("src/owned.py"), b"base\n").expect("owned source is written");
     fs::write(root.join("README.md"), b"base readme\n").expect("readme is written");
