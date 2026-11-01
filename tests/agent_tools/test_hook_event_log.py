@@ -30,7 +30,7 @@ sys.path.insert(0, str(HOOKS_DIR))
 sys.path.insert(0, str(TOOLS_DIR))
 
 import hook_event_log  # noqa: E402
-import test_codex_hooks as codex_hooks  # noqa: E402
+from tests.agent_tools import test_codex_hooks as codex_hooks  # noqa: E402
 from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
 
 

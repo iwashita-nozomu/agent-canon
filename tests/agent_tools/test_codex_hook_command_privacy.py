@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import test_codex_hooks as hooks
+from tests.agent_tools import test_codex_hooks as hooks
 
 
 class CodexHookCommandPrivacyTest(unittest.TestCase):

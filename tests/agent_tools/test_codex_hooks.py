@@ -16,20 +16,22 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 from unittest import mock
 
-import hook_event_log
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
+
+import hook_event_log  # noqa: E402
 
 from tools.agent.orchestration.prompt_classifier import (
     PromptClassifierInputs,
     prompt_intake_signals,
 )
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
