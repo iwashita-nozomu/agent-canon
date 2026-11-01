@@ -1048,7 +1048,10 @@ fn inspect_archive(
         let (name, parts, identity_parts) = normalized_member_identity(&original_name)?;
         if let Some((other, _)) = identities.get(&identity_parts) {
             return Err(format!(
-                "duplicate ZIP member identity: {other:?} and {original_name:?} -> {name:?}"
+                "duplicate ZIP member identity: {} and {} -> {}",
+                python_repr(other),
+                python_repr(&original_name),
+                python_repr(&name)
             ));
         }
         for depth in 1..=identity_parts.len() {
@@ -1057,9 +1060,9 @@ fn inspect_archive(
             if let Some(previous) = prefix_spellings.get(&identity_prefix) {
                 if previous != &spelling {
                     return Err(format!(
-                        "duplicate ZIP path-prefix identity: {:?} and {:?}",
-                        previous.join("/"),
-                        spelling.join("/")
+                        "duplicate ZIP path-prefix identity: {} and {}",
+                        python_repr(&previous.join("/")),
+                        python_repr(&spelling.join("/"))
                     ));
                 }
             } else {
@@ -1069,7 +1072,8 @@ fn inspect_archive(
         let mode = (entry.external_attributes() >> 16) & 0o170000;
         if mode == 0o120000 {
             return Err(format!(
-                "symlink ZIP member is not allowed: {original_name:?}"
+                "symlink ZIP member is not allowed: {}",
+                python_repr(&original_name)
             ));
         }
         let is_directory = original_name.ends_with('/');
@@ -1113,8 +1117,9 @@ fn inspect_archive(
             {
                 if !*parent_is_directory {
                     return Err(format!(
-                        "ZIP member path topology conflict: {parent:?} is a file parent of {:?}",
-                        member.original_name
+                        "ZIP member path topology conflict: {} is a file parent of {}",
+                        python_repr(parent),
+                        python_repr(&member.original_name)
                     ));
                 }
             }
@@ -1152,6 +1157,10 @@ fn decode_zip_name_untruncated(raw_name: &[u8], utf8_name: bool) -> Result<Strin
     Ok(raw_name.iter().copied().map(cp437_char).collect())
 }
 
+fn python_repr(value: &str) -> String {
+    rustpython_ast::Constant::Str(value.to_owned()).to_string()
+}
+
 fn truncate_zip_name(name: &str) -> String {
     name.split_once('\0')
         .map_or(name, |(prefix, _)| prefix)
@@ -1182,22 +1191,22 @@ fn cp437_char(byte: u8) -> char {
 
 fn normalized_member_identity(name: &str) -> Result<(String, Vec<String>, Vec<String>), String> {
     if name.is_empty() || name.contains('\0') {
-        return Err(format!("unsafe ZIP member path: {name:?}"));
+        return Err(format!("unsafe ZIP member path: {}", python_repr(name)));
     }
     let slash_name = name.replace('\\', "/");
     if slash_name.starts_with('/') || has_windows_drive(&slash_name) {
-        return Err(format!("unsafe ZIP member path: {name:?}"));
+        return Err(format!("unsafe ZIP member path: {}", python_repr(name)));
     }
     let mut parts = Vec::new();
     for part in slash_name.split('/') {
         match part {
             "" | "." => {}
-            ".." => return Err(format!("unsafe ZIP member path: {name:?}")),
+            ".." => return Err(format!("unsafe ZIP member path: {}", python_repr(name))),
             _ => parts.push(part.to_owned()),
         }
     }
     if parts.is_empty() {
-        return Err(format!("unsafe ZIP member path: {name:?}"));
+        return Err(format!("unsafe ZIP member path: {}", python_repr(name)));
     }
     let normalized = parts.join("/");
     let identity = parts
@@ -1260,21 +1269,32 @@ fn copy_archive_members(
             });
             continue;
         }
-        let entry = archive
-            .get_entry(member.wayfinder)
-            .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
-        let local_header = entry
-            .local_header(&mut local_header_buffer)
-            .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        let entry = archive.get_entry(member.wayfinder).map_err(|_| {
+            format!(
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
+            )
+        })?;
+        let local_header = entry.local_header(&mut local_header_buffer).map_err(|_| {
+            format!(
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
+            )
+        })?;
         let local_name = decode_zip_name_untruncated(
             local_header.file_path().as_ref(),
             local_header.flags().is_utf8(),
         )
-        .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        .map_err(|_| {
+            format!(
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
+            )
+        })?;
         if local_name != member.header_name {
             return Err(format!(
-                "cannot read ZIP member: {:?}",
-                member.original_name
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
             ));
         }
         let (compressed_start, compressed_end) = entry.compressed_data_range();
@@ -1283,14 +1303,14 @@ fn copy_archive_members(
             || compressed_end > member.next_header_offset
         {
             return Err(format!(
-                "cannot read ZIP member: {:?}",
-                member.original_name
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
             ));
         }
         if member.central_flags & UNSUPPORTED_ZIP_ENTRY_FLAGS != 0 {
             return Err(format!(
-                "cannot read ZIP member: {:?}",
-                member.original_name
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
             ));
         }
 
@@ -1309,15 +1329,26 @@ fn copy_archive_members(
             .map_err(|error| format!("cannot create ZIP member {:?}: {error}", member.name))?;
         let decoder =
             zip_member_decoder(member.compression_method, entry.reader(), member.size_bytes)
-                .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+                .map_err(|_| {
+                    format!(
+                        "cannot read ZIP member: {}",
+                        python_repr(&member.original_name)
+                    )
+                })?;
         let mut verified = entry.verifying_reader(decoder);
-        let digest = copy_and_digest(&mut verified, &mut target)
-            .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        let digest = copy_and_digest(&mut verified, &mut target).map_err(|_| {
+            format!(
+                "cannot read ZIP member: {}",
+                python_repr(&member.original_name)
+            )
+        })?;
         drop(target);
         if digest.size_bytes != member.size_bytes {
             return Err(format!(
-                "ZIP member size mismatch: {:?}: expected {}, observed {}",
-                member.original_name, member.size_bytes, digest.size_bytes
+                "ZIP member size mismatch: {}: expected {}, observed {}",
+                python_repr(&member.original_name),
+                member.size_bytes,
+                digest.size_bytes
             ));
         }
         records.push(RawMemberRecord {
@@ -1558,7 +1589,7 @@ fn verify_bundle_hashes(
             &parent,
             OsStr::new(leaf),
             &expected,
-            &format!("ZIP member {:?}", member.name),
+            &format!("ZIP member {}", python_repr(&member.name)),
         )?;
     }
     Ok(())
