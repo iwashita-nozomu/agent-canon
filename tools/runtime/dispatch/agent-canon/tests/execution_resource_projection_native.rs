@@ -31,18 +31,17 @@ fn execution_resource_projection_matches_captured_cpython_cases() {
         let case = object(case).expect("case object");
         let name = string(field(case, "name").expect("case name"));
         let api = string(field(case, "api").expect("case API"));
-        let input = string(field(case, "input").expect("case input"));
+        let input = field(case, "input").expect("case input");
         let expected =
             object(field(case, "output").expect("case output")).expect("expected outcome object");
         let expected_ok = boolean(field(expected, "ok").expect("expected ok"));
 
         let actual = match api.as_str() {
-            "validate_projection_bytes" => validate_projection_bytes(&input),
+            "validate_projection_bytes" => validate_projection_bytes(&string(input)),
             "validate_normalized_input" => {
-                let payload = parse_json(&input).expect("normalized input parses");
-                validate_normalized_input(&payload).map(|()| JsonValue::Null)
+                validate_normalized_input(input).map(|()| JsonValue::Null)
             }
-            "projection_context_payload" => Ok(projection_context_payload(&input)),
+            "projection_context_payload" => Ok(projection_context_payload(&string(input))),
             other => panic!("unknown captured API {other:?} in case {name:?}"),
         };
 
