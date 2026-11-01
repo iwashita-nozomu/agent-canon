@@ -15,7 +15,7 @@
 // upstream implementation python_sequence_matcher.rs provides CPython-compatible similarity scoring
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
-// downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on exported seeds
+// downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on native-exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
 // downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle

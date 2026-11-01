@@ -1,7 +1,7 @@
 # Canonical template bundle profiles owned by AgentCanon.
 # @dependency-start
 # contract configuration
-# responsibility Declares canonical template, Codex plugin, and native CLI package inputs.
+# responsibility Declares canonical template, Codex plugin, static-seed, and native CLI package inputs.
 # upstream design ../design/agent-canon-bootstrap-tool-runtime.md distribution boundary
 # downstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs snapshot exporter
 # @dependency-end
@@ -99,4 +99,4 @@ roots = ["LICENSE"]
 
 [profiles.static-seed]
 roots = []
-producer = "tools/runtime/source/export_static_seed.py"
+producer = "tools/runtime/dispatch/agent-canon/src/template_bundle.rs"

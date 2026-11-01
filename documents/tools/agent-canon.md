@@ -49,6 +49,8 @@ tools/bin/agent-canon docs format <paths...>
 tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--delete] [--mutation-capability-json <json>] [--runtime-root <path>] [--output <path>]
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
+tools/bin/agent-canon template-bundle export --source-root <root> --source-ref <commit-ish> --profile static-seed --output <directory>
+tools/bin/agent-canon template-bundle committed-tree --source-root <root> --source-ref <commit-ish>
 tools/bin/agent-canon test-design check <test-paths...>
 tools/bin/agent-canon waterfall-gate-check (--run-id <run-id> | --report-dir <path>) --gate <gate> [--report-root <path>]
 tools/bin/agent-canon task-close (--run-id <run-id> | --report-dir <path>) [--report-root <path>] [--runtime-root <path>]
@@ -74,6 +76,11 @@ an exported static seed or source-hidden consumer root with
 `--static-seed-consumer`. It reads the selected root and emits the existing
 bootstrap-check findings and pass/fail markers without resolving an AgentCanon
 source checkout.
+
+`template-bundle export --profile static-seed` exports the exact allowlisted
+source snapshot. `template-bundle committed-tree` returns the resolved commit
+and complete Git tree entries for native consumers such as the dependency graph
+renderer.
 
 `test-design check` reports missing oracle, brittle coupling, exact
 mock/output/prose assertions, time coupling, unseeded randomness, and

@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Verifies deterministic static-seed export, forbidden-surface rejection, and source-hidden consumer validation.
-# upstream implementation ../../tools/runtime/source/export_static_seed.py exports one committed exact-path seed.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs exports one committed exact-path seed.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs validates the source-hidden exported seed.
 # upstream design ../../documents/contracts/static-seed-export.md defines the static seed boundary.
 # upstream design ../../documents/contracts/static-seed-allowlist.toml defines the canonical production allowlist.
@@ -10,17 +10,14 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from types import ModuleType
 
 try:
     import tomllib
@@ -28,23 +25,11 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "source" / "export_static_seed.py"
-AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+AGENT_CANON_CLI = os.environ.get(
+    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 ALLOWLIST_PATH = Path("documents/contracts/static-seed-allowlist.toml")
 PROVENANCE_PATH = "agent-canon-static-seed.json"
-
-
-def _load_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("export_static_seed", SCRIPT)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"unable to import {SCRIPT}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-EXPORTER = _load_module()
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -165,12 +150,15 @@ def _make_canonical_37_role_fixture(root: Path) -> Path:
 def _run_export(repo: Path, output: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         (
-            sys.executable,
-            str(SCRIPT),
+            AGENT_CANON_CLI,
+            "template-bundle",
+            "export",
             "--source-root",
             str(repo),
             "--source-ref",
             "HEAD",
+            "--profile",
+            "static-seed",
             "--output",
             str(output),
         ),
@@ -289,10 +277,6 @@ class ExportStaticSeedTest(unittest.TestCase):
                 },
                 {path.relative_to(first).as_posix() for path in role_files},
             )
-            if AGENT_CANON_CLI is None:
-                raise RuntimeError(
-                    "AGENT_CANON_CLI must select the current native executable"
-                )
             checker = subprocess.run(
                 (
                     AGENT_CANON_CLI,
@@ -484,19 +468,6 @@ class ExportStaticSeedTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unsupported keys", result.stderr)
-
-    def test_loaded_plan_can_be_written_after_source_disappears(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            repo = _make_fixture(root)
-            plan = EXPORTER.load_export_plan(repo, "HEAD")
-            shutil.rmtree(repo)
-
-            output = root / "seed"
-            EXPORTER.write_export(plan, output)
-
-            _assert_source_free_seed(self, output)
-
 
 if __name__ == "__main__":
     unittest.main()

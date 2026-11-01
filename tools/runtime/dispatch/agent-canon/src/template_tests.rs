@@ -4,6 +4,8 @@
 // upstream implementation code_template_rendering.rs explicit-root code renderer
 // upstream implementation entrypoint_composer.rs consumer root composer
 // upstream implementation template_bundle.rs profile and archive owner
+// upstream design ../../../../../documents/contracts/static-seed-export.md static-seed export contract
+// upstream design ../../../../../documents/contracts/static-seed-allowlist.toml static-seed file set
 // downstream implementation lib.rs library-owned Template test module
 // @dependency-end
 

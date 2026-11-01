@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Renders dependency manifest graph TSV artifacts into deterministic bundle and projection reports.
 # upstream implementation ./check_dependency_graph.sh writes dependency graph TSV artifacts.
-# upstream implementation ../../runtime/source/export_static_seed.py reads complete committed Git trees for the optional tracked-path layer.
+# upstream implementation ../../runtime/dispatch/agent-canon/src/template_bundle.rs exposes committed Git trees for the optional tracked-path layer.
 # upstream design ../../../documents/design/dependency-manifest-design.md defines manifest graph semantics.
 # downstream design ../../../documents/tools/render_dependency_manifest_graph.md documents report generation.
 # downstream implementation ../../../tests/agent_tools/test_render_dependency_manifest_graph.py tests graph rendering.
@@ -27,14 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-from tools.runtime.source.export_static_seed import (
-    GitTreeEntry,
-    StaticSeedError,
-    load_committed_tree,
-)
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
@@ -91,6 +84,16 @@ class Edge:
     kind: str
     source: str
     target: str
+
+
+@dataclass(frozen=True)
+class GitTreeEntry:
+    """One committed tree entry returned by the native template-bundle owner."""
+
+    mode: str
+    object_type: str
+    object_id: str
+    path: str
 
 
 @dataclass(frozen=True)
@@ -649,6 +652,68 @@ def detect_direction_cycles(
     return detect_cycles(tuple(edge for edge in edges if edge.direction == direction))
 
 
+def _read_committed_tree(
+    root: Path, source_revision: str
+) -> tuple[str, dict[str, GitTreeEntry]]:
+    """Read committed Git entries through the native template-bundle owner."""
+    cli = os.environ.get("AGENT_CANON_CLI") or str(REPOSITORY_ROOT / "tools/bin/agent-canon")
+    try:
+        result = subprocess.run(
+            (
+                cli,
+                "template-bundle",
+                "committed-tree",
+                "--source-root",
+                str(root),
+                "--source-ref",
+                source_revision,
+            ),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        raise ValueError(f"unable to read selected Git tree: {error}") from error
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        try:
+            error_payload = json.loads(detail)
+            if isinstance(error_payload, dict) and isinstance(error_payload.get("error"), str):
+                detail = error_payload["error"]
+        except json.JSONDecodeError:
+            pass
+        raise ValueError(f"unable to read selected Git tree: {detail or 'native CLI failed'}")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"unable to read selected Git tree: invalid native JSON: {error}") from error
+    if not isinstance(payload, dict):
+        raise ValueError("unable to read selected Git tree: native response is not an object")
+    revision = payload.get("source_commit")
+    entries_value = payload.get("entries")
+    if not isinstance(revision, str) or not isinstance(entries_value, list):
+        raise ValueError("unable to read selected Git tree: native response is incomplete")
+    entries: dict[str, GitTreeEntry] = {}
+    for value in entries_value:
+        if not isinstance(value, dict):
+            raise ValueError("unable to read selected Git tree: native entry is not an object")
+        mode = value.get("mode")
+        object_type = value.get("object_type")
+        object_id = value.get("object_id")
+        path = value.get("path")
+        if not all(isinstance(field, str) for field in (mode, object_type, object_id, path)):
+            raise ValueError("unable to read selected Git tree: native entry is incomplete")
+        if path in entries:
+            raise ValueError(f"unable to read selected Git tree: duplicate path: {path}")
+        entries[path] = GitTreeEntry(
+            mode=mode,
+            object_type=object_type,
+            object_id=object_id,
+            path=path,
+        )
+    return revision, entries
+
+
 def build_report(
     root: Path,
     edges: tuple[Edge, ...],
@@ -656,10 +721,7 @@ def build_report(
     source_revision: str = "HEAD",
 ) -> GraphReport:
     """Build typed dependency diagnostics alongside one committed source tree."""
-    try:
-        tracked_tree_revision, tree_entries = load_committed_tree(root, source_revision)
-    except StaticSeedError as error:
-        raise ValueError(f"unable to read selected Git tree: {error}") from error
+    tracked_tree_revision, tree_entries = _read_committed_tree(root, source_revision)
     tracked_tree_entries = tuple(tree_entries[path] for path in sorted(tree_entries))
     node_set = {edge.source for edge in edges} | {edge.target for edge in edges}
     degree = Counter[str]()

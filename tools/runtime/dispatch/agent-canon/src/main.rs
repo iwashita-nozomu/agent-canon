@@ -170,7 +170,7 @@ Commands:
   helper-function-inventory [paths...] [--root <repo-root>] [--format text|json|markdown]
   python-module-groups-check --root <repo-root> [--contract path]
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
-  template-bundle <export|verify|native-package|native-verify|native-version> [options]
+  template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
 
 Options:
