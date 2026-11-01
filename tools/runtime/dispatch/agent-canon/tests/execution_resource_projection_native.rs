@@ -20,6 +20,8 @@ use agent_canon::python_json::{
 // 74048eb2ee3b62bd41f5993c96123f957e2c787735c66a2ad240301052bd862f
 // Raw overflow capture: execution-projection-old-overflow-6abtnr4c/early-export/corpus.json; SHA256:
 // 96af170f28416f5435aca4fe184274532c0d0aeb088fa4a282b9d5eccb932a5c
+// Raw syntax capture: execution-projection-old-syntax-apbns7b9/early-export/corpus.json; SHA256:
+// 2a4155497b12c771ddc1421f7c9126565a54b03e5e33af31f9522f09b130c647
 
 #[test]
 fn execution_resource_projection_matches_captured_cpython_cases() {
@@ -114,6 +116,58 @@ fn duplicate_rejection_is_opt_in_for_the_shared_json_parser() {
 
 #[test]
 fn execution_resource_projection_matches_captured_boundary_cases() {
+    let syntax_cases = [
+        (
+            "{\"x\"1}\n",
+            "Expecting ':' delimiter: line 1 column 5 (char 4)",
+        ),
+        (
+            "{\"x\":1 \"y\":2}\n",
+            "Expecting ',' delimiter: line 1 column 8 (char 7)",
+        ),
+        (
+            "[1 2]\n",
+            "Expecting ',' delimiter: line 1 column 4 (char 3)",
+        ),
+        ("{}x\n", "Extra data: line 1 column 3 (char 2)"),
+        (
+            "\"abc\n",
+            "Unterminated string starting at: line 1 column 1 (char 0)",
+        ),
+        (r#""\q""#, "Invalid \\escape: line 1 column 2 (char 1)"),
+        (
+            r#""\u12x4""#,
+            "Invalid \\uXXXX escape: line 1 column 3 (char 2)",
+        ),
+        (
+            "\"a\tb\"\n",
+            "Invalid control character at: line 1 column 3 (char 2)",
+        ),
+        ("{\"x\":}\n", "Expecting value: line 1 column 6 (char 5)"),
+        ("[}\n", "Expecting value: line 1 column 2 (char 1)"),
+        (" \n", "Expecting value: line 1 column 2 (char 1)"),
+        (
+            "\u{feff}{}\n",
+            "Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)",
+        ),
+        (
+            "{\"é\"1}\n",
+            "Expecting ':' delimiter: line 1 column 5 (char 4)",
+        ),
+        (
+            "{\"x\":1,}\n",
+            "Expecting property name enclosed in double quotes: line 1 column 8 (char 7)",
+        ),
+        ("[1,]\n", "Expecting value: line 1 column 4 (char 3)"),
+    ];
+    for (input, expected_message) in syntax_cases {
+        assert_projection_error(
+            validate_projection_bytes(input),
+            "JSONDecodeError",
+            JsonString::from_text(expected_message),
+        );
+    }
+
     assert_projection_error(
         validate_projection_bytes("{\"\\ud800\":1,\"\\ud800\":2}\n"),
         "ProjectionError",

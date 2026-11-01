@@ -195,6 +195,8 @@ pub enum JsonParseError {
     Syntax {
         message: String,
         index: usize,
+        line: usize,
+        column: usize,
         byte_index: usize,
         parser_column: bool,
     },
@@ -205,9 +207,15 @@ pub enum JsonParseError {
 impl JsonParseError {
     pub fn message(&self) -> JsonString {
         match self {
-            Self::Syntax { message, index, .. } => JsonString::from_text(&format!(
-                "Expecting value: line 1 column {} (char {index})",
-                *index + 1
+            Self::Syntax {
+                message,
+                index,
+                line,
+                column,
+                ..
+            } => JsonString::from_text(&format!(
+                "{}: line {line} column {column} (char {index})",
+                python_json_decode_reason(message),
             )),
             Self::DuplicateKey(key) => {
                 let mut message = JsonString::from_text("duplicate JSON key: ");
@@ -248,11 +256,38 @@ impl JsonParseError {
     }
 }
 
+fn python_json_decode_reason(message: &str) -> String {
+    match message {
+        "unexpected trailing characters" | "leading zeros are not permitted in numbers" => {
+            "Extra data".to_owned()
+        }
+        "expected ':' after object key" => "Expecting ':' delimiter".to_owned(),
+        "expected ',' or ']' after array value" | "expected ',' or '}' after object value" => {
+            "Expecting ',' delimiter".to_owned()
+        }
+        "unescaped control character in string" => "Invalid control character at".to_owned(),
+        "unterminated string" => "Unterminated string starting at".to_owned(),
+        "invalid escape" => "Invalid \\escape".to_owned(),
+        "invalid unicode escape" => "Invalid \\uXXXX escape".to_owned(),
+        "expected object key" => "Expecting property name enclosed in double quotes".to_owned(),
+        "unexpected UTF-8 BOM" => "Unexpected UTF-8 BOM (decode using utf-8-sig)".to_owned(),
+        "expected a JSON value"
+        | "unexpected end of input"
+        | "invalid literal"
+        | "expected a digit in number"
+        | "expected a digit after decimal point"
+        | "expected a digit in exponent" => "Expecting value".to_owned(),
+        _ => message.to_owned(),
+    }
+}
+
 impl From<String> for JsonParseError {
     fn from(value: String) -> Self {
         Self::Syntax {
             message: value,
             index: 0,
+            line: 1,
+            column: 1,
             byte_index: 0,
             parser_column: false,
         }
@@ -422,6 +457,9 @@ impl<'a> JsonParser<'a> {
                     if self.consume_if(b'}') {
                         completed = Some(pop_frame(&mut frames)?);
                     } else {
+                        if self.reject_duplicates && self.peek() != Some(b'"') {
+                            return Err(self.error("expected object key"));
+                        }
                         let key = self.parse_string()?;
                         if let Some(JsonFrame::Object {
                             key: slot, state, ..
@@ -434,6 +472,9 @@ impl<'a> JsonParser<'a> {
                 }
                 FrameState::ObjectKey => {
                     self.skip_whitespace();
+                    if self.reject_duplicates && self.peek() != Some(b'"') {
+                        return Err(self.error("expected object key"));
+                    }
                     let key = self.parse_string()?;
                     if let Some(JsonFrame::Object {
                         key: slot, state, ..
@@ -482,6 +523,9 @@ impl<'a> JsonParser<'a> {
         frames: &mut Vec<JsonFrame>,
     ) -> Result<Option<JsonValue>, JsonParseError> {
         self.skip_whitespace();
+        if self.reject_duplicates && self.index == 0 && self.input.starts_with('\u{feff}') {
+            return Err(self.error("unexpected UTF-8 BOM"));
+        }
         match self.peek() {
             Some(b'{') => {
                 self.check_depth(frames.len())?;
@@ -561,14 +605,42 @@ impl<'a> JsonParser<'a> {
                     return serde_json::from_str::<JsonString>(&self.input[start..self.index])
                         .map_err(|error| error.to_string().into());
                 }
-                b'\\' => self.index = (self.index + 2).min(self.bytes.len()),
+                b'\\' => {
+                    let escape_start = self.index;
+                    self.index += 1;
+                    match self.peek() {
+                        Some(b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't') => {
+                            self.index += 1;
+                        }
+                        Some(b'u') if self.reject_duplicates => {
+                            self.index += 1;
+                            for _ in 0..4 {
+                                if !self.peek().is_some_and(|byte| byte.is_ascii_hexdigit()) {
+                                    return Err(
+                                        self.error_at("invalid unicode escape", escape_start + 1)
+                                    );
+                                }
+                                self.index += 1;
+                            }
+                        }
+                        Some(b'u') => self.index = (escape_start + 2).min(self.bytes.len()),
+                        Some(_) if self.reject_duplicates => {
+                            return Err(self.error_at("invalid escape", escape_start));
+                        }
+                        Some(_) => self.index += 1,
+                        None if self.reject_duplicates => {
+                            return Err(self.error_at("invalid escape", escape_start));
+                        }
+                        None => {}
+                    }
+                }
                 byte if byte < 0x20 => {
-                    return Err(self.error("unescaped control character in string"))
+                    return Err(self.error_at("unescaped control character in string", self.index))
                 }
                 _ => self.index += 1,
             }
         }
-        Err(self.error("unterminated string"))
+        Err(self.error_at("unterminated string", start))
     }
 
     fn parse_number(&mut self) -> Result<JsonValue, JsonParseError> {
@@ -657,9 +729,21 @@ impl<'a> JsonParser<'a> {
     }
 
     fn error(&self, message: &str) -> JsonParseError {
+        self.error_at(message, self.index)
+    }
+
+    fn error_at(&self, message: &str, byte_index: usize) -> JsonParseError {
+        let prefix = &self.input[..byte_index];
+        let line = prefix.bytes().filter(|byte| *byte == b'\n').count() + 1;
+        let column = prefix
+            .rsplit('\n')
+            .next()
+            .map_or(1, |line| line.chars().count() + 1);
         JsonParseError::Syntax {
             message: message.to_owned(),
-            index: self.input[..self.index].chars().count(),
+            index: prefix.chars().count(),
+            line,
+            column,
             byte_index: self.index,
             parser_column: true,
         }
