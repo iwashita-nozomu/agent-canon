@@ -6,7 +6,7 @@
 // upstream implementation python_cli_integer.rs parses Python-compatible integer thresholds
 // downstream implementation main.rs exposes the notebook-quality selector
 // downstream implementation ../../../../../tools/validation/ci/runners/run_all_checks.sh runs default notebook validation
-// downstream implementation ../../../../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts the notebook quality contract check
+// downstream implementation tool_rejection_preflight.rs predicts the notebook quality contract check
 // downstream implementation ../../../../../tests/tools/test_notebook_quality.py preserves notebook checker CLI oracles
 // downstream design ../../../../../documents/tools/notebook_quality.md documents the command contract
 // @dependency-end

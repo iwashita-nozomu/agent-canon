@@ -90,6 +90,29 @@ fn canonical(value: &JsonValue) -> Vec<u8> {
     canonical_json_ascii_bytes(value).expect("fixture value has Python-compatible ASCII JSON")
 }
 
+fn expected_with_native_tool_locator(value: &JsonValue) -> JsonValue {
+    let serialized = canonical(value);
+    let mut expected = parse_json(std::str::from_utf8(&serialized).unwrap()).unwrap();
+    let JsonValue::Object(fields) = &mut expected else {
+        panic!("classifier output is an object");
+    };
+    let tools = fields
+        .0
+        .iter_mut()
+        .find(|(key, _)| key.equals_text("candidate_tools"));
+    let Some((_, JsonValue::Array(tools))) = tools else {
+        panic!("classifier output supplies candidate tools");
+    };
+    for tool in &mut tools.0 {
+        if let JsonValue::String(name) = tool {
+            if name.equals_text("tool_rejection_preflight.py") {
+                *name = JsonString::from_text("tool-rejection-preflight");
+            }
+        }
+    }
+    expected
+}
+
 fn string_array(values: &[JsonString]) -> JsonValue {
     JsonValue::Array(JsonArray(
         values.iter().cloned().map(JsonValue::String).collect(),
@@ -231,7 +254,10 @@ fn prompt_classifier_matches_frozen_cpython_outputs_and_order_contract() {
             validation_repair_evidence: &validation_repair,
         });
         let actual = signals_value(&signals);
-        let expected = object_field(case, "output").expect("expected output exists");
+        let expected_storage = expected_with_native_tool_locator(
+            object_field(case, "output").expect("expected output exists"),
+        );
+        let expected = &expected_storage;
         assert_skills_prefix(
             &actual,
             object_field(case, "required_skills_prefix").expect("required skill prefix exists"),
