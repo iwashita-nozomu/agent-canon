@@ -2,11 +2,12 @@
 // contract implementation
 // responsibility Compares Codex session token footprints and records run-bundle evidence.
 // upstream design ../../../../../agents/skills/tokens.md defines the token comparison protocol
-// upstream implementation python_cli_integer.rs parses Python-compatible integer options
+// upstream implementation python_cli_integer.rs parses options and exactly divides Python integers
 // upstream implementation python_cli_options.rs resolves Python argparse option prefixes
 // upstream implementation python_json.rs preserves Python JSON values and float formatting
 // upstream implementation python_text.rs preserves Python-compatible whitespace and line splitting
 // upstream implementation path_resolution.rs preserves non-strict resolved paths
+// upstream reference ../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
 // upstream implementation source_dependency_graph.rs supplies Python-compatible component matching
 // upstream implementation hook_report_projection.rs appends optional run-local monitoring evidence
 // downstream implementation main.rs exposes the token footprint CLI
@@ -466,30 +467,11 @@ fn ratio(candidate: &BigInt, baseline: &BigInt) -> Result<f64, String> {
     if baseline <= &BigInt::from(0_u8) {
         return Err("baseline total_tokens must be greater than zero".to_owned());
     }
-    bigint_ratio(candidate, baseline)
+    python_cli_integer::true_divide(candidate, baseline)
 }
 
-fn bigint_ratio(numerator: &BigInt, denominator: &BigInt) -> Result<f64, String> {
-    let numerator_float = integer_to_f64(numerator);
-    let denominator_float = integer_to_f64(denominator);
-    let value = if numerator_float.is_finite() && denominator_float.is_finite() {
-        numerator_float / denominator_float
-    } else {
-        let (numerator_mantissa, numerator_exponent) = decimal_mantissa_exponent(numerator)?;
-        let (denominator_mantissa, denominator_exponent) = decimal_mantissa_exponent(denominator)?;
-        let exponent = numerator_exponent
-            .checked_sub(denominator_exponent)
-            .ok_or_else(|| "integer division result too large for a float".to_owned())?;
-        (numerator_mantissa / denominator_mantissa) * 10_f64.powi(exponent)
-    };
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err("integer division result too large for a float".to_owned())
-    }
-}
-
-fn integer_to_f64(value: &BigInt) -> f64 {
+// Python converts the integer day count to a float when computing the mtime cutoff.
+fn integer_seconds_to_f64(value: &BigInt) -> f64 {
     value.to_string().parse().unwrap_or_else(|_| {
         if value < &BigInt::from(0_u8) {
             f64::NEG_INFINITY
@@ -497,23 +479,6 @@ fn integer_to_f64(value: &BigInt) -> f64 {
             f64::INFINITY
         }
     })
-}
-
-fn decimal_mantissa_exponent(value: &BigInt) -> Result<(f64, i32), String> {
-    let representation = value.to_string();
-    let negative = representation.starts_with('-');
-    let digits = representation.trim_start_matches('-');
-    let count = digits.len();
-    let leading = &digits[..count.min(17)];
-    let leading = leading
-        .parse::<f64>()
-        .map_err(|_| "integer division result too large for a float".to_owned())?;
-    let precision = i32::try_from(count.min(17) - 1)
-        .map_err(|_| "integer division result too large for a float".to_owned())?;
-    let exponent = i32::try_from(count - 1)
-        .map_err(|_| "integer division result too large for a float".to_owned())?;
-    let mantissa = leading / 10_f64.powi(precision);
-    Ok((if negative { -mantissa } else { mantissa }, exponent))
 }
 
 fn comparison_status(value: f64) -> &'static str {
@@ -634,7 +599,7 @@ fn session_glob_paths(
             recent_days.clone()
         };
         let seconds = days * BigInt::from(SECONDS_PER_DAY);
-        let seconds = integer_to_f64(&seconds);
+        let seconds = integer_seconds_to_f64(&seconds);
         if !seconds.is_finite() {
             return Err("int too large to convert to float".to_owned());
         }
@@ -838,7 +803,10 @@ fn moving_average(values: &[BigInt], window: &BigInt) -> Result<Vec<f64>, String
         let sum = values[start..=index]
             .iter()
             .fold(BigInt::from(0_u8), |sum, value| sum + value);
-        averages.push(bigint_ratio(&sum, &BigInt::from(index + 1 - start))?);
+        averages.push(python_cli_integer::true_divide(
+            &sum,
+            &BigInt::from(index + 1 - start),
+        )?);
     }
     Ok(averages)
 }
@@ -860,7 +828,7 @@ fn tokens_per_event(footprints: &[TokenFootprint]) -> Result<f64, String> {
     if events <= BigInt::from(0_u8) {
         return Ok(0.0);
     }
-    bigint_ratio(&token_total(footprints), &events)
+    python_cli_integer::true_divide(&token_total(footprints), &events)
 }
 
 fn latest_moving_average(footprints: &[TokenFootprint], window: &BigInt) -> Result<f64, String> {
@@ -1060,4 +1028,73 @@ fn prepare_report_parent(path: &Path) -> Result<(), String> {
 
 fn effective_window(window: &BigInt) -> BigInt {
     window.clone().max(BigInt::from(1_u8))
+}
+
+#[cfg(test)]
+mod exact_ratio_status_tests {
+    use super::{comparison_status, python_cli_integer, BigInt};
+    use serde_json::Value;
+
+    const PYTHON_ORACLE: &str =
+        include_str!("../tests/fixtures/python_integer_division/python_golden.json");
+
+    #[test]
+    fn comparison_status_uses_the_cpython_rounded_ratio_at_the_half_threshold() {
+        let oracle: Value = serde_json::from_str(PYTHON_ORACLE).expect("CPython oracle parses");
+        let cases = oracle["cases"]
+            .as_array()
+            .expect("oracle cases are an array");
+        for (name, expected_status, expected_bits) in [
+            ("threshold-round-to-half", "pass", "3fe0000000000000"),
+            ("threshold-next-float", "fail", "3fe0000000000001"),
+        ] {
+            let case = cases
+                .iter()
+                .find(|case| case["name"].as_str() == Some(name))
+                .unwrap_or_else(|| panic!("missing CPython oracle case: {name}"));
+            let numerator = case["numerator"]
+                .as_str()
+                .expect("numerator is decimal text")
+                .parse::<BigInt>()
+                .expect("numerator parses");
+            let denominator = case["denominator"]
+                .as_str()
+                .expect("denominator is decimal text")
+                .parse::<BigInt>()
+                .expect("denominator parses");
+            let ratio = python_cli_integer::true_divide(&numerator, &denominator)
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            let expected_bits =
+                u64::from_str_radix(expected_bits, 16).expect("expected bits are hexadecimal");
+            assert_eq!(ratio.to_bits(), expected_bits, "{name}");
+            assert_eq!(comparison_status(ratio), expected_status, "{name}");
+        }
+    }
+
+    #[test]
+    fn report_float_precision_matches_all_finite_cpython_oracle_cases() {
+        let oracle: Value = serde_json::from_str(PYTHON_ORACLE).expect("CPython oracle parses");
+        let cases = oracle["cases"]
+            .as_array()
+            .expect("oracle cases are an array");
+        for case in cases {
+            let Some(expected_fixed) = case["fixed_3"].as_str() else {
+                continue;
+            };
+            let name = case["name"].as_str().expect("case name is text");
+            let numerator = case["numerator"]
+                .as_str()
+                .expect("numerator is decimal text")
+                .parse::<BigInt>()
+                .expect("numerator parses");
+            let denominator = case["denominator"]
+                .as_str()
+                .expect("denominator is decimal text")
+                .parse::<BigInt>()
+                .expect("denominator parses");
+            let value = python_cli_integer::true_divide(&numerator, &denominator)
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            assert_eq!(super::fixed(value), expected_fixed, "{name}");
+        }
+    }
 }
