@@ -3,6 +3,7 @@
 // responsibility Shares Python-compatible Unicode string and line handling across native callers.
 // downstream implementation agent_search.rs preserves Python input validation
 // downstream implementation notebook_quality.rs preserves Python notebook text semantics
+// downstream implementation classify_path_risk.rs preserves Python changed-path file parsing
 // downstream implementation token_footprints.rs preserves Python JSONL line splitting
 // @dependency-end
 

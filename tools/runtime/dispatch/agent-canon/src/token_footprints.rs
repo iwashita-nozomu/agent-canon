@@ -610,16 +610,7 @@ fn session_glob_paths(
     let mut unique_paths = BTreeMap::<String, PathBuf>::new();
     for pattern in patterns {
         let (base, components, directory_only) = split_glob_pattern(pattern)?;
-        let mut matches = Vec::new();
-        let mut visited = HashSet::new();
-        glob_walk(
-            &base,
-            0,
-            &components,
-            directory_only,
-            &mut matches,
-            &mut visited,
-        );
+        let matches = glob_paths(&base, &components, directory_only);
         for path in matches {
             if !fs::metadata(&path).is_ok_and(|metadata| metadata.is_file()) {
                 continue;
@@ -720,98 +711,85 @@ fn split_glob_pattern(pattern: &str) -> Result<(PathBuf, Vec<String>, bool), Str
     Ok((base, patterns, directory_only))
 }
 
-fn glob_walk(
-    current: &Path,
-    index: usize,
-    components: &[String],
-    directory_only: bool,
-    matches: &mut Vec<PathBuf>,
-    visited: &mut HashSet<(PathBuf, usize)>,
-) {
-    if index == components.len() {
-        if !directory_only || fs::metadata(current).is_ok_and(|metadata| metadata.is_dir()) {
-            matches.push(current.to_path_buf());
+fn glob_paths(base: &Path, components: &[String], directory_only: bool) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    let mut pending = vec![(base.to_path_buf(), 0_usize)];
+    let mut visited = HashSet::new();
+
+    while let Some((current, index)) = pending.pop() {
+        if index == components.len() {
+            if !directory_only || fs::metadata(&current).is_ok_and(|metadata| metadata.is_dir()) {
+                matches.push(current);
+            }
+            continue;
         }
-        return;
-    }
-    let pattern = &components[index];
-    if pattern == "**" {
-        let key = resolve_non_strict(current).unwrap_or_else(|_| current.to_path_buf());
-        if !visited.insert((key, index)) {
-            return;
-        }
-        glob_walk(
-            current,
-            index + 1,
-            components,
-            directory_only,
-            matches,
-            visited,
-        );
-        let Ok(entries) = fs::read_dir(current) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name();
-            let Some(name) = name.to_str() else {
+
+        let pattern = &components[index];
+        if pattern == "**" {
+            let key = resolve_non_strict(&current).unwrap_or_else(|_| current.clone());
+            if !visited.insert((key, index)) {
+                continue;
+            }
+            pending.push((current.clone(), index + 1));
+            let Ok(entries) = fs::read_dir(&current) else {
                 continue;
             };
-            if name.starts_with('.') {
-                continue;
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name();
+                let Some(name) = name.to_str() else {
+                    continue;
+                };
+                if name.starts_with('.') {
+                    continue;
+                }
+                if index + 1 == components.len() {
+                    pending.push((path.clone(), index + 1));
+                }
+                if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
+                    pending.push((path, index));
+                }
             }
-            if index + 1 == components.len() {
-                glob_walk(
-                    &path,
-                    index + 1,
-                    components,
-                    directory_only,
-                    matches,
-                    visited,
-                );
-            }
-            if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
-                glob_walk(&path, index, components, directory_only, matches, visited);
-            }
+            continue;
         }
-        return;
-    }
-    if !pattern
-        .chars()
-        .any(|character| matches!(character, '*' | '?' | '['))
-    {
-        glob_walk(
-            &current.join(pattern),
-            index + 1,
-            components,
-            directory_only,
-            matches,
-            visited,
-        );
-        return;
-    }
-    let Ok(entries) = fs::read_dir(current) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(name_text) = name.to_str() else {
+
+        let has_glob_magic = |value: &str| {
+            value
+                .chars()
+                .any(|character| matches!(character, '*' | '?' | '['))
+        };
+        if !has_glob_magic(pattern) {
+            let mut path = current;
+            let mut next_index = index;
+            while let Some(component) = components.get(next_index) {
+                if component == "**" || has_glob_magic(component) {
+                    break;
+                }
+                path.push(component);
+                next_index += 1;
+            }
+            pending.push((path, next_index));
+            continue;
+        }
+
+        let Ok(entries) = fs::read_dir(&current) else {
             continue;
         };
-        if name_text.starts_with('.') && !pattern.starts_with('.') {
-            continue;
-        }
-        if crate::source_dependency_graph::fnmatch_case(name_text, pattern) {
-            glob_walk(
-                &entry.path(),
-                index + 1,
-                components,
-                directory_only,
-                matches,
-                visited,
-            );
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name_text) = name.to_str() else {
+                continue;
+            };
+            if name_text.starts_with('.') && !pattern.starts_with('.') {
+                continue;
+            }
+            if crate::source_dependency_graph::fnmatch_case(name_text, pattern) {
+                pending.push((entry.path(), index + 1));
+            }
         }
     }
+
+    matches
 }
 
 fn path_posix(path: &Path) -> String {
