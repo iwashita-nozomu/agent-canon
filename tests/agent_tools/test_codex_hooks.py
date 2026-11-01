@@ -6,15 +6,13 @@
 # upstream implementation ../../.codex/config.toml enables hooks
 # upstream implementation ../../.codex/hooks.json declares the three active hooks
 # upstream implementation ../../tools/runtime/authority/hook_safety.py owns active safety leaves
-# upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the typed event contract
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the native typed event contract
 # downstream implementation ../../tests/agent_tools/test_hook_event_log.py validates hook telemetry
 # @dependency-end
 
 from __future__ import annotations
 
-import ast
 import hashlib
-import io
 import json
 import os
 import subprocess
@@ -25,18 +23,17 @@ from pathlib import Path
 from typing import NotRequired, TypedDict, cast
 from unittest import mock
 
-import hook_dispatcher
-import hook_event_log
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 
-from tools.agent.orchestration.prompt_classifier import (
+import hook_event_log  # noqa: E402
+
+from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
-HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 RETIRED_ROUTE_TABLE = (
@@ -74,6 +71,14 @@ RETIRED_ROUTE_FIELDS = {
 }
 
 
+def codex_hook_command(*arguments: str) -> list[str]:
+    """Select the registered native Hook route for integration tests."""
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the native Hook CLI")
+    return [selected_cli, "codex-hook", *arguments]
+
+
 class PromptClassifierCase(TypedDict):
     """Type the optional expectations in the prompt-routing fixture table."""
 
@@ -93,16 +98,69 @@ class CodexHooksTest(unittest.TestCase):
         """Resident hooks resolve trusted targets through the existing mount root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             target = Path(tmp_dir) / "trusted-project"
-            target.mkdir()
-            with mock.patch.dict(
-                os.environ,
-                {"AGENT_CANON_TARGET_CONTAINER_ROOT": str(target)},
-                clear=True,
-            ):
-                state = hook_dispatcher.hook_root()
-            self.assertEqual(state.active_root, target.resolve())
-            self.assertTrue(state.standalone)
-            self.assertEqual(state.status, hook_dispatcher.HookRootStatus.OVERRIDE)
+            report = target / "reports" / "agents" / "resident-run"
+            report.mkdir(parents=True)
+            (target / ".active_run").write_text(
+                "reports/agents/resident-run\n", encoding="utf-8"
+            )
+            subprocess.run(["git", "init", "-q", str(target)], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(target),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/container-target.git",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(target),
+                    "-c",
+                    "user.name=fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-qm",
+                    "init",
+                ],
+                check=True,
+            )
+            results = target / "results"
+            results.mkdir()
+            selected_cli = os.environ.get("AGENT_CANON_CLI")
+            if not selected_cli:
+                raise RuntimeError("AGENT_CANON_CLI must select the native Hook CLI")
+            native_environment = {
+                "PATH": os.environ.get("PATH", ""),
+                "AGENT_CANON_CLI": selected_cli,
+                "AGENT_CANON_TARGET_CONTAINER_ROOT": str(target),
+                "AGENT_CANON_PARENT_ROOT": str(target),
+                "AGENT_CANON_HOOK_RESULTS_DIR": str(results),
+                "AGENT_CANON_RUNTIME_ROOT": str(target),
+                "AGENT_CANON_SOURCE_REPOSITORY_REMOTE": "https://example.invalid/container-target.git",
+            }
+            result = subprocess.run(
+                codex_hook_command("UserPromptSubmit"),
+                cwd=PROJECT_ROOT,
+                input=json.dumps(
+                    {"hookEventName": "UserPromptSubmit", "prompt": "plain"}
+                ),
+                check=True,
+                capture_output=True,
+                text=True,
+                env=native_environment,
+            )
+            self.assertEqual(result.stdout, "")
+            event = self._spooled_event(results)
+            self.assertEqual(event["workflow_monitor_report_dir"], str(report))
+            self.assertTrue((report / "workflow_monitoring.md").is_file())
 
     def _run_hook(
         self,
@@ -115,7 +173,7 @@ class CodexHooksTest(unittest.TestCase):
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
         with tempfile.TemporaryDirectory() as temp_dir:
             return subprocess.run(
-                [sys.executable, str(HOOK_DISPATCHER), event],
+                codex_hook_command(event),
                 cwd=PROJECT_ROOT,
                 input=raw_payload,
                 check=True,
@@ -134,7 +192,7 @@ class CodexHooksTest(unittest.TestCase):
 
     def _contract(self) -> dict[str, object]:
         result = subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+            codex_hook_command("--contract"),
             cwd=PROJECT_ROOT,
             check=True,
             capture_output=True,
@@ -184,7 +242,7 @@ class CodexHooksTest(unittest.TestCase):
                 check=True,
             )
         return subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), event],
+            codex_hook_command(event),
             cwd=PROJECT_ROOT,
             input=raw_payload,
             check=True,
@@ -234,7 +292,7 @@ class CodexHooksTest(unittest.TestCase):
             str(cwd.parent / f".{cwd.name}-runtime"),
         )
         return subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), event],
+            codex_hook_command(event),
             cwd=cwd,
             input=raw_payload,
             check=True,
@@ -798,78 +856,6 @@ class CodexHooksTest(unittest.TestCase):
                     self.assertNotIn(value, serialized)
                 self.assertNotIn("tool_response", event)
 
-    def test_projection_failure_monitor_follows_single_successful_append(self) -> None:
-        """Only a successful append projects the same safe record to the monitor."""
-        payload = {
-            "hookEventName": "PostToolUse",
-            "tool_name": "Bash",
-            "tool_input": {"command": "printf 'private-command-value'"},
-            "tool_response": {
-                "exit_code": 0,
-                "stdout": "private-stdout",
-                "stderr": "private-stderr",
-            },
-            "metadata": "private-metadata-value",
-        }
-        for append_status in ("spooled", "duplicate", "failed", "exception"):
-            with (
-                self.subTest(append_status=append_status),
-                tempfile.TemporaryDirectory() as tmp,
-            ):
-                root = Path(tmp)
-                context = mock.Mock()
-                context.run_id.return_value = "hook-projection-failure"
-                if append_status == "exception":
-                    context.append.side_effect = OSError("fixture append failure")
-                else:
-                    context.append.return_value = mock.Mock(status=append_status)
-                with (
-                    mock.patch.object(
-                        hook_dispatcher,
-                        "hook_root",
-                        return_value=hook_dispatcher.HookRootState(
-                            root, False, hook_dispatcher.HookRootStatus.OVERRIDE
-                        ),
-                    ),
-                    mock.patch.object(
-                        hook_dispatcher,
-                        "resolve_report_target",
-                        return_value=root / "report",
-                    ),
-                    mock.patch.object(
-                        hook_dispatcher, "HookLogContext", return_value=context
-                    ),
-                    mock.patch.object(
-                        hook_dispatcher, "emit_behavior_projection"
-                    ) as emit,
-                    mock.patch("sys.stdout", new_callable=io.StringIO) as output,
-                ):
-                    self.assertEqual(
-                        hook_dispatcher.dispatch_event(
-                            "PostToolUse", json.dumps(payload).encode("utf-8")
-                        ),
-                        0,
-                    )
-                self.assertEqual(output.getvalue(), "")
-                context.append.assert_called_once()
-                event = context.append.call_args.args[0]
-                self.assertEqual(event["record_kind"], "behavior_event")
-                self.assertEqual(event["status"], "invalid_projection")
-                if append_status == "spooled":
-                    emit.assert_called_once()
-                    projection = emit.call_args.args[1]
-                    for key, value in projection.items():
-                        self.assertEqual(event[key], value)
-                else:
-                    emit.assert_not_called()
-                for value in (
-                    "private-command-value",
-                    "private-stdout",
-                    "private-stderr",
-                    "private-metadata-value",
-                ):
-                    self.assertNotIn(value, json.dumps(event))
-
     def test_coordination_receipt_uses_real_posttool_result(self) -> None:
         """Coordination receipts live in the base spool event, not behavior snapshots."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1038,32 +1024,19 @@ class CodexHooksTest(unittest.TestCase):
         self.assertNotIn("cmd", payload)
 
     def test_dispatcher_hot_path_has_no_child_process_or_network_calls(self) -> None:
-        """The active dispatcher remains in-process and local-only."""
-        tree = ast.parse(HOOK_DISPATCHER.read_text(encoding="utf-8"))
-        imported = {
-            alias.name.split(".", 1)[0]
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Import)
-            for alias in node.names
-        }
-        imported.update(
-            alias.name.split(".", 1)[0]
-            for node in ast.walk(tree)
-            if isinstance(node, ast.ImportFrom)
-            for alias in node.names
-        )
-        self.assertNotIn("subprocess", imported)
-        self.assertNotIn("socket", imported)
-        self.assertNotIn("urllib", imported)
-        forbidden_calls = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr
-            in {"run", "Popen", "check_call", "check_output", "urlopen"}
-        ]
-        self.assertEqual(forbidden_calls, [])
+        """The native dispatcher keeps direct process and network calls out."""
+        source = (
+            PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
+        ).read_text(encoding="utf-8")
+        for operation in (
+            "std::process::Command",
+            "Command::new(",
+            "std::net::",
+            "TcpStream",
+            "UdpSocket",
+            "reqwest::",
+        ):
+            self.assertNotIn(operation, source)
 
     def test_prompt_intake_signals_keeps_evaluator_classification_pure(self) -> None:
         """Prompt routing remains observable without JSONL or runtime-hook side effects."""
@@ -1383,17 +1356,22 @@ def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> 
 def test_hook_report_requires_parent_capability() -> None:
     """Report projection stays disabled until the parent capability is present."""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        target = Path(tmp_dir) / "report"
-        target.mkdir()
-        state = hook_dispatcher.HookRootState(
-            Path(tmp_dir), False, hook_dispatcher.HookRootStatus.OVERRIDE
+        root = Path(tmp_dir) / "source"
+        target = root / "report"
+        target.mkdir(parents=True)
+        fixture = CodexHooksTest()
+        result = fixture._run_hook_in_root(
+            root,
+            "UserPromptSubmit",
+            {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"},
+            extra_env={
+                "AGENT_CANON_PARENT_ROOT": "",
+                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(target),
+            },
         )
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
-            with mock.patch.dict(
-                os.environ,
-                {hook_dispatcher.WORKFLOW_MONITOR_REPORT_DIR_ENV: str(target)},
-            ):
-                assert hook_dispatcher.resolve_report_target(state) is None
+        assert result.stdout == ""
+        assert not list(root.parent.glob("spool/hook-events/**/*.json"))
+        assert not (target / "workflow_monitoring.md").exists()
 
 
 if __name__ == "__main__":

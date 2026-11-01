@@ -1,0 +1,207 @@
+{
+  "source": "2e8dd23dae249e923c1fd122b6a0017b59feef31",
+  "python": "3.12.3",
+  "source_hash": "ed87e1ab08cd2b4ca323df307d3519ddf3c4dd1ca908c285c12c6f2eee4e8c9c",
+  "fixed_clock": "module datetime.now returns 2026-01-02 03:04:05 local, formatter retainsJSTliteral",
+  "report_name": "run-fixed",
+  "cases": [
+    {
+      "name": "missing",
+      "initial_base64": null,
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoicGxhaW4iLCJzY2hlbWEiOiJhZ2VudC1jYW5vbi5iZWhhdmlvci1ldmVudC52MSIsInNlbGVjdGVkX3dvcmtmbG93cyI6WyJzY29wZWRfY2hhbmdlIl0sInN0YXR1cyI6InBhc3MifQojIyBUb29sIFdhcm5pbmdzCgotIHRvb2xfd2FybmluZ3Nfc3RhdHVzOiBwZW5kaW5nCgojIyBJbnRlcnZlbnRpb25zCgojIyBJbXByb3ZlbWVudCBEZWNpc2lvbnMKCi0gc2tpbGxfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSBjb25maWdfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSB3b3JrZmxvd19pbXByb3ZlbWVudF9kZWNpc2lvbjogcGVuZGluZwotIGtub3dsZWRnZV9sZWFybmluZ19kZWNpc2lvbjogcGVuZGluZwo="
+    },
+    {
+      "name": "blank",
+      "initial_base64": "IAo=",
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoicGxhaW4iLCJzY2hlbWEiOiJhZ2VudC1jYW5vbi5iZWhhdmlvci1ldmVudC52MSIsInNlbGVjdGVkX3dvcmtmbG93cyI6WyJzY29wZWRfY2hhbmdlIl0sInN0YXR1cyI6InBhc3MifQojIyBUb29sIFdhcm5pbmdzCgotIHRvb2xfd2FybmluZ3Nfc3RhdHVzOiBwZW5kaW5nCgojIyBJbnRlcnZlbnRpb25zCgojIyBJbXByb3ZlbWVudCBEZWNpc2lvbnMKCi0gc2tpbGxfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSBjb25maWdfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSB3b3JrZmxvd19pbXByb3ZlbWVudF9kZWNpc2lvbjogcGVuZGluZwotIGtub3dsZWRnZV9sZWFybmluZ19kZWNpc2lvbjogcGVuZGluZwo="
+    },
+    {
+      "name": "repeat",
+      "initial_base64": null,
+      "repeat": 2,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        },
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoicGxhaW4iLCJzY2hlbWEiOiJhZ2VudC1jYW5vbi5iZWhhdmlvci1ldmVudC52MSIsInNlbGVjdGVkX3dvcmtmbG93cyI6WyJzY29wZWRfY2hhbmdlIl0sInN0YXR1cyI6InBhc3MifQoKIyMgVG9vbCBXYXJuaW5ncwoKLSB0b29sX3dhcm5pbmdzX3N0YXR1czogcGVuZGluZwoKIyMgSW50ZXJ2ZW50aW9ucwoKIyMgSW1wcm92ZW1lbnQgRGVjaXNpb25zCgotIHNraWxsX2ltcHJvdmVtZW50X2RlY2lzaW9uOiBwZW5kaW5nCi0gY29uZmlnX2ltcHJvdmVtZW50X2RlY2lzaW9uOiBwZW5kaW5nCi0gd29ya2Zsb3dfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSBrbm93bGVkZ2VfbGVhcm5pbmdfZGVjaXNpb246IHBlbmRpbmcK"
+    },
+    {
+      "name": "existing",
+      "initial_base64": "IyBFeGlzdGluZwoKIyMgU2lnbmFscwotIHByZXNlcnZlZAoKIyMgQmVoYXZpb3IgRXZlbnRzCi0gcHJpb3IKCiMjIFRvb2wgV2FybmluZ3MKLSB0b29sX3dhcm5pbmdzX3N0YXR1czogcGVuZGluZwoKIyMgSW50ZXJ2ZW50aW9ucwo=",
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBFeGlzdGluZwoKIyMgU2lnbmFscwotIHByZXNlcnZlZAoKIyMgQmVoYXZpb3IgRXZlbnRzCi0gcHJpb3IKCi0gYDIwMjYtMDEtMDIgMDM6MDQgSlNUYCBiZWhhdmlvcl9ldmVudF9qc29uPXsiZXZlbnRfaWQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwicHJvbXB0X2V4Y2VycHRfcmVkYWN0ZWQiOiJwbGFpbiIsInNjaGVtYSI6ImFnZW50LWNhbm9uLmJlaGF2aW9yLWV2ZW50LnYxIiwic2VsZWN0ZWRfd29ya2Zsb3dzIjpbInNjb3BlZF9jaGFuZ2UiXSwic3RhdHVzIjoicGFzcyJ9CiMjIFRvb2wgV2FybmluZ3MKLSB0b29sX3dhcm5pbmdzX3N0YXR1czogcGVuZGluZwoKIyMgSW50ZXJ2ZW50aW9ucwo="
+    },
+    {
+      "name": "directory",
+      "initial_base64": null,
+      "repeat": 1,
+      "kind": "directory",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "failed",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": "IsADirectoryError"
+        }
+      ],
+      "output_base64": null
+    },
+    {
+      "name": "unicode",
+      "initial_base64": null,
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "\u65e5\u672c\u8a9e \ud83d\ude00"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoiXHU2NWU1XHU2NzJjXHU4YTllIFx1ZDgzZFx1ZGUwMCIsInNjaGVtYSI6ImFnZW50LWNhbm9uLmJlaGF2aW9yLWV2ZW50LnYxIiwic2VsZWN0ZWRfd29ya2Zsb3dzIjpbInNjb3BlZF9jaGFuZ2UiXSwic3RhdHVzIjoicGFzcyJ9CiMjIFRvb2wgV2FybmluZ3MKCi0gdG9vbF93YXJuaW5nc19zdGF0dXM6IHBlbmRpbmcKCiMjIEludGVydmVudGlvbnMKCiMjIEltcHJvdmVtZW50IERlY2lzaW9ucwoKLSBza2lsbF9pbXByb3ZlbWVudF9kZWNpc2lvbjogcGVuZGluZwotIGNvbmZpZ19pbXByb3ZlbWVudF9kZWNpc2lvbjogcGVuZGluZwotIHdvcmtmbG93X2ltcHJvdmVtZW50X2RlY2lzaW9uOiBwZW5kaW5nCi0ga25vd2xlZGdlX2xlYXJuaW5nX2RlY2lzaW9uOiBwZW5kaW5nCg=="
+    },
+    {
+      "name": "surrogate",
+      "initial_base64": null,
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "\ud800"
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoiXHVkODAwIiwic2NoZW1hIjoiYWdlbnQtY2Fub24uYmVoYXZpb3ItZXZlbnQudjEiLCJzZWxlY3RlZF93b3JrZmxvd3MiOlsic2NvcGVkX2NoYW5nZSJdLCJzdGF0dXMiOiJwYXNzIn0KIyMgVG9vbCBXYXJuaW5ncwoKLSB0b29sX3dhcm5pbmdzX3N0YXR1czogcGVuZGluZwoKIyMgSW50ZXJ2ZW50aW9ucwoKIyMgSW1wcm92ZW1lbnQgRGVjaXNpb25zCgotIHNraWxsX2ltcHJvdmVtZW50X2RlY2lzaW9uOiBwZW5kaW5nCi0gY29uZmlnX2ltcHJvdmVtZW50X2RlY2lzaW9uOiBwZW5kaW5nCi0gd29ya2Zsb3dfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSBrbm93bGVkZ2VfbGVhcm5pbmdfZGVjaXNpb246IHBlbmRpbmcK"
+    },
+    {
+      "name": "nan",
+      "initial_base64": null,
+      "repeat": 1,
+      "kind": "normal",
+      "event": {
+        "schema": "agent-canon.behavior-event.v1",
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "pass",
+        "selected_workflows": [
+          "scoped_change"
+        ],
+        "prompt_excerpt_redacted": "plain",
+        "other": NaN
+      },
+      "timestamp": "2026-01-02 03:04 JST",
+      "outcomes": [
+        {
+          "status": "spooled",
+          "path": "$ROOT/reports/run-fixed/workflow_monitoring.md",
+          "error": ""
+        }
+      ],
+      "output_base64": "IyBXb3JrZmxvdyBNb25pdG9yaW5nCjwhLS0KQGRlcGVuZGVuY3ktc3RhcnQKcmVzcG9uc2liaWxpdHkgUmVjb3JkcyB3b3JrZmxvdyBtb25pdG9yaW5nIGZvciB0aGlzIHJ1biBidW5kbGUuCnVwc3RyZWFtIGRlc2lnbiAuLi8uLi8uLi90ZW1wbGF0ZXMvYWdlbnRzL3dvcmtmbG93X21vbml0b3JpbmcubWQgdGVtcGxhdGUKQGRlcGVuZGVuY3ktZW5kCi0tPgoKLSBSdW4gSUQ6IHJ1bi1maXhlZAoKIyMgU2lnbmFscwoKIyMgQmVoYXZpb3IgRXZlbnRzCgotIGAyMDI2LTAxLTAyIDAzOjA0IEpTVGAgYmVoYXZpb3JfZXZlbnRfanNvbj17ImV2ZW50X2lkIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsIm90aGVyIjpOYU4sInByb21wdF9leGNlcnB0X3JlZGFjdGVkIjoicGxhaW4iLCJzY2hlbWEiOiJhZ2VudC1jYW5vbi5iZWhhdmlvci1ldmVudC52MSIsInNlbGVjdGVkX3dvcmtmbG93cyI6WyJzY29wZWRfY2hhbmdlIl0sInN0YXR1cyI6InBhc3MifQojIyBUb29sIFdhcm5pbmdzCgotIHRvb2xfd2FybmluZ3Nfc3RhdHVzOiBwZW5kaW5nCgojIyBJbnRlcnZlbnRpb25zCgojIyBJbXByb3ZlbWVudCBEZWNpc2lvbnMKCi0gc2tpbGxfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSBjb25maWdfaW1wcm92ZW1lbnRfZGVjaXNpb246IHBlbmRpbmcKLSB3b3JrZmxvd19pbXByb3ZlbWVudF9kZWNpc2lvbjogcGVuZGluZwotIGtub3dsZWRnZV9sZWFybmluZ19kZWNpc2lvbjogcGVuZGluZwo="
+    }
+  ]
+}

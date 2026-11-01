@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests runtime parent-mutation rejection and authenticated child-scope admission.
 # upstream implementation ../../tools/runtime/authority/mutation_authority.py owns mutation authority.
-# upstream implementation ../../.codex/hooks/hook_dispatcher.py applies the PreToolUse decision.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs applies the PreToolUse decision.
 # @dependency-end
 """Focused tests for parent orchestration-only mutation control."""
 

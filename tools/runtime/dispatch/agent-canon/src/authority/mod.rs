@@ -514,6 +514,17 @@ pub struct ParentOwnedPathReceipt {
     lexical_snapshot: Option<LexicalSnapshot>,
 }
 
+/// Result of publishing bytes without replacing an existing parent-owned file.
+#[derive(Clone, Debug)]
+pub enum ParentOwnedNoReplaceOutcome {
+    /// The requested bytes were published at the path.
+    Published(ParentOwnedPathReceipt),
+    /// The path already contained exactly the requested bytes.
+    Duplicate(ParentOwnedPathReceipt),
+    /// The path already contained different bytes and was left untouched.
+    Conflict(ParentOwnedPathReceipt),
+}
+
 impl ParentOwnedPathReceipt {
     pub fn lexical_path(&self) -> &Path {
         &self.lexical_path
@@ -668,6 +679,20 @@ impl AttestedParent {
     ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
         platform::write_parent_owned_file(self, candidate, bytes, purpose)
     }
+
+    /// Publish bytes beneath this attested parent without replacing an entry.
+    ///
+    /// An existing regular file is classified by stable byte comparison. A
+    /// matching file is a duplicate; a differing file is a conflict. Other
+    /// filesystem races and I/O failures are returned as authority errors.
+    pub fn publish_parent_owned_file_noreplace(
+        &self,
+        candidate: &Path,
+        bytes: &[u8],
+        purpose: NonEmptyTrimmedString,
+    ) -> Result<ParentOwnedNoReplaceOutcome, AuthorityError> {
+        platform::publish_parent_owned_file_noreplace(self, candidate, bytes, purpose)
+    }
 }
 
 impl fmt::Debug for AttestedParent {
@@ -743,16 +768,18 @@ impl ParentRootAttestor {
 #[cfg(target_os = "linux")]
 mod platform {
     pub(crate) use super::linux::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        atomic_replace_parent_owned_file, attest, issue_child_handoff,
+        publish_parent_owned_file_noreplace, read_parent_owned_file, resolve_parent_owned_path,
+        verify_live_identity, write_parent_owned_file,
     };
 }
 
 #[cfg(not(target_os = "linux"))]
 mod platform {
     pub(crate) use super::unsupported::{
-        atomic_replace_parent_owned_file, attest, issue_child_handoff, read_parent_owned_file,
-        resolve_parent_owned_path, verify_live_identity, write_parent_owned_file,
+        atomic_replace_parent_owned_file, attest, issue_child_handoff,
+        publish_parent_owned_file_noreplace, read_parent_owned_file, resolve_parent_owned_path,
+        verify_live_identity, write_parent_owned_file,
     };
 }
 

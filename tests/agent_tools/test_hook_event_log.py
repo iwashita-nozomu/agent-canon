@@ -29,8 +29,8 @@ TOOLS_DIR = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(HOOKS_DIR))
 sys.path.insert(0, str(TOOLS_DIR))
 
-import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
+from tests.agent_tools import test_codex_hooks as codex_hooks  # noqa: E402
 from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
 
 
@@ -231,76 +231,54 @@ class HookEventLogHotPathTest(unittest.TestCase):
             self.assertEqual(append_stdout.getvalue(), "")
             self.assertEqual(append_stderr.getvalue(), "")
 
-            dispatcher_stdout = io.StringIO()
-            with (
-                patch.object(
-                    hook_event_log,
-                    "publish_hook_event_noreplace",
-                    return_value=("failed", "spool_io_failure"),
-                ),
-                contextlib.redirect_stdout(dispatcher_stdout),
-            ):
-                result = hook_dispatcher.dispatch_event(
-                    "UserPromptSubmit",
-                    json.dumps(
-                        {
-                            "hookEventName": "UserPromptSubmit",
-                            "prompt": "-----BEGIN PRIVATE KEY-----",
-                        }
-                    ).encode("utf-8"),
-                )
-            self.assertEqual(result, 0)
-            self.assertEqual(json.loads(dispatcher_stdout.getvalue())["decision"], "block")
+            source = root / "source"
+            results = source / "hook-results"
+            results.mkdir(parents=True)
+            spool_blocker = results / ".event-spool"
+            spool_blocker.write_text("fixture append failure", encoding="utf-8")
+            result = codex_hooks.CodexHooksTest()._run_hook_in_root(
+                source,
+                "UserPromptSubmit",
+                {
+                    "hookEventName": "UserPromptSubmit",
+                    "prompt": "-----BEGIN PRIVATE KEY-----",
+                },
+                extra_env={"AGENT_CANON_HOOK_RESULTS_DIR": str(results)},
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(json.loads(result.stdout)["decision"], "block")
+            self.assertEqual(
+                spool_blocker.read_text(encoding="utf-8"), "fixture append failure"
+            )
 
     def test_h05_dispatch_spool_is_fingerprint_only(self) -> None:
-        raw = json.dumps(
-            {
-                "hookEventName": "PreToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"cmd": "git restore secret.py"},
-            }
-        ).encode("utf-8")
-        captured: dict[str, object] = {}
-        dispatcher_stdout = io.StringIO()
-
-        def capture(entry: dict[str, object]) -> None:
-            captured.update(entry)
-
+        payload = {
+            "hookEventName": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"cmd": "git restore secret.py"},
+        }
+        raw = json.dumps(payload).encode("utf-8")
         with tempfile.TemporaryDirectory() as tmp_dir:
-            with (
-                patch.dict(
-                    os.environ,
-                    {"AGENT_CANON_RUNTIME_ROOT": tmp_dir},
-                ),
-                patch.object(
-                    hook_dispatcher.HookLogContext,
-                    "append",
-                    side_effect=capture,
-                ) as append,
-                contextlib.redirect_stdout(dispatcher_stdout),
-            ):
-                result = hook_dispatcher.dispatch_event("PreToolUse", raw)
+            source = Path(tmp_dir) / "source"
+            source.mkdir()
+            result = codex_hooks.CodexHooksTest()._run_hook_in_root(
+                source, "PreToolUse", payload
+            )
+            event = codex_hooks.CodexHooksTest()._spooled_event(source)
 
-        self.assertEqual(result, 0)
-        append.assert_called_once()
-        self.assertEqual(json.loads(dispatcher_stdout.getvalue())["decision"], "block")
-        self.assertEqual(
-            set(captured),
-            {
-                "hook_run_id",
-                "timestamp",
-                "payload_fingerprint",
-                "status",
-                "hook_event_name",
-                "safety_decision",
-                "operation",
-                "mutation_control",
-            },
-        )
-        self.assertNotIn("prompt", captured)
-        self.assertNotIn("command", captured)
-        self.assertNotIn("stdout", captured)
-        self.assertNotIn("stderr", captured)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stdout)["decision"], "block")
+        self.assertEqual(event["payload_fingerprint"], hashlib.sha256(raw).hexdigest())
+        self.assertEqual(event["status"], "blocked_destructive_git")
+        for field in (
+            "prompt",
+            "command",
+            "tool_input",
+            "tool_response",
+            "stdout",
+            "stderr",
+        ):
+            self.assertNotIn(field, event)
 
 
 if __name__ == "__main__":

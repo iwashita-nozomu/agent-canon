@@ -11,6 +11,19 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
+fn permits_lexical_suffix(error: &std::io::Error) -> bool {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        return true;
+    }
+    // CPython's non-strict Windows resolver keeps invalid names lexical.
+    // This read-only resolution does not authorize opening the resulting path.
+    #[cfg(windows)]
+    if error.raw_os_error() == Some(123) {
+        return true;
+    }
+    false
+}
+
 #[derive(Clone)]
 enum ResolutionComponent {
     RootDir(OsString),
@@ -113,7 +126,7 @@ pub fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
                             format!("canonicalize {}: {error}", candidate.display())
                         })?;
                     }
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    Err(error) if permits_lexical_suffix(&error) => {
                         resolved.push(name);
                     }
                     Err(error) => {
@@ -125,4 +138,24 @@ pub fn resolve_non_strict(path: &Path) -> Result<PathBuf, String> {
         }
     }
     Ok(resolved)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_windows_names_remain_lexical_without_creating_files() {
+        let root = fs::canonicalize(env::temp_dir()).expect("temporary root resolves");
+        for name in ["\u{1c}", "invalid<name"] {
+            let path = root.join(name);
+            assert_eq!(
+                fs::symlink_metadata(&path)
+                    .expect_err("Windows cannot address this name")
+                    .raw_os_error(),
+                Some(123)
+            );
+            assert_eq!(resolve_non_strict(&path).expect("lexical suffix"), path);
+        }
+    }
 }
