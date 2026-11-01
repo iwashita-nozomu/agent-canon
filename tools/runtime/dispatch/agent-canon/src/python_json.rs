@@ -1,6 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides Python-compatible JSON values, parsing, number formatting, and compact ASCII canonicalization.
+// downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python integer/bool equality after canonical float rejection.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
 // downstream test ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.

@@ -2,7 +2,7 @@
 // contract implementation
 // responsibility Validates and forwards the exact PostToolUse execution-resource projection.
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
-// downstream implementation entrypoint_composer.rs will compose this pure API for native hook dispatch.
+// upstream implementation ../../../container/execution_resource_projection.py owns existing behavior semantics.
 // downstream test ../tests/execution_resource_projection_native.rs validates frozen CPython 3.12.3 behavior.
 // @dependency-end
 
@@ -70,7 +70,7 @@ pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), String> {
     {
         return Err("normalized Hook schema_version is not exact".to_owned());
     }
-    if string_field(fields, "tool_name").is_none() {
+    if !is_string(field(fields, "tool_name").expect("exact normalized fields")) {
         return Err("normalized tool_name is not a string".to_owned());
     }
     let tool_input = field(fields, "tool_input").expect("exact normalized fields");
@@ -94,8 +94,8 @@ pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), String> {
     let response_fields = response_fields.expect("checked response object");
     let exit_code = field(response_fields, "exit_code").expect("exact response fields");
     if !is_integer(exit_code)
-        || string_field(response_fields, "stderr").is_none()
-        || string_field(response_fields, "stdout").is_none()
+        || !is_string(field(response_fields, "stderr").expect("exact response fields"))
+        || !is_string(field(response_fields, "stdout").expect("exact response fields"))
     {
         return Err("normalized tool_response field types are invalid".to_owned());
     }
@@ -312,6 +312,10 @@ fn string(value: &JsonValue) -> Option<String> {
         JsonValue::String(value) => value.to_text(),
         _ => None,
     }
+}
+
+fn is_string(value: &JsonValue) -> bool {
+    matches!(value, JsonValue::String(_))
 }
 
 fn string_field(fields: &JsonObject, name: &str) -> Option<String> {
