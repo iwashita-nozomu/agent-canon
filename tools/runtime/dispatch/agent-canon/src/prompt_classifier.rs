@@ -751,7 +751,7 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
         ],
     ),
     (
-        "tool_rejection_preflight.py",
+        "tool-rejection-preflight",
         &["tool rejection", "preflight", "はじかれる"],
     ),
     (

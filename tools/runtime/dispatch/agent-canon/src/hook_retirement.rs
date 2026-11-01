@@ -163,8 +163,8 @@ pub const RETIRED_CHILD_TOMBSTONES: &[RetiredChildTombstone] = &[
     ),
     row(
         "cause_investigation_guard.py",
-        "tools/validation/semantic/tools/tool_rejection_preflight.py",
-        "command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+        "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs",
+        "command-only:tools/bin/agent-canon tool-rejection-preflight",
         "cause investigation",
         "cause evidence belongs to intake",
     ),
