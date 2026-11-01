@@ -113,7 +113,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
             defaults["pre_edit_rejection_prediction_status"], "optional_diagnostic"
         )
         self.assertIn(
-            "tool_rejection_preflight.py", defaults["pre_edit_rejection_command"]
+            "tools/bin/agent-canon tool-rejection-preflight",
+            defaults["pre_edit_rejection_command"],
         )
         self.assertNotIn("tool_reuse_ledger_status", defaults)
         self.assertNotIn("tool_reuse_ledger", str(manifest))

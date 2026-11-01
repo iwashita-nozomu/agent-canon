@@ -6,7 +6,7 @@ responsibility Owns experiment run identity, lifecycle state, reproducibility co
 upstream design ../canonical/skills.md skill canon registry
 upstream design structure-planning.md reusable experiment and report structure contract
 upstream design prose-reasoning-graph.md prose graph experiment-plan diagnostics overlay
-downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts experiment execution surface guardrails
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts experiment execution surface guardrails
 @dependency-end
 -->
 

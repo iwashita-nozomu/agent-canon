@@ -6,7 +6,7 @@ responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
 downstream implementation ../../tools/validation/ci/checks/check_experiment_registry.py validates registry schema
-downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts managed execution surface guardrails
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts managed execution surface guardrails
 @dependency-end
 -->
 
@@ -171,7 +171,7 @@ make experiment-check
 registered command から `{config_path}` が欠ける場合も fail します。
 
 実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#topic-boundary)
-の変更契約に従います。`tool_rejection_preflight.py` の
+の変更契約に従います。`tool-rejection-preflight` の
 `experiment_execution_surface_guard` は
 [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction)
 の補助診断であり、patch 前の必須 evidence ではありません。

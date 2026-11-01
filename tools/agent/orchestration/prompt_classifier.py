@@ -583,7 +583,7 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "behavior event",
         "behavior_events",
     ),
-    "tool_rejection_preflight.py": ("tool rejection", "preflight", "はじかれる"),
+    "tool-rejection-preflight": ("tool rejection", "preflight", "はじかれる"),
     "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
 }
 SHELL_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")

@@ -634,7 +634,7 @@ def emit_bootstrap_output(
     print(
         "PRE_EDIT_REJECTION_COMMAND="
         + public_command_for_layout(
-            "python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>",
+            "tools/bin/agent-canon tool-rejection-preflight --root . <planned-edit-paths>",
             public_layout,
         )
     )
