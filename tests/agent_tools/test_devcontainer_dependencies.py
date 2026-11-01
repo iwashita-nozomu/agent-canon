@@ -3530,6 +3530,9 @@ class DependencyModelTests(unittest.TestCase):
                 "mermaid-cli",
             },
         )
+        rust_toolchain = plan.by_id()["rust-toolchain"]
+        self.assertEqual(rust_toolchain.version, "1.99.1")
+        self.assertEqual(rust_toolchain.verification.output_contains, "rustc 1.99.1")
         for removed in (
             "playwright",
             "playwright-chromium",

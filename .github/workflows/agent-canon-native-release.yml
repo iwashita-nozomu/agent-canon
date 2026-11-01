@@ -41,6 +41,8 @@ jobs:
   prepare:
     name: Distribution contracts
     runs-on: ubuntu-24.04
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.1"
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       targets: ${{ steps.plan.outputs.targets }}
@@ -53,6 +55,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
 
       - name: Select the matrix and validate publication input
         id: plan
@@ -121,12 +127,17 @@ jobs:
       EXECUTABLE: ${{ matrix.executable }}
       RUSTFLAGS: ${{ matrix.rustflags }}
       AGENT_CANON_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RUSTUP_TOOLCHAIN: "1.99.1"
     steps:
       - name: Checkout source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
 
       - name: Set up Python 3.12
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
