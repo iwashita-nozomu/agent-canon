@@ -18,13 +18,9 @@
 // downstream test ../tests/run_evaluation_native.rs establishes selected-file check behavior
 // @dependency-end
 
-use std::collections::HashMap;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-
 use regex::Regex;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
@@ -702,61 +698,6 @@ pub fn token_fields(line: &str) -> BTreeMap<String, String> {
     fields
 }
 
-const MECHANICALLY_REGENERATED_REPORT_ROOTS: &[&str] = &[
-    "reports/agent-eval-runs",
-    "reports/agent-improvement-guide",
-    "reports/agent-runtime-dashboard",
-    "reports/dependency-review",
-    "reports/hooks",
-    "reports/.cache",
-];
-
-fn normalized_git_path(path: &str) -> String {
-    path.replace('\\', "/").trim_matches('/').to_owned()
-}
-
-fn is_mechanically_regenerated_report_path(path: &str) -> bool {
-    let normalized = normalized_git_path(path);
-    if MECHANICALLY_REGENERATED_REPORT_ROOTS.iter().any(|root| {
-        normalized == *root
-            || normalized
-                .strip_prefix(root)
-                .is_some_and(|suffix| suffix.starts_with('/'))
-    }) {
-        return true;
-    }
-    let Some(filename) = normalized.strip_prefix("reports/") else {
-        return false;
-    };
-    if filename.contains('/') {
-        return false;
-    }
-    [".json", ".patch", ".txt"]
-        .iter()
-        .any(|extension| filename.ends_with(extension) && filename.len() > extension.len())
-}
-
-fn git_report_paths(workspace: &Path, extra: &[&str]) -> Vec<String> {
-    let mut command = Command::new("git");
-    command
-        .args(["ls-files"])
-        .args(extra)
-        .args(["-z", "--", "reports"])
-        .current_dir(workspace);
-    let Ok(output) = command.output() else {
-        return Vec::new();
-    };
-    if !output.status.success() {
-        return Vec::new();
-    }
-    output
-        .stdout
-        .split(|byte| *byte == 0)
-        .filter(|path| !path.is_empty())
-        .map(|path| String::from_utf8_lossy(path).into_owned())
-        .collect()
-}
-
 fn resolve_non_strict(path: &Path) -> PathBuf {
     crate::path_resolution::resolve_non_strict(path).unwrap_or_else(|_| {
         if path.is_absolute() {
@@ -780,10 +721,19 @@ pub fn report_artifact_placement_blockers(
         return Ok(Vec::new());
     }
     let mut report_paths = BTreeMap::<String, &'static str>::new();
-    for path in git_report_paths(&workspace, &["--others", "--exclude-standard"]) {
+    for raw_path in
+        git_report_paths(&workspace, &["--others", "--exclude-standard"]).unwrap_or_default()
+    {
+        let path = String::from_utf8_lossy(&raw_path).into_owned();
         report_paths.entry(path).or_insert("untracked");
     }
-    for path in git_report_paths(&workspace, &["--others", "--ignored", "--exclude-standard"]) {
+    for raw_path in git_report_paths(&workspace, &["--others", "--ignored", "--exclude-standard"])
+        .unwrap_or_default()
+    {
+        if !is_mechanically_regenerated_report_path(&raw_path) {
+            continue;
+        }
+        let path = String::from_utf8_lossy(&raw_path).into_owned();
         report_paths.entry(path).or_insert("ignored");
     }
     let report_root_metadata = [
@@ -795,9 +745,6 @@ pub fn report_artifact_placement_blockers(
     for (path, state) in report_paths {
         let candidate = resolve_non_strict(&workspace.join(&path));
         if report_root_metadata.contains(&candidate) || candidate.starts_with(&report_dir) {
-            continue;
-        }
-        if state == "ignored" && !is_mechanically_regenerated_report_path(&path) {
             continue;
         }
         blockers.push(format!(
