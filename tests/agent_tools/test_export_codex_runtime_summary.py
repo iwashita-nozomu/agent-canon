@@ -7,6 +7,7 @@
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves codex-runtime archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents runtime log archive ownership
 # upstream reference ../fixtures/codex_runtime_summary/python_golden.json freezes original CLI inputs and complete output
+# upstream reference ../fixtures/codex_runtime_summary/python_cli_arguments.json freezes help and argument errors
 # @dependency-end
 
 from __future__ import annotations
