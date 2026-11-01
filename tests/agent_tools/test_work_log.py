@@ -2,8 +2,9 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests test work log behavior.
-# upstream implementation ../../tools/runtime/archive/work_log.py appends run-local logs
+# responsibility Tests run-local work-log CLI behavior against the native owner.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/work_log.rs appends run-local logs
+# upstream implementation ../../tools/runtime/archive/work_log.py supplies the independent local-clock oracle
 # @dependency-end
 
 from __future__ import annotations
@@ -16,7 +17,26 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-WORK_LOG_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "work_log.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
+
+
+def _native_command(*arguments: str) -> list[str]:
+    assert AGENT_CANON_CLI, "AGENT_CANON_CLI must select the current native executable"
+    executable = Path(AGENT_CANON_CLI)
+    assert (
+        executable.is_absolute()
+        and executable.is_file()
+        and os.access(executable, os.X_OK)
+    )
+    return [str(executable), "work-log", *arguments]
+
+
+def _timestamp_from_output(result: subprocess.CompletedProcess[str]) -> str:
+    assert result.returncode == 0, result.stderr
+    entry = next(
+        line for line in result.stdout.splitlines() if line.startswith("`")
+    )
+    return entry[1:].split(" | ", 1)[0]
 
 
 class WorkLogTest(unittest.TestCase):
@@ -45,9 +65,7 @@ class WorkLogTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -62,7 +80,7 @@ class WorkLogTest(unittest.TestCase):
                     "updated docs",
                     "--next",
                     "run tests",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -105,9 +123,7 @@ class WorkLogTest(unittest.TestCase):
             )
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--kind",
@@ -118,7 +134,7 @@ class WorkLogTest(unittest.TestCase):
                     "ran targeted pytest",
                     "--next",
                     "update closeout",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -145,9 +161,7 @@ class WorkLogTest(unittest.TestCase):
             report_dir = runtime_root / "reports" / "agents" / "run-3"
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -161,7 +175,7 @@ class WorkLogTest(unittest.TestCase):
                     "contract not created yet",
                     "--message",
                     "checked MCP inventory",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -184,9 +198,7 @@ class WorkLogTest(unittest.TestCase):
             report_dir = runtime_root / "reports" / "agents" / "run-4"
 
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORK_LOG_SCRIPT),
+                _native_command(
                     "--workspace-root",
                     str(workspace_root),
                     "--report-dir",
@@ -198,7 +210,7 @@ class WorkLogTest(unittest.TestCase):
                     "--allow-missing-request-clause-id",
                     "--message",
                     "checked MCP inventory",
-                ],
+                ),
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
@@ -207,6 +219,63 @@ class WorkLogTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("--missing-request-clause-reason is required", result.stderr)
+
+    def test_native_timestamp_uses_the_host_local_clock(self) -> None:
+        """Compare native minute stamps to the retained Python owner in child TZs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            runtime_root = Path(tmp_dir) / "runtime"
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir()
+            zones = [None] if os.name == "nt" else ["UTC", "Asia/Tokyo"]
+
+            for zone_index, timezone in enumerate(zones):
+                child_env = os.environ.copy()
+                if timezone is not None:
+                    child_env["TZ"] = timezone
+                else:
+                    child_env.pop("TZ", None)
+
+                def run(owner: str, sample: int) -> subprocess.CompletedProcess[str]:
+                    run_id = f"clock-{zone_index}-{sample}"
+                    common = [
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-dir",
+                        str(runtime_root / "reports" / "agents" / run_id),
+                        "--runtime-root",
+                        str(runtime_root),
+                        "--request-clause-id",
+                        "CLOCK-1",
+                        "--message",
+                        "sample local timestamp",
+                    ]
+                    command = (
+                        [
+                            sys.executable,
+                            "-m",
+                            "tools.runtime.archive.work_log",
+                            *common,
+                        ]
+                        if owner == "python"
+                        else _native_command(*common)
+                    )
+                    return subprocess.run(
+                        command,
+                        cwd=PROJECT_ROOT,
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        env=child_env,
+                    )
+
+                before = _timestamp_from_output(run("python", 0))
+                native = _timestamp_from_output(run("native", 1))
+                after = _timestamp_from_output(run("python", 2))
+                self.assertIn(
+                    native,
+                    {before, after},
+                    f"native local-clock stamp diverged for TZ={timezone!r}",
+                )
 
 
 if __name__ == "__main__":
