@@ -163,6 +163,23 @@ task or handoff; the latest explicit user instruction governs conflicts while
 compatible earlier requirements remain active. Before editing or restoring
 behavior, define the intended outcome across changed and retained requirements;
 use history for rationale, not correctness.
+
+For each repair or migration, follow this order:
+
+1. Decide what changes and how before editing: the required behavior, owning
+   mechanism, affected callers, and implementation/replacement/deletion mapping.
+   Group the work into complete units by responsibility and dependency.
+2. Implement one unit, including its necessary API, caller, and configuration
+   changes.
+3. Review the whole unit for omitted deletions, obsolete implementations,
+   remaining references, and exclusive support. Complete its retirement and
+   consumer changes before validation.
+4. Format the completed unit and run its selected tests and checks.
+
+Use existing failure evidence to settle the repair decision before the next
+implementation pass. Completing each unit through retirement review keeps tests
+focused on the decided behavior and prevents a sequence of isolated patches.
+
 For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
 to distinguish missing input preparation from missing required API behavior,
