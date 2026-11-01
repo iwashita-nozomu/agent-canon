@@ -746,6 +746,11 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
     ):
         assert command in rust
         assert command not in remainder
+    for line in rust.splitlines():
+        if any(
+            command in line for command in ("cargo build", "cargo clippy", "cargo test")
+        ):
+            assert "--locked --offline" in line
     wrapper = (
         FULL_WRAPPER.read_text()
         .split("run_standalone_static_gate_ci() {", 1)[1]
