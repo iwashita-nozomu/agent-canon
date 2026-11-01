@@ -20,6 +20,7 @@
 // downstream test ../tests/source_mutation_native.rs validates source mutation capability behavior
 // downstream test ../tests/design_duplicates_native.rs compares duplicate-design CLI behavior with its frozen oracle
 // downstream test ../tests/design_similarity_native.rs compares similarity CLI behavior with frozen Python oracles
+// downstream test ../tests/design_organizer_native.rs compares organizer CLI behavior with its frozen Python oracle
 // @dependency-end
 
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
@@ -48,6 +49,10 @@ const SIMILAR_DESIGN_PROGRAM: &str = "find_similar_designs.py";
 const SIMILAR_DESIGN_USAGE: &str = "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
 const SIMILAR_DESIGN_TASK_DIRECTORY: &str = "tasks/similar-designs";
 const SIMILAR_DESIGN_REPORT_FILENAME: &str = "similar_designs_report.txt";
+const ORGANIZE_DESIGN_PROGRAM: &str = "organize_designs.py";
+const ORGANIZE_DESIGN_USAGE: &str = "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
+const ORGANIZE_DESIGN_TASK_DIRECTORY: &str = "tasks/design-organization";
+const ORGANIZE_DESIGN_REPORT_FILENAME: &str = "design_organize_report.txt";
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -80,6 +85,11 @@ static MARKDOWN_LINK_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").expect("static Markdown link regex"));
 static CODE_FENCE_PATTERN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)```.*?```").expect("static Markdown code-fence regex"));
+static ORGANIZER_CODE_PATH_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"`([^`/]+/[^`]+(?:/[^`]*)?)`").expect("static organizer code-path regex")
+});
+static ORGANIZER_MODULE_NAME_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[A-Za-z0-9_.-]+$").expect("static organizer module-name regex"));
 static EXTERNAL_LINK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-zA-Z][a-zA-Z0-9+.-]*://").expect("static external link scheme regex")
 });
@@ -205,6 +215,12 @@ struct WriteSummary {
 }
 
 pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| argument.as_str() == "organize-designs")
+    {
+        return run_organize_designs(&args[1..]);
+    }
     if args
         .first()
         .is_some_and(|argument| argument.as_str() == "find-similar-designs")
@@ -406,6 +422,413 @@ fn run_redundant_designs(raw: &[String]) -> i32 {
     }
     println!("Report written to {}", target.display());
     0
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OrganizeDesignArgs {
+    design_root: PathBuf,
+    apply: bool,
+    mutation_capability_json: Option<String>,
+    runtime_root: Option<PathBuf>,
+    output: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrganizeDesignOption {
+    Help,
+    DesignRoot,
+    Apply,
+    MutationCapabilityJson,
+    RuntimeRoot,
+    Output,
+}
+
+const ORGANIZE_DESIGN_OPTIONS: &[(&str, OrganizeDesignOption)] = &[
+    ("--help", OrganizeDesignOption::Help),
+    ("--design-root", OrganizeDesignOption::DesignRoot),
+    ("--apply", OrganizeDesignOption::Apply),
+    (
+        "--mutation-capability-json",
+        OrganizeDesignOption::MutationCapabilityJson,
+    ),
+    ("--runtime-root", OrganizeDesignOption::RuntimeRoot),
+    ("--output", OrganizeDesignOption::Output),
+];
+
+enum OrganizeDesignParse {
+    Run(OrganizeDesignArgs),
+    Help,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OrganizeDesignProposal {
+    source: PathBuf,
+    target: PathBuf,
+    module: Option<String>,
+}
+
+fn run_organize_designs(raw: &[String]) -> i32 {
+    let parsed = match parse_organize_design_args(raw) {
+        Ok(OrganizeDesignParse::Run(parsed)) => parsed,
+        Ok(OrganizeDesignParse::Help) => {
+            print_organize_design_help();
+            return 0;
+        }
+        Err(message) => return organize_design_error(&message),
+    };
+
+    let current_dir = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            return organize_design_runtime_error(format!("cannot resolve source root: {error}"));
+        }
+    };
+    let source_root = match fs::canonicalize(&current_dir) {
+        Ok(path) => path,
+        Err(error) => {
+            return organize_design_runtime_error(format!(
+                "cannot resolve source root {}: {error}",
+                current_dir.display()
+            ));
+        }
+    };
+    let design_dir = match resolve_design_root(&parsed.design_root, &current_dir) {
+        Ok(path) => path,
+        Err(message) => return organize_design_error(&message),
+    };
+    if !design_dir.is_dir() {
+        return organize_design_error(format!(
+            "design root is not a directory: {}",
+            design_dir.display()
+        ));
+    }
+    let proposals = match build_organize_design_proposals(&design_dir) {
+        Ok(proposals) => proposals,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let capability = if parsed.apply {
+        match SourceMutationCapability::from_json(
+            &source_root,
+            parsed.mutation_capability_json.as_deref(),
+        ) {
+            Ok(capability) => Some(capability),
+            Err(error) => return organize_design_runtime_error(error.to_string()),
+        }
+    } else {
+        None
+    };
+
+    let requested_runtime_root = parsed.runtime_root.clone().or_else(|| {
+        std::env::var_os(RUNTIME_ROOT_ENV)
+            .filter(|value| !value.is_empty())
+            .and_then(|value| value.into_string().ok())
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    });
+    let runtime_root = match requested_runtime_root
+        .as_deref()
+        .map(expand_cli_path)
+        .transpose()
+    {
+        Ok(path) => path,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let boundary =
+        match RuntimeArtifactBoundary::for_source(&source_root, runtime_root.as_deref(), true) {
+            Ok(boundary) => boundary,
+            Err(error) => return organize_design_runtime_error(error),
+        };
+    let output = match parsed.output.as_deref().map(expand_cli_path).transpose() {
+        Ok(path) => path,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+    let report_target = match admit_external_report_target(
+        &boundary,
+        output.as_deref(),
+        Path::new(ORGANIZE_DESIGN_TASK_DIRECTORY),
+        ORGANIZE_DESIGN_REPORT_FILENAME,
+    ) {
+        Ok(target) => target,
+        Err(error) => return organize_design_runtime_error(error),
+    };
+
+    if let Some(capability) = capability.as_ref() {
+        for proposal in proposals
+            .iter()
+            .filter(|proposal| proposal.module.is_some())
+        {
+            if let Err(error) = capability.assert_allowed(&proposal.target) {
+                return organize_design_runtime_error(error);
+            }
+        }
+        for proposal in proposals
+            .iter()
+            .filter(|proposal| proposal.module.is_some())
+        {
+            if let Err(error) =
+                capability.copy_file_with_metadata(&proposal.source, &proposal.target)
+            {
+                return organize_design_runtime_error(error);
+            }
+        }
+    }
+
+    let report = render_organize_design_report(&proposals, parsed.apply);
+    let relative_target = match report_target.strip_prefix(boundary.root()) {
+        Ok(path) => path,
+        Err(_) => {
+            return organize_design_runtime_error(format!(
+                "path escapes runtime root: {}",
+                report_target.display()
+            ));
+        }
+    };
+    if let Err(error) = boundary.atomic_write_text(relative_target, &report, 0o600) {
+        return organize_design_runtime_error(error);
+    }
+    println!("Report written to {}", report_target.display());
+    0
+}
+
+fn parse_organize_design_args(raw: &[String]) -> Result<OrganizeDesignParse, String> {
+    let mut parsed = OrganizeDesignArgs {
+        design_root: PathBuf::from("documents/design"),
+        apply: false,
+        mutation_capability_json: None,
+        runtime_root: None,
+        output: None,
+    };
+    let mut index = 0;
+    let mut unrecognized = Vec::new();
+    while index < raw.len() {
+        let argument = raw[index].as_str();
+        if argument == "-h" {
+            return Ok(OrganizeDesignParse::Help);
+        }
+
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        if !option.starts_with("--") || option == "--" {
+            unrecognized.push(argument.to_string());
+            index += 1;
+            continue;
+        }
+
+        let name = match resolve_long_option_prefix(option, ORGANIZE_DESIGN_OPTIONS) {
+            Ok(name) => name,
+            Err(LongOptionError::Unrecognized) => {
+                unrecognized.push(argument.to_string());
+                index += 1;
+                continue;
+            }
+            Err(LongOptionError::Ambiguous(matches)) => {
+                return Err(format!(
+                    "ambiguous option: {option} could match {}",
+                    matches.join(", ")
+                ));
+            }
+        };
+        match name {
+            OrganizeDesignOption::Help => {
+                return match inline_value {
+                    Some(value) => Err(format!(
+                        "argument -h/--help: ignored explicit argument '{value}'"
+                    )),
+                    None => Ok(OrganizeDesignParse::Help),
+                };
+            }
+            OrganizeDesignOption::Apply => {
+                if let Some(value) = inline_value {
+                    return Err(format!(
+                        "argument --apply: ignored explicit argument '{value}'"
+                    ));
+                }
+                parsed.apply = true;
+            }
+            option_name => {
+                let value = match inline_value {
+                    Some(value) => value.to_string(),
+                    None => {
+                        index += 1;
+                        let Some(value) = raw.get(index) else {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                organize_design_option_label(option_name)
+                            ));
+                        };
+                        if value.starts_with("--") {
+                            return Err(format!(
+                                "argument {}: expected one argument",
+                                organize_design_option_label(option_name)
+                            ));
+                        }
+                        value.clone()
+                    }
+                };
+                match option_name {
+                    OrganizeDesignOption::DesignRoot => parsed.design_root = PathBuf::from(value),
+                    OrganizeDesignOption::MutationCapabilityJson => {
+                        parsed.mutation_capability_json = Some(value)
+                    }
+                    OrganizeDesignOption::RuntimeRoot => {
+                        parsed.runtime_root = Some(PathBuf::from(value))
+                    }
+                    OrganizeDesignOption::Output => parsed.output = Some(PathBuf::from(value)),
+                    OrganizeDesignOption::Help | OrganizeDesignOption::Apply => {
+                        unreachable!("flag options are handled before their values")
+                    }
+                }
+            }
+        }
+        index += 1;
+    }
+    if unrecognized.is_empty() {
+        Ok(OrganizeDesignParse::Run(parsed))
+    } else {
+        Err(format!(
+            "unrecognized arguments: {}",
+            unrecognized.join(" ")
+        ))
+    }
+}
+
+fn organize_design_option_label(option: OrganizeDesignOption) -> &'static str {
+    match option {
+        OrganizeDesignOption::DesignRoot => "--design-root",
+        OrganizeDesignOption::MutationCapabilityJson => "--mutation-capability-json",
+        OrganizeDesignOption::RuntimeRoot => "--runtime-root",
+        OrganizeDesignOption::Output => "--output",
+        OrganizeDesignOption::Help | OrganizeDesignOption::Apply => {
+            unreachable!("flag options do not take values")
+        }
+    }
+}
+
+fn print_organize_design_help() {
+    println!("{ORGANIZE_DESIGN_USAGE}\n");
+    println!("Plan design-document organization without implicit source mutation.");
+    println!();
+    println!("The default operation only reads documents/design and writes an external");
+    println!("runtime report. --apply is a distinct source mutation route and requires");
+    println!("an exact typed --mutation-capability-json covering every target.\n");
+    println!("options:");
+    println!("  -h, --help            show this help message and exit");
+    println!("  --design-root DESIGN_ROOT");
+    println!("                        Read-only design root (defaults to documents/design).");
+    println!("  --apply               Copy proposals into source; requires an explicit");
+    println!("                        mutation capability.");
+    println!("  --mutation-capability-json MUTATION_CAPABILITY_JSON");
+    println!("                        Exact typed source mutation capability JSON.");
+    println!("  --runtime-root RUNTIME_ROOT");
+    println!("                        External runtime root (or AGENT_CANON_RUNTIME_ROOT);");
+    println!("                        never source-local.");
+    println!("  --output OUTPUT       External report path; when omitted, a run-scoped file");
+    println!("                        is created under the runtime root.");
+}
+
+fn organize_design_error(message: impl std::fmt::Display) -> i32 {
+    eprintln!("{ORGANIZE_DESIGN_USAGE}");
+    eprintln!("{ORGANIZE_DESIGN_PROGRAM}: error: {message}");
+    2
+}
+
+fn organize_design_runtime_error(message: impl std::fmt::Display) -> i32 {
+    organize_design_error(format!("runtime_or_mutation_error: {message}"))
+}
+
+fn build_organize_design_proposals(
+    design_dir: &Path,
+) -> Result<Vec<OrganizeDesignProposal>, String> {
+    let mut files = collect_organizer_markdown_files(design_dir)?;
+    #[cfg(windows)]
+    let case_mapper = icu_casemap::CaseMapper::new();
+    #[cfg(windows)]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right, &case_mapper);
+    #[cfg(not(windows))]
+    let path_order = |left: &Path, right: &Path| similarity_path_order(left, right);
+    files.sort_by(|left, right| path_order(left, right));
+
+    let mut proposals = Vec::with_capacity(files.len());
+    for source in files {
+        let relative = source
+            .strip_prefix(design_dir)
+            .expect("organizer source is beneath its root");
+        if relative.components().count() >= 2 {
+            continue;
+        }
+        if source
+            .components()
+            .any(|component| component.as_os_str() == std::ffi::OsStr::new("templates"))
+        {
+            continue;
+        }
+        let text = fs::read_to_string(&source).map_err(|error| {
+            format!("cannot read design document {}: {error}", source.display())
+        })?;
+        match detect_organizer_submodule(&text) {
+            Some(module) => proposals.push(OrganizeDesignProposal {
+                target: design_dir
+                    .join(&module)
+                    .join(source.file_name().expect("markdown path has a filename")),
+                source,
+                module: Some(module),
+            }),
+            None => proposals.push(OrganizeDesignProposal {
+                target: source.clone(),
+                source,
+                module: None,
+            }),
+        }
+    }
+    Ok(proposals)
+}
+
+fn detect_organizer_submodule(text: &str) -> Option<String> {
+    let path = ORGANIZER_CODE_PATH_PATTERN.captures(text)?.get(1)?.as_str();
+    let parts = path.split('/').collect::<Vec<_>>();
+    let candidate = if parts.first().copied() == Some("python") {
+        parts.get(1).copied()?
+    } else {
+        parts.first().copied()?
+    };
+    if matches!(candidate, "." | "..") || !ORGANIZER_MODULE_NAME_PATTERN.is_match(candidate) {
+        return None;
+    }
+    Some(candidate.to_string())
+}
+
+fn render_organize_design_report(proposals: &[OrganizeDesignProposal], apply: bool) -> String {
+    let mut lines = Vec::new();
+    let mut submodules = BTreeSet::new();
+    for proposal in proposals {
+        match &proposal.module {
+            None => lines.push(format!(
+                "UNRESOLVED (no explicit code path): {}",
+                proposal.source.display()
+            )),
+            Some(module) => {
+                submodules.insert(module.clone());
+                if apply {
+                    lines.push(format!(
+                        "COPIED {} -> {}",
+                        proposal.source.display(),
+                        proposal.target.display()
+                    ));
+                } else {
+                    lines.push(format!(
+                        "PROPOSE {} -> {}",
+                        proposal.source.display(),
+                        proposal.target.display()
+                    ));
+                }
+            }
+        }
+    }
+    lines.extend([String::new(), "Detected submodules:".to_string()]);
+    lines.extend(submodules.into_iter().map(|name| format!(" - {name}")));
+    format!("{}\n", lines.join("\n"))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1023,6 +1446,18 @@ fn build_redundant_design_report(
 }
 
 fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+    let include = |path: &Path| !redundant_markdown_name_is_excluded(path);
+    collect_markdown_tree(root, files, &include)
+}
+
+fn collect_markdown_tree<F>(
+    root: &Path,
+    files: &mut Vec<PathBuf>,
+    include: &F,
+) -> Result<(), String>
+where
+    F: Fn(&Path) -> bool,
+{
     let entries = fs::read_dir(root)
         .map_err(|error| format!("cannot read design root {}: {error}", root.display()))?;
     for entry in entries {
@@ -1033,7 +1468,7 @@ fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Re
             .file_type()
             .map_err(|error| format!("cannot inspect design path {}: {error}", path.display()))?;
         if file_type.is_dir() {
-            collect_redundant_markdown_files(&path, files)?;
+            collect_markdown_tree(&path, files, include)?;
             continue;
         }
         let is_markdown = path.extension().is_some_and(|extension| {
@@ -1044,15 +1479,34 @@ fn collect_redundant_markdown_files(root: &Path, files: &mut Vec<PathBuf>) -> Re
                 extension == "md"
             }
         });
-        let excluded_name = path.file_name().is_some_and(|name| {
-            let name = name.to_string_lossy();
-            name.to_lowercase().contains("template") || name.ends_with(".bak")
-        });
-        if is_markdown && !excluded_name && path.is_file() {
+        if is_markdown && include(&path) && path.is_file() {
             files.push(path);
         }
     }
     Ok(())
+}
+
+fn redundant_markdown_name_is_excluded(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        name.to_lowercase().contains("template") || name.ends_with(".bak")
+    })
+}
+
+fn collect_organizer_markdown_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let include_all = |_path: &Path| true;
+    let mut files = Vec::new();
+    collect_markdown_tree(root, &mut files, &include_all)?;
+    files.retain(|path| {
+        let has_templates_component = path
+            .components()
+            .any(|component| component.as_os_str() == std::ffi::OsStr::new("templates"));
+        !has_templates_component
+            && path
+                .strip_prefix(root)
+                .is_ok_and(|relative| relative.components().count() < 2)
+    });
+    Ok(files)
 }
 
 fn normalized_design_sha(text: &str) -> String {
@@ -1519,6 +1973,7 @@ commands:\n\
   format                  format Markdown, then run the adjacent docs check\n\
   find-redundant-designs  report exact duplicate design documents; --delete requires an exact source mutation capability\n\
   find-similar-designs    compare Markdown design documents and write an external runtime report\n\
+  organize-designs        plan design-document placement; --apply requires an exact source mutation capability\n\
   links                   check Markdown links; --apply requires an exact source mutation capability\n\
   check-entrypoints       check the finite root entrypoint owner-map contract\n\
   check-bootstrap         check bootstrap docs or a source-free static-seed consumer\n\

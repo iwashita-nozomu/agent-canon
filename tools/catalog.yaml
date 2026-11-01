@@ -279,22 +279,38 @@ entries:
 
   - id: organize-designs
     summary: Plans design-document organization and requires an explicit mutation capability to apply it.
-    path: tools/validation/documentation/authoring/organize_designs.py
+    path: tools/runtime/dispatch/agent-canon/src/docs.rs
     family: docs
     role: docs
     status: maintainer_only
     audience: maintainer
     placement: workflow_helper
-    command: python3 tools/validation/documentation/authoring/organize_designs.py --runtime-root <external-runtime>
-    dispatch: {argv: ["python3", "tools/validation/documentation/authoring/organize_designs.py", "--runtime-root", "<external-runtime>"]}
+    command: tools/bin/agent-canon docs organize-designs --runtime-root <external-runtime>
+    dispatch:
+      runtime: rust
+      argv: ["tools/bin/agent-canon", "docs", "organize-designs", "--runtime-root", "<external-runtime>"]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      # Dispatch owns the external report; source copies require the explicit mutation capability.
+      side_effect: external-artifact
+      output_root: external-runtime
+      written_paths: []
     writes: true
     default_wiring:
       ci: false
       pr_check: false
     docs:
-      - documents/tools/README.md
+      - documents/tools/agent-canon.md
     tests:
       - tests/tools/test_design_doc_runtime_boundaries.py
+      - tools/runtime/dispatch/agent-canon/tests/design_organizer_native.rs
+      - tools/runtime/dispatch/agent-canon/tests/source_mutation_native.rs
 
   - id: numeric-performance
     summary: Classifies post-run numerical performance observations using task-owned mathematical evidence.
