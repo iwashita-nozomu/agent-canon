@@ -650,6 +650,11 @@ impl<'a> JsonParser<'a> {
             Some(b'0') => {
                 self.index += 1;
                 if matches!(self.peek(), Some(b'0'..=b'9')) {
+                    if self.reject_duplicates {
+                        return Ok(JsonValue::Number(JsonNumber::from_raw(
+                            &self.input[start..self.index],
+                        )));
+                    }
                     return Err(self.error("leading zeros are not permitted in numbers"));
                 }
             }
@@ -670,7 +675,9 @@ impl<'a> JsonParser<'a> {
             is_float = true;
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
                 if self.reject_duplicates {
-                    return Err(self.error_at("unexpected trailing characters", fraction_start));
+                    return Ok(JsonValue::Number(JsonNumber::from_raw(
+                        &self.input[start..fraction_start],
+                    )));
                 }
                 return Err(self.error("expected a digit after decimal point"));
             }
@@ -687,7 +694,9 @@ impl<'a> JsonParser<'a> {
             }
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
                 if self.reject_duplicates {
-                    return Err(self.error_at("unexpected trailing characters", exponent_start));
+                    return Ok(JsonValue::Number(JsonNumber::from_raw(
+                        &self.input[start..exponent_start],
+                    )));
                 }
                 return Err(self.error("expected a digit in exponent"));
             }

@@ -22,6 +22,8 @@ use agent_canon::python_json::{
 // 96af170f28416f5435aca4fe184274532c0d0aeb088fa4a282b9d5eccb932a5c
 // Raw syntax capture: execution-projection-old-syntax-apbns7b9/early-export/corpus.json; SHA256:
 // 2a4155497b12c771ddc1421f7c9126565a54b03e5e33af31f9522f09b130c647
+// Raw number-syntax capture: execution-projection-old-number-syntax-zokbbdpb/early-export/corpus.json; SHA256:
+// 5f5bca190e8edeb8320b3668755f83e8439b6a39b02b67bd47f0efcfc2675f4b
 
 #[test]
 fn execution_resource_projection_matches_captured_cpython_cases() {
@@ -150,7 +152,27 @@ fn execution_resource_projection_matches_captured_boundary_cases() {
         ("{}x\n", "Extra data: line 1 column 3 (char 2)"),
         ("1.\n", "Extra data: line 1 column 2 (char 1)"),
         ("1e\n", "Extra data: line 1 column 2 (char 1)"),
+        ("1e+\n", "Extra data: line 1 column 2 (char 1)"),
         ("-\n", "Expecting value: line 1 column 1 (char 0)"),
+        ("-.\n", "Expecting value: line 1 column 1 (char 0)"),
+        ("01\n", "Extra data: line 1 column 2 (char 1)"),
+        ("-01\n", "Extra data: line 1 column 3 (char 2)"),
+        (
+            "{\"x\":1.}\n",
+            "Expecting ',' delimiter: line 1 column 7 (char 6)",
+        ),
+        (
+            "{\"x\":1e}\n",
+            "Expecting ',' delimiter: line 1 column 7 (char 6)",
+        ),
+        (
+            "[1e]\n",
+            "Expecting ',' delimiter: line 1 column 3 (char 2)",
+        ),
+        (
+            "[01]\n",
+            "Expecting ',' delimiter: line 1 column 3 (char 2)",
+        ),
         (
             "\"abc\n",
             "Unterminated string starting at: line 1 column 1 (char 0)",
