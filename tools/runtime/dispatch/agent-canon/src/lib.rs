@@ -79,6 +79,7 @@ pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
 pub mod prompt_capture;
+pub mod prompt_classifier;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
@@ -90,6 +91,7 @@ pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
+pub mod skill_lane_detector;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
 pub mod task_close;
