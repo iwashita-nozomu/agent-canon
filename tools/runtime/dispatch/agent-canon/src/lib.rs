@@ -67,9 +67,11 @@ pub mod execution_resource_projection;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
+pub mod behavior_event_assembly;
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
+pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod native_release;
@@ -77,6 +79,8 @@ pub mod owner_guarantee;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
+pub mod prompt_capture;
+pub mod prompt_classifier;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
@@ -88,8 +92,10 @@ pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
+pub mod skill_lane_detector;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod subagent_selection;
 pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
@@ -98,6 +104,7 @@ pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
 pub mod work_log;
+pub mod workflow_context;
 
 #[cfg(test)]
 mod template_tests;

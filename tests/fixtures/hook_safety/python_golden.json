@@ -1,0 +1,1715 @@
+{
+  "baseline": {
+    "commit": "d92019c74854fcaa76e189ef192858676718f600",
+    "effective_runtime": "unverified",
+    "source_pins": {
+      ".codex/hooks/hook_dispatcher.py": {
+        "git_blob_oid": "cbb8d5c82c1606c5a99cfa094afcf440014e5d9c",
+        "sha256": "5551d2946264cb0179655ba908832ac33f2016169015c0fca3c02d7cdd6b5995"
+      },
+      "tests/agent_tools/test_codex_hooks.py": {
+        "git_blob_oid": "52dcf41c5cadbe4c25a0f6c86b1f1363625e5d2e",
+        "sha256": "805748a43c6ed5a75844ddad295bb4e03a3c8dbca9acc77ba2f1f03a87341491"
+      },
+      "tests/agent_tools/test_hook_safety.py": {
+        "git_blob_oid": "b13230ec7eea27f1c433a09a5b2e6ed95323560e",
+        "sha256": "79d5c6c75252ead010fedcd0b87a2472b9d4403f12ac328ce1100e1d4adcc336"
+      },
+      "tools/runtime/authority/hook_safety.py": {
+        "git_blob_oid": "643d043d597d980f26c4906c67a4eda69753fe56",
+        "sha256": "7906504e9f927614713b044ec21880ec31341961e1f58e262af02145135841d0"
+      }
+    },
+    "tree": "19402772d724fcb7cca9b3790b049f873a597953"
+  },
+  "captured_api": [
+    "SHELL_TOOL_NAMES",
+    "branch_block_payload",
+    "first_block",
+    "payload_prompt",
+    "payload_tool_command",
+    "payload_tool_name",
+    "secret_block_payload",
+    "secret_kind"
+  ],
+  "constants": {
+    "SHELL_TOOL_NAMES": [
+      "Bash",
+      "bash"
+    ]
+  },
+  "fixtures": {
+    "git_intent_and_payload_results": [
+      {
+        "block_payload": null,
+        "case_id": "empty",
+        "intent": null,
+        "synthetic_input": {
+          "command": ""
+        },
+        "synthetic_input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "block_payload": null,
+        "case_id": "whitespace-only",
+        "intent": null,
+        "synthetic_input": {
+          "command": " \t\n "
+        },
+        "synthetic_input_sha256": "84db5a07e5711e157718218564157af5caaa5796789fd41bc3086e9c7346500d"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "98122a2f82a181b03587022fd068c9fcc1c8a6b8b0cc048bea69db051490c0b4",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "restore-with-git-directory-prefix",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "git -C vendor/agent-canon restore --worktree ."
+        },
+        "synthetic_input_sha256": "98122a2f82a181b03587022fd068c9fcc1c8a6b8b0cc048bea69db051490c0b4"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "4da7f453ed8b33b8895ac0e9c0818c41a78abe778f5f5e08cd90e0d423331692",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "reset-with-global-option",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "git --no-pager reset --mixed HEAD"
+        },
+        "synthetic_input_sha256": "4da7f453ed8b33b8895ac0e9c0818c41a78abe778f5f5e08cd90e0d423331692"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "bb05d8ed5c2aea4abee1edfb57c967ade402aad36cefb174de7ec037b5d87809",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "restore-with-short-global-option",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "git -P restore --staged file.py"
+        },
+        "synthetic_input_sha256": "bb05d8ed5c2aea4abee1edfb57c967ade402aad36cefb174de7ec037b5d87809"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "94a3eb8e802d50adf129ada51f71aaf0b1289aaeaad32e0ba74ca40572b97848",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:checkout",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:checkout; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "checkout-with-global-option",
+        "intent": {
+          "evidence": "current-checkout mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "checkout"
+        },
+        "synthetic_input": {
+          "command": "git -p checkout -- file.py"
+        },
+        "synthetic_input_sha256": "94a3eb8e802d50adf129ada51f71aaf0b1289aaeaad32e0ba74ca40572b97848"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "37694fad5a45d6bb25360caf2158c9ac9d0b0d87b1004a2a2ead3472e01862ea",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "opaque-exec-path-option",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "git --exec-path=/tmp reset HEAD"
+        },
+        "synthetic_input_sha256": "37694fad5a45d6bb25360caf2158c9ac9d0b0d87b1004a2a2ead3472e01862ea"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "d30d324fb238ab4c23ffe8b85307995b29fee4805ea14b64102b0ef1481cfca2",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "env-unset-short",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "env -u HOME git restore ."
+        },
+        "synthetic_input_sha256": "d30d324fb238ab4c23ffe8b85307995b29fee4805ea14b64102b0ef1481cfca2"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "aaa69a1e1392353e878441cd5157b35f009582f152f13e31a870b7b1dcbf7e23",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "env-unset-long",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "env --unset=HOME git reset HEAD"
+        },
+        "synthetic_input_sha256": "aaa69a1e1392353e878441cd5157b35f009582f152f13e31a870b7b1dcbf7e23"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "6079c2abedd2efbe6bc90b4fee11c03b3c42a64668d7353f6298a62f7aaaba85",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:clean",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:clean; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "command-wrapper",
+        "intent": {
+          "evidence": "git clean force",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "clean"
+        },
+        "synthetic_input": {
+          "command": "command -- git clean -f"
+        },
+        "synthetic_input_sha256": "6079c2abedd2efbe6bc90b4fee11c03b3c42a64668d7353f6298a62f7aaaba85"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "6fe9a7298a3f2d07fd9d794afc8360c2c1bc192f5db5909deb7ca0294b8202d3",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:stash",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:stash; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "command-wrapper-search-path",
+        "intent": {
+          "evidence": "stash mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "stash"
+        },
+        "synthetic_input": {
+          "command": "command -p git stash push -m save"
+        },
+        "synthetic_input_sha256": "6fe9a7298a3f2d07fd9d794afc8360c2c1bc192f5db5909deb7ca0294b8202d3"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "6e6f4eda9288b1aff14089f1cf005c2de2bfa3b47764ad86d2e4bc01a036f81e",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:checkout",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:checkout; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "parenthesized-command",
+        "intent": {
+          "evidence": "current-checkout mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "checkout"
+        },
+        "synthetic_input": {
+          "command": "( git checkout main )"
+        },
+        "synthetic_input_sha256": "6e6f4eda9288b1aff14089f1cf005c2de2bfa3b47764ad86d2e4bc01a036f81e"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "d21d7a470594db9627d7734bb84e7390171659aa16dca22a58a5e90514f9432f",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:switch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:switch; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "negated-command",
+        "intent": {
+          "evidence": "current-checkout mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "switch"
+        },
+        "synthetic_input": {
+          "command": "! git switch main"
+        },
+        "synthetic_input_sha256": "d21d7a470594db9627d7734bb84e7390171659aa16dca22a58a5e90514f9432f"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "422f6d5005ff8f0f4e3c3184b0a72fe47ebf6332eaecdeaed838433cb7b05911",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "time-wrapper",
+        "intent": {
+          "evidence": "worktree prune",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "time -p git worktree prune"
+        },
+        "synthetic_input_sha256": "422f6d5005ff8f0f4e3c3184b0a72fe47ebf6332eaecdeaed838433cb7b05911"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "170c4b3da3df7e39b2a8c2f8f5fff86398ebbf194dc72a7b8c10e41fccc667b7",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "bash-script-wrapper",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "bash -lc 'git restore --worktree .'"
+        },
+        "synthetic_input_sha256": "170c4b3da3df7e39b2a8c2f8f5fff86398ebbf194dc72a7b8c10e41fccc667b7"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "9a9defd5cbef39b547338b7c5b533c19e92e4913bfb6645e6155f291f16ac270",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "eval-script-wrapper",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "eval 'git reset --mixed HEAD'"
+        },
+        "synthetic_input_sha256": "9a9defd5cbef39b547338b7c5b533c19e92e4913bfb6645e6155f291f16ac270"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "11546c8e7bb2662ddb29ecfea57867eb3498a7df3adfa7f35453880b77638863",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:clean",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:clean; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "later-command-segment",
+        "intent": {
+          "evidence": "git clean force",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "clean"
+        },
+        "synthetic_input": {
+          "command": "true && git clean --force -d"
+        },
+        "synthetic_input_sha256": "11546c8e7bb2662ddb29ecfea57867eb3498a7df3adfa7f35453880b77638863"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "4f30195c9d9b223896b37db2e53c3c0814c311bfc50b6d119518dce177f3409f",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:branch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:branch; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "branch-delete-short",
+        "intent": {
+          "evidence": "delete/rename",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "branch"
+        },
+        "synthetic_input": {
+          "command": "git branch -Dtopic"
+        },
+        "synthetic_input_sha256": "4f30195c9d9b223896b37db2e53c3c0814c311bfc50b6d119518dce177f3409f"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "8e0dfcdaf3f792888b54ab6d79ef4dc1aafa3b44f67da5dcaa4bcc0e273b1322",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:branch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:branch; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "branch-move-short",
+        "intent": {
+          "evidence": "delete/rename",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "branch"
+        },
+        "synthetic_input": {
+          "command": "git branch -mtopic"
+        },
+        "synthetic_input_sha256": "8e0dfcdaf3f792888b54ab6d79ef4dc1aafa3b44f67da5dcaa4bcc0e273b1322"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "7d2d24c6f4c6d49b9331f3b0c5e055a4e0a8adbee8847a3d0d7471241a7aa1f2",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "opaque-config-env-option",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "git --config-env=core.editor=EDITOR reset --hard HEAD"
+        },
+        "synthetic_input_sha256": "7d2d24c6f4c6d49b9331f3b0c5e055a4e0a8adbee8847a3d0d7471241a7aa1f2"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "3e80741c0f9ed8d95c5d38d34281a2765329b198a3a83ce67cb2a9c252b46cae",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "opaque-option-value",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "git --config-env core.editor=EDITOR reset --hard HEAD"
+        },
+        "synthetic_input_sha256": "3e80741c0f9ed8d95c5d38d34281a2765329b198a3a83ce67cb2a9c252b46cae"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "e590426e7e5331edba725da8747cfafafa200acc8a9c0a5c23ef10c18367033f",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:opaque",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:opaque; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "opaque-long-option",
+        "intent": {
+          "evidence": "opaque protected Git mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "opaque"
+        },
+        "synthetic_input": {
+          "command": "sudo git --unrecognized-global-option reset --hard HEAD"
+        },
+        "synthetic_input_sha256": "e590426e7e5331edba725da8747cfafafa200acc8a9c0a5c23ef10c18367033f"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "27b4d0f691d4f5fc997f71f0664650cf3229a66671b7c15033079818f3986077",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:opaque",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:opaque; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "opaque-many-global-options",
+        "intent": {
+          "evidence": "opaque protected Git mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "opaque"
+        },
+        "synthetic_input": {
+          "command": "sudo git -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A -A reset --hard HEAD"
+        },
+        "synthetic_input_sha256": "27b4d0f691d4f5fc997f71f0664650cf3229a66671b7c15033079818f3986077"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "8782a4636e5e6a92613864d58c3452063d6a3352d561f78423af6b40c1ccc41a",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "backtick-reset",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo `git reset --hard`"
+        },
+        "synthetic_input_sha256": "8782a4636e5e6a92613864d58c3452063d6a3352d561f78423af6b40c1ccc41a"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "4cc2810a0846679ae88fb2e80be4fe51bf00231ba4ad91bb1d8f2b3f5c9fd1bf",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "double-quoted-backtick-reset",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo \"`git reset --hard`\""
+        },
+        "synthetic_input_sha256": "4cc2810a0846679ae88fb2e80be4fe51bf00231ba4ad91bb1d8f2b3f5c9fd1bf"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "7a45e6fdadc663419209687beed7a76d7e636c4632e84713883302ef76bc2051",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "incomplete-backtick-reset",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo `git reset --hard"
+        },
+        "synthetic_input_sha256": "7a45e6fdadc663419209687beed7a76d7e636c4632e84713883302ef76bc2051"
+      },
+      {
+        "block_payload": null,
+        "case_id": "backtick-safe-command",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo `date`"
+        },
+        "synthetic_input_sha256": "3a604a377da722025ba3d23633f93869221a6f61bf27239c32a5c1a1ddfaade5"
+      },
+      {
+        "block_payload": null,
+        "case_id": "double-quoted-backtick-safe-command",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo \"`date`\""
+        },
+        "synthetic_input_sha256": "2802a5bd5a23ed613d827f0144350db792c30ad537f95dafafcef791c6f67403"
+      },
+      {
+        "block_payload": null,
+        "case_id": "single-quoted-backtick-is-data",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo '`git reset --hard`'"
+        },
+        "synthetic_input_sha256": "deb395e8a003e661f4857462ab4130097a9ed2496ac0c1dcc8d5784235a516b3"
+      },
+      {
+        "block_payload": null,
+        "case_id": "backtick-read-only-command",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo `git status`"
+        },
+        "synthetic_input_sha256": "3407a4c00c8fe96121ac88639d259f45c29c535f3ce6c96b844da32a5df8a601"
+      },
+      {
+        "block_payload": null,
+        "case_id": "incomplete-backtick-safe-command",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo `date"
+        },
+        "synthetic_input_sha256": "90762d4646dcc4d09730320ad5d89a429cf29a75983a40e33ac74d07de9dec45"
+      },
+      {
+        "block_payload": null,
+        "case_id": "escaped-backtick-is-data",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo \\`git reset --hard\\`"
+        },
+        "synthetic_input_sha256": "496d9c000b6c1c0e50716be7c8a0710756a4761c0e641ed27f501c4b09da2728"
+      },
+      {
+        "block_payload": null,
+        "case_id": "backtick-in-shell-comment",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo safe # `git reset --hard`"
+        },
+        "synthetic_input_sha256": "6e28955d7f249f8d9b8c874fe488314b540c96e4e707ecd64296560bc3e86432"
+      },
+      {
+        "block_payload": null,
+        "case_id": "incomplete-backtick-in-comment",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo safe # `git reset --hard"
+        },
+        "synthetic_input_sha256": "ecd6114f2c08b45f0c96bcdb9d74d3f878cad27f29ec27cd650974f6e3d28d0a"
+      },
+      {
+        "block_payload": null,
+        "case_id": "comment-after-separator",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo safe;# `git reset --hard`"
+        },
+        "synthetic_input_sha256": "9cdd3ed455a7145a7e397fd73309d75191dad9750f2a80b9abbeb7c390e77e82"
+      },
+      {
+        "block_payload": null,
+        "case_id": "single-quoted-comment-text",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo '# `git reset --hard`'"
+        },
+        "synthetic_input_sha256": "229d7511183f97391cb9575c0f87715fcd886d7be9c6a5205e6a43ba07291cd6"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "38739852b6ab0fd389f602cf980c384663c9c59a33f38ea5fce0a4b0f56d59fd",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "attached-hash-does-not-start-comment",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo safe#`git reset --hard`"
+        },
+        "synthetic_input_sha256": "38739852b6ab0fd389f602cf980c384663c9c59a33f38ea5fce0a4b0f56d59fd"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "800bba52f5ed8d3f57c0e79b6461bfb7d8ea3372cc9c6371bc166c68ef6c9d5c",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "quoted-hash-and-backtick",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo \"# `git reset --hard`\""
+        },
+        "synthetic_input_sha256": "800bba52f5ed8d3f57c0e79b6461bfb7d8ea3372cc9c6371bc166c68ef6c9d5c"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "77084508b3b09b800e962f5aaf4b637fbb4e68cdf44290ce71ccb1e0573c2827",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "escaped-hash-and-backtick",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo \\#`git reset --hard`"
+        },
+        "synthetic_input_sha256": "77084508b3b09b800e962f5aaf4b637fbb4e68cdf44290ce71ccb1e0573c2827"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "30c6ceff636b7ccc28975ba341769f0fa3952e8380b58115f6b502ad7e93e953",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "read-only-then-executable-backtick",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "echo safe # `date`\necho `git reset --hard`"
+        },
+        "synthetic_input_sha256": "30c6ceff636b7ccc28975ba341769f0fa3952e8380b58115f6b502ad7e93e953"
+      },
+      {
+        "block_payload": null,
+        "case_id": "unclosed-single-quote",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo 'git reset --hard"
+        },
+        "synthetic_input_sha256": "681bafff9eb75c9581eacfd630a39c130cba5af31e03757a1fc160095113e621"
+      },
+      {
+        "block_payload": null,
+        "case_id": "unclosed-double-quote",
+        "intent": null,
+        "synthetic_input": {
+          "command": "echo \"git reset --hard"
+        },
+        "synthetic_input_sha256": "73c139f85f3aa22417c89062e927859ecbc384f1bb827188102abef9fb61ee8f"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "846701e2812e67aadfdc610e963bd6f9d363321827fa60b1f6e1cbc2750d1589",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:opaque",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:opaque; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "quoted-reset-text",
+        "intent": {
+          "evidence": "opaque protected Git mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "opaque"
+        },
+        "synthetic_input": {
+          "command": "echo 'git reset --hard'"
+        },
+        "synthetic_input_sha256": "846701e2812e67aadfdc610e963bd6f9d363321827fa60b1f6e1cbc2750d1589"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "95f1f60be3d32d8219919d99424d2a4672f229a1114a0ae68bb0e51463694a52",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:opaque",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:opaque; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "quoted-git-executable",
+        "intent": {
+          "evidence": "opaque protected Git mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "opaque"
+        },
+        "synthetic_input": {
+          "command": "echo \"git reset --hard\""
+        },
+        "synthetic_input_sha256": "95f1f60be3d32d8219919d99424d2a4672f229a1114a0ae68bb0e51463694a52"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "f291fa6d24805d2f830669459dd2f893f4aee0dc4619b4d0c0511e023e7b845f",
+          "decision": "block",
+          "next_action": "request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason",
+          "operation": "branch_creation:switch",
+          "reason": "BRANCH_WORKTREE_CREATION_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=branch_creation:switch; requires=same-segment AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request|agent_canon_workflow and nonempty AGENT_CANON_BRANCH_WORKTREE_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "create-without-authority",
+        "intent": {
+          "evidence": "create/orphan",
+          "kind": "branch_creation",
+          "requires_creation": true,
+          "requires_destructive": false,
+          "subcommand": "switch"
+        },
+        "synthetic_input": {
+          "command": "git switch -c topic"
+        },
+        "synthetic_input_sha256": "f291fa6d24805d2f830669459dd2f893f4aee0dc4619b4d0c0511e023e7b845f"
+      },
+      {
+        "block_payload": null,
+        "case_id": "create-with-user-authority",
+        "intent": null,
+        "synthetic_input": {
+          "command": "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request AGENT_CANON_BRANCH_WORKTREE_REASON=synthetic git switch -c topic"
+        },
+        "synthetic_input_sha256": "5215d6e3124c54dc8b7bc78f3722c66f1508b849594775f3f9a8b934b2fab915"
+      },
+      {
+        "block_payload": null,
+        "case_id": "create-with-workflow-authority",
+        "intent": null,
+        "synthetic_input": {
+          "command": "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow AGENT_CANON_BRANCH_WORKTREE_REASON=synthetic git checkout -b topic"
+        },
+        "synthetic_input_sha256": "8bccbe709ce1a21d5f3ee646c0833108ad8ed5b3ea3d9a622ed6586c9fb4038e"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "405099fad2a50059db8256a5549d6a914e44f3d3acdb0ed215430b9fe27999de",
+          "decision": "block",
+          "next_action": "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
+          "operation": "destructive_branch_creation:switch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block; BRANCH_WORKTREE_CREATION_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_branch_creation:switch; requires=same-segment AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request|agent_canon_workflow and nonempty AGENT_CANON_BRANCH_WORKTREE_REASON; same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "force-create-with-creation-authority-only",
+        "intent": {
+          "evidence": "force-create/ref-overwrite",
+          "kind": "destructive_branch_creation",
+          "requires_creation": true,
+          "requires_destructive": true,
+          "subcommand": "switch"
+        },
+        "synthetic_input": {
+          "command": "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request AGENT_CANON_BRANCH_WORKTREE_REASON=synthetic git switch -C topic"
+        },
+        "synthetic_input_sha256": "405099fad2a50059db8256a5549d6a914e44f3d3acdb0ed215430b9fe27999de"
+      },
+      {
+        "block_payload": null,
+        "case_id": "force-create-with-both-authorities",
+        "intent": null,
+        "synthetic_input": {
+          "command": "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request AGENT_CANON_BRANCH_WORKTREE_REASON=synthetic AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git switch -C topic"
+        },
+        "synthetic_input_sha256": "c284c8cccb9df2bc33ea622e87b9f92374f62fe5487e48923bc8a6b0dcb153b3"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "6beee6d5236ff4127f0fcdd85522fc038e0eb3b4a589cbb6722a151092a0e90b",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "destructive-without-authority",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "git restore --worktree ./synthetic-file.txt"
+        },
+        "synthetic_input_sha256": "6beee6d5236ff4127f0fcdd85522fc038e0eb3b4a589cbb6722a151092a0e90b"
+      },
+      {
+        "block_payload": null,
+        "case_id": "destructive-with-inline-authority",
+        "intent": null,
+        "synthetic_input": {
+          "command": "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore --worktree ./synthetic-file.txt"
+        },
+        "synthetic_input_sha256": "aa36ec0c3c1429119efe4e75a77b687fa048fc6173c96422e7ac17f73ef79baa"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "6497d024f20844ee770aabb528e91155297e5c76f93da291a9985854a853dfe5",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "destructive-authority-without-reason",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval git reset --hard HEAD"
+        },
+        "synthetic_input_sha256": "6497d024f20844ee770aabb528e91155297e5c76f93da291a9985854a853dfe5"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "5425bc6a8334935bfb411430730dc8e0970aaa187d5b66bbbb9e175ea0dc71cf",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "destructive-reason-without-authority",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore ./synthetic-file.txt"
+        },
+        "synthetic_input_sha256": "5425bc6a8334935bfb411430730dc8e0970aaa187d5b66bbbb9e175ea0dc71cf"
+      },
+      {
+        "block_payload": null,
+        "case_id": "env-prefix-does-not-authorize",
+        "intent": null,
+        "synthetic_input": {
+          "command": "env AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git reset HEAD"
+        },
+        "synthetic_input_sha256": "aeecab11f738e2f471d9dd6c439ce86440963f7bd286bd56e3df262bcbe4b121"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "fbe2ef8b76c66563da635067c19d53c4dac0b86d201b2696c0a58ffa6bbf8900",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:reset",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:reset; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "destructive-authority-does-not-cross-and",
+        "intent": {
+          "evidence": "git reset",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "reset"
+        },
+        "synthetic_input": {
+          "command": "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved git restore ./synthetic-file.txt && git reset HEAD"
+        },
+        "synthetic_input_sha256": "fbe2ef8b76c66563da635067c19d53c4dac0b86d201b2696c0a58ffa6bbf8900"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "dc8a89531d8624ee164c8322ac92dceea0e369a8b35ba67ddce16879330d787f",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:restore",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:restore; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "destructive-authority-does-not-cross-semicolon",
+        "intent": {
+          "evidence": "git restore",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "restore"
+        },
+        "synthetic_input": {
+          "command": "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved; git restore ./synthetic-file.txt"
+        },
+        "synthetic_input_sha256": "dc8a89531d8624ee164c8322ac92dceea0e369a8b35ba67ddce16879330d787f"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-status",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git status --short"
+        },
+        "synthetic_input_sha256": "c96885f0a85f64c61b0d76510ca80e4a19be674e163a73b68a0a3d57f4dc15b6"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-diff",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git diff --stat"
+        },
+        "synthetic_input_sha256": "bcf996cc2c0b7eb7e8ddcd15c1c22e596e11fd6556591a38ebc741509209e1a5"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-default",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch"
+        },
+        "synthetic_input_sha256": "fccb7f52c95ac3eb1bebc98a5e6fa94c5ccef91bcc459462318de73f2661d6ba"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-current",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --show-current"
+        },
+        "synthetic_input_sha256": "5079ab293bb2afccb5691fca35d938b78349f87ab939a64d4cf3e9d1ea7ed79c"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-list",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --list 'topic/*'"
+        },
+        "synthetic_input_sha256": "3b832220744f0368e90e2974433f6e8121f3bdea412161086e0a15063c03ef4c"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-edit-description",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --edit-description topic"
+        },
+        "synthetic_input_sha256": "976445e447ea8118801a9bc2164c699b4e4b260e06a4d2bc5d99f2bf4602e664"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-upstream-equals",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --set-upstream-to=origin/main topic"
+        },
+        "synthetic_input_sha256": "9057b5bd70143984a61b5557ee14f9206b5ab179201e449960d2612255a369c8"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-upstream-value",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --set-upstream-to origin/main topic"
+        },
+        "synthetic_input_sha256": "7993deb11d8998f93e2ae5877f9855fd77d0684616ee02d28e2ed025857a2cc0"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-unset-upstream",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch --unset-upstream topic"
+        },
+        "synthetic_input_sha256": "08bea59ee3235149784f542cd7ac7633f4c0a8b7902819f061f633b7dc3856ae"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-u",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch -u origin/main topic"
+        },
+        "synthetic_input_sha256": "156fadfd0a46f4a1f00231214a7006b2343ebd97fd6de7283899b3eef3feffe8"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-branch-u-attached-value",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git branch -uorigin/main topic"
+        },
+        "synthetic_input_sha256": "681ea30234e974f45480d05960336fb4196cec5d6512e9e2760e7e9a2dee96e6"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-worktree-list",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git worktree list --porcelain"
+        },
+        "synthetic_input_sha256": "f986a823871146835d6091558b67f3f7db54762f2ba252f99dd57b00b507dc7e"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-worktree-lock",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git worktree lock ../topic"
+        },
+        "synthetic_input_sha256": "67958f78cf66c6bd9c56337c1752728f72f320bdbd2d64f107f5d1158192c789"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-worktree-lock-reason-value",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git worktree lock --reason maintenance ../topic"
+        },
+        "synthetic_input_sha256": "79fc8bb8b7e5b2e1876f75c01536d5abaadc17e5b2d858e47095626b86bdb8df"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-worktree-lock-reason-equals",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git worktree lock --reason=maintenance ../topic"
+        },
+        "synthetic_input_sha256": "6284709319fba81e5e004972f623d4d8d4257c0d9fcedad70b410cd05f14aebf"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-worktree-unlock",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git worktree unlock ../topic"
+        },
+        "synthetic_input_sha256": "99dd45e80324f0f838920ff6d4a3e34d2f439e0e4675345085a723e8e714b922"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-stash-list",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git stash list"
+        },
+        "synthetic_input_sha256": "f6faf70d0a101a19fd16b3654e69fe1848daa47cf7b34db191e1580481da6265"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-stash-show",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git stash show stash@{0}"
+        },
+        "synthetic_input_sha256": "562047473c7f39cb0a6483789a373f72ad56910b2cbf9d20f7f9dfdb6e03d40e"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-clean-dry-run",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git clean -n"
+        },
+        "synthetic_input_sha256": "554e3f4fe958a872fe463ef092783b2599ff2fcaf2a11b510fd404baec848818"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-clean-dry-run-force",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git clean --dry-run -f"
+        },
+        "synthetic_input_sha256": "874b12dfe9cace8adb6cdb493281e5b9e757b13d276d2d996a95132b7320a6a6"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-clean-dry-run-flags",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git clean -fnx"
+        },
+        "synthetic_input_sha256": "bb2301a1c24c0eab2a08ccda1c7edaa8bcd564b9fd7d5200c17a97f5dfc93ad1"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-clean-dry-run-flags-reversed",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git clean -nfx"
+        },
+        "synthetic_input_sha256": "e08959f93eeb33007e815b94da142cfc18b4f6158f39cea2d6bd5ae3071db030"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-switch-help",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git switch --help"
+        },
+        "synthetic_input_sha256": "50c642dc2f61e68fbdbc952d78e09b68f7c9075016bf73ebf2ae45941dc7f390"
+      },
+      {
+        "block_payload": null,
+        "case_id": "read-only-checkout-help",
+        "intent": null,
+        "synthetic_input": {
+          "command": "git checkout -h"
+        },
+        "synthetic_input_sha256": "21f2484edbedf87f005ceb17394bc6455c7eb117392b5b877a3f2d5ac4af9e36"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "7980ff945768bd35346c5415593b413f16696a39d1c67cd1d696503e002185b0",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:branch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:branch; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "branch-metadata-mutation",
+        "intent": {
+          "evidence": "delete/rename",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "branch"
+        },
+        "synthetic_input": {
+          "command": "git branch -Mtopic"
+        },
+        "synthetic_input_sha256": "7980ff945768bd35346c5415593b413f16696a39d1c67cd1d696503e002185b0"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "50631179ec5f217870cc31ddb5bec8d027524d560e22c5c7af13fbd2faa03986",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:branch",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:branch; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "branch-option-conflict",
+        "intent": {
+          "evidence": "delete/rename",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "branch"
+        },
+        "synthetic_input": {
+          "command": "git branch --set-upstream-to --delete topic"
+        },
+        "synthetic_input_sha256": "50631179ec5f217870cc31ddb5bec8d027524d560e22c5c7af13fbd2faa03986"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "18f1db8a9a93c3411f69b0b4d750134545c800cdcab9060bdd97cc8a57f4e68f",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "worktree-remove",
+        "intent": {
+          "evidence": "worktree remove",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "git worktree remove ../topic"
+        },
+        "synthetic_input_sha256": "18f1db8a9a93c3411f69b0b4d750134545c800cdcab9060bdd97cc8a57f4e68f"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "1058aa375218e6ddfa1d49b8bc5c6eb0c2494ecaa8c22febbb005e663d1fc875",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "worktree-move",
+        "intent": {
+          "evidence": "worktree move",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "git worktree move ../old ../new"
+        },
+        "synthetic_input_sha256": "1058aa375218e6ddfa1d49b8bc5c6eb0c2494ecaa8c22febbb005e663d1fc875"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "a62437a7fd30ca2db86953f9bdb293467574e9c14e0e5e267844c240b0c4d8bc",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "worktree-repair",
+        "intent": {
+          "evidence": "worktree repair",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "git worktree repair ../topic"
+        },
+        "synthetic_input_sha256": "a62437a7fd30ca2db86953f9bdb293467574e9c14e0e5e267844c240b0c4d8bc"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "eed6df62f974ae8dcedeb61b68ec539ffc59ece71a13c89564edfae6bda888cd",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "worktree-lock-invalid-options",
+        "intent": {
+          "evidence": "worktree lock mutation",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "git worktree lock --reason --force ../topic"
+        },
+        "synthetic_input_sha256": "eed6df62f974ae8dcedeb61b68ec539ffc59ece71a13c89564edfae6bda888cd"
+      },
+      {
+        "block_payload": {
+          "command_sha256": "1dee7eaeec2bfa08b6ef49dd4c365f8f7adc678c7c257ae9359b995e9f8b3289",
+          "decision": "block",
+          "next_action": "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+          "operation": "destructive_git:worktree",
+          "reason": "DESTRUCTIVE_GIT_GUARD=block: protected shared-checkout Git intent lacks required authority. operation=destructive_git:worktree; requires=same-segment AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval and nonempty AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+          "remediation": [
+            "Inspect status and preserve changes owned by the user or another concurrent chat.",
+            "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",
+            "If the user explicitly approves the protected action, place every required authority and reason assignment in the same shell segment immediately before Git."
+          ]
+        },
+        "case_id": "worktree-unlock-force",
+        "intent": {
+          "evidence": "worktree unlock",
+          "kind": "destructive_git",
+          "requires_creation": false,
+          "requires_destructive": true,
+          "subcommand": "worktree"
+        },
+        "synthetic_input": {
+          "command": "git worktree unlock --force ../topic"
+        },
+        "synthetic_input_sha256": "1dee7eaeec2bfa08b6ef49dd4c365f8f7adc678c7c257ae9359b995e9f8b3289"
+      }
+    ],
+    "payload_accessor_results": [
+      {
+        "case_id": "nested-command-precedes-all-fallbacks",
+        "prompt": "synthetic prompt fixture",
+        "synthetic_input": {
+          "cmd": "git restore .",
+          "command": "git clean -ffdx",
+          "prompt": "synthetic prompt fixture",
+          "tool_input": {
+            "cmd": "git reset --hard HEAD",
+            "command": "git status --short"
+          },
+          "tool_name": "Bash"
+        },
+        "tool_command": "git status --short",
+        "tool_name": "Bash"
+      },
+      {
+        "case_id": "nested-cmd-fallback",
+        "prompt": "",
+        "synthetic_input": {
+          "tool_input": {
+            "cmd": "git worktree list"
+          },
+          "tool_name": "bash"
+        },
+        "tool_command": "git worktree list",
+        "tool_name": "bash"
+      },
+      {
+        "case_id": "top-level-command-fallback",
+        "prompt": "",
+        "synthetic_input": {
+          "cmd": "git clean -f",
+          "command": "git branch --show-current"
+        },
+        "tool_command": "git branch --show-current",
+        "tool_name": ""
+      },
+      {
+        "case_id": "wrong-field-types",
+        "prompt": "",
+        "synthetic_input": {
+          "prompt": 9,
+          "tool_input": {
+            "command": 9
+          },
+          "tool_name": 7
+        },
+        "tool_command": "",
+        "tool_name": ""
+      },
+      {
+        "case_id": "empty-object",
+        "prompt": "",
+        "synthetic_input": {},
+        "tool_command": "",
+        "tool_name": ""
+      }
+    ],
+    "secret_results": [
+      {
+        "block_payload": null,
+        "case_id": "no-match",
+        "secret_kind": null,
+        "synthetic_input": {
+          "prompt": "A synthetic prompt fixture without credential-like text."
+        }
+      },
+      {
+        "block_payload": {
+          "decision": "block",
+          "next_action": "remove_secret_or_use_redacted_placeholder_then_retry",
+          "reason": "Prompt appears to include a private key block. Remove the secret or replace it with a redacted placeholder.",
+          "remediation": [
+            "Remove the secret material from the prompt.",
+            "Replace examples with redacted placeholders such as `[REDACTED_TOKEN]`.",
+            "Rotate the secret if it was pasted into the session by mistake."
+          ]
+        },
+        "case_id": "private-key-header-canary",
+        "secret_kind": "private key block",
+        "synthetic_input": {
+          "prompt": "-----BEGIN PRIVATE KEY-----"
+        }
+      },
+      {
+        "block_payload": {
+          "decision": "block",
+          "next_action": "remove_secret_or_use_redacted_placeholder_then_retry",
+          "reason": "Prompt appears to include a AWS access key id. Remove the secret or replace it with a redacted placeholder.",
+          "remediation": [
+            "Remove the secret material from the prompt.",
+            "Replace examples with redacted placeholders such as `[REDACTED_TOKEN]`.",
+            "Rotate the secret if it was pasted into the session by mistake."
+          ]
+        },
+        "case_id": "aws-access-id-canary",
+        "secret_kind": "AWS access key id",
+        "synthetic_input": {
+          "prompt": "AKIA0000000000000000"
+        }
+      },
+      {
+        "block_payload": {
+          "decision": "block",
+          "next_action": "remove_secret_or_use_redacted_placeholder_then_retry",
+          "reason": "Prompt appears to include a GitHub token. Remove the secret or replace it with a redacted placeholder.",
+          "remediation": [
+            "Remove the secret material from the prompt.",
+            "Replace examples with redacted placeholders such as `[REDACTED_TOKEN]`.",
+            "Rotate the secret if it was pasted into the session by mistake."
+          ]
+        },
+        "case_id": "github-token-canary",
+        "secret_kind": "GitHub token",
+        "synthetic_input": {
+          "prompt": "ghp_test_canary_00000000000000000000000000000000"
+        }
+      },
+      {
+        "block_payload": {
+          "decision": "block",
+          "next_action": "remove_secret_or_use_redacted_placeholder_then_retry",
+          "reason": "Prompt appears to include a OpenAI-style API key. Remove the secret or replace it with a redacted placeholder.",
+          "remediation": [
+            "Remove the secret material from the prompt.",
+            "Replace examples with redacted placeholders such as `[REDACTED_TOKEN]`.",
+            "Rotate the secret if it was pasted into the session by mistake."
+          ]
+        },
+        "case_id": "openai-style-key-canary",
+        "secret_kind": "OpenAI-style API key",
+        "synthetic_input": {
+          "prompt": "sk-abcdefghijklmnopqrstuvwxyz1234567890"
+        }
+      }
+    ]
+  },
+  "schema_id": "agent-canon.hook-safety-old-api-oracle.v1"
+}

@@ -18,6 +18,7 @@ tests/fixtures/**/python_golden.json text eol=lf
 
 # These frozen oracles bind their exact UTF-8 bytes on every host.
 tests/fixtures/design_similarity/float_python_golden.json text eol=lf
+tests/fixtures/hook_safety/python_golden.json text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
