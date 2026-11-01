@@ -261,7 +261,7 @@ def design_brief_lines(
         "## Goals",
         "Implement the approved bounded change.",
         "## Existing Code And Docs To Reuse",
-        "Mirror `tools/runtime/lifecycle/task_close.py`.",
+        "Mirror `tools/runtime/dispatch/agent-canon/src/task_close.rs`.",
     ]
     if include_abstract:
         lines.extend(
@@ -295,7 +295,7 @@ def design_brief_lines(
                 (
                     "Read `user_request_contract.md`, `design_review.md`, "
                     "`document_flow_review.md`, `test_plan.md`, and "
-                    "`tools/runtime/lifecycle/task_close.py`."
+                    "`tools/runtime/dispatch/agent-canon/src/task_close.rs`."
                 ),
             ]
         )

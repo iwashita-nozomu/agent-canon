@@ -132,4 +132,4 @@ $paper-writing
 - 選択された reviewer の feedback は、その reviewer の担当と実際の evidence に基づいて扱います。
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行します。止めるのは user が明示的に止めた場合か external block がある場合だけです。
-- user-facing completion は、割り当てられた仕事の実結果と必要な validation evidence に基づいて報告します。記録された failure は隠さず、選択されていない check は成功扱いしません。`task_close.py` は既存 run が選択した場合の evidence 集約に使いますが、通常の task 開始や実行を認可する graph gate ではありません。
+- user-facing completion は、割り当てられた仕事の実結果と必要な validation evidence に基づいて報告します。記録された failure は隠さず、選択されていない check は成功扱いしません。native `agent-canon task-close` は既存 run が選択した場合の evidence 集約に使いますが、通常の task 開始や実行を認可する graph gate ではありません。

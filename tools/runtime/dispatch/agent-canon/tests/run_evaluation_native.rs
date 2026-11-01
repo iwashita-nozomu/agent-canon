@@ -5,7 +5,7 @@
 // upstream implementation ../src/report_artifact_checks.rs owns pure report checks
 // upstream implementation ../src/eval_manifest_paths.rs owns canonical/legacy Eval source paths
 // upstream design ../../../../../eval/definitions/agent_behavior_eval.toml defines behavior criteria
-// downstream implementation ../../../../../tools/runtime/lifecycle/task_close.py consumes evaluator status
+// downstream implementation ../src/task_close.rs consumes evaluator status
 // @dependency-end
 
 use agent_canon::eval_manifest_paths::{eval_manifest_path, resolve_eval_manifest};
