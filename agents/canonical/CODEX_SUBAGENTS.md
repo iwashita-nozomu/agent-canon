@@ -30,7 +30,7 @@ prompt、routing、subagent-config drift の監査は `prompt_config_reviewer` �
 
 [../../documents/design/request-intent-and-update-relation.md](../../documents/design/request-intent-and-update-relation.md) の handoff flow は既存
 agent context の再利用を優先します。並行作業を選ぶ場合は実際の依存、write scope、
-衝突を考慮し、起動結果と完了結果を区別して既存の handoff record に残します。
+衝突を考慮し、起動結果と完了結果を区別して会話または native handoff で伝えます。
 
 Runtime collaboration capability and coordination receipts are owned by
 [agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
@@ -81,8 +81,8 @@ does not require separation.
   user-guided debugging の executor は各 workflow owner が定めます
 - selected route と必要な owner-critical review を解決します。関連する owner
   guidance は Markdown 相対リンクで示しますが、リンク先すべてを読む義務には
-  しません。実際の native tool / child results を選択済み workflow の既存記録へ
-  残し、起動結果と完了結果を区別します。
+  しません。実際の native tool / child results を現在の context で確認し、
+  起動結果と完了結果を区別します。
 - selected delegation / coordination route だけが write-capable implementer
   handoff を作ります。起動できない場合は実際の原因を利用者または選択済み owner に
   伝え、child に割り当てた unit を親が代替実装しません。bounded single-owner
@@ -175,7 +175,6 @@ structured handoff または、coordination/resumption が必要な場合の dur
   machine token のまま実行し、typed failure semantics を保持します。
 - `tool_evidence`: `dynamic_skill_routing` の候補、`tool_catalog_matches`、実行済み
   tool packet の結果。
-- `tool_reuse_ledger`: selected write-capable implementer には、既存 tool を使うか拒否した理由を渡します。予測検査の扱いは [Optional Rejection Prediction](../COMMUNICATION_PROTOCOL.md#optional-rejection-prediction) に従います。
 
 The worker prompt begins with the parent-selected `reuse_survey` assets and
 test paths when known; for split or extraction work, the splitter inspects
@@ -212,7 +211,7 @@ conflict/rework artifact contract to the handoff.
 
 ## Coordination
 
-Selected coordination routes use their existing handoff and record owners.
+Selected coordination routes use native handoff and current source/results.
 Markdown links point to conditional owner guidance, not a mandatory graph or
 read-set. Use actual native launch, completion, and failure results to assess the
 work; existing Eval or owner review judges missing or unnecessary work, while a
@@ -320,64 +319,15 @@ Tool-result route markers:
 
 ## Hook And Tool Feedback To Subagent Protocol
 
-hook、code checker、static analysis、CI、review tool の結果が subagent の責務や handoff に関係する場合、parent は次回の chat で注意するだけで閉じません。
-結果を見て、subagent protocol の更新要否を `workflow_monitoring.md` の behavior event に記録します。
-
-- subagent が読むべき checker result、hook log、dependency scope、review finding が handoff に入っていなかった場合、選択済み workflow の handoff guidance を更新します。
-- 特定 role が同じ失敗を見逃した場合、`.codex/agents/<role>.toml`、この文書、または role に対応する skill / workflow を更新します。
-- tool / hook の誤検知や task-local noise で protocol 変更が不要な場合でも、`subagent_protocol_update=not_required` と `protocol_feedback_reason=<short-reason>` を記録します。
-- reviewer role は、最新 diff だけでなく、hook / tool feedback が parent protocol と subagent protocol の判断まで閉じているかを確認します。
-
-subagent protocol feedback の必須 token セットは次です。
-
-```text
-hook_tool_feedback=reviewed
-parent_protocol_update=<applied|recorded|not_required>
-subagent_protocol_update=<applied|recorded|not_required>
-protocol_feedback_reason=<short-reason>
-```
+実際の結果から手順・role・handoff の欠陥が分かった場合は、その正本を修正します。
+必要な根拠と変更点は会話で伝えます。変更不要の結果ごとに判断台帳、behavior event、
+protocol status token を作成する要求はありません。
 
 ## Pre-Goal Activation
 
-Goal-driven repo-changing tasks prepare subagent fan-out before the final
-`/goal` command when the goal intent is clear. The parent may draft the candidate
-goal, and read-only roles check the draft before implementation. If the active
-runtime requires explicit spawn authorization, persist the handoff packets and
-spawn the roles after authorization.
-
-Candidate pre-goal roles:
-
-- `requirements_organizer`: derive a target-state-complete Objective, non-goals,
-  constraints, and Exit Criteria from the user request and durable repo notes.
-- `explorer`: inspect repo docs, prior notes, dependency surfaces, existing
-  tools, and reuse candidates that affect the goal.
-- `execution_planner`: group the open work in the selected handoff or run-bundle
-  `schedule.md` into the next cohesive slice.
-- `plan_reviewer`: verify that the complete responsibility unit is checkable;
-  checkpoints remain nonblocking observations outside rollback and micro-slice
-  gates.
-
-Start with roles needed for the current responsibility. Add another role only
-when request evidence, an actual dependency, or a distinct review need calls for it.
-
-Activation Conditions:
-
-- These pre-goal agents are read-only for draft checking. A write-capable route
-  proceeds after the user-authorized repository change has a structured handoff
-  with objective, owner boundary, implementation mechanism, and evidence map.
-- Write-capable `worker` / `spark_worker` instances do not wait for a repository
-  mirror of session goal state.
-- Goal-driven and ordinary repo-changing tasks use a structured handoff with
-  bounded `allowed_paths`, write scope, validation plan, and tool-rejection
-  preflight before the selected write-capable implementer. Use a run bundle when
-  coordination or resumption requires durable lifecycle evidence.
-- Use the catalog's intake guidance when it is relevant; a catalog listing alone
-  does not require a role to be started.
-- Handoffs include the objective and evidence map directly. When a run bundle is
-  selected, pass the relevant `schedule.md` work and `work_log.md` results to
-  the next role.
-- Hand the next unchecked `schedule.md` work units to `execution_planner`
-  instead of reconstructing durable progress from chat.
+明示された Goal または現在の依頼と、会話にある契約・方針を使います。
+Goal の存在だけでは、事前 fan-out、schedule、handoff file、進捗台帳を要求しません。
+担当の追加は、その責務や独立した判断が必要な場合に選びます。
 
 ## Codex Command Surface
 
@@ -682,6 +632,6 @@ unnecessary work was done. A different route alone is not a failure.
 ## Capacity And Lifecycle
 
 Use the selected runtime's actual capacity information when it affects the
-chosen work. For child work, retain actual launch, completion or failure, and
-handoff evidence in the selected workflow's existing record; a monitor status
+chosen work. For child work, use actual launch, completion or failure, and
+native handoff results already in context; a monitor status
 alone does not establish completion.

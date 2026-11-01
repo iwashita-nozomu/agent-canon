@@ -45,7 +45,7 @@ source, reachable behavior, and a witness or sound analysis. Repair accepted
 in-scope findings while preserving intent; record verified rejection, escalation,
 and unresolved claims with their effects on completion. Recheck only changed or
 invalidated evidence. When Local Capability Priority was selected, retain its
-[existing record](../skills/agent-orchestration.md#local-capability-priority).
+[capability decision](../skills/agent-orchestration.md#local-capability-priority).
 
 An implemented, published, or handed-off result is not automatically verified or
 applied. An unmet requirement returns to its next owning action through
@@ -55,9 +55,9 @@ become completion prerequisites.
 
 ## Bounded delivery
 
-For `bounded_fast_path`, use the existing task/Issue or structured handoff to
-carry the requested work and applicable completion evidence. Record the exact
-diff and selected checks; include an activated review only when one was selected.
+For `bounded_fast_path`, use the current conversation and actual diff/results.
+Report the final checks and an activated review when one was selected. No work
+ledger, scope table, or per-commit evidence record is required.
 If the request includes base integration or publication, carry its current-base
 and authorized remote readback. Clean up only task-owned resources created by
 the selected operations. Decide commit and push under
@@ -96,7 +96,7 @@ an inactive field.
 Use the changed contract's selected profile/check matrix and the common
 [formatting and verification boundary](../../ROOT_AGENTS.md#validation-routing).
 静的解析、読み取り確認、docs / targeted tests / agent checks を、変更契約と残るリスクから選びます。
-Record final-source formatter/check and selected static/targeted evidence once;
+Report the final-source formatter/check and selected validation results;
 later edits or integration invalidate only the affected evidence. Separate CI,
 format, and synthetic checker-retest paths are not extra completion predicates.
 
@@ -105,16 +105,11 @@ downstream review. Select a whole-repository dependency review only when the
 changed contract or explicit request requires it. Shared canon, Large Delivery,
 and high-risk labels alone do not request every repository check.
 
-Immediately after failed verification, update the
-[failed verification topic](../../documents/operations/notes-lifecycle.md#failed-verification-record)
-and read back that saved record. Keep observation and established cause distinct.
-Preserve the selected profile's `failing_contract`, `observation_level`,
-`cause_classification`, `intent_preservation`, and evidence in its existing record;
-the taxonomy belongs to the
-[profile/check matrix](../../documents/runtime/runtime-profiles-and-check-matrix.md).
-Repair a demonstrated in-scope cause or record the exact unavailable operation
-and next owner/action. Continue independent authorized work without upgrading
-unrun checks to passed.
+After failed verification, use the actual output to distinguish observation,
+cause, input assumptions, and required API behavior before deciding a repair.
+Keep the diagnosis and next action in the conversation. No failure-topic file,
+classification ledger, or per-attempt status record is required. Unrun checks
+remain unverified.
 
 Tool or reviewer findings entering implementation use the existing
 [tool-finding-report](../skills/tool-finding-report.md) route when its condition
@@ -141,8 +136,8 @@ Use [Completion Readiness](#completion-readiness) for the selected route. Read
 ## Completion Readiness
 
 For either execution route, compare the current result and evidence against the
-whole agreed deliverable before a terminal response. Use the existing task/Issue
-record or selected run state; this adds no checklist artifact or terminal checker.
+whole agreed deliverable before a terminal response. Use the current context,
+actual diff, and available results; no completion ledger is required.
 
 When a required result is missing, perform its next authorized owning action in
 the same task, then reassess the affected evidence. A defect returns to repair;

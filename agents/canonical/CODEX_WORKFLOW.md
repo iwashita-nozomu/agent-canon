@@ -25,13 +25,13 @@ owners contain the procedures; ROOT owns the shared reading constraints.
 | Skill selection is unresolved | [Skill selection](CODEX_ROUTING.md#contract-required-skill-set) |
 | Validation profile is unresolved | [profile selection](CODEX_ROUTING.md#runtime-profile-and-risk-selection) |
 | A file must be placed or moved | [placement](CODEX_ROUTING.md#3-placement) |
-| The selected route benefits from durable run context | [run context](CODEX_BOOTSTRAP.md#4-run-context) |
+| The user requested coordination artifacts | [run context](CODEX_BOOTSTRAP.md#4-run-context) |
 | A requested repair has no established causal code | [cause localization](../skills/dependency-analysis.md#method) |
 | Design or implementation is active | [implementation reader map](CODEX_IMPLEMENTATION.md#reader-map) |
 | Validation or closeout is due | [completion reader map](CODEX_COMPLETION.md#reader-map) |
 | Additional context becomes necessary during the active phase | [context read conditions](CODEX_INTAKE.md#optional-context) and the active Skill's matching conditional link, then return to the interrupted phase |
 | Execution fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) |
-| Verification fails | [failure record](../../documents/operations/notes-lifecycle.md#failed-verification-record) when the result is observed |
+| Verification fails | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) using actual output and current context |
 
 ## Completion Readiness
 
