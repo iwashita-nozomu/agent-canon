@@ -5,6 +5,7 @@
 // downstream implementation notebook_quality.rs preserves Python notebook text semantics
 // downstream implementation classify_path_risk.rs preserves Python changed-path file parsing
 // downstream implementation token_footprints.rs preserves Python JSONL line splitting
+// downstream implementation historical_skill_usage.rs preserves byte-oriented history splitting
 // @dependency-end
 
 pub fn python_strip(value: &str) -> &str {
@@ -31,6 +32,28 @@ pub fn python_splitlines(value: &str) -> Vec<&str> {
             characters.next();
         }
         start = end;
+    }
+    if start < value.len() {
+        lines.push(&value[start..]);
+    }
+    lines
+}
+
+/// Split bytes on Python's ASCII byte-line boundaries (`\r`, `\n`, and `\r\n`).
+pub(crate) fn python_bytes_splitlines(value: &[u8]) -> Vec<&[u8]> {
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut index = 0;
+    while index < value.len() {
+        let byte = value[index];
+        if byte == b'\r' || byte == b'\n' {
+            lines.push(&value[start..index]);
+            if byte == b'\r' && value.get(index + 1) == Some(&b'\n') {
+                index += 1;
+            }
+            start = index + 1;
+        }
+        index += 1;
     }
     if start < value.len() {
         lines.push(&value[start..]);

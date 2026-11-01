@@ -48,6 +48,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation historical_skill_usage.rs reads archived skill-usage history
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
@@ -157,6 +158,7 @@ Commands:
   git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  historical-skill-usage-read --path <skill_usage.jsonl>
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
@@ -402,6 +404,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "summarize-hlo-jsonl" {
         std::process::exit(result_logs::run_summary(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::historical_skill_usage::SELECTOR {
+        std::process::exit(agent_canon::historical_skill_usage::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "semantic-index" {

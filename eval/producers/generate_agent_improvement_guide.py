@@ -5,7 +5,7 @@
 # upstream design ../../eval/definitions/README.md eval evidence contract
 # upstream design ../../documents/runtime/runtime-log-archive.md hook result accumulation contract
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted archive result paths
-# upstream implementation ../../tools/runtime/archive/historical_skill_usage_reader.py reads archived skill_usage.jsonl read-only
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs reads archived skill_usage.jsonl read-only
 # upstream design ../../documents/runtime/private-feedback-knowledge.md private GitHub Issue packet storage
 # downstream implementation ../../.github/workflows/agent-improvement-guide.yml runs this on selected PR paths and manual dispatch
 # downstream implementation ../../tests/agent_tools/test_generate_agent_improvement_guide.py tests guide generation
@@ -18,6 +18,7 @@ import argparse
 import os
 import json
 import subprocess
+import shutil
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -37,7 +38,52 @@ from tools.runtime.artifacts.runtime_artifacts import (
     RuntimeArtifactError,
     runtime_artifact_boundary,
 )  # noqa: E402
-from tools.runtime.archive.historical_skill_usage_reader import read_skill_usage_history  # noqa: E402
+
+
+def _native_agent_canon_cli() -> str:
+    """Return the selected native AgentCanon executable for the read-only history route."""
+    for name in ("AGENT_CANON_CLI", "AGENT_CANON_NATIVE_BIN", "AGENT_CANON_CLI_CMD"):
+        selected = os.environ.get(name, "").strip()
+        if selected:
+            return selected
+    executable = shutil.which("agent-canon")
+    if executable:
+        return executable
+    return str(Path(__file__).resolve().parents[2] / "tools" / "bin" / "agent-canon")
+
+
+def _native_skill_usage_records(path: Path) -> tuple[dict[str, object], ...]:
+    """Read accepted historical records through the native read-only parser."""
+    result = subprocess.run(
+        [
+            _native_agent_canon_cli(),
+            "historical-skill-usage-read",
+            "--path",
+            str(path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"native historical skill-usage read failed: {detail}")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            "native historical skill-usage output is malformed JSON"
+        ) from error
+    if not isinstance(payload, dict):
+        raise RuntimeError("native historical skill-usage output must be an object")
+    records = payload.get("records")
+    if not isinstance(records, list) or not all(
+        isinstance(record, dict) for record in records
+    ):
+        raise RuntimeError("native historical skill-usage records are malformed")
+    return tuple(cast(dict[str, object], record) for record in records)
+
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5
@@ -572,8 +618,7 @@ class AgentImprovementGuide:
         counter = HookEvidenceCounter(known_skill_ids(self.root), root=self.root)
         for path in self.hook_result_paths():
             if path.name == "skill_usage.jsonl":
-                history = read_skill_usage_history(path)
-                for entry in history.records:
+                for entry in _native_skill_usage_records(path):
                     counter.add_entry(path, entry)
                 continue
             for raw_line in path.read_text(encoding="utf-8").splitlines():

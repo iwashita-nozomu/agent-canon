@@ -91,6 +91,9 @@ runtime_schema:
     - id: rust-python-module-groups-check
       selector: python-module-groups-check
       path: tools/runtime/dispatch/agent-canon/src/python_module_groups.rs
+    - id: rust-historical-skill-usage-read
+      selector: historical-skill-usage-read
+      path: tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs
 
 status_values:
   - canonical
