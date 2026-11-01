@@ -3,7 +3,7 @@
 // responsibility Replays frozen TaskClose API and CLI outcomes through the native owner.
 // upstream implementation ../src/task_close.rs owns read-only terminal predicates and CLI output
 // upstream implementation ../src/runtime_boundary.rs owns external runtime artifact reads
-// upstream test ../../../../../tests/fixtures/task_close/python_golden.json freezes old TaskClose results
+// upstream reference ../../../../../tests/fixtures/task_close/python_golden.json freezes old TaskClose results
 // @dependency-end
 
 use agent_canon::agent_tool_calls::{
@@ -105,13 +105,45 @@ fn create_main706_workspace(destination: &Path) -> PathBuf {
         .ancestors()
         .nth(4)
         .expect("Cargo manifest lives below the AgentCanon root");
-    let clone = Command::new("git")
-        .args(["clone", "--quiet", "--shared", "--no-checkout"])
-        .arg(repository)
+    // upload-pack checks this Git path before resolving a linked-worktree gitfile.
+    let control = repository.join(".git");
+    let control = control.to_str().expect("fixture Git path is UTF-8");
+    let quoted_control = format!("'{}'", control.replace('\'', "'\"'\"'"));
+    let upload_pack = format!("git -c safe.directory={quoted_control} upload-pack");
+    let initialize = Command::new("git")
+        .args(["init", "--quiet", "--initial-branch=main"])
         .arg(destination)
         .output()
-        .expect("create isolated Git context from local source history");
-    assert!(clone.status.success(), "local repository clone succeeds");
+        .expect("initialize isolated TaskClose Git context");
+    assert!(
+        initialize.status.success(),
+        "initialize fixture Git context: {}",
+        String::from_utf8_lossy(&initialize.stderr)
+    );
+    let source = repository.to_str().expect("fixture source path is UTF-8");
+    let origin = git(destination, &["remote", "add", "origin", source]);
+    assert!(
+        origin.status.success(),
+        "set local fixture source: {}",
+        String::from_utf8_lossy(&origin.stderr)
+    );
+    let fetch = git(
+        destination,
+        &[
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "--depth=1",
+            &format!("--upload-pack={upload_pack}"),
+            "origin",
+            OLD_SOURCE_COMMIT,
+        ],
+    );
+    assert!(
+        fetch.status.success(),
+        "fetch exact TaskClose fixture commit: {}",
+        String::from_utf8_lossy(&fetch.stderr)
+    );
     let reset = git(destination, &["reset", "--hard", OLD_SOURCE_COMMIT]);
     assert!(
         reset.status.success(),
