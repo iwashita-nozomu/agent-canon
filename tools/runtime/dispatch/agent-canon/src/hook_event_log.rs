@@ -317,8 +317,7 @@ pub fn utc_now() -> String {
 
 pub fn compact_timestamp(timestamp: &str) -> String {
     timestamp
-        .replace('-', "")
-        .replace(':', "")
+        .replace(['-', ':'], "")
         .replace("+00:00", "Z")
         .replace('.', "")
 }

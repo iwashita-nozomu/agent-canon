@@ -73,7 +73,7 @@ pub fn normalize_remote(remote: &str) -> Result<String, SourceRepositoryIdentity
                     "source_remote_invalid",
                 ))?;
         let path_start = authority_path
-            .find(|character| matches!(character, '/' | '?' | '#'))
+            .find(['/', '?', '#'])
             .unwrap_or(authority_path.len());
         let authority = &authority_path[..path_start];
         if authority.is_empty() {
@@ -82,9 +82,7 @@ pub fn normalize_remote(remote: &str) -> Result<String, SourceRepositoryIdentity
             ));
         }
         let raw_path = &authority_path[path_start..];
-        let path_end = raw_path
-            .find(|character| matches!(character, '?' | '#'))
-            .unwrap_or(raw_path.len());
+        let path_end = raw_path.find(['?', '#']).unwrap_or(raw_path.len());
         let path = &raw_path[..path_end];
         let host_port = authority.rsplit('@').next().unwrap_or(authority);
         let host = if let Some(after_open) = host_port.strip_prefix('[') {
@@ -165,7 +163,7 @@ pub fn stable_source_repository_id(remote: &str) -> Result<String, SourceReposit
         .chars()
         .take(prefix_length)
         .collect::<String>()
-        .trim_end_matches(|character| matches!(character, '-' | '.'))
+        .trim_end_matches(['-', '.'])
         .to_owned();
     Ok(format!("{prefix}-{digest}"))
 }
@@ -249,13 +247,11 @@ fn remote_from_git_config(
     root: &Path,
     remote_name: &str,
 ) -> Result<String, SourceRepositoryIdentityError> {
-    let root = crate::path_resolution::resolve_non_strict(root)
-        .map(PathBuf::from)
-        .map_err(|_| {
-            SourceRepositoryIdentityError::Io(std::io::Error::other(
-                "cannot resolve source repository root",
-            ))
-        })?;
+    let root = crate::path_resolution::resolve_non_strict(root).map_err(|_| {
+        SourceRepositoryIdentityError::Io(std::io::Error::other(
+            "cannot resolve source repository root",
+        ))
+    })?;
     let git_entry = root.join(".git");
     let git_dir = if git_entry.is_file() {
         let marker_raw =
@@ -271,13 +267,11 @@ fn remote_from_git_config(
         } else {
             git_entry.parent().unwrap_or(&root).join(target)
         };
-        crate::path_resolution::resolve_non_strict(&target)
-            .map(PathBuf::from)
-            .map_err(|_| {
-                SourceRepositoryIdentityError::Io(std::io::Error::other(
-                    "cannot resolve Git directory path",
-                ))
-            })?
+        crate::path_resolution::resolve_non_strict(&target).map_err(|_| {
+            SourceRepositoryIdentityError::Io(std::io::Error::other(
+                "cannot resolve Git directory path",
+            ))
+        })?
     } else {
         git_entry
     };
