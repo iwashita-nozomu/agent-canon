@@ -269,12 +269,17 @@ jobs:
       actions: read
     env:
       GH_TOKEN: ${{ github.token }}
+      RUSTUP_TOOLCHAIN: "1.99.1"
     steps:
       - name: Checkout the release source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
 
       - name: Select retained native artifacts by ID
         id: artifacts

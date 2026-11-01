@@ -57,7 +57,7 @@ def test_native_build_toolchain_matches_canonical_image_pin() -> None:
         for record in manifest["records"]
         if record.get("id") == "rust-toolchain"
     )
-    compiling_jobs = {"prepare", "build"}
+    compiling_jobs = {"prepare", "build", "publish-release"}
 
     assert {
         workflow["jobs"][job]["env"]["RUSTUP_TOOLCHAIN"] for job in compiling_jobs
