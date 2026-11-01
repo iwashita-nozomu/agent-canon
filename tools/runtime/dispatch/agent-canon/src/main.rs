@@ -22,6 +22,8 @@
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
 // upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
+// downstream implementation github_workflow_check.rs validates standalone workflows and PR templates
+// downstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -59,6 +61,7 @@ mod config;
 mod dependency_headers;
 mod dependency_manifest;
 mod file_surface_inventory;
+mod github_workflow_check;
 mod graph;
 pub mod graph_client;
 mod jit_ir_to_lean;
@@ -69,6 +72,7 @@ mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
+mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
 mod python_structure_hash;
@@ -112,7 +116,7 @@ Commands:
   graph-client <status|query|context> --root <repo-root> [options] [--format json]
   source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
   agent-search [search options]
-  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
+  check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
   docs <check|format|find-redundant-designs|find-similar-designs|organize-designs|check-bootstrap|check-entrypoints> [options] [paths...]
   codex-config --source-config <path>
@@ -245,6 +249,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "check-github-workflows" {
+        std::process::exit(github_workflow_check::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-drift" {
