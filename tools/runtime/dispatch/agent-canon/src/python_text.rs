@@ -7,16 +7,16 @@
 // downstream implementation token_footprints.rs preserves Python JSONL line splitting
 // @dependency-end
 
-pub(crate) fn python_strip(value: &str) -> &str {
+pub fn python_strip(value: &str) -> &str {
     value.trim_matches(is_python_whitespace)
 }
 
-pub(crate) fn is_python_whitespace(character: char) -> bool {
+pub fn is_python_whitespace(character: char) -> bool {
     character.is_whitespace()
         || matches!(character, '\u{001c}' | '\u{001d}' | '\u{001e}' | '\u{001f}')
 }
 
-pub(crate) fn python_splitlines(value: &str) -> Vec<&str> {
+pub fn python_splitlines(value: &str) -> Vec<&str> {
     let mut lines = Vec::new();
     let mut start = 0;
     let mut characters = value.char_indices().peekable();

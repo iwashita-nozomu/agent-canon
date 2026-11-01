@@ -81,7 +81,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
-mod python_text;
+use agent_canon::python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;

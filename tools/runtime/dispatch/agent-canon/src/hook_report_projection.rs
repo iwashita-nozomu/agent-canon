@@ -196,8 +196,7 @@ fn append_monitoring_projection_with_timestamp(
     }
 
     if let Some(runtime_root) = runtime_root {
-        let boundary =
-            RuntimeArtifactBoundary::for_source(source_root, Some(&runtime_root), false)?;
+        let boundary = RuntimeArtifactBoundary::for_source(source_root, Some(runtime_root), false)?;
         let resolved = boundary.resolve(&target)?;
         ensure_runtime_parent(&boundary, &resolved)?;
         update_monitoring_file(
