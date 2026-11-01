@@ -13,7 +13,7 @@
 // downstream implementation main.rs registers the native selector
 // downstream implementation ../../../../../tools/catalog.yaml publishes the native command
 // downstream implementation ../../../../../tools/runtime/manifest/manifest_rendering.py projects the optional diagnostic
-// downstream test ../../../../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
+// downstream implementation ../../../../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
 // @dependency-end
 
 use crate::classify_path_risk::{json_ensure_ascii, python_splitlines};

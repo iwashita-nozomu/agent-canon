@@ -190,7 +190,7 @@ RETIRED_CHILD_TOMBSTONES: tuple[RetiredChildTombstone, ...] = (
     _row(
         "cause_investigation_guard.py",
         "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs",
-        "command-only:tools/bin/agent-canon tool-rejection-preflight --gate cause_investigation",
+        "command-only:tools/bin/agent-canon tool-rejection-preflight",
         "cause investigation",
         "cause evidence belongs to intake",
     ),
