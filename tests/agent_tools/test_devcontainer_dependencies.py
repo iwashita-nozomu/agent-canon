@@ -3530,6 +3530,9 @@ class DependencyModelTests(unittest.TestCase):
                 "mermaid-cli",
             },
         )
+        rust_toolchain = plan.by_id()["rust-toolchain"]
+        self.assertEqual(rust_toolchain.version, "1.99.1")
+        self.assertEqual(rust_toolchain.verification.output_contains, "rustc 1.99.1")
         for removed in (
             "playwright",
             "playwright-chromium",
@@ -4395,13 +4398,10 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertNotEqual(receipt_check.returncode, 0)
             self.assertIn("receipt source identity mismatch", receipt_check.stderr)
-            fake_cargo_home = Path(
-                tempfile.mkdtemp(
-                    prefix="agent-canon-fake-cargo-home-",
-                    dir=root.parent,
-                )
-            )
-            self.addCleanup(shutil.rmtree, fake_cargo_home)
+            # Cargo home is parent-owned runtime data, so keep it under the
+            # attested root.
+            fake_cargo_home = root / "fake-cargo-home"
+            fake_cargo_home.mkdir()
             fake_bin = fake_cargo_home / "bin"
             fake_bin.mkdir(parents=True)
             cargo = fake_bin / "cargo"
