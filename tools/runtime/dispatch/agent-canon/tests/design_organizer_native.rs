@@ -466,12 +466,13 @@ fn assert_source_tree_matches_oracle(case: &Value, source: &Path, temp: &TempRoo
             }
             "symlink" => {
                 let old_text = entry["link_text"].as_str().expect("old link text");
-                let new_text = remap_case_path(old_text, old_case_root, &temp.0);
+                let new_text =
+                    symlink_target_for_host(&remap_case_path(old_text, old_case_root, &temp.0));
                 let actual_link = fs::read_link(source.join(relative))
                     .expect("expected source symlink exists after native operation");
                 assert_eq!(
-                    actual_link,
-                    PathBuf::from(new_text),
+                    actual_link.as_os_str(),
+                    std::ffi::OsStr::new(&new_text),
                     "{}: link text",
                     case["name"]
                 );
@@ -641,7 +642,8 @@ fn materialize_tree(
         let old_link = state["link_text"]
             .as_str()
             .expect("old symlink text is text");
-        let link_text = remap_case_path(old_link, old_case_root, new_case_root);
+        let link_text =
+            symlink_target_for_host(&remap_case_path(old_link, old_case_root, new_case_root));
         create_fixture_symlink(&link_text, &path)?;
         seed_symlink_metadata(&path, state, metadata_setup_complete)?;
     }
@@ -845,4 +847,21 @@ fn remap_case_path(value: &str, old_case_root: &str, new_case_root: &Path) -> St
         .strip_prefix(&old_prefix)
         .map(|suffix| new_case_root.join(suffix).display().to_string())
         .unwrap_or_else(|| value.to_string())
+}
+
+fn symlink_target_for_host(path: &str) -> String {
+    #[cfg(windows)]
+    {
+        // TempRoot::canonicalize yields an extended Windows path. Win32 link
+        // readback omits that namespace prefix; materialized and expected link
+        // targets therefore use its drive or UNC spelling. Report paths are
+        // not passed through this fixture-only mapping.
+        if let Some(unc_path) = path.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{unc_path}");
+        }
+        if let Some(normal_path) = path.strip_prefix(r"\\?\") {
+            return normal_path.to_string();
+        }
+    }
+    path.to_string()
 }
