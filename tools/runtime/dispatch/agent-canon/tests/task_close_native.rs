@@ -3,7 +3,7 @@
 // responsibility Replays frozen TaskClose API and CLI outcomes through the native owner.
 // upstream implementation ../src/task_close.rs owns read-only terminal predicates and CLI output
 // upstream implementation ../src/runtime_boundary.rs owns external runtime artifact reads
-// upstream test ../../../../../tests/fixtures/task_close/python_golden.json freezes old TaskClose results
+// upstream reference ../../../../../tests/fixtures/task_close/python_golden.json freezes old TaskClose results
 // @dependency-end
 
 use agent_canon::agent_tool_calls::{
