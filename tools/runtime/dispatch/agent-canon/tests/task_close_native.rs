@@ -105,13 +105,49 @@ fn create_main706_workspace(destination: &Path) -> PathBuf {
         .ancestors()
         .nth(4)
         .expect("Cargo manifest lives below the AgentCanon root");
-    let clone = Command::new("git")
-        .args(["clone", "--quiet", "--shared", "--no-checkout"])
-        .arg(repository)
+    let control = git(repository, &["rev-parse", "--absolute-git-dir"]);
+    assert!(
+        control.status.success(),
+        "read fixture source Git directory: {}",
+        String::from_utf8_lossy(&control.stderr)
+    );
+    let control = String::from_utf8(control.stdout).expect("fixture Git directory is UTF-8");
+    let quoted_control = format!("'{}'", control.trim().replace('\'', "'\"'\"'"));
+    let upload_pack = format!("git -c safe.directory={quoted_control} upload-pack");
+    let initialize = Command::new("git")
+        .args(["init", "--quiet", "--initial-branch=main"])
         .arg(destination)
         .output()
-        .expect("create isolated Git context from local source history");
-    assert!(clone.status.success(), "local repository clone succeeds");
+        .expect("initialize isolated TaskClose Git context");
+    assert!(
+        initialize.status.success(),
+        "initialize fixture Git context: {}",
+        String::from_utf8_lossy(&initialize.stderr)
+    );
+    let source = repository.to_str().expect("fixture source path is UTF-8");
+    let origin = git(destination, &["remote", "add", "origin", source]);
+    assert!(
+        origin.status.success(),
+        "set local fixture source: {}",
+        String::from_utf8_lossy(&origin.stderr)
+    );
+    let fetch = git(
+        destination,
+        &[
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "--depth=1",
+            &format!("--upload-pack={upload_pack}"),
+            "origin",
+            OLD_SOURCE_COMMIT,
+        ],
+    );
+    assert!(
+        fetch.status.success(),
+        "fetch exact TaskClose fixture commit: {}",
+        String::from_utf8_lossy(&fetch.stderr)
+    );
     let reset = git(destination, &["reset", "--hard", OLD_SOURCE_COMMIT]);
     assert!(
         reset.status.success(),
