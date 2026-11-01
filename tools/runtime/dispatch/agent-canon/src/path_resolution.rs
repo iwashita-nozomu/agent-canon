@@ -3,6 +3,7 @@
 // responsibility Resolves paths using non-strict filesystem semantics, including symbolic links with missing targets.
 // downstream implementation semantic_responsibility.rs delegates its checked references to this shared resolver
 // downstream implementation lean_proof_env.rs resolves selected package and Lean source paths
+// downstream implementation hook_retirement.rs resolves the read-only audit root
 // @dependency-end
 
 use std::collections::HashSet;

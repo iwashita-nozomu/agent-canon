@@ -91,6 +91,9 @@ runtime_schema:
     - id: rust-python-module-groups-check
       selector: python-module-groups-check
       path: tools/runtime/dispatch/agent-canon/src/python_module_groups.rs
+    - id: rust-hook-retirement-check
+      selector: hook-retirement-check
+      path: tools/runtime/dispatch/agent-canon/src/hook_retirement.rs
 
 status_values:
   - canonical

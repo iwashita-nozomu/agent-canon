@@ -3,6 +3,7 @@
 // responsibility Resolves unique Python argparse-compatible prefixes for native long options.
 // downstream implementation compare_agent_run_paths.rs preserves its run-path CLI option contract
 // downstream implementation docs.rs preserves duplicate-design CLI option compatibility
+// downstream implementation hook_retirement.rs preserves native checker option prefixes
 // @dependency-end
 
 #[derive(Debug, Clone, PartialEq, Eq)]

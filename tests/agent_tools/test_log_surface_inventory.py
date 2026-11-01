@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs inventories emitted machine-readable fields
-# downstream implementation ../../tools/validation/semantic/hooks/check_hook_retirement.py consumes inventory checks
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_retirement.rs consumes inventory checks
 # @dependency-end
 """Tests for log-surface field inventory."""
 
