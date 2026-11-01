@@ -116,10 +116,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "tools/bin/agent-canon tool-rejection-preflight",
             defaults["pre_edit_rejection_command"]
         )
-        self.assertEqual(
-            defaults["tool_reuse_ledger_status"],
-            "required_before_custom_implementation",
-        )
+        self.assertNotIn("tool_reuse_ledger_status", defaults)
+        self.assertNotIn("tool_reuse_ledger", str(manifest))
 
     def test_project_cpp_tests_select_cpp_reviewer_without_python_reviewer(
         self,

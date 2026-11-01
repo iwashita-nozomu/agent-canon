@@ -75,7 +75,9 @@ of a design file activates DIC, full staging, or a separate reviewer.
 
 ## Coordination design packet
 
-This section applies only to the selected full-staging route. Its
+Use this section only for design artifacts explicitly supplied or requested by
+the user. Ordinary migration does not create coordination records, clause maps,
+or fingerprint files. For that selected artifact route, its
 `team_manifest.yaml#run.active_design_packet` is the persisted artifact authority,
 with schema `waterfall.design_packet.v1`. Preserve the selected design artifact,
 technical review, document-flow review paths, and `document_flow_required` flag.
@@ -104,9 +106,8 @@ invalidates the affected review, not every unrelated gate.
 Use patch-based edits for changes whose responsibility can be traced manually.
 Use the repository's existing generator, transformer, or formatter for mechanical
 changes. Preserve unrelated/user-owned content and review the resulting diff.
-The requested scope remains authoritative; retain the selected change unit and
-source-backed scope decisions in the existing task/handoff rather than creating
-a second scope ledger.
+The requested scope remains authoritative. Keep the selected change and its
+source-backed scope decisions in the current conversation.
 
 For document creation, splitting, movement, or deletion, first read
 [placement and references](ARTIFACT_PLACEMENT.md#置き場ルール). Formatting follows
@@ -164,21 +165,22 @@ compatible earlier requirements remain active. Before editing or restoring
 behavior, define the intended outcome across changed and retained requirements;
 use history for rationale, not correctness.
 
-For each repair or migration, follow this order:
+For the planned repair or migration, follow this order:
 
 1. Decide what changes and how before editing: the required behavior, owning
-   mechanism, affected callers, and implementation/replacement/deletion mapping.
+   mechanism, affected callers, and obsolete code to remove.
    Group the work into complete units by responsibility and dependency.
-2. Implement one unit, including its necessary API, caller, and configuration
-   changes.
-3. Review the whole unit for omitted deletions, obsolete implementations,
+2. Implement the planned units in dependency order, including their API, caller,
+   and configuration changes.
+3. Review the completed migration for omitted deletions, obsolete implementations,
    remaining references, and exclusive support. Complete its retirement and
    consumer changes before validation.
-4. Format the completed unit and run its selected tests and checks.
+4. Format the final state and run its selected tests and checks together.
 
 Use existing failure evidence to settle the repair decision before the next
-implementation pass. Completing each unit through retirement review keeps tests
-focused on the decided behavior and prevents a sequence of isolated patches.
+implementation pass. Intermediate helpers, edits, and commits do not require
+separate test runs. Planning and handoff use the current context, without work
+ledgers, scope tables, or replacement-tracking files.
 
 For a failed test or unavailable execution, use the
 [test responsibility contract](../../documents/conventions/coding-conventions-testing.md#3-unit-test-contract)
@@ -217,13 +219,10 @@ manifests and reconstruction recipes; materialized programs retain explicit
 lifetime ownership. These requirements apply to that changed contract, not to
 unrelated implementations.
 
-After an implementation slice, continue remaining required work and selected
-review/validation. Keep a run-local work log only for selected coordination or
-resumption; otherwise use the existing task/Issue or structured handoff. Record
-stale legacy scope/log observations with their owner rather than making them new
-authority. Validation autofix follows an in-scope contract finding; unrelated
-style debt stays separate. A failed check immediately routes to its
-[topic record](../../documents/operations/notes-lifecycle.md#failed-verification-record).
+Continue the planned implementation and retirement review before final
+validation. Carry unfinished work and established findings in the conversation.
+Validation autofix follows an in-scope contract finding; unrelated style debt
+stays separate.
 
 ### Return from a repair detour
 
@@ -231,8 +230,8 @@ Use this section when diagnosis or cause repair interrupts requested code work.
 The cause owner is a repair destination, not a replacement for the task.
 
 1. Before moving to that owner, retain the original target's repository/path and
-   symbol or block, interrupted operation, and acceptance in the existing task or
-   handoff. Reuse the known source revision and execution route. Keep this return
+   symbol or block, interrupted operation, and acceptance in the current context.
+   Reuse the known source revision and execution route. Keep this return
    point distinct from the cause location; a changed cause hypothesis does not
    change the requested outcome.
 2. Locate and repair the demonstrated in-scope cause. Once that repair and its
@@ -242,7 +241,7 @@ The cause owner is a repair destination, not a replacement for the task.
    evidence rather than restarting intake or unrelated diagnosis.
 3. Complete the target's remaining implementation and selected acceptance check
    before taking an unrelated finding or reporting completion. When no further
-   target edit is needed, record why and continue its selected verification;
+   target edit is needed, explain why and continue its selected verification;
    reopening a file, promising to resume, or a cause-side pass is not that result.
 
 A prerequisite repair's success does not prove its caller's requested behavior;
