@@ -67,6 +67,7 @@ pub mod execution_resource_projection;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
+pub mod behavior_event_assembly;
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
