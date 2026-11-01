@@ -110,8 +110,7 @@ impl WriterTarget {
     /// Return the expanded, non-strict physical checkout path.
     pub fn normalized_root(&self) -> Result<JsonString, WriterTargetError> {
         let expanded = expand_path(&self.checkout_root)?;
-        let resolved =
-            resolve_non_strict(&expanded).map_err(|error| WriterTargetError::new(error))?;
+        let resolved = resolve_non_strict(&expanded).map_err(WriterTargetError::new)?;
         Ok(JsonString::from_text(&resolved.to_string_lossy()))
     }
 
