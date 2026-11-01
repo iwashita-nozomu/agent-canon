@@ -13,7 +13,7 @@
 # upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs owns the Rust CLI build gate.
-# upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs GitHub workflow and PR template checks
 # upstream implementation run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
@@ -274,7 +274,7 @@ consume_source_correctness_receipt
 echo ""
 
 echo "1️⃣  GitHub workflow and PR template checks"
-python3 "${CANON_CI_ROOT}/checks/check_github_workflows.py"
+"${WORKSPACE_ROOT}/tools/bin/agent-canon" check-github-workflows --root "${WORKSPACE_ROOT}"
 echo ""
 
 echo "2️⃣  changed AgentCanon paths"

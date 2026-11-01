@@ -625,7 +625,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
         "cargo build",
         "tool-catalog",
         "run_accumulated_agent_evals.py",
-        "check_github_workflows.py",
+        "check-github-workflows",
     ):
         assert command not in wrapper
 

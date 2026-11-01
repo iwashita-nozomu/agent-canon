@@ -592,7 +592,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate",
                     "# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py lifecycle receipt",
                     "# upstream implementation ../../../runtime/dispatch/agent-canon/src/main.rs CLI build gate",
-                    "# upstream implementation ./check_github_workflows.py github checks",
+                    "# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs github checks",
                     "# upstream implementation ./run_python_quality_checks.sh python quality",
                     "# @dependency-end",
                     'run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"',
@@ -611,7 +611,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/validation/semantic/convention/check_convention_compliance.py",
             "tools/runtime/lifecycle/update_lifecycle_contract.py",
             "tools/runtime/dispatch/agent-canon/src/main.rs",
-            "tools/validation/ci/checks/check_github_workflows.py",
+            "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
             "tools/validation/ci/checks/run_python_quality_checks.sh",
         ]:
             self.write_plain_manifest(root, relative)
