@@ -300,7 +300,7 @@ run_pr_project_quality_boundary
 echo ""
 
 echo "6b️⃣  generated artifact guard"
-python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"
+run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"
 echo ""
 
 emit_generated_completeness_receipt
