@@ -1,9 +1,7 @@
 #![cfg(target_os = "linux")]
 
 use agent_canon::hook_dispatcher::{run_with_input, HookCliResult};
-use agent_canon::python_json::{
-    canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonValue,
-};
+use agent_canon::python_json::{canonical_json_ascii_bytes, parse_json, JsonArray, JsonValue};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use std::collections::BTreeMap;
@@ -214,28 +212,21 @@ fn assert_spool_fields(actual: &JsonValue, expected: &JsonValue, name: &str) {
     let JsonValue::Object(actual_fields) = actual else {
         panic!("{name}: native spool entry is an object")
     };
-    let projected = JsonObject(
-        expected_fields
+    for (expected_key, expected_value) in &expected_fields.0 {
+        let expected_name = expected_key.to_text().expect("field name is Unicode");
+        let value = actual_fields
             .0
             .iter()
-            .map(|(expected_key, _)| {
-                let expected_name = expected_key.to_text().expect("field name is Unicode");
-                let value = actual_fields
-                    .0
-                    .iter()
-                    .rev()
-                    .find(|(actual_key, _)| actual_key == expected_key)
-                    .map(|(_, value)| value.clone())
-                    .unwrap_or_else(|| panic!("{name}: missing spool field {expected_name}"));
-                (expected_key.clone(), value.clone())
-            })
-            .collect(),
-    );
-    assert_eq!(
-        canonical_json_ascii_bytes(&JsonValue::Object(projected)).expect("serialize projection"),
-        canonical_json_ascii_bytes(expected).expect("serialize old oracle fields"),
-        "selected spool fields for {name}"
-    );
+            .rev()
+            .find(|(actual_key, _)| actual_key == expected_key)
+            .map(|(_, value)| value)
+            .unwrap_or_else(|| panic!("{name}: missing spool field {expected_name}"));
+        assert_eq!(
+            canonical_json_ascii_bytes(value).expect("serialize actual field"),
+            canonical_json_ascii_bytes(expected_value).expect("serialize old oracle field"),
+            "spool field {expected_name} for {name}"
+        );
+    }
 }
 
 fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
