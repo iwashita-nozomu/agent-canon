@@ -478,101 +478,115 @@ fn report_selection_preserves_precedence_and_pointer_containment() {
 
 #[test]
 fn report_and_spool_keep_private_arguments_out_and_fail_open() {
-    for failure in ["none", "append", "report", "parent"] {
-        let temp = TempDir::new();
-        git_repo(temp.path());
-        let source = temp.path().join("source");
-        let results = temp.path().join("results");
-        let report = temp.path().join("report");
-        for directory in [&source, &results, &report] {
-            fs::create_dir(directory).unwrap();
-        }
-        let mut values = environment(&source, &results);
-        for name in ["AGENT_CANON_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT"] {
-            values.insert(name.to_owned(), temp.path().display().to_string());
-        }
-        values.insert(
-            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
-            report.display().to_string(),
-        );
-        let monitor = report.join("workflow_monitoring.md");
-        if failure == "append" {
-            fs::write(results.join(".event-spool"), "existing-file").unwrap();
-        } else if failure == "report" {
-            fs::create_dir(&monitor).unwrap();
-        } else if failure == "parent" {
-            values.insert("AGENT_CANON_PARENT_ROOT".to_owned(), String::new());
-        }
-        let result = run_with_input(&["PostToolUse".to_owned()], br#"{"tool_name":"Bash","tool_input":{"command":"/usr/bin/printf '%s' private-command-value"},"tool_response":{"exit_code":0,"stdout":"private-stdout","stderr":"private-stderr"},"metadata":"private-metadata-value"}"#, &values, &source);
-        assert_eq!(result.exit_code, 0, "{failure}: hook remains successful");
-        assert!(result.stdout.is_empty());
-        assert!(result.stderr.is_empty());
-        let events = event_values(&results);
-        assert_eq!(
-            events.len(),
-            usize::from(!matches!(failure, "append" | "parent")),
-            "{failure}: one append outcome"
-        );
-        if matches!(failure, "append" | "parent") {
-            assert!(!monitor.exists(), "failed append does not write a report");
+    for marker in [
+        "private-command-value".to_owned(),
+        format!("ghp_{}", "A".repeat(36)),
+    ] {
+        for failure in ["none", "append", "report", "parent"] {
+            let temp = TempDir::new();
+            git_repo(temp.path());
+            let source = temp.path().join("source");
+            let results = temp.path().join("results");
+            let report = temp.path().join("report");
+            for directory in [&source, &results, &report] {
+                fs::create_dir(directory).unwrap();
+            }
+            let mut values = environment(&source, &results);
+            for name in ["AGENT_CANON_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT"] {
+                values.insert(name.to_owned(), temp.path().display().to_string());
+            }
+            values.insert(
+                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
+                report.display().to_string(),
+            );
+            let monitor = report.join("workflow_monitoring.md");
             if failure == "append" {
-                assert_eq!(
-                    fs::read(results.join(".event-spool")).unwrap(),
-                    b"existing-file"
+                fs::write(results.join(".event-spool"), "existing-file").unwrap();
+            } else if failure == "report" {
+                fs::create_dir(&monitor).unwrap();
+            } else if failure == "parent" {
+                values.insert("AGENT_CANON_PARENT_ROOT".to_owned(), String::new());
+            }
+            let payload = serde_json::json!({"tool_name":"Bash","tool_input":{"command":format!("/usr/bin/printf '%s' {marker}")},"tool_response":{"exit_code":0,"stdout":"private-stdout","stderr":"private-stderr"},"metadata":"private-metadata-value"});
+            let result = run_with_input(
+                &["PostToolUse".to_owned()],
+                &serde_json::to_vec(&payload).unwrap(),
+                &values,
+                &source,
+            );
+            assert_eq!(result.exit_code, 0, "{failure}: hook remains successful");
+            assert!(result.stdout.is_empty());
+            assert!(result.stderr.is_empty());
+            let events = event_values(&results);
+            assert_eq!(
+                events.len(),
+                usize::from(!matches!(failure, "append" | "parent")),
+                "{failure}: one append outcome"
+            );
+            if matches!(failure, "append" | "parent") {
+                assert!(!monitor.exists(), "failed append does not write a report");
+                if failure == "append" {
+                    assert_eq!(
+                        fs::read(results.join(".event-spool")).unwrap(),
+                        b"existing-file"
+                    );
+                }
+                continue;
+            }
+            let event = &events[0];
+            assert_eq!(text(field(event, "status").unwrap()), "invalid_projection");
+            assert_eq!(text(field(event, "tool_command_verb").unwrap()), "");
+            assert!(field(event, "tool_response").is_none());
+            let bytes = canonical_json_ascii_bytes(event).unwrap();
+            let event_text = String::from_utf8(bytes).unwrap();
+            let report_text = if failure == "none" {
+                fs::read_to_string(&monitor).expect("successful append writes report")
+            } else {
+                assert!(
+                    monitor.is_dir(),
+                    "failed report preserves existing directory"
+                );
+                String::new()
+            };
+            for private in [
+                marker.as_str(),
+                "private-stdout",
+                "private-stderr",
+                "private-metadata-value",
+            ] {
+                assert!(
+                    !event_text.contains(private),
+                    "{failure}: private event value"
+                );
+                assert!(
+                    !report_text.contains(private),
+                    "{failure}: private report value"
                 );
             }
-            continue;
-        }
-        let event = &events[0];
-        assert_eq!(text(field(event, "status").unwrap()), "invalid_projection");
-        assert_eq!(text(field(event, "tool_command_verb").unwrap()), "");
-        assert!(field(event, "tool_response").is_none());
-        let bytes = canonical_json_ascii_bytes(event).unwrap();
-        let event_text = String::from_utf8(bytes).unwrap();
-        let report_text = if failure == "none" {
-            fs::read_to_string(&monitor).expect("successful append writes report")
-        } else {
-            assert!(
-                monitor.is_dir(),
-                "failed report preserves existing directory"
-            );
-            String::new()
-        };
-        for private in [
-            "private-command-value",
-            "private-stdout",
-            "private-stderr",
-            "private-metadata-value",
-        ] {
-            assert!(
-                !event_text.contains(private),
-                "{failure}: private event value"
-            );
-            assert!(
-                !report_text.contains(private),
-                "{failure}: private report value"
-            );
-        }
-        if failure == "none" {
-            assert_eq!(report_text.matches("behavior_event_json=").count(), 1);
-            let line = report_text
-                .lines()
-                .find_map(|line| line.trim().strip_prefix("behavior_event_json="))
-                .expect("one behavior projection");
-            let projected = parse_json(line).unwrap();
-            let JsonValue::Object(fields) = &projected else {
-                panic!("projected event is an object");
-            };
-            for (name, expected) in &fields.0 {
-                let name = name.to_text().unwrap();
-                assert_eq!(
-                    canonical_json_ascii_bytes(
-                        field(event, &name).expect("projection field belongs to spooled event")
-                    )
-                    .unwrap(),
-                    canonical_json_ascii_bytes(expected).unwrap(),
-                    "monitor and spool agree on {name}"
-                );
+            if failure == "none" {
+                assert_eq!(report_text.matches("behavior_event_json=").count(), 1);
+                let line = report_text
+                    .lines()
+                    .find_map(|line| {
+                        line.split_once("behavior_event_json=")
+                            .map(|(_, json)| json)
+                    })
+                    .expect("one behavior projection");
+                let projected = parse_json(line).unwrap();
+                let JsonValue::Object(fields) = &projected else {
+                    panic!("projected event is an object");
+                };
+                for (name, expected) in &fields.0 {
+                    let name = name.to_text().unwrap();
+                    assert_eq!(
+                        canonical_json_ascii_bytes(
+                            field(event, &name).expect("projection field belongs to spooled event")
+                        )
+                        .unwrap(),
+                        canonical_json_ascii_bytes(expected).unwrap(),
+                        "monitor and spool agree on {name}"
+                    );
+                }
             }
         }
     }
