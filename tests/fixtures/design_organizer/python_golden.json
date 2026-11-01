@@ -1,0 +1,2906 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/runtime"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 0,
+      "legacy_discrepancy_only": false,
+      "name": "default-planning",
+      "report": {
+        "capture_method": "O_NOATIME",
+        "content_base64": "VU5SRVNPTFZFRCAobm8gZXhwbGljaXQgY29kZSBwYXRoKTogL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1kZWZhdWx0LXBsYW5uaW5nLXY2dXUzOGpjL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EtdW5yZXNvbHZlZC5tZApQUk9QT1NFIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItZGVmYXVsdC1wbGFubmluZy12NnV1MzhqYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9iLXBsYW5uZWQubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1kZWZhdWx0LXBsYW5uaW5nLXY2dXUzOGpjL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2Zvby9iLXBsYW5uZWQubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+        "content_sha256": "4f2890edaff8ddfce21f41a154519380fc10b1a520a017d6cf18952439bcf550",
+        "content_utf8": "UNRESOLVED (no explicit code path): /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/source/documents/design/a-unresolved.md\nPROPOSE /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/source/documents/design/b-planned.md -> /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/source/documents/design/foo/b-planned.md\n\nDetected submodules:\n - foo\n",
+        "metadata": {
+          "atime_ns": 1793486796320056514,
+          "gid": 1000,
+          "kind": "file",
+          "mode_octal": "0o600",
+          "mtime_ns": 1793486796320749870,
+          "size": 692,
+          "st_flags": null,
+          "st_mode_octal": "0o100600",
+          "uid": 1000,
+          "xattrs": {
+            "status": "captured",
+            "values": {}
+          }
+        },
+        "path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/runtime/tasks/design-organization/run-vk4advfi/design_organize_report.txt"
+      },
+      "reported_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/runtime/tasks/design-organization/run-vk4advfi/design_organize_report.txt",
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796315815096,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796320056514,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "tasks": {
+            "atime_ns": 1793486796315815096,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796320056514,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "tasks/design-organization": {
+            "atime_ns": 1793486796320056514,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796320056514,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "tasks/design-organization/run-vk4advfi": {
+            "atime_ns": 1793486796320056514,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o700",
+            "mtime_ns": 1793486796323815259,
+            "st_flags": null,
+            "st_mode_octal": "0o40700",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "tasks/design-organization/run-vk4advfi/design_organize_report.txt": {
+            "atime_ns": 1793486796320056514,
+            "content_base64": "VU5SRVNPTFZFRCAobm8gZXhwbGljaXQgY29kZSBwYXRoKTogL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1kZWZhdWx0LXBsYW5uaW5nLXY2dXUzOGpjL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EtdW5yZXNvbHZlZC5tZApQUk9QT1NFIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItZGVmYXVsdC1wbGFubmluZy12NnV1MzhqYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9iLXBsYW5uZWQubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1kZWZhdWx0LXBsYW5uaW5nLXY2dXUzOGpjL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2Zvby9iLXBsYW5uZWQubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4f2890edaff8ddfce21f41a154519380fc10b1a520a017d6cf18952439bcf550",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1793486796320749870,
+            "size": 692,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/runtime",
+      "setup_notes": {
+        "runtime_created_by_setup": false
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796289315735,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796288943717,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796289315735,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796288943717,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796289315735,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289236164,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a-unresolved.md": {
+            "atime_ns": 1793486796315815096,
+            "content_base64": "Tm8gZXhwbGljaXQgY29kZSBwYXRoIGhlcmUuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c5d695392cbe6a047f07dce1a06ce070f9300713429bd348f7226ca854fc861d",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289097930,
+            "size": 28,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/b-planned.md": {
+            "atime_ns": 1793486796315815096,
+            "content_base64": "VXNlIGBmb28vYmFyLnB5YCBmb3IgdGhlIGVudHJ5cG9pbnQuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c61a0313ffae30f37d625ffba64fbfacef3ff600e3a596bb05e0a230ee81062f",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289140558,
+            "size": 37,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/nested": {
+            "atime_ns": 1793486796289315735,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289140558,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/nested/ignored.md": {
+            "atime_ns": 1793486796289140558,
+            "content_base64": "VXNlIGBuZXN0ZWQvbmFtZS5weWAuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "24679ef9f9d89ede8a6e1e8394916c28d42d8135a85e36c492295106ce060079",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289236164,
+            "size": 22,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/templates": {
+            "atime_ns": 1793486796289315735,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289236164,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/templates/ignored.md": {
+            "atime_ns": 1793486796289236164,
+            "content_base64": "VXNlIGB0ZW1wbGF0ZS9uYW1lLnB5YC4K",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "d3dde8ab6cf502b2276cca1ae354d0afd634d43c67391cc37b0a6b70678302ea",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289315735,
+            "size": 24,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796287814525,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796288943717,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796288943717,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796288943717,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796288943717,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289236164,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a-unresolved.md": {
+            "atime_ns": 1793486796288943717,
+            "content_base64": "Tm8gZXhwbGljaXQgY29kZSBwYXRoIGhlcmUuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c5d695392cbe6a047f07dce1a06ce070f9300713429bd348f7226ca854fc861d",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289097930,
+            "size": 28,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/b-planned.md": {
+            "atime_ns": 1793486796289097930,
+            "content_base64": "VXNlIGBmb28vYmFyLnB5YCBmb3IgdGhlIGVudHJ5cG9pbnQuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c61a0313ffae30f37d625ffba64fbfacef3ff600e3a596bb05e0a230ee81062f",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289140558,
+            "size": 37,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/nested": {
+            "atime_ns": 1793486796289140558,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289140558,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/nested/ignored.md": {
+            "atime_ns": 1793486796289140558,
+            "content_base64": "VXNlIGBuZXN0ZWQvbmFtZS5weWAuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "24679ef9f9d89ede8a6e1e8394916c28d42d8135a85e36c492295106ce060079",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289236164,
+            "size": 22,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/templates": {
+            "atime_ns": 1793486796289236164,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796289236164,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/templates/ignored.md": {
+            "atime_ns": 1793486796289236164,
+            "content_base64": "VXNlIGB0ZW1wbGF0ZS9uYW1lLnB5YC4K",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "d3dde8ab6cf502b2276cca1ae354d0afd634d43c67391cc37b0a6b70678302ea",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796289315735,
+            "size": 24,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "",
+      "stderr_utf8": "",
+      "stdout_base64": "UmVwb3J0IHdyaXR0ZW4gdG8gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1kZWZhdWx0LXBsYW5uaW5nLXY2dXUzOGpjL3J1bnRpbWUvdGFza3MvZGVzaWduLW9yZ2FuaXphdGlvbi9ydW4tdms0YWR2ZmkvZGVzaWduX29yZ2FuaXplX3JlcG9ydC50eHQK",
+      "stdout_utf8": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-default-planning-v6uu38jc/runtime/tasks/design-organization/run-vk4advfi/design_organize_report.txt\n",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo/a.md\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 0,
+      "legacy_discrepancy_only": false,
+      "name": "successful-exact-grant",
+      "report": {
+        "capture_method": "O_NOATIME",
+        "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc3VjY2Vzc2Z1bC1leGFjdC1ncmFudC0zM2ltOTdlYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9hLm1kIC0+IC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc3VjY2Vzc2Z1bC1leGFjdC1ncmFudC0zM2ltOTdlYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9mb28vYS5tZAoKRGV0ZWN0ZWQgc3VibW9kdWxlczoKIC0gZm9vCg==",
+        "content_sha256": "077ad48931349e10b9cb275ae73f7d933731604490bbf65471d77103fc0dfd0e",
+        "content_utf8": "COPIED /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/source/documents/design/a.md -> /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/source/documents/design/foo/a.md\n\nDetected submodules:\n - foo\n",
+        "metadata": {
+          "atime_ns": 1793486796364150156,
+          "gid": 1000,
+          "kind": "file",
+          "mode_octal": "0o600",
+          "mtime_ns": 1793486796364495257,
+          "size": 445,
+          "st_flags": null,
+          "st_mode_octal": "0o100600",
+          "uid": 1000,
+          "xattrs": {
+            "status": "captured",
+            "values": {}
+          }
+        },
+        "path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/runtime/report.txt"
+      },
+      "reported_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/runtime/report.txt",
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796359815993,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796364495257,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "report.txt": {
+            "atime_ns": 1793486796364150156,
+            "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc3VjY2Vzc2Z1bC1leGFjdC1ncmFudC0zM2ltOTdlYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9hLm1kIC0+IC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc3VjY2Vzc2Z1bC1leGFjdC1ncmFudC0zM2ltOTdlYy9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9mb28vYS5tZAoKRGV0ZWN0ZWQgc3VibW9kdWxlczoKIC0gZm9vCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "077ad48931349e10b9cb275ae73f7d933731604490bbf65471d77103fc0dfd0e",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1793486796364495257,
+            "size": 445,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/runtime",
+      "setup_notes": {
+        "atime_ns_requested": 1700000100123456789,
+        "flags_setup": {
+          "reason": "UF_NODUMP or os.chflags unavailable",
+          "status": "unsupported"
+        },
+        "mode_requested": "0o640",
+        "mtime_ns_requested": 1700000123456789012,
+        "xattr_setup": [
+          {
+            "name": "user.agentcanon.organizer.source",
+            "status": "set",
+            "value_base64": "ZnJvbS1zb3VyY2U="
+          }
+        ]
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796331913363,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796331757193,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796331913363,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796331757193,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796332088320,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796359815993,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796359815993,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.source": {
+                  "base64": "ZnJvbS1zb3VyY2U=",
+                  "sha256": "69b5b574d4408de848cceaff140ccce7e69b701b4cc80e32a9c30aefde3e4107"
+                }
+              }
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796359815993,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796359815993,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796359815993,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.source": {
+                  "base64": "ZnJvbS1zb3VyY2U=",
+                  "sha256": "69b5b574d4408de848cceaff140ccce7e69b701b4cc80e32a9c30aefde3e4107"
+                }
+              }
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796327815340,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796331757193,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796331757193,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796331757193,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796331757193,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796331913363,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1700000100123456789,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.source": {
+                  "base64": "ZnJvbS1zb3VyY2U=",
+                  "sha256": "69b5b574d4408de848cceaff140ccce7e69b701b4cc80e32a9c30aefde3e4107"
+                }
+              }
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "",
+      "stderr_utf8": "",
+      "stdout_base64": "UmVwb3J0IHdyaXR0ZW4gdG8gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1zdWNjZXNzZnVsLWV4YWN0LWdyYW50LTMzaW05N2VjL3J1bnRpbWUvcmVwb3J0LnR4dAo=",
+      "stdout_utf8": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-successful-exact-grant-33im97ec/runtime/report.txt\n",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 0,
+      "legacy_discrepancy_only": false,
+      "name": "regular-target-overwrite-and-metadata",
+      "report": {
+        "capture_method": "O_NOATIME",
+        "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItcmVndWxhci10YXJnZXQtb3ZlcndyaXRlLWFuZC1tZXRhZGF0YS1raTh4b2w1MS9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9hLm1kIC0+IC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItcmVndWxhci10YXJnZXQtb3ZlcndyaXRlLWFuZC1tZXRhZGF0YS1raTh4b2w1MS9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9mb28vYS5tZAoKRGV0ZWN0ZWQgc3VibW9kdWxlczoKIC0gZm9vCg==",
+        "content_sha256": "e4b8e547e0b5741ca3f8de904330b91e52112fce680f710ad7de894289251cba",
+        "content_utf8": "COPIED /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/source/documents/design/a.md -> /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/source/documents/design/foo/a.md\n\nDetected submodules:\n - foo\n",
+        "metadata": {
+          "atime_ns": 1793486796407051972,
+          "gid": 1000,
+          "kind": "file",
+          "mode_octal": "0o600",
+          "mtime_ns": 1793486796407390246,
+          "size": 475,
+          "st_flags": null,
+          "st_mode_octal": "0o100600",
+          "uid": 1000,
+          "xattrs": {
+            "status": "captured",
+            "values": {}
+          }
+        },
+        "path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/runtime/report.txt"
+      },
+      "reported_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/runtime/report.txt",
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796403816889,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796407816970,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "report.txt": {
+            "atime_ns": 1793486796407051972,
+            "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItcmVndWxhci10YXJnZXQtb3ZlcndyaXRlLWFuZC1tZXRhZGF0YS1raTh4b2w1MS9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9hLm1kIC0+IC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItcmVndWxhci10YXJnZXQtb3ZlcndyaXRlLWFuZC1tZXRhZGF0YS1raTh4b2w1MS9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9mb28vYS5tZAoKRGV0ZWN0ZWQgc3VibW9kdWxlczoKIC0gZm9vCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "e4b8e547e0b5741ca3f8de904330b91e52112fce680f710ad7de894289251cba",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1793486796407390246,
+            "size": 475,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/runtime",
+      "setup_notes": {
+        "source_metadata_setup": {
+          "atime_ns_requested": 1700000100123456789,
+          "flags_setup": {
+            "reason": "UF_NODUMP or os.chflags unavailable",
+            "status": "unsupported"
+          },
+          "mode_requested": "0o640",
+          "mtime_ns_requested": 1700000123456789012,
+          "xattr_setup": [
+            {
+              "name": "user.agentcanon.organizer.shared",
+              "status": "set",
+              "value_base64": "c291cmNlLXZhbHVl"
+            }
+          ]
+        },
+        "target_metadata_setup": {
+          "atime_ns_requested": 1650000100000000000,
+          "flags_setup": {
+            "status": "not-requested"
+          },
+          "mode_requested": "0o600",
+          "mtime_ns_requested": 1650000123000000000,
+          "xattr_setup": [
+            {
+              "name": "user.agentcanon.organizer.shared",
+              "status": "set",
+              "value_base64": "b2xkLXRhcmdldC12YWx1ZQ=="
+            },
+            {
+              "name": "user.agentcanon.organizer.target-only",
+              "status": "set",
+              "value_base64": "cHJlc2VydmUtdGFyZ2V0LW9ubHk="
+            }
+          ]
+        }
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796374308204,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374051876,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796374308204,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374051876,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796374308204,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374206394,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796403816889,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.shared": {
+                  "base64": "c291cmNlLXZhbHVl",
+                  "sha256": "16e22e8b1d6088f35463a3861974baf6717fc34ef65667736cfb5cff222f82fe"
+                }
+              }
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796374308204,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374206394,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796403816889,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.shared": {
+                  "base64": "c291cmNlLXZhbHVl",
+                  "sha256": "16e22e8b1d6088f35463a3861974baf6717fc34ef65667736cfb5cff222f82fe"
+                },
+                "user.agentcanon.organizer.target-only": {
+                  "base64": "cHJlc2VydmUtdGFyZ2V0LW9ubHk=",
+                  "sha256": "ca3374c5a8cd9f5a796827131c5b7f9c43555020132a93cade33f0d55e2f555a"
+                }
+              }
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796371816237,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374051876,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796374051876,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374051876,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796374051876,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374206394,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1700000100123456789,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o640",
+            "mtime_ns": 1700000123456789012,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100640",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.shared": {
+                  "base64": "c291cmNlLXZhbHVl",
+                  "sha256": "16e22e8b1d6088f35463a3861974baf6717fc34ef65667736cfb5cff222f82fe"
+                }
+              }
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796374206394,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796374206394,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1650000100000000000,
+            "content_base64": "b2xkIHRhcmdldCBieXRlcwo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "6fdd4cee656dd0171277e5d86dff93ae99be357319d9699e36f06b9fd955e3cb",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1650000123000000000,
+            "size": 17,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {
+                "user.agentcanon.organizer.shared": {
+                  "base64": "b2xkLXRhcmdldC12YWx1ZQ==",
+                  "sha256": "64715be2603de57655aad9f6d785d2c48e114689cbfa674949f8b191a2955a07"
+                },
+                "user.agentcanon.organizer.target-only": {
+                  "base64": "cHJlc2VydmUtdGFyZ2V0LW9ubHk=",
+                  "sha256": "ca3374c5a8cd9f5a796827131c5b7f9c43555020132a93cade33f0d55e2f555a"
+                }
+              }
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "",
+      "stderr_utf8": "",
+      "stdout_base64": "UmVwb3J0IHdyaXR0ZW4gdG8gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1yZWd1bGFyLXRhcmdldC1vdmVyd3JpdGUtYW5kLW1ldGFkYXRhLWtpOHhvbDUxL3J1bnRpbWUvcmVwb3J0LnR4dAo=",
+      "stdout_utf8": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-regular-target-overwrite-and-metadata-ki8xol51/runtime/report.txt\n",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo/a.md\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-multiple-target-denied-before-source-effects-lcv_oldz/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-multiple-target-denied-before-source-effects-lcv_oldz/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 2,
+      "legacy_discrepancy_only": false,
+      "name": "multiple-target-denied-before-source-effects",
+      "report": null,
+      "reported_path": null,
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796447817785,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796447817785,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-multiple-target-denied-before-source-effects-lcv_oldz/runtime",
+      "setup_notes": {
+        "expected_target_directory_before_cli": false
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796416207777,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796415993865,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796416207777,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796415993865,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796416343032,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796416207777,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796447817785,
+            "content_base64": "Rmlyc3QgcGxhbm5lZCBlbnRyeXBvaW50IGlzIGBmb28vYS5weWAuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "68df0c9b8a96af699b9773076e1ff5c03943fdbf38f0d8cce2c8f21320424d57",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796416160639,
+            "size": 40,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/b.md": {
+            "atime_ns": 1793486796447817785,
+            "content_base64": "U2Vjb25kIHBsYW5uZWQgZW50cnlwb2ludCBpcyBgZm9vL2IucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "f172ff44228e302c86dbd15fa3671e56cd39465bcae97822118dde86ac76448f",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796416207777,
+            "size": 41,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796411817051,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796415993865,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796415993865,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796415993865,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796415993865,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796416207777,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796415993865,
+            "content_base64": "Rmlyc3QgcGxhbm5lZCBlbnRyeXBvaW50IGlzIGBmb28vYS5weWAuCg==",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "68df0c9b8a96af699b9773076e1ff5c03943fdbf38f0d8cce2c8f21320424d57",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796416160639,
+            "size": 40,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/b.md": {
+            "atime_ns": 1793486796416160639,
+            "content_base64": "U2Vjb25kIHBsYW5uZWQgZW50cnlwb2ludCBpcyBgZm9vL2IucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "f172ff44228e302c86dbd15fa3671e56cd39465bcae97822118dde86ac76448f",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796416207777,
+            "size": 41,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "dXNhZ2U6IG9yZ2FuaXplX2Rlc2lnbnMucHkgWy1oXSBbLS1kZXNpZ24tcm9vdCBERVNJR05fUk9PVF0gWy0tYXBwbHldCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLW11dGF0aW9uLWNhcGFiaWxpdHktanNvbiBNVVRBVElPTl9DQVBBQklMSVRZX0pTT05dCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLXJ1bnRpbWUtcm9vdCBSVU5USU1FX1JPT1RdIFstLW91dHB1dCBPVVRQVVRdCm9yZ2FuaXplX2Rlc2lnbnMucHk6IGVycm9yOiBydW50aW1lX29yX211dGF0aW9uX2Vycm9yOiBtdXRhdGlvbiB0YXJnZXQgaXMgb3V0c2lkZSBhbGxvd2VkX3BhdGhzOiBkb2N1bWVudHMvZGVzaWduL2Zvby9iLm1kCg==",
+      "stderr_utf8": "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\norganize_designs.py: error: runtime_or_mutation_error: mutation target is outside allowed_paths: documents/design/foo/b.md\n",
+      "stdout_base64": "",
+      "stdout_utf8": "",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo/a.md\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 0,
+      "legacy_discrepancy_only": false,
+      "name": "source-file-symlink-copy",
+      "report": {
+        "capture_method": "O_NOATIME",
+        "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc291cmNlLWZpbGUtc3ltbGluay1jb3B5LXY4X3NwX3F4L3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1zb3VyY2UtZmlsZS1zeW1saW5rLWNvcHktdjhfc3BfcXgvc291cmNlL2RvY3VtZW50cy9kZXNpZ24vZm9vL2EubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+        "content_sha256": "8bba9b8861c2f7482a8a02bdc549bda495483c529db1b3f27e892677d0a9bc4f",
+        "content_utf8": "COPIED /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/source/documents/design/a.md -> /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/source/documents/design/foo/a.md\n\nDetected submodules:\n - foo\n",
+        "metadata": {
+          "atime_ns": 1793486796486562647,
+          "gid": 1000,
+          "kind": "file",
+          "mode_octal": "0o600",
+          "mtime_ns": 1793486796486890135,
+          "size": 449,
+          "st_flags": null,
+          "st_mode_octal": "0o100600",
+          "uid": 1000,
+          "xattrs": {
+            "status": "captured",
+            "values": {}
+          }
+        },
+        "path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/runtime/report.txt"
+      },
+      "reported_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/runtime/report.txt",
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796483818518,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796487818600,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "report.txt": {
+            "atime_ns": 1793486796486562647,
+            "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc291cmNlLWZpbGUtc3ltbGluay1jb3B5LXY4X3NwX3F4L3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1zb3VyY2UtZmlsZS1zeW1saW5rLWNvcHktdjhfc3BfcXgvc291cmNlL2RvY3VtZW50cy9kZXNpZ24vZm9vL2EubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "8bba9b8861c2f7482a8a02bdc549bda495483c529db1b3f27e892677d0a9bc4f",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1793486796486890135,
+            "size": 449,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/runtime",
+      "setup_notes": {
+        "payload": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/support/real.md",
+        "symlink_time_setup": {
+          "atime_ns": 1700000123456789012,
+          "mtime_ns": 1700000123456789012,
+          "status": "set"
+        },
+        "symlink_xattr_setup": {
+          "reason": "setxattr lacks no-follow support",
+          "status": "unsupported"
+        }
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796455437990,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796455437990,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796455639043,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796483818518,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796455676899,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796455437990,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/support/real.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1700000123456789012,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796483818518,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796483818518,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796455676899,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796455437990,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/support/real.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1700000123456789012,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796451817867,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796455215552,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796455215552,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455437990,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1700000123456789012,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796455437990,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/support/real.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1700000123456789012,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "",
+      "stderr_utf8": "",
+      "stdout_base64": "UmVwb3J0IHdyaXR0ZW4gdG8gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1zb3VyY2UtZmlsZS1zeW1saW5rLWNvcHktdjhfc3BfcXgvcnVudGltZS9yZXBvcnQudHh0Cg==",
+      "stdout_utf8": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-file-symlink-copy-v8_sp_qx/runtime/report.txt\n",
+      "support_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796455437990,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "real.md": {
+            "atime_ns": 1793486796483818518,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796455437990,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "support_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796455215552,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796455215552,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "real.md": {
+            "atime_ns": 1793486796455215552,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796455437990,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 0,
+      "legacy_discrepancy_only": true,
+      "name": "existing-target-symlink-internal-legacy-discrepancy",
+      "report": {
+        "capture_method": "O_NOATIME",
+        "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItZXhpc3RpbmctdGFyZ2V0LXN5bWxpbmstaW50ZXJuYWwtbGVnYWN5LWRpc2NyZXBhbmN5LXRudjJ4bndpL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1leGlzdGluZy10YXJnZXQtc3ltbGluay1pbnRlcm5hbC1sZWdhY3ktZGlzY3JlcGFuY3ktdG52Mnhud2kvc291cmNlL2RvY3VtZW50cy9kZXNpZ24vZm9vL2EubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+        "content_sha256": "e99ea3e0155022f0d7dacfd89e38722b87a1317c1f05de94a635bf8044388718",
+        "content_utf8": "COPIED /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source/documents/design/a.md -> /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source/documents/design/foo/a.md\n\nDetected submodules:\n - foo\n",
+        "metadata": {
+          "atime_ns": 1793486796529229125,
+          "gid": 1000,
+          "kind": "file",
+          "mode_octal": "0o600",
+          "mtime_ns": 1793486796529595802,
+          "size": 503,
+          "st_flags": null,
+          "st_mode_octal": "0o100600",
+          "uid": 1000,
+          "xattrs": {
+            "status": "captured",
+            "values": {}
+          }
+        },
+        "path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/runtime/report.txt"
+      },
+      "reported_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/runtime/report.txt",
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796527819415,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796529595802,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "report.txt": {
+            "atime_ns": 1793486796529229125,
+            "content_base64": "Q09QSUVEIC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItZXhpc3RpbmctdGFyZ2V0LXN5bWxpbmstaW50ZXJuYWwtbGVnYWN5LWRpc2NyZXBhbmN5LXRudjJ4bndpL3NvdXJjZS9kb2N1bWVudHMvZGVzaWduL2EubWQgLT4gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1leGlzdGluZy10YXJnZXQtc3ltbGluay1pbnRlcm5hbC1sZWdhY3ktZGlzY3JlcGFuY3ktdG52Mnhud2kvc291cmNlL2RvY3VtZW50cy9kZXNpZ24vZm9vL2EubWQKCkRldGVjdGVkIHN1Ym1vZHVsZXM6CiAtIGZvbwo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "e99ea3e0155022f0d7dacfd89e38722b87a1317c1f05de94a635bf8044388718",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o600",
+            "mtime_ns": 1793486796529595802,
+            "size": 503,
+            "st_flags": null,
+            "st_mode_octal": "0o100600",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/runtime",
+      "setup_notes": {
+        "legacy_discrepancy_only": true,
+        "note": "The old Python capability may resolve this in-subtree symlink and copy2 follows it for a regular source; this is not a required native feature.",
+        "victim": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source/documents/design/foo/victim.md"
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796497698820,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497434602,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796497698820,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497434602,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796497698820,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497581806,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796523819334,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796497581806,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796497967437,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497698820,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796498008320,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796497581806,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source/documents/design/foo/victim.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497698820,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo/victim.md": {
+            "atime_ns": 1793486796523819334,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796497581806,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796495818762,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497434602,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796497434602,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497434602,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796497434602,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497581806,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796497434602,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796497581806,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796497581806,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497698820,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796497698820,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796497698820,
+              "size": 24
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/source/documents/design/foo/victim.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796497698820,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo/victim.md": {
+            "atime_ns": 1793486796497581806,
+            "content_base64": "dmljdGltIG11c3QgYmUgb2JzZXJ2ZWQK",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "9c06f81e7828a60989b200b18e20bbacb535ec713fbae316cf63f236882e4f7a",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796497698820,
+            "size": 24,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "",
+      "stderr_utf8": "",
+      "stdout_base64": "UmVwb3J0IHdyaXR0ZW4gdG8gL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1leGlzdGluZy10YXJnZXQtc3ltbGluay1pbnRlcm5hbC1sZWdhY3ktZGlzY3JlcGFuY3ktdG52Mnhud2kvcnVudGltZS9yZXBvcnQudHh0Cg==",
+      "stdout_utf8": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-internal-legacy-discrepancy-tnv2xnwi/runtime/report.txt\n",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 2,
+      "legacy_discrepancy_only": false,
+      "name": "existing-target-symlink-outside-source",
+      "report": null,
+      "reported_path": null,
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796567820229,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796567820229,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/runtime",
+      "setup_notes": {
+        "outside_target": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/support/outside.md"
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796538556499,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538312498,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796538556499,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538312498,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796538795353,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796567820229,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796538453965,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796538881938,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796538922679,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796538556499,
+              "size": 30
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/support/outside.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796535819578,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538312498,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796538312498,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538312498,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796538312498,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796538312498,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796538453965,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796538556499,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796538556499,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796538556499,
+              "size": 30
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/support/outside.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538556499,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "dXNhZ2U6IG9yZ2FuaXplX2Rlc2lnbnMucHkgWy1oXSBbLS1kZXNpZ24tcm9vdCBERVNJR05fUk9PVF0gWy0tYXBwbHldCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLW11dGF0aW9uLWNhcGFiaWxpdHktanNvbiBNVVRBVElPTl9DQVBBQklMSVRZX0pTT05dCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLXJ1bnRpbWUtcm9vdCBSVU5USU1FX1JPT1RdIFstLW91dHB1dCBPVVRQVVRdCm9yZ2FuaXplX2Rlc2lnbnMucHk6IGVycm9yOiBydW50aW1lX29yX211dGF0aW9uX2Vycm9yOiBtdXRhdGlvbiB0YXJnZXQgaXMgb3V0c2lkZSBzb3VyY2U6IC92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItZXhpc3RpbmctdGFyZ2V0LXN5bWxpbmstb3V0c2lkZS1zb3VyY2UtdXdmczNrbF8vc291cmNlL2RvY3VtZW50cy9kZXNpZ24vZm9vL2EubWQK",
+      "stderr_utf8": "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\norganize_designs.py: error: runtime_or_mutation_error: mutation target is outside source: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-existing-target-symlink-outside-source-uwfs3kl_/source/documents/design/foo/a.md\n",
+      "stdout_base64": "",
+      "stdout_utf8": "",
+      "support_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796538556499,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538453965,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "outside.md": {
+            "atime_ns": 1793486796538453965,
+            "content_base64": "b3V0c2lkZSBtdXN0IHJlbWFpbiB1bmNoYW5nZWQK",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "a9baab52b8037b378d181922b7fa6328543210ac50ee1ceb331096fe042ddc4c",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796538556499,
+            "size": 30,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "support_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796538453965,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796538453965,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "outside.md": {
+            "atime_ns": 1793486796538453965,
+            "content_base64": "b3V0c2lkZSBtdXN0IHJlbWFpbiB1bmNoYW5nZWQK",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "a9baab52b8037b378d181922b7fa6328543210ac50ee1ceb331096fe042ddc4c",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796538556499,
+            "size": 30,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--runtime-root",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/runtime",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 2,
+      "legacy_discrepancy_only": false,
+      "name": "source-symlink-with-existing-target-symlink",
+      "report": null,
+      "reported_path": null,
+      "runtime_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796603820963,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796603820963,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/runtime",
+      "setup_notes": {
+        "payload": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/support/real.md",
+        "victim": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/source/documents/design/foo/victim.md"
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796575380234,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796575380234,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796575380234,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575226298,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796575380234,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796575226298,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/support/real.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575226298,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796575770037,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575380234,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796575808788,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796575380234,
+              "size": 29
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/source/documents/design/foo/victim.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575380234,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo/victim.md": {
+            "atime_ns": 1793486796575226298,
+            "content_base64": "dmljdGltIG11c3QgcmVtYWluIHVuY2hhbmdlZAo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c62f3c61bcd93a08c2d3e899cc664ff52966a2280756d234ec9dadfaa9812873",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796575380234,
+            "size": 29,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796571820311,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796575007403,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796575007403,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575226298,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796575226298,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796575226298,
+              "size": 38
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/support/real.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575226298,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo": {
+            "atime_ns": 1793486796575226298,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575380234,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/foo/a.md": {
+            "atime_ns": 1793486796575380234,
+            "followed_target": {
+              "kind": "file",
+              "mtime_ns": 1793486796575380234,
+              "size": 29
+            },
+            "gid": 1000,
+            "kind": "symlink",
+            "link_text": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/source/documents/design/foo/victim.md",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575380234,
+            "st_flags": null,
+            "st_mode_octal": "0o120777",
+            "uid": 1000,
+            "xattrs": {
+              "reason": "listxattr lacks no-follow support",
+              "status": "unsupported"
+            }
+          },
+          "documents/design/foo/victim.md": {
+            "atime_ns": 1793486796575226298,
+            "content_base64": "dmljdGltIG11c3QgcmVtYWluIHVuY2hhbmdlZAo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "c62f3c61bcd93a08c2d3e899cc664ff52966a2280756d234ec9dadfaa9812873",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796575380234,
+            "size": 29,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "dXNhZ2U6IG9yZ2FuaXplX2Rlc2lnbnMucHkgWy1oXSBbLS1kZXNpZ24tcm9vdCBERVNJR05fUk9PVF0gWy0tYXBwbHldCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLW11dGF0aW9uLWNhcGFiaWxpdHktanNvbiBNVVRBVElPTl9DQVBBQklMSVRZX0pTT05dCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLXJ1bnRpbWUtcm9vdCBSVU5USU1FX1JPT1RdIFstLW91dHB1dCBPVVRQVVRdCm9yZ2FuaXplX2Rlc2lnbnMucHk6IGVycm9yOiBydW50aW1lX29yX211dGF0aW9uX2Vycm9yOiBbRXJybm8gMTddIEZpbGUgZXhpc3RzOiAnL3Zhci9saWIvYWdlbnQtY2Fub24vcnVudGltZS90YXNrcy9mdWxsLXJ1c3QtbWlncmF0aW9uLTIwMjYxMDMwLXN6OHFfcDR6L29yZ2FuaXplci1tYWluNzA2LWNsaS1iYXNlbGluZS1yZXRyeS01NzhueDZsZS90bXAvZGVzaWduLW9yZ2FuaXplci1zb3VyY2Utc3ltbGluay13aXRoLWV4aXN0aW5nLXRhcmdldC1zeW1saW5rLXg0YmdzejJtL3N1cHBvcnQvcmVhbC5tZCcgLT4gJy92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9vcmdhbml6ZXItbWFpbjcwNi1jbGktYmFzZWxpbmUtcmV0cnktNTc4bng2bGUvdG1wL2Rlc2lnbi1vcmdhbml6ZXItc291cmNlLXN5bWxpbmstd2l0aC1leGlzdGluZy10YXJnZXQtc3ltbGluay14NGJnc3oybS9zb3VyY2UvZG9jdW1lbnRzL2Rlc2lnbi9mb28vYS5tZCcK",
+      "stderr_utf8": "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\norganize_designs.py: error: runtime_or_mutation_error: [Errno 17] File exists: '/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/support/real.md' -> '/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-source-symlink-with-existing-target-symlink-x4bgsz2m/source/documents/design/foo/a.md'\n",
+      "stdout_base64": "",
+      "stdout_utf8": "",
+      "support_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796575380234,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "real.md": {
+            "atime_ns": 1793486796603820963,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796575226298,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "support_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796575007403,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796575007403,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "real.md": {
+            "atime_ns": 1793486796575007403,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796575226298,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      }
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/old-source/tools/validation/documentation/authoring/organize_designs.py",
+        "--design-root",
+        "documents/design",
+        "--apply",
+        "--mutation-capability-json",
+        "{\"allowed_paths\":[\"documents/design/foo/a.md\"],\"purpose\":\"organizer-oracle\",\"authority\":\"issue-1630\"}",
+        "--output",
+        "report.txt"
+      ],
+      "cwd": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/organizer-main706-cli-baseline-retry-578nx6le/tmp/design-organizer-missing-runtime-before-apply-dsq2x27r/source",
+      "environment": {
+        "AGENT_CANON_RUNTIME_ROOT": "removed",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit": 2,
+      "legacy_discrepancy_only": false,
+      "name": "missing-runtime-before-apply",
+      "report": null,
+      "reported_path": null,
+      "runtime_after": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_before": {
+        "entries": {},
+        "exists": false
+      },
+      "runtime_root": null,
+      "setup_notes": {
+        "runtime_should_not_exist_before_or_after": true
+      },
+      "source_after": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796612356839,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612133043,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796612356839,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612133043,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796612501535,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612356839,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796639821696,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796612356839,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "source_before": {
+        "entries": {
+          ".": {
+            "atime_ns": 1793486796607821045,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612133043,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents": {
+            "atime_ns": 1793486796612133043,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612133043,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design": {
+            "atime_ns": 1793486796612133043,
+            "gid": 1000,
+            "kind": "directory",
+            "mode_octal": "0o777",
+            "mtime_ns": 1793486796612356839,
+            "st_flags": null,
+            "st_mode_octal": "0o40777",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          },
+          "documents/design/a.md": {
+            "atime_ns": 1793486796612133043,
+            "content_base64": "QSBwbGFubmVkIGVudHJ5cG9pbnQgaXMgYGZvby9iYXIucHlgLgo=",
+            "content_capture": "O_NOATIME",
+            "content_sha256": "4c67b3eb1d80d1e5f18311572d01a51abadcf49a10c3455920beaa9f575ef8c6",
+            "gid": 1000,
+            "kind": "file",
+            "mode_octal": "0o666",
+            "mtime_ns": 1793486796612356839,
+            "size": 38,
+            "st_flags": null,
+            "st_mode_octal": "0o100666",
+            "uid": 1000,
+            "xattrs": {
+              "status": "captured",
+              "values": {}
+            }
+          }
+        },
+        "exists": true
+      },
+      "stderr_base64": "dXNhZ2U6IG9yZ2FuaXplX2Rlc2lnbnMucHkgWy1oXSBbLS1kZXNpZ24tcm9vdCBERVNJR05fUk9PVF0gWy0tYXBwbHldCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLW11dGF0aW9uLWNhcGFiaWxpdHktanNvbiBNVVRBVElPTl9DQVBBQklMSVRZX0pTT05dCiAgICAgICAgICAgICAgICAgICAgICAgICAgIFstLXJ1bnRpbWUtcm9vdCBSVU5USU1FX1JPT1RdIFstLW91dHB1dCBPVVRQVVRdCm9yZ2FuaXplX2Rlc2lnbnMucHk6IGVycm9yOiBydW50aW1lX29yX211dGF0aW9uX2Vycm9yOiBleHBsaWNpdCBydW50aW1lIHJvb3QgcmVxdWlyZWQ7IHBhc3MgLS1ydW50aW1lLXJvb3Qgb3Igc2V0IEFHRU5UX0NBTk9OX1JVTlRJTUVfUk9PVAo=",
+      "stderr_utf8": "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\norganize_designs.py: error: runtime_or_mutation_error: explicit runtime root required; pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT\n",
+      "stdout_base64": "",
+      "stdout_utf8": "",
+      "support_after": {
+        "entries": {},
+        "exists": false
+      },
+      "support_before": {
+        "entries": {},
+        "exists": false
+      }
+    }
+  ],
+  "execution": "actual subprocess calls to the pinned organize_designs.py; no copied organizer implementation",
+  "expected_source_head": "706c3b43f658b5341db7c3856208a870103f9568",
+  "host": {
+    "chflags_api": false,
+    "implementation": "CPython",
+    "nofollow_support": {
+      "chmod": false,
+      "getxattr": false,
+      "listxattr": false,
+      "setxattr": false,
+      "utime": true
+    },
+    "o_noatime": true,
+    "os_name": "posix",
+    "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "st_flags_field": false,
+    "symlink_api": true,
+    "unicode_version": "15.0.0",
+    "xattr_api": true
+  },
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "schema": "design_organizer_old_cli_observation_v1",
+  "source_owner_sha256": {
+    "tools/analysis/documents/formatting/_runtime_output.py": "ec4f88840db9813400e44094b6ac1a31023af90002c683e44fc43f3b38d986ac",
+    "tools/runtime/artifacts/runtime_artifacts.py": "722c23782965dd2311a5320bdb582477890cd4b0473a89de4d664b469e10f251",
+    "tools/validation/documentation/authoring/organize_designs.py": "0be410edfbba29ac19debb9b121fb2b81535e21299dd64cbc3368ea8e647943b"
+  }
+}
