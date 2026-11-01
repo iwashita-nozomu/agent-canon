@@ -603,6 +603,27 @@ fn missing_runtime_directory_does_not_change_safety_or_create_files() {
     git_repo(temp.path());
     let source = temp.path().join("source");
     fs::create_dir(&source).unwrap();
+    fs::create_dir(source.join("subdir")).unwrap();
+    let declared_source_runtime = source.join(".runtime");
+    let source_runtime_alias = source.join("subdir/../.runtime");
+    assert_eq!(
+        agent_canon::runtime_boundary::RuntimeSpoolBoundary::resolve_path(
+            &source,
+            &declared_source_runtime,
+            Path::new("spool/hook-events")
+        )
+        .unwrap(),
+        declared_source_runtime.join("spool/hook-events")
+    );
+    assert!(
+        agent_canon::runtime_boundary::RuntimeSpoolBoundary::resolve_path(
+            &source,
+            &source_runtime_alias,
+            Path::new("spool/hook-events")
+        )
+        .is_err()
+    );
+    assert!(!declared_source_runtime.exists());
     let missing_runtime = temp.path().join("uncreated-runtime");
     let mut values = environment(&source, &temp.path().join("unused-results"));
     values.remove("AGENT_CANON_HOOK_RESULTS_DIR");

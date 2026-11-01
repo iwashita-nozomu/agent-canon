@@ -1270,6 +1270,12 @@ impl RuntimeSpoolBoundary {
         reject_symlink_components(&requested, Path::new("/"))?;
         let root = canonicalize_with_missing_suffix(&requested)?;
         let source_runtime_spool = root == source.join(SOURCE_RUNTIME_DIRECTORY);
+        if source_runtime_spool && requested != source.join(SOURCE_RUNTIME_DIRECTORY) {
+            return Err(format!(
+                "source runtime path is not canonical: {}",
+                requested.display()
+            ));
+        }
         if !source_runtime_spool && (root == source || root.starts_with(&source)) {
             return Err(format!(
                 "runtime root must not be inside source root: source={} runtime={}",
