@@ -336,7 +336,7 @@ fn map_oracle_paths(
     if let (Some(old_report), Some(report)) = (case["report"]["path"].as_str(), report) {
         replacements.push((old_report.to_string(), report.display().to_string()));
     }
-    replacements.sort_by(|left, right| right.0.len().cmp(&left.0.len()));
+    replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.0.len()));
     let mut mapped = text.to_owned();
     for (old, new) in replacements {
         mapped = mapped.replace(&old, &new);
