@@ -125,7 +125,7 @@ impl OrderedCounter {
 
     fn compact_json(&self) -> SerdeValue {
         let mut entries = self.entries.clone();
-        entries.sort_by(|left, right| right.1.cmp(&left.1));
+        entries.sort_by_key(|entry| std::cmp::Reverse(entry.1));
         entries.truncate(MAX_COUNTER_ITEMS);
         let mut values = Map::new();
         for (key, count) in entries {
@@ -146,6 +146,13 @@ struct SummaryOutput {
     live_total_usage_tokens: BigInt,
     live_turn_count: usize,
     latest_turn_id: String,
+}
+
+struct SummaryPaths<'a> {
+    source_root: &'a Path,
+    canon_root: &'a Path,
+    history_path: &'a Path,
+    sqlite_path: &'a Path,
 }
 
 struct ExportResult {
@@ -435,11 +442,13 @@ fn run_export(options: CliOptions) -> Result<i32, String> {
 
     for thread_id in &thread_ids {
         let result = export_summary(
-            &source_root,
-            &canon_root,
+            &SummaryPaths {
+                source_root: &source_root,
+                canon_root: &canon_root,
+                history_path: &history_path,
+                sqlite_path: &sqlite_path,
+            },
             thread_id,
-            &history_path,
-            &sqlite_path,
             grouped_session_paths
                 .get(thread_id)
                 .map(Vec::as_slice)
@@ -583,31 +592,22 @@ fn path_posix(path: &Path) -> String {
 }
 
 fn export_summary(
-    source_root: &Path,
-    canon_root: &Path,
+    paths: &SummaryPaths<'_>,
     thread_id: &str,
-    history_path: &Path,
-    sqlite_path: &Path,
     session_paths: &[PathBuf],
     recent_days: Option<&BigInt>,
     output: Option<&Path>,
     dry_run: bool,
 ) -> Result<ExportResult, String> {
+    let source_root = paths.source_root;
+    let canon_root = paths.canon_root;
+    let history_path = paths.history_path;
+    let sqlite_path = paths.sqlite_path;
     let cutoff = recent_cutoff(recent_days);
     let history = read_history(history_path, thread_id, cutoff.as_ref())?;
     let sqlite = read_sqlite(sqlite_path, thread_id, cutoff.as_ref())?;
     let sessions = read_sessions(session_paths)?;
-    let summary = summary_payload(
-        source_root,
-        canon_root,
-        thread_id,
-        history_path,
-        sqlite_path,
-        &history,
-        &sqlite,
-        &sessions,
-        recent_days,
-    )?;
+    let summary = summary_payload(paths, thread_id, &history, &sqlite, &sessions, recent_days)?;
     let output_path = match output {
         Some(path) => path.to_path_buf(),
         None => codex_runtime_summary_path(source_root, canon_root, thread_id)?,
@@ -1536,16 +1536,17 @@ fn json_value(value: &SerdeValue) -> Result<JsonValue, String> {
 }
 
 fn summary_payload(
-    source_root: &Path,
-    canon_root: &Path,
+    paths: &SummaryPaths<'_>,
     thread_id: &str,
-    history_path: &Path,
-    sqlite_path: &Path,
     history: &HistorySummary,
     sqlite_summary: &SqliteSummary,
     sessions: &SessionSummary,
     recent_days: Option<&BigInt>,
 ) -> Result<SummaryOutput, String> {
+    let source_root = paths.source_root;
+    let canon_root = paths.canon_root;
+    let history_path = paths.history_path;
+    let sqlite_path = paths.sqlite_path;
     let live_total_usage_tokens = sqlite_summary
         .token_turns
         .iter()
