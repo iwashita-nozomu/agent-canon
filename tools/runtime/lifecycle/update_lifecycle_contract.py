@@ -11,7 +11,6 @@
 # downstream implementation ../../agent/orchestration/tool_calls.py materializes lifecycle-bound subagent and close ToolCall packets.
 # downstream implementation ../../repository/github/github_publish.py consumes immutable pull-request lifecycle and gate evidence.
 # downstream implementation ../../repository/github/publication_integrator.py consumes candidate CAS and publication receipts.
-# downstream implementation ./task_close.py consumes closeout coverage without revalidating upstream gates.
 # downstream implementation ../../repository/workspace/repository_topic_clone.py consumes source branch receipts.
 # downstream implementation ../../../tests/agent_tools/test_publication_integrator.py validates lifecycle mechanics.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.

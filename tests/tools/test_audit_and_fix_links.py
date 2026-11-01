@@ -1,134 +1,131 @@
 # @dependency-start
 # contract test
-# responsibility Tests the canonical Rust link-check route and explicit source mutation boundary.
-# upstream implementation ../../tools/validation/documentation/checks/audit_and_fix_links.py link audit compatibility wrapper
-# upstream implementation ../../tools/analysis/documents/formatting/_runtime_output.py mutation capability parser
-# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs canonical link diagnostics
+# responsibility Exercises the native docs link route and its exact source-mutation capability behavior.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs native links command
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_mutation.rs exact source mutation capability
+# downstream test ../../tools/runtime/dispatch/agent-canon/tests/source_mutation_native.rs capability boundary regressions
 # @dependency-end
-"""Tests for the Markdown link compatibility wrapper."""
+"""Native docs link route and source-mutation CLI regressions."""
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "audit_and_fix_links.py"
-
-
-def load_module():
-    """Load the wrapper as a module without executing its CLI."""
-    spec = importlib.util.spec_from_file_location("audit_and_fix_links", SCRIPT_PATH)
-    if spec is None or spec.loader is None:
-        raise AssertionError("wrapper module cannot be loaded")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+CLI_PATH = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
+NATIVE_BIN_CANDIDATES = (
+    PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/target/release/agent-canon",
+    PROJECT_ROOT / "tools/runtime/dispatch/agent-canon/target/debug/agent-canon",
+)
 
 
 class AuditAndFixLinksTest(unittest.TestCase):
-    """Exercise one canonical read-only route and one explicit apply route."""
+    """Keep the former wrapper's four read-only/apply purposes on the Rust route."""
 
     def write_file(self, path: Path, contents: str) -> None:
-        """Create a fixture file."""
+        """Create one task-owned source fixture."""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(contents, encoding="utf-8")
 
-    def test_check_forwards_to_rust_once_without_report_write(self) -> None:
-        """Read-only checks use the Rust CLI and never create source reports."""
-        module = load_module()
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_file(root / "README.md", "# Root\n")
-            completed = subprocess.CompletedProcess([], 1)
-            old_cwd = Path.cwd()
-            try:
-                os.chdir(root)
-                with patch.object(module.subprocess, "run", return_value=completed) as run:
-                    self.assertEqual(module.main(["--check", "README.md"]), 1)
-            finally:
-                os.chdir(old_cwd)
-            command = run.call_args.args[0]
-            self.assertEqual(command[1:4], ["docs", "check", "--root"])
-            self.assertEqual(command[4], str(root))
-            self.assertFalse((root / "reports" / "broken_links.txt").exists())
+    def native_binary(self) -> Path:
+        """Return the built native binary selected by the existing wrapper."""
+        configured = os.environ.get("AGENT_CANON_NATIVE_BIN")
+        candidates = (Path(configured),) if configured else NATIVE_BIN_CANDIDATES
+        binary = next(
+            (
+                path
+                for path in candidates
+                if path.is_file() and os.access(path, os.X_OK)
+            ),
+            None,
+        )
+        if binary is None:
+            self.fail("native agent-canon binary must be built before this source test")
+        return binary
 
-    def test_container_route_uses_immutable_rust_binary_without_source_output(self) -> None:
-        """The bootstrap image route invokes its binary directly and stays read-only."""
-        module = load_module()
+    def run_links(
+        self, args: list[str], *, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the stable command wrapper with the requested docs arguments."""
+        return subprocess.run(
+            [str(CLI_PATH), "docs", "links", *args],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+
+    def test_check_uses_native_read_only_route_without_report_write(self) -> None:
+        """Read-only link checks run in the native docs owner and create no report."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_file(root / "README.md", "# Root\n")
-            completed = subprocess.CompletedProcess([], 0)
-            old_cwd = Path.cwd()
-            try:
-                os.chdir(root)
-                with patch.dict(module.os.environ, {"AGENT_CANON_EXECUTION_PLANE": "tool-container"}), patch.object(
-                    module.subprocess, "run", return_value=completed
-                ) as run:
-                    self.assertEqual(module.main(["README.md"]), 0)
-            finally:
-                os.chdir(old_cwd)
-            command = run.call_args.args[0]
-            self.assertEqual(command[0], "/usr/local/bin/agent-canon")
-            self.assertEqual(command[1:4], ["docs", "check", "--root"])
+            completed = self.run_links(["--root", str(root), "--check", "missing.md"])
+            self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertFalse((root / "reports").exists())
 
-    def test_apply_requires_mutation_capability_and_preserves_source_on_failure(self) -> None:
-        """An apply request without a typed capability fails before writing."""
-        module = load_module()
+    def test_selected_native_binary_override_runs_without_source_output(self) -> None:
+        """The stable wrapper can select the immutable native executable directly."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            self.write_file(root / "README.md", "# Root\n")
-            self.write_file(root / "docs" / "guide.md", "[root](README.md)\n")
-            before = (root / "docs" / "guide.md").read_bytes()
-            old_cwd = Path.cwd()
-            try:
-                os.chdir(root)
-                with patch.object(module, "forward_cli_to_rust") as forward:
-                    with self.assertRaises(SystemExit) as error:
-                        module.main(["--apply", "docs"])
-            finally:
-                os.chdir(old_cwd)
-            self.assertEqual(error.exception.code, 2)
-            forward.assert_not_called()
-            self.assertEqual((root / "docs" / "guide.md").read_bytes(), before)
+            environment = os.environ.copy()
+            environment["AGENT_CANON_NATIVE_BIN"] = str(self.native_binary())
+            environment["AGENT_CANON_SOURCE_ROOT"] = str(PROJECT_ROOT)
+            completed = self.run_links(
+                ["--root", str(root), "missing.md"], env=environment
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertFalse((root / "reports").exists())
 
-    def test_apply_rewrites_only_capability_bound_source_file(self) -> None:
-        """The explicit capability permits one source rewrite without a report."""
-        module = load_module()
+    def test_apply_requires_capability_and_preserves_source_on_failure(self) -> None:
+        """An apply request without the exact source capability fails before writing."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_file(root / "README.md", "# Root\n")
             guide = root / "docs" / "guide.md"
             self.write_file(guide, "[root](README.md)\n")
-            capability = '{"allowed_paths":["docs/guide.md"],"purpose":"test","authority":"issue-841"}'
-            old_cwd = Path.cwd()
-            try:
-                os.chdir(root)
-                with patch.object(module, "forward_cli_to_rust") as forward:
-                    self.assertEqual(
-                        module.main(
-                            [
-                                "--apply",
-                                "--mutation-capability-json",
-                                capability,
-                                "docs",
-                            ]
-                        ),
-                        0,
-                    )
-            finally:
-                os.chdir(old_cwd)
-            forward.assert_not_called()
-            self.assertEqual(guide.read_text(encoding="utf-8"), "[root](../README.md)\n")
+            before = guide.read_bytes()
+
+            completed = self.run_links(["--root", str(root), "--apply", "docs"])
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertEqual(guide.read_bytes(), before)
+            self.assertFalse((root / "reports").exists())
+
+    def test_apply_rewrites_only_capability_bound_source_file(self) -> None:
+        """The explicit capability rewrites one allowed file and leaves adjacent source intact."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_file(root / "README.md", "# Root\n")
+            guide = root / "docs" / "guide.md"
+            untouched = root / "docs" / "untouched.md"
+            self.write_file(guide, "[root](README.md)\n")
+            self.write_file(untouched, "# Untouched\n")
+            capability = (
+                '{"allowed_paths":["docs/guide.md"],'
+                '"purpose":"test","authority":"issue-1630"}'
+            )
+
+            completed = self.run_links(
+                [
+                    "--root",
+                    str(root),
+                    "--apply",
+                    "--mutation-capability-json",
+                    capability,
+                    "docs",
+                ]
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(
+                guide.read_text(encoding="utf-8"), "[root](../README.md)\n"
+            )
+            self.assertEqual(untouched.read_text(encoding="utf-8"), "# Untouched\n")
             self.assertFalse((root / "reports").exists())
 
 

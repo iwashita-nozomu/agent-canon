@@ -291,6 +291,7 @@ run_workflow_container() {
   python3 "${ROOT}/tools/validation/ci/checks/check_github_workflows.py"
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
+    tests/tools/test_compile_cache.py \
     tests/bootstrap/test_bootstrap_runtime.py
 }
 

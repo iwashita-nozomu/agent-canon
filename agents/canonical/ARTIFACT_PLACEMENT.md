@@ -5,6 +5,7 @@ contract agent-runtime
 responsibility Owns placement of task artifacts and routes durable document creation to its structure owner.
 upstream design README.md canonical workflow index
 upstream design ../../documents/rule/directory-structure.md document placement, responsibility split, and reader reachability
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs generated artifact guard
 @dependency-end
 -->
 
@@ -74,12 +75,13 @@ immutable snapshot, append-only index, push and remote readback. Broad `sync` is
 explicitly selected cumulative runtime families, not a replacement report publisher.
 Read actual placement/identity from that owner's status output rather than guessing.
 
-When coordinated closeout is selected, `task_close.py` checks artifact placement.
+When coordinated closeout is selected, native `agent-canon task-close` checks artifact placement.
 Tracked durable reports are allowed by canon; untracked/ignored reports belong only
 to the current run directory. Old run bundles follow archive/closeout rather than
 being copied into a new run.
 
-Mechanically regenerable report roots remain governed by `generated_artifact_guard.py`:
+Mechanically regenerable report roots remain governed by
+`agent-canon generated-artifact-guard`:
 `reports/agent-eval-runs/`, `reports/dependency-review/`,
 `reports/agent-runtime-dashboard/`, `reports/agent-improvement-guide/`, `reports/hooks/`,
 `reports/.cache/`, and generated `reports/*.json`, `*.patch`, `*.txt`.

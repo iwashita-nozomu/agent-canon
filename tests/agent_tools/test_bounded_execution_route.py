@@ -59,7 +59,7 @@ def test_real_edge_or_resumption_selects_existing_coordination(context, reason):
     assert result == {
         "execution_route": "coordination",
         "next_action": "run_existing_coordinated_closeout",
-        "commands": ["python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"],
+        "commands": ["tools/bin/agent-canon task-close --run-id <run-id>"],
         "selected_validation": context["validation"],
         "verification_status": "pending",
     }
@@ -170,7 +170,7 @@ def test_closeout_without_context_does_not_advertise_a_run_bundle(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["commands"] == []
-    assert "task_close.py" not in result.stdout
+    assert "agent-canon task-close" not in result.stdout
 
 
 def test_non_closeout_selector_rejects_execution_context(context, tmp_path):

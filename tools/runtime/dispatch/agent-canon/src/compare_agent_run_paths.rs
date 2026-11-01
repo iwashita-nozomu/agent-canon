@@ -4,11 +4,13 @@
 // upstream design ../../../../agents/skills/adaptive-improvement-loop.md owns rerun comparison meaning
 // upstream design ../../../../templates/agents/workflow_monitoring.md records path events
 // upstream implementation path_resolution.rs owns non-strict physical run-path resolution
+// upstream implementation python_cli_options.rs owns Python argparse-compatible long-option prefixes
 // downstream implementation main.rs exposes the compare-agent-run-paths command
 // downstream test ../tests/compare_agent_run_paths_native.rs freezes the Python CLI oracle
 // @dependency-end
 
 use crate::path_resolution::resolve_non_strict;
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use regex::Regex;
 use std::fs;
 use std::io;
@@ -297,26 +299,13 @@ struct CliOptions {
     report_out: Option<String>,
 }
 
-fn option_name(value: &str) -> Result<OptionName, String> {
+fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
     const OPTIONS: &[(&str, OptionName)] = &[
         ("--help", OptionName::Help),
         ("--baseline-run", OptionName::BaselineRun),
         ("--candidate-run", OptionName::CandidateRun),
         ("--report-out", OptionName::ReportOut),
     ];
-    let matches = OPTIONS
-        .iter()
-        .filter(|(option, _)| option.starts_with(value))
-        .map(|(_, name)| *name)
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [name] => Ok(*name),
-        [] => Err(format!("unrecognized argument: {value}")),
-        _ => Err(format!("ambiguous option: {value}")),
-    }
-}
-
-fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
     let mut baseline_run = None;
     let mut candidate_run = None;
     let mut report_out = None;
@@ -334,7 +323,10 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
         if !option.starts_with("--") {
             return Err(format!("unrecognized argument: {argument}"));
         }
-        let name = option_name(option)?;
+        let name = resolve_long_option_prefix(option, OPTIONS).map_err(|error| match error {
+            LongOptionError::Unrecognized => format!("unrecognized argument: {option}"),
+            LongOptionError::Ambiguous(_) => format!("ambiguous option: {option}"),
+        })?;
         if matches!(name, OptionName::Help) {
             return match inline_value {
                 Some(value) => Err(format!(

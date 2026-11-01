@@ -77,7 +77,7 @@ to either execution route. Risk and changed-file counts do not select this path.
 
 For a bounded task, output identifies the selected route and next action, with
 no shell closeout command or inactive gate records. Coordinated output instead
-includes the existing `task_close.py --run-id <run-id>` command and its
+includes the existing `tools/bin/agent-canon task-close --run-id <run-id>` command and its
 catalog-defined next action. Both routes project `execution_route`, `next_action`,
 `commands`, `selected_validation`, and `verification_status` from the current
 route policy and established context. The current catalog's route policy is

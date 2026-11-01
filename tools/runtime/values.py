@@ -13,7 +13,6 @@
 # downstream implementation ./artifacts/external_artifact_binding.py narrows provider readback values
 # downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
 # downstream implementation ./lifecycle/bootstrap_agent_run.py narrows command payload values
-# downstream implementation ./lifecycle/task_close.py narrows lifecycle artifact values
 # @dependency-end
 """Refine only the container shape of decoded values; domain schemas stay local."""
 

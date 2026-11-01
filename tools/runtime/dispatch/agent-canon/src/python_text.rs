@@ -9,7 +9,7 @@ pub(crate) fn python_strip(value: &str) -> &str {
     value.trim_matches(is_python_whitespace)
 }
 
-fn is_python_whitespace(character: char) -> bool {
+pub(crate) fn is_python_whitespace(character: char) -> bool {
     character.is_whitespace()
         || matches!(character, '\u{001c}' | '\u{001d}' | '\u{001e}' | '\u{001f}')
 }
