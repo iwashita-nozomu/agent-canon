@@ -880,9 +880,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             "explicitly assigned action is canonical repository-topic-clone.prepare",
             calls[0][1],
         )
-        self.assertIn(
-            "preexisting target is not required for preparation", calls[0][1]
-        )
+        self.assertIn("preexisting target is not required for preparation", calls[0][1])
         self.assertIsNotNone(dispatch.close_agent_token)
         self.assertEqual(
             dispatch.close_agent_token.arguments,
