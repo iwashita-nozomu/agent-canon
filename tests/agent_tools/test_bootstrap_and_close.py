@@ -2075,7 +2075,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "The parent chooses the next step from linked guidance and actual outcomes",
                     manager_prompt,
                 )
-                self.assertIn("return its actual result inline", manager_prompt)
+                self.assertIn("return the assigned result inline", manager_prompt)
                 self.assertIn("when present", manager_prompt)
                 self.assertIn("respect supplied path boundaries", manager_prompt)
                 self.assertIn(
