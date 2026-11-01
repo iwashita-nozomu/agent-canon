@@ -1104,11 +1104,14 @@ fn dispatch_event(
     };
     let parts = HookInvocationParts {
         hook_event_name: JsonString::from_text(event),
-        hook_invocation_id: JsonString::from_text(
-            &object_string(&spool_entry, "hook_run_id")
-                .and_then(JsonString::to_text)
-                .unwrap_or_default(),
-        ),
+        hook_invocation_id: spool_entry
+            .0
+            .iter()
+            .find_map(|(name, value)| match value {
+                JsonValue::String(value) if name.equals_text("hook_run_id") => Some(value.clone()),
+                _ => None,
+            })
+            .unwrap_or_default(),
         hook_payload: payload.as_ref(),
         payload_status: JsonString::from_text(if payload.is_some() {
             "parsed"
