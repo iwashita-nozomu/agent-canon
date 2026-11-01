@@ -297,7 +297,8 @@ entries:
       stderr: captured
       exit: propagate
       signal: propagate
-      side_effect: explicit-target-write
+      # Dispatch owns the external report; source copies require the explicit mutation capability.
+      side_effect: external-artifact
       output_root: external-runtime
       written_paths: []
     writes: true
