@@ -645,7 +645,7 @@ impl<'a> JsonParser<'a> {
 
     fn parse_number(&mut self) -> Result<JsonValue, JsonParseError> {
         let start = self.index;
-        self.consume_if(b'-');
+        let negative = self.consume_if(b'-');
         match self.peek() {
             Some(b'0') => {
                 self.index += 1;
@@ -659,18 +659,26 @@ impl<'a> JsonParser<'a> {
                     self.index += 1;
                 }
             }
+            _ if self.reject_duplicates && negative => {
+                return Err(self.error_at("expected a JSON value", start));
+            }
             _ => return Err(self.error("expected a digit in number")),
         }
         let mut is_float = false;
+        let fraction_start = self.index;
         if self.consume_if(b'.') {
             is_float = true;
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
+                if self.reject_duplicates {
+                    return Err(self.error_at("unexpected trailing characters", fraction_start));
+                }
                 return Err(self.error("expected a digit after decimal point"));
             }
             while matches!(self.peek(), Some(b'0'..=b'9')) {
                 self.index += 1;
             }
         }
+        let exponent_start = self.index;
         if matches!(self.peek(), Some(b'e' | b'E')) {
             is_float = true;
             self.index += 1;
@@ -678,6 +686,9 @@ impl<'a> JsonParser<'a> {
                 self.index += 1;
             }
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
+                if self.reject_duplicates {
+                    return Err(self.error_at("unexpected trailing characters", exponent_start));
+                }
                 return Err(self.error("expected a digit in exponent"));
             }
             while matches!(self.peek(), Some(b'0'..=b'9')) {

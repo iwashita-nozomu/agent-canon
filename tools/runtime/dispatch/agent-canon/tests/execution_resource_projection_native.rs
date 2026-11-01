@@ -112,6 +112,24 @@ fn duplicate_rejection_is_opt_in_for_the_shared_json_parser() {
             .expect_err("strict canonicalizer rejects NaN"),
         "Out of range float values are not JSON compliant: nan"
     );
+    assert_eq!(
+        parse_json("1.")
+            .err()
+            .expect("default parser rejects incomplete fraction"),
+        "expected a digit after decimal point at column 3"
+    );
+    assert_eq!(
+        parse_json("1e")
+            .err()
+            .expect("default parser rejects incomplete exponent"),
+        "expected a digit in exponent at column 3"
+    );
+    assert_eq!(
+        parse_json("-")
+            .err()
+            .expect("default parser rejects lone sign"),
+        "expected a digit in number at column 2"
+    );
 }
 
 #[test]
@@ -130,13 +148,19 @@ fn execution_resource_projection_matches_captured_boundary_cases() {
             "Expecting ',' delimiter: line 1 column 4 (char 3)",
         ),
         ("{}x\n", "Extra data: line 1 column 3 (char 2)"),
+        ("1.\n", "Extra data: line 1 column 2 (char 1)"),
+        ("1e\n", "Extra data: line 1 column 2 (char 1)"),
+        ("-\n", "Expecting value: line 1 column 1 (char 0)"),
         (
             "\"abc\n",
             "Unterminated string starting at: line 1 column 1 (char 0)",
         ),
-        (r#""\q""#, "Invalid \\escape: line 1 column 2 (char 1)"),
         (
-            r#""\u12x4""#,
+            concat!(r#""\q""#, "\n"),
+            "Invalid \\escape: line 1 column 2 (char 1)",
+        ),
+        (
+            concat!(r#""\u12x4""#, "\n"),
             "Invalid \\uXXXX escape: line 1 column 3 (char 2)",
         ),
         (
@@ -161,10 +185,18 @@ fn execution_resource_projection_matches_captured_boundary_cases() {
         ("[1,]\n", "Expecting value: line 1 column 4 (char 3)"),
     ];
     for (input, expected_message) in syntax_cases {
-        assert_projection_error(
-            validate_projection_bytes(input),
+        let error = validate_projection_bytes(input)
+            .err()
+            .expect("captured syntax case rejects");
+        assert_eq!(
+            error.error_type(),
             "JSONDecodeError",
-            JsonString::from_text(expected_message),
+            "syntax input: {input:?}"
+        );
+        assert_eq!(
+            error.message(),
+            &JsonString::from_text(expected_message),
+            "syntax input: {input:?}"
         );
     }
 
