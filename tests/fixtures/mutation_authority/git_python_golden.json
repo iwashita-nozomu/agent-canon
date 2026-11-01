@@ -1,0 +1,1294 @@
+{
+  "source": "6ec9b0fc18116899e136509a13383da45c327f9a",
+  "python": "3.12.3",
+  "git_version": "git version 2.43.0",
+  "source_hash": "58b4eb89b1721c1dd374e98674d3117809e6430e16e50a61045c927733f83213",
+  "root_placeholder": "$ROOT",
+  "kind": "Replayable actualGit authority supplement; input recipes andJSONfiles precede productAPI call",
+  "cases": [
+    {
+      "name": "empty-index",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "379e36fcebd530f33b3ae31e80ca6a73712a8596865b389d086befa84c25d426"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "staged-owned",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ],
+        [
+          "git",
+          "add",
+          "src/owned.py"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m README.md"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "b42f1609c42f13fd3c4dfeeac4afa4b717cac6e858da2b48f9b2bb7fce02fbfc"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "staged-outside",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "README.md",
+          "outside\n"
+        ],
+        [
+          "git",
+          "add",
+          "README.md"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m src/owned.py"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "README.md"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "fd8599d6427cd78ce94dad8674c820936089613bf5e433ad4693f4b54d3b8677"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "all-owned",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit --all -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "a2a4c271889c88a1a7305c05fd8ec21f3ba2d38117149ad09c85447e967b6cb8"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "all-outside",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "README.md",
+          "outside\n"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -am allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "README.md"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "8b216a9f282ac411129282361b58b3ab63d87b7c9adc8c8e83e2c6bed6d3e457"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "explicit-owned",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m allowed -- src/owned.py"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "fbd3df82cd7e614f5569ff27b40fcd4e58452bce2901428f374cba502497e7e0"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "explicit-outside",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "README.md",
+          "outside\n"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m allowed -- README.md"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "README.md"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "376e634681c39fa4625211bd7ef10caf7b580f1da1fafeb488e6f8a6d4e0aa56"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "pathspec-file",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ],
+        [
+          "git",
+          "add",
+          "src/owned.py"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit --pathspec-from-file=paths.txt -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "writer_target_unresolved_shell_path",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "/__agent_canon_unresolved_shell_path__"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "37507d0616e1fe886cc163f360f332104e4829bbbe71741a6da44ed7429c6375"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "writer_target_unresolved_shell_path"
+      }
+    },
+    {
+      "name": "index-env",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ],
+        [
+          "git",
+          "add",
+          "src/owned.py"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942",
+        "GIT_INDEX_FILE": "other-index"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "git_commit_repository_input_redirect_forbidden",
+        "mutation": true,
+        "actor_id": "",
+        "role_id": "",
+        "parent_agent_id": "",
+        "scope_digest": "",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "",
+        "command_sha256": "379e36fcebd530f33b3ae31e80ca6a73712a8596865b389d086befa84c25d426"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "git_commit_repository_input_redirect_forbidden"
+      }
+    },
+    {
+      "name": "output-owned",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git diff --output src/owned.py"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "8499d35b8f8c0b811931cd77993673c94f893f2b5e3c7e374e9fcd08cc03e036"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "output-outside",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git diff --output README.md"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "README.md"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "7b372eaa9f466e065a9908573f89ccf83041a86ecc4e0d609c799cf92ce17c1d"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "output-stdout",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git diff --output -"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "not_applicable",
+        "reason": "read_only_command",
+        "mutation": false,
+        "actor_id": "",
+        "role_id": "",
+        "parent_agent_id": "",
+        "scope_digest": "",
+        "mutation_paths": [],
+        "evidence_ref": "",
+        "command_sha256": ""
+      },
+      "block_payload": null
+    },
+    {
+      "name": "raw-merge",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git merge main"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "raw_git_merge_or_rebase_forbidden",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "main"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "68645a42854f7894a5d453f23c15c3bc96dd7227e357a9ce982cab44ae24648e"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "raw_git_merge_or_rebase_forbidden"
+      }
+    },
+    {
+      "name": "raw-rebase",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git rebase main"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "raw_git_merge_or_rebase_forbidden",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "main"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "929507ac519bfa1cdc396dd3f8430712cf19da7c4892123c30e9ab6beae3ac36"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "raw_git_merge_or_rebase_forbidden"
+      }
+    },
+    {
+      "name": "amend-owned",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ],
+        [
+          "git",
+          "add",
+          "src/owned.py"
+        ],
+        [
+          "git",
+          "commit",
+          "-m",
+          "ownedchange"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git commit --amend -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "53e32d4d895416292a6c305811041a85f3d650d3a3df99cc904c4471f1968246"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "cwd-redirect",
+      "git_recipe": "helpers.init_writer_git_repo: branchfix/942;userTest/test@example.invalid;src/owned.py=baseLF;README.md=basereadmeLF;gitaddboth;commitbase",
+      "actions": [
+        [
+          "write",
+          "src/owned.py",
+          "changed\n"
+        ],
+        [
+          "git",
+          "add",
+          "src/owned.py"
+        ]
+      ],
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "writer-942"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/owned.py"
+          ],
+          "branch": "fix/942",
+          "checkout_identity": {
+            "branch": "fix/942",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "iwashita-nozomu/agent-canon"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "iwashita-nozomu/agent-canon",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "writer-942",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-942",
+          "receipt_sha256": "f724afa146623297e33871b89a1b79cdfa9f9caa3b7119f23f6c4bebd397669e",
+          "role_id": "implementer",
+          "run_id": "run-942",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "writer-942",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-942"
+      },
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C .. commit -m allowed"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "writer_target_git_repository_redirect_forbidden",
+        "mutation": true,
+        "actor_id": "writer-942",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-942",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "$ROOT_PARENT"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "101755d4e7921de94dfea9bcf731cad6e6b63077487f2b0f2c9e37aa4a3fedf4"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "writer_target_git_repository_redirect_forbidden"
+      }
+    }
+  ],
+  "derived_from_sha256": "7e859af8a0c85e2a77652b31259edd8d2dd7686eeb49b23abe6862b0507ec249",
+  "placeholder_mapping": {
+    "$ROOT": "current case checkout root",
+    "$ROOT_PARENT": "parent of case checkout root"
+  }
+}
