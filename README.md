@@ -54,7 +54,7 @@ command-specific requirements.
 The source checkout wrapper at tools/bin/agent-canon directly executes an
 existing native binary from the crate's target/release or target/debug
 directory. Set AGENT_CANON_NATIVE_BIN to select a binary stored elsewhere.
-The generic agent-canon tool run catalog route is still transitional and
+The generic agent-canon tool run catalog route uses the native CLI and
 continues to use its registered shared runtime.
 
 Knowledge and feedback commands use the native executable to write and inspect

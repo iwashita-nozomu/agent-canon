@@ -114,6 +114,7 @@ pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;
+pub mod tool_dispatch;
 pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
