@@ -3,7 +3,7 @@
 // responsibility Decomposes an authorized DOCX into a searchable, auditable reference bundle.
 // upstream design ../../../../../documents/tools/extract_docx.md defines the bundle and CLI contract
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md defines native ownership and caller closure
-// upstream implementation ../Cargo.toml selects the native ZIP reader/codecs, XML, Unicode, and filesystem providers
+// upstream implementation ../Cargo.toml selects ZIP offset detection, the native reader/codecs, XML, Unicode, and filesystem providers
 // upstream implementation ../python_cli_integer.rs shares Python Unicode 15 digit classification
 // downstream implementation ../tests/extract_docx_native.rs qualifies the XML parser and native DOCX projection
 // downstream implementation ../../../../../tests/tools/test_extract_docx.py checks the public CLI and transaction behavior
@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Component, Path, PathBuf};
 #[cfg(not(unix))]
 use std::time::SystemTime;
@@ -69,6 +69,83 @@ struct InputFile {
     canonical_path: PathBuf,
 }
 
+struct ArchiveCoordinateReader<R> {
+    inner: R,
+    base_offset: u64,
+    length: u64,
+    position: u64,
+}
+
+impl<R: Read + Seek> ArchiveCoordinateReader<R> {
+    fn new(mut inner: R, base_offset: u64) -> io::Result<Self> {
+        let file_length = inner.seek(SeekFrom::End(0))?;
+        let length = file_length.checked_sub(base_offset).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "ZIP archive offset exceeds the input length",
+            )
+        })?;
+        inner.seek(SeekFrom::Start(base_offset))?;
+        Ok(Self {
+            inner,
+            base_offset,
+            length,
+            position: 0,
+        })
+    }
+
+    fn physical_position(&self, logical_position: u64) -> io::Result<u64> {
+        self.base_offset
+            .checked_add(logical_position)
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "ZIP reader offset overflow")
+            })
+    }
+}
+
+impl<R: Read> Read for ArchiveCoordinateReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let remaining = self.length.saturating_sub(self.position);
+        let requested = u64::try_from(buffer.len()).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP read buffer length overflow",
+            )
+        })?;
+        let read_length = usize::try_from(remaining.min(requested))
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "ZIP read length overflow"))?;
+        let read = self.inner.read(&mut buffer[..read_length])?;
+        let read_count =
+            u64::try_from(read).map_err(|_| io::Error::other("ZIP read byte count overflow"))?;
+        self.position = self
+            .position
+            .checked_add(read_count)
+            .ok_or_else(|| io::Error::other("ZIP reader position overflow"))?;
+        Ok(read)
+    }
+}
+
+impl<R: Read + Seek> Seek for ArchiveCoordinateReader<R> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let logical_position = match position {
+            SeekFrom::Start(position) => i128::from(position),
+            SeekFrom::Current(delta) => i128::from(self.position) + i128::from(delta),
+            SeekFrom::End(delta) => i128::from(self.length) + i128::from(delta),
+        };
+        if !(0..=i128::from(u64::MAX)).contains(&logical_position) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ZIP seek is outside the representable range",
+            ));
+        }
+        let logical_position = logical_position as u64;
+        self.inner
+            .seek(SeekFrom::Start(self.physical_position(logical_position)?))?;
+        self.position = logical_position;
+        Ok(logical_position)
+    }
+}
+
 struct ArchiveMember {
     wayfinder: ZipArchiveEntryWayfinder,
     header_name: String,
@@ -82,6 +159,11 @@ struct ArchiveMember {
     central_flags: u16,
     local_header_offset: u64,
     next_header_offset: u64,
+}
+
+struct ArchiveIndex {
+    base_offset: u64,
+    members: Vec<ArchiveMember>,
 }
 
 struct RawMemberRecord {
@@ -739,9 +821,14 @@ fn build_staged_bundle(
         source_digest,
         "source copy",
     )?;
-    let members = inspect_archive(staging, &input.source_name, &input.canonical_path)?;
-    let raw_records =
-        copy_archive_members(staging, &input.source_name, &members, &input.canonical_path)?;
+    let archive = inspect_archive(staging, &input.source_name, &input.canonical_path)?;
+    let raw_records = copy_archive_members(
+        staging,
+        &input.source_name,
+        archive.base_offset,
+        &archive.members,
+        &input.canonical_path,
+    )?;
     let raw_root = staging
         .open_dir_nofollow("raw")
         .map_err(|error| format!("cannot open raw ZIP member root: {error}"))?;
@@ -770,7 +857,13 @@ fn build_staged_bundle(
         },
         "zip_members": raw_records.iter().map(RawMemberRecord::as_value).collect::<Vec<_>>(),
     });
-    verify_bundle_hashes(staging, input, source_digest, &members, &raw_records)?;
+    verify_bundle_hashes(
+        staging,
+        input,
+        source_digest,
+        &archive.members,
+        &raw_records,
+    )?;
     write_manifest(staging, &manifest)?;
     Ok(manifest)
 }
@@ -925,7 +1018,7 @@ fn inspect_archive(
     staging: &Dir,
     source_name: &str,
     source_path: &Path,
-) -> Result<Vec<ArchiveMember>, String> {
+) -> Result<ArchiveIndex, String> {
     let source_dir = staging
         .open_dir_nofollow("source")
         .map_err(|error| format!("cannot open copied source directory: {error}"))?;
@@ -935,6 +1028,7 @@ fn inspect_archive(
             source_path.display()
         )
     })?;
+    let (base_offset, source) = zip_archive_coordinate_view(source, source_path)?;
     let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
     let archive = RawZipArchive::from_seekable(source, &mut buffer)
         .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
@@ -1044,7 +1138,10 @@ fn inspect_archive(
     if document_member.is_directory {
         return Err(format!("DOCX member is not a file: {DOCUMENT_XML_MEMBER}"));
     }
-    Ok(members)
+    Ok(ArchiveIndex {
+        base_offset,
+        members,
+    })
 }
 
 fn decode_zip_name(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
@@ -1128,6 +1225,7 @@ fn portable_part_identity(part: &str) -> String {
 fn copy_archive_members(
     staging: &Dir,
     source_name: &str,
+    base_offset: u64,
     members: &[ArchiveMember],
     source_path: &Path,
 ) -> Result<Vec<RawMemberRecord>, String> {
@@ -1146,6 +1244,8 @@ fn copy_archive_members(
             source_path.display()
         )
     })?;
+    let source = ArchiveCoordinateReader::new(source, base_offset)
+        .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
     let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
     let archive = RawZipArchive::from_seekable(source, &mut buffer)
         .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
@@ -1311,6 +1411,20 @@ fn open_read_file(parent: &Dir, name: &OsStr) -> io::Result<cap_std::fs::File> {
     let mut options = OpenOptions::new();
     options.read(true).follow(FollowSymlinks::No);
     parent.open_with(name, &options)
+}
+
+// zip 9 detects prepended data; rawzip must read with the ZIP start at logical offset zero.
+fn zip_archive_coordinate_view(
+    source: cap_std::fs::File,
+    source_path: &Path,
+) -> Result<(u64, ArchiveCoordinateReader<cap_std::fs::File>), String> {
+    let archive = zip::ZipArchive::new(source)
+        .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
+    let base_offset = archive.offset();
+    let source = archive.into_inner();
+    let source = ArchiveCoordinateReader::new(source, base_offset)
+        .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
+    Ok((base_offset, source))
 }
 
 fn read_file(root: &Dir, relative: &Path) -> io::Result<Vec<u8>> {

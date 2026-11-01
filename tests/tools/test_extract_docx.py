@@ -5,6 +5,7 @@
 # upstream implementation ../../tools/bin/agent-canon exposes the stable native command
 # downstream design ../../documents/tools/extract_docx.md documents the bundle contract
 # upstream reference ../../tests/fixtures/docx_zip/python_golden.json freezes old ZIP codec, duplicate-name, output, and cleanup outcomes
+# upstream reference ../../tests/fixtures/docx_zip/python_sfx_golden.json freezes old ZIP64/SFX acceptance and bundle outcomes
 # @dependency-end
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 ZIP_GOLDEN = PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_golden.json"
+SFX_ZIP_GOLDEN = PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_sfx_golden.json"
 
 
 def safe_document_xml() -> str:
@@ -193,6 +195,72 @@ class ExtractDocxTest(unittest.TestCase):
                     if path.is_file()
                 }
                 self.assertEqual(actual_raw_paths, set(case["raw_files"]))
+
+    def test_zip64_and_self_extracting_archives_match_frozen_python_oracle(self) -> None:
+        """ZIP64, SFX, and SFX+ZIP64 retain old acceptance and bundle bytes."""
+        oracle = json.loads(SFX_ZIP_GOLDEN.read_text(encoding="utf-8"))
+        self.assertEqual(
+            [case["name"] for case in oracle["cases"]],
+            ["zip64", "sfx", "sfx-zip64"],
+        )
+        for case in oracle["cases"]:
+            with (
+                self.subTest(case=case["name"]),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
+                root = Path(tmp_dir)
+                source = root / "reference.docx"
+                bundle = root / "bundle"
+                archive = base64.b64decode(case["archive_base64"])
+                expected_manifest = case["manifest"]
+                self.assertEqual(
+                    len(archive),
+                    expected_manifest["source"]["size_bytes"],
+                )
+                self.assertEqual(
+                    hashlib.sha256(archive).hexdigest(),
+                    expected_manifest["source"]["sha256"],
+                )
+                source.write_bytes(archive)
+
+                result = self.run_cli(str(source), "--output-dir", str(bundle))
+
+                self.assertEqual(result.returncode, case["exit"], result.stderr)
+                self.assertEqual(
+                    result.stdout,
+                    case["stdout"].replace("{output}", str(bundle)),
+                )
+                self.assertEqual(result.stderr, case["stderr"])
+                self.assertEqual(bundle.exists(), case["output_exists"])
+                self.assert_no_staging_paths(bundle)
+                manifest = json.loads(
+                    (bundle / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(manifest, expected_manifest)
+                self.assertEqual(
+                    (bundle / "extracted.md").read_text(encoding="utf-8"),
+                    case["markdown"],
+                )
+                self.assertEqual(
+                    (bundle / "source" / "reference.docx").read_bytes(),
+                    archive,
+                )
+                raw_members = [
+                    member for member in manifest["zip_members"] if not member["directory"]
+                ]
+                actual_raw_paths = {
+                    path.relative_to(bundle / "raw").as_posix()
+                    for path in (bundle / "raw").rglob("*")
+                    if path.is_file()
+                }
+                self.assertEqual(
+                    actual_raw_paths,
+                    {member["name"] for member in raw_members},
+                )
+                for member in raw_members:
+                    raw_file = bundle / "raw" / member["name"]
+                    self.assertEqual(raw_file.stat().st_size, member["size_bytes"])
+                    self.assertEqual(sha256(raw_file), member["sha256"])
 
     def test_writes_searchable_text_raw_members_and_verified_manifest(self) -> None:
         """A DOCX becomes a complete bundle whose retained hashes read back."""
