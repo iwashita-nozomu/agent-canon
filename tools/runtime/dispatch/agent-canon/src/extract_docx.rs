@@ -747,12 +747,14 @@ fn create_staging_directory(reservation: &OutputReservation) -> Result<StagingDi
             reservation.name.to_string_lossy(),
             encode_hex(&random)
         );
-        let mut builder = DirBuilder::new();
+        let builder = DirBuilder::new();
         #[cfg(unix)]
-        {
+        let builder = {
             use cap_std::fs::DirBuilderExt;
+            let mut builder = builder;
             builder.mode(0o700);
-        }
+            builder
+        };
         match reservation.parent.create_dir_with(&stage_name, &builder) {
             Ok(()) => {
                 let directory = match reservation.parent.open_dir_nofollow(&stage_name) {
