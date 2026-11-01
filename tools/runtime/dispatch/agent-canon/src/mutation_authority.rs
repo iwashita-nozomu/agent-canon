@@ -439,7 +439,7 @@ pub fn evaluate_mutation_authority(
     if let Some(explicit_paths) = context.environment.get(WRITER_ALLOWED_PATHS_ENV) {
         if !python_strip(explicit_paths).is_empty() {
             match crate::python_json::parse_json(explicit_paths) {
-                Ok(JsonValue::Array(JsonArray(values))) => {
+                Ok(JsonValue::Array(JsonArray(ref values))) => {
                     let parsed = values
                         .iter()
                         .map(json_value_text)
