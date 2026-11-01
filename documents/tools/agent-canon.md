@@ -50,6 +50,7 @@ tools/bin/agent-canon docs find-redundant-designs [--design-root <path>] [--dele
 tools/bin/agent-canon docs check-entrypoints [--root <repo-root>] [--format text|json]
 tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consumer]
 tools/bin/agent-canon test-design check <test-paths...>
+tools/bin/agent-canon waterfall-gate-check (--run-id <run-id> | --report-dir <path>) --gate <gate> [--report-root <path>]
 tools/bin/agent-canon task-close (--run-id <run-id> | --report-dir <path>) [--report-root <path>] [--runtime-root <path>]
 agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json

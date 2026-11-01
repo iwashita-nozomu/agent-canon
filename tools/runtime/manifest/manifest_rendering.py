@@ -1235,8 +1235,8 @@ def manifest_pre_handoff_gate_status_lines(
 ) -> list[str]:
     """Render the pre-handoff gate status contract."""
     design_argv = (
-        "python3",
-        "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
+        "tools/bin/agent-canon",
+        "waterfall-gate-check",
         "--report-dir",
         "<report-dir>",
         "--gate",
