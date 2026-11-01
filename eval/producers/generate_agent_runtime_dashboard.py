@@ -3457,7 +3457,7 @@ def token_usage_next_action(
             reason="no token footprint comparison or moving-average evidence found",
             evidence=TOKEN_USAGE_EVIDENCE_TARGET,
             owner_surface="workflow_monitoring.md and token logging hooks",
-            command="python3 eval/checkers/compare_codex_token_footprints.py --session-glob '<sessions>' --report-dir <run>",
+            command="tools/bin/agent-canon compare-codex-token-footprints --session-glob '<sessions>' --report-dir <run>",
             done_condition="AGENT_RUNTIME_DASHBOARD_TOKEN_COMPARISONS>0 or AGENT_RUNTIME_DASHBOARD_TOKEN_SUMMARIES>0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="human-review-then-agent-fix",

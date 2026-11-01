@@ -1,10 +1,11 @@
-//! Append one behavior-event line to the existing workflow monitor document.
+//! Project behavior events and monitoring entries into the existing workflow monitor document.
 // @dependency-start
 // contract implementation
-// responsibility Projects an already assembled behavior event into the existing run-local monitor document.
+// responsibility Projects assembled behavior events and monitoring entries into the existing run-local monitor document.
 // upstream implementation runtime_boundary.rs owns explicit external runtime path resolution and file boundaries
 // upstream implementation work_log.rs owns the host-local timestamp format used by workflow monitoring
 // upstream implementation behavior_event_assembly.rs owns the behavior-event payload
+// downstream implementation token_footprints.rs appends token comparison and summary evidence
 // downstream implementation ../tests/hook_report_projection_native.rs compares complete document bytes with the old API oracle
 // @dependency-end
 
@@ -99,7 +100,13 @@ fn emit_behavior_projection_with_timestamp(
         match RuntimeArtifactBoundary::for_source(source_root, Some(runtime_root), false) {
             Ok(boundary) => match boundary.resolve(&target) {
                 Ok(resolved) => match ensure_runtime_parent(&boundary, &resolved) {
-                    Ok(()) => update_monitoring_file(&resolved, report_dir, &entry, timestamp),
+                    Ok(()) => update_monitoring_file(
+                        &resolved,
+                        report_dir,
+                        std::slice::from_ref(&entry),
+                        &[],
+                        timestamp,
+                    ),
                     Err(error) => Err(error),
                 },
                 Err(error) => Err(error),
@@ -109,7 +116,13 @@ fn emit_behavior_projection_with_timestamp(
     } else {
         match resolve_external_artifact_path(source_root, &target) {
             Ok(resolved) => match create_external_parent(&resolved) {
-                Ok(()) => update_monitoring_file(&resolved, report_dir, &entry, timestamp),
+                Ok(()) => update_monitoring_file(
+                    &resolved,
+                    report_dir,
+                    std::slice::from_ref(&entry),
+                    &[],
+                    timestamp,
+                ),
                 Err(error) => Err(error),
             },
             Err(error) => Err(error),
@@ -123,6 +136,86 @@ fn emit_behavior_projection_with_timestamp(
             error: String::new(),
         },
         Err(error) => failed_projection(fallback_path, error),
+    }
+}
+
+/// Append already assembled behavior and intervention entries through the shared locked monitor owner.
+pub fn append_monitoring_projection(
+    report_dir: &Path,
+    source_root: &Path,
+    runtime_root: Option<&Path>,
+    behavior_events: &[String],
+    interventions: &[String],
+) -> Result<PathBuf, String> {
+    let timestamp = python_timestamp_jst()?;
+    let inherited_runtime_root = runtime_root
+        .map(Path::to_path_buf)
+        .or_else(process_runtime_root);
+    append_monitoring_projection_with_timestamp(
+        report_dir,
+        source_root,
+        inherited_runtime_root.as_deref(),
+        behavior_events,
+        interventions,
+        Some(&timestamp),
+    )
+}
+
+/// Append monitoring entries with a supplied timestamp for deterministic callers.
+pub fn append_monitoring_projection_at(
+    report_dir: &Path,
+    source_root: &Path,
+    runtime_root: Option<&Path>,
+    behavior_events: &[String],
+    interventions: &[String],
+    timestamp: &str,
+) -> Result<PathBuf, String> {
+    append_monitoring_projection_with_timestamp(
+        report_dir,
+        source_root,
+        runtime_root,
+        behavior_events,
+        interventions,
+        Some(timestamp),
+    )
+}
+
+fn append_monitoring_projection_with_timestamp(
+    report_dir: &Path,
+    source_root: &Path,
+    runtime_root: Option<&Path>,
+    behavior_events: &[String],
+    interventions: &[String],
+    timestamp: Option<&str>,
+) -> Result<PathBuf, String> {
+    let target = report_dir.join(MONITORING_FILE);
+    if !target.is_absolute() {
+        return Err(
+            "explicit external runtime root required for relative artifact path".to_owned(),
+        );
+    }
+
+    if let Some(runtime_root) = runtime_root {
+        let boundary = RuntimeArtifactBoundary::for_source(source_root, Some(runtime_root), false)?;
+        let resolved = boundary.resolve(&target)?;
+        ensure_runtime_parent(&boundary, &resolved)?;
+        update_monitoring_file(
+            &resolved,
+            report_dir,
+            behavior_events,
+            interventions,
+            timestamp,
+        )
+    } else {
+        let resolved = resolve_external_artifact_path(source_root, &target)?;
+        create_external_parent(&resolved)?;
+        update_monitoring_file(
+            &resolved,
+            report_dir,
+            behavior_events,
+            interventions,
+            timestamp,
+        )
     }
 }
 
@@ -163,7 +256,8 @@ fn create_external_parent(target: &Path) -> Result<(), String> {
 fn update_monitoring_file(
     path: &Path,
     report_dir: &Path,
-    entry: &str,
+    behavior_events: &[String],
+    interventions: &[String],
     timestamp: Option<&str>,
 ) -> Result<PathBuf, String> {
     // The locked update rewrites the document and needs Windows truncation access.
@@ -190,8 +284,15 @@ fn update_monitoring_file(
         Some(value) if !python_strip(value).is_empty() => python_strip(value).to_owned(),
         _ => python_timestamp_jst()?,
     };
-    let behavior_entry = normalize_entry(entry, &timestamp)?;
-    insert_entries(&mut lines, BEHAVIOR_HEADING, &[behavior_entry]);
+    let behavior_entries = behavior_events
+        .iter()
+        .map(|entry| normalize_entry(entry, &timestamp))
+        .collect::<Result<Vec<_>, _>>()?;
+    let intervention_entries = interventions
+        .iter()
+        .map(|entry| normalize_entry(entry, &timestamp))
+        .collect::<Result<Vec<_>, _>>()?;
+    insert_entries(&mut lines, BEHAVIOR_HEADING, &behavior_entries);
     let warning_status = infer_tool_warning_status(&lines);
     set_section_status(
         &mut lines,
@@ -199,6 +300,7 @@ fn update_monitoring_file(
         TOOL_WARNING_STATUS_KEY,
         &warning_status,
     );
+    insert_entries(&mut lines, "## Interventions", &intervention_entries);
 
     let document = format!("{}\n", python_strip_end(&lines.join("\n")));
     file.set_len(0).map_err(|error| {

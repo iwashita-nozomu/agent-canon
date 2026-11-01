@@ -2461,12 +2461,12 @@ entries:
 
   - id: compare-codex-token-footprints
     summary: Compares Codex session token footprints for efficiency review.
-    path: eval/checkers/compare_codex_token_footprints.py
+    path: tools/runtime/dispatch/agent-canon/src/token_footprints.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/compare_codex_token_footprints.py
-    dispatch: {argv: ["python3", "eval/checkers/compare_codex_token_footprints.py"]}
+    command: tools/bin/agent-canon compare-codex-token-footprints
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "compare-codex-token-footprints"]}
     writes: true
     default_wiring:
       ci: false
