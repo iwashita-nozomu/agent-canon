@@ -105,14 +105,10 @@ fn create_main706_workspace(destination: &Path) -> PathBuf {
         .ancestors()
         .nth(4)
         .expect("Cargo manifest lives below the AgentCanon root");
-    let control = git(repository, &["rev-parse", "--absolute-git-dir"]);
-    assert!(
-        control.status.success(),
-        "read fixture source Git directory: {}",
-        String::from_utf8_lossy(&control.stderr)
-    );
-    let control = String::from_utf8(control.stdout).expect("fixture Git directory is UTF-8");
-    let quoted_control = format!("'{}'", control.trim().replace('\'', "'\"'\"'"));
+    // upload-pack checks this Git path before resolving a linked-worktree gitfile.
+    let control = repository.join(".git");
+    let control = control.to_str().expect("fixture Git path is UTF-8");
+    let quoted_control = format!("'{}'", control.replace('\'', "'\"'\"'"));
     let upload_pack = format!("git -c safe.directory={quoted_control} upload-pack");
     let initialize = Command::new("git")
         .args(["init", "--quiet", "--initial-branch=main"])
