@@ -56,7 +56,6 @@ pub const HOOK_CONTRACT_SCHEMA: &str = "agent-canon.hook-contract.v1";
 pub const POST_TOOL_USE_INPUT_SCHEMA: &str = "agent-canon-post-tool-use-input/v1";
 pub const MAX_HOOK_PAYLOAD_BYTES: usize = 256 * 1024;
 
-const SOURCE_ROOT_FALLBACK: &str = env!("CARGO_MANIFEST_DIR");
 const DISPATCHER_SOURCE_ROOT_ENV: &str = "AGENT_CANON_HOOK_SOURCE_ROOT";
 const WORKFLOW_MONITOR_REPORT_DIR_ENV: &str = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR";
 const ACTIVE_RUN_POINTER: &str = "reports/agents/.active_run";

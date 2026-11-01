@@ -8,8 +8,9 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 static NEXT_TEMP: AtomicUsize = AtomicUsize::new(0);
@@ -291,9 +292,9 @@ fn native_hook_cli_matches_frozen_cpython_cases() {
         let arguments = case_arguments(case);
         let results_dir = temp.path().join("results").join(&name);
         fs::create_dir_all(&results_dir).expect("create isolated hook result directory");
-        let environment = environment(temp.path(), &results_dir);
+        let values = environment(temp.path(), &results_dir);
 
-        let result = run_with_input(&arguments, &input, &environment, temp.path());
+        let result = run_with_input(&arguments, &input, &values, temp.path());
         assert_case_result(result, case, &name);
 
         let events = event_values(&results_dir);
@@ -310,6 +311,51 @@ fn native_hook_cli_matches_frozen_cpython_cases() {
         );
         for (actual, expected) in events.iter().zip(&expected_fields.0) {
             assert_spool_fields(actual, expected, &name);
+        }
+
+        let cli_results_dir = temp.path().join("cli-results").join(&name);
+        fs::create_dir_all(&cli_results_dir).expect("create isolated CLI result directory");
+        let cli_environment = environment(temp.path(), &cli_results_dir);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
+        command
+            .arg("codex-hook")
+            .args(&arguments)
+            .current_dir(temp.path())
+            .env_clear()
+            .envs(&cli_environment)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        if let Some(path) = std::env::var_os("PATH") {
+            command.env("PATH", path);
+        }
+        let mut child = command.spawn().expect("start native hook CLI");
+        child
+            .stdin
+            .take()
+            .expect("native hook CLI stdin")
+            .write_all(&input)
+            .expect("supply captured hook input");
+        let output = child
+            .wait_with_output()
+            .expect("read native hook CLI output");
+        assert_case_result(
+            HookCliResult {
+                exit_code: output.status.code().expect("native hook CLI exit code"),
+                stdout: output.stdout,
+                stderr: output.stderr,
+            },
+            case,
+            &format!("CLI {name}"),
+        );
+        let cli_events = event_values(&cli_results_dir);
+        assert_eq!(
+            cli_events.len(),
+            expected_fields.0.len(),
+            "CLI spool event count for {name}"
+        );
+        for (actual, expected) in cli_events.iter().zip(&expected_fields.0) {
+            assert_spool_fields(actual, expected, &format!("CLI {name}"));
         }
     }
 }
