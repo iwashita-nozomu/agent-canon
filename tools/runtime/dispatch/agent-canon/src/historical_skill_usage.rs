@@ -35,7 +35,8 @@ enum CliOption {
     Path,
 }
 
-const CLI_OPTIONS: &[(&str, CliOption)] = &[("--help", CliOption::Help), ("--path", CliOption::Path)];
+const CLI_OPTIONS: &[(&str, CliOption)] =
+    &[("--help", CliOption::Help), ("--path", CliOption::Path)];
 
 fn empty_readback(status: &'static str) -> HistoricalSkillUsageReadback {
     HistoricalSkillUsageReadback {
@@ -170,12 +171,11 @@ fn parse_arguments(args: &[String]) -> Result<Option<PathBuf>, String> {
         if !option_text.starts_with("--") {
             return Err(format!("unrecognized argument: {token}"));
         }
-        let option = resolve_long_option_prefix(option_text, CLI_OPTIONS).map_err(|error| {
-            match error {
+        let option =
+            resolve_long_option_prefix(option_text, CLI_OPTIONS).map_err(|error| match error {
                 LongOptionError::Unrecognized => format!("unrecognized argument: {token}"),
                 LongOptionError::Ambiguous(_) => format!("ambiguous option: {option_text}"),
-            }
-        })?;
+            })?;
         if matches!(option, CliOption::Help) {
             if inline_value.is_some() {
                 return Err(format!("ignored explicit argument for --help: {token}"));
@@ -228,4 +228,3 @@ pub fn run(args: &[String]) -> i32 {
     println!("{output}");
     0
 }
-
