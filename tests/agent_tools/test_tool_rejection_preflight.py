@@ -23,7 +23,9 @@ SELECTOR = "tool-rejection-preflight"
 LEGACY_COMMAND = "python3 tools/validation/semantic/tools/tool_rejection_preflight.py"
 NATIVE_COMMAND = "tools/bin/agent-canon tool-rejection-preflight"
 LEGACY_WORKFLOW_SOURCE = "tools/validation/ci/checks/check_github_workflows.py"
-NATIVE_WORKFLOW_SOURCE = "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"
+NATIVE_WORKFLOW_SOURCE = (
+    "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"
+)
 ORACLE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "tool_rejection_preflight"
 COMBINED_PATHS = (
     "tools/agent_tools/new_shared_checker_oracle.py",
