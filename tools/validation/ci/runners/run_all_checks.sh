@@ -18,7 +18,7 @@
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
 # upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
 # upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
-# upstream implementation ../checks/check_github_workflows.py validates GitHub workflow and PR checklist contracts
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
 # upstream implementation ../../../../eval/checkers/smoke_test_research_perspective_pack.py validates research role packet
@@ -455,7 +455,7 @@ fi
 echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_github_workflows.py" 2>&1; then
+elif run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}" 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"

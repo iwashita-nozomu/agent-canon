@@ -48,7 +48,7 @@ path: tools/validation/semantic/skills/check_skill_frontmatter.py
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
 path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
-path: tools/validation/ci/checks/check_github_workflows.py
+path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
 """,
     "documents/runtime/bootstrap-runtime.md": "bootstrap runtime owner\n",
     "bootstrap/container/image/Dockerfile": "FROM scratch\n# bootstrap_runtime\n",
@@ -248,7 +248,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "`python3 tools/validation/semantic/convention/check_convention_compliance.py`.\n"
     ),
     "agents/skills/agent-canon-update.md": (
-        "check_github_workflows.py\n"
+        "github_workflow_check.rs\n"
         "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
@@ -273,12 +273,12 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "check_convention_compliance.py "
         "check_skill_frontmatter.py "
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "check_github_workflows.py bootstrap_runtime.py run_agent_canon docs check "
+        "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
     ),
     "tools/validation/ci/checks/check_agent_canon_pr.sh": (
         'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/convention/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
-        "python3 tools/validation/ci/checks/check_github_workflows.py\n"
+        "tools/bin/agent-canon check-github-workflows\n"
     ),
     "tools/runtime/dispatch/agent-canon/src/docs.rs": "runtime profile inventory\n",
     "documents/tools/agent-canon.md": "docs\n",
@@ -984,14 +984,15 @@ class CheckConventionComplianceTest(unittest.TestCase):
         github_checker = (
             root
             / "tools"
-            / "validation"
-            / "ci"
-            / "checks"
-            / "check_github_workflows.py"
+            / "runtime"
+            / "dispatch"
+            / "agent-canon"
+            / "src"
+            / "github_workflow_check.rs"
         )
         github_checker.parent.mkdir(parents=True, exist_ok=True)
         github_checker.write_text(
-            "#!/usr/bin/env python3\ncheck_skill_frontmatter.py\n",
+            "// native GitHub workflow checker\n",
             encoding="utf-8",
         )
 
