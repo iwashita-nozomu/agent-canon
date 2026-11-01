@@ -69,10 +69,13 @@ fn writer_target_values_match_frozen_python_oracle() {
         let operation = string_field(case, "operation")
             .to_text()
             .expect("case operation is text");
-        let input = replace_root(
+        let mut input = replace_root(
             object_field(case, "input").expect("value case has input"),
             &root.0,
         );
+        if cfg!(windows) && name == "allowed_paths/6" {
+            replace_absolute_allowed_path(&mut input);
+        }
         let result = match operation.as_str() {
             "parse" => parse_writer_target(&input),
             "identity" => {
@@ -198,11 +201,19 @@ fn assert_value_case(
         );
     } else {
         let error = result.expect_err("old API rejects this value");
-        assert_eq!(
-            error.code(),
+        let expected_error = if cfg!(windows) && name == "allowed_paths/6" {
+            format!(
+                "writer_target:allowed_path_not_relative:{}",
+                windows_absolute_allowed_path().to_string_lossy()
+            )
+        } else {
             string_field(case, "error")
                 .to_text()
-                .expect("error code is text"),
+                .expect("error code is text")
+        };
+        assert_eq!(
+            error.code(),
+            expected_error,
             "{name}: stable writer-target rejection"
         );
     }
@@ -226,12 +237,14 @@ fn materialize_packet_case(case: &JsonValue, checkout_root: &Path, fixture_root:
         return;
     }
 
-    let packet_path = checkout_root.join(".agent-canon/writer-target.json");
+    let packet_path = checkout_root
+        .join(".agent-canon")
+        .join("writer-target.json");
     fs::create_dir_all(packet_path.parent().expect("packet file has parent"))
         .expect("packet directory is created");
     match kind.as_str() {
         "symlink-file" => {
-            let outside = fixture_root.join("real/writer-target-outside.json");
+            let outside = fixture_root.join("real").join("writer-target-outside.json");
             fs::write(&outside, b"external packet data\n").expect("outside packet is seeded");
             create_file_link(&outside, &packet_path).expect("packet file symlink is created");
         }
@@ -287,9 +300,7 @@ fn replace_root(value: &JsonValue, root: &Path) -> JsonValue {
             let Some(text) = value.to_text() else {
                 return JsonValue::String(value.clone());
             };
-            JsonValue::String(JsonString::from_text(
-                &text.replace("$ROOT", &root.to_string_lossy()),
-            ))
+            JsonValue::String(JsonString::from_text(&replace_root_text(&text, root)))
         }
         JsonValue::Array(JsonArray(values)) => JsonValue::Array(JsonArray(
             values
@@ -304,6 +315,49 @@ fn replace_root(value: &JsonValue, root: &Path) -> JsonValue {
                 .collect(),
         )),
     }
+}
+
+fn replace_root_text(value: &str, root: &Path) -> String {
+    let Some(suffix) = value.strip_prefix("$ROOT") else {
+        return value.to_owned();
+    };
+    let mut relative = suffix;
+    while relative.starts_with('/') || relative.starts_with('\\') {
+        relative = &relative[1..];
+    }
+    let mut path = root.to_path_buf();
+    for component in relative.split('/') {
+        if !component.is_empty() {
+            path.push(component);
+        }
+    }
+    path.to_string_lossy().into_owned()
+}
+
+fn windows_absolute_allowed_path() -> PathBuf {
+    std::env::temp_dir().join("agent-canon-writer-target-absolute-allowed-path")
+}
+
+fn replace_absolute_allowed_path(input: &mut JsonValue) {
+    let JsonValue::Object(object) = input else {
+        panic!("absolute-path fixture input is an object");
+    };
+    let allowed_paths = object
+        .0
+        .iter_mut()
+        .find(|(key, _)| key.equals_text("allowed_paths"))
+        .map(|(_, value)| value)
+        .expect("absolute-path fixture has allowed_paths");
+    let JsonValue::Array(array) = allowed_paths else {
+        panic!("absolute-path fixture has an allowed_paths array");
+    };
+    let paths = &mut array.0;
+    assert_eq!(paths.len(), 1);
+    // The frozen POSIX `/absolute` premise is not a Windows absolute path.
+    // Give this one case a native absolute path and keep its path-bearing error.
+    paths[0] = JsonValue::String(JsonString::from_text(
+        &windows_absolute_allowed_path().to_string_lossy(),
+    ));
 }
 
 fn environment_json(environment: std::collections::BTreeMap<String, JsonString>) -> JsonValue {
