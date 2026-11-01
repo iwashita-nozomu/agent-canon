@@ -2,7 +2,7 @@
 
 use agent_canon::hook_dispatcher::{run_with_input, HookCliResult};
 use agent_canon::python_json::{
-    canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonString, JsonValue,
+    canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonValue,
 };
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
@@ -227,7 +227,7 @@ fn assert_spool_fields(actual: &JsonValue, expected: &JsonValue, name: &str) {
                     .find(|(actual_key, _)| actual_key == expected_key)
                     .map(|(_, value)| value.clone())
                     .unwrap_or_else(|| panic!("{name}: missing spool field {expected_name}"));
-                (expected_key.clone(), value)
+                (expected_key.clone(), value.clone())
             })
             .collect(),
     );
