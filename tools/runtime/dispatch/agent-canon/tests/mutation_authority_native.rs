@@ -6,6 +6,7 @@
 // upstream implementation ../src/python_json.rs owns the shared JSON representation and canonical receipt bytes
 // upstream evidence ../../../../../tests/fixtures/mutation_authority/python_golden.json freezes 31 old basic API cases
 // upstream evidence ../../../../../tests/fixtures/mutation_authority/git_python_golden.json freezes 16 old real-Git cases
+// upstream evidence ../../../../../tests/fixtures/mutation_authority/parser/python_golden.json freezes 15 old parser boundary cases
 // @dependency-end
 
 use agent_canon::mutation_authority::{
@@ -25,8 +26,11 @@ const BASIC_GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/mutation_authority/python_golden.json");
 const GIT_GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/mutation_authority/git_python_golden.json");
+const PARSER_GOLDEN: &str =
+    include_str!("../../../../../tests/fixtures/mutation_authority/parser/python_golden.json");
 const BASIC_SHA256: &str = "7861606800e965d30c385eda6d295de6df68f3bec0debee98ee3d8a206c447c7";
 const GIT_SHA256: &str = "f6c2833a38629e37978605fc33b1e2dcd70502185a5c177d325f5ee3f107f8c6";
+const PARSER_SHA256: &str = "8c9310487272ebb884d9f2899cc0e42c1dadea21ad44019d829d3f2e9d73173c";
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -78,6 +82,19 @@ fn mutation_authority_matches_frozen_real_git_cpython_cases() {
     assert_eq!(cases.len(), 16);
     for case in cases {
         verify_case(case, true);
+    }
+}
+
+#[test]
+fn mutation_authority_matches_frozen_parser_boundary_cases() {
+    assert_eq!(sha256(PARSER_GOLDEN.as_bytes()), PARSER_SHA256);
+    let corpus: Value = serde_json::from_str(PARSER_GOLDEN).expect("parser corpus parses");
+    let cases = corpus["cases"]
+        .as_array()
+        .expect("parser cases are an array");
+    assert_eq!(cases.len(), 15);
+    for case in cases {
+        verify_case(case, false);
     }
 }
 

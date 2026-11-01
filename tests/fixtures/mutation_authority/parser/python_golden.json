@@ -1,0 +1,1110 @@
+{
+  "source": "6ec9b0fc18116899e136509a13383da45c327f9a",
+  "python": "3.12.3",
+  "source_hash": "58b4eb89b1721c1dd374e98674d3117809e6430e16e50a61045c927733f83213",
+  "root_placeholder": "$ROOT",
+  "kind": "Actual oldAPI parser supplement for reviewer concrete shell separator/patch grammar findings",
+  "cases": [
+    {
+      "name": "shell-separator-0",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\u00a0src/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "\u00a0",
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "9dff1ad5a304457e23826ea09165bcb59a7ab90aa33b9b970b35fa653526e6a5"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "shell-separator-1",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\u0085src/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "\u0085",
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "2827a753e1a1ba11a4e87b97c3719d4a6ab24924c3d04014970ed72e924ca9c2"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "shell-separator-2",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\u001csrc/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "\u001c",
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "0edbd96549db07c5260185754e4b37c62d513cd571a8029b0ac39928e3a1f54e"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "shell-separator-3",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\u2028src/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "\u2028",
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "92bbd8a22a5392f349baf3da5b59a679e9833dbf01322e9fbc8520ef905bd99e"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "shell-separator-4",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\u3000src/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "\u3000",
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "4b1067bcc75afb2edf6540963b0cad59985a6ea798d261016aeb5ea8f5960a1e"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "shell-separator-5",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch src/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "7ddcb91763e08d761b0c5147889368e23be259e152c0a05ae68b7a6301bb3ed6"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "shell-separator-6",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\tsrc/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "6c5285140fcea174367d9d951f6ab2a3600ce4c0c0104f038cd7158646429032"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "shell-separator-7",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\rsrc/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "1f339659e493d6c4485794fe0cdfbec124f0c7499d9ad5c578e5c87272c91753"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "shell-separator-8",
+      "payload": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch\nsrc/owned.py"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "746dbbae376fabbee613a59dc23f6bff88d93203f94b6fc4dd02ce2df3af363b"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "patch-marker-0",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n***Update File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "5aab8bb494e883c36f32c4fcdc32bec3be049d1801baf03008a94c60f88bbea9"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    },
+    {
+      "name": "patch-marker-1",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "a98b1286ec690be4aadcd9f12a8089693e8e28cc170ca2c3b5e0fe7bff8edfc7"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "patch-marker-2",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n***\tUpdate File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "8d08935f29b6c836ee91a0f98834b7a7e9a99d2a89d75f2ca3a03378065d2c5a"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "patch-marker-3",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n***\u00a0Update File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "04d8656820717d507644aa5a71da7bfd1bba2c7f155da64a7af76d8110527013"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "patch-marker-4",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n*** Add File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "allowed",
+        "reason": "child_scope_verified",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [
+          "src/owned.py"
+        ],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "fb9f25abe8a0f2361800d6620e673dd799c0367818c9746a21f57e97f5fa3238"
+      },
+      "block_payload": null
+    },
+    {
+      "name": "patch-marker-5",
+      "payload": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "patch": "*** Begin Patch\n***Delete File: src/owned.py\n*** End Patch\n"
+        }
+      },
+      "report_dir": "$ROOT",
+      "hook_spool_root": "$ROOT",
+      "environment": {
+        "AGENT_CANON_RUNTIME_AGENT_ID": "child-1",
+        "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
+        "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-1"
+      },
+      "json_files": {
+        "spawn.json": {
+          "mutation_scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "subagent_agent_type": "worker",
+          "subagent_event_kind": "spawn",
+          "subagent_target": "child-1"
+        },
+        ".agent-canon/writer-target.json": {
+          "allowed_paths": [
+            "src/"
+          ],
+          "branch": "test",
+          "checkout_identity": {
+            "branch": "test",
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "remote": "local/repo"
+          },
+          "checkout_root": "$ROOT",
+          "remote": "local/repo",
+          "schema": "agent-canon.writer-target-packet.v1"
+        },
+        "runtime/agent_identity.json": {
+          "agent_id": "child-1",
+          "allowed_directories": [],
+          "allowed_files": [
+            "src/owned.py"
+          ],
+          "authority": "write_capable_child",
+          "parent_agent_id": "parent-1",
+          "receipt_sha256": "cb3845554a3b4273114fdd3c32f1df34c2239f6a07dd9e7852a6c31a312c6c55",
+          "role_id": "implementer",
+          "run_id": "run-1",
+          "schema": "agent-canon.runtime-agent-identity.v1",
+          "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+          "status": "active"
+        }
+      },
+      "decision": {
+        "schema": "agent-canon.mutation-authority.v1",
+        "status": "blocked",
+        "reason": "mutation_scope_outside_child_receipt",
+        "mutation": true,
+        "actor_id": "child-1",
+        "role_id": "implementer",
+        "parent_agent_id": "parent-1",
+        "scope_digest": "476ae9a2b48807e5c25396d2b96d0e1cc14b3ffa3f79cd67fdeb6eb145564d5f",
+        "mutation_paths": [],
+        "evidence_ref": "$ROOT/runtime/agent_identity.json",
+        "command_sha256": "bb3f005d96b85dc8d8d695ff1fc8e70bbdaa6de09ecc6cb14dc911dd3760813b"
+      },
+      "block_payload": {
+        "decision": "block",
+        "reason": "Repository mutation is restricted to an authenticated write-capable child scope.",
+        "next_action": "launch_or_resume_write_capable_child_with_runtime_identity_receipt",
+        "mutation_authority": "mutation_scope_outside_child_receipt"
+      }
+    }
+  ]
+}

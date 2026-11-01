@@ -18,7 +18,7 @@ use crate::writer_target::{
     read_writer_target_packet, WriterTarget, WRITER_TARGET_PACKET_RELATIVE,
 };
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -599,16 +599,16 @@ fn read_identity(report_dir: &Path) -> Option<(IdentityReceipt, String)> {
             )),
         ),
     ]));
-    if !canonical_sha256(&scope_value)
+    if canonical_sha256(&scope_value)
         .ok()
-        .is_some_and(|digest| digest.as_str() == scope_digest.to_text().as_deref().unwrap_or(""))
+        .is_none_or(|digest| digest.as_str() != scope_digest.to_text().as_deref().unwrap_or(""))
     {
         return None;
     }
-    if !canonical_object_without(&value, "receipt_sha256")
+    if canonical_object_without(&value, "receipt_sha256")
         .ok()
         .map(|canonical| sha256_hex(canonical.as_bytes()))
-        .is_some_and(|digest| digest == receipt_sha256.to_text().unwrap_or_default())
+        .is_none_or(|digest| digest != receipt_sha256.to_text().unwrap_or_default())
     {
         return None;
     }
@@ -990,9 +990,11 @@ fn mutation_request(
             let paths = patch
                 .lines()
                 .filter_map(|line| {
-                    let directive = line
-                        .strip_prefix("***")?
-                        .trim_start_matches(is_python_whitespace);
+                    let suffix = line.strip_prefix("***")?;
+                    let directive = suffix.trim_start_matches(is_python_whitespace);
+                    if directive.len() == suffix.len() {
+                        return None;
+                    }
                     ["Update File:", "Add File:", "Delete File:"]
                         .iter()
                         .find_map(|prefix| directive.strip_prefix(prefix))
@@ -1081,86 +1083,139 @@ fn command_segments(command: &str) -> Vec<Vec<String>> {
 
 fn shell_tokens(command: &str) -> Option<Vec<String>> {
     let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut active = false;
-    let mut quote = None;
-    let mut characters = command.chars().peekable();
-    while let Some(character) = characters.next() {
-        match quote {
-            Some('\'') => {
-                if character == '\'' {
-                    quote = None;
+    let mut input = command.chars().collect::<VecDeque<_>>();
+    let mut token = String::new();
+    let mut state = ' ';
+    let mut escaped_state = ' ';
+    let mut quoted = false;
+    while let Some(character) = input.pop_front() {
+        match state {
+            ' ' => {
+                if shlex_whitespace(character) {
+                    continue;
+                }
+                if character == '#' {
+                    discard_shell_comment(&mut input);
+                } else if character == '\\' {
+                    escaped_state = 'a';
+                    state = '\\';
+                } else if shlex_word_character(character) {
+                    token.push(character);
+                    state = 'a';
+                } else if shlex_punctuation(character) {
+                    token.push(character);
+                    state = 'c';
+                } else if matches!(character, '\'' | '"') {
+                    state = character;
                 } else {
-                    current.push(character);
+                    tokens.push(character.to_string());
                 }
             }
-            Some('"') => match character {
-                '"' => quote = None,
-                '\\' => {
-                    let next = characters.next()?;
-                    if matches!(next, '"' | '\\') {
-                        current.push(next);
-                    } else {
-                        current.push('\\');
-                        current.push(next);
+            'a' => {
+                if shlex_whitespace(character) {
+                    state = ' ';
+                    if !token.is_empty() || quoted {
+                        tokens.push(std::mem::take(&mut token));
+                        quoted = false;
+                    }
+                } else if character == '#' {
+                    discard_shell_comment(&mut input);
+                    state = ' ';
+                    if !token.is_empty() || quoted {
+                        tokens.push(std::mem::take(&mut token));
+                        quoted = false;
+                    }
+                } else if matches!(character, '\'' | '"') {
+                    state = character;
+                } else if character == '\\' {
+                    escaped_state = 'a';
+                    state = '\\';
+                } else if shlex_word_character(character) {
+                    token.push(character);
+                } else {
+                    input.push_front(character);
+                    state = ' ';
+                    if !token.is_empty() || quoted {
+                        tokens.push(std::mem::take(&mut token));
+                        quoted = false;
                     }
                 }
-                _ => current.push(character),
-            },
-            None => match character {
-                '\'' | '"' => {
-                    quote = Some(character);
-                    active = true;
+            }
+            'c' => {
+                if shlex_whitespace(character) {
+                    state = ' ';
+                    tokens.push(std::mem::take(&mut token));
+                } else if character == '#' {
+                    discard_shell_comment(&mut input);
+                    state = ' ';
+                    tokens.push(std::mem::take(&mut token));
+                } else if shlex_punctuation(character) {
+                    token.push(character);
+                } else {
+                    input.push_front(character);
+                    state = ' ';
+                    tokens.push(std::mem::take(&mut token));
                 }
-                '\\' => {
-                    let next = characters.next()?;
-                    if next != '\n' {
-                        current.push(next);
-                    }
-                    active = true;
+            }
+            '\'' => {
+                quoted = true;
+                if character == '\'' {
+                    state = 'a';
+                } else {
+                    token.push(character);
                 }
-                character if character.is_whitespace() => {
-                    if active {
-                        tokens.push(std::mem::take(&mut current));
-                        active = false;
-                    }
+            }
+            '"' => {
+                quoted = true;
+                if character == '"' {
+                    state = 'a';
+                } else if character == '\\' {
+                    escaped_state = '"';
+                    state = '\\';
+                } else {
+                    token.push(character);
                 }
-                '#' if !active => {
-                    for rest in characters.by_ref() {
-                        if rest == '\n' {
-                            break;
-                        }
-                    }
+            }
+            '\\' => {
+                if escaped_state == '"' && character != '"' && character != '\\' {
+                    token.push('\\');
                 }
-                character if ";&|()<>".contains(character) => {
-                    if active {
-                        tokens.push(std::mem::take(&mut current));
-                        active = false;
-                    }
-                    let mut punctuation = character.to_string();
-                    while characters
-                        .peek()
-                        .is_some_and(|next| ";&|()<>".contains(*next))
-                    {
-                        punctuation.push(characters.next().expect("peeked punctuation"));
-                    }
-                    tokens.push(punctuation);
-                }
-                _ => {
-                    current.push(character);
-                    active = true;
-                }
-            },
-            Some(_) => unreachable!("only shell single and double quotes are used"),
+                token.push(character);
+                state = escaped_state;
+            }
+            _ => unreachable!("the shlex-compatible state set is closed"),
         }
     }
-    if quote.is_some() {
+    if matches!(state, '\'' | '"' | '\\') {
         return None;
     }
-    if active {
-        tokens.push(current);
+    if !token.is_empty() || quoted {
+        tokens.push(token);
     }
     Some(tokens)
+}
+
+fn shlex_whitespace(character: char) -> bool {
+    matches!(character, ' ' | '\t' | '\r' | '\n')
+}
+
+fn shlex_punctuation(character: char) -> bool {
+    ";&|()<>".contains(character)
+}
+
+fn shlex_word_character(character: char) -> bool {
+    character.is_ascii_alphanumeric()
+        || character == '_'
+        || "ßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÝÞ~-./*?="
+            .contains(character)
+}
+
+fn discard_shell_comment(input: &mut VecDeque<char>) {
+    while let Some(character) = input.pop_front() {
+        if character == '\n' {
+            break;
+        }
+    }
 }
 
 fn command_index(segment: &[String]) -> Option<usize> {
