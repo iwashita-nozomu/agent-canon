@@ -1,4 +1,13 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical citation_evidence_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent/orchestration/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent/orchestration/model_profile_registry.py
 # source canonical digest: 902677a5bd158cec47097f36f68b6d7ec5e4443afd9aa7337567d8cca26c56a2
 
 name = "citation_evidence_reviewer"
@@ -11,4 +20,4 @@ model_reasoning_effort = "high"
 model_context_window = 1050000
 model_auto_compact_token_limit = 900000
 
-developer_instructions = "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands."
+developer_instructions = "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions. In a handback, refer to the existing readback without repeating its fields; refresh it only when checkout state changes."
