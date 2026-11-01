@@ -4042,12 +4042,13 @@ output_contains = "1.2.3"
             .join("../../../../")
             .canonicalize()
             .expect("repository root exists");
-        // Frozen independently from the pre-migration Python build_plan owner.
+        // Frozen from the pre-migration Python build_plan oracle at source SHA
+        // d6e7592dddd2ea8fe9e1160742808f9f38c1d3c293608cda0921147e1a47f4c5.
         let manifest = root.join("bootstrap/container/image/dependencies.toml");
         let manifest_bytes = fs::read(&manifest).expect("canonical manifest bytes are readable");
         assert_eq!(
             sha256_hex(&manifest_bytes),
-            "2ad12d007239bc2fff90ba3c8c81ca9270610c69ba38b588980459f4b6b9c52a"
+            "429e8daf314140f7d593714d4aeb7038ce1864df06912f604f0c2deddb8f05b8"
         );
         let plan = load_plan(&root, None).expect("canonical dependency plan parses");
         let mut expected = [
@@ -4126,12 +4127,14 @@ output_contains = "1.2.3"
             .map(|record| record.id.clone())
             .collect::<BTreeSet<_>>();
         assert_eq!(actual, expected);
+        // Python platform.machine() was controlled for these oracle rows; the
+        // aarch64 fingerprint does not claim an actual arm64 execution.
         let expected_fingerprint = match env::consts::ARCH {
             "x86_64" | "amd64" => {
-                "69f80ebba0abca46cfd219a4174a8dc3a6a534fb336e2d71da5a7e4fa4ba0d85"
+                "a51cbacded9478282eb188e3be0e2f9d1cc91896c7015eac74452dc15bdfd135"
             }
             "aarch64" | "arm64" => {
-                "9eba38a548d37d212b7c5d03fc90a9aac6d073a62a1701a7469a0506dd4b89de"
+                "edc6bcc252ed48b73f4eaf5eb0b8912ddafbe55ceb8261b971fa231a78101045"
             }
             other => panic!("unsupported plan-golden architecture: {other}"),
         };

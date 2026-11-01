@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -40,6 +41,27 @@ def _native_cli() -> str:
     ):
         raise RuntimeError("AGENT_CANON_CLI must select an absolute executable file")
     return str(executable)
+
+
+def test_native_build_toolchain_matches_canonical_image_pin() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/agent-canon-native-release.yml").read_text()
+    )
+    manifest = tomllib.loads(
+        (ROOT / "bootstrap/container/image/dependencies.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    rust_toolchain = next(
+        record["version"]
+        for record in manifest["records"]
+        if record.get("id") == "rust-toolchain"
+    )
+    compiling_jobs = {"prepare", "build", "publish-release"}
+
+    assert {
+        workflow["jobs"][job]["env"]["RUSTUP_TOOLCHAIN"] for job in compiling_jobs
+    } == {rust_toolchain}
 
 
 def test_native_publication_plan_honors_the_event_and_manual_choice() -> None:
