@@ -17,7 +17,8 @@
 // downstream implementation waterfall_gate.rs owns the native selected-stage gate command
 // downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
-// downstream implementation graph_client.rs exposes the in-process typed graph client API
+// downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
+// downstream implementation source_dependency_graph.rs exports tracked-source facts and source target resolution
 // downstream implementation agent_search.rs routes explicit repository-search provider requests
 // upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
@@ -112,6 +113,8 @@ Commands:
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
+  graph-client <status|query|context> --root <repo-root> [options] [--format json]
+  source-dependency-graph [--root <repo-root> --edges-out PATH --manifests-out PATH] | resolve-targets --root ROOT --source FILE --target PATH
   agent-search [search options]
   check-github-workflows [--root <repo-root>]\n  check-dependency-headers [--root <repo-root>] [--changed] [--surface <glob>]... [paths...]
   classify-path-risk [--path PATH]... [--paths-file PATH] [--format text|json|github-output] [--full-confidence]
@@ -350,6 +353,14 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "graph" {
         std::process::exit(graph::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "graph-client" {
+        std::process::exit(graph_client::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "source-dependency-graph" {
+        std::process::exit(source_dependency_graph::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "agent-search" {
