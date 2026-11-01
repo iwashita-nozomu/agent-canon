@@ -485,12 +485,7 @@ mod tests {
                 );
             }
             let actual = check_headers(&root.0);
-            let expected: Vec<Value> = case["findings"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .cloned()
-                .collect();
+            let expected: Vec<Value> = case["findings"].as_array().unwrap().to_vec();
             assert_eq!(actual.len(), expected.len(), "{}", case["name"]);
             for (finding, expected) in actual.iter().zip(expected) {
                 assert_eq!(finding.severity, expected["severity"].as_str().unwrap());
