@@ -207,7 +207,18 @@ class HookRetirementTest(unittest.TestCase):
                                 encoding="utf-8",
                             )
                             self.assertEqual(result.returncode, run["exit"])
-                            self.assertEqual(result.stdout, run["stdout"])
+                            expected = run["stdout"]
+                            digest_proof = json.loads((PROJECT_ROOT / "tests/fixtures/codex_runtime_summary/retirement_digest.json").read_text(encoding="utf-8"))
+                            self.assertEqual(digest_proof["old_digest"], "7fe7b7ea25b13567ba27aa93235da043460df83132162818b93236fa4c4369b9")
+                            relocations = [
+                                ('"owner":"tools/runtime/archive/export_codex_runtime_summary.py"', '"owner":"tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs"'),
+                                ('"command_or_skill":"command-only:python3 tools/runtime/archive/export_codex_runtime_summary.py"', '"command_or_skill":"command-only:tools/bin/agent-canon export-codex-runtime-summary"'),
+                                (digest_proof["old_digest"], digest_proof["new_digest"]),
+                            ]
+                            for old, new in relocations:
+                                self.assertEqual(expected.count(old), 1)
+                                expected = expected.replace(old, new)
+                            self.assertEqual(result.stdout, expected)
                             self.assertEqual(result.stderr, run["stderr"])
         self.assertEqual(run_count, 7)
 
