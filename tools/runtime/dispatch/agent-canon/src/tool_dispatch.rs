@@ -215,10 +215,10 @@ pub fn load_tool_catalog(root: &Path) -> Result<ToolCatalog, DispatchError> {
     let raw = tool_catalog::load_yaml_document(&catalog_path)
         .map_err(|error| DispatchError::new("invalid-catalog", error))?;
     let catalog = mapping(&raw, "catalog")?;
-    let schema_value = mapping_field(catalog, "runtime_schema")
+    let schema_value = mapping_field(&catalog, "runtime_schema")
         .ok_or_else(|| DispatchError::new("invalid-type", "runtime_schema"))?;
     let schema = mapping(schema_value, "runtime_schema")?;
-    let raw_version = mapping_field(schema, "version");
+    let raw_version = mapping_field(&schema, "version");
     let version = raw_version.and_then(Yaml::as_i64);
     if version != Some(SCHEMA_VERSION) {
         return Err(DispatchError::new(
@@ -227,7 +227,7 @@ pub fn load_tool_catalog(root: &Path) -> Result<ToolCatalog, DispatchError> {
         ));
     }
 
-    let entries_value = mapping_field(catalog, "entries")
+    let entries_value = mapping_field(&catalog, "entries")
         .ok_or_else(|| DispatchError::new("invalid-entries", "entries"))?;
     let entries = tool_catalog::as_sequence(entries_value)
         .ok_or_else(|| DispatchError::new("invalid-entries", "entries"))?;
@@ -242,7 +242,7 @@ pub fn load_tool_catalog(root: &Path) -> Result<ToolCatalog, DispatchError> {
         }
     }
 
-    let rust_commands = match mapping_field(schema, "rust_public_commands") {
+    let rust_commands = match mapping_field(&schema, "rust_public_commands") {
         None | Some(Yaml::Null) => &[][..],
         Some(value) => tool_catalog::as_sequence(value).ok_or_else(|| {
             DispatchError::new(
@@ -254,11 +254,11 @@ pub fn load_tool_catalog(root: &Path) -> Result<ToolCatalog, DispatchError> {
     for (index, raw_command) in rust_commands.iter().enumerate() {
         let command = mapping(raw_command, &format!("rust_public_commands[{}]", index + 1))?;
         let identifier = required_string(
-            mapping_field(command, "id"),
+            mapping_field(&command, "id"),
             &format!("rust_public_commands[{}].id", index + 1),
         )?;
         let selector = required_string(
-            mapping_field(command, "selector"),
+            mapping_field(&command, "selector"),
             &format!("rust_public_commands[{}].selector", index + 1),
         )?;
         if selector.chars().any(char::is_whitespace) {
@@ -1290,7 +1290,7 @@ fn run_process(
     } else {
         Stdio::inherit()
     });
-    let child = command
+    let mut child = command
         .spawn()
         .map_err(|error| DispatchError::new(error_code, format!("{tool_id}:{error}")))?;
     if stdout_policy == "captured" || stderr_policy == "captured" || stdin_policy == "captured" {
