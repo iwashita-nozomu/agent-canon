@@ -3,13 +3,14 @@
 # @dependency-start
 # contract test
 # responsibility Tests generated report artifact guard behavior.
-# upstream implementation ../../tools/runtime/artifacts/generated_artifact_guard.py rejects regenerated reports left in tree
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects regenerated reports left in tree
 # upstream implementation ../../tools/runtime/artifacts/report_artifact_checks.py classifies report artifact paths
 # upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md canonical artifact placement policy
 # @dependency-end
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -19,9 +20,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.runtime.artifacts.report_artifact_checks import generated_eval_transient_blockers  # noqa: E402
+from tools.runtime.artifacts.report_artifact_checks import (
+    generated_eval_transient_blockers,
+)  # noqa: E402
 
-GUARD_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "artifacts" / "generated_artifact_guard.py"
+AGENT_CANON_CLI = os.environ.get("AGENT_CANON_CLI")
 
 
 class GeneratedArtifactGuardTest(unittest.TestCase):
@@ -55,9 +58,13 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
         )
 
     def run_guard(self, root: Path) -> subprocess.CompletedProcess[str]:
-        """Run the guard against a test repository."""
+        """Run the selected native guard against a test repository."""
+        if not AGENT_CANON_CLI:
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
-            [sys.executable, str(GUARD_SCRIPT), "--root", str(root)],
+            [AGENT_CANON_CLI, "generated-artifact-guard", "--root", str(root)],
             cwd=root,
             check=False,
             capture_output=True,
@@ -69,7 +76,9 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.init_repo(root)
-            artifact = root / "reports" / "dependency-review" / "run" / "dependency_graph.tsv"
+            artifact = (
+                root / "reports" / "dependency-review" / "run" / "dependency_graph.tsv"
+            )
             artifact.parent.mkdir(parents=True, exist_ok=True)
             artifact.write_text("source\ttarget\n", encoding="utf-8")
 
@@ -109,7 +118,9 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            artifact = root / "reports" / "agent-eval-runs" / "run" / "01-role.stdout.txt"
+            artifact = (
+                root / "reports" / "agent-eval-runs" / "run" / "01-role.stdout.txt"
+            )
             artifact.parent.mkdir(parents=True, exist_ok=True)
             artifact.write_text("ok\n", encoding="utf-8")
 
@@ -162,7 +173,7 @@ class GeneratedArtifactGuardTest(unittest.TestCase):
             )
 
     def test_allows_run_bundle_reports_for_closeout_gate(self) -> None:
-        """Run bundles are one-shot evidence and remain task_close.py responsibility."""
+        """Run bundles are one-shot evidence and remain native TaskClose responsibility."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.init_repo(root)

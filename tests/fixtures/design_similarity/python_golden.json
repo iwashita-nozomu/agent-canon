@@ -1,0 +1,189 @@
+{
+  "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/source/tools/analysis/documents/analysis/find_similar_designs.py",
+  "source_sha256": "16eb31387a66b223e98262a553ce19f1e49bcdb24fe4b489cc6d1151a2f8717e",
+  "cases": [
+    {
+      "name": "same",
+      "files": {
+        "a.md": "# Same\ntext",
+        "b.md": "# Same\ntext"
+      },
+      "threshold_argument": "0.6",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/same/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/same/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/same/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/same/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/same/source/documents/design/b.md\n"
+    },
+    {
+      "name": "markup",
+      "files": {
+        "a.md": "# Title\n[link](target) ```hidden``` body",
+        "b.md": "Title link body"
+      },
+      "threshold_argument": "0.8",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/markup/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/markup/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/markup/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.8)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/markup/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/markup/source/documents/design/b.md\n"
+    },
+    {
+      "name": "zero",
+      "files": {
+        "a.md": "abc",
+        "b.md": "xyz"
+      },
+      "threshold_argument": "0",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/zero/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/zero/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/zero/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.0)\n0.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/zero/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/zero/source/documents/design/b.md\n"
+    },
+    {
+      "name": "one",
+      "files": {
+        "a.md": "same",
+        "b.md": "same",
+        "c.md": "different"
+      },
+      "threshold_argument": "1",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/one/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/one/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/one/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 1.0)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/one/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/one/source/documents/design/b.md\n"
+    },
+    {
+      "name": "tiny-threshold",
+      "files": {
+        "a.md": "abc",
+        "b.md": "xyz"
+      },
+      "threshold_argument": "1e-7",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/tiny-threshold/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/tiny-threshold/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/tiny-threshold/runtime/report.txt\n",
+      "stderr": "",
+      "report": "No similar design files found with threshold >= 1e-07\n"
+    },
+    {
+      "name": "whitespace",
+      "files": {
+        "a.md": "a\u001cb",
+        "b.md": "a b",
+        "c.md": "a\u00a0b"
+      },
+      "threshold_argument": "0.9",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.9)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/b.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/c.md\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/c.md\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/whitespace/source/documents/design/b.md\n"
+    },
+    {
+      "name": "popular",
+      "files": {
+        "a.md": "xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "b.md": "yaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "threshold_argument": "0.1",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/popular/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/popular/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/popular/runtime/report.txt\n",
+      "stderr": "",
+      "report": "No similar design files found with threshold >= 0.1\n"
+    },
+    {
+      "name": "pair-ties",
+      "files": {
+        "a.md": "same",
+        "b.md": "same",
+        "c.md": "same"
+      },
+      "threshold_argument": "0.6",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/runtime/report.txt\n",
+      "stderr": "",
+      "report": "Similar design file pairs (threshold >= 0.6)\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/b.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/c.md\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/c.md\n1.000  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/a.md  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/pair-ties/source/documents/design/b.md\n"
+    },
+    {
+      "name": "excluded-template",
+      "files": {
+        "a.md": "same",
+        "b.md": "other",
+        "TEMPLATE.md": "same"
+      },
+      "threshold_argument": "0.9",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/excluded-template/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/excluded-template/runtime",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/excluded-template/runtime/report.txt\n",
+      "stderr": "",
+      "report": "No similar design files found with threshold >= 0.9\n"
+    },
+    {
+      "name": "invalid-low",
+      "files": {
+        "a.md": "same"
+      },
+      "threshold_argument": "-0.1",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/invalid-low/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/invalid-low/runtime",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\nfind_similar_designs.py: error: --min must be between 0 and 1\n",
+      "report": null
+    },
+    {
+      "name": "invalid-high",
+      "files": {
+        "a.md": "same"
+      },
+      "threshold_argument": "1.1",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/invalid-high/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/invalid-high/runtime",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\nfind_similar_designs.py: error: --min must be between 0 and 1\n",
+      "report": null
+    },
+    {
+      "name": "nan",
+      "files": {
+        "a.md": "same"
+      },
+      "threshold_argument": "nan",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/nan/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/nan/runtime",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\nfind_similar_designs.py: error: --min must be between 0 and 1\n",
+      "report": null
+    },
+    {
+      "name": "inf",
+      "files": {
+        "a.md": "same"
+      },
+      "threshold_argument": "inf",
+      "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/inf/source",
+      "runtime": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/design-similarity-old-contract-87r0en9z/inf/runtime",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_similar_designs.py [-h] [--design-root DESIGN_ROOT] [--min MIN]\n                               [--runtime-root RUNTIME_ROOT] [--output OUTPUT]\nfind_similar_designs.py: error: --min must be between 0 and 1\n",
+      "report": null
+    }
+  ],
+  "state": "actual old CLI only; consumer implementation not selected yet"
+}

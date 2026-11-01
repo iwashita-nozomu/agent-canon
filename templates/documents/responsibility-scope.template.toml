@@ -81,7 +81,7 @@ paths = [
   "references/**",
 ]
 protecting_tools = [
-  "tools/runtime/lifecycle/task_close.py",
+  "tools/runtime/dispatch/agent-canon/src/task_close.rs",
   "tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
 ]
 issues = []

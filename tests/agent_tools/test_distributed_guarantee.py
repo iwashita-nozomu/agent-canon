@@ -4,7 +4,6 @@
 # contract test
 # responsibility Exercises owner-local guarantee receipts, existing-edge invalidation, and integration non-rerun projection.
 # upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization and reuse tuple.
-# upstream implementation ../../tools/agent/orchestration/autonomous_convergence.py owns closeout projection consumer.
 # upstream implementation ../../tools/repository/github/publication_integrator.py owns integration receipt projection.
 # upstream implementation ../../tools/repository/github/issue_sync.py owns Issue clause projection.
 # @dependency-end
@@ -17,7 +16,6 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from tools.agent.orchestration.autonomous_convergence import owner_receipt_closeout_state  # noqa: E402
 from tools.repository.github.issue_sync import GitHubIssueRecord, project_issue_clauses  # noqa: E402
 from tools.agent.orchestration.packets import (  # noqa: E402
     OWNER_GUARANTEE_PACKET_SCHEMA,
@@ -106,7 +104,6 @@ def test_invalidation_reaches_only_declared_dependency_edge() -> None:
     owner_a = receipt(owner="owner-a", edges=["owner-a->owner-b"])
     owner_b = receipt(owner="owner-b")
     owner_c = receipt(owner="owner-c")
-    assert owner_receipt_closeout_state([owner_a, owner_b, owner_c], dependency_edges=["owner-a->owner-b"]).ready
     invalidation = normalize_owner_invalidation_packet(
         {
             "schema": OWNER_INVALIDATION_PACKET_SCHEMA,

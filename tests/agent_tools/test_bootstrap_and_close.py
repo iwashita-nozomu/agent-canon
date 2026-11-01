@@ -33,13 +33,6 @@ from unittest.mock import patch
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-G2_CLOSEOUT_FIXTURE = (
-    PROJECT_ROOT
-    / "tests"
-    / "fixtures"
-    / "generated_completeness"
-    / "closeout_g1_g2.json"
-)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.agent.orchestration.implementation_dispatch import (  # noqa: E402
@@ -53,25 +46,11 @@ from tools.agent.orchestration.packets import (  # noqa: E402
 )
 from tools.runtime.authority.task_authority import hash_baseline_bytes  # noqa: E402
 from tools.runtime.authority.checkout_identity import resolve_checkout_identity  # noqa: E402
-from tools.runtime.lifecycle.task_close import (  # noqa: E402
-    _child_closeout_evidence,
-    document_structure_evidence_ready,
-    update_lifecycle_closeout_consumer,
-)
 from tools.agent.orchestration.team_config import (  # noqa: E402
     AgentTypeSelection,
     load_task_catalog,
     load_team_config,
     select_roles,
-)
-from tools.agent.orchestration.tool_calls import (  # noqa: E402
-    CloseAgentLifecycleEvidence,
-    materialize_close_agent_tool_call,
-)
-from tools.runtime.lifecycle.update_lifecycle_contract import (  # noqa: E402
-    materialize_descendant_close_receipt,
-    materialize_gate_verdict,
-    materialize_reservation_release_receipt,
 )
 from tools.runtime.archive.work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 from tools.runtime.lifecycle.bootstrap_agent_run import (  # noqa: E402
@@ -84,7 +63,18 @@ RUNTIME_PROFILE_INVENTORY = (
 BOOTSTRAP_SCRIPT = (
     PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
 )
-TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "task_close.py"
+
+
+def task_close_command() -> list[str]:
+    """Select the registered native TaskClose CLI for closeout regressions."""
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError(
+            "AGENT_CANON_CLI must select the native TaskClose executable"
+        )
+    return [selected_cli, "task-close"]
+
+
 WORKTREE_START_SCRIPT = (
     PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
 )
@@ -153,126 +143,6 @@ def selected_active_design_packet(prefix: str) -> dict[str, object]:
 
 GRAPH_ACTIVE_DESIGN_PACKET = selected_active_design_packet("graph")
 U2_ACTIVE_DESIGN_PACKET = selected_active_design_packet("u2")
-
-
-def update_lifecycle_closeout_fixture() -> dict[str, object]:
-    """Return one valid six-gate nested-lifecycle closeout artifact."""
-    bundle = json.loads(G2_CLOSEOUT_FIXTURE.read_text(encoding="utf-8"))
-    context = bundle["contexts"][0]
-    binding = deepcopy(context["binding"])
-    gates: list[dict[str, object]] = deepcopy(context["gate_verdicts"])
-    gate_contracts = {
-        "G3": (
-            "pr_identity_cas",
-            PROJECT_ROOT / "tools" / "repository" / "github" / "github_publish.py",
-            "materialize_pr_identity_gate",
-        ),
-        "G4": (
-            "standalone_source_branch_integrity",
-            PROJECT_ROOT
-            / "tools"
-            / "repository"
-            / "workspace"
-            / "repository_topic_clone.py",
-            "_ensure_branch",
-        ),
-        "G5": (
-            "remote_publication_readback",
-            PROJECT_ROOT
-            / "tools"
-            / "repository"
-            / "github"
-            / "publication_integrator.py",
-            "integrate_publication",
-        ),
-    }
-    for index, gate_id in enumerate(("G3", "G4", "G5"), 2):
-        evidence_refs = [
-            cast("dict[str, object]", gate["binding"])["evidence_ref"] for gate in gates
-        ]
-        ordered_inputs = {
-            "G3": evidence_refs[:2],
-            "G4": evidence_refs[2:3],
-            "G5": evidence_refs[3:4],
-        }[gate_id]
-        invariant, owner_path, owner_symbol = gate_contracts[gate_id]
-        gate = materialize_gate_verdict(
-            binding=binding,
-            gate_id=gate_id,
-            ordered_input_evidence_refs=cast("list[str]", ordered_inputs),
-            invariant=cast("str", invariant),
-            output_digest="sha256:" + format(index, "x") * 64,
-            owner=f"{owner_path}#{owner_symbol}",
-            verdict="pass",
-        )
-        gates.append(gate)
-    handback: dict[str, object] = {
-        "schema": "agent-canon.durable-handback.v1",
-        "binding": binding,
-        "agent_id": "agent:owner",
-        "descendant_ids": ["agent:reviewer"],
-        "reservation_ids": ["reservation:reviewer"],
-        "evidence_ref": "evidence:" + "b" * 64,
-        "state": "durable_handback",
-    }
-    owned_path = "/tmp/agent-canon-update-owned"
-    gate_five_binding = cast("dict[str, object]", gates[4]["binding"])
-    cleanup: dict[str, object] = {
-        "schema": "agent-canon.cleanup-proof.v1",
-        "binding": binding,
-        "remote_readback_evidence_ref": gate_five_binding["evidence_ref"],
-        "task_owned_paths": [owned_path],
-        "task_owned_state_before": {owned_path: "present"},
-        "task_owned_state_after": {owned_path: "removed"},
-        "cleaned_paths": [owned_path],
-        "unknown_shared_state_before_digest": "sha256:" + "c" * 64,
-        "unknown_shared_state_after_digest": "sha256:" + "c" * 64,
-        "unknown_shared_state_unchanged_evidence_ref": "evidence:" + "d" * 64,
-        "evidence_ref": "evidence:" + "e" * 64,
-        "state": "cleanup_proven",
-    }
-    descendants = [
-        materialize_descendant_close_receipt(
-            binding=binding,
-            durable_handback=handback,
-            agent_id="agent:reviewer",
-            evidence_ref="evidence:" + "f" * 64,
-        )
-    ]
-    reservations = [
-        materialize_reservation_release_receipt(
-            binding=binding,
-            durable_handback=handback,
-            reservation_id="reservation:reviewer",
-            evidence_ref="evidence:" + "0" * 64,
-        )
-    ]
-    closeout = materialize_close_agent_tool_call(
-        run_id="run-update-lifecycle",
-        agent_id="agent:owner",
-        evidence=CloseAgentLifecycleEvidence(
-            gate_verdicts=gates,
-            cleanup_proof=cleanup,
-            durable_handback=handback,
-            descendant_close_receipts=descendants,
-            reservation_release_receipts=reservations,
-        ),
-    )
-    g6 = cast("dict[str, object]", closeout["g6_gate"])
-    token = cast("dict[str, object]", closeout["close_agent_tool_call"])
-    return {
-        "schema": "agent-canon.update-lifecycle-closeout.v1",
-        "gate_verdicts": [*gates, g6],
-        "durable_handback": handback,
-        "descendants": descendants,
-        "reservations": reservations,
-        "descendants_closed_evidence_ref": closeout["descendants_closed_evidence_ref"],
-        "reservations_released_evidence_ref": closeout[
-            "reservations_released_evidence_ref"
-        ],
-        "cleanup_proof": cleanup,
-        "close_agent_tool_call": token,
-    }
 
 
 def current_git_head(workspace: Path = PROJECT_ROOT) -> str:
@@ -753,6 +623,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             os.environ,
             {
                 "AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT),
+                "AGENT_CANON_SOURCE_ROOT": str(PROJECT_ROOT),
                 "AGENT_CANON_RUNTIME_ROOT": str(TEST_TEMP_ROOT),
             },
         )
@@ -763,89 +634,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
         """Retired repository synchronization wrappers are absent."""
         self.assertFalse((PROJECT_ROOT / "tools" / "sync_agent_canon.sh").exists())
         self.assertFalse((PROJECT_ROOT / "tools" / "update_agent_canon.sh").exists())
-
-    def consume_update_lifecycle_fixture(
-        self,
-        payload: dict[str, object],
-    ) -> dict[str, object]:
-        """Persist and consume one isolated update-lifecycle closeout record."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_dir = Path(tmp_dir)
-            (report_dir / "update_lifecycle_closeout.json").write_text(
-                json.dumps(payload),
-                encoding="utf-8",
-            )
-            return update_lifecycle_closeout_consumer(report_dir)
-
-    def test_update_lifecycle_terminal_tool_call_passes_after_cleanup(self) -> None:
-        """The positive close route binds all six gates and terminal ToolCall."""
-        payload = update_lifecycle_closeout_fixture()
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        token = cast("dict[str, object]", payload["close_agent_tool_call"])
-        self.assertEqual(decision["ready"], True)
-        self.assertEqual(decision["reason"], "pass")
-        self.assertEqual(token["tool_id"], "close_agent")
-        self.assertEqual(token["state"], "terminal")
-        self.assertEqual(decision["close_agent_token_id"], token["token_id"])
-
-    def test_update_lifecycle_rejects_completed_but_open_descendant(self) -> None:
-        """A completed handback is not a substitute for closing the agent."""
-        payload = update_lifecycle_closeout_fixture()
-        descendants = cast("list[dict[str, object]]", payload["descendants"])
-        descendants[0]["state"] = "completed"
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        self.assertEqual(decision["reason"], "close_agent:completed_but_open")
-
-    def test_update_lifecycle_rejects_unknown_descendant(self) -> None:
-        """Every observed descendant must exist in the durable handback ledger."""
-        payload = update_lifecycle_closeout_fixture()
-        descendants = cast("list[dict[str, object]]", payload["descendants"])
-        unknown = dict(descendants[0])
-        unknown["agent_id"] = "agent:unknown"
-        unknown["evidence_ref"] = "evidence:" + "1" * 64
-        descendants.append(unknown)
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        self.assertEqual(decision["reason"], "close_agent:unknown_descendant")
-
-    def test_update_lifecycle_rejects_reservation_leak(self) -> None:
-        """Closeout remains blocked until every declared reservation is released."""
-        payload = update_lifecycle_closeout_fixture()
-        reservations = cast("list[dict[str, object]]", payload["reservations"])
-        reservations[0]["state"] = "reserved"
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        self.assertEqual(decision["reason"], "close_agent:reservation_leak")
-
-    def test_update_lifecycle_rejects_cleanup_before_remote_readback(self) -> None:
-        """Cleanup proof must point at the exact G5 publication evidence."""
-        payload = update_lifecycle_closeout_fixture()
-        cleanup = cast("dict[str, object]", payload["cleanup_proof"])
-        cleanup["remote_readback_evidence_ref"] = "evidence:" + "2" * 64
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        self.assertEqual(
-            decision["reason"], "close_agent:cleanup_before_remote_readback"
-        )
-
-    def test_update_lifecycle_rejects_missing_gate_receipt(self) -> None:
-        """Terminal close requires the ordered complete G1-G6 boundary set."""
-        payload = update_lifecycle_closeout_fixture()
-        gates = cast("list[dict[str, object]]", payload["gate_verdicts"])
-        gates.pop()
-
-        decision = self.consume_update_lifecycle_fixture(payload)
-
-        self.assertEqual(
-            decision["reason"], "close_agent:all_six_gate_evidence_required"
-        )
 
     def assert_role_prompt_includes(
         self,
@@ -2371,8 +2159,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_root / "test-task-close-locked"),
                 ],
@@ -2552,8 +2339,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2575,8 +2361,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
             pending_verification = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2591,33 +2376,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("CLOSEOUT_READY=no", pending_verification.stdout)
             self.assertIn("verification_status", pending_verification.stdout)
             self.assertNotIn("verification_unlock", pending_verification.stdout)
-
-    def test_task_close_rejects_forged_verifier_or_parent_evidence(self) -> None:
-        """Closeout cannot pass with a forged child receipt or mutation claim."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-forged-child-evidence"
-            report_dir = report_root / run_id
-            report_root.mkdir(parents=True, exist_ok=True)
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            verifier = report_dir / "runtime" / "verifier_receipt.json"
-            verifier.write_text(
-                verifier.read_text(encoding="utf-8").replace("verifier-1", "forged"),
-                encoding="utf-8",
-            )
-            ready, blockers = _child_closeout_evidence(
-                report_dir,
-                {
-                    "verifier_role_id": "verifier",
-                    "verifier_runtime_agent_id": "verifier-1",
-                    "verifier_receipt_ref": "runtime/verifier_receipt.json",
-                    "parent_mutation_status": "no_parent_mutation",
-                    "parent_mutation_evidence_ref": "runtime/parent_mutation_evidence.json",
-                },
-            )
-            self.assertFalse(ready)
-            self.assertIn("runtime_verifier_receipt_invalid", blockers)
 
     def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
         """task_close should allow targeted static analysis selected by the risk profile."""
@@ -2642,8 +2400,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2683,8 +2440,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2729,8 +2485,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2885,8 +2640,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -2925,8 +2679,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -2964,8 +2717,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
                 result = subprocess.run(
                     [
-                        sys.executable,
-                        str(TASK_CLOSE_SCRIPT),
+                        *task_close_command(),
                         "--report-dir",
                         str(report_dir),
                     ],
@@ -2992,8 +2744,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3021,8 +2772,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3058,8 +2808,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3096,8 +2845,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3123,8 +2871,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3180,8 +2927,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
                     result = subprocess.run(
                         [
-                            sys.executable,
-                            str(TASK_CLOSE_SCRIPT),
+                            *task_close_command(),
                             "--report-dir",
                             str(report_dir),
                         ],
@@ -3216,8 +2962,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3254,8 +2999,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3290,8 +3034,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3330,8 +3073,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3391,8 +3133,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -3454,8 +3195,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -3517,8 +3257,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -3587,8 +3326,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -3602,33 +3340,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
-
-    def test_document_structure_evidence_checks_graph_only_when_fields_are_supplied(
-        self,
-    ) -> None:
-        """Graph closeout values are conditional evidence, not a selection detector."""
-        evidence = {
-            "document_structure_paths": "README.md",
-            "document_structure_status": "complete",
-            "structure_activation": "not_required",
-            "document_split_decision": "keep:existing-topology:README.md",
-            "structure_planning": "not_required",
-            "structure_contract": "not_required:existing-topology:README.md",
-            "structure_owner": "README.md owner",
-            "structure_source": "README.md canonical source",
-            "structure_reader": "repository entry reader",
-            "structure_layout": "existing README layout",
-            "structure_validation_topology": "targeted Markdown check",
-        }
-
-        self.assertTrue(document_structure_evidence_ready(["README.md"], evidence)[2])
-
-        evidence["prose_graph_activation"] = "selected"
-        evidence["prose_graph"] = "pending"
-        self.assertFalse(document_structure_evidence_ready(["README.md"], evidence)[2])
-
-        evidence["prose_graph"] = "complete"
-        self.assertTrue(document_structure_evidence_ready(["README.md"], evidence)[2])
 
     def test_task_close_accepts_existing_topology_without_graph_selection_record(
         self,
@@ -3691,7 +3402,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             closeout_path.write_text(text, encoding="utf-8")
 
             result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                [*task_close_command(), "--run-id", run_id],
                 cwd=workspace_root,
                 env=environment,
                 check=False,
@@ -3755,7 +3466,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             closeout_path.write_text(text, encoding="utf-8")
 
             result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                [*task_close_command(), "--run-id", run_id],
                 cwd=workspace_root,
                 env=environment,
                 check=False,
@@ -3824,7 +3535,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             outer_head = current_git_head(parent_root)
             expected_outer_diff_ref = current_diff_ref(workspace_root)
             result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                [*task_close_command(), "--run-id", run_id],
                 cwd=workspace_root,
                 env=environment,
                 check=False,
@@ -3867,8 +3578,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -3922,8 +3632,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -3984,8 +3693,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4041,8 +3749,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4120,8 +3827,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4188,8 +3894,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4249,8 +3954,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4308,8 +4012,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--run-id",
                     run_id,
                 ],
@@ -4400,8 +4103,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -4510,8 +4212,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -4602,8 +4303,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],
@@ -4712,8 +4412,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
+                    *task_close_command(),
                     "--report-dir",
                     str(report_dir),
                 ],

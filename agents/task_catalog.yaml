@@ -49,7 +49,7 @@ execution_route_policy:
       commands: []
     coordination:
       next_action: run_existing_coordinated_closeout
-      commands: ["python3 tools/runtime/lifecycle/task_close.py --run-id <run-id>"]
+      commands: ["tools/bin/agent-canon task-close --run-id <run-id>"]
 
 role_topology_defaults:
   role_families:

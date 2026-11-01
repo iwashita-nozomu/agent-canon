@@ -5,7 +5,6 @@
 # upstream design ../../../README.md shared automation index
 # upstream design ../../../documents/design/request-intent-and-update-relation.md run-bundle temporary-state and retention readback projection
 # upstream implementation ../manifest/manifest_rendering.py renders optional run-bundle artifacts
-# downstream implementation ../lifecycle/task_close.py consumes actual run-artifact checks
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""
@@ -1160,31 +1159,6 @@ def is_mechanically_regenerated_report_path(path: str) -> bool:
     )
 
 
-def generated_report_artifact_blockers(workspace: Path) -> list[str]:
-    """Return regenerated report outputs that should not remain in the tree."""
-    report_paths = {
-        path: "tracked"
-        for path in _git_report_paths(workspace, ())
-        if is_mechanically_regenerated_report_path(path)
-    }
-    for path in _git_report_paths(
-        workspace,
-        ("--others", "--exclude-standard"),
-    ):
-        if is_mechanically_regenerated_report_path(path):
-            report_paths.setdefault(path, "untracked")
-    for path in _git_report_paths(
-        workspace,
-        ("--others", "--ignored", "--exclude-standard"),
-    ):
-        if is_mechanically_regenerated_report_path(path):
-            report_paths.setdefault(path, "ignored")
-    return [
-        f"generated_report_artifact_{state}_left_in_tree:{path}"
-        for path, state in sorted(report_paths.items())
-    ]
-
-
 def generated_eval_transient_blockers(workspace: Path) -> list[str]:
     """Return exact two-level eval producer stdout/stderr captures in the tree."""
     report_paths = {
@@ -1208,11 +1182,6 @@ def generated_eval_transient_blockers(workspace: Path) -> list[str]:
         f"generated_report_artifact_{state}_left_in_tree:{path}"
         for path, state in sorted(report_paths.items())
     ]
-
-
-def join_artifact_blockers(blockers: Sequence[str]) -> str:
-    """Render blockers for compact shell output."""
-    return "|".join(blockers) if blockers else "none"
 
 
 def report_artifact_placement_blockers(workspace: Path, report_dir: Path) -> list[str]:

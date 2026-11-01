@@ -220,7 +220,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
         "`agents/agents_config.json#artifacts.active_design_packet` |\n"
-        "| closeout authority | `task_close.py`; `report_artifact_checks.py` |\n\n"
+        "| closeout authority | `tools/runtime/dispatch/agent-canon/src/task_close.rs`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |\n\n"
         "## Workflow Family Reader Paths\n\n"
         "| Family | Owner Row |\n"
         "| ------ | --------- |\n"
@@ -303,7 +303,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
         "BRANCH_WORKTREE_CREATION_GUARD=block\n"
     ),
-    "tools/runtime/lifecycle/task_close.py": "task close owner\n",
+    "tools/runtime/dispatch/agent-canon/src/task_close.rs": "task close owner\n",
     "ROOT_AGENTS.md": (
         "Current user request controls scope; preserve unknown state and user data.\n"
         "## Runtime Owner Map\n\n"
@@ -324,7 +324,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
         "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
-        "| report and closeout structure | `task_close.py` | closeout gate |\n"
+        "| report and closeout structure | `tools/runtime/dispatch/agent-canon/src/task_close.rs` | closeout gate |\n"
     ),
     "AGENTS.md": (
         "Multiple chats or sessions unknown dirty Proven exact task ownership "

@@ -1,0 +1,429 @@
+{
+  "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/source/tools/analysis/documents/analysis/find_redundant_designs.py",
+  "source_sha256": "280ebd7c33eac7e3cbfc800e998ef160b46e03a98993ef4db77b7645e138cee7",
+  "cases": [
+    {
+      "name": "empty",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/empty/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/empty/runtime",
+      "files": {},
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/empty/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/empty/runtime/report.txt\n",
+      "stderr": "",
+      "before": {},
+      "after": {},
+      "reports": {
+        "report.txt": "No exact-duplicate design files found.\n"
+      }
+    },
+    {
+      "name": "default-unique-output",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--default-output"
+      ],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": true,
+      "second_invocation": {
+        "exit": 0,
+        "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/runtime/tasks/redundant-designs/run-09v5kpmu/redundant_designs.txt\n",
+        "stderr": ""
+      },
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/runtime/tasks/redundant-designs/run-0h73sphw/redundant_designs.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {
+        "tasks/redundant-designs/run-09v5kpmu/redundant_designs.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/b.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/b.md\n\n",
+        "tasks/redundant-designs/run-0h73sphw/redundant_designs.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/b.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/default-unique-output/source/documents/design/b.md\n\n"
+      }
+    },
+    {
+      "name": "root-whitespace-duplicates",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/runtime",
+      "files": {
+        "a.md": "same  text\n",
+        "b.md": "same\ttext\n"
+      },
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "732f2b58c52dca6f9546dbd76a9c72e345f082a946bcfb17aac4ea2e43c7d5b2",
+        "documents/design/b.md": "35a4be48b8c977336be729f87e9fc84b0e15c1e758f0e2bbccb687dfea7996eb"
+      },
+      "after": {
+        "documents/design/a.md": "732f2b58c52dca6f9546dbd76a9c72e345f082a946bcfb17aac4ea2e43c7d5b2",
+        "documents/design/b.md": "35a4be48b8c977336be729f87e9fc84b0e15c1e758f0e2bbccb687dfea7996eb"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/source/documents/design/b.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/root-whitespace-duplicates/source/documents/design/b.md\n\n"
+      }
+    },
+    {
+      "name": "nested-canonical",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/runtime",
+      "files": {
+        "a.md": "same",
+        "z/deep.md": "same",
+        "b/short.md": "same"
+      },
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/z/deep.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b/short.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/z/deep.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b/short.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/b/short.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/z/deep.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/b/short.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/nested-canonical/source/documents/design/z/deep.md\n\n"
+      }
+    },
+    {
+      "name": "multiple-group-order",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/runtime",
+      "files": {
+        "a.md": "alpha",
+        "b.md": "beta",
+        "c.md": "alpha",
+        "d.md": "beta"
+      },
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+        "documents/design/c.md": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+        "documents/design/b.md": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753",
+        "documents/design/d.md": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753"
+      },
+      "after": {
+        "documents/design/a.md": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+        "documents/design/c.md": "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8",
+        "documents/design/b.md": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753",
+        "documents/design/d.md": "f44e64e75f3948e9f73f8dfa94721c4ce8cbb4f265c4790c702b2d41cfbf2753"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/c.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/c.md\n\nDUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/b.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/d.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/b.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/multiple-group-order/source/documents/design/d.md\n\n"
+      }
+    },
+    {
+      "name": "unicode-whitespace",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/runtime",
+      "files": {
+        "a.md": "one\u001ctwo",
+        "b.md": "one two",
+        "c.md": "one\u00a0two"
+      },
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "73a3f0ed468f43b3f2031403b7ad789b19e1247a4e398388ea403ed442b00794",
+        "documents/design/c.md": "d153e07702e5e90c726d3829656efc492593cbbeaa61ca3aac4b74ad77cd964a",
+        "documents/design/b.md": "8ab63e29a4ba14e4e1688f9c15e5af90895421358c945b0431f85d66977bd3d2"
+      },
+      "after": {
+        "documents/design/a.md": "73a3f0ed468f43b3f2031403b7ad789b19e1247a4e398388ea403ed442b00794",
+        "documents/design/c.md": "d153e07702e5e90c726d3829656efc492593cbbeaa61ca3aac4b74ad77cd964a",
+        "documents/design/b.md": "8ab63e29a4ba14e4e1688f9c15e5af90895421358c945b0431f85d66977bd3d2"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/b.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/c.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/b.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/unicode-whitespace/source/documents/design/c.md\n\n"
+      }
+    },
+    {
+      "name": "template-exclusion",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same",
+        "TEMPLATE.md": "same",
+        "backup.md.bak": "same"
+      },
+      "extra": [],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/backup.md.bak": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/TEMPLATE.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/backup.md.bak": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/TEMPLATE.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/source/documents/design/b.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/template-exclusion/source/documents/design/b.md\n\n"
+      }
+    },
+    {
+      "name": "delete-without-grant",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-grant/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-grant/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--delete"
+      ],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-grant/runtime/report.txt",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_redundant_designs.py [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\nfind_redundant_designs.py: error: runtime_or_mutation_error: explicit mutation capability required; pass --mutation-capability-json\n",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {}
+    },
+    {
+      "name": "delete-without-runtime",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-runtime/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-runtime/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--delete"
+      ],
+      "capability": {
+        "allowed_paths": [
+          "documents/design/b.md"
+        ],
+        "purpose": "oracle fixture",
+        "authority": "issue-1630"
+      },
+      "has_runtime": false,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-without-runtime/runtime/report.txt",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_redundant_designs.py [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\nfind_redundant_designs.py: error: runtime_or_mutation_error: explicit runtime root required; pass --runtime-root or set AGENT_CANON_RUNTIME_ROOT\n",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {}
+    },
+    {
+      "name": "delete-valid",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--delete"
+      ],
+      "capability": {
+        "allowed_paths": [
+          "documents/design/b.md"
+        ],
+        "purpose": "oracle fixture",
+        "authority": "issue-1630"
+      },
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/runtime/report.txt",
+      "exit": 0,
+      "stdout": "Report written to /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/runtime/report.txt\n",
+      "stderr": "",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {
+        "report.txt": "DUP_GROUP:\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source/documents/design/a.md\n  /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source/documents/design/b.md\n  KEEP: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source/documents/design/a.md\n  DELETE: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source/documents/design/b.md\n\n\nDELETED:\n/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-valid/source/documents/design/b.md\n"
+      }
+    },
+    {
+      "name": "delete-incomplete-grant",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-incomplete-grant/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-incomplete-grant/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same",
+        "c.md": "same"
+      },
+      "extra": [
+        "--delete"
+      ],
+      "capability": {
+        "allowed_paths": [
+          "documents/design/b.md"
+        ],
+        "purpose": "oracle fixture",
+        "authority": "issue-1630"
+      },
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-incomplete-grant/runtime/report.txt",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_redundant_designs.py [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\nfind_redundant_designs.py: error: runtime_or_mutation_error: mutation target is outside allowed_paths: documents/design/c.md\n",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/c.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/c.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {}
+    },
+    {
+      "name": "delete-unknown-grant-field",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-unknown-grant-field/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-unknown-grant-field/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--delete"
+      ],
+      "capability": {
+        "allowed_paths": [
+          "documents/design/b.md"
+        ],
+        "purpose": "oracle fixture",
+        "authority": "issue-1630",
+        "unexpected": true
+      },
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/delete-unknown-grant-field/runtime/report.txt",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_redundant_designs.py [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\nfind_redundant_designs.py: error: runtime_or_mutation_error: mutation capability fields must be allowed_paths, purpose, authority\n",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {}
+    },
+    {
+      "name": "source-local-output",
+      "source_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/source-local-output/source",
+      "runtime_root": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/source-local-output/runtime",
+      "files": {
+        "a.md": "same",
+        "b.md": "same"
+      },
+      "extra": [
+        "--source-output"
+      ],
+      "capability": null,
+      "has_runtime": true,
+      "default_output": false,
+      "second_invocation": null,
+      "output": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/source-local-output/source/report.txt",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: find_redundant_designs.py [-h] [--design-root DESIGN_ROOT] [--delete]\n                                 [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                                 [--runtime-root RUNTIME_ROOT]\n                                 [--output OUTPUT]\nfind_redundant_designs.py: error: runtime_or_mutation_error: path escapes runtime root: /var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/duplicate-design-packet-and-oracle-keiqw0r4/fixtures/source-local-output/source/report.txt\n",
+      "before": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "after": {
+        "documents/design/a.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5",
+        "documents/design/b.md": "0967115f2813a3541eaef77de9d9d5773f1c0c04314b0bbfe4ff3b3b1c55b5d5"
+      },
+      "reports": {}
+    }
+  ],
+  "status": "actual old CLI outcomes; no product logic implemented in fixtures"
+}
