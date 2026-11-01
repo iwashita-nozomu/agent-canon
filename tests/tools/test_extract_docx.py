@@ -25,7 +25,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 ZIP_GOLDEN = PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_golden.json"
-SFX_ZIP_GOLDEN = PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_sfx_golden.json"
+SFX_ZIP_GOLDEN = (
+    PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_sfx_golden.json"
+)
 
 
 def safe_document_xml() -> str:
@@ -196,7 +198,9 @@ class ExtractDocxTest(unittest.TestCase):
                 }
                 self.assertEqual(actual_raw_paths, set(case["raw_files"]))
 
-    def test_zip64_and_self_extracting_archives_match_frozen_python_oracle(self) -> None:
+    def test_zip64_and_self_extracting_archives_match_frozen_python_oracle(
+        self,
+    ) -> None:
         """ZIP64, SFX, and SFX+ZIP64 retain old acceptance and bundle bytes."""
         oracle = json.loads(SFX_ZIP_GOLDEN.read_text(encoding="utf-8"))
         self.assertEqual(
@@ -246,7 +250,9 @@ class ExtractDocxTest(unittest.TestCase):
                     archive,
                 )
                 raw_members = [
-                    member for member in manifest["zip_members"] if not member["directory"]
+                    member
+                    for member in manifest["zip_members"]
+                    if not member["directory"]
                 ]
                 actual_raw_paths = {
                     path.relative_to(bundle / "raw").as_posix()
@@ -280,12 +286,18 @@ class ExtractDocxTest(unittest.TestCase):
 
             source_copy = bundle / "source" / source.name
             self.assertEqual(source_copy.read_bytes(), source.read_bytes())
-            self.assertTrue((bundle / "raw" / "word" / "media" / "image1.emf").is_file())
+            self.assertTrue(
+                (bundle / "raw" / "word" / "media" / "image1.emf").is_file()
+            )
 
-            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads(
+                (bundle / "manifest.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(manifest["schema_version"], 1)
             self.assertEqual(manifest["source"]["name"], source.name)
-            self.assertEqual(manifest["source"]["size_bytes"], source_copy.stat().st_size)
+            self.assertEqual(
+                manifest["source"]["size_bytes"], source_copy.stat().st_size
+            )
             self.assertEqual(manifest["source"]["sha256"], sha256(source_copy))
             self.assertEqual(manifest["outputs"]["extracted_markdown"], "extracted.md")
             for member in manifest["zip_members"]:
@@ -300,7 +312,10 @@ class ExtractDocxTest(unittest.TestCase):
         """Traversal, POSIX absolute, and Windows absolute paths fail closed."""
         unsafe_names = ("../escape.txt", "/escape.txt", r"C:\escape.txt")
         for index, unsafe_name in enumerate(unsafe_names):
-            with self.subTest(unsafe_name=unsafe_name), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(unsafe_name=unsafe_name),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 source = root / f"unsafe-{index}.docx"
                 bundle = root / "bundle"
@@ -407,14 +422,22 @@ class ExtractDocxTest(unittest.TestCase):
             result = self.run_cli(str(source), "--output-dir", str(bundle))
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            manifest = json.loads(
+                (bundle / "manifest.json").read_text(encoding="utf-8")
+            )
             member_names = [member["name"] for member in manifest["zip_members"]]
             self.assertIn("assets/é.bin", member_names)
             self.assertIn("assets/├⌐.bin", member_names)
             self.assertIn("assets/name", member_names)
-            self.assertEqual((bundle / "raw" / "assets" / "é.bin").read_bytes(), b"extra")
-            self.assertEqual((bundle / "raw" / "assets" / "├⌐.bin").read_bytes(), b"extra")
-            self.assertEqual((bundle / "raw" / "assets" / "name").read_bytes(), b"extra")
+            self.assertEqual(
+                (bundle / "raw" / "assets" / "é.bin").read_bytes(), b"extra"
+            )
+            self.assertEqual(
+                (bundle / "raw" / "assets" / "├⌐.bin").read_bytes(), b"extra"
+            )
+            self.assertEqual(
+                (bundle / "raw" / "assets" / "name").read_bytes(), b"extra"
+            )
 
     def test_rejects_nonempty_output_directory_without_mutation(self) -> None:
         """Existing content is never overwritten implicitly."""
@@ -501,6 +524,7 @@ class ExtractDocxTest(unittest.TestCase):
             self.assertTrue((bundle / "manifest.json").is_file())
             self.assertTrue((bundle / "source" / source.name).is_file())
             self.assert_no_staging_paths(bundle)
+
 
 if __name__ == "__main__":
     unittest.main()
