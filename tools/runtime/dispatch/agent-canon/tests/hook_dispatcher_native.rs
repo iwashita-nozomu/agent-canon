@@ -350,3 +350,193 @@ fn native_hook_cli_matches_frozen_cpython_cases() {
         }
     }
 }
+
+#[test]
+fn report_selection_preserves_precedence_and_pointer_containment() {
+    for kind in [
+        "explicit",
+        "pointer",
+        "local-pointer",
+        "missing",
+        "parent-escape",
+        "absolute-escape",
+        "target-symlink",
+        "report-root-symlink",
+    ] {
+        let temp = TempDir::new();
+        git_repo(temp.path());
+        let source = temp.path().join("source");
+        let results = temp.path().join("results");
+        let report_root = source.join("reports/agents");
+        let target = report_root.join("selected-run");
+        let outside = temp.path().join("outside");
+        fs::create_dir_all(&target).expect("create existing run target");
+        fs::create_dir_all(&results).expect("create event results directory");
+        fs::create_dir_all(&outside).expect("create outside directory");
+        let mut values = environment(&source, &results);
+        values.insert(
+            "AGENT_CANON_PARENT_ROOT".to_owned(),
+            temp.path().display().to_string(),
+        );
+        values.insert(
+            "AGENT_CANON_RUNTIME_ROOT".to_owned(),
+            temp.path().display().to_string(),
+        );
+        let mut selected = None;
+        match kind {
+            "explicit" => {
+                fs::write(report_root.join(".active_run"), "selected-run\n").unwrap();
+                values.insert(
+                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
+                    outside.display().to_string(),
+                );
+                selected = Some(outside.clone());
+            }
+            "pointer" => {
+                fs::write(report_root.join(".active_run"), "selected-run\n").unwrap();
+                selected = Some(target.clone());
+            }
+            "local-pointer" => {
+                fs::write(source.join(".active_run"), "reports/agents/selected-run\n").unwrap();
+                selected = Some(target.clone());
+            }
+            "missing" => fs::write(report_root.join(".active_run"), "missing-run\n").unwrap(),
+            "parent-escape" => fs::write(report_root.join(".active_run"), "../escape\n").unwrap(),
+            "absolute-escape" => fs::write(
+                report_root.join(".active_run"),
+                outside.display().to_string(),
+            )
+            .unwrap(),
+            "target-symlink" => {
+                std::os::unix::fs::symlink(&outside, report_root.join("escape")).unwrap();
+                fs::write(report_root.join(".active_run"), "escape\n").unwrap();
+            }
+            "report-root-symlink" => {
+                fs::remove_dir(&target).unwrap();
+                fs::remove_dir(&report_root).unwrap();
+                std::os::unix::fs::symlink(&outside, &report_root).unwrap();
+                fs::create_dir(outside.join("selected-run")).unwrap();
+                fs::write(outside.join(".active_run"), "selected-run\n").unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let result = run_with_input(
+            &["UserPromptSubmit".to_owned()],
+            br#"{"prompt":"use $task-routing"}"#,
+            &values,
+            &source,
+        );
+        assert_eq!(
+            result.exit_code,
+            0,
+            "{kind}: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(result.stdout.is_empty(), "{kind}: no prompt output");
+        let events = event_values(&results);
+        assert_eq!(events.len(), 1, "{kind}: one event");
+        let expected = selected
+            .as_ref()
+            .map(|path| path.display().to_string())
+            .unwrap_or_default();
+        assert_eq!(
+            text(field(&events[0], "workflow_monitor_report_dir").unwrap()),
+            expected,
+            "{kind}: report selection"
+        );
+        if let Some(selected) = selected {
+            assert!(
+                selected.join("workflow_monitoring.md").is_file(),
+                "{kind}: selected report is written"
+            );
+        } else {
+            assert!(
+                !target.join("workflow_monitoring.md").exists(),
+                "{kind}: target report absent"
+            );
+            assert!(
+                !outside.join("workflow_monitoring.md").exists(),
+                "{kind}: outside report absent"
+            );
+        }
+    }
+}
+
+#[test]
+fn report_and_spool_keep_private_arguments_out_and_fail_open() {
+    for failure in ["none", "append", "report"] {
+        let temp = TempDir::new();
+        git_repo(temp.path());
+        let source = temp.path().join("source");
+        let results = temp.path().join("results");
+        let report = temp.path().join("report");
+        for directory in [&source, &results, &report] {
+            fs::create_dir(directory).unwrap();
+        }
+        let mut values = environment(&source, &results);
+        for name in ["AGENT_CANON_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT"] {
+            values.insert(name.to_owned(), temp.path().display().to_string());
+        }
+        values.insert(
+            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
+            report.display().to_string(),
+        );
+        let monitor = report.join("workflow_monitoring.md");
+        if failure == "append" {
+            fs::write(results.join(".event-spool"), "existing-file").unwrap();
+        } else if failure == "report" {
+            fs::create_dir(&monitor).unwrap();
+        }
+        let result = run_with_input(&["PostToolUse".to_owned()], br#"{"tool_name":"Bash","tool_input":{"command":"/usr/bin/printf '%s' private-command-value"},"tool_response":{"exit_code":0,"stdout":"private-stdout","stderr":"private-stderr"},"metadata":"private-metadata-value"}"#, &values, &source);
+        assert_eq!(result.exit_code, 0, "{failure}: hook remains successful");
+        assert!(result.stdout.is_empty());
+        assert!(result.stderr.is_empty());
+        let events = event_values(&results);
+        assert_eq!(
+            events.len(),
+            usize::from(failure != "append"),
+            "{failure}: one append outcome"
+        );
+        if failure == "append" {
+            assert!(!monitor.exists(), "failed append does not write a report");
+            assert_eq!(
+                fs::read(results.join(".event-spool")).unwrap(),
+                b"existing-file"
+            );
+            continue;
+        }
+        let event = &events[0];
+        assert_eq!(text(field(event, "status").unwrap()), "invalid_projection");
+        assert_eq!(text(field(event, "tool_command_verb").unwrap()), "");
+        assert!(field(event, "tool_response").is_none());
+        let bytes = canonical_json_ascii_bytes(event).unwrap();
+        let event_text = String::from_utf8(bytes).unwrap();
+        let report_text = if failure == "none" {
+            fs::read_to_string(&monitor).expect("successful append writes report")
+        } else {
+            assert!(
+                monitor.is_dir(),
+                "failed report preserves existing directory"
+            );
+            String::new()
+        };
+        for private in [
+            "private-command-value",
+            "private-stdout",
+            "private-stderr",
+            "private-metadata-value",
+        ] {
+            assert!(
+                !event_text.contains(private),
+                "{failure}: private event value"
+            );
+            assert!(
+                !report_text.contains(private),
+                "{failure}: private report value"
+            );
+        }
+        if failure == "none" {
+            assert_eq!(report_text.matches("behavior_event_json=").count(), 1);
+        }
+    }
+}
