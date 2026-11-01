@@ -4398,10 +4398,12 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertNotEqual(receipt_check.returncode, 0)
             self.assertIn("receipt source identity mismatch", receipt_check.stderr)
+            # Cargo home is parent-owned runtime data, so keep it under the
+            # attested root.
             fake_cargo_home = Path(
                 tempfile.mkdtemp(
                     prefix="agent-canon-fake-cargo-home-",
-                    dir=root.parent,
+                    dir=root,
                 )
             )
             self.addCleanup(shutil.rmtree, fake_cargo_home)
