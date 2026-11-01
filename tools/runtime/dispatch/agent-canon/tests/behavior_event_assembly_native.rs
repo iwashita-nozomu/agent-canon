@@ -114,7 +114,7 @@ fn parts<'a>(
 ) -> HookInvocationParts<'a> {
     let payload = object_field(case_input, "payload").expect("fixture payload exists");
     let payload_status = text_field(case_input, "payload_status").clone();
-    let hook_payload = payload_status.equals_text("parsed").then_some(payload);
+    let hook_payload = Some(payload);
     HookInvocationParts {
         hook_event_name: text_field(case_input, "event").clone(),
         hook_invocation_id: text_field(case_input, "invocation").clone(),
