@@ -1068,9 +1068,7 @@ pub fn related_skill_candidates(
 fn capability_value_option(option: &str) -> Option<&'static str> {
     match option {
         "--capability" | "--format" | "--mode" | "--risk" | "--root" => Some(option),
-        "--name" | "--area" | "--prompt" | "--request" | "--purpose" | "--task" => {
-            Some("--prompt")
-        }
+        "--name" | "--area" | "--prompt" | "--request" | "--purpose" | "--task" => Some("--prompt"),
         "--prompt-file" | "--request-file" | "--query-file" => Some("--prompt-file"),
         _ => None,
     }
@@ -1097,16 +1095,15 @@ pub fn capability_flag_conflict(argv: &[String]) -> Option<String> {
         let token = &argv[index];
         if token == "--capability" || token.starts_with("--capability=") {
             index += 1;
-            if token == "--capability"
-                && index < argv.len()
-                && !argv[index].starts_with("--")
-            {
+            if token == "--capability" && index < argv.len() && !argv[index].starts_with("--") {
                 index += 1;
             }
             continue;
         }
         if token.starts_with("--") && token.contains('=') {
-            let option = token.split_once('=').map_or(token.as_str(), |(option, _)| option);
+            let option = token
+                .split_once('=')
+                .map_or(token.as_str(), |(option, _)| option);
             if let Some(canonical) = capability_value_option(option) {
                 if !matches!(canonical, "--format" | "--mode" | "--risk" | "--root") {
                     return Some(format!("capability-input-conflict:{canonical}"));
@@ -1123,7 +1120,10 @@ pub fn capability_flag_conflict(argv: &[String]) -> Option<String> {
             return Some(format!("capability-unsupported-option:{token}"));
         }
         if let Some(canonical) = capability_value_option(token) {
-            if !matches!(canonical, "--capability" | "--format" | "--mode" | "--risk" | "--root") {
+            if !matches!(
+                canonical,
+                "--capability" | "--format" | "--mode" | "--risk" | "--root"
+            ) {
                 return Some(format!("capability-input-conflict:{canonical}"));
             }
             index += 1;
@@ -1179,19 +1179,29 @@ pub fn preflight_capability_argv(argv: &[String]) -> CapabilityPreflight {
                 index += 2;
                 continue;
             }
-            values.push(token.split_once('=').map_or("", |(_, value)| value).to_owned());
+            values.push(
+                token
+                    .split_once('=')
+                    .map_or("", |(_, value)| value)
+                    .to_owned(),
+            );
             index += 1;
             continue;
         }
         let option = if token.starts_with("--") {
-            token.split_once('=').map_or(token.as_str(), |(option, _)| option)
+            token
+                .split_once('=')
+                .map_or(token.as_str(), |(option, _)| option)
         } else {
             ""
         };
         let has_equals = token.starts_with("--") && token.contains('=');
         if matches!(option, "--format" | "--mode" | "--risk" | "--root") {
             let value = if has_equals {
-                token.split_once('=').map_or("", |(_, value)| value).to_owned()
+                token
+                    .split_once('=')
+                    .map_or("", |(_, value)| value)
+                    .to_owned()
             } else if index + 1 >= argv.len() || argv[index + 1].starts_with("--") {
                 let error_code = match option {
                     "--format" => "missing-format-value",
@@ -1262,11 +1272,11 @@ pub fn preflight_capability_argv(argv: &[String]) -> CapabilityPreflight {
             };
         }
     };
-    if let Some(duplicate) = normalized_ids.iter().enumerate().find_map(|(position, value)| {
-        normalized_ids[..position]
-            .contains(value)
-            .then_some(value)
-    }) {
+    if let Some(duplicate) = normalized_ids
+        .iter()
+        .enumerate()
+        .find_map(|(position, value)| normalized_ids[..position].contains(value).then_some(value))
+    {
         return CapabilityPreflight {
             capability_ids: normalized_ids,
             mode,
@@ -1451,10 +1461,7 @@ pub fn decide_capabilities(
     }
     skills.push(matched.skill.clone());
     let skills = ordered_unique(&skills);
-    let active_skills = ordered_unique(&[
-        "agent-orchestration".to_owned(),
-        matched.skill.clone(),
-    ]);
+    let active_skills = ordered_unique(&["agent-orchestration".to_owned(), matched.skill.clone()]);
     let deferred_skills = skills
         .iter()
         .filter(|skill| !active_skills.contains(skill))
@@ -1505,8 +1512,8 @@ fn route_source_override(raw: &str, code: &str) -> Result<PathBuf, (String, Stri
 }
 
 fn current_route_repository_root(raw_root: &Path) -> Result<PathBuf, String> {
-    let expanded = crate::path_expansion::expand_user_path(raw_root)
-        .map_err(|error| error.to_string())?;
+    let expanded =
+        crate::path_expansion::expand_user_path(raw_root).map_err(|error| error.to_string())?;
     let start = if expanded.is_absolute() {
         expanded
     } else {
@@ -1543,24 +1550,25 @@ fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, 
         } else {
             &canon_override
         };
-        let source = route_source_override(
-            source_value,
-            "agent_canon_source_root_override_invalid",
-        )?;
-        let canon = route_source_override(
-            canon_value,
-            "agent_canon_canon_root_override_invalid",
-        )?;
+        let source =
+            route_source_override(source_value, "agent_canon_source_root_override_invalid")?;
+        let canon = route_source_override(canon_value, "agent_canon_canon_root_override_invalid")?;
         if !has_skill_catalog(&source) {
             return Err((
                 "agent_canon_source_root_override_missing".to_owned(),
-                format!("Override source root has no AgentCanon catalog: {}", source.display()),
+                format!(
+                    "Override source root has no AgentCanon catalog: {}",
+                    source.display()
+                ),
             ));
         }
         if !has_skill_catalog(&canon) {
             return Err((
                 "agent_canon_canon_root_override_missing".to_owned(),
-                format!("Override canon root has no AgentCanon catalog: {}", canon.display()),
+                format!(
+                    "Override canon root has no AgentCanon catalog: {}",
+                    canon.display()
+                ),
             ));
         }
         return Ok(source);
@@ -1577,10 +1585,7 @@ fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, 
     Ok(current_repository_root)
 }
 
-fn render_capability_decision(
-    decision: &CapabilityRouteDecision,
-    output_format: &str,
-) -> String {
+fn render_capability_decision(decision: &CapabilityRouteDecision, output_format: &str) -> String {
     let matches = serde_json::to_string(&decision.matches).expect("matches serialize");
     let related_skills =
         serde_json::to_string(&decision.related_skills).expect("related skills serialize");
@@ -1610,8 +1615,14 @@ fn render_capability_decision(
             format!("- Capability IDs: `{capability_ids}`"),
             format!("- Matches: `{matches}`"),
             format!("- Skills: `{}`", join_or_dash(&decision.skills)),
-            format!("- Active skills: `{}`", join_or_dash(&decision.active_skills)),
-            format!("- Deferred skills: `{}`", join_or_dash(&decision.deferred_skills)),
+            format!(
+                "- Active skills: `{}`",
+                join_or_dash(&decision.active_skills)
+            ),
+            format!(
+                "- Deferred skills: `{}`",
+                join_or_dash(&decision.deferred_skills)
+            ),
             format!(
                 "- Related skill candidates: `{}`",
                 join_or_dash(&decision.related_skill_candidates)
@@ -1631,7 +1642,10 @@ fn render_capability_decision(
         format!("CAPABILITY_MATCHES={matches}"),
         format!("SKILLS={}", join_or_dash(&decision.skills)),
         format!("ACTIVE_SKILLS={}", join_or_dash(&decision.active_skills)),
-        format!("DEFERRED_SKILLS={}", join_or_dash(&decision.deferred_skills)),
+        format!(
+            "DEFERRED_SKILLS={}",
+            join_or_dash(&decision.deferred_skills)
+        ),
         format!(
             "RELATED_SKILL_CANDIDATES={}",
             join_or_dash(&decision.related_skill_candidates)
@@ -1658,7 +1672,10 @@ pub fn run_capability_route(args: &[String]) -> i32 {
             &preflight.capability_ids,
             &preflight.mode,
         );
-        println!("{}", render_capability_decision(&decision, &preflight.output_format));
+        println!(
+            "{}",
+            render_capability_decision(&decision, &preflight.output_format)
+        );
         return 2;
     }
     let default_root = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -1678,7 +1695,10 @@ pub fn run_capability_route(args: &[String]) -> i32 {
                 &preflight.capability_ids,
                 &preflight.mode,
             );
-            println!("{}", render_capability_decision(&decision, &preflight.output_format));
+            println!(
+                "{}",
+                render_capability_decision(&decision, &preflight.output_format)
+            );
             return 2;
         }
     };
@@ -1689,8 +1709,15 @@ pub fn run_capability_route(args: &[String]) -> i32 {
         &index,
         &preflight,
     );
-    println!("{}", render_capability_decision(&decision, &preflight.output_format));
-    if decision.status == "pass" { 0 } else { 2 }
+    println!(
+        "{}",
+        render_capability_decision(&decision, &preflight.output_format)
+    );
+    if decision.status == "pass" {
+        0
+    } else {
+        2
+    }
 }
 
 /// Runs the optional authoring-only YAML and JSON schema checks.
@@ -1829,7 +1856,10 @@ mod capability_route_tests {
         );
         assert_eq!(decision.status, "pass");
         assert_eq!(decision.capability_ids, vec!["oop_type_design".to_owned()]);
-        assert_eq!(decision.matches[0].owner, "pre_implementation_oop_type_design");
+        assert_eq!(
+            decision.matches[0].owner,
+            "pre_implementation_oop_type_design"
+        );
         assert_eq!(
             decision.skills,
             vec![
@@ -1840,7 +1870,10 @@ mod capability_route_tests {
         );
         assert_eq!(
             decision.active_skills,
-            vec!["agent-orchestration".to_owned(), "oop-type-design".to_owned()]
+            vec![
+                "agent-orchestration".to_owned(),
+                "oop-type-design".to_owned()
+            ]
         );
         assert_eq!(
             decision.deferred_skills,

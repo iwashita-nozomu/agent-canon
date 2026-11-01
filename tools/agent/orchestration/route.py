@@ -1021,32 +1021,12 @@ def has_unknown_resolution(resolutions: Iterable[NameResolution]) -> bool:
     return any(item.status == "unknown" for item in resolutions)
 
 
-def _native_capability_cli() -> Path:
-    """Resolve the configured native CLI used for capability selection."""
-    configured = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI")
-    if configured:
-        return Path(configured)
-    source_root = Path(__file__).resolve().parents[3]
-    crate_root = source_root / "tools" / "runtime" / "dispatch" / "agent-canon"
-    target_root = Path(os.environ.get("CARGO_TARGET_DIR") or crate_root / "target")
-    for profile in ("release", "debug"):
-        candidate = target_root / profile / "agent-canon"
-        if candidate.is_file() and os.access(candidate, os.X_OK):
-            return candidate
-    cache_root = Path(
-        os.environ.get("AGENT_CANON_CACHE_ROOT") or "/var/lib/agent-canon/cache"
-    )
-    cached_cli = cache_root / "bin" / "agent-canon"
-    if cached_cli.is_file() and os.access(cached_cli, os.X_OK):
-        return cached_cli
-    return source_root / "tools" / "bin" / "agent-canon"
-
-
 def _run_native_capability_route(argv: Sequence[str]) -> int:
     """Delegate the complete explicit-capability route to its Rust owner."""
+    cli = Path(__file__).resolve().parents[3] / "tools" / "bin" / "agent-canon"
     try:
         result = subprocess.run(
-            [str(_native_capability_cli()), "capability-route", *argv],
+            [str(cli), "capability-route", *argv],
             cwd=Path.cwd(),
             check=False,
             capture_output=True,
