@@ -24,9 +24,9 @@ NATIVE_CLI = os.environ.get("AGENT_CANON_CLI") or os.environ.get(
     "AGENT_CANON_NATIVE_BIN", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
 )
 PYTHON_GOLDEN = json.loads(
-    (PROJECT_ROOT / "tests" / "fixtures" / "eval_accumulation" / "python_golden.json").read_text(
-        encoding="utf-8"
-    )
+    (
+        PROJECT_ROOT / "tests" / "fixtures" / "eval_accumulation" / "python_golden.json"
+    ).read_text(encoding="utf-8")
 )
 PYTHON_COMPACT_GOLDEN = json.loads(
     (
@@ -126,14 +126,24 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(result.stdout, self.golden_output("complete-text", "stdout", root))
-            self.assertEqual(result.stderr, self.golden_output("complete-text", "stderr", root))
+            self.assertEqual(
+                result.stdout, self.golden_output("complete-text", "stdout", root)
+            )
+            self.assertEqual(
+                result.stderr, self.golden_output("complete-text", "stderr", root)
+            )
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
             json_result = self.run_checker(root, "--format", "json")
-            self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
-            self.assertEqual(json_result.stdout, self.golden_output("complete-json", "stdout", root))
-            self.assertEqual(json_result.stderr, self.golden_output("complete-json", "stderr", root))
+            self.assertEqual(
+                json_result.returncode, 0, json_result.stdout + json_result.stderr
+            )
+            self.assertEqual(
+                json_result.stdout, self.golden_output("complete-json", "stdout", root)
+            )
+            self.assertEqual(
+                json_result.stderr, self.golden_output("complete-json", "stderr", root)
+            )
 
     def test_duplicate_hook_run_id_fails(self) -> None:
         """Hook run ids must be unique even within the same JSONL file."""
@@ -151,8 +161,12 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertEqual(result.stdout, self.golden_output("duplicate-text", "stdout", root))
-            self.assertEqual(result.stderr, self.golden_output("duplicate-text", "stderr", root))
+            self.assertEqual(
+                result.stdout, self.golden_output("duplicate-text", "stdout", root)
+            )
+            self.assertEqual(
+                result.stderr, self.golden_output("duplicate-text", "stderr", root)
+            )
             self.assertIn("duplicate", result.stdout)
 
     def test_transport_index_is_not_a_hook_event(self) -> None:
@@ -267,7 +281,9 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             golden_stderr = self.golden_output("duplicate-compact", "stderr", root)
             old_terminal_error = golden_stderr.splitlines()[-1].split(": ", 1)[1]
-            self.assertEqual(result.returncode, self.golden_case("duplicate-compact")["exit"])
+            self.assertEqual(
+                result.returncode, self.golden_case("duplicate-compact")["exit"]
+            )
             self.assertEqual(result.stdout, "")
             self.assertTrue(result.stderr.rstrip().endswith(old_terminal_error))
             self.assertFalse(compact.exists())
