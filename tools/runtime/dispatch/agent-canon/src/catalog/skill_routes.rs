@@ -1068,8 +1068,10 @@ pub fn related_skill_candidates(
 
 fn capability_value_option(option: &str) -> Option<&str> {
     match option {
-        "--capability" | "--format" | "--mode" | "--risk" | "--root" => Some(option),
-        "--name" | "--area" | "--prompt" | "--request" | "--purpose" | "--task" => Some("--prompt"),
+        "--capability" | "--format" | "--mode" | "--risk" | "--root" | "--name" | "--area" => {
+            Some(option)
+        }
+        "--prompt" | "--request" | "--purpose" | "--task" => Some("--prompt"),
         "--prompt-file" | "--request-file" | "--query-file" => Some("--prompt-file"),
         _ => None,
     }

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -1022,7 +1023,11 @@ def has_unknown_resolution(resolutions: Iterable[NameResolution]) -> bool:
 
 def _run_native_capability_route(argv: Sequence[str]) -> int:
     """Delegate the complete explicit-capability route to its Rust owner."""
-    cli = Path(__file__).resolve().parents[3] / "tools" / "bin" / "agent-canon"
+    cli = (
+        os.environ.get("AGENT_CANON_NATIVE_BIN")
+        or os.environ.get("AGENT_CANON_CLI")
+        or str(Path(__file__).resolve().parents[3] / "tools" / "bin" / "agent-canon")
+    )
     try:
         result = subprocess.run(
             [str(cli), "capability-route", *argv],
