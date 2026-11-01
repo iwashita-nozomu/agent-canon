@@ -170,8 +170,6 @@ fn run_oracle_case(case: &Value) -> bool {
         return true;
     }
 
-    assert_source_tree_matches_oracle(case, &source, &temp);
-
     assert_eq!(
         output.status.code(),
         Some(case["exit"].as_i64().expect("case exit code") as i32),
@@ -179,6 +177,8 @@ fn run_oracle_case(case: &Value) -> bool {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    assert_source_tree_matches_oracle(case, &source, &temp);
+
     let mapped_stdout = map_oracle_paths(
         case,
         case["stdout_utf8"].as_str().expect("old stdout is text"),
