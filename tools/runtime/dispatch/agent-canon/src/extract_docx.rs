@@ -1218,8 +1218,8 @@ fn has_windows_drive(path: &str) -> bool {
 }
 
 fn portable_part_identity(part: &str) -> String {
-    let normalized = ComposingNormalizer::new_nfc().normalize(part).into_owned();
-    CaseMapper::new().fold_string(&normalized).into_owned()
+    let normalized = ComposingNormalizer::new_nfc().normalize(part);
+    CaseMapper::new().fold_string(&normalized)
 }
 
 fn copy_archive_members(
