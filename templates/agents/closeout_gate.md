@@ -16,14 +16,9 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Reader Map（読者 map）
 
-- この template は user-facing completion を unlock できる時点を判定する closeout evidence ledger を所有します。
-- 冒頭で gate status と unlock rule を記録し、その後 selected validation、AgentCanon sync、spec coverage、review integration、document structure、tool warning、subagent lifecycle、diff-check、tree-head、report placement、evaluation、log、最終 evidence を確認します。
-- verifier と auditor は `## Gate Status` と `## Unlock Rule` から読み始め、current run profile が有効にした evidence section だけを埋めます。
-- 分割して読む場合は status key を checklist anchor とし、対応 key が pending の section だけを開きます。
-
-この artifact は、user-facing completion を unlock するための最終 readback を所有します。
-現在の runtime profile が選んだ targeted validation と、選ばなかった full suite/full scan の
-境界を分け、source/projection identity、failure response、cleanup の証拠を先に確認します。
+- この artifact 自体が明示的な成果物として要求された場合だけ使います。
+- 通常の移行・修正の完了に、closeout 台帳やこのファイルの作成は要求しません。
+- 指定された形式で、最終状態と実際の検証結果を伝えます。
 
 ## Gate Status（gate status）
 
@@ -153,7 +148,7 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Tool Warning Evidence（tool warning evidence）
 
-<!-- workflow_monitoring.md の Tool Warnings ledger が non-pending か確認します。warning がなければ `tool_warning_monitoring_status: none`、`tool_warning_open_items: none`、evidence source を記録します。warning があれば全 warning_id を resolved、理由付き accepted、issue 付き deferred のいずれかにし、fix-now/S0/S1 は deferred ではなく resolved にします。 -->
+<!-- 実際に観測された warning と対応結果を、要求された成果物に必要な範囲で説明します。warning がない作業へ追加の管理記録は要求しません。 -->
 
 - tool_warning_monitoring_status:
 - tool_warning_open_items:

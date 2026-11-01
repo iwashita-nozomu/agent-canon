@@ -187,7 +187,7 @@ acceptance trace だけを持ちます。
 
 - consumer: [templates/documents/design-document.template.md](../../templates/documents/design-document.template.md)
 - responsibility region: authority / decision status、target state、OOP/type boundary、
-  dependency/effect、adversarial review、reconstruction、acceptance、evidence ledger
+  dependency/effect、adversarial review、reconstruction、acceptance、必要な根拠
 - acceptance trace: template section anchor と design clause の source anchor を既存 DIC
   の path / section / clause / evidence trace に保存します。semantic clause 本文をこの
   templateへ複製せず、canonical guide への owner reference と projection/trace 欄だけを
@@ -224,17 +224,15 @@ acceptance trace だけを持ちます。
   側の semantic duplicate owner を削除します。AgentCanon C++ scaffold は、この build
   design が owner と target identity を定義した場合に限り、別 change として追加します。
 
-## Evidence And Assumption Ledger
+## Normalization Boundaries
 
-normalization の意味、owner、evidence、validation を、次の短い structured ledger で固定
-します。record は必要な根拠だけを保持し、説明文や path の重複を増やしません。
+- C++ native consumer の profile と実在 source/header anchor は
+  [cpp-build-layout](../design/cpp-build-layout.md) で選びます。
+- C++ Docstring projection は syntax / format と native target anchor を対応させます。
+- reviewer は変更された言語・文書の責務と実際の根拠から選びます。
+- static interface に意味が十分表現されていれば、説明を重複投影しません。
 
-| id | normalization meaning | owner | evidence | validation |
-| --- | --- | --- | --- | --- |
-| DAL-01 | C++ native consumer は build design が選ぶ profile と実在 source/header anchor に正規化する | [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | canonical dependency readback と design document source anchor | canonical CI/readback、prose/source-reference readback、native-path candidate |
-| DAL-02 | C++ Docstring projection は syntax / format と native target anchor の join に正規化する | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | C++ projection record の adapter owner、target identity、header/source anchor | DIC source trace と C++ adapter readback |
-| DAL-03 | reviewer 選択は changed-surface evidence を existing language/docs candidates へ正規化し、OOP ownerだけを capability projection へ渡す | `tools/agent/orchestration/agent_team.py` + `agents/skills/catalog.yaml` | candidate list、OOP route packet、dependency order | `language_review_candidates`、`route.py`、orchestration check |
-| DAL-04 | projection の省略は static surface に semantic delta が十分表現済みという DIC evidence に正規化する | [documents/conventions/DOCSTRING_GUIDE.md](DOCSTRING_GUIDE.md) | DIC path / section / clause / evidence trace | docs check と DIC source-trace readback |
+これらの判断を管理する台帳や、更新のたびの証跡表は要求しません。
 
 ## Language projection boundary
 

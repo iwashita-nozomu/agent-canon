@@ -103,11 +103,6 @@ STANDARD_CLOSEOUT_BEHAVIOR_EVENTS = (
     "tool_call=canonical-format-check code_checker=pass checker=markdown-math-mermaid scope=changed-paths",
     "hook_dispatcher=official schema=agent-canon.posttooluse-stop.v1 events=PostToolUse,Stop",
     "static_analysis_feedback=recorded target=review-backlog-scan",
-    (
-        "hook_tool_feedback=reviewed parent_protocol_update=not_required "
-        "subagent_protocol_update=not_required "
-        "protocol_feedback_reason=standard-closeout-no-new-protocol-change"
-    ),
     "validation_failure_not_observed reason=standard-closeout-preset",
     "token_efficiency_not_required reason=no-comparable-session",
     "runtime_feedback_not_observed",

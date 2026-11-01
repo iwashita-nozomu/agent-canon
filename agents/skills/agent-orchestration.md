@@ -32,7 +32,7 @@ outcome during implementation or validation.
 
 Start from the active Goal and current instruction, or the current request when
 no Goal exists. For resumed work, reuse settled scope and remaining work from
-the current context or existing task record. Classify advisory/read-only or
+the current conversation. Classify advisory/read-only or
 repository-changing work. Reuse applicable instructions and owner context; read
 only within the
 [current read authority](../../ROOT_AGENTS.md#always-on-boundary).
@@ -59,7 +59,7 @@ answer. Include a recommendation when useful. If user input is missing, state
 what is needed without implying it was checked. Include contract location and
 conflict evidence when applicable. An active Goal or internal design does not
 authorize the change. Wait on dependent changes while continuing independent
-work. Carry the decision into the existing task or handoff when resumed work
+work. Carry the decision in the conversation or native handoff when resumed work
 depends on it.
 
 Complete authorized contract-derived repairs, including required input preparation
@@ -172,13 +172,13 @@ Unavailable required validation remains unverified.
 
 For a selected implementation, use current owner evidence to resolve design
 questions that could change the agreed outcome, implementation, or validation.
-Reuse the existing task or handoff; create a durable packet only when
-coordination or resumption needs one.
+Keep the needed decision and source context in the conversation or native
+handoff. Coordination and resumption do not require a separate work ledger.
 
 ## Execution-Time-Aware Work-Conservation Contract
 
-When coordination is selected, follow only applicable owner links and record
-actual tool/child results in the existing workflow record. A launch is not
+When coordination is selected, follow only applicable owner links and use
+actual tool/child results already available in the conversation. A launch is not
 completion; a route difference alone is not failure. Use existing Eval or owner
 review to judge missing or unnecessary work.
 

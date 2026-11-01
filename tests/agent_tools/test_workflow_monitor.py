@@ -491,10 +491,10 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertNotIn("pre_edit_rejection_prediction=", text)
             self.assertNotIn("predicted_tool_rejection_gates=", text)
             self.assertIn("static_analysis_feedback=recorded", text)
-            self.assertIn("hook_tool_feedback=reviewed", text)
-            self.assertIn("parent_protocol_update=not_required", text)
-            self.assertIn("subagent_protocol_update=not_required", text)
-            self.assertIn("protocol_feedback_reason=", text)
+            self.assertNotIn("hook_tool_feedback=", text)
+            self.assertNotIn("parent_protocol_update=", text)
+            self.assertNotIn("subagent_protocol_update=", text)
+            self.assertNotIn("protocol_feedback_reason=", text)
             self.assertIn(
                 "validation_failure_not_observed reason=standard-closeout-preset",
                 text,
@@ -562,6 +562,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
+            self.assertNotIn("TOOL_REUSE_LEDGER_STATUS=", result.stdout)
             self.assertIn(
                 "PRE_EDIT_REJECTION_PREDICTION_STATUS=optional_diagnostic",
                 result.stdout,

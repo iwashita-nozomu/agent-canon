@@ -101,8 +101,8 @@ entry condition.
 
 For an explicit cross-module/API change, inspect only the involved roots and
 edges. Distinguish source/API/build dependencies from repository pin edges;
-record order and affected consumers in the caller's existing plan when they
-determine implementation or validation order. Keep using the established
+use the needed order and affected consumers in the current conversation when
+they determine implementation or validation order. Keep using the established
 cross-module handoff when this route needs it.
 
 ## Interpretation
@@ -111,8 +111,8 @@ Use only what the selected evidence establishes. Failed or unsupported relation
 queries, missing fields, and incomplete indexes remain verification gaps rather
 than evidence of no dependency. Keep code relations separate from manifest
 edges even when both inform one scope decision. Preserve the observed input,
-source location, causal reasoning, and remaining uncertainty in the existing
-task record when they affect the action. If LSP relation evidence is selected,
+source location, causal reasoning, and remaining uncertainty in the current
+context when they affect the action. If LSP relation evidence is selected,
 follow its capability limits in
 [lsp_code_analysis.md](../../documents/tools/lsp_code_analysis.md).
 

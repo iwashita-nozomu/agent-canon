@@ -41,7 +41,7 @@ selections bypass the index. Generated consumers keep their own owner routes.
 | Selected validation or closeout is due | [completion reader map](CODEX_COMPLETION.md#reader-map) |
 | Any reader-facing text is about to be written | [reader-facing writing](ROOT_DELIVERY.md#reader-facing-writing) |
 | Verification results are about to be reported | [result reporting](ROOT_DELIVERY.md#result-reporting) |
-| Verification has failed | [failed verification record](../../documents/operations/notes-lifecycle.md#failed-verification-record) |
+| Verification has failed | [bounded diagnosis](ROOT_EXECUTION.md#configured-execution-and-bounded-diagnosis) |
 | Prior failed attempts may determine adoption or rejection | [retrieve before deciding](../../documents/operations/notes-lifecycle.md#retrieve-before-deciding) |
 | Connected GitHub Issue or PR publication/status is requested | [connected publication](../skills/pr-processing.md#work-from-the-current-connected-session) |
 

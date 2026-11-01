@@ -357,7 +357,6 @@ FinalPathLayout {
 }
 
 OwnerInvariantBoundaries {
-  unit_records_source: Ref
   unlisted_write_policy: deny
   landed_oop_owner_write_policy: read_only_hash_bound
   shared_checkout_write_policy: forbidden
@@ -381,7 +380,6 @@ PublicShapeIndex {
 }
 
 DeletionReplacementIndex {
-  unit_records_source: Ref
   compatibility_layers: forbidden
   provisional_duplicate_truth: forbidden
 }
