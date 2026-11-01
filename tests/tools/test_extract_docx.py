@@ -4,10 +4,12 @@
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/extract_docx.rs owns DOCX decomposition and bundle output
 # upstream implementation ../../tools/bin/agent-canon exposes the stable native command
 # downstream design ../../documents/tools/extract_docx.md documents the bundle contract
+# upstream reference ../../tests/fixtures/docx_zip/python_golden.json freezes old ZIP codec, duplicate-name, output, and cleanup outcomes
 # @dependency-end
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import stat
@@ -21,6 +23,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
+ZIP_GOLDEN = PROJECT_ROOT / "tests" / "fixtures" / "docx_zip" / "python_golden.json"
 
 
 def safe_document_xml() -> str:
@@ -131,6 +134,65 @@ class ExtractDocxTest(unittest.TestCase):
             list(bundle.parent.glob(f".{bundle.name}.extract-*")),
             [],
         )
+
+    def test_zip_reading_matches_frozen_python_codec_and_name_oracle(self) -> None:
+        """Supported codecs and CPython ZIP-name identity keep old outcomes."""
+        oracle = json.loads(ZIP_GOLDEN.read_text(encoding="utf-8"))
+        self.assertEqual(len(oracle["cases"]), 6)
+        for case in oracle["cases"]:
+            with (
+                self.subTest(case=case["name"]),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
+                root = Path(tmp_dir)
+                source = root / case["source_name"]
+                bundle = root / "bundle"
+                archive = base64.b64decode(case["archive_base64"])
+                self.assertEqual(
+                    hashlib.sha256(archive).hexdigest(),
+                    case["archive_sha256"],
+                )
+                source.write_bytes(archive)
+
+                result = self.run_cli(str(source), "--output-dir", str(bundle))
+
+                self.assertEqual(result.returncode, case["exit"], result.stderr)
+                self.assertEqual(
+                    result.stdout,
+                    case["stdout"].replace("{output}", str(bundle)),
+                )
+                self.assertEqual(result.stderr, case["stderr"])
+                self.assertEqual(bundle.exists(), case["output_exists"])
+                stage_leftovers = sorted(
+                    path.name for path in root.glob(f".{bundle.name}.extract-*")
+                )
+                self.assertEqual(stage_leftovers, case["stage_leftovers"])
+                if not case["output_exists"]:
+                    continue
+
+                manifest = json.loads(
+                    (bundle / "manifest.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(manifest, case["manifest"])
+                self.assertEqual(
+                    (bundle / "extracted.md").read_text(encoding="utf-8"),
+                    case["markdown"],
+                )
+                self.assertEqual(
+                    (bundle / "source" / case["source_name"]).read_bytes(),
+                    archive,
+                )
+                for relative_path, expected_base64 in case["raw_files"].items():
+                    self.assertEqual(
+                        (bundle / "raw" / relative_path).read_bytes(),
+                        base64.b64decode(expected_base64),
+                    )
+                actual_raw_paths = {
+                    path.relative_to(bundle / "raw").as_posix()
+                    for path in (bundle / "raw").rglob("*")
+                    if path.is_file()
+                }
+                self.assertEqual(actual_raw_paths, set(case["raw_files"]))
 
     def test_writes_searchable_text_raw_members_and_verified_manifest(self) -> None:
         """A DOCX becomes a complete bundle whose retained hashes read back."""

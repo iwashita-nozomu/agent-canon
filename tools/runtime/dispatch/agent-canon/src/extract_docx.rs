@@ -3,12 +3,13 @@
 // responsibility Decomposes an authorized DOCX into a searchable, auditable reference bundle.
 // upstream design ../../../../../documents/tools/extract_docx.md defines the bundle and CLI contract
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md defines native ownership and caller closure
-// upstream implementation ../Cargo.toml selects the native ZIP, XML, Unicode, and filesystem providers
+// upstream implementation ../Cargo.toml selects the native ZIP reader/codecs, XML, Unicode, and filesystem providers
 // upstream implementation ../python_cli_integer.rs shares Python Unicode 15 digit classification
 // downstream implementation ../tests/extract_docx_native.rs qualifies the XML parser and native DOCX projection
 // downstream implementation ../../../../../tests/tools/test_extract_docx.py checks the public CLI and transaction behavior
 // @dependency-end
 
+use bzip2::read::BzDecoder;
 use cap_fs_ext::{
     DirExt, FollowSymlinks, MetadataExt as CapabilityMetadataExt, OpenOptionsFollowExt,
 };
@@ -16,6 +17,8 @@ use cap_std::fs::{Dir, DirBuilder, OpenOptions};
 use expat::internal::parse::{Handler, HandlerSet, Parser, Status};
 use icu_casemap::CaseMapper;
 use icu_normalizer::ComposingNormalizer;
+use lzma_rust2::LzmaReader;
+use rawzip::{CompressionMethod, ZipArchive as RawZipArchive, ZipArchiveEntryWayfinder};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -26,13 +29,13 @@ use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 #[cfg(not(unix))]
 use std::time::SystemTime;
-use zip::ZipArchive;
 
 const SCHEMA_VERSION: u64 = 1;
 const DOCUMENT_XML_MEMBER: &str = "word/document.xml";
 const WORD_NAMESPACE: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const CHUNK_SIZE: usize = 1024 * 1024;
-const UTF8_NAME_FLAG: u16 = 0x0800;
+const LOCAL_HEADER_BUFFER_SIZE: usize = u16::MAX as usize * 2;
+const UNSUPPORTED_ZIP_ENTRY_FLAGS: u16 = 0x0001 | 0x0020 | 0x0040;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct FileDigest {
@@ -67,13 +70,18 @@ struct InputFile {
 }
 
 struct ArchiveMember {
-    index: usize,
+    wayfinder: ZipArchiveEntryWayfinder,
+    header_name: String,
     original_name: String,
     name: String,
     parts: Vec<String>,
     identity_parts: Vec<String>,
     is_directory: bool,
     size_bytes: u64,
+    compression_method: CompressionMethod,
+    central_flags: u16,
+    local_header_offset: u64,
+    next_header_offset: u64,
 }
 
 struct RawMemberRecord {
@@ -927,18 +935,22 @@ fn inspect_archive(
             source_path.display()
         )
     })?;
-    let mut archive = ZipArchive::new(source)
+    let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
+    let archive = RawZipArchive::from_seekable(source, &mut buffer)
         .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
 
-    let mut members = Vec::with_capacity(archive.len());
+    let directory_offset = archive.directory_offset();
+    let mut entries = archive.entries(&mut buffer);
+    let mut members = Vec::new();
     let mut identities: HashMap<Vec<String>, (String, bool)> = HashMap::new();
     let mut prefix_spellings: HashMap<Vec<String>, Vec<String>> = HashMap::new();
-    for index in 0..archive.len() {
-        let entry = archive
-            .by_index(index)
-            .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
-        let utf8_name = entry.flags().as_u16() & UTF8_NAME_FLAG != 0;
-        let original_name = decode_zip_name(entry.name_raw(), utf8_name)?;
+    while let Some(entry) = entries
+        .next_entry()
+        .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?
+    {
+        let header_name =
+            decode_zip_name_untruncated(entry.file_path().as_ref(), entry.flags().is_utf8())?;
+        let original_name = truncate_zip_name(&header_name);
         let (name, parts, identity_parts) = normalized_member_identity(&original_name)?;
         if let Some((other, _)) = identities.get(&identity_parts) {
             return Err(format!(
@@ -967,19 +979,38 @@ fn inspect_archive(
             ));
         }
         let is_directory = original_name.ends_with('/');
+        let wayfinder = entry.wayfinder();
         identities.insert(
             identity_parts.clone(),
             (original_name.clone(), is_directory),
         );
         members.push(ArchiveMember {
-            index,
+            wayfinder,
+            header_name,
             original_name,
             name,
             parts,
             identity_parts,
             is_directory,
-            size_bytes: entry.size(),
+            size_bytes: entry.uncompressed_size_hint(),
+            compression_method: entry.compression_method(),
+            central_flags: entry.flags().bits(),
+            local_header_offset: entry.local_header_offset(),
+            next_header_offset: directory_offset,
         });
+    }
+    drop(entries);
+
+    let mut physical_order = (0..members.len()).collect::<Vec<_>>();
+    physical_order.sort_by(|left, right| {
+        members[*right]
+            .local_header_offset
+            .cmp(&members[*left].local_header_offset)
+    });
+    let mut next_header_offset = directory_offset;
+    for index in physical_order {
+        members[index].next_header_offset = next_header_offset;
+        next_header_offset = members[index].local_header_offset;
     }
 
     for member in &members {
@@ -1017,17 +1048,22 @@ fn inspect_archive(
 }
 
 fn decode_zip_name(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
-    let end = raw_name
-        .iter()
-        .position(|byte| *byte == 0)
-        .unwrap_or(raw_name.len());
-    let raw_name = &raw_name[..end];
+    decode_zip_name_untruncated(raw_name, utf8_name).map(|name| truncate_zip_name(&name))
+}
+
+fn decode_zip_name_untruncated(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
     if utf8_name {
         return std::str::from_utf8(raw_name)
             .map(str::to_owned)
             .map_err(|error| format!("ZIP member name is not valid UTF-8: {error}"));
     }
     Ok(raw_name.iter().copied().map(cp437_char).collect())
+}
+
+fn truncate_zip_name(name: &str) -> String {
+    name.split_once('\0')
+        .map_or(name, |(prefix, _)| prefix)
+        .to_owned()
 }
 
 fn cp437_char(byte: u8) -> char {
@@ -1110,14 +1146,13 @@ fn copy_archive_members(
             source_path.display()
         )
     })?;
-    let mut archive = ZipArchive::new(source)
+    let mut buffer = vec![0; rawzip::RECOMMENDED_BUFFER_SIZE];
+    let archive = RawZipArchive::from_seekable(source, &mut buffer)
         .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
 
     let mut records = Vec::with_capacity(members.len());
+    let mut local_header_buffer = vec![0; LOCAL_HEADER_BUFFER_SIZE];
     for member in members {
-        let mut entry = archive
-            .by_index(member.index)
-            .map_err(|_| format!("not a readable DOCX ZIP archive: {}", source_path.display()))?;
         if member.is_directory {
             create_directory_chain(&raw_root, &member.parts).map_err(|error| {
                 format!("ZIP directory path conflict: {:?}: {error}", member.name)
@@ -1129,6 +1164,40 @@ fn copy_archive_members(
                 sha256: None,
             });
             continue;
+        }
+        let entry = archive
+            .get_entry(member.wayfinder)
+            .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        let local_header = entry
+            .local_header(&mut local_header_buffer)
+            .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        let local_name = decode_zip_name_untruncated(
+            local_header.file_path().as_ref(),
+            local_header.flags().is_utf8(),
+        )
+        .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        if local_name != member.header_name {
+            return Err(format!(
+                "cannot read ZIP member: {:?}",
+                member.original_name
+            ));
+        }
+        drop(local_header);
+        let (compressed_start, compressed_end) = entry.compressed_data_range();
+        if compressed_start < member.local_header_offset
+            || compressed_end < compressed_start
+            || compressed_end > member.next_header_offset
+        {
+            return Err(format!(
+                "cannot read ZIP member: {:?}",
+                member.original_name
+            ));
+        }
+        if member.central_flags & UNSUPPORTED_ZIP_ENTRY_FLAGS != 0 {
+            return Err(format!(
+                "cannot read ZIP member: {:?}",
+                member.original_name
+            ));
         }
 
         let leaf = member
@@ -1144,7 +1213,11 @@ fn copy_archive_members(
             })?;
         let mut target = create_new_file(&parent, OsStr::new(leaf))
             .map_err(|error| format!("cannot create ZIP member {:?}: {error}", member.name))?;
-        let digest = copy_and_digest(&mut entry, &mut target)
+        let decoder =
+            zip_member_decoder(member.compression_method, entry.reader(), member.size_bytes)
+                .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
+        let mut verified = entry.verifying_reader(decoder);
+        let digest = copy_and_digest(&mut verified, &mut target)
             .map_err(|_| format!("cannot read ZIP member: {:?}", member.original_name))?;
         drop(target);
         if digest.size_bytes != member.size_bytes {
@@ -1161,6 +1234,47 @@ fn copy_archive_members(
         });
     }
     Ok(records)
+}
+
+fn zip_member_decoder<'a, R: Read + 'a>(
+    method: CompressionMethod,
+    mut compressed: R,
+    uncompressed_size: u64,
+) -> Result<Box<dyn Read + 'a>, String> {
+    match method {
+        CompressionMethod::STORE => Ok(Box::new(compressed)),
+        CompressionMethod::DEFLATE => Ok(Box::new(flate2::read::DeflateDecoder::new(compressed))),
+        CompressionMethod::BZIP2 => Ok(Box::new(BzDecoder::new(compressed))),
+        CompressionMethod::LZMA => {
+            // ZIP method 14 prefixes the raw LZMA stream with version and property-size fields.
+            let mut header = [0_u8; 4];
+            compressed
+                .read_exact(&mut header)
+                .map_err(|error| format!("cannot read ZIP LZMA header: {error}"))?;
+            let properties_size = u16::from_le_bytes([header[2], header[3]]);
+            if properties_size != 5 {
+                return Err(format!(
+                    "unexpected ZIP LZMA properties size: {properties_size}"
+                ));
+            }
+            let mut properties = [0_u8; 5];
+            compressed
+                .read_exact(&mut properties)
+                .map_err(|error| format!("cannot read ZIP LZMA properties: {error}"))?;
+            let dictionary_size =
+                u32::from_le_bytes([properties[1], properties[2], properties[3], properties[4]]);
+            let decoder = LzmaReader::new_with_props(
+                compressed,
+                uncompressed_size,
+                properties[0],
+                dictionary_size,
+                None,
+            )
+            .map_err(|error| format!("cannot initialize ZIP LZMA decoder: {error}"))?;
+            Ok(Box::new(decoder))
+        }
+        _ => Err(format!("unsupported ZIP compression method: {method}")),
+    }
 }
 
 fn create_directory_chain(root: &Dir, parts: &[String]) -> io::Result<Dir> {
