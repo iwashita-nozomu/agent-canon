@@ -2,9 +2,9 @@ use super::{
     digest_bytes, digest_hex, encode_hex, AttestationRequest, AttestedParent, AuthorityError,
     ChildHandoffReceipt, ChildHandoffRequest, ComponentIdentity, EntryKind, FileIdentity, FileMode,
     HandoffMode, HandoffStorage, HandoffTransport, LexicalEntrySnapshot, LexicalSnapshot,
-    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedPathReceipt, ParentRootReject,
-    PhysicalRoot, RootKind, RootPrecedence, SecretToken, Sha256Digest, TargetIdentity,
-    VerifiedChildHandoff, HANDOFF_SCHEMA,
+    NonEmptyTrimmedString, Nonce128, OwnerRoot, ParentOwnedNoReplaceOutcome,
+    ParentOwnedPathReceipt, ParentRootReject, PhysicalRoot, RootKind, RootPrecedence, SecretToken,
+    Sha256Digest, TargetIdentity, VerifiedChildHandoff, HANDOFF_SCHEMA,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -774,6 +774,194 @@ pub(crate) fn write_parent_owned_file(
 ) -> Result<ParentOwnedPathReceipt, AuthorityError> {
     let receipt = resolve_parent_owned_path(attested, candidate, purpose)?;
     atomic_replace_parent_owned_file(attested, &receipt, bytes, FileMode::Private0600)
+}
+
+pub(crate) fn publish_parent_owned_file_noreplace(
+    attested: &AttestedParent,
+    candidate: &Path,
+    bytes: &[u8],
+    purpose: NonEmptyTrimmedString,
+) -> Result<ParentOwnedNoReplaceOutcome, AuthorityError> {
+    let receipt = resolve_parent_owned_path(attested, candidate, purpose.clone())?;
+    if receipt.target.is_some() {
+        return classify_existing_parent_owned_file(attested, receipt, bytes);
+    }
+
+    let root = validate_receipt(attested, &receipt)?;
+    let parts = relative_components(root.path(), &receipt.physical_path)?;
+    let (parent_parts, leaf) = split_leaf(&parts)?;
+    let (parent, parent_components) =
+        open_component_chain(root, parent_parts, &receipt.parent_components, true)?;
+    attested.verify_live_identity()?;
+    verify_component_identities(root, parent_parts, &parent_components)?;
+    verify_target_identity(&parent, leaf, receipt.target, true)?;
+    verify_lexical_snapshot(root, &receipt, false, true)?;
+
+    let mut temp_name: Option<OsString> = None;
+    let operation_result = (|| {
+        let mut opened_temp = None;
+        for _ in 0..32 {
+            let mut random = [0_u8; 16];
+            getrandom::getrandom(&mut random).map_err(|_| {
+                error(
+                    ParentRootReject::UnsupportedPlatform,
+                    "operating-system temporary-name generation is unavailable",
+                )
+            })?;
+            let mut name = OsString::from(".");
+            name.push(leaf);
+            name.push(".");
+            name.push(encode_hex(&random));
+            name.push(".tmp");
+            let mut options = OpenOptions::new();
+            options
+                .write(true)
+                .create_new(true)
+                .follow(FollowSymlinks::No);
+            options.mode(0o600);
+            match parent.open_with(&name, &options) {
+                Ok(file) => {
+                    temp_name = Some(name);
+                    opened_temp = Some(file);
+                    break;
+                }
+                Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => {
+                    continue;
+                }
+                Err(_) => {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "cannot create parent-owned no-replace temporary file",
+                    ));
+                }
+            }
+        }
+        let temp_name_ref = temp_name.as_ref().ok_or_else(|| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot allocate unique parent-owned no-replace temporary file",
+            )
+        })?;
+        let mut file = opened_temp.ok_or_else(|| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "no-replace temporary file was not opened",
+            )
+        })?;
+        write_all_progress(&mut file, bytes).map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot write parent-owned no-replace temporary file",
+            )
+        })?;
+        file.sync_all().map_err(|_| {
+            error(
+                ParentRootReject::RootRaceDetected,
+                "cannot sync parent-owned no-replace temporary file",
+            )
+        })?;
+        drop(file);
+
+        attested.verify_live_identity()?;
+        verify_component_identities(root, parent_parts, &parent_components)?;
+        verify_target_identity(&parent, leaf, receipt.target, true)?;
+        verify_lexical_snapshot(root, &receipt, false, true)?;
+        match parent.hard_link(temp_name_ref, &parent, leaf) {
+            Ok(()) => {
+                sync_directory(&parent)?;
+                attested.verify_live_identity()?;
+                verify_component_identities(root, parent_parts, &parent_components)?;
+                let target = target_identity(&parent, leaf)?.ok_or_else(|| {
+                    error(
+                        ParentRootReject::RootRaceDetected,
+                        "published parent-owned file disappeared",
+                    )
+                })?;
+                if target.kind != EntryKind::File {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "published parent-owned target is not a regular file",
+                    ));
+                }
+                let lexical_snapshot = capture_lexical_snapshot(root, &receipt.lexical_path)?;
+                if receipt
+                    .lexical_snapshot
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.entry.as_ref())
+                    .is_some_and(|entry| entry.kind == EntryKind::Symlink)
+                    && receipt.lexical_snapshot != lexical_snapshot
+                {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "lexical symlink changed during no-replace publication",
+                    ));
+                }
+                let mut published = receipt.clone();
+                published.parent_components = parent_components.clone();
+                published.target = Some(target);
+                published.lexical_snapshot = lexical_snapshot;
+                verify_lexical_snapshot(root, &published, true, false)?;
+                attested.verify_live_identity()?;
+                if read_parent_owned_file(attested, &published)? != bytes {
+                    return Err(error(
+                        ParentRootReject::RootRaceDetected,
+                        "published parent-owned bytes changed during readback",
+                    ));
+                }
+                Ok(ParentOwnedNoReplaceOutcome::Published(published))
+            }
+            Err(error_value) if error_value.kind() == std::io::ErrorKind::AlreadyExists => {
+                let current = resolve_parent_owned_path(attested, candidate, purpose.clone())?;
+                classify_existing_parent_owned_file(attested, current, bytes)
+            }
+            Err(_) => Err(error(
+                ParentRootReject::RootRaceDetected,
+                "cannot publish parent-owned file without replacement",
+            )),
+        }
+    })();
+
+    let cleanup_result = match temp_name.as_ref() {
+        Some(name) => match parent.remove_file(name) {
+            Ok(()) => sync_directory(&parent),
+            Err(error_value) if error_value.kind() == std::io::ErrorKind::NotFound => {
+                sync_directory(&parent)
+            }
+            Err(error_value) => Err(error(
+                ParentRootReject::RootRaceDetected,
+                format!("cannot clean up parent-owned no-replace temporary file: {error_value}"),
+            )),
+        },
+        None => Ok(()),
+    };
+    match (operation_result, cleanup_result) {
+        (Ok(outcome), Ok(())) => Ok(outcome),
+        (Ok(_), Err(cleanup_error)) => Err(cleanup_error),
+        (Err(primary), Ok(())) => Err(primary),
+        (Err(primary), Err(cleanup_error)) => Err(error(
+            ParentRootReject::RootRaceDetected,
+            format!("{primary}; no-replace temporary cleanup failed: {cleanup_error}"),
+        )),
+    }
+}
+
+fn classify_existing_parent_owned_file(
+    attested: &AttestedParent,
+    receipt: ParentOwnedPathReceipt,
+    bytes: &[u8],
+) -> Result<ParentOwnedNoReplaceOutcome, AuthorityError> {
+    if receipt.target.is_none() {
+        return Err(error(
+            ParentRootReject::RootRaceDetected,
+            "no-replace conflict target disappeared before comparison",
+        ));
+    }
+    let existing = read_parent_owned_file(attested, &receipt)?;
+    if existing == bytes {
+        Ok(ParentOwnedNoReplaceOutcome::Duplicate(receipt))
+    } else {
+        Ok(ParentOwnedNoReplaceOutcome::Conflict(receipt))
+    }
 }
 
 fn lexical_candidate(root: &Path, candidate: &Path) -> Result<PathBuf, AuthorityError> {
