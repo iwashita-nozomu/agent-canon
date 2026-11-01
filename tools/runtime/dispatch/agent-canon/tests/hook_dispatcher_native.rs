@@ -358,6 +358,7 @@ fn report_selection_preserves_precedence_and_pointer_containment() {
         "explicit",
         "pointer",
         "local-pointer",
+        "container-target",
         "missing",
         "parent-escape",
         "absolute-escape",
@@ -393,9 +394,16 @@ fn report_selection_preserves_precedence_and_pointer_containment() {
                 );
                 selected = Some(outside.clone());
             }
-            "pointer" => {
+            "pointer" | "container-target" => {
                 fs::write(report_root.join(".active_run"), "selected-run\n").unwrap();
                 selected = Some(target.clone());
+                if kind == "container-target" {
+                    values.remove("AGENT_CANON_HOOK_SOURCE_ROOT");
+                    values.insert(
+                        "AGENT_CANON_TARGET_CONTAINER_ROOT".to_owned(),
+                        source.display().to_string(),
+                    );
+                }
             }
             "local-pointer" => {
                 fs::write(source.join(".active_run"), "reports/agents/selected-run\n").unwrap();
@@ -436,6 +444,11 @@ fn report_selection_preserves_precedence_and_pointer_containment() {
         assert!(result.stdout.is_empty(), "{kind}: no prompt output");
         let events = event_values(&results);
         assert_eq!(events.len(), 1, "{kind}: one event");
+        assert_eq!(
+            text(field(&events[0], "root").unwrap()),
+            source.display().to_string(),
+            "{kind}: event uses selected repository root"
+        );
         let expected = selected
             .as_ref()
             .map(|path| path.display().to_string())
@@ -465,7 +478,7 @@ fn report_selection_preserves_precedence_and_pointer_containment() {
 
 #[test]
 fn report_and_spool_keep_private_arguments_out_and_fail_open() {
-    for failure in ["none", "append", "report"] {
+    for failure in ["none", "append", "report", "parent"] {
         let temp = TempDir::new();
         git_repo(temp.path());
         let source = temp.path().join("source");
@@ -487,6 +500,8 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
             fs::write(results.join(".event-spool"), "existing-file").unwrap();
         } else if failure == "report" {
             fs::create_dir(&monitor).unwrap();
+        } else if failure == "parent" {
+            values.insert("AGENT_CANON_PARENT_ROOT".to_owned(), String::new());
         }
         let result = run_with_input(&["PostToolUse".to_owned()], br#"{"tool_name":"Bash","tool_input":{"command":"/usr/bin/printf '%s' private-command-value"},"tool_response":{"exit_code":0,"stdout":"private-stdout","stderr":"private-stderr"},"metadata":"private-metadata-value"}"#, &values, &source);
         assert_eq!(result.exit_code, 0, "{failure}: hook remains successful");
@@ -495,15 +510,17 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
         let events = event_values(&results);
         assert_eq!(
             events.len(),
-            usize::from(failure != "append"),
+            usize::from(!matches!(failure, "append" | "parent")),
             "{failure}: one append outcome"
         );
-        if failure == "append" {
+        if matches!(failure, "append" | "parent") {
             assert!(!monitor.exists(), "failed append does not write a report");
-            assert_eq!(
-                fs::read(results.join(".event-spool")).unwrap(),
-                b"existing-file"
-            );
+            if failure == "append" {
+                assert_eq!(
+                    fs::read(results.join(".event-spool")).unwrap(),
+                    b"existing-file"
+                );
+            }
             continue;
         }
         let event = &events[0];
@@ -538,6 +555,25 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
         }
         if failure == "none" {
             assert_eq!(report_text.matches("behavior_event_json=").count(), 1);
+            let line = report_text
+                .lines()
+                .find_map(|line| line.trim().strip_prefix("behavior_event_json="))
+                .expect("one behavior projection");
+            let projected = parse_json(line).unwrap();
+            let JsonValue::Object(fields) = &projected else {
+                panic!("projected event is an object");
+            };
+            for (name, expected) in &fields.0 {
+                let name = name.to_text().unwrap();
+                assert_eq!(
+                    canonical_json_ascii_bytes(
+                        field(event, &name).expect("projection field belongs to spooled event")
+                    )
+                    .unwrap(),
+                    canonical_json_ascii_bytes(expected).unwrap(),
+                    "monitor and spool agree on {name}"
+                );
+            }
         }
     }
 }
