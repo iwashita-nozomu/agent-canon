@@ -4,9 +4,9 @@
 // downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
-// downstream test ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
-// downstream test ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
-// downstream test ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
+// downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
+// downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
+// downstream implementation ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
 // @dependency-end
 
 use serde::de::{self, Visitor};
@@ -817,17 +817,23 @@ fn is_json_integer(value: &str) -> bool {
 
 /// Serialize with Python's `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)` bytes.
 pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_nonfinite(value, false)
+    canonical_json_ascii_bytes_with_options(value, false, false)
 }
 
 /// Serialize with the same canonical form, rejecting non-finite floats as `allow_nan=False` does.
 pub fn canonical_json_ascii_bytes_reject_nonfinite(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_nonfinite(value, true)
+    canonical_json_ascii_bytes_with_options(value, true, false)
 }
 
-fn canonical_json_ascii_bytes_with_nonfinite(
+/// Serialize like `json.dump(value, sort_keys=True, ensure_ascii=True)` with default separators.
+pub fn python_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_options(value, false, true)
+}
+
+fn canonical_json_ascii_bytes_with_options(
     value: &JsonValue,
     reject_nonfinite: bool,
+    spaced_separators: bool,
 ) -> Result<Vec<u8>, String> {
     enum Action<'a> {
         Value(&'a JsonValue),
@@ -868,7 +874,11 @@ fn canonical_json_ascii_bytes_with_nonfinite(
                     for index in (0..values.0.len()).rev() {
                         actions.push(Action::Value(&values.0[index]));
                         if index > 0 {
-                            actions.push(Action::Text(b","));
+                            actions.push(Action::Text(if spaced_separators {
+                                b", "
+                            } else {
+                                b","
+                            }));
                         }
                     }
                 }
@@ -890,10 +900,14 @@ fn canonical_json_ascii_bytes_with_nonfinite(
                     for index in (0..unique_entries.len()).rev() {
                         let (key, value) = unique_entries[index];
                         actions.push(Action::Value(value));
-                        actions.push(Action::Text(b":"));
+                        actions.push(Action::Text(if spaced_separators { b": " } else { b":" }));
                         actions.push(Action::String(key));
                         if index > 0 {
-                            actions.push(Action::Text(b","));
+                            actions.push(Action::Text(if spaced_separators {
+                                b", "
+                            } else {
+                                b","
+                            }));
                         }
                     }
                 }

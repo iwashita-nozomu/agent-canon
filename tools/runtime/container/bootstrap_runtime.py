@@ -3859,27 +3859,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.operation == "codex" and args.codex_operation == "hook":
         try:
-            hook_directory = Path(args.repository_root) / ".codex" / "hooks"
-            if hook_directory.is_symlink() or not hook_directory.is_dir():
-                raise BootstrapError(
-                    "codex_hook_source_missing",
-                    "bundled canonical hook source is unavailable",
-                )
-            hook_directory_text = str(hook_directory)
-            if hook_directory_text not in sys.path:
-                sys.path.insert(0, hook_directory_text)
-            import hook_dispatcher
-
-            return hook_dispatcher.dispatch_event(args.event, sys.stdin.buffer.read())
-        except BootstrapError as exc:
+            return subprocess.run(
+                ["agent-canon", "codex-hook", args.event],
+                input=sys.stdin.buffer.read(),
+                check=False,
+            ).returncode
+        except OSError as exc:
             print(
                 _json(
                     {
                         "schema": SCHEMA_RECEIPT,
                         "status": "error",
-                        "code": exc.code,
-                        "detail": exc.detail,
-                        "evidence": exc.evidence,
+                        "code": "codex_hook_source_missing",
+                        "detail": str(exc),
+                        "evidence": {},
                     }
                 ),
                 file=sys.stderr,

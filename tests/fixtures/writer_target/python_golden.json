@@ -1,0 +1,1154 @@
+{
+  "source": "6ec9b0fc18116899e136509a13383da45c327f9a",
+  "python": "3.12.3",
+  "source_hash": "21e3998c7f537aa6cd77496d41cfd9153e430b3dcdd9a935135cef7caf533d4c",
+  "root_placeholder": "$ROOT",
+  "root_setup": "create real directory and alias->real before value cases",
+  "value_cases": [
+    {
+      "name": "base",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "checkout_root/0",
+      "input": {
+        "checkout_root": "relative",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:checkout_root_must_be_absolute"
+    },
+    {
+      "name": "checkout_root/1",
+      "input": {
+        "checkout_root": "",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:checkout_root_required"
+    },
+    {
+      "name": "checkout_root/2",
+      "input": {
+        "checkout_root": null,
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:checkout_root_required"
+    },
+    {
+      "name": "checkout_root/3",
+      "input": {
+        "checkout_root": 3,
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:checkout_root_required"
+    },
+    {
+      "name": "checkout_root/4",
+      "input": {
+        "checkout_root": "$ROOT/alias/missing",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/real/missing",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/real/missing",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "checkout_root/5",
+      "input": {
+        "checkout_root": "$ROOT/real/../new",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/new",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/new",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "branch/0",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_required"
+    },
+    {
+      "name": "branch/1",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": " main",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_must_be_named"
+    },
+    {
+      "name": "branch/2",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "main ",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_must_be_named"
+    },
+    {
+      "name": "branch/3",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "main\nnext",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_must_be_named"
+    },
+    {
+      "name": "branch/4",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": 3,
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_required"
+    },
+    {
+      "name": "branch/5",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": null,
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:branch_required"
+    },
+    {
+      "name": "branch/6",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "space inside",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "space inside",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "space inside",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "branch/7",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "a\tb",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "a\tb",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "a\tb",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "remote/0",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_required"
+    },
+    {
+      "name": "remote/1",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_must_be_owner_repository"
+    },
+    {
+      "name": "remote/2",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "a/b/c",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_must_be_owner_repository"
+    },
+    {
+      "name": "remote/3",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "a b/c",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_must_be_owner_repository"
+    },
+    {
+      "name": "remote/4",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "\u00c4/\u00df",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "\u00e4/ss",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "remote/5",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "x/y",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "x/y",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "remote/6",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": 3,
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_required"
+    },
+    {
+      "name": "remote/7",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": null,
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_required"
+    },
+    {
+      "name": "allowed_paths/0",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": []
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_paths_required"
+    },
+    {
+      "name": "allowed_paths/1",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": null
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_paths_required"
+    },
+    {
+      "name": "allowed_paths/2",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": "src"
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_paths_required"
+    },
+    {
+      "name": "allowed_paths/3",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "."
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "."
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\".\"]"
+      }
+    },
+    {
+      "name": "allowed_paths/4",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/\"]"
+      }
+    },
+    {
+      "name": "allowed_paths/5",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "a/../b"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_not_relative:a/../b"
+    },
+    {
+      "name": "allowed_paths/6",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "/absolute"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_not_relative:/absolute"
+    },
+    {
+      "name": "allowed_paths/7",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "a//b"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_not_relative:a//b"
+    },
+    {
+      "name": "allowed_paths/8",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "a\\b"
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_not_relative:a\\b"
+    },
+    {
+      "name": "allowed_paths/9",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "./src"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "./src"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"./src\"]"
+      }
+    },
+    {
+      "name": "allowed_paths/10",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "a/./b"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "a/./b"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"a/./b\"]"
+      }
+    },
+    {
+      "name": "allowed_paths/11",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          " "
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_required"
+    },
+    {
+      "name": "allowed_paths/12",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "a",
+          "a"
+        ]
+      },
+      "operation": "parse",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "a",
+          "a"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"a\",\"a\"]"
+      }
+    },
+    {
+      "name": "allowed_paths/13",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          3
+        ]
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:allowed_path_required"
+    },
+    {
+      "name": "wrong-schema",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ],
+        "schema": "wrong"
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:schema_mismatch"
+    },
+    {
+      "name": "extra-field",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ],
+        "surprise": 1
+      },
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:unknown_fields:surprise"
+    },
+    {
+      "name": "null",
+      "input": null,
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:must_be_mapping"
+    },
+    {
+      "name": "array",
+      "input": [],
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:must_be_mapping"
+    },
+    {
+      "name": "empty",
+      "input": {},
+      "operation": "parse",
+      "accepted": false,
+      "error": "writer_target:remote_required"
+    },
+    {
+      "name": "identity-ok",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "identity",
+      "identity": {
+        "cwd": "$ROOT/checkout",
+        "git_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "environment": {
+        "AGENT_CANON_CHECKOUT_ROOT": "$ROOT/checkout",
+        "AGENT_CANON_CHECKOUT_BRANCH": "feat/1-owned",
+        "AGENT_CANON_WRITER_ALLOWED_PATHS": "[\"src/a.rs\",\"docs/\"]"
+      }
+    },
+    {
+      "name": "identity-cwd",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "identity",
+      "identity": {
+        "cwd": "$ROOT",
+        "git_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "accepted": false,
+      "error": "writer_target:checkout_root_identity_mismatch"
+    },
+    {
+      "name": "identity-git_root",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "identity",
+      "identity": {
+        "cwd": "$ROOT/checkout",
+        "git_root": "$ROOT",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "accepted": false,
+      "error": "writer_target:checkout_root_identity_mismatch"
+    },
+    {
+      "name": "identity-branch",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "identity",
+      "identity": {
+        "cwd": "$ROOT/checkout",
+        "git_root": "$ROOT/checkout",
+        "branch": "main",
+        "remote": "owner/repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "accepted": false,
+      "error": "writer_target:branch_identity_mismatch"
+    },
+    {
+      "name": "identity-remote",
+      "input": {
+        "checkout_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "allowed_paths": [
+          "src/a.rs",
+          "docs/"
+        ]
+      },
+      "operation": "identity",
+      "identity": {
+        "cwd": "$ROOT/checkout",
+        "git_root": "$ROOT/checkout",
+        "branch": "feat/1-owned",
+        "remote": "Owner/Repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "accepted": false,
+      "error": "writer_target:remote_identity_mismatch"
+    }
+  ],
+  "packet_cases": [
+    {
+      "name": "valid",
+      "recipe": {
+        "kind": "valid",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-valid",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-valid",
+            "git_root": "$ROOT/packet-valid",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-valid",
+      "accepted": true,
+      "output": {
+        "schema": "agent-canon.writer-target.v1",
+        "checkout_root": "$ROOT/packet-valid",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "allowed_paths": [
+          "src/"
+        ]
+      },
+      "identity": {
+        "cwd": "$ROOT/packet-valid",
+        "git_root": "$ROOT/packet-valid",
+        "branch": "feat/1-owned",
+        "remote": "owner/repo",
+        "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "missing",
+      "recipe": {
+        "kind": "missing",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-missing",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-missing",
+            "git_root": "$ROOT/packet-missing",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-missing",
+      "accepted": false,
+      "error": "writer_target_packet_missing"
+    },
+    {
+      "name": "bad-json",
+      "recipe": {
+        "kind": "bad-json",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-bad-json",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-bad-json",
+            "git_root": "$ROOT/packet-bad-json",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-bad-json",
+      "accepted": false,
+      "error": "writer_target_packet_invalid"
+    },
+    {
+      "name": "bad-schema",
+      "recipe": {
+        "kind": "bad-schema",
+        "packet": {
+          "schema": "wrong",
+          "checkout_root": "$ROOT/packet-bad-schema",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-bad-schema",
+            "git_root": "$ROOT/packet-bad-schema",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-bad-schema",
+      "accepted": false,
+      "error": "writer_target_packet_invalid"
+    },
+    {
+      "name": "extra-key",
+      "recipe": {
+        "kind": "extra-key",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-extra-key",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-extra-key",
+            "git_root": "$ROOT/packet-extra-key",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "extra": 1
+        }
+      },
+      "checkout_root": "$ROOT/packet-extra-key",
+      "accepted": false,
+      "error": "writer_target_packet_invalid"
+    },
+    {
+      "name": "identity-mismatch",
+      "recipe": {
+        "kind": "identity-mismatch",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-identity-mismatch",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-identity-mismatch",
+            "git_root": "$ROOT/packet-identity-mismatch",
+            "branch": "main",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-identity-mismatch",
+      "accepted": false,
+      "error": "writer_target_packet_identity_mismatch"
+    },
+    {
+      "name": "wrong-root",
+      "recipe": {
+        "kind": "wrong-root",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT",
+            "git_root": "$ROOT",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-wrong-root",
+      "accepted": false,
+      "error": "writer_target_packet_identity_mismatch"
+    },
+    {
+      "name": "symlink-parent",
+      "recipe": {
+        "kind": "symlink-parent",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-symlink-parent",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-symlink-parent",
+            "git_root": "$ROOT/packet-symlink-parent",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-symlink-parent",
+      "accepted": false,
+      "error": "writer_target_packet_path_unsafe"
+    },
+    {
+      "name": "symlink-file",
+      "recipe": {
+        "kind": "symlink-file",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-symlink-file",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-symlink-file",
+            "git_root": "$ROOT/packet-symlink-file",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-symlink-file",
+      "accepted": false,
+      "error": "writer_target_packet_path_unsafe"
+    },
+    {
+      "name": "directory-file",
+      "recipe": {
+        "kind": "directory-file",
+        "packet": {
+          "schema": "agent-canon.writer-target-packet.v1",
+          "checkout_root": "$ROOT/packet-directory-file",
+          "branch": "feat/1-owned",
+          "remote": "owner/repo",
+          "allowed_paths": [
+            "src/"
+          ],
+          "checkout_identity": {
+            "cwd": "$ROOT/packet-directory-file",
+            "git_root": "$ROOT/packet-directory-file",
+            "branch": "feat/1-owned",
+            "remote": "owner/repo",
+            "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "checkout_root": "$ROOT/packet-directory-file",
+      "accepted": false,
+      "error": "writer_target_packet_path_unsafe"
+    }
+  ]
+}

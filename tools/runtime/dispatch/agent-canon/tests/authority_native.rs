@@ -2,7 +2,8 @@
 
 use agent_canon::authority::{
     AttestationRequest, AuthorityError, ChildHandoffRequest, FileMode, NonEmptyTrimmedString,
-    Nonce128, ParentRootAttestor, ParentRootReject, SecretToken, Sha256Digest,
+    Nonce128, ParentOwnedNoReplaceOutcome, ParentRootAttestor, ParentRootReject, SecretToken,
+    Sha256Digest,
 };
 use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
@@ -998,6 +999,254 @@ fn test_atomic_publish_and_readback_keep_exact_bytes_and_private_mode() {
         attested.read_parent_owned_file(&git_admin_receipt).unwrap(),
         b"git-common-owned\0bytes"
     );
+}
+
+#[test]
+fn test_noreplace_publish_classifies_identical_and_conflicting_bytes() {
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "noreplace-test");
+    let payload = br#"{"hook_run_id":"run-1","status":"ok"}"#;
+    let mut payload_with_lf = payload.to_vec();
+    payload_with_lf.push(b'\n');
+
+    let published = attested
+        .publish_parent_owned_file_noreplace(
+            Path::new("reports/event.json"),
+            &payload_with_lf,
+            nonempty("noreplace-test"),
+        )
+        .expect("publish a new parent-owned file without replacement");
+    let receipt = match published {
+        ParentOwnedNoReplaceOutcome::Published(receipt) => receipt,
+        other => panic!("expected publication, got {other:?}"),
+    };
+    assert_eq!(
+        attested.read_parent_owned_file(&receipt).unwrap(),
+        payload_with_lf
+    );
+    let output = temp.path().join("reports/event.json");
+    assert_eq!(fs::read(&output).unwrap(), payload_with_lf);
+    assert_eq!(
+        fs::metadata(&output).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert_eq!(
+        fs::read_dir(output.parent().unwrap()).unwrap().count(),
+        1,
+        "publication leaves no temporary entry"
+    );
+
+    let duplicate = attested
+        .publish_parent_owned_file_noreplace(
+            Path::new("reports/event.json"),
+            &payload_with_lf,
+            nonempty("noreplace-test"),
+        )
+        .expect("classify an identical existing file");
+    let duplicate_receipt = match duplicate {
+        ParentOwnedNoReplaceOutcome::Duplicate(receipt) => receipt,
+        other => panic!("expected duplicate, got {other:?}"),
+    };
+    assert_eq!(duplicate_receipt.physical_path(), receipt.physical_path());
+
+    let conflicting = attested
+        .publish_parent_owned_file_noreplace(
+            Path::new("reports/event.json"),
+            b"different\n",
+            nonempty("noreplace-test"),
+        )
+        .expect("classify a conflicting existing file");
+    match conflicting {
+        ParentOwnedNoReplaceOutcome::Conflict(conflict_receipt) => {
+            assert_eq!(
+                attested.read_parent_owned_file(&conflict_receipt).unwrap(),
+                payload_with_lf
+            );
+        }
+        other => panic!("expected conflict, got {other:?}"),
+    }
+    assert_eq!(fs::read(&output).unwrap(), payload_with_lf);
+}
+
+#[test]
+fn test_concurrent_noreplace_calls_do_not_replace_a_nonparticipant_winner() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    fs::create_dir(temp.path().join("reports")).expect("create event directory");
+    let attested = Arc::new(native_attested_root(temp.path(), "noreplace-race-test"));
+
+    let barrier = Arc::new(Barrier::new(3));
+    let payloads = [b"first\n".as_slice(), b"second\n".as_slice()];
+    let handles = payloads
+        .into_iter()
+        .map(|payload| {
+            let attested = Arc::clone(&attested);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                attested
+                    .publish_parent_owned_file_noreplace(
+                        Path::new("reports/concurrent.json"),
+                        payload,
+                        nonempty("noreplace-race-test"),
+                    )
+                    .expect("concurrent publishers leave one winner intact")
+            })
+        })
+        .collect::<Vec<_>>();
+    barrier.wait();
+    let outcomes = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("join concurrent publisher"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| matches!(outcome, ParentOwnedNoReplaceOutcome::Published(_)))
+            .count(),
+        1
+    );
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| matches!(outcome, ParentOwnedNoReplaceOutcome::Conflict(_)))
+            .count(),
+        1
+    );
+    let concurrent_winner = fs::read(temp.path().join("reports/concurrent.json"))
+        .expect("read concurrent no-replace winner");
+    assert!(
+        concurrent_winner.as_slice() == b"first\n" || concurrent_winner.as_slice() == b"second\n"
+    );
+
+    let barrier = Arc::new(Barrier::new(3));
+    let handles = (0..2)
+        .map(|_| {
+            let attested = Arc::clone(&attested);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                attested
+                    .publish_parent_owned_file_noreplace(
+                        Path::new("reports/identical.json"),
+                        b"same\n",
+                        nonempty("noreplace-race-test"),
+                    )
+                    .expect("concurrent identical publishers are classified")
+            })
+        })
+        .collect::<Vec<_>>();
+    barrier.wait();
+    let outcomes = handles
+        .into_iter()
+        .map(|handle| handle.join().expect("join identical publisher"))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| matches!(outcome, ParentOwnedNoReplaceOutcome::Published(_)))
+            .count(),
+        1
+    );
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| matches!(outcome, ParentOwnedNoReplaceOutcome::Duplicate(_)))
+            .count(),
+        1
+    );
+    assert_eq!(
+        fs::read(temp.path().join("reports/identical.json")).unwrap(),
+        b"same\n"
+    );
+
+    let winner = b"external-winner\n";
+    fs::write(temp.path().join("reports/event.json"), winner)
+        .expect("nonparticipant creates the destination");
+    let barrier = Arc::new(Barrier::new(3));
+    let handles = [b"first\n".as_slice(), b"second\n".as_slice()]
+        .into_iter()
+        .map(|payload| {
+            let attested = Arc::clone(&attested);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                attested
+                    .publish_parent_owned_file_noreplace(
+                        Path::new("reports/event.json"),
+                        payload,
+                        nonempty("noreplace-race-test"),
+                    )
+                    .expect("existing destination is classified without replacement")
+            })
+        })
+        .collect::<Vec<_>>();
+    barrier.wait();
+    for handle in handles {
+        assert!(matches!(
+            handle.join().expect("join concurrent publisher"),
+            ParentOwnedNoReplaceOutcome::Conflict(_)
+        ));
+    }
+    assert_eq!(
+        fs::read(temp.path().join("reports/event.json")).unwrap(),
+        winner
+    );
+    assert_eq!(
+        fs::read_dir(temp.path().join("reports")).unwrap().count(),
+        3,
+        "concurrent publication leaves no temporary entry"
+    );
+}
+
+#[test]
+fn test_noreplace_publish_rejects_escaping_symlink_and_replaced_parent() {
+    use std::os::unix::fs::symlink;
+
+    let temp = TempDir::new();
+    git_repo(temp.path(), "https://example.invalid/parent.git");
+    let attested = native_attested_root(temp.path(), "noreplace-identity-test");
+    let outside = TempDir::new();
+    let external = outside.path().join("outside.json");
+    fs::write(&external, b"sentinel\n").expect("write outside target");
+    symlink(&external, temp.path().join("escape.json")).expect("create escaping symlink");
+    assert_reject(
+        attested.publish_parent_owned_file_noreplace(
+            Path::new("escape.json"),
+            b"must-not-publish\n",
+            nonempty("noreplace-identity-test"),
+        ),
+        ParentRootReject::SymlinkEscape,
+    );
+    assert_eq!(fs::read(&external).unwrap(), b"sentinel\n");
+
+    symlink(&outside.0, temp.path().join("outside-dir")).expect("create escaping parent symlink");
+    assert_reject(
+        attested.publish_parent_owned_file_noreplace(
+            Path::new("outside-dir/event.json"),
+            b"must-not-publish\n",
+            nonempty("noreplace-identity-test"),
+        ),
+        ParentRootReject::SymlinkEscape,
+    );
+    assert!(!outside.path().join("event.json").exists());
+
+    let moved = outside.path().join("attested-old");
+    fs::rename(temp.path(), &moved).expect("move attested root");
+    fs::create_dir(temp.path()).expect("replace attested root path");
+    assert_reject(
+        attested.publish_parent_owned_file_noreplace(
+            Path::new("replacement.json"),
+            b"must-not-publish\n",
+            nonempty("noreplace-identity-test"),
+        ),
+        ParentRootReject::RootRaceDetected,
+    );
+    assert!(!temp.path().join("replacement.json").exists());
 }
 
 #[test]

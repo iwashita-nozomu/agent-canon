@@ -4,7 +4,7 @@
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
 // upstream implementation runtime_boundary.rs owns external runtime path and write capabilities.
 // downstream implementation report_artifact_checks.rs validates the visible work-log completion view.
-// downstream test ../tests/work_log_native.rs preserves ledger and CLI oracles.
+// downstream implementation ../tests/work_log_native.rs preserves ledger and CLI oracles.
 // @dependency-end
 
 use crate::python_json::{
@@ -985,7 +985,7 @@ fn resolve_active_report_dir(
     Ok(Some(report_dir))
 }
 
-fn python_timestamp_jst() -> Result<String, String> {
+pub(crate) fn python_timestamp_jst() -> Result<String, String> {
     // Match Python's host-local datetime.now() while retaining its literal suffix.
     let now = OffsetDateTime::now_utc();
     let local_offset = UtcOffset::local_offset_at(now)

@@ -85,7 +85,7 @@ roots = ["templates/agents"]
 roots = ["templates/documents"]
 
 [profiles.codex-user]
-roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", ".codex/hooks/hook_dispatcher.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
+roots = ["ROOT_AGENTS.md", ".codex/hooks.json", ".codex/personal/skills", "agents/skills", "bootstrap.sh", "bootstrap/host/lifecycle/entrypoint.sh", "tools/runtime/container/bootstrap_runtime.py", "LICENSE", "tools/agent/templates", "documents/runtime/runtime-profiles-and-check-matrix.json"]
 
 [profiles.native-cli]
 roots = ["LICENSE"]
@@ -140,11 +140,6 @@ roots = ["templates/experiments"]
         &source,
         "tools/runtime/container/bootstrap_runtime.py",
         b"# runtime\n",
-    );
-    write(
-        &source,
-        ".codex/hooks/hook_dispatcher.py",
-        b"# dispatcher\n",
     );
     write(
         &source,

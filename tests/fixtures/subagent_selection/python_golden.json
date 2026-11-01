@@ -1,0 +1,1561 @@
+{
+  "source": "88a70bddaaacd2f2d5913e7f83dc2756f0ec8fa0",
+  "python": "3.12.3",
+  "source_hash": "d150068d613d119d7dc305cdf0329c6367b6d13d604d16e7425c49dec0136bd9",
+  "cases": [
+    {
+      "name": "null",
+      "payload": null,
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "empty",
+      "payload": {},
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "simple-spawn",
+      "payload": {
+        "tool_name": "spawn_agent",
+        "subagent_target": "worker"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "spawn",
+          "tool_name": "spawn_agent",
+          "agent_type": "",
+          "target": "worker",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "task",
+      "payload": {
+        "tool_name": "Task"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "spawn",
+          "tool_name": "Task",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "explicit-action",
+      "payload": {
+        "tool_name": "unknown",
+        "action": "send_input"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_input",
+          "tool_name": "unknown",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "unknown-action",
+      "payload": {
+        "tool_name": "unknown",
+        "action": "future-operation"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "future-operation",
+          "tool_name": "unknown",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "targets",
+      "payload": {
+        "targets": [
+          "x",
+          "",
+          null,
+          7,
+          "y"
+        ],
+        "prompt": "\u65e5\u672c\u8a9e prompt",
+        "model": "requested",
+        "fork_context": true
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [
+            "x",
+            "y"
+          ],
+          "model": "requested",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "357d6b2a6f51c50e",
+          "prompt_char_count": 10,
+          "item_count": 2,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "precedence",
+      "payload": {
+        "tool_name": "spawn_agent",
+        "subagent_tool_name": "wait",
+        "subagent_event_kind": "close",
+        "action": "spawn",
+        "subagent_targets": null,
+        "targets": [
+          "fallback"
+        ],
+        "subagent_target": "first",
+        "target": "second"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "close",
+          "tool_name": "spawn_agent",
+          "agent_type": "",
+          "target": "first",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "surrogate-tool",
+      "payload": {
+        "tool_name": "\ud800"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "\ud800",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "surrogate-prompt",
+      "payload": {
+        "tool_name": "spawn_agent",
+        "prompt": "\ud800"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": false,
+        "error_type": "UnicodeEncodeError",
+        "error": "'utf-8' codec can't encode character '\\ud800' in position 0: surrogates not allowed"
+      }
+    },
+    {
+      "name": "alias-send_message",
+      "payload": {
+        "tool_name": "send_message"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.send_message",
+      "payload": {
+        "tool_name": "tools.send_message"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "tools.send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.send_message",
+      "payload": {
+        "tool_name": "functions.collaboration.send_message"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "functions.collaboration.send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-followup_task",
+      "payload": {
+        "tool_name": "followup_task"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "followup_task",
+          "tool_name": "followup_task",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.followup_task",
+      "payload": {
+        "tool_name": "tools.followup_task"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "followup_task",
+          "tool_name": "tools.followup_task",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.followup_task",
+      "payload": {
+        "tool_name": "functions.collaboration.followup_task"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "followup_task",
+          "tool_name": "functions.collaboration.followup_task",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-list_agents",
+      "payload": {
+        "tool_name": "list_agents"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "list_agents",
+          "tool_name": "list_agents",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.list_agents",
+      "payload": {
+        "tool_name": "tools.list_agents"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "list_agents",
+          "tool_name": "tools.list_agents",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.list_agents",
+      "payload": {
+        "tool_name": "functions.collaboration.list_agents"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "list_agents",
+          "tool_name": "functions.collaboration.list_agents",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-interrupt_agent",
+      "payload": {
+        "tool_name": "interrupt_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "interrupt_agent",
+          "tool_name": "interrupt_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.interrupt_agent",
+      "payload": {
+        "tool_name": "tools.interrupt_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "interrupt_agent",
+          "tool_name": "tools.interrupt_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.interrupt_agent",
+      "payload": {
+        "tool_name": "functions.collaboration.interrupt_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "interrupt_agent",
+          "tool_name": "functions.collaboration.interrupt_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-spawn",
+      "payload": {
+        "tool_name": "spawn"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "spawn",
+          "tool_name": "spawn",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.spawn",
+      "payload": {
+        "tool_name": "tools.spawn"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "spawn",
+          "tool_name": "tools.spawn",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.spawn",
+      "payload": {
+        "tool_name": "functions.collaboration.spawn"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "spawn",
+          "tool_name": "functions.collaboration.spawn",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-send_input",
+      "payload": {
+        "tool_name": "send_input"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_input",
+          "tool_name": "send_input",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.send_input",
+      "payload": {
+        "tool_name": "tools.send_input"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_input",
+          "tool_name": "tools.send_input",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.send_input",
+      "payload": {
+        "tool_name": "functions.collaboration.send_input"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_input",
+          "tool_name": "functions.collaboration.send_input",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-wait",
+      "payload": {
+        "tool_name": "wait"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "wait",
+          "tool_name": "wait",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.wait",
+      "payload": {
+        "tool_name": "tools.wait"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "wait",
+          "tool_name": "tools.wait",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.wait",
+      "payload": {
+        "tool_name": "functions.collaboration.wait"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "wait",
+          "tool_name": "functions.collaboration.wait",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-close",
+      "payload": {
+        "tool_name": "close"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "close",
+          "tool_name": "close",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.close",
+      "payload": {
+        "tool_name": "tools.close"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "close",
+          "tool_name": "tools.close",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.close",
+      "payload": {
+        "tool_name": "functions.collaboration.close"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "close",
+          "tool_name": "functions.collaboration.close",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-resume",
+      "payload": {
+        "tool_name": "resume"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "resume",
+          "tool_name": "resume",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-tools.resume",
+      "payload": {
+        "tool_name": "tools.resume"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "resume",
+          "tool_name": "tools.resume",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "alias-functions.collaboration.resume",
+      "payload": {
+        "tool_name": "functions.collaboration.resume"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "resume",
+          "tool_name": "functions.collaboration.resume",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "runtime-wait_agent",
+      "payload": {
+        "tool_name": "wait_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "wait",
+          "tool_name": "wait_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "runtime-close_agent",
+      "payload": {
+        "tool_name": "close_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "close",
+          "tool_name": "close_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "runtime-resume_agent",
+      "payload": {
+        "tool_name": "resume_agent"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "resume",
+          "tool_name": "resume_agent",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "runtime-tools.COLLABORATION.SEND_MESSAGE",
+      "payload": {
+        "tool_name": "tools.COLLABORATION.SEND_MESSAGE"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "tools.COLLABORATION.SEND_MESSAGE",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "runtime-tool\u017f.collaboration.send_message",
+      "payload": {
+        "tool_name": "tool\u017f.collaboration.send_message"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "tool\u017f.collaboration.send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-0",
+      "payload": {
+        "subagent_invoked": false,
+        "fork_context": false
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "truth-1",
+      "payload": {
+        "subagent_invoked": true,
+        "fork_context": true
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-2",
+      "payload": {
+        "subagent_invoked": 0,
+        "fork_context": 0
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "truth-3",
+      "payload": {
+        "subagent_invoked": 1,
+        "fork_context": 1
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-4",
+      "payload": {
+        "subagent_invoked": -1,
+        "fork_context": -1
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-5",
+      "payload": {
+        "subagent_invoked": "",
+        "fork_context": ""
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "truth-6",
+      "payload": {
+        "subagent_invoked": "yes",
+        "fork_context": "yes"
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-7",
+      "payload": {
+        "subagent_invoked": [],
+        "fork_context": []
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "truth-8",
+      "payload": {
+        "subagent_invoked": [
+          "x"
+        ],
+        "fork_context": [
+          "x"
+        ]
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "truth-9",
+      "payload": {
+        "subagent_invoked": {},
+        "fork_context": {}
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": false,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": false
+        }
+      }
+    },
+    {
+      "name": "truth-10",
+      "payload": {
+        "subagent_invoked": {
+          "x": 0
+        },
+        "fork_context": {
+          "x": 0
+        }
+      },
+      "hook_event_name": null,
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "",
+          "tool_name": "",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": true,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true
+        }
+      }
+    },
+    {
+      "name": "receipt-success",
+      "payload": {
+        "hookEventName": "PostToolUse",
+        "tool_name": "send_message",
+        "tool_input": {},
+        "tool_response": {
+          "exit_code": 0,
+          "stderr": "",
+          "stdout": "ok"
+        }
+      },
+      "hook_event_name": "PostToolUse",
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true,
+          "coordination_receipt": {
+            "schema": "agent-canon.coordination-receipt.v1",
+            "operation": "send_message",
+            "capability_status": "unverified",
+            "effective_operations": [],
+            "evidence_ref": "",
+            "transport": "durable_artifact",
+            "direct_peer": false,
+            "status": "succeeded"
+          }
+        }
+      }
+    },
+    {
+      "name": "receipt-failure",
+      "payload": {
+        "hookEventName": "PostToolUse",
+        "tool_name": "send_message",
+        "tool_input": {},
+        "tool_response": {
+          "exit_code": 3,
+          "stderr": "fail",
+          "stdout": ""
+        }
+      },
+      "hook_event_name": "PostToolUse",
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true,
+          "coordination_receipt": {
+            "schema": "agent-canon.coordination-receipt.v1",
+            "operation": "send_message",
+            "capability_status": "unverified",
+            "effective_operations": [],
+            "evidence_ref": "",
+            "transport": "durable_artifact",
+            "direct_peer": false,
+            "status": "failed"
+          }
+        }
+      }
+    },
+    {
+      "name": "receipt-boolean-exit",
+      "payload": {
+        "hookEventName": "PostToolUse",
+        "tool_name": "send_message",
+        "tool_input": {},
+        "tool_response": {
+          "exit_code": false,
+          "stderr": "",
+          "stdout": ""
+        }
+      },
+      "hook_event_name": "PostToolUse",
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true,
+          "coordination_receipt": {
+            "schema": "agent-canon.coordination-receipt.v1",
+            "operation": "send_message",
+            "capability_status": "unverified",
+            "effective_operations": [],
+            "evidence_ref": "",
+            "transport": "durable_artifact",
+            "direct_peer": false,
+            "status": "invalid_tool_result"
+          }
+        }
+      }
+    },
+    {
+      "name": "receipt-extra-field",
+      "payload": {
+        "hookEventName": "PostToolUse",
+        "tool_name": "send_message",
+        "tool_input": {},
+        "tool_response": {
+          "exit_code": 0,
+          "stderr": "",
+          "stdout": "",
+          "extra": 0
+        }
+      },
+      "hook_event_name": "PostToolUse",
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true,
+          "coordination_receipt": {
+            "schema": "agent-canon.coordination-receipt.v1",
+            "operation": "send_message",
+            "capability_status": "unverified",
+            "effective_operations": [],
+            "evidence_ref": "",
+            "transport": "durable_artifact",
+            "direct_peer": false,
+            "status": "invalid_tool_result"
+          }
+        }
+      }
+    },
+    {
+      "name": "receipt-wrong-event",
+      "payload": {
+        "hookEventName": "PostToolUse",
+        "tool_name": "send_message",
+        "tool_input": {},
+        "tool_response": {
+          "exit_code": 0,
+          "stderr": "",
+          "stdout": ""
+        }
+      },
+      "hook_event_name": "PreToolUse",
+      "output": {
+        "ok": true,
+        "result": {
+          "invoked": true,
+          "action": "send_message",
+          "tool_name": "send_message",
+          "agent_type": "",
+          "target": "",
+          "targets": [],
+          "model": "",
+          "reasoning_effort": "",
+          "fork_context": false,
+          "prompt_fingerprint": "",
+          "prompt_char_count": 0,
+          "item_count": 0,
+          "should_log": true,
+          "coordination_receipt": null
+        }
+      }
+    }
+  ]
+}

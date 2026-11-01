@@ -37,8 +37,11 @@
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
 // downstream implementation work_log.rs owns the canonical run-local work log and semantic ledger
+// downstream implementation hook_report_projection.rs updates one existing behavior-event section
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
+// downstream implementation writer_target.rs owns typed writer-target and packet validation
+// downstream implementation mutation_authority.rs owns PreToolUse mutation classification and child-scope admission
 // downstream implementation tool_selection.rs owns pure tool-selection evidence
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -49,13 +52,13 @@
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
-// downstream test ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
-// downstream test ../tests/artifacts_native.rs validates the shared artifact API
-// downstream test ../tests/catalog_native.rs validates the shared catalog API
-// downstream test ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
-// downstream test template_tests.rs validates native Template APIs
-// downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
-// downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
+// downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
+// downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
+// downstream implementation ../tests/catalog_native.rs validates the shared catalog API
+// downstream implementation ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
+// downstream implementation template_tests.rs validates native Template APIs
+// downstream implementation ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
+// downstream implementation ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
 pub mod active_design_packet;
@@ -73,16 +76,27 @@ pub mod extract_docx;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
+pub mod agent_canon_source_root;
+pub mod behavior_event_assembly;
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
+pub mod hook_dispatcher;
+pub mod hook_event_log;
+pub mod hook_report_projection;
+pub mod hook_retirement;
+pub mod hook_safety;
 pub mod lean_proof_env;
+pub mod log_repository_identity;
 pub mod lsp_code_analysis;
+pub mod mutation_authority;
 pub mod native_release;
 pub mod owner_guarantee;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
+pub mod prompt_capture;
+pub mod prompt_classifier;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
@@ -94,8 +108,10 @@ pub mod report_artifact_checks;
 pub mod run_evaluation;
 pub mod runtime_boundary;
 pub mod scip_index;
+pub mod skill_lane_detector;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod subagent_selection;
 pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
@@ -105,6 +121,8 @@ pub mod tool_selection;
 pub mod update_lifecycle_contract;
 pub mod waterfall_gate;
 pub mod work_log;
+pub mod workflow_context;
+pub mod writer_target;
 
 #[cfg(test)]
 mod template_tests;
