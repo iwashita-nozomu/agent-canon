@@ -59,13 +59,24 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
 
     def test_help_and_argument_errors_match_the_original_cli(self) -> None:
         """Match the captured help and argument-error responses."""
-        golden = json.loads((PROJECT_ROOT / "tests/fixtures/codex_runtime_summary/python_cli_arguments.json").read_text())
+        golden = json.loads(
+            (
+                PROJECT_ROOT
+                / "tests/fixtures/codex_runtime_summary/python_cli_arguments.json"
+            ).read_text()
+        )
         self.assertEqual(golden["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6")
         environment = os.environ.copy()
         environment["COLUMNS"] = str(golden["columns"])
         for case in golden["cases"]:
             with self.subTest(case=case["name"]):
-                result = subprocess.run([NATIVE_CLI, "export-codex-runtime-summary", *case["argv"]], env=environment, capture_output=True, text=True, check=False)
+                result = subprocess.run(
+                    [NATIVE_CLI, "export-codex-runtime-summary", *case["argv"]],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
                 self.assertEqual(result.returncode, case["exit"])
                 self.assertEqual(result.stdout, case["stdout"])
                 self.assertEqual(result.stderr, case["stderr"])
