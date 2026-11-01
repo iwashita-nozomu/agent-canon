@@ -3,7 +3,7 @@
 # responsibility Tests test evaluate agent run behavior.
 # upstream design ../../agents/skills/agent-learning.md agent feedback workflow
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs evaluates run bundles
-# downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes agent evaluation status
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/task_close.rs consumes agent evaluation status
 # @dependency-end
 
 """Tests for agent run evaluation."""

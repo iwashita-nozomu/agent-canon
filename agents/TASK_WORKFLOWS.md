@@ -10,6 +10,7 @@ upstream design canonical/CODEX_SUBAGENTS.md subagent role contract.
 downstream design skills/codex-task-workflow.md implementation stage and closeout flow.
 downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py creates optional run-bundle metadata.
 downstream implementation ../tools/runtime/lifecycle/workflow_monitor.py records actual behavior events.
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/task_close.rs owns native coordinated closeout checks.
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/compare_agent_run_paths.rs compares expected and actual routes.
 @dependency-end
 -->
@@ -38,7 +39,7 @@ task catalog, runtime profile matrix, or closeout tools as policy authority.
 | implementation guidance and closeout | [agents/skills/codex-task-workflow.md](skills/codex-task-workflow.md); selected family row in `agents/task_catalog.yaml` |
 | active design packet schema | [agents/COMMUNICATION_PROTOCOL.md](COMMUNICATION_PROTOCOL.md); `agents/agents_config.json#artifacts.active_design_packet` |
 | semantic responsibility allocation | [documents/design/semantic-responsibility-contract.md](../documents/design/semantic-responsibility-contract.md); run-local instance via active-packet `source_refs` |
-| closeout authority | `task_close.py`; `report_artifact_checks.py` |
+| closeout authority | `tools/runtime/dispatch/agent-canon/src/task_close.rs`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |
 | validation failure response taxonomy | `documents/runtime/runtime-profiles-and-check-matrix.json`; generated reader projection: [documents/runtime/runtime-profiles-and-check-matrix.md](../documents/runtime/runtime-profiles-and-check-matrix.md) |
 | validation failure response workflow projections | [agents/canonical/CODEX_WORKFLOW.md](canonical/CODEX_WORKFLOW.md); [agents/canonical/CODEX_SUBAGENTS.md](canonical/CODEX_SUBAGENTS.md); [documents/conventions/REVIEW_PROCESS.md](../documents/conventions/REVIEW_PROCESS.md) |
 
@@ -125,4 +126,4 @@ monitor row alone. A route difference alone is not an Eval failure.
 
 - `python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py`
 - `python3 tools/validation/semantic/convention/check_convention_compliance.py`
-- `python3 tools/runtime/lifecycle/task_close.py ...`
+- `tools/bin/agent-canon task-close ...`

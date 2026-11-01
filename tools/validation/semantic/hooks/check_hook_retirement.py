@@ -131,7 +131,7 @@ def contract_payload(root: Path) -> dict[str, object]:
     artifacts = [
         {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/archive/historical_skill_usage_reader.py", "consumers": ["tools/runtime/archive/historical_skill_usage_reader.py", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
         {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/runtime/archive/behavior_event_assembly.py", "parser": "tools/runtime/archive/behavior_event_assembly.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"]},
-        {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/runtime/lifecycle/workflow_monitor.py", "parser": "tools/runtime/lifecycle/workflow_monitor.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py", "tools/runtime/lifecycle/task_close.py"]},
+        {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/runtime/lifecycle/workflow_monitor.py", "parser": "tools/runtime/lifecycle/workflow_monitor.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py", "tools/runtime/dispatch/agent-canon/src/task_close.rs"]},
     ]
     active, inactive = _active_events(root)
     malformed = [match for match in matches if not isinstance(match.get("token"), str)]

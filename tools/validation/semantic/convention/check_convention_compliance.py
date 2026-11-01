@@ -284,7 +284,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "report and closeout structure",
-                    "tools/runtime/lifecycle/task_close.py",
+                    "tools/runtime/dispatch/agent-canon/src/task_close.rs",
                     "closeout gate",
                 ),
                 (
@@ -390,7 +390,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "closeout authority",
-                    "task_close.py",
+                    "task_close.rs",
                     "report_artifact_checks.py",
                 ),
             ),
