@@ -290,7 +290,7 @@ path: tools/validation/ci/checks/check_github_workflows.py
     ".codex/README.md": (
         "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
     ),
-    ".codex/hooks/hook_dispatcher.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs": (
         "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
         "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety "
         "validate_projection_bytes record_hook_invocation HookLogContext "
@@ -614,7 +614,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""
-        path = ".codex/hooks/hook_dispatcher.py"
+        path = "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
         fixture = MINIMAL_REPO_FILES[path]
         for marker in HOOK_GUARDRAIL_POLICY_MARKERS[path]:
             with self.subTest(marker=marker), tempfile.TemporaryDirectory() as tmp_dir:

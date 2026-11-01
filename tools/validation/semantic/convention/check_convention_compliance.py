@@ -210,7 +210,7 @@ SOURCE_FILE_DEFINITION_ORDER_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "source_file_definition_order"
 ]
 HOOK_GUARDRAIL_POLICY_MARKERS = {
-    ".codex/hooks/hook_dispatcher.py": (
+    "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs": (
         "HOOK_EVENT_CONTRACTS",
         "HookEventContract",
         "ACTIVE_HOOK_HANDLERS",
