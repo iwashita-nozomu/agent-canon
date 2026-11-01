@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests test waterfall gate check behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream design ../../agents/canonical/CODEX_IMPLEMENTATION.md owns the implementation and design contract
 # upstream implementation ../../tools/agent/orchestration/packets.py owns canonical active-packet projection loading
 # upstream implementation ../../tools/repository/workspace/workspace_scope.py owns report path resolution
 # @dependency-end
@@ -34,7 +35,7 @@ from tools.agent.orchestration.packets import (  # noqa: E402
 from tools.agent.orchestration.team_config import RunBundleSpec, load_team_config  # noqa: E402
 
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
-GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "lifecycle" / "waterfall_gate_check.py"
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 def write_markdown(path: Path, lines: list[str]) -> None:
@@ -144,8 +145,8 @@ def run_gate(report_dir: Path, gate: str) -> subprocess.CompletedProcess[str]:
     """Run one waterfall gate check."""
     return subprocess.run(
         [
-            sys.executable,
-            str(GATE_CHECK_SCRIPT),
+            str(AGENT_CANON_CLI),
+            "waterfall-gate-check",
             "--report-dir",
             str(report_dir),
             "--gate",
@@ -313,7 +314,7 @@ def design_brief_lines(
             [
                 "## Canonical Tree-Head Plan",
                 (
-                    "Keep `tools/validation/semantic/lifecycle/waterfall_gate_check.py` as the only "
+                    "Keep `tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs` as the only "
                     "canonical implementation path and do not leave backup files."
                 ),
             ]
@@ -329,7 +330,7 @@ def design_brief_lines(
     lines.extend(
         [
             "## Identifier And Naming Plan",
-            "Use `waterfall_gate_check.py` after the existing task tool names.",
+            "Use `waterfall-gate-check` after the existing task tool names.",
         ]
     )
     return lines
@@ -734,20 +735,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "plan",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "plan")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("schedule.md:planned_work_units_empty", result.stdout)
@@ -1062,18 +1050,26 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
     def test_implementation_checkpoint_contract_requires_abstract_trace(self) -> None:
         """Checkpoint review surfaces should reject file-local-only justification."""
-        template_text = (PROJECT_ROOT / "templates" / "agents" / "change_review.md").read_text(
-            encoding="utf-8"
-        )
+        template_text = (
+            PROJECT_ROOT / "templates" / "agents" / "change_review.md"
+        ).read_text(encoding="utf-8")
         workflow_text = (
             PROJECT_ROOT / "agents" / "skills" / "codex-task-workflow.md"
         ).read_text(encoding="utf-8")
+        implementation_owner_text = (
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md"
+        ).read_text(encoding="utf-8")
 
-        for text in (template_text, workflow_text):
-            self.assertIn("Abstract Design Frame", text)
-            self.assertIn("Implementation Source Packet", text)
-            self.assertRegex(text, r"(?i)(responsibility model|責務 model)")
-            self.assertRegex(text, r"(?i)(file|path)")
+        self.assertIn("Abstract Design Frame", template_text)
+        self.assertIn("Implementation Source Packet", template_text)
+        self.assertRegex(template_text, r"(?i)(responsibility model|責務 model)")
+        self.assertRegex(template_text, r"(?i)(file|path)")
+        self.assertIn(
+            "[CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md)",
+            workflow_text,
+        )
+        self.assertIn("Abstract Design Frame", implementation_owner_text)
+        self.assertIn("Implementation Source Packet", implementation_owner_text)
 
     def test_final_gate_rejects_empty_work_log(self) -> None:
         """Final gate should fail when work_log.md has no concrete entries."""
@@ -1123,20 +1119,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("work_log.md:section_empty_or_missing:entries", result.stdout)
@@ -1191,20 +1174,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -1262,20 +1232,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(

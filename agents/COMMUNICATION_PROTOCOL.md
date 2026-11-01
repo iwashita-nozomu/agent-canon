@@ -11,7 +11,7 @@ downstream design skills/subagent-bootstrap.md consumes fresh subagent context c
 downstream design TASK_WORKFLOWS.md routes active design packet ownership
 downstream design skills/codex-task-workflow.md consumes the active design packet contract
 downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
-downstream implementation ../tools/validation/semantic/lifecycle/waterfall_gate_check.py validates persisted active design packets
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs validates persisted active design packets
 downstream implementation ../tools/validation/semantic/tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
 @dependency-end
 -->
@@ -324,7 +324,8 @@ require the current `design_brief.md` path or revision and the selected
 owner/design gate.
 `design_review.md` `Design Artifact Under Review`, normalized decision evidence
 from the [review dispatcher](../tools/agent/orchestration/review_dispatch.py),
-`waterfall-gate-check --gate design` evidence, and selected
+`tools/bin/agent-canon waterfall-gate-check --report-dir <report-dir> --gate design`
+evidence, and selected
 `document_flow_review.md` status are required only when those gates are active.
 Missing candidate review artifacts do not block an otherwise semantically
 sufficient handoff; an active gate with missing, stale, or non-approval evidence
