@@ -28,7 +28,9 @@ class CheckToolCatalogTest(unittest.TestCase):
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the selected native CLI against a root."""
         if not AGENT_CANON_CLI:
-            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
             [AGENT_CANON_CLI, "tool-catalog", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
@@ -61,7 +63,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             "tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs",
         )
         self.assertEqual(
-            rows["quarto"]["path"], "tools/runtime/dispatch/tool_dispatch.py"
+            rows["quarto"]["path"],
+            "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
         self.assertEqual(rows["quarto"]["path"], rows["vl-convert"]["path"])
         self.assertTrue(rows["workflow-monitor"]["writes"])

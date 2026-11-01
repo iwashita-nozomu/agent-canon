@@ -299,7 +299,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "Python, Rust, and LSP tool dispatch",
-                    "tools/runtime/dispatch/tool_dispatch.py",
+                    "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
                     "tool dispatch tests",
                 ),
                 (
