@@ -1077,14 +1077,14 @@ fn test_concurrent_noreplace_calls_do_not_replace_a_nonparticipant_winner() {
     let temp = TempDir::new();
     git_repo(temp.path(), "https://example.invalid/parent.git");
     fs::create_dir(temp.path().join("reports")).expect("create event directory");
-    let attested = native_attested_root(temp.path(), "noreplace-race-test");
+    let attested = Arc::new(native_attested_root(temp.path(), "noreplace-race-test"));
 
     let barrier = Arc::new(Barrier::new(3));
     let payloads = [b"first\n".as_slice(), b"second\n".as_slice()];
     let handles = payloads
         .into_iter()
         .map(|payload| {
-            let attested = attested.clone();
+            let attested = Arc::clone(&attested);
             let barrier = Arc::clone(&barrier);
             thread::spawn(move || {
                 barrier.wait();
@@ -1126,7 +1126,7 @@ fn test_concurrent_noreplace_calls_do_not_replace_a_nonparticipant_winner() {
     let barrier = Arc::new(Barrier::new(3));
     let handles = (0..2)
         .map(|_| {
-            let attested = attested.clone();
+            let attested = Arc::clone(&attested);
             let barrier = Arc::clone(&barrier);
             thread::spawn(move || {
                 barrier.wait();
@@ -1171,7 +1171,7 @@ fn test_concurrent_noreplace_calls_do_not_replace_a_nonparticipant_winner() {
     let handles = [b"first\n".as_slice(), b"second\n".as_slice()]
         .into_iter()
         .map(|payload| {
-            let attested = attested.clone();
+            let attested = Arc::clone(&attested);
             let barrier = Arc::clone(&barrier);
             thread::spawn(move || {
                 barrier.wait();
