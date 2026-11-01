@@ -5,11 +5,11 @@
 // upstream design ../../../../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 // upstream implementation skill_projection_registry.rs resolves generated skill-view owner paths
 // upstream implementation dependency_manifest.rs owns dependency declaration parsing and lexical target resolution
+// upstream implementation path_resolution.rs owns shared Python-compatible component matching
 // downstream implementation main.rs dispatches the native source dependency review command
 // downstream implementation graph_client.rs exposes typed source-derived dependency query and context
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
 // downstream implementation agent_search.rs routes selected dependency requests through the source graph owner
-// downstream implementation token_footprints.rs reuses Python-compatible component matching for session globs
 // downstream implementation ../../../../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
 // downstream implementation ../../../../../tests/agent_tools/test_dependency_graph_cycles.py verifies snapshot and normal-path boundaries
 // @dependency-end
@@ -18,6 +18,7 @@ use crate::dependency_manifest::{
     parse_dependency_header, ParsedDependencyHeader, TargetPathError,
 };
 use crate::skill_projection_registry::{generated_skill_projections, GeneratedProjection};
+use agent_canon::path_resolution::python_fnmatch_case;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -629,91 +630,8 @@ fn has_glob_magic(path: &str) -> bool {
         .any(|character| matches!(character, '*' | '?' | '['))
 }
 
-fn class_match(pattern: &[char], start: usize, value: Option<char>) -> Option<(usize, bool)> {
-    let mut content_start = start + 1;
-    let negated = pattern.get(content_start) == Some(&'!');
-    if negated {
-        content_start += 1;
-    }
-    let leading_close = pattern.get(content_start) == Some(&']');
-    if leading_close {
-        content_start += 1;
-    }
-    let closing = (content_start..pattern.len()).find(|index| pattern[*index] == ']')?;
-    let Some(value) = value else {
-        return Some((closing, false));
-    };
-    let mut index = content_start;
-    let mut matched = leading_close && value == ']';
-    while index < closing {
-        let low = pattern[index];
-        if index + 2 < closing && pattern[index + 1] == '-' {
-            let high = pattern[index + 2];
-            matched |= low <= value && value <= high;
-            index += 3;
-        } else {
-            matched |= value == low;
-            index += 1;
-        }
-    }
-    Some((closing, if negated { !matched } else { matched }))
-}
-
-fn fnmatch_chars(
-    value: &[char],
-    pattern: &[char],
-    value_index: usize,
-    pattern_index: usize,
-    memo: &mut BTreeMap<(usize, usize), bool>,
-) -> bool {
-    if let Some(result) = memo.get(&(value_index, pattern_index)) {
-        return *result;
-    }
-    let result = if pattern_index == pattern.len() {
-        value_index == value.len()
-    } else {
-        match pattern[pattern_index] {
-            '*' => {
-                let mut next = pattern_index + 1;
-                while next < pattern.len() && pattern[next] == '*' {
-                    next += 1;
-                }
-                fnmatch_chars(value, pattern, value_index, next, memo)
-                    || (value_index < value.len()
-                        && fnmatch_chars(value, pattern, value_index + 1, pattern_index, memo))
-            }
-            '?' => {
-                value_index < value.len()
-                    && fnmatch_chars(value, pattern, value_index + 1, pattern_index + 1, memo)
-            }
-            '[' => match class_match(pattern, pattern_index, value.get(value_index).copied()) {
-                Some((end, matched)) => {
-                    matched && fnmatch_chars(value, pattern, value_index + 1, end + 1, memo)
-                }
-                None => {
-                    value.get(value_index) == Some(&'[')
-                        && fnmatch_chars(value, pattern, value_index + 1, pattern_index + 1, memo)
-                }
-            },
-            character => {
-                value_index < value.len()
-                    && character == value[value_index]
-                    && fnmatch_chars(value, pattern, value_index + 1, pattern_index + 1, memo)
-            }
-        }
-    };
-    memo.insert((value_index, pattern_index), result);
-    result
-}
-
 pub(crate) fn fnmatch_case(value: &str, pattern: &str) -> bool {
-    fnmatch_chars(
-        &value.chars().collect::<Vec<_>>(),
-        &pattern.chars().collect::<Vec<_>>(),
-        0,
-        0,
-        &mut BTreeMap::new(),
-    )
+    python_fnmatch_case(value, pattern)
 }
 
 #[cfg(test)]
