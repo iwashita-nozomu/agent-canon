@@ -20,7 +20,8 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs 
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/main.rs dispatches public graph commands
 downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
-downstream implementation ../../tools/analysis/dependencies/graph_client.py provides the sole Python graph adapter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs provides the native typed graph client API
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs exports tracked-source dependency review inputs
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
 @dependency-end
@@ -653,7 +654,7 @@ validation. This shell owns no persisted graph state or runtime status.
 
 Responsibilities:
 
-- consume source-derived dependency projections from `source_dependency_graph.py`
+- consume source-derived dependency projections from the native source graph owner
 - filter explicit dependency facts and project their typed detail
 - fail manifest files that are isolated from the edge graph
 - validate self reference

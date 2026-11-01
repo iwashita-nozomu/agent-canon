@@ -47,20 +47,10 @@ except ImportError:
         runtime_artifact_boundary,
     )
 
-try:
-    from tools.analysis.dependencies.graph_client import (
-        CANONICAL_GRAPH_EXECUTABLE,
-        GraphClient,
-        GraphClientError,
-        GraphResponse,
-    )
-except ImportError:  # pragma: no cover - direct CLI execution
-    from tools.analysis.dependencies.graph_client import (
-        CANONICAL_GRAPH_EXECUTABLE,
-        GraphClient,
-        GraphClientError,
-        GraphResponse,
-    )
+CANONICAL_GRAPH_EXECUTABLE = Path(
+    os.environ.get("AGENT_CANON_CLI", "")
+    or Path(__file__).resolve().parents[2] / "bin" / "agent-canon"
+)
 
 SCHEMA_VERSION = 1
 DEFAULT_PROFILE = "writing"
@@ -1336,23 +1326,63 @@ def graph_dependency_records_for_inputs(
     documents: Sequence[tuple[Path, str]],
 ) -> tuple[dict[str, tuple[GraphDependencyRecord, ...]], str]:
     """Project dependency records from one canonical graph query."""
+    command = [
+        str(CANONICAL_GRAPH_EXECUTABLE),
+        "graph-client",
+        "query",
+        "--root",
+        str(root),
+        "--relation",
+        "dependency",
+        "--direction",
+        "both",
+        "--depth",
+        "0",
+        "--all",
+        "--format",
+        "json",
+    ]
     try:
-        result = GraphClient(root, CANONICAL_GRAPH_EXECUTABLE).query(
-            all_nodes=True,
-            relation="dependency",
-            direction="both",
-            depth=0,
+        process = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
         )
-    except GraphClientError as error:
-        raise ValueError(f"canonical graph dependency query failed: {error}") from error
-    if result.status != "fresh" or result.exit_code != 0:
+    except OSError as error:
+        raise ValueError(
+            f"canonical graph dependency query failed: process launch failed: {error}"
+        ) from error
+    try:
+        result = json.loads(process.stdout)
+    except json.JSONDecodeError as error:
+        detail = process.stderr.strip() or f"graph response is not JSON: {error}"
+        prefix = "GRAPH_CLIENT=fail reason="
+        if detail.startswith(prefix):
+            detail = detail.removeprefix(prefix)
+        raise ValueError(f"canonical graph dependency query failed: {detail}") from error
+    if not isinstance(result, dict):
+        raise ValueError("canonical graph dependency query failed: graph response must be an object")
+    if (
+        result.get("command") != "query"
+        or type(result.get("exit_code")) is not int
+        or result.get("exit_code") != process.returncode
+    ):
+        raise ValueError("canonical graph dependency query failed: graph response identity is invalid")
+    payload_value = result.get("payload")
+    if not isinstance(payload_value, dict):
+        raise ValueError("canonical graph dependency query failed: graph payload must be an object")
+    payload = cast(dict[str, object], payload_value)
+    if result.get("status") != "fresh" or result.get("exit_code") != 0:
         raise ValueError(
             "canonical graph dependency query is unavailable: "
-            f"status={result.status} reason={result.payload.get('reason')}"
+            f"status={result.get('status')} reason={payload.get('reason')}"
         )
-    graph_fingerprint = result.payload.get("graph_fingerprint")
+    graph_fingerprint = payload.get("graph_fingerprint")
     if not isinstance(graph_fingerprint, str) or not graph_fingerprint:
         raise ValueError("canonical graph query lacks graph_fingerprint")
+    if not isinstance(result.get("dependency_facts"), list):
+        raise ValueError("canonical graph query dependency_facts must be an array")
     return (
         {
             source_path: dependency_records_for_graph_source(
@@ -1368,13 +1398,17 @@ def graph_dependency_records_for_inputs(
 
 
 def dependency_records_for_graph_source(
-    result: GraphResponse,
+    result: Mapping[str, object],
     source_path: str,
     source_text: str,
 ) -> tuple[GraphDependencyRecord, ...]:
     """Return graph records for one source without interpreting manifest syntax."""
     records: list[GraphDependencyRecord] = []
-    raw_nodes_value = result.payload.get("nodes")
+    payload_value = result.get("payload")
+    if not isinstance(payload_value, dict):
+        raise ValueError("canonical graph query payload must be an object")
+    payload = cast(dict[str, object], payload_value)
+    raw_nodes_value = payload.get("nodes")
     if not isinstance(raw_nodes_value, list):
         raise ValueError("canonical graph query nodes must be an array")
     raw_nodes = cast(list[object], raw_nodes_value)
@@ -1418,12 +1452,20 @@ def dependency_records_for_graph_source(
                     source_end=end,
                 )
             )
-    for fact in result.dependency_facts:
-        if fact.source != source_path:
+    raw_facts = result.get("dependency_facts")
+    if not isinstance(raw_facts, list):
+        raise ValueError("canonical graph query dependency_facts must be an array")
+    for raw_fact in raw_facts:
+        fact = cast(dict[str, object], raw_fact)
+        if fact.get("source") != source_path:
             continue
-        body = f"{fact.target} {fact.reason}".strip()
-        role = f"{fact.direction} {fact.kind}"
-        start, end = graph_source_offsets(source_text, fact.source_span, source_path)
+        body = f"{fact['target']} {fact['reason']}".strip()
+        role = f"{fact['direction']} {fact['kind']}"
+        start, end = graph_source_offsets(
+            source_text,
+            cast(Mapping[str, object] | None, fact.get("source_span")),
+            source_path,
+        )
         records.append(
             GraphDependencyRecord(
                 role=role,

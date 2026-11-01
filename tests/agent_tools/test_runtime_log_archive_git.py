@@ -63,7 +63,6 @@ def _module_belongs_to_current_checkout(module_name: str) -> bool:
 
 for _module_name in (
     "tools",
-    "tools.analysis.dependencies.graph_client",
     "tools.repository.github.github_publish",
     "tools.runtime.archive.log_repository_identity",
     "tools.runtime.archive.runtime_log_paths",
@@ -74,7 +73,6 @@ for _module_name in (
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
 
-from tools.analysis.dependencies.graph_client import GraphClient
 from tools.repository.github import github_publish
 from tools.runtime.archive.log_repository_identity import stable_source_repository_id
 from tools.runtime.archive.runtime_log_paths import (
@@ -3588,7 +3586,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(second_receipt_path.read_bytes(), second_receipt_bytes)
 
     def test_graph_status_query_context_consume_persisted_runtime_event(self) -> None:
-        """The typed adapter consumes command responses without a producer route."""
+        """The native typed adapter consumes source and explicit graph responses."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             executable = root / "graph"
@@ -3602,13 +3600,57 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 encoding="utf-8",
             )
             executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
-            client = GraphClient(root, executable)
-            self.assertEqual(client.status().status, "fresh")
-            self.assertEqual(client.query(all_nodes=True).status, "fresh")
-            self.assertEqual(
-                client.context("documents/design/example.md", token="runtime-token").status,
-                "stale",
+            cli = Path(
+                os.environ.get(
+                    "AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon")
+                )
             )
+
+            def invoke(command: str, *options: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [
+                        str(cli),
+                        "graph-client",
+                        command,
+                        "--root",
+                        str(root),
+                        "--format",
+                        "json",
+                        "--executable",
+                        str(executable),
+                        *options,
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            status = invoke("status")
+            self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+            self.assertEqual(json.loads(status.stdout)["status"], "fresh")
+
+            query = invoke("query", "--all")
+            self.assertEqual(query.returncode, 0, query.stdout + query.stderr)
+            self.assertEqual(json.loads(query.stdout)["status"], "fresh")
+
+            persisted_query = invoke("query", "--relation", "owner")
+            self.assertEqual(
+                persisted_query.returncode,
+                0,
+                persisted_query.stdout + persisted_query.stderr,
+            )
+            self.assertEqual(json.loads(persisted_query.stdout)["status"], "fresh")
+
+            context = invoke(
+                "context",
+                "--path",
+                "documents/design/example.md",
+                "--token",
+                "runtime-token",
+            )
+            self.assertEqual(context.returncode, 2, context.stdout + context.stderr)
+            self.assertEqual(json.loads(context.stdout)["status"], "stale")
 
     def test_ingest_indexes_identical_projection_event_without_duplicate(self) -> None:
         """Ingest should index an identical unindexed event without appending it."""
