@@ -54,6 +54,7 @@
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // downstream implementation tool_dispatch.rs routes typed catalog commands through the native CLI
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
+// downstream implementation extract_docx.rs routes the native DOCX extraction command
 // @dependency-end
 
 mod agent_search;
@@ -104,7 +105,7 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer,
+    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
     generated_completeness, native_release, report_artifact_checks, run_evaluation,
     stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
     tool_dispatch, tool_proof_coverage, waterfall_gate, work_log,
@@ -167,6 +168,7 @@ Commands:
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
+  extract-docx <input.docx> --output-dir <directory>
   semantic-index <operation>
   structured-analysis <operation>
   python-structure-hash --root <repo-root> [paths...]
@@ -366,6 +368,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
         std::process::exit(file_surface_inventory::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "extract-docx" {
+        std::process::exit(extract_docx::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "docs" {

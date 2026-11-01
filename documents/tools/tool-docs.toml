@@ -305,10 +305,10 @@ summary = "Canonical native LSP 3.17 code-analysis API, protocol, and report sch
 [[tool]]
 id = "extract-docx"
 classification = "public"
-tool = "tools/analysis/documents/extraction/extract_docx.py"
+tool = "tools/runtime/dispatch/agent-canon/src/extract_docx.rs"
 doc = "documents/tools/extract_docx.md"
-language = "python"
-summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."
+language = "rust"
+summary = "Native DOCX decomposition into searchable and auditable reference bundles."
 
 [[tool]]
 id = "evaluate-agent-run"
