@@ -16,6 +16,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-primitives",
  "cap-std",
+ "expat-rs",
  "flate2",
  "getrandom 0.2.17",
  "hmac",
@@ -287,6 +288,15 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "expat-rs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4048d4264aea89714216bcdb1a9a64b835efef3bfc2d17e0470cb189f051c71d"
+dependencies = [
+ "thiserror",
 ]
 
 [[package]]
