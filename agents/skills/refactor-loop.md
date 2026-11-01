@@ -130,8 +130,11 @@ accepting a path or dependency-direction change.
 1. Start from the current target, diff, governing contract, required guarantee,
    most recently incorporated implementation, and existing reuse evidence. A
    prior refactor sequence is not a reason to repeat its stages.
-2. Use the target and contract to select the owner, replaceable unit, mechanism,
-   and validation route.
+2. Decide the change before editing: select the owner, complete replaceable unit,
+   mechanism, affected callers, replacement/deletion mapping, and validation
+   route. Group dependent changes so each unit can finish its implementation and
+   retirement together. Follow the ordered execution in
+   [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md#5-implementation).
 3. For a structural refactor, fix the canonical root and update the surfaces in
    the requested change. Remove obsolete entrypoints, wrappers, aliases, and
    exclusive support under RC-09. Keep API/structure mapping only where the
@@ -142,11 +145,12 @@ accepting a path or dependency-direction change.
    `tool-finding-report`, or a domain reviewer only when the changed contract or
    unresolved risk requires that owner. Prompt/doc/static-contract changes use the
    selected static or targeted validation route.
-5. After each repair unit, inspect the current diff against the changed guarantee
-   and run only the selected validation. Review findings are hypotheses: repair
-   them only when current source, reachable effects, and evidence change the owner,
-   edit, or validation decision. Reuse existing receipts and return unavailable or
-   unrelated work to its owner.
+5. After implementing the complete unit, review its diff and replacement/deletion
+   mapping for obsolete code, remaining references, exclusive support, and omitted
+   deletions. Finish that closure review, then run only the selected validation.
+   Use source-backed findings to settle the next complete repair decision before
+   editing. Reuse existing receipts and return unavailable or unrelated work to
+   its owner.
 6. A selected coordination route may hand off a bounded writer/reviewer. Use the
    existing subagent and parallel-write owners for placement, lifecycle, and
    handback; this skill does not reproduce their field lists or approval gates.
