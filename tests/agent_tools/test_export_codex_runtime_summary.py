@@ -95,6 +95,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             expected_records = {name: relocate(record) for name, record in old_records.items()}
             summary_name = next(name for name in old_records if "/chats/" in name)
             summary = expected_records[summary_name]
+            assert isinstance(summary, dict)
             stable = {key: value for key, value in summary.items() if key not in {"recorded_at", "summary_id"}}
             expected_id = hashlib.sha256(json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()[:16]
             observed_times = []
@@ -106,6 +107,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 old_record = old_records[name]
                 self.assertEqual(old_bytes, (json.dumps(old_record, sort_keys=True) + "\n").encode())
                 expected = expected_records[name]
+                assert isinstance(expected, dict)
                 expected["summary_id"] = expected_id
                 actual = json.loads(actual_bytes)
                 recorded_at = actual["recorded_at"]
