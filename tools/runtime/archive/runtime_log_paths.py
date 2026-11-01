@@ -6,7 +6,6 @@
 # downstream implementation ../../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
 # downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
 # downstream implementation ./export_codex_runtime_summary.py writes bounded Codex runtime summaries
-# downstream implementation ../../../eval/checkers/eval_accumulation_check.py validates mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
 # downstream implementation ../../../eval/producers/evaluate_workflow_selection.py writes accumulated eval reports through this resolver
 # downstream implementation ../../../eval/producers/evaluate_codex_agent_roles.py writes accumulated eval reports through this resolver

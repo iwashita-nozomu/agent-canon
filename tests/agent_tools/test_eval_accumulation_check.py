@@ -3,8 +3,10 @@
 # @dependency-start
 # contract test
 # responsibility Tests eval accumulation validation.
-# upstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval result evidence
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result evidence
 # upstream design ../../documents/runtime/runtime-log-archive.md eval result storage contract
+# downstream reference ../fixtures/eval_accumulation/python_golden.json freezes the old CLI output from the migration base
+# downstream reference ../fixtures/eval_accumulation/python_compact_golden.json freezes the old compact-summary bytes
 # @dependency-end
 
 from __future__ import annotations
@@ -18,7 +20,24 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "eval_accumulation_check.py"
+NATIVE_CLI = os.environ.get("AGENT_CANON_CLI") or os.environ.get(
+    "AGENT_CANON_NATIVE_BIN", str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
+PYTHON_GOLDEN = json.loads(
+    (PROJECT_ROOT / "tests" / "fixtures" / "eval_accumulation" / "python_golden.json").read_text(
+        encoding="utf-8"
+    )
+)
+PYTHON_COMPACT_GOLDEN = json.loads(
+    (
+        PROJECT_ROOT
+        / "tests"
+        / "fixtures"
+        / "eval_accumulation"
+        / "python_compact_golden.json"
+    ).read_text(encoding="utf-8")
+)
+PYTHON_GOLDENS = (PYTHON_GOLDEN, PYTHON_COMPACT_GOLDEN)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.archive.runtime_log_paths import (
     HOOK_SPOOL_INDEX_NAME,
@@ -29,6 +48,29 @@ from tools.runtime.archive.runtime_log_paths import (
 
 class EvalAccumulationCheckTest(unittest.TestCase):
     """Exercise accumulated eval result validation."""
+
+    def golden_case(self, name: str) -> dict[str, object]:
+        """Return one frozen old-CLI case by its stable name."""
+        for golden in PYTHON_GOLDENS:
+            cases = golden["cases"]
+            assert isinstance(cases, list)
+            for case in cases:
+                assert isinstance(case, dict)
+                if case.get("name") == name:
+                    return case
+        raise AssertionError(f"missing frozen Python CLI case: {name}")
+
+    def golden_output(self, name: str, field: str, root: Path) -> str:
+        """Expand only the declared path and repository-identity tokens."""
+        case = self.golden_case(name)
+        output = case[field]
+        assert isinstance(output, str)
+        output = output.replace("{case}", root.parent.as_posix())
+        output = output.replace("{repo}", PROJECT_ROOT.as_posix())
+        repo_key = case.get("repo_log_key")
+        if isinstance(repo_key, str):
+            output = output.replace(repo_key, repo_log_key(root))
+        return output
 
     def runtime_root(self, root: Path) -> Path:
         """Return a sibling runtime root outside the source fixture."""
@@ -44,8 +86,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run the checker against a root."""
         command = [
-            sys.executable,
-            str(SCRIPT),
+            NATIVE_CLI,
+            "eval-accumulation-check",
             "--root",
             str(root),
             "--family-registry",
@@ -69,6 +111,14 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
     def test_complete_fixture_passes(self) -> None:
         """A complete mounted archive fixture should pass."""
+        self.assertEqual(
+            PYTHON_GOLDEN["source_commit"],
+            "edd5cdce7e6f7511c80fb5d6fc67125f0f4eb1fe",
+        )
+        self.assertEqual(
+            PYTHON_GOLDEN["script_sha256"],
+            "e2faa429b5edbd3cdf914f0b97269b996d61f4fba6bc2ab9f2a5a5872655d713",
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "source"
             root.mkdir()
@@ -76,7 +126,14 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout, self.golden_output("complete-text", "stdout", root))
+            self.assertEqual(result.stderr, self.golden_output("complete-text", "stderr", root))
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
+
+            json_result = self.run_checker(root, "--format", "json")
+            self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
+            self.assertEqual(json_result.stdout, self.golden_output("complete-json", "stdout", root))
+            self.assertEqual(json_result.stderr, self.golden_output("complete-json", "stderr", root))
 
     def test_duplicate_hook_run_id_fails(self) -> None:
         """Hook run ids must be unique even within the same JSONL file."""
@@ -94,6 +151,8 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(result.stdout, self.golden_output("duplicate-text", "stdout", root))
+            self.assertEqual(result.stderr, self.golden_output("duplicate-text", "stderr", root))
             self.assertIn("duplicate", result.stdout)
 
     def test_transport_index_is_not_a_hook_event(self) -> None:
@@ -164,15 +223,54 @@ class EvalAccumulationCheckTest(unittest.TestCase):
 
             result = self.run_checker(root, "--compact-out", str(compact))
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("EVAL_ACCUMULATION_COMPACT_OUT=", result.stdout)
+            self.assertEqual(
+                result.returncode,
+                self.golden_case("duplicate-compact-success")["exit"],
+                result.stdout + result.stderr,
+            )
+            self.assertEqual(
+                result.stdout,
+                self.golden_output("duplicate-compact-success", "stdout", root),
+            )
+            self.assertEqual(
+                result.stderr,
+                self.golden_output("duplicate-compact-success", "stderr", root),
+            )
             self.assertNotIn("EVAL_ACCUMULATION_FINDING=", result.stdout)
-            payload = json.loads(compact.read_text(encoding="utf-8"))
+            compact_text = compact.read_text(encoding="utf-8")
+            self.assertEqual(
+                compact_text,
+                self.golden_output("duplicate-compact-success", "compact_bytes", root),
+            )
+            payload = json.loads(compact_text)
             self.assertEqual(payload["status"], "fail")
             self.assertGreater(payload["finding_count"], 0)
             self.assertIn("hook_run_id", payload["finding_counts"])
             self.assertIn("hook_legacy_missing_namespace", payload)
             self.assertIn("hook_namespace_debt", payload)
+
+    def test_compact_outside_runtime_fails_without_stdout(self) -> None:
+        """A compact report outside its runtime boundary fails before stdout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "source"
+            root.mkdir()
+            self.write_fixture(root)
+            hook_path = self.hook_path(root)
+            entry = self.hook_entry("hook-duplicate")
+            hook_path.write_text(
+                json.dumps(entry) + "\n" + json.dumps(entry) + "\n",
+                encoding="utf-8",
+            )
+            compact = root.parent / "compact.json"
+
+            result = self.run_checker(root, "--compact-out", str(compact))
+
+            golden_stderr = self.golden_output("duplicate-compact", "stderr", root)
+            old_terminal_error = golden_stderr.splitlines()[-1].split(": ", 1)[1]
+            self.assertEqual(result.returncode, self.golden_case("duplicate-compact")["exit"])
+            self.assertEqual(result.stdout, "")
+            self.assertTrue(result.stderr.rstrip().endswith(old_terminal_error))
+            self.assertFalse(compact.exists())
 
     def test_hook_entries_without_namespace_are_counted_not_failed(self) -> None:
         """Accumulated hook logs missing namespaces remain visible for repair."""
@@ -606,6 +704,14 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             result = self.run_checker(root, with_runtime=False)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual(
+                result.stdout,
+                self.golden_output("missing-runtime-text", "stdout", root),
+            )
+            self.assertEqual(
+                result.stderr,
+                self.golden_output("missing-runtime-text", "stderr", root),
+            )
             self.assertIn("EVAL_ACCUMULATION=error", result.stdout)
             self.assertIn(
                 "EVAL_ACCUMULATION_ERROR_CODE=log_archive_required", result.stdout

@@ -5,6 +5,7 @@
 //! root.  Keeping this policy in one module prevents individual tools from
 //! accidentally recreating the old `.agent-canon` source-tree cache.
 
+use crate::python_text::python_strip;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::env;
@@ -939,6 +940,18 @@ impl std::ops::Deref for RuntimeSpoolBoundary {
 }
 
 impl RuntimeArtifactBoundary {
+    /// Resolve one read-only artifact path without opening or creating its runtime root.
+    ///
+    /// This admits general runtime paths such as the mounted log archive while retaining the
+    /// source-containment and no-symlink checks shared with the restricted spool resolver.
+    pub fn resolve_read_path(
+        source_root: &Path,
+        requested: Option<&Path>,
+        path: &Path,
+    ) -> Result<PathBuf, String> {
+        resolve_readonly_runtime_path(source_root, requested, path, false)
+    }
+
     pub fn for_source(
         source_root: &Path,
         requested: Option<&Path>,
@@ -1254,42 +1267,7 @@ impl RuntimeSpoolBoundary {
         requested: &Path,
         path: &Path,
     ) -> Result<PathBuf, String> {
-        let source = fs::canonicalize(expand_user_path(source_root)?).map_err(|error| {
-            format!(
-                "source root is unavailable: {}: {error}",
-                source_root.display()
-            )
-        })?;
-        let requested = expand_user_path(requested)?;
-        if !requested.is_absolute() {
-            return Err(format!(
-                "runtime root must be absolute: {}",
-                requested.display()
-            ));
-        }
-        reject_symlink_components(&requested, Path::new("/"))?;
-        let root = canonicalize_with_missing_suffix(&requested)?;
-        let source_runtime_spool = root == source.join(SOURCE_RUNTIME_DIRECTORY);
-        if source_runtime_spool && requested != source.join(SOURCE_RUNTIME_DIRECTORY) {
-            return Err(format!(
-                "source runtime path is not canonical: {}",
-                requested.display()
-            ));
-        }
-        if !source_runtime_spool && (root == source || root.starts_with(&source)) {
-            return Err(format!(
-                "runtime root must not be inside source root: source={} runtime={}",
-                source.display(),
-                root.display()
-            ));
-        }
-        if source_runtime_spool && root.exists() && !root.is_dir() {
-            return Err(format!(
-                "source runtime root is not a directory: {}",
-                root.display()
-            ));
-        }
-        resolve_runtime_path(&source, &root, path, true, source_runtime_spool)
+        resolve_readonly_runtime_path(source_root, Some(requested), path, true)
     }
 
     pub fn for_source(
@@ -1303,6 +1281,63 @@ impl RuntimeSpoolBoundary {
     pub fn boundary(&self) -> &RuntimeArtifactBoundary {
         &self.0
     }
+}
+
+fn resolve_readonly_runtime_path(
+    source_root: &Path,
+    requested: Option<&Path>,
+    path: &Path,
+    spool_only: bool,
+) -> Result<PathBuf, String> {
+    let source = fs::canonicalize(expand_user_path(source_root)?).map_err(|error| {
+        format!(
+            "source root is unavailable: {}: {error}",
+            source_root.display()
+        )
+    })?;
+    let requested = requested
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            env::var_os(RUNTIME_ROOT_ENV)
+                .filter(|value| !value.is_empty())
+                .and_then(|value| value.into_string().ok())
+                .map(|value| python_strip(&value).to_owned())
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from)
+        })
+        .ok_or_else(|| {
+            format!("explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}")
+        })?;
+    let requested = expand_user_path(&requested)?;
+    if !requested.is_absolute() {
+        return Err(format!(
+            "runtime root must be absolute: {}",
+            requested.display()
+        ));
+    }
+    reject_symlink_components(&requested, Path::new("/"))?;
+    let root = canonicalize_with_missing_suffix(&requested)?;
+    let source_runtime_spool = spool_only && root == source.join(SOURCE_RUNTIME_DIRECTORY);
+    if source_runtime_spool && requested != source.join(SOURCE_RUNTIME_DIRECTORY) {
+        return Err(format!(
+            "source runtime path is not canonical: {}",
+            requested.display()
+        ));
+    }
+    if !source_runtime_spool && (root == source || root.starts_with(&source)) {
+        return Err(format!(
+            "runtime root must not be inside source root: source={} runtime={}",
+            source.display(),
+            root.display()
+        ));
+    }
+    if source_runtime_spool && root.exists() && !root.is_dir() {
+        return Err(format!(
+            "source runtime root is not a directory: {}",
+            requested.display()
+        ));
+    }
+    resolve_runtime_path(&source, &root, path, spool_only, source_runtime_spool)
 }
 
 fn resolve_explicit_root(source: &Path, requested: &Path, create: bool) -> Result<PathBuf, String> {

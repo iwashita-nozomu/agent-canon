@@ -6,7 +6,7 @@
 # upstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs repository and AgentCanon CI gates
 # upstream implementation ../../tests/bootstrap/docker.sh provides the full-check image runtime environment
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py writes accumulated eval reports
-# upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated eval reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated eval reports
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves mounted log archive paths
 # @dependency-end
 
@@ -49,7 +49,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         producer_marker = (
             'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
         )
-        checker_marker = 'eval_accumulation_check.py"'
+        checker_marker = "run_agent_canon eval-accumulation-check"
         command_env_marker = (
             'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
         )
@@ -80,7 +80,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn(standalone_marker, text)
         self.assertIn(standalone_eval_run, text)
         producer_index = text.index(standalone_eval_run)
-        checker_index = text.index('eval_accumulation_check.py"')
+        checker_index = text.index("run_agent_canon eval-accumulation-check")
 
         self.assertLess(producer_index, checker_index)
         self.assertNotIn("AGENT_CANON_REPOSITORY_MODE", text)

@@ -5,6 +5,7 @@
 // upstream implementation ./hook_safety.rs owns shared Python Unicode 15 word boundaries for secret patterns.
 // upstream implementation ./python_json.rs owns Python-compatible strings and JSON values.
 // downstream implementation ../tests/prompt_capture_native.rs checks frozen CPython 3.12.3 results.
+// downstream implementation eval_accumulation_check.rs validates redacted behavior-event excerpts
 // downstream reference ../../../../../tests/fixtures/prompt_capture/python_golden.json freezes old capture and redaction inputs/results.
 // @dependency-end
 //! Pure prompt redaction and bounded prompt evidence capture.

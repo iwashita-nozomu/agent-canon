@@ -47,6 +47,7 @@
 // downstream implementation entrypoint_owner_map.rs checks root entrypoint owner-map contracts within docs
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
@@ -149,6 +150,7 @@ Commands:
   git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
@@ -209,6 +211,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
+        std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "codex-hook" {

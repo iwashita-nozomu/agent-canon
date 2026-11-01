@@ -4,6 +4,7 @@
 # contract test
 # responsibility Verifies standalone static unit source/runtime routing and eval failure evidence retention.
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh owns contract and eval unit commands
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs owns the native eval checker command
 # upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs the selected eval producer collection
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py defines canonical eval result paths
 # upstream design ../../documents/design/source-owned-dependency-validation.md source and persisted graph authority split
@@ -131,7 +132,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     )
     paths = (
         ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
-        ("eval/checkers/eval_accumulation_check.py", "checker", checker_status),
         (
             "eval/checkers/smoke_test_research_perspective_pack.py",
             "smoke",
@@ -153,14 +153,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "report_dir.mkdir(parents=True, exist_ok=True)\n"
             "(report_dir / 'agent-canon-pr-gate-pass.md').write_text('synthetic report\\n', encoding='utf-8')\n"
             if name == "producer"
-            else (
-                f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
-                "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
-                "if not report.is_file():\n"
-                "    raise SystemExit(87)\n"
-                if name == "checker"
-                else ""
-            )
+            else ""
         )
         script.write_text(
             "import json, os, sys\n"
@@ -174,6 +167,27 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             + f"raise SystemExit({status})\n",
             encoding="utf-8",
         )
+    native_cli = source / "tools" / "bin" / "agent-canon"
+    native_cli.parent.mkdir(parents=True, exist_ok=True)
+    native_cli.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, sys\n"
+        "from pathlib import Path\n"
+        "if sys.argv[1] != 'eval-accumulation-check':\n"
+        "    raise SystemExit(86)\n"
+        "with Path(os.environ['CALLS']).open('a') as stream:\n"
+        "    stream.write(json.dumps(['checker', "
+        "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
+        "os.environ.get('AGENT_CANON_LOG_ROOT'), "
+        "os.environ.get('AGENT_CANON_RUNTIME_ROOT')]) + '\\n')\n"
+        f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
+        "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
+        "if not report.is_file():\n"
+        "    raise SystemExit(87)\n"
+        f"raise SystemExit({checker_status})\n",
+        encoding="utf-8",
+    )
+    native_cli.chmod(0o755)
     text = RUNNER.read_text(encoding="utf-8")
     body = (
         "run_eval() ("
@@ -191,6 +205,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "RUNTIME_ROOT": str(source),
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
+            "AGENT_CANON_CLI": str(native_cli),
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),

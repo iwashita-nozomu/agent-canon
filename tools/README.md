@@ -146,7 +146,7 @@ catalog/checker owners rather than adding a second README registry.
 | theorem graph proof-frontier checks | `tools/bin/agent-canon theorem-graph-circularity-check` |
 | generated artifact guard | `tools/bin/agent-canon generated-artifact-guard` |
 | archive state | `python3 tools/runtime/archive/runtime_log_archive_git.py status` |
-| eval archive structure | `python3 eval/checkers/eval_accumulation_check.py` |
+| eval archive structure | `tools/bin/agent-canon eval-accumulation-check` |
 | path-risk/profile selection | `tools/bin/agent-canon classify-path-risk` |
 | one-shot LSP code analysis | `tools/bin/agent-canon lsp-code-analysis analyze --root <root> --format json` |
 | Markdown/links/Mermaid | `tools/bin/agent-canon docs check` |

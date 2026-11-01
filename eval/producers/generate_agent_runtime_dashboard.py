@@ -3282,7 +3282,7 @@ def hook_failure_next_action(
             reason=f"{failed} hook entries report status=fail",
             evidence=evidence,
             owner_surface=".codex/hooks/ and hook accumulation tooling",
-            command="python3 eval/checkers/eval_accumulation_check.py",
+            command="tools/bin/agent-canon eval-accumulation-check",
             done_condition="hook status fail count is 0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
             automation="agent-fix",

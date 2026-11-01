@@ -196,7 +196,7 @@ const CONTRACTS: &[ToolContract] = &[
     },
     ToolContract {
         name: "eval_accumulation",
-        tool: "eval/checkers/eval_accumulation_check.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs",
         links: &[
             direct_link("eval/definitions/README.md"),
             direct_link("documents/runtime/runtime-log-archive.md"),
