@@ -61,7 +61,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             "tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs",
         )
         self.assertEqual(
-            rows["quarto"]["path"], "tools/runtime/dispatch/tool_dispatch.py"
+            rows["quarto"]["path"],
+            "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
         self.assertEqual(rows["quarto"]["path"], rows["vl-convert"]["path"])
         self.assertTrue(rows["workflow-monitor"]["writes"])

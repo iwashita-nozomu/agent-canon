@@ -266,7 +266,7 @@ CONTRACT_COMPLETE_IMPLEMENTATION_RULE = (
 
 REPO_TOOL_ROUTING_POLICY_SOURCE = "agents/skills/task-routing.md#Standard Command"
 
-REPO_TOOL_ROUTING_OWNER = "tools/runtime/dispatch/tool_dispatch.py"
+REPO_TOOL_ROUTING_OWNER = "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs"
 
 REPO_TOOL_ROUTING_STATUS = "selected_native_argv"
 
