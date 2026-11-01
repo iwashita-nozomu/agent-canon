@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::LazyLock;
 
+use crate::agent_canon_source_root::has_catalog;
 use regex::Regex;
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
@@ -1065,7 +1066,7 @@ pub fn related_skill_candidates(
     (related_by_source, ordered_unique(&candidates))
 }
 
-fn capability_value_option(option: &str) -> Option<&'static str> {
+fn capability_value_option(option: &str) -> Option<&str> {
     match option {
         "--capability" | "--format" | "--mode" | "--risk" | "--root" => Some(option),
         "--name" | "--area" | "--prompt" | "--request" | "--purpose" | "--task" => Some("--prompt"),
@@ -1277,11 +1278,12 @@ pub fn preflight_capability_argv(argv: &[String]) -> CapabilityPreflight {
         .enumerate()
         .find_map(|(position, value)| normalized_ids[..position].contains(value).then_some(value))
     {
+        let error_code = format!("duplicate-capability:{duplicate}");
         return CapabilityPreflight {
             capability_ids: normalized_ids,
             mode,
             output_format,
-            error_code: format!("duplicate-capability:{duplicate}"),
+            error_code,
             root,
         };
     }
@@ -1520,7 +1522,7 @@ fn current_route_repository_root(raw_root: &Path) -> Result<PathBuf, String> {
         crate::path_resolution::resolve_non_strict(&expanded)?
     };
     for candidate in start.ancestors() {
-        if has_skill_catalog(candidate) {
+        if has_catalog(candidate) {
             return crate::path_resolution::resolve_non_strict(candidate);
         }
         if candidate.join(".git").exists() {
@@ -1553,7 +1555,7 @@ fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, 
         let source =
             route_source_override(source_value, "agent_canon_source_root_override_invalid")?;
         let canon = route_source_override(canon_value, "agent_canon_canon_root_override_invalid")?;
-        if !has_skill_catalog(&source) {
+        if !has_catalog(&source) {
             return Err((
                 "agent_canon_source_root_override_missing".to_owned(),
                 format!(
@@ -1562,7 +1564,7 @@ fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, 
                 ),
             ));
         }
-        if !has_skill_catalog(&canon) {
+        if !has_catalog(&canon) {
             return Err((
                 "agent_canon_canon_root_override_missing".to_owned(),
                 format!(
@@ -1573,7 +1575,7 @@ fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, 
         }
         return Ok(source);
     }
-    if !has_skill_catalog(&current_repository_root) {
+    if !has_catalog(&current_repository_root) {
         return Err((
             "agent_canon_source_root_missing".to_owned(),
             format!(
