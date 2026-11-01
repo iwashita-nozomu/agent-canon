@@ -231,7 +231,7 @@ fn python_number_equal(left: &JsonNumber, right: &JsonNumber) -> bool {
 ///
 /// The explicit work stack preserves Python's structural equality without recursing on nested
 /// arrays or objects. Number comparisons retain arbitrary precision for integer values.
-pub(crate) fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
+pub fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
     let mut pending = vec![(left, right)];
     while let Some((left, right)) = pending.pop() {
         match (left, right) {
