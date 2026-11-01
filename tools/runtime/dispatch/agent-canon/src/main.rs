@@ -114,6 +114,7 @@ Commands:
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
+  codex-hook [EVENT|--group EVENT] [--contract|--list]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
@@ -198,6 +199,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "codex-hook" {
+        std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "task-close" {
