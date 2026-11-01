@@ -708,6 +708,7 @@ fn validate_static_seed_codex_config(files: &[StaticSeedFile]) -> BundleResult<(
 }
 
 /// Load and validate source-independent static-seed bytes from one committed tree.
+#[cfg(test)]
 pub(crate) fn load_static_seed_plan(
     source_root: &Path,
     source_ref: &str,
