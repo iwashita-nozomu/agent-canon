@@ -482,7 +482,7 @@ fn reserve_output_directory(output_dir: &Path) -> Result<OutputReservation, Stri
             "output path is not a directory: {}",
             path.display()
         )),
-        Ok(metadata) => {
+        Ok(_) => {
             if !directory_is_empty(&parent, &name).map_err(|error| {
                 format!(
                     "cannot inspect output directory {}: {error}",
