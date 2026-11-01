@@ -871,6 +871,18 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("checkout_identity", calls[0][1])
         self.assertIn("cwd", calls[0][1])
         self.assertIn("git_root", calls[0][1])
+        self.assertIn("incoming write-capable handoff", calls[0][1])
+        self.assertIn("do not echo it or its path list in the result", calls[0][1])
+        self.assertIn(
+            "refer to the existing readback without repeating its fields", calls[0][1]
+        )
+        self.assertIn(
+            "explicitly assigned action is canonical repository-topic-clone.prepare",
+            calls[0][1],
+        )
+        self.assertIn(
+            "preexisting target is not required for preparation", calls[0][1]
+        )
         self.assertIsNotNone(dispatch.close_agent_token)
         self.assertEqual(
             dispatch.close_agent_token.arguments,

@@ -236,6 +236,15 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         "parent_authority",
         "stop_handback",
     ]
+    stop_handback = next(
+        item.fragment
+        for item in STATIC_OBLIGATION_TABLE
+        if item.obligation_id == "stop_handback"
+    )
+    assert stop_handback == (
+        "return the role result and any new commit/check facts produced by "
+        "the assigned work, then stop"
+    )
     clauses = {
         clause.clause_id: clause
         for role_id in registry.role_profile_bindings

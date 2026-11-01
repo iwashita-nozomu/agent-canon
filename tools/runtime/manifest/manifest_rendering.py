@@ -537,7 +537,7 @@ def same_role_subagent_policy_output_lines() -> tuple[str, ...]:
 def writer_target_policy_output_lines() -> tuple[str, ...]:
     """Return the pre-spawn writer-target contract."""
     return (
-        "WRITER_TARGET_POLICY=required_for_write_capable_handoffs",
+        "WRITER_TARGET_POLICY=required_before_source_edit",
         "WRITER_TARGET_PREPARED_BY=repository-topic-clone.prepare",
         "WRITER_TARGET_COLLISION=reject_same_checkout_root_before_spawn",
         f"WRITER_TARGET_FIELDS={','.join(WRITER_TARGET_REQUIRED_FIELDS)}",
@@ -1777,9 +1777,10 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         else "do not edit repository files; return the assigned result inline"
     )
     writer_target = (
-        " Carry writer_target with absolute checkout_root, fixed branch, normalized remote, "
-        "and allowed_paths; start in that checkout and do not switch/checkout/rename branches "
-        "or create worktrees."
+        " Source-edit assignments use the prepared writer_target and allowed_paths as "
+        "authorization. A sole assigned repository-topic-clone.prepare action may use its "
+        "exact request and current path scope to create the target; do not edit source until "
+        "the result is read back. Do not echo the target packet in the result."
         if role.id in {"implementer", "integration_executor"}
         else ""
     )
@@ -1803,10 +1804,11 @@ def role_prompt_contract(role: Role, workflow_family: dict[str, object] | None) 
         "Carry the owner-produced DecisionSufficiencyPacket reference and "
         "run.repo_tool_routing_policy tool_route, native argv, process result, and tool_evidence into "
         "the next handoff or review result when repo-owned tools are part of the selected route. "
-        "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
-        "and normalized remote owner/repository at the bounded transition points; do not "
-        "repeat it for ordinary commands. Do not delegate unless the handoff explicitly "
-        "explicitly authorizes a native child call; do not launch an unselected child. "
+        "Use checkout_identity at the bounded transition points. In a return handoff, refer "
+        "to the current readback without repeating its fields; include a refreshed block only "
+        "when checkout state changed. "
+        "Do not delegate unless the handoff explicitly authorizes a native child call; "
+        "do not launch an unselected child. "
         "Return findings or outputs tied to "
         "request_clause_ids, include artifact paths and dependency-file headers when files "
         "are created, and report remaining planned work or a next gate only when assigned."
@@ -1836,8 +1838,10 @@ def compact_role_prompt_contract(
         else "read-only; return assigned result inline"
     )
     writer_target = (
-        " carry writer_target (absolute checkout_root, fixed branch, normalized remote, allowed_paths); "
-        "do not switch or rename branches or create worktrees"
+        " source edits require the prepared writer_target and allowed_paths; an explicitly "
+        "assigned repository-topic-clone.prepare action may create that target from its exact "
+        "request and current path scope; no source edits before target readback; do not echo "
+        "the target packet in the result"
         if role.id in {"implementer", "integration_executor"}
         else ""
     )
@@ -1850,13 +1854,14 @@ def compact_role_prompt_contract(
         "assigned result inline. For "
         "requirements and intake assignments, include the objective, non-goals, "
         "constraints, and completion conditions in that handoff."
-        f" Include checkout_identity in every handoff where Git state matters;{writer_target}."
+        f" Reference the current checkout_identity for assignment context; in a return include only "
+        f"new commit/check or checkout-transition facts;{writer_target}."
         f" {reuse_instruction}"
     )
 
 
 def role_prompt_must_include(role: Role) -> tuple[str, ...]:
-    """Return handoff fields every invocation prompt should include for one role."""
+    """Return inbound prompt fields, with source-write authority checked at dispatch."""
     common: list[str] = []
     if role.id == "skill_evaluator":
         return (
@@ -1868,7 +1873,7 @@ def role_prompt_must_include(role: Role) -> tuple[str, ...]:
     common.append("checkout_identity")
     if role.write_policy.mode != "read_only":
         common.extend(("write_policy", "allowed_files_or_directories"))
-    if role.id in {"implementer", "integration_executor"}:
+    if role.id == "integration_executor":
         common.append("writer_target")
     if role.id in REUSE_SURVEY_PROMPT_ROLES:
         common.append("reuse_survey")

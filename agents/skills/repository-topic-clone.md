@@ -32,6 +32,11 @@ repository-topic checkout の操作を選び、
 選択した操作だけを実行し、引数は [CLI 参照](../../documents/tools/repository_topic_clone.md#基本操作)
 から組み立てます。handoff の identity を引き継ぎ、write-capable な `prepare` には
 current allowed paths を渡します。
+canonical `prepare` 自体が明示的に割り当てられた場合、まだ `writer_target` が無いことは
+実行を止める理由になりません。指定済みの repository URL/name、workspace root、topic、
+branch、mode、current allowed paths で prepare を実行し、戻った checkout identity と
+target packet を read back します。source edit は readback 後、その target checkout で
+のみ行います。
 computed path と actual Git identity が一致する checkout の task marker / writer packet は
 `prepare` で current metadata へ更新できます。
 この metadata-only operation は source と Git index を変更せず、dirty status を clean 扱いしません。

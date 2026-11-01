@@ -413,26 +413,39 @@ exactly these fields:
 - `head`: the resolved `HEAD` commit, or `unknown`
 - `remote`: normalized remote `owner/repository`, or `unknown`
 
-Read it once at agent/work-unit start, after a cwd or checkout change, before
-conflict resolution, before commit/push/PR, before cleanup or destructive Git,
-and in subagent handoff/final handback. Reuse the same block while checkout
-state is unchanged; ordinary commands do not trigger another read. The block
-describes where an operation runs and does not grant authority or replace any
-branch, worktree, merge, cleanup, or publication policy.
+Read it once at agent/work-unit start and after a cwd or checkout change. Read
+back the relevant current state before conflict resolution, commit/push/PR,
+cleanup, or destructive Git. A handoff or final result reuses that readback;
+do not repeat unchanged identity fields. When assigned work changes the checkout
+or creates a commit/check result, report only those new facts needed by the next
+decision. The block describes where an operation runs and does not grant
+authority or replace any branch, worktree, merge, cleanup, or publication
+policy.
 
 ## Fresh Subagent Context Capsule
 
 Subagents are fresh per launch and do not inherit accumulated context. Each
 handoff carries the selected task, objective and owned request clauses, current
 and retained requirements, relevant retirement reasons and unresolved points,
-current stage and checkout identity, exact owner files or sections to read, role
-boundary, expected result, and return contract. The latest explicit user
-instruction governs conflicts while compatible earlier requirements remain
-active. Keep evidence local unless needed for the next decision; link to this
-section instead of restating capsule fields.
+current stage and selected checkout reference, exact owner files or sections to
+read, role boundary, expected result, and return contract. A prepared
+`writer_target` supplies checkout and write-scope context to a write-capable
+child; that target and its `allowed_paths` are incoming authorization, not
+return fields. The latest explicit user instruction governs conflicts while
+compatible earlier requirements remain active. Keep evidence local unless
+needed for the next decision; link to this section instead of restating capsule
+fields.
 
-For write-capable work, carry the prepared `writer_target` and assigned
-`allowed_paths` under [Parallel Write Safety](canonical/CODEX_SUBAGENTS.md#parallel-write-safety).
+For an incoming source-edit assignment, carry the prepared `writer_target` and
+assigned `allowed_paths` under
+[Parallel Write Safety](canonical/CODEX_SUBAGENTS.md#parallel-write-safety).
+If the assigned operation is canonical `repository-topic-clone.prepare` itself,
+the exact repository request and current allowed paths are sufficient to
+materialize the target; no preexisting target is required. This authorizes only
+that preparation. Treat identity mismatch or typed failure as a hold, and do not
+edit source until the returned target is read back. A child returns its role
+result and any new commit/check or checkout facts produced by the assigned
+work, without echoing the unchanged target or path list.
 Carry the selected route's validation command or review gate when applicable;
 include route evidence only when the task needs it. Include a
 `pre_handoff_gate_status` only for a gate selected by the current route. Active
