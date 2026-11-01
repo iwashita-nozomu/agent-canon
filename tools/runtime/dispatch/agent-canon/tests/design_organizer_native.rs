@@ -333,6 +333,9 @@ fn map_oracle_paths(
         &format!("{old_case_root}/support"),
         &temp.support(),
     );
+    if let Some(report_text) = case["report"]["content_utf8"].as_str() {
+        add_report_path_replacements(&mut replacements, report_text, old_source, source);
+    }
     if let (Some(old_report), Some(report)) = (case["report"]["path"].as_str(), report) {
         replacements.push((old_report.to_string(), report.display().to_string()));
     }
@@ -342,6 +345,42 @@ fn map_oracle_paths(
         mapped = mapped.replace(&old, &new);
     }
     mapped
+}
+
+fn add_report_path_replacements(
+    replacements: &mut Vec<(String, String)>,
+    report_text: &str,
+    old_source: &str,
+    source: &Path,
+) {
+    for line in report_text.lines() {
+        let Some(proposal) = line
+            .strip_prefix("PROPOSE ")
+            .or_else(|| line.strip_prefix("COPIED "))
+        else {
+            continue;
+        };
+        let Some((_, old_target)) = proposal.split_once(" -> ") else {
+            continue;
+        };
+        if replacements.iter().any(|(known, _)| known == old_target) {
+            continue;
+        }
+        let Some(relative) = old_target
+            .strip_prefix(old_source)
+            .and_then(|path| path.strip_prefix('/'))
+        else {
+            continue;
+        };
+        let mut native_target = source.to_path_buf();
+        for component in relative
+            .split('/')
+            .filter(|component| !component.is_empty())
+        {
+            native_target.push(component);
+        }
+        replacements.push((old_target.to_string(), native_target.display().to_string()));
+    }
 }
 
 fn add_tree_replacements(
