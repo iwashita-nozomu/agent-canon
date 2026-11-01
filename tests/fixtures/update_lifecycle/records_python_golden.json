@@ -1,0 +1,1004 @@
+{
+  "source": "06e720e0190c4e803efbdef3920d283a213c1f76",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "binding_fixture": "tests/agent_tools/test_publication_integrator.py::lifecycle_binding",
+  "host_path_flavor": "POSIX",
+  "cases": [
+    {
+      "name": "snapshot-valid-posix-absolute-path",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "/tmp/agent-canon-oracle/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "output": {
+        "base_identity": {
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "schema": "agent-canon.snapshot.v1",
+        "source_namespace": "/tmp/agent-canon-oracle/source"
+      },
+      "canonical_utf8": "{\"base_identity\":{\"commit_sha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"schema\":\"agent-canon.snapshot.v1\",\"source_namespace\":\"/tmp/agent-canon-oracle/source\"}",
+      "sha256": "60d7736372a977cade7bbb2ef2fb29ea1e3a1a365f62b306d51d82dabfd21d60"
+    },
+    {
+      "name": "snapshot-nonabsolute-path-before-invalid-base",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "relative/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "bad",
+          "commit_sha": "x",
+          "tree_sha": "y"
+        }
+      },
+      "error": {
+        "code": "lifecycle:path_not_absolute",
+        "detail": "snapshot.source_namespace"
+      }
+    },
+    {
+      "name": "snapshot-schema-before-binding-and-path",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "wrong",
+        "binding": {},
+        "source_namespace": "relative/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "error": {
+        "code": "lifecycle:schema_invalid",
+        "detail": "agent-canon.snapshot.v1"
+      }
+    },
+    {
+      "name": "snapshot-binding-before-path",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {},
+        "source_namespace": "relative/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "binding:candidate_sha,evidence_digest,evidence_ref,input_digest,snapshot_id,timing,tool_id,tool_version,transaction_id,tree_sha"
+      }
+    },
+    {
+      "name": "snapshot-invalid-remote-ref",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "/tmp/agent-canon-oracle/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "error": {
+        "code": "lifecycle:ref_invalid",
+        "detail": "snapshot.base_identity.ref"
+      }
+    },
+    {
+      "name": "snapshot-invalid-commit-sha",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "/tmp/agent-canon-oracle/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      "error": {
+        "code": "lifecycle:identity_invalid",
+        "detail": "snapshot.base_identity.commit_sha"
+      }
+    },
+    {
+      "name": "snapshot-missing-key",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "/tmp/agent-canon-oracle/source"
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "snapshot:base_identity"
+      }
+    },
+    {
+      "name": "snapshot-extra-key",
+      "api": "validate_snapshot",
+      "input": {
+        "schema": "agent-canon.snapshot.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "source_namespace": "/tmp/agent-canon-oracle/source",
+        "base_identity": {
+          "remote": "origin",
+          "ref": "refs/heads/main",
+          "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "unexpected": true
+      },
+      "error": {
+        "code": "lifecycle:field_forbidden",
+        "detail": "snapshot:unexpected"
+      }
+    },
+    {
+      "name": "evidence-valid",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 1
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "observed_at": "2026-07-18T00:00:00Z",
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "schema": "agent-canon.evidence-identity.v1",
+        "sequence": 1
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"observed_at\":\"2026-07-18T00:00:00Z\",\"producer_path\":\"/tmp/agent-canon-oracle/producer.py\",\"producer_symbol\":\"produce_snapshot\",\"schema\":\"agent-canon.evidence-identity.v1\",\"sequence\":1}",
+      "sha256": "c68dde3858ae2b966a9b6198bec332e18f7dbcf4345bafb23d03e52ad2db3523"
+    },
+    {
+      "name": "evidence-huge-positive-integer",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "observed_at": "2026-07-18T00:00:00Z",
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "schema": "agent-canon.evidence-identity.v1",
+        "sequence": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"observed_at\":\"2026-07-18T00:00:00Z\",\"producer_path\":\"/tmp/agent-canon-oracle/producer.py\",\"producer_symbol\":\"produce_snapshot\",\"schema\":\"agent-canon.evidence-identity.v1\",\"sequence\":10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000}",
+      "sha256": "816db91488283234d0a29a7b327c255620fc25de476b509d127fb989cc7d9414"
+    },
+    {
+      "name": "evidence-bool-sequence",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": true
+      },
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "evidence_identity.sequence"
+      }
+    },
+    {
+      "name": "evidence-float-sequence",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 1.0
+      },
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "evidence_identity.sequence"
+      }
+    },
+    {
+      "name": "evidence-zero-sequence",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 0
+      },
+      "error": {
+        "code": "lifecycle:integer_invalid",
+        "detail": "evidence_identity.sequence"
+      }
+    },
+    {
+      "name": "evidence-invalid-time-after-path-and-symbol",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "not-a-date",
+        "sequence": 1
+      },
+      "error": {
+        "code": "lifecycle:timestamp_invalid",
+        "detail": "evidence_identity.observed_at"
+      }
+    },
+    {
+      "name": "evidence-relative-path-before-invalid-time",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "relative/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "not-a-date",
+        "sequence": 1
+      },
+      "error": {
+        "code": "lifecycle:path_not_absolute",
+        "detail": "evidence_identity.producer_path"
+      }
+    },
+    {
+      "name": "evidence-empty-symbol-before-invalid-time",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "",
+        "observed_at": "not-a-date",
+        "sequence": 1
+      },
+      "error": {
+        "code": "lifecycle:string_invalid",
+        "detail": "evidence_identity.producer_symbol"
+      }
+    },
+    {
+      "name": "evidence-schema-before-binding",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "wrong",
+        "binding": {},
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 1
+      },
+      "error": {
+        "code": "lifecycle:schema_invalid",
+        "detail": "agent-canon.evidence-identity.v1"
+      }
+    },
+    {
+      "name": "evidence-binding-before-path",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {},
+        "producer_path": "relative/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z",
+        "sequence": 1
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "binding:candidate_sha,evidence_digest,evidence_ref,input_digest,snapshot_id,timing,tool_id,tool_version,transaction_id,tree_sha"
+      }
+    },
+    {
+      "name": "evidence-missing-key",
+      "api": "validate_evidence_identity",
+      "input": {
+        "schema": "agent-canon.evidence-identity.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "producer_path": "/tmp/agent-canon-oracle/producer.py",
+        "producer_symbol": "produce_snapshot",
+        "observed_at": "2026-07-18T00:00:00Z"
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "evidence_identity:sequence"
+      }
+    },
+    {
+      "name": "checkpoint-pass",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "pass",
+        "failure_code": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "checkpoint_id": "prepare",
+        "failure_code": null,
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "verdict": "pass"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"checkpoint_id\":\"prepare\",\"failure_code\":null,\"schema\":\"agent-canon.checkpoint-receipt.v1\",\"verdict\":\"pass\"}",
+      "sha256": "e3cacf805cdcfebc703e6d3a953b434fda8f768a993f6209220de0facdf2dfd8"
+    },
+    {
+      "name": "checkpoint-fail-with-code",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "fail",
+        "failure_code": "owner-check-failed"
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "checkpoint_id": "prepare",
+        "failure_code": "owner-check-failed",
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "verdict": "fail"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"checkpoint_id\":\"prepare\",\"failure_code\":\"owner-check-failed\",\"schema\":\"agent-canon.checkpoint-receipt.v1\",\"verdict\":\"fail\"}",
+      "sha256": "46dcf7882de20d7e2f35defda4f358af0c3e8339efb617c155cd11878c459920"
+    },
+    {
+      "name": "checkpoint-skip",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "skip",
+        "failure_code": null
+      },
+      "output": {
+        "binding": {
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-07-18T00:00:00Z"
+          },
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "tree_sha": "4444444444444444444444444444444444444444"
+        },
+        "checkpoint_id": "prepare",
+        "failure_code": null,
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "verdict": "skip"
+      },
+      "canonical_utf8": "{\"binding\":{\"candidate_sha\":\"3333333333333333333333333333333333333333\",\"evidence_digest\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\",\"evidence_ref\":\"evidence:6666666666666666666666666666666666666666666666666666666666666666\",\"input_digest\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\",\"snapshot_id\":\"snapshot:2222222222222222222222222222222222222222222222222222222222222222\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-07-18T00:00:00Z\",\"last_attempt_at\":\"2026-07-18T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-07-18T00:00:00Z\"},\"tool_id\":\"publication-integrator\",\"tool_version\":\"test.v1\",\"transaction_id\":\"tx:1111111111111111111111111111111111111111111111111111111111111111\",\"tree_sha\":\"4444444444444444444444444444444444444444\"},\"checkpoint_id\":\"prepare\",\"failure_code\":null,\"schema\":\"agent-canon.checkpoint-receipt.v1\",\"verdict\":\"skip\"}",
+      "sha256": "04b2047d0e2cfb34968b28354858b0374348a3b31362cd9914a6d104ad8d05e7"
+    },
+    {
+      "name": "checkpoint-fail-without-code",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "fail",
+        "failure_code": null
+      },
+      "error": {
+        "code": "lifecycle:string_invalid",
+        "detail": "checkpoint_receipt.failure_code"
+      }
+    },
+    {
+      "name": "checkpoint-pass-with-code",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "pass",
+        "failure_code": "forbidden"
+      },
+      "error": {
+        "code": "lifecycle:failure_code_forbidden",
+        "detail": "checkpoint_receipt"
+      }
+    },
+    {
+      "name": "checkpoint-unknown-id",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "unknown",
+        "verdict": "pass",
+        "failure_code": null
+      },
+      "error": {
+        "code": "lifecycle:enum_invalid",
+        "detail": "checkpoint_receipt.checkpoint_id"
+      }
+    },
+    {
+      "name": "checkpoint-schema-before-binding",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "wrong",
+        "binding": {},
+        "checkpoint_id": "prepare",
+        "verdict": "pass",
+        "failure_code": null
+      },
+      "error": {
+        "code": "lifecycle:schema_invalid",
+        "detail": "agent-canon.checkpoint-receipt.v1"
+      }
+    },
+    {
+      "name": "checkpoint-binding-before-id",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {},
+        "checkpoint_id": "unknown",
+        "verdict": "pass",
+        "failure_code": null
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "binding:candidate_sha,evidence_digest,evidence_ref,input_digest,snapshot_id,timing,tool_id,tool_version,transaction_id,tree_sha"
+      }
+    },
+    {
+      "name": "checkpoint-missing-key",
+      "api": "validate_checkpoint_receipt",
+      "input": {
+        "schema": "agent-canon.checkpoint-receipt.v1",
+        "binding": {
+          "transaction_id": "tx:1111111111111111111111111111111111111111111111111111111111111111",
+          "snapshot_id": "snapshot:2222222222222222222222222222222222222222222222222222222222222222",
+          "candidate_sha": "3333333333333333333333333333333333333333",
+          "tree_sha": "4444444444444444444444444444444444444444",
+          "input_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "tool_id": "publication-integrator",
+          "tool_version": "test.v1",
+          "evidence_ref": "evidence:6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "timing": {
+            "started_at": "2026-07-18T00:00:00Z",
+            "finished_at": "2026-07-18T00:00:00Z",
+            "last_attempt_at": "2026-07-18T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false
+          }
+        },
+        "checkpoint_id": "prepare",
+        "verdict": "pass"
+      },
+      "error": {
+        "code": "lifecycle:field_missing",
+        "detail": "checkpoint_receipt:failure_code"
+      }
+    }
+  ]
+}
