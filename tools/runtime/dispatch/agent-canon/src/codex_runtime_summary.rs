@@ -148,7 +148,6 @@ struct SummaryOutput {
     latest_turn_id: String,
 }
 
-#[derive(Debug)]
 struct ExportResult {
     status: String,
     index_status: String,
