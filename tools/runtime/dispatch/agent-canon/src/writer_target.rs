@@ -393,7 +393,7 @@ fn relative_paths(value: Option<&JsonValue>) -> Result<Vec<JsonString>, WriterTa
     paths
         .iter()
         .map(|path| {
-            let Some(JsonValue::String(path)) = path else {
+            let JsonValue::String(path) = path else {
                 return Err(WriterTargetError::new(
                     "writer_target:allowed_path_required",
                 ));
