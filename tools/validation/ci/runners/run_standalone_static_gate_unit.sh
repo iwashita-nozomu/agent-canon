@@ -149,7 +149,7 @@ run_docs() {
 }
 
 run_rust() {
-  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
+  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
   local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
   if [[ ! -x "${agent_cli}" ]]; then
     echo "AGENT_CANON_CLI_BUILD=fail" >&2
@@ -157,9 +157,9 @@ run_rust() {
   fi
   "${agent_cli}" --version
   cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --all-targets -- -D warnings
+  cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
   env -u AGENT_CANON_RUNTIME_ROOT \
-    cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml
+    cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
 }
 
 run_contracts() {
