@@ -301,7 +301,7 @@ pub fn utc_now() -> String {
     let mut timestamp = format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
         now.year(),
-        now.month().number_from_month(),
+        now.month() as u8,
         now.day(),
         now.hour(),
         now.minute(),
