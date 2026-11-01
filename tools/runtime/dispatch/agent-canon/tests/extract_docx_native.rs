@@ -161,9 +161,7 @@ fn product_heading_suffix_matches_python_unicode_digit_then_int_behavior() {
     let markdown = extract_markdown(fraction.as_bytes(), "reference.docx").unwrap();
     assert!(markdown.contains("# Section"), "{markdown}");
 
-    let multiple_properties = format!(
-        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:rPr/></w:pPr><w:pPr><w:pStyle w:val="Heading２"/></w:pPr><w:r><w:t>Section</w:t></w:r></w:p></w:body></w:document>"#
-    );
+    let multiple_properties = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:rPr/></w:pPr><w:pPr><w:pStyle w:val="Heading２"/></w:pPr><w:r><w:t>Section</w:t></w:r></w:p></w:body></w:document>"#;
     let markdown = extract_markdown(multiple_properties.as_bytes(), "reference.docx").unwrap();
     assert!(markdown.contains("## Section"), "{markdown}");
 }
