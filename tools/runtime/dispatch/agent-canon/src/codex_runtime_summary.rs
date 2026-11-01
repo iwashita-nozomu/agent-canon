@@ -22,8 +22,8 @@ use crate::path_resolution::{python_glob_paths, resolve_non_strict};
 use crate::python_cli_integer;
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::python_json::{
-    canonical_json_ascii_bytes, parse_json, python_json_ascii_bytes, to_serde_json_value,
-    JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
+    canonical_json_ascii_bytes, parse_json, to_serde_json_value, JsonArray, JsonNumber, JsonObject,
+    JsonString, JsonValue,
 };
 use crate::python_text::{python_splitlines, python_strip};
 use crate::runtime_boundary::{
@@ -815,7 +815,7 @@ fn source_artifact_root() -> Result<PathBuf, String> {
 }
 
 fn append_parent_jsonl(path: &Path, record: &JsonValue) -> Result<(), String> {
-    let mut line = python_json_ascii_bytes(record)?;
+    let mut line = canonical_json_ascii_bytes(record)?;
     line.push(b'\n');
     let source = source_artifact_root()?;
     let boundary = RuntimeArtifactBoundary::for_source(&source, None, true)?;
