@@ -11,7 +11,7 @@ use agent_canon::behavior_event_assembly::{
 };
 use agent_canon::prompt_classifier::PromptClassifierInputs;
 use agent_canon::python_json::{
-    canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonString, JsonValue,
+    canonical_json_ascii_bytes, parse_json, JsonObject, JsonString, JsonValue,
 };
 use agent_canon::subagent_selection::{select_subagents, SubagentSelection};
 use agent_canon::tool_selection::{select_tools, ToolSelection};
