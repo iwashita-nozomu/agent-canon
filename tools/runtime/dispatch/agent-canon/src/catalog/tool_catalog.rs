@@ -234,6 +234,17 @@ pub fn resolve_repo_path(root: &Path, relative_path: &str, source_root: Option<&
     }
 }
 
+/// Read one YAML document using the catalog owner's parser without imposing
+/// the legacy catalog checker's shape or runtime-dispatch validation.
+pub fn load_yaml_document(path: &Path) -> Result<Yaml, String> {
+    let text = fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let mut documents = YamlLoader::load_from_str(&text).map_err(|error| error.to_string())?;
+    if documents.len() > 1 {
+        return Err("multiple YAML documents".to_owned());
+    }
+    Ok(documents.pop().unwrap_or(Yaml::Null))
+}
+
 fn load_catalog(path: &Path) -> (Option<Yaml>, Vec<Finding>) {
     if !path.is_file() {
         return (
