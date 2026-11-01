@@ -103,10 +103,10 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
-    codex_runtime_summary, report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
-    theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage, waterfall_gate,
-    work_log,
+    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer,
+    generated_completeness, native_release, report_artifact_checks, run_evaluation,
+    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
+    tool_proof_coverage, waterfall_gate, work_log,
 };
 use std::env;
 

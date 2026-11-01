@@ -271,7 +271,9 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             return Ok(None);
         }
         if let Some(value) = argument.strip_prefix("-h=") {
-            return Err(format!("argument -h/--help: ignored explicit argument '{value}'"));
+            return Err(format!(
+                "argument -h/--help: ignored explicit argument '{value}'"
+            ));
         }
         if argument == "--" {
             if index + 1 == args.len() {
@@ -318,7 +320,9 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
         );
         if !takes_value {
             if let Some(value) = inline_value {
-                return Err(format!("argument {option}: ignored explicit argument '{value}'"));
+                return Err(format!(
+                    "argument {option}: ignored explicit argument '{value}'"
+                ));
             }
             match name {
                 OptionName::AllThreads => options.all_threads = true,
@@ -353,9 +357,8 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             OptionName::SqliteLog => options.sqlite_log = PathBuf::from(value),
             OptionName::SessionGlob => options.session_globs.push(value),
             OptionName::RecentDays => {
-                options.recent_days = python_cli_integer::parse(&value).ok_or_else(|| {
-                    format!("argument {option}: invalid int value: '{value}'")
-                })?;
+                options.recent_days = python_cli_integer::parse(&value)
+                    .ok_or_else(|| format!("argument {option}: invalid int value: '{value}'"))?;
             }
             OptionName::AllTime => unreachable!("flag options were handled above"),
             OptionName::Output => options.output = Some(PathBuf::from(value)),
@@ -390,10 +393,9 @@ fn run_export(options: CliOptions) -> Result<i32, String> {
         Some(options.recent_days)
     };
     let session_cutoff = recent_cutoff(recent_days.as_ref());
-    let history_path = expand_user_path(&options.history_jsonl)
-        .map_err(|error| error.to_string())?;
-    let sqlite_path = expand_user_path(&options.sqlite_log)
-        .map_err(|error| error.to_string())?;
+    let history_path =
+        expand_user_path(&options.history_jsonl).map_err(|error| error.to_string())?;
+    let sqlite_path = expand_user_path(&options.sqlite_log).map_err(|error| error.to_string())?;
     let session_paths = iter_session_paths(&options.session_globs, session_cutoff.as_ref())?;
     let grouped_session_paths = session_paths_by_thread(&session_paths);
     let thread_ids = if options.all_threads {
@@ -486,7 +488,9 @@ fn run_export(options: CliOptions) -> Result<i32, String> {
     );
     println!(
         "CODEX_RUNTIME_SUMMARY_OUTPUT={}",
-        last_output.as_deref().map_or_else(String::new, path_display)
+        last_output
+            .as_deref()
+            .map_or_else(String::new, path_display)
     );
     println!(
         "CODEX_RUNTIME_SUMMARY_INDEX_STATUS={}",
@@ -644,17 +648,11 @@ fn codex_runtime_summary_path(
         )))
 }
 
-fn codex_runtime_index_path(
-    active_root: &Path,
-    canon_root: &Path,
-) -> Result<PathBuf, String> {
+fn codex_runtime_index_path(active_root: &Path, canon_root: &Path) -> Result<PathBuf, String> {
     Ok(codex_runtime_summary_dir(active_root, canon_root)?.join(CODEX_INDEX_FILE))
 }
 
-fn codex_runtime_summary_dir(
-    active_root: &Path,
-    canon_root: &Path,
-) -> Result<PathBuf, String> {
+fn codex_runtime_summary_dir(active_root: &Path, canon_root: &Path) -> Result<PathBuf, String> {
     Ok(archive_root(canon_root)?
         .join(CODEX_RUNTIME_DIRECTORY)
         .join(repo_key(active_root)?))
@@ -665,8 +663,8 @@ fn archive_root(canon_root: &Path) -> Result<PathBuf, String> {
     let override_value = override_value.to_string_lossy();
     let override_value = python_strip(&override_value);
     if !override_value.is_empty() {
-        let expanded = expand_user_path(Path::new(override_value))
-            .map_err(|error| error.to_string())?;
+        let expanded =
+            expand_user_path(Path::new(override_value)).map_err(|error| error.to_string())?;
         if expanded.is_absolute() {
             let declared = env::var_os(PRIVATE_LOG_ROOT_ENV).unwrap_or_default();
             let declared = declared.to_string_lossy();
@@ -677,8 +675,8 @@ fn archive_root(canon_root: &Path) -> Result<PathBuf, String> {
                         .to_owned(),
                 );
             }
-            let declared = expand_user_path(Path::new(declared))
-                .map_err(|error| error.to_string())?;
+            let declared =
+                expand_user_path(Path::new(declared)).map_err(|error| error.to_string())?;
             let declared = resolve_non_strict(&declared)?;
             let resolved = resolve_external_artifact_path(canon_root, &expanded)?;
             if resolved != declared {
@@ -700,7 +698,10 @@ fn runtime_relative_path(canon_root: &Path, relative: &Path) -> Result<PathBuf, 
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err(format!("unsafe runtime-relative path: {}", relative.display()));
+        return Err(format!(
+            "unsafe runtime-relative path: {}",
+            relative.display()
+        ));
     }
     let runtime_root = env::var_os(RUNTIME_ROOT_ENV).unwrap_or_default();
     let runtime_root = runtime_root.to_string_lossy();
@@ -710,9 +711,13 @@ fn runtime_relative_path(canon_root: &Path, relative: &Path) -> Result<PathBuf, 
             "explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
         ));
     }
-    let runtime_root = expand_user_path(Path::new(runtime_root)).map_err(|error| error.to_string())?;
+    let runtime_root =
+        expand_user_path(Path::new(runtime_root)).map_err(|error| error.to_string())?;
     if !runtime_root.is_absolute() {
-        return Err(format!("runtime root must be absolute: {}", runtime_root.display()));
+        return Err(format!(
+            "runtime root must be absolute: {}",
+            runtime_root.display()
+        ));
     }
     resolve_external_artifact_path(canon_root, &runtime_root.join(relative))
 }
@@ -907,7 +912,8 @@ fn for_each_python_text_line<F>(path: &Path, mut consume: F) -> Result<(), Strin
 where
     F: FnMut(&str) -> Result<(), String>,
 {
-    let file = fs::File::open(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let file =
+        fs::File::open(path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
     let mut reader = BufReader::new(file);
     let mut pending = Vec::new();
     loop {
@@ -944,7 +950,11 @@ where
     Ok(())
 }
 
-fn read_history(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result<HistorySummary, String> {
+fn read_history(
+    path: &Path,
+    thread_id: &str,
+    cutoff: Option<&BigInt>,
+) -> Result<HistorySummary, String> {
     if !path.is_file() {
         return Ok(HistorySummary {
             entry_count: 0,
@@ -992,7 +1002,10 @@ fn read_history(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result
     Ok(result)
 }
 
-fn read_history_thread_ids(path: &Path, cutoff: Option<&BigInt>) -> Result<BTreeSet<String>, String> {
+fn read_history_thread_ids(
+    path: &Path,
+    cutoff: Option<&BigInt>,
+) -> Result<BTreeSet<String>, String> {
     if !path.is_file() {
         return Ok(BTreeSet::new());
     }
@@ -1031,7 +1044,12 @@ fn open_readonly_sqlite(path: &Path) -> Result<Connection, String> {
     .map_err(|error| format!("cannot open SQLite runtime log {}: {error}", path.display()))?;
     connection
         .busy_timeout(Duration::from_secs(1))
-        .map_err(|error| format!("cannot configure SQLite runtime log {}: {error}", path.display()))?;
+        .map_err(|error| {
+            format!(
+                "cannot configure SQLite runtime log {}: {error}",
+                path.display()
+            )
+        })?;
     Ok(connection)
 }
 
@@ -1057,7 +1075,11 @@ fn sqlite_text(row: &rusqlite::Row<'_>, index: usize) -> Result<Option<String>, 
     }
 }
 
-fn read_sqlite(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result<SqliteSummary, String> {
+fn read_sqlite(
+    path: &Path,
+    thread_id: &str,
+    cutoff: Option<&BigInt>,
+) -> Result<SqliteSummary, String> {
     let mut result = SqliteSummary {
         row_count: 0,
         estimated_bytes: BigInt::from(0_u8),
@@ -1081,9 +1103,12 @@ fn read_sqlite(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result<
         )
         .map_err(|error| format!("cannot query SQLite runtime log {}: {error}", path.display()))?;
     let mut turns = BTreeMap::<String, TokenTurn>::new();
-    let mut rows = statement
-        .query([thread_id])
-        .map_err(|error| format!("cannot query SQLite runtime log {}: {error}", path.display()))?;
+    let mut rows = statement.query([thread_id]).map_err(|error| {
+        format!(
+            "cannot query SQLite runtime log {}: {error}",
+            path.display()
+        )
+    })?;
     while let Some(row) = rows
         .next()
         .map_err(|error| format!("cannot read SQLite runtime log {}: {error}", path.display()))?
@@ -1095,8 +1120,16 @@ fn read_sqlite(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result<
             continue;
         }
         result.row_count += 1;
-        result.first_ts = Some(result.first_ts.map_or(timestamp, |value| value.min(timestamp)));
-        result.last_ts = Some(result.last_ts.map_or(timestamp, |value| value.max(timestamp)));
+        result.first_ts = Some(
+            result
+                .first_ts
+                .map_or(timestamp, |value| value.min(timestamp)),
+        );
+        result.last_ts = Some(
+            result
+                .last_ts
+                .map_or(timestamp, |value| value.max(timestamp)),
+        );
         if let Some(estimated_bytes) = sqlite_integer(row, 4)? {
             result.estimated_bytes += BigInt::from(estimated_bytes);
         }
@@ -1131,11 +1164,13 @@ fn read_sqlite(path: &Path, thread_id: &str, cutoff: Option<&BigInt>) -> Result<
         }
     }
     result.token_turns = turns.into_values().collect();
-    result
-        .token_turns
-        .sort_by(|left, right| (left.timestamp, &left.turn_id).cmp(&(right.timestamp, &right.turn_id)));
+    result.token_turns.sort_by(|left, right| {
+        (left.timestamp, &left.turn_id).cmp(&(right.timestamp, &right.turn_id))
+    });
     if result.token_turns.len() > MAX_TURN_ITEMS {
-        result.token_turns.drain(..result.token_turns.len() - MAX_TURN_ITEMS);
+        result
+            .token_turns
+            .drain(..result.token_turns.len() - MAX_TURN_ITEMS);
     }
     Ok(result)
 }
@@ -1162,9 +1197,9 @@ fn update_token_turn(
         estimated_token_count,
         token_limit_reached,
     };
-    let replace = turns.get(&turn_id).is_none_or(|existing| {
-        candidate.total_usage_tokens >= existing.total_usage_tokens
-    });
+    let replace = turns
+        .get(&turn_id)
+        .is_none_or(|existing| candidate.total_usage_tokens >= existing.total_usage_tokens);
     if replace {
         turns.insert(turn_id, candidate);
     }
@@ -1176,16 +1211,14 @@ fn post_sampling_regex() -> &'static Regex {
         Regex::new(
             r"turn_id=(?P<turn_id>\S+).*?total_usage_tokens=(?P<total>[\p{Nd}&&\p{Age:15.0}]+)",
         )
-            .expect("Codex post-sampling regex is valid")
+        .expect("Codex post-sampling regex is valid")
     });
     &REGEX
 }
 
 fn estimated_token_regex() -> &'static Regex {
     static REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
-        Regex::new(
-            r"estimated_token_count=(?:Some\()?(?P<estimated>[\p{Nd}&&\p{Age:15.0}]+)\)?",
-        )
+        Regex::new(r"estimated_token_count=(?:Some\()?(?P<estimated>[\p{Nd}&&\p{Age:15.0}]+)\)?")
             .expect("Codex estimated-token regex is valid")
     });
     &REGEX
@@ -1193,8 +1226,7 @@ fn estimated_token_regex() -> &'static Regex {
 
 fn token_limit_regex() -> &'static Regex {
     static REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
-        Regex::new(r"token_limit_reached=(?P<limit>\w+)")
-            .expect("Codex token-limit regex is valid")
+        Regex::new(r"token_limit_reached=(?P<limit>\w+)").expect("Codex token-limit regex is valid")
     });
     &REGEX
 }
@@ -1237,7 +1269,10 @@ fn session_thread_id_regex() -> &'static Regex {
     &REGEX
 }
 
-fn read_sqlite_thread_ids(path: &Path, cutoff: Option<&BigInt>) -> Result<BTreeSet<String>, String> {
+fn read_sqlite_thread_ids(
+    path: &Path,
+    cutoff: Option<&BigInt>,
+) -> Result<BTreeSet<String>, String> {
     if !path.is_file() {
         return Ok(BTreeSet::new());
     }
@@ -1256,17 +1291,26 @@ fn read_sqlite_thread_ids(path: &Path, cutoff: Option<&BigInt>) -> Result<BTreeS
     if cutoff.is_some() {
         query.push_str(" AND ts >= ?");
     }
-    let mut statement = connection
-        .prepare(&query)
-        .map_err(|error| format!("cannot query SQLite runtime log {}: {error}", path.display()))?;
+    let mut statement = connection.prepare(&query).map_err(|error| {
+        format!(
+            "cannot query SQLite runtime log {}: {error}",
+            path.display()
+        )
+    })?;
     let mut rows = if let Some(cutoff) = cutoff {
-        statement
-            .query([cutoff])
-            .map_err(|error| format!("cannot query SQLite runtime log {}: {error}", path.display()))?
+        statement.query([cutoff]).map_err(|error| {
+            format!(
+                "cannot query SQLite runtime log {}: {error}",
+                path.display()
+            )
+        })?
     } else {
-        statement
-            .query([])
-            .map_err(|error| format!("cannot query SQLite runtime log {}: {error}", path.display()))?
+        statement.query([]).map_err(|error| {
+            format!(
+                "cannot query SQLite runtime log {}: {error}",
+                path.display()
+            )
+        })?
     };
     let mut thread_ids = BTreeSet::new();
     while let Some(row) = rows
@@ -1298,8 +1342,7 @@ fn iter_session_paths(
             } else {
                 &path
             };
-            let expanded =
-                expand_user_path(expansion_input).map_err(|error| error.to_string())?;
+            let expanded = expand_user_path(expansion_input).map_err(|error| error.to_string())?;
             let resolved = resolve_non_strict(&expanded)?;
             let key = python_path_components(&resolved);
             unique_paths.entry(key).or_insert(resolved);
@@ -1431,7 +1474,9 @@ fn read_sessions(paths: &[PathBuf]) -> Result<SessionSummary, String> {
             if !matches!(usage, Some(JsonValue::Object(object)) if !object.0.is_empty()) {
                 return Ok(());
             }
-            let Some(total) = python_integer(usage.and_then(|value| object_member(value, "total_tokens"))) else {
+            let Some(total) =
+                python_integer(usage.and_then(|value| object_member(value, "total_tokens")))
+            else {
                 return Ok(());
             };
             file_events += 1;
@@ -1517,7 +1562,9 @@ fn summary_payload(
     let live_total_usage_tokens = sqlite_summary
         .token_turns
         .iter()
-        .fold(BigInt::from(0_u8), |sum, turn| sum + &turn.total_usage_tokens);
+        .fold(BigInt::from(0_u8), |sum, turn| {
+            sum + &turn.total_usage_tokens
+        });
     let latest_turn = sqlite_summary.token_turns.last();
     let recorded_at = utc_now();
     let source_repo_key = repo_key(source_root)?;
@@ -1608,8 +1655,14 @@ fn summary_payload(
     let payload_map = payload
         .as_object_mut()
         .expect("summary payload is an object");
-    payload_map.insert("recorded_at".to_owned(), SerdeValue::String(recorded_at.clone()));
-    payload_map.insert("summary_id".to_owned(), SerdeValue::String(summary_id.clone()));
+    payload_map.insert(
+        "recorded_at".to_owned(),
+        SerdeValue::String(recorded_at.clone()),
+    );
+    payload_map.insert(
+        "summary_id".to_owned(),
+        SerdeValue::String(summary_id.clone()),
+    );
     let payload = json_value(&payload)?;
     Ok(SummaryOutput {
         payload,
@@ -1653,5 +1706,3 @@ fn summary_index_payload(
         "latest_turn_id": summary.latest_turn_id,
     }))
 }
-
-

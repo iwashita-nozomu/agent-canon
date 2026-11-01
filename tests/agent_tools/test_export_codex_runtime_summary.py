@@ -6,10 +6,13 @@
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves codex-runtime archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents runtime log archive ownership
+# upstream reference ../fixtures/codex_runtime_summary/python_golden.json freezes original CLI inputs and complete output
 # @dependency-end
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import os
 import sqlite3
@@ -18,6 +21,7 @@ import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -51,6 +55,67 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_RUNTIME_ROOT"] = self._previous_runtime
         self._runtime_temp.cleanup()
+
+    def test_complete_all_time_output_matches_frozen_python_cli(self) -> None:
+        """Compare both real CLI runs and every stored byte with the old producer."""
+        golden = json.loads((PROJECT_ROOT / "tests/fixtures/codex_runtime_summary/python_golden.json").read_text())
+        self.assertEqual(golden["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6")
+        self.assertEqual(golden["script_sha256"], "9d32bb15e3143c679ad3bea08297d4992dece34ff75bf9d5c914fb748f46fe8e")
+        with tempfile.TemporaryDirectory() as temporary:
+            case = Path(temporary)
+            source, canon, runtime = case / "project", case / "agent-canon", case / "runtime"
+            source.mkdir()
+            canon.mkdir()
+            runtime.mkdir()
+            for item in golden["input_files"]:
+                self.assertIn(item["path"], {"history.jsonl", "logs_2.sqlite"})
+                (case / item["path"]).write_bytes(base64.b64decode(item["base64"]))
+            environment = os.environ.copy()
+            for name in ("AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_LOG_ROOT"):
+                environment.pop(name, None)
+            environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
+            environment["CODEX_HOME"] = str(case / "empty-codex-home")
+            command = [NATIVE_CLI, "export-codex-runtime-summary", "--source-root", str(source), "--canon-root", str(canon), "--thread-id", golden["thread_id"], "--history-jsonl", str(case / "history.jsonl"), "--sqlite-log", str(case / "logs_2.sqlite"), "--all-time", "--session-glob", str(case / "no-sessions/*.jsonl")]
+            for old in golden["runs"]:
+                result = subprocess.run(command, env=environment, capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, old["exit"], result.stderr)
+                self.assertEqual(result.stderr, old["stderr"])
+                self.assertEqual(result.stdout, old["stdout"].replace(golden["runtime_root"], str(runtime)))
+            expected_files = {item["path"]: base64.b64decode(item["base64"]) for item in golden["files"]}
+            self.assertEqual({p.relative_to(runtime).as_posix() for p in runtime.rglob("*") if p.is_file()}, set(expected_files))
+            old_records = {name: json.loads(data) for name, data in expected_files.items() if name.endswith(".jsonl")}
+            def relocate(value: object) -> object:
+                if isinstance(value, str):
+                    return value.replace(golden["case_root"], case.as_posix())
+                if isinstance(value, dict):
+                    return {key: relocate(item) for key, item in value.items()}
+                if isinstance(value, list):
+                    return [relocate(item) for item in value]
+                return value
+            expected_records = {name: relocate(record) for name, record in old_records.items()}
+            summary_name = next(name for name in old_records if "/chats/" in name)
+            summary = expected_records[summary_name]
+            stable = {key: value for key, value in summary.items() if key not in {"recorded_at", "summary_id"}}
+            expected_id = hashlib.sha256(json.dumps(stable, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()[:16]
+            observed_times = []
+            for name, old_bytes in expected_files.items():
+                actual_bytes = (runtime / name).read_bytes()
+                if not name.endswith(".jsonl"):
+                    self.assertEqual(actual_bytes, old_bytes)
+                    continue
+                old_record = old_records[name]
+                self.assertEqual(old_bytes, (json.dumps(old_record, sort_keys=True) + "\n").encode())
+                expected = expected_records[name]
+                expected["summary_id"] = expected_id
+                actual = json.loads(actual_bytes)
+                recorded_at = actual["recorded_at"]
+                self.assertRegex(recorded_at, r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{6})?Z$")
+                datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
+                observed_times.append(recorded_at)
+                self.assertEqual(actual_bytes, (json.dumps(actual, sort_keys=True) + "\n").encode())
+                actual["recorded_at"] = old_record["recorded_at"]
+                self.assertEqual(actual, expected)
+            self.assertEqual(len(set(observed_times)), 1)
 
     def test_exports_idempotent_summary_without_prompt_text(self) -> None:
         """Exporter should write one bounded JSONL summary per unique observation."""

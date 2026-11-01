@@ -17,8 +17,8 @@
 use crate::dependency_manifest::{
     parse_dependency_header, ParsedDependencyHeader, TargetPathError,
 };
-use agent_canon::path_resolution::python_fnmatch_case;
 use crate::skill_projection_registry::{generated_skill_projections, GeneratedProjection};
+use agent_canon::path_resolution::python_fnmatch_case;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
