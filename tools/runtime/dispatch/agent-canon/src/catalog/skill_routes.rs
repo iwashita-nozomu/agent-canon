@@ -1470,9 +1470,9 @@ pub fn decide_capabilities(
         .cloned()
         .collect();
     let (related_skills, related_skill_candidates) = related_skill_candidates(
-        &[matched.skill.clone()],
+        std::slice::from_ref(&matched.skill),
         &index.rules_by_skill,
-        &[matched.skill.clone()],
+        std::slice::from_ref(&matched.skill),
     );
     let reason = format!(
         "capability={};owner={};phase={};activation={}",
