@@ -190,7 +190,13 @@ impl JsonNumber {
 }
 
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {
-    JsonParser::new(input).parse()
+    JsonParser::new(input, false).parse()
+}
+
+/// Parse JSON while rejecting duplicate object keys and Python's non-finite constants.
+/// Existing callers retain `parse_json`'s last-key-wins and constant behavior.
+pub fn parse_json_reject_duplicates(input: &str) -> Result<JsonValue, String> {
+    JsonParser::new(input, true).parse()
 }
 
 // Python accepts 9,994 arrays nested inside the record object (9,995 containers total).
@@ -259,14 +265,16 @@ struct JsonParser<'a> {
     input: &'a str,
     bytes: &'a [u8],
     index: usize,
+    reject_duplicates: bool,
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(input: &'a str) -> Self {
+    fn new(input: &'a str, reject_duplicates: bool) -> Self {
         Self {
             input,
             bytes: input.as_bytes(),
             index: 0,
+            reject_duplicates,
         }
     }
 
@@ -292,6 +300,13 @@ impl<'a> JsonParser<'a> {
                             if let Some(position) =
                                 values.0.iter().position(|(existing, _)| existing == &key)
                             {
+                                if self.reject_duplicates {
+                                    return Err(format!(
+                                        "duplicate JSON key: {}",
+                                        key.to_text()
+                                            .unwrap_or_else(|| "<non-Unicode key>".to_owned())
+                                    ));
+                                }
                                 values.0[position].1 = value;
                             } else {
                                 values.0.push((key, value));
@@ -433,14 +448,23 @@ impl<'a> JsonParser<'a> {
                 Ok(Some(JsonValue::Null))
             }
             Some(b'N') => {
+                if self.reject_duplicates {
+                    return Err("non-finite JSON constant: NaN".to_owned());
+                }
                 self.consume_literal("NaN")?;
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::NAN))))
             }
             Some(b'I') => {
+                if self.reject_duplicates {
+                    return Err("non-finite JSON constant: Infinity".to_owned());
+                }
                 self.consume_literal("Infinity")?;
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::INFINITY))))
             }
             Some(b'-') if self.input[self.index..].starts_with("-Infinity") => {
+                if self.reject_duplicates {
+                    return Err("non-finite JSON constant: -Infinity".to_owned());
+                }
                 self.consume_literal("-Infinity")?;
                 Ok(Some(JsonValue::Number(JsonNumber::Float(
                     f64::NEG_INFINITY,
