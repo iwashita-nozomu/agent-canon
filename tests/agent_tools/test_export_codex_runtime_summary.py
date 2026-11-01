@@ -193,7 +193,11 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                     continue
                 old_record = old_records[name]
                 self.assertEqual(
-                    old_bytes, (json.dumps(old_record, sort_keys=True, separators=(",", ":")) + "\n").encode()
+                    old_bytes,
+                    (
+                        json.dumps(old_record, sort_keys=True, separators=(",", ":"))
+                        + "\n"
+                    ).encode(),
                 )
                 expected = expected_records[name]
                 assert isinstance(expected, dict)
@@ -206,7 +210,10 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
                 observed_times.append(recorded_at)
                 self.assertEqual(
-                    actual_bytes, (json.dumps(actual, sort_keys=True, separators=(",", ":")) + "\n").encode()
+                    actual_bytes,
+                    (
+                        json.dumps(actual, sort_keys=True, separators=(",", ":")) + "\n"
+                    ).encode(),
                 )
                 actual["recorded_at"] = old_record["recorded_at"]
                 self.assertEqual(actual, expected)
