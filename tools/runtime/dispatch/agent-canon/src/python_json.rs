@@ -190,13 +190,84 @@ impl JsonNumber {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JsonParseError {
+    Syntax {
+        message: String,
+        index: usize,
+        byte_index: usize,
+        parser_column: bool,
+    },
+    DuplicateKey(JsonString),
+    NonFiniteConstant(String),
+}
+
+impl JsonParseError {
+    pub fn message(&self) -> JsonString {
+        match self {
+            Self::Syntax { message, index, .. } => JsonString::from_text(&format!(
+                "Expecting value: line 1 column {} (char {index})",
+                *index + 1
+            )),
+            Self::DuplicateKey(key) => {
+                let mut message = JsonString::from_text("duplicate JSON key: ");
+                message.0.extend_from_slice(&key.0);
+                message
+            }
+            Self::NonFiniteConstant(message) => JsonString::from_text(message),
+        }
+    }
+
+    fn display_text(&self) -> String {
+        match self {
+            Self::Syntax {
+                message,
+                byte_index,
+                parser_column,
+                ..
+            } => {
+                if *parser_column {
+                    format!("{message} at column {}", *byte_index + 1)
+                } else {
+                    message.clone()
+                }
+            }
+            Self::DuplicateKey(key) => {
+                let mut message = String::from("duplicate JSON key: ");
+                for codepoint in &key.0 {
+                    if let Some(character) = char::from_u32(*codepoint) {
+                        message.push(character);
+                    } else {
+                        message.push_str(&format!("\\u{codepoint:04x}"));
+                    }
+                }
+                message
+            }
+            Self::NonFiniteConstant(message) => message.clone(),
+        }
+    }
+}
+
+impl From<String> for JsonParseError {
+    fn from(value: String) -> Self {
+        Self::Syntax {
+            message: value,
+            index: 0,
+            byte_index: 0,
+            parser_column: false,
+        }
+    }
+}
+
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {
-    JsonParser::new(input, false).parse()
+    JsonParser::new(input, false)
+        .parse()
+        .map_err(|error| error.display_text())
 }
 
 /// Parse JSON while rejecting duplicate object keys and Python's non-finite constants.
 /// Existing callers retain `parse_json`'s last-key-wins and constant behavior.
-pub fn parse_json_reject_duplicates(input: &str) -> Result<JsonValue, String> {
+pub fn parse_json_reject_duplicates(input: &str) -> Result<JsonValue, JsonParseError> {
     JsonParser::new(input, true).parse()
 }
 
@@ -279,7 +350,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse(mut self) -> Result<JsonValue, String> {
+    fn parse(mut self) -> Result<JsonValue, JsonParseError> {
         let mut frames = Vec::new();
         let mut completed = None;
         let root = loop {
@@ -302,11 +373,7 @@ impl<'a> JsonParser<'a> {
                                 values.0.iter().position(|(existing, _)| existing == &key)
                             {
                                 if self.reject_duplicates {
-                                    return Err(format!(
-                                        "duplicate JSON key: {}",
-                                        key.to_text()
-                                            .unwrap_or_else(|| "<non-Unicode key>".to_owned())
-                                    ));
+                                    return Err(JsonParseError::DuplicateKey(key));
                                 }
                                 values.0[position].1 = value;
                             } else {
@@ -413,7 +480,7 @@ impl<'a> JsonParser<'a> {
     fn parse_value_start(
         &mut self,
         frames: &mut Vec<JsonFrame>,
-    ) -> Result<Option<JsonValue>, String> {
+    ) -> Result<Option<JsonValue>, JsonParseError> {
         self.skip_whitespace();
         match self.peek() {
             Some(b'{') => {
@@ -449,24 +516,30 @@ impl<'a> JsonParser<'a> {
                 Ok(Some(JsonValue::Null))
             }
             Some(b'N') => {
-                if self.reject_duplicates {
-                    return Err("non-finite JSON constant: NaN".to_owned());
-                }
                 self.consume_literal("NaN")?;
+                if self.reject_duplicates {
+                    return Err(JsonParseError::NonFiniteConstant(
+                        "non-finite JSON constant: NaN".to_owned(),
+                    ));
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::NAN))))
             }
             Some(b'I') => {
-                if self.reject_duplicates {
-                    return Err("non-finite JSON constant: Infinity".to_owned());
-                }
                 self.consume_literal("Infinity")?;
+                if self.reject_duplicates {
+                    return Err(JsonParseError::NonFiniteConstant(
+                        "non-finite JSON constant: Infinity".to_owned(),
+                    ));
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::INFINITY))))
             }
             Some(b'-') if self.input[self.index..].starts_with("-Infinity") => {
-                if self.reject_duplicates {
-                    return Err("non-finite JSON constant: -Infinity".to_owned());
-                }
                 self.consume_literal("-Infinity")?;
+                if self.reject_duplicates {
+                    return Err(JsonParseError::NonFiniteConstant(
+                        "non-finite JSON constant: -Infinity".to_owned(),
+                    ));
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(
                     f64::NEG_INFINITY,
                 ))))
@@ -477,7 +550,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_string(&mut self) -> Result<JsonString, String> {
+    fn parse_string(&mut self) -> Result<JsonString, JsonParseError> {
         let start = self.index;
         self.index += 1;
         while self.index < self.bytes.len() {
@@ -486,7 +559,7 @@ impl<'a> JsonParser<'a> {
                     self.index += 1;
                     // This scan only finds the token boundary; serde_json decodes the escapes.
                     return serde_json::from_str::<JsonString>(&self.input[start..self.index])
-                        .map_err(|error| error.to_string());
+                        .map_err(|error| error.to_string().into());
                 }
                 b'\\' => self.index = (self.index + 2).min(self.bytes.len()),
                 byte if byte < 0x20 => {
@@ -498,7 +571,7 @@ impl<'a> JsonParser<'a> {
         Err(self.error("unterminated string"))
     }
 
-    fn parse_number(&mut self) -> Result<JsonValue, String> {
+    fn parse_number(&mut self) -> Result<JsonValue, JsonParseError> {
         let start = self.index;
         self.consume_if(b'-');
         match self.peek() {
@@ -547,7 +620,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn consume_literal(&mut self, literal: &str) -> Result<(), String> {
+    fn consume_literal(&mut self, literal: &str) -> Result<(), JsonParseError> {
         if self.input[self.index..].starts_with(literal) {
             self.index += literal.len();
             Ok(())
@@ -575,7 +648,7 @@ impl<'a> JsonParser<'a> {
         self.bytes.get(self.index).copied()
     }
 
-    fn check_depth(&self, depth: usize) -> Result<(), String> {
+    fn check_depth(&self, depth: usize) -> Result<(), JsonParseError> {
         if depth >= MAX_JSON_NESTING {
             Err(self.error("maximum JSON nesting depth exceeded"))
         } else {
@@ -583,19 +656,26 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn error(&self, message: &str) -> String {
-        format!("{message} at column {}", self.index + 1)
+    fn error(&self, message: &str) -> JsonParseError {
+        JsonParseError::Syntax {
+            message: message.to_owned(),
+            index: self.input[..self.index].chars().count(),
+            byte_index: self.index,
+            parser_column: true,
+        }
     }
 }
 
-fn pop_frame(frames: &mut Vec<JsonFrame>) -> Result<JsonValue, String> {
+fn pop_frame(frames: &mut Vec<JsonFrame>) -> Result<JsonValue, JsonParseError> {
     match frames.pop() {
         Some(JsonFrame::Array { values, .. }) => Ok(JsonValue::Array(values)),
         Some(JsonFrame::Object {
             values, key: None, ..
         }) => Ok(JsonValue::Object(values)),
-        Some(JsonFrame::Object { .. }) => Err("object closed with an incomplete key".to_owned()),
-        None => Err("container stack is empty".to_owned()),
+        Some(JsonFrame::Object { .. }) => {
+            Err("object closed with an incomplete key".to_owned().into())
+        }
+        None => Err("container stack is empty".to_owned().into()),
     }
 }
 
@@ -664,6 +744,18 @@ fn is_json_integer(value: &str) -> bool {
 
 /// Serialize with Python's `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)` bytes.
 pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_nonfinite(value, false)
+}
+
+/// Serialize with the same canonical form, rejecting non-finite floats as `allow_nan=False` does.
+pub fn canonical_json_ascii_bytes_reject_nonfinite(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_nonfinite(value, true)
+}
+
+fn canonical_json_ascii_bytes_with_nonfinite(
+    value: &JsonValue,
+    reject_nonfinite: bool,
+) -> Result<Vec<u8>, String> {
     enum Action<'a> {
         Value(&'a JsonValue),
         String(&'a JsonString),
@@ -691,6 +783,18 @@ pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> 
                     }
                 }
                 JsonValue::Number(JsonNumber::Float(value)) => {
+                    if reject_nonfinite && !value.is_finite() {
+                        let value_text = if value.is_nan() {
+                            "nan"
+                        } else if value.is_sign_negative() {
+                            "-inf"
+                        } else {
+                            "inf"
+                        };
+                        return Err(format!(
+                            "Out of range float values are not JSON compliant: {value_text}"
+                        ));
+                    }
                     bytes.extend_from_slice(json_float(*value).as_bytes());
                 }
                 JsonValue::String(value) => actions.push(Action::String(value)),

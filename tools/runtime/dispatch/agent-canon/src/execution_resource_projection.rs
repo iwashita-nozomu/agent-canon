@@ -9,8 +9,8 @@
 //! Pure validation and wrapper construction for PostToolUse execution-resource projections.
 
 use crate::python_json::{
-    canonical_json_ascii_bytes, parse_json_reject_duplicates, JsonNumber, JsonObject, JsonString,
-    JsonValue,
+    canonical_json_ascii_bytes_reject_nonfinite, parse_json_reject_duplicates, JsonNumber,
+    JsonObject, JsonParseError, JsonString, JsonValue,
 };
 use sha2::{Digest, Sha256};
 
@@ -51,37 +51,85 @@ const PROJECTION_ERROR_KINDS: &[&str] = &[
     "see_execution_resource_plan",
 ];
 
+/// A projection validation error whose JSON string can retain lone surrogates.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectionError {
+    error_type: &'static str,
+    message: JsonString,
+}
+
+impl ProjectionError {
+    pub fn error_type(&self) -> &'static str {
+        self.error_type
+    }
+
+    pub fn message(&self) -> &JsonString {
+        &self.message
+    }
+
+    fn value_error(message: String) -> Self {
+        Self {
+            error_type: "ValueError",
+            message: JsonString::from_text(&message),
+        }
+    }
+}
+
+impl From<String> for ProjectionError {
+    fn from(message: String) -> Self {
+        Self {
+            error_type: "ProjectionError",
+            message: JsonString::from_text(&message),
+        }
+    }
+}
+
+impl From<JsonParseError> for ProjectionError {
+    fn from(error: JsonParseError) -> Self {
+        let error_type = match &error {
+            JsonParseError::Syntax { .. } => "JSONDecodeError",
+            JsonParseError::DuplicateKey(_) | JsonParseError::NonFiniteConstant(_) => {
+                "ProjectionError"
+            }
+        };
+        Self {
+            error_type,
+            message: error.message(),
+        }
+    }
+}
+
 /// Validate the exact dispatcher-owned six-field PostToolUse input.
-pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), String> {
+pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), ProjectionError> {
     let fields =
         object(payload).ok_or_else(|| "normalized PostToolUse fields are not exact".to_owned())?;
     if !has_exact_keys(fields, NORMALIZED_INPUT_KEYS) {
-        return Err("normalized PostToolUse fields are not exact".to_owned());
+        return Err("normalized PostToolUse fields are not exact"
+            .to_owned()
+            .into());
     }
-    if !string_field(fields, "hook_event_name")
-        .as_deref()
-        .is_some_and(|value| value == "PostToolUse")
-    {
-        return Err("normalized Hook event is not PostToolUse".to_owned());
+    if string_field(fields, "hook_event_name").as_deref() != Some("PostToolUse") {
+        return Err("normalized Hook event is not PostToolUse".to_owned().into());
     }
-    if !string_field(fields, "schema_version")
-        .as_deref()
-        .is_some_and(|value| value == NORMALIZED_INPUT_SCHEMA)
-    {
-        return Err("normalized Hook schema_version is not exact".to_owned());
+    if string_field(fields, "schema_version").as_deref() != Some(NORMALIZED_INPUT_SCHEMA) {
+        return Err("normalized Hook schema_version is not exact"
+            .to_owned()
+            .into());
     }
     if !is_string(field(fields, "tool_name").expect("exact normalized fields")) {
-        return Err("normalized tool_name is not a string".to_owned());
+        return Err("normalized tool_name is not a string".to_owned().into());
     }
     let tool_input = field(fields, "tool_input").expect("exact normalized fields");
     object(tool_input).ok_or_else(|| "normalized tool_input is not an object".to_owned())?;
     let fingerprint = string_field(fields, "tool_input_fingerprint");
     require_sha256(fingerprint.as_deref(), "tool_input_fingerprint")?;
-    let canonical = canonical_json_ascii_bytes(tool_input)
-        .map_err(|_| "tool_input_fingerprint does not match tool_input".to_owned())?;
+    let canonical = canonical_json_ascii_bytes_reject_nonfinite(tool_input)
+        .map_err(ProjectionError::value_error)?;
     let expected_fingerprint = sha256_hex(&canonical);
     if fingerprint.as_deref() != Some(expected_fingerprint.as_str()) {
-        return Err("tool_input_fingerprint does not match tool_input".to_owned());
+        return Err("tool_input_fingerprint does not match tool_input"
+            .to_owned()
+            .into());
     }
 
     let response = field(fields, "tool_response").expect("exact normalized fields");
@@ -89,7 +137,9 @@ pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), String> {
     if !response_fields
         .is_some_and(|fields| has_exact_keys(fields, &["exit_code", "stderr", "stdout"]))
     {
-        return Err("normalized tool_response fields are not exact".to_owned());
+        return Err("normalized tool_response fields are not exact"
+            .to_owned()
+            .into());
     }
     let response_fields = response_fields.expect("checked response object");
     let exit_code = field(response_fields, "exit_code").expect("exact response fields");
@@ -97,42 +147,44 @@ pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), String> {
         || !is_string(field(response_fields, "stderr").expect("exact response fields"))
         || !is_string(field(response_fields, "stdout").expect("exact response fields"))
     {
-        return Err("normalized tool_response field types are invalid".to_owned());
+        return Err("normalized tool_response field types are invalid"
+            .to_owned()
+            .into());
     }
     Ok(())
 }
 
 /// Validate one canonical LF-terminated projection line and return its parsed object.
-pub fn validate_projection_bytes(stdout: &str) -> Result<JsonValue, String> {
+pub fn validate_projection_bytes(stdout: &str) -> Result<JsonValue, ProjectionError> {
     if stdout.len() > MAX_PROJECTION_BYTES {
-        return Err("projection exceeds bounded output size".to_owned());
+        return Err("projection exceeds bounded output size".to_owned().into());
     }
     if !stdout.ends_with('\n') || stdout.matches('\n').count() != 1 || stdout.contains('\r') {
-        return Err("projection must be exactly one LF-terminated line".to_owned());
+        return Err("projection must be exactly one LF-terminated line"
+            .to_owned()
+            .into());
     }
     let line = &stdout[..stdout.len() - 1];
     if line.is_empty() {
-        return Err("projection line is empty".to_owned());
+        return Err("projection line is empty".to_owned().into());
     }
     let projection = parse_json_reject_duplicates(line)?;
     let fields = object(&projection)
         .ok_or_else(|| "projection fields are not the exact nine-key set".to_owned())?;
     if !has_exact_keys(fields, PROJECTION_KEYS) {
-        return Err("projection fields are not the exact nine-key set".to_owned());
+        return Err("projection fields are not the exact nine-key set"
+            .to_owned()
+            .into());
     }
-    if !string_field(fields, "schema_version")
-        .as_deref()
-        .is_some_and(|value| value == PROJECTION_SCHEMA_VERSION)
-    {
+    if string_field(fields, "schema_version").as_deref() != Some(PROJECTION_SCHEMA_VERSION) {
         return Err(
-            "projection schema_version is not execution-resource-plan-projection/v2".to_owned(),
+            "projection schema_version is not execution-resource-plan-projection/v2"
+                .to_owned()
+                .into(),
         );
     }
-    if !string_field(fields, "projection")
-        .as_deref()
-        .is_some_and(|value| value == "post_tool_use")
-    {
-        return Err("projection kind is not post_tool_use".to_owned());
+    if string_field(fields, "projection").as_deref() != Some("post_tool_use") {
+        return Err("projection kind is not post_tool_use".to_owned().into());
     }
     let run_id = string_field(fields, "run_id")
         .filter(|value| is_run_id(value))
@@ -141,24 +193,26 @@ pub fn validate_projection_bytes(stdout: &str) -> Result<JsonValue, String> {
     if string_field(fields, "plan_path").as_deref()
         != Some(format!("{expected_runtime}/execution_resource_plan.json").as_str())
     {
-        return Err("projection plan_path is not canonical".to_owned());
+        return Err("projection plan_path is not canonical".to_owned().into());
     }
     if string_field(fields, "completion_coverage_path").as_deref()
         != Some(format!("{expected_runtime}/completion_coverage.json").as_str())
     {
-        return Err("projection completion_coverage_path is not canonical".to_owned());
+        return Err("projection completion_coverage_path is not canonical"
+            .to_owned()
+            .into());
     }
     if !is_integer(field(fields, "exit_code").expect("exact projection fields")) {
-        return Err("projection exit_code is not an integer".to_owned());
+        return Err("projection exit_code is not an integer".to_owned().into());
     }
     let plan_fingerprint = string_field(fields, "plan_fingerprint");
     require_sha256(plan_fingerprint.as_deref(), "plan_fingerprint")?;
     validate_admission(field(fields, "admission").expect("exact projection fields"))?;
     validate_error(field(fields, "error").expect("exact projection fields"))?;
-    let canonical = canonical_json_ascii_bytes(&projection)
-        .map_err(|_| "projection bytes are not canonical".to_owned())?;
+    let canonical = canonical_json_ascii_bytes_reject_nonfinite(&projection)
+        .map_err(ProjectionError::value_error)?;
     if canonical.as_slice() != line.as_bytes() {
-        return Err("projection bytes are not canonical".to_owned());
+        return Err("projection bytes are not canonical".to_owned().into());
     }
     Ok(projection)
 }
@@ -186,13 +240,13 @@ pub fn projection_context_payload(stdout: &str) -> JsonValue {
     ]))
 }
 
-fn validate_admission(value: &JsonValue) -> Result<(), String> {
+fn validate_admission(value: &JsonValue) -> Result<(), ProjectionError> {
     if matches!(value, JsonValue::Null) {
         return Ok(());
     }
     let fields = object(value).filter(|fields| has_exact_keys(fields, ADMISSION_KEYS));
     let Some(fields) = fields else {
-        return Err("admission fields are not exact".to_owned());
+        return Err("admission fields are not exact".to_owned().into());
     };
     require_sha256(
         string_field(fields, "admission_fingerprint").as_deref(),
@@ -202,15 +256,14 @@ fn validate_admission(value: &JsonValue) -> Result<(), String> {
         string_field(fields, "runtime_identity_fingerprint").as_deref(),
         "runtime_identity_fingerprint",
     )?;
-    if !string_field(fields, "guarantee")
-        .as_deref()
-        .is_some_and(|value| value == ADMISSION_GUARANTEE)
-    {
-        return Err("admission guarantee is not exact".to_owned());
+    if string_field(fields, "guarantee").as_deref() != Some(ADMISSION_GUARANTEE) {
+        return Err("admission guarantee is not exact".to_owned().into());
     }
     let namespace = string_field(fields, "namespace_id");
     if !namespace.as_deref().is_some_and(is_namespace) {
-        return Err("admission namespace_id is not bounded opaque text".to_owned());
+        return Err("admission namespace_id is not bounded opaque text"
+            .to_owned()
+            .into());
     }
     let selected = field(fields, "selected_uuids").expect("exact admission fields");
     let valid_uuids = match selected {
@@ -221,33 +274,37 @@ fn validate_admission(value: &JsonValue) -> Result<(), String> {
         _ => false,
     };
     if !valid_uuids {
-        return Err("admission selected_uuids are not opaque UUIDs".to_owned());
+        return Err("admission selected_uuids are not opaque UUIDs"
+            .to_owned()
+            .into());
     }
     Ok(())
 }
 
-fn validate_error(value: &JsonValue) -> Result<(), String> {
+fn validate_error(value: &JsonValue) -> Result<(), ProjectionError> {
     if matches!(value, JsonValue::Null) {
         return Ok(());
     }
     let fields = object(value).filter(|fields| has_exact_keys(fields, &["kind"]));
     let Some(fields) = fields else {
-        return Err("error fields are not exact".to_owned());
+        return Err("error fields are not exact".to_owned().into());
     };
     if !string_field(fields, "kind")
         .as_deref()
         .is_some_and(|kind| PROJECTION_ERROR_KINDS.contains(&kind))
     {
-        return Err("error kind is not an exact coarse projection constant".to_owned());
+        return Err("error kind is not an exact coarse projection constant"
+            .to_owned()
+            .into());
     }
     Ok(())
 }
 
-fn require_sha256(value: Option<&str>, field: &str) -> Result<(), String> {
+fn require_sha256(value: Option<&str>, field: &str) -> Result<(), ProjectionError> {
     if value.is_some_and(is_sha256) {
         Ok(())
     } else {
-        Err(format!("{field} is not a lowercase SHA-256 fingerprint"))
+        Err(format!("{field} is not a lowercase SHA-256 fingerprint").into())
     }
 }
 

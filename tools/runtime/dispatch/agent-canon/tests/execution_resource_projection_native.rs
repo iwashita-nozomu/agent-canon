@@ -7,10 +7,19 @@
 
 use agent_canon::execution_resource_projection::{
     projection_context_payload, validate_normalized_input, validate_projection_bytes,
+    ProjectionError,
 };
 use agent_canon::python_json::{
-    canonical_json_ascii_bytes, parse_json, parse_json_reject_duplicates, JsonObject, JsonValue,
+    canonical_json_ascii_bytes, canonical_json_ascii_bytes_reject_nonfinite, parse_json,
+    parse_json_reject_duplicates, JsonObject, JsonParseError, JsonString, JsonValue,
 };
+
+// Supplemental CPython 3.12.3 captures for source 88a70bddaaacd2f2d5913e7f83dc2756f0ec8fa0
+// are inlined here to keep the original 31-case fixture byte-identical.
+// Raw boundary capture: execution-projection-old-boundaries-hy915nk9/export/corpus.json; SHA256:
+// 74048eb2ee3b62bd41f5993c96123f957e2c787735c66a2ad240301052bd862f
+// Raw overflow capture: execution-projection-old-overflow-6abtnr4c/early-export/corpus.json; SHA256:
+// 96af170f28416f5435aca4fe184274532c0d0aeb088fa4a282b9d5eccb932a5c
 
 #[test]
 fn execution_resource_projection_matches_captured_cpython_cases() {
@@ -56,14 +65,16 @@ fn execution_resource_projection_matches_captured_cpython_cases() {
                 );
             }
             Err(actual_error) => {
+                let expected_type =
+                    string(field(expected, "error_type").expect("expected error type"));
                 assert_eq!(
-                    string(field(expected, "error_type").expect("expected error type")),
-                    "ProjectionError",
+                    actual_error.error_type(),
+                    expected_type.as_str(),
                     "captured error type differs for {name}"
                 );
                 assert_eq!(
-                    actual_error,
-                    string(field(expected, "error").expect("expected error message")),
+                    actual_error.message(),
+                    json_string(field(expected, "error").expect("expected error message")),
                     "exact error differs for {name}"
                 );
             }
@@ -82,14 +93,103 @@ fn duplicate_rejection_is_opt_in_for_the_shared_json_parser() {
         parse_json_reject_duplicates(input)
             .err()
             .expect("strict parser rejects duplicate keys"),
-        "duplicate JSON key: value"
+        JsonParseError::DuplicateKey(JsonString::from_text("value"))
     );
     assert_eq!(
         parse_json_reject_duplicates("NaN")
             .err()
             .expect("strict parser rejects non-finite values"),
-        "non-finite JSON constant: NaN"
+        JsonParseError::NonFiniteConstant("non-finite JSON constant: NaN".to_owned())
     );
+    let default_nan = parse_json("NaN").expect("default parser continues accepting NaN");
+    let canonical_nan =
+        canonical_json_ascii_bytes(&default_nan).expect("default canonicalizer allows NaN");
+    assert_eq!(canonical_nan.as_slice(), b"NaN".as_slice());
+    assert_eq!(
+        canonical_json_ascii_bytes_reject_nonfinite(&default_nan)
+            .expect_err("strict canonicalizer rejects NaN"),
+        "Out of range float values are not JSON compliant: nan"
+    );
+}
+
+#[test]
+fn execution_resource_projection_matches_captured_boundary_cases() {
+    assert_projection_error(
+        validate_projection_bytes("{\"\\ud800\":1,\"\\ud800\":2}\n"),
+        "ProjectionError",
+        {
+            let mut message = JsonString::from_text("duplicate JSON key: ");
+            message.0.push(0xd800);
+            message
+        },
+    );
+    assert_projection_error(
+        validate_projection_bytes("{\"\\u00e9\":1,\"\\u00e9\":2}\n"),
+        "ProjectionError",
+        JsonString::from_text("duplicate JSON key: é"),
+    );
+    assert_projection_error(
+        validate_projection_bytes("NaNx\n"),
+        "ProjectionError",
+        JsonString::from_text("non-finite JSON constant: NaN"),
+    );
+    assert_projection_error(
+        validate_projection_bytes("Infinityx\n"),
+        "ProjectionError",
+        JsonString::from_text("non-finite JSON constant: Infinity"),
+    );
+    assert_projection_error(
+        validate_projection_bytes("Nan\n"),
+        "JSONDecodeError",
+        JsonString::from_text("Expecting value: line 1 column 1 (char 0)"),
+    );
+    assert_projection_error(
+        validate_projection_bytes("{\"admission\":\n"),
+        "JSONDecodeError",
+        JsonString::from_text("Expecting value: line 1 column 14 (char 13)"),
+    );
+
+    let normalized_surrogate_inputs = [
+        r#"{"hook_event_name":"PostToolUse","schema_version":"agent-canon-post-tool-use-input/v1","tool_input_fingerprint":"827b867e0b5a01dcb19514626d1a3146bf8258df041fe9ad35506a84e1dc0bc5","tool_name":"\ud800","tool_input":{"command":"echo hello"},"tool_response":{"exit_code":0,"stderr":"","stdout":""}}"#,
+        r#"{"hook_event_name":"PostToolUse","schema_version":"agent-canon-post-tool-use-input/v1","tool_input_fingerprint":"827b867e0b5a01dcb19514626d1a3146bf8258df041fe9ad35506a84e1dc0bc5","tool_name":"exec_command","tool_input":{"command":"echo hello"},"tool_response":{"exit_code":0,"stderr":"\ud800","stdout":""}}"#,
+        r#"{"hook_event_name":"PostToolUse","schema_version":"agent-canon-post-tool-use-input/v1","tool_input_fingerprint":"827b867e0b5a01dcb19514626d1a3146bf8258df041fe9ad35506a84e1dc0bc5","tool_name":"exec_command","tool_input":{"command":"echo hello"},"tool_response":{"exit_code":0,"stderr":"","stdout":"\ud800"}}"#,
+    ];
+    for input in normalized_surrogate_inputs {
+        let payload = parse_json(input).expect("captured normalized input parses");
+        assert!(validate_normalized_input(&payload).is_ok());
+    }
+
+    for (value, expected_float) in [
+        ("NaN", "nan"),
+        ("Infinity", "inf"),
+        ("-Infinity", "-inf"),
+        ("Infinity", "inf"),
+        ("-Infinity", "-inf"),
+        ("1e400", "inf"),
+        ("-1e400", "-inf"),
+    ] {
+        let input = format!(
+            "{{\"hook_event_name\":\"PostToolUse\",\"schema_version\":\"agent-canon-post-tool-use-input/v1\",\"tool_input_fingerprint\":\"827b867e0b5a01dcb19514626d1a3146bf8258df041fe9ad35506a84e1dc0bc5\",\"tool_name\":\"exec_command\",\"tool_input\":{{\"value\":{value}}},\"tool_response\":{{\"exit_code\":0,\"stderr\":\"\",\"stdout\":\"\"}}}}"
+        );
+        let payload = parse_json(&input).expect("captured non-finite normalized input parses");
+        assert_projection_error(
+            validate_normalized_input(&payload).map(|()| JsonValue::Null),
+            "ValueError",
+            JsonString::from_text(&format!(
+                "Out of range float values are not JSON compliant: {expected_float}"
+            )),
+        );
+    }
+}
+
+fn assert_projection_error<T>(
+    result: Result<T, ProjectionError>,
+    expected_type: &str,
+    expected_message: JsonString,
+) {
+    let error = result.err().expect("captured case must reject");
+    assert_eq!(error.error_type(), expected_type);
+    assert_eq!(error.message(), &expected_message);
 }
 
 fn object(value: &JsonValue) -> Option<&JsonObject> {
@@ -118,6 +218,13 @@ fn string(value: &JsonValue) -> String {
     match value {
         JsonValue::String(value) => value.to_text().expect("captured string is Unicode"),
         _ => panic!("expected captured string"),
+    }
+}
+
+fn json_string(value: &JsonValue) -> &JsonString {
+    match value {
+        JsonValue::String(value) => value,
+        _ => panic!("expected captured JSON string"),
     }
 }
 
