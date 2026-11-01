@@ -28,7 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 
 import hook_event_log  # noqa: E402
 
-from tools.agent.orchestration.prompt_classifier import (
+from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
 )
