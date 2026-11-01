@@ -31,28 +31,23 @@ Skill の標準委譲と source 保守の分担を設計・見直しする場合
 [Skill Maintenance Delegation](#skill-maintenance-delegation) を読みます。
 
 この文書（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）は、repository cleanup を近接 path や analyzer の finding ではなく、意味のある
-責務単位として閉じるための共通設計です（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。repository cleanup 全体を扱う場合は境界と unit schema を読み、次に各
+責務単位として閉じるための共通設計です（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。repository cleanup 全体を扱う場合は責務境界を確認し、次に各
 cleanup skill の既存 owner route（[agents/skills/responsibility-cleanup.md](../../agents/skills/responsibility-cleanup.md)）、外部 tool の証拠、validation/rollback、統合と再レビュー
 の順に読みます（`agents/skills/catalog.yaml`）。公開 skill の discovery metadata と生成 shim の schema は既存の
 catalog/materializer owner（`agents/skills/catalog.yaml`、`tools/agent/skills/skill_shim_materializer.py`）を参照し、この文書へ複製しません。
 
 ## Purpose and Target State
 
-cleanup は `tree -a -J --noreport` を構造観測として取得し、source、view、generated、
-project、personal の境界、依存 closure、責務単位、候補 path、実装 owner、検証、rollback（`tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs`）、
-handoff（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）を一つの unit record にまとめます。到達状態は、各 unit が一つの replaceable
-responsibility と一つの一次 owner を持ち、必要な specialist dispatch と統合後の
-再レビューが readback できる状態です。
-
-ディレクトリ名、近接性、ファイル数、既存 analyzer の finding は候補や観測値として
-記録し、責務の authority は owner surface、dependency closure、公開契約、検証 route（[agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md)）、
-および rollback（[agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md)）によって確定します。
+cleanup は source、view、generated、project、personal の境界と必要な利用側を確認し、
+完成状態、修正単位、削除する旧実装を現在の context で決めます。必要な実装と利用側の
+変更を揃え、削除・参照漏れを見直してから最終状態をまとめて検証します。
+unit record、範囲表、進捗台帳の作成・更新は要求しません。
 
 ## Responsibility / Owner Boundaries
 
 | unit | route owner | operation | completion evidence ([documents/design/responsibility-cleanup.md](responsibility-cleanup.md)) |
 | --- | --- | --- | --- |
-| responsibility | `responsibility-cleanup` | tree 観測、境界分類、dependency closure、replaceable unit 化、specialist dispatch、統合と再レビューを束ねる | unit record と owner/review readback |
+| responsibility | `responsibility-cleanup` | tree 観測、境界分類、dependency closure、replaceable unit 化、specialist dispatch、統合と再レビューを束ねる | 完成した差分と最終検証結果 |
 | environment | `environment-cleanup` | environment dependency/runtime capability unit を `dependency-design` で確定し、`environment-maintenance` へ渡す | design packet、maintenance handoff、environment validation |
 | code | `code-cleanup` | public/module responsibility と到達性を `dependency-analysis` で閉じ、`refactor-loop`、`change-review` へ渡す | impact packet、refactor review、targeted validation |
 | skill | `$skill-creator` と [Updating Skills](../../agents/skills/README.md#updating-skills) | 一般的な作成・改訂は標準へ渡し、AgentCanon の canonical doc/catalog/DAG/caller/配布を既存保守手順で揃える | source と shim/graph の生成・readback、該当する挙動評価 |
@@ -89,31 +84,11 @@ repository全体のcleanupを要求せず、挙動改訂時の独立評価と生
 将来標準がローカル配布契約まで満たす場合は、同じ保証と実際のreadbackを比較して
 残る保守手順も削減します。今回の構造削減を実測token削減・行動改善とは扱いません。
 
-## Responsibility-Unit Schema
+## Responsibility Boundary
 
-各 cleanup unit は次の field をこの順で保持します。
-
-```text
-unit_id,
-root,
-tree_snapshot,
-owner,
-surface_class,
-source_view_generated_personal_boundary,
-evidence,
-candidate_paths,
-dependencies,
-external_tools,
-disposition,
-validation,
-rollback,
-handoff
-```
-
-`tree_snapshot` は観測した tree artifact の identity、`surface_class` は owner が定義する
-責務分類（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）、`disposition` は candidate を採用・保留・対象外へ分類した根拠、`handoff` は
-次の owner が消費する packet とします（[documents/design/responsibility-cleanup.md](responsibility-cleanup.md)）。path の候補だけで unit を分割せず、hard edge、
-dependency、consumer、公開契約、lifecycle（[agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md)）を閉じてから責務単位を確定します。
+責務、必要な依存・利用側、公開契約と lifecycle を確認して修正単位を決めます。
+専用の unit schema や field 一覧の管理は不要です。必要な条件は実装者の現在の
+context と会話での引継ぎに揃えます。
 
 ## Duplicate Implementation Retirement
 
@@ -222,8 +197,8 @@ RC-09 の置換・廃止では、正本、不要な旧コードの除去、必�
 出力ではなく、`.codex/config.toml` の catalog skill id に対する entry set、source order、
 path、enabled の readback input とします。
 
-rollback は既存の `rollback` field に復元元の Git tree/commit と対象 path、再生成する
-projection、再検証 command を記録します。コミット済み source の保持先は Git 履歴です。
+復元が必要な場合は Git 履歴から対象の source と path を選びます。通常の削除のために
+rollback field や復元台帳を維持する必要はありません。
 別コピー、退避 branch/worktree、復元リハーサルを通常の削除の前提にしません。
 Git に未収録の変更・untracked の作業とユーザー/runtime データは、既存 Git/storage owner
 の手順で保護します。実際に復元が必要になった時点で対象 revision/path を選び、後続変更と
@@ -234,7 +209,7 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 | clause | implementation owner | target | reverse readback |
 | --- | --- | --- | --- |
 | RC-01 tree observation and boundary classification | `responsibility-cleanup` / `structure-refactor` | `tree -a -J --noreport`, `tools/validation/semantic/structure/repo_structure_contract.py`, `tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs` | tree snapshot と owner/surface classification |
-| RC-02 dependency closure and unit schema | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) unit schema, dependency graph | unit fields、closure、handoff readback |
+| RC-02 dependency closure and responsibility boundary | `responsibility-cleanup` / `dependency-analysis` | [documents/design/responsibility-cleanup.md](responsibility-cleanup.md) 責務境界と依存 | 依存と利用側を含む完成状態 |
 | RC-03 environment route | `environment-cleanup` | [agents/skills/dependency-design.md](../../agents/skills/dependency-design.md), [agents/skills/environment-maintenance.md](../../agents/skills/environment-maintenance.md) | dependency design と maintenance validation |
 | RC-04 code route | `code-cleanup` | [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md), [agents/skills/refactor-loop.md](../../agents/skills/refactor-loop.md), [agents/skills/change-review.md](../../agents/skills/change-review.md) | impact、refactor、review の連続 evidence |
 | RC-05 skill route | `$skill-creator` / [Updating Skills](../../agents/skills/README.md#updating-skills) | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent/skills/skill_shim_materializer.py`, `tools/agent/skills/skill_dependency_map.py` | 標準委譲、必要なsource保守とcaller移行、shim/graph・host inputのreadback、該当する独立評価 |
@@ -242,17 +217,6 @@ Git に未収録の変更・untracked の作業とユーザー/runtime データ
 | RC-07 external evidence and rollback | owner-selected specialist | unit `external_tools`, `rollback`、`handoff` | primary source/version/license/security と rollback readback |
 | RC-08 integration and re-review | `agent-orchestration` / `change-review` | generated projections、tree/commit readback、review packet | final owner/review/validation readback |
 | RC-09 replacement and duplicate retirement | `code-cleanup` / `refactor-loop` / `change-review` | [code-cleanup Route](../../agents/skills/code-cleanup.md#route), [refactor-loop Purpose](../../agents/skills/refactor-loop.md#purpose), [change-review Procedure](../../agents/skills/change-review.md#procedure) | 残す正本、旧実装・専用補助コードの削除、必要な利用側移行、変更契約の検証と具体的な残件 |
-
-## Evidence And Assumption Ledger
-
-| kind | statement | evidence / owner | status |
-| --- | --- | --- | --- |
-| current state | public skill identity、dependency relation、runtime shim、host-wiring input、graph はそれぞれ既存の catalog/config/materializer/checker owner が持つ | `agents/skills/catalog.yaml`, `.codex/config.toml`, `agents/skills/skill-dependencies.yaml`, `tools/agent/skills/skill_shim_materializer.py`, `tools/agent/skills/skill_dependency_map.py` | checked |
-| target state | 公開cleanup Skillは既存registry/DAG/readbackへ接続し、Skill作成は標準委譲と既存source保守へ分ける | [Skill Maintenance Delegation](#skill-maintenance-delegation), [Updating Skills](../../agents/skills/README.md#updating-skills) | implementation readback |
-| assumption | tree は構造観測であり、責務 authority は owner/dependency/contract evidence から閉じる | `RC-01`, `RC-02`, [agents/skills/structure-refactor.md](../../agents/skills/structure-refactor.md) | explicit |
-| assumption | analyzer は candidate producer であり、採用 disposition と削除 oracle は owner route が決める | `RC-02`, `RC-07`, [agents/skills/dependency-analysis.md](../../agents/skills/dependency-analysis.md) | explicit |
-| limitation | 外部 tool の採用可否は一次資料、version、scope、false positive、license/security、install owner、rollback の evidence が揃うまで保留する | `RC-07` | explicit |
-| contract | 通常の置換・統合でも不要な旧コードを削除し、別の廃止依頼や active caller ゼロを待たず、必要な利用側移行と変更契約の検証まで閉じる | [RC-09](#duplicate-implementation-retirement), [code-cleanup](../../agents/skills/code-cleanup.md), [refactor-loop](../../agents/skills/refactor-loop.md), [change-review](../../agents/skills/change-review.md) | explicit |
 
 ## Clause IDs
 

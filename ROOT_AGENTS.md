@@ -56,7 +56,7 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   purpose; preserve shared purpose/invariants, distinguish changed inputs, and extend the
   existing contract/type/interface/abstraction when required valid cases need it. Fix the
   established cause and rerun the selected route. Preserve an interrupted task's
-  target, operation, and acceptance in its existing record; resume it after repair.
+  target, operation, and acceptance in the current context; resume it after repair.
   Cause-local success is not task completion. No speculative guards, fallbacks,
   retries, gates, or hypothetical-input layers; never alter tests or switch routes
   just to pass. Distinguish observations, established causes, and unverified results.
@@ -99,9 +99,14 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   edits to consumers' generated instructions.
 - Prefer the current agent. Delegate when explicit requirements, needed independent
   judgment, or separable parallel work justify transfer/integration cost.
+- Keep the plan and handoff in the current conversation. Do not create or maintain
+  work, progress, reuse, scope, or per-commit validation ledgers. Implement the
+  planned migration, review obsolete code and references, then validate its final
+  state together; intermediate edits and commits are not separate test gates.
 - Complete the authorized in-scope outcome, including existing failures; diagnosis,
-  checkpoints, and no-op checks are insufficient. Each owner completes its repair
-  unit and required check before another; independent units may proceed in parallel.
+  checkpoints, and no-op checks are insufficient. Complete the planned repair
+  units and retirement review before final validation; independent work may proceed
+  in parallel.
   If blocked, name the failed operation, unverified property, and next owner/action;
   finish independent work.
 - Report commit/push separately and distinguish implemented, verified, published,

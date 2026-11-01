@@ -957,8 +957,8 @@ class EvaluateAgentRunTest(unittest.TestCase):
             self.assertIn("runtime_feedback=observed", result.stdout)
             self.assertIn("applied or recorded", result.stdout)
 
-    def test_evaluate_missing_hook_tool_protocol_feedback_fails(self) -> None:
-        """Hook and tool outcomes must route into protocol feedback decisions."""
+    def test_evaluate_does_not_require_protocol_update_bookkeeping(self) -> None:
+        """Absent protocol-update bookkeeping does not fail a ready run."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
@@ -989,9 +989,11 @@ class EvaluateAgentRunTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_EVALUATION_STATUS=revise", result.stdout)
-            self.assertIn("hook and tool results", result.stdout.lower())
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_EVALUATION_STATUS=pass", result.stdout)
+            self.assertNotIn(
+                "behavior::hook_tool_protocol_feedback_recorded", result.stdout
+            )
 
     def test_evaluate_missing_code_checker_results_fail(self) -> None:
         """Run evaluation should require code checker behavior evidence."""

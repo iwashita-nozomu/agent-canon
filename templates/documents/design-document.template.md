@@ -53,8 +53,7 @@ downstream implementation <implementation-path> implements the approved boundary
 ## 含む内容
 
 authority、責務、OOP/type boundary、依存閉包、side effect と failure semantics、
-複数の選択肢と棄却根拠、敵対レビュー、再構築手順、受入条件、evidence and
-assumption ledger を含めます。実装詳細の羅列、未検証の性能主張、run-local log の
+複数の選択肢と棄却根拠、必要な仮定と根拠、再構築手順、受入条件を含めます。実装詳細の羅列、未検証の性能主張、run-local log の
 貼り付けは含めません。
 
 ## Docstring projection
@@ -256,14 +255,11 @@ read back します。ID は行番号ではなく、設計文書の version を�
 - test activation condition:
 - static / targeted validation route:
 
-## Evidence and assumption ledger
+## 必要な仮定と根拠
 
-| id | kind | claim / assumption | source path and line | confidence | how falsified |
-| --- | --- | --- | --- | --- | --- |
-| E1 | observation / assumption | `<claim>` | `<path:line>` | high / medium / low | `<check>` |
-
-この template を埋めた設計文書は、承認後に実装へ投影します。run-local report、
-raw log、生成済み mirror はこの文書の正本ではありません。
+結論に必要な仮定と確認済みの根拠を、関連する本文の節へ書きます。実装・API が
+保証する性質と未確認の仮定を区別し、必要な source や検証結果を参照します。
+管理 ID、確信度、状態を埋める台帳は作りません。
 
 ## Formatter, readback, and lifecycle
 

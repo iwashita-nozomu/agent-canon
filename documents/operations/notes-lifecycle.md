@@ -8,11 +8,12 @@ upstream design README.md durable document index
 -->
 
 この文書は、`documents/notes/` の記録、再利用、昇格を所有します。
-失敗した検証は実行中にトピックへ保存し、次の調査・設計・実装判断で参照します。
+知見の文書化を成果物として選んだ場合に使います。通常の修正では、方針と未完了事項を
+会話に保持し、操作や検証失敗ごとの台帳・action log・topic file は要求しません。
 
 ## この文書の読み方
 
-- 検証で失敗したときは「Failed Verification Record」を使います。
+- 失敗分析メモを作成する依頼では「Failed Verification Record」を使います。
 - 同じ候補や問題を調べる前は「Retrieve Before Deciding」を使います。
 - review / closeout では保存先と参照の整合を確認し、恒久規約を正本へ昇格します。
 
@@ -26,14 +27,14 @@ upstream design README.md durable document index
 
 ### 1. During Execution
 
-- 時系列と操作の参照は `documents/notes/worktrees/` の action log に残します。
-- 実験 topic の結果要約は `documents/notes/experiments/` に残します。
-- branch / worktree の入口整理は `documents/notes/branches/` に残します。
-- 失敗した検証は、直後に下の topic record を更新し、同じ task 内で保存内容を読み戻します。
+実際の source、差分、tool 出力を使って判断します。実行中の作業台帳、branch/worktree
+の action log、失敗ごとの topic 更新と読み戻しは要求しません。
+必要な知見は会話に保持し、文書化が成果物に含まれる場合だけ保存します。
 
 ### Failed Verification Record
 
-公開可能な repository 固有の失敗は `documents/notes/failures/<topic>.md` に記録します。
+失敗分析メモの作成が依頼された場合、公開可能な repository 固有の結果は
+`documents/notes/failures/<topic>.md` にまとめます。
 この repository では既存の failures area をトピック別メモとして使います。consumer が
 `documents/memo/` 等を既に所有する場合は、その配置規約に従います。
 private な再利用知識は [private log owner](../runtime/private-feedback-knowledge.md) の
@@ -50,8 +51,7 @@ private な再利用知識は [private log owner](../runtime/private-feedback-kn
 | 結論 | 検証が確定した事実、原因が立証された範囲、候補の採用・修正・却下理由 |
 | 再利用条件 | 同じ判断を適用する条件と、再検証が必要になる変更点 |
 
-観測した失敗を先に保存し、判断に必要な原因・代案は調査と検証を続けて同じ topic に
-追記します。仮説と確定結果は見分けられる形にし、検証した条件の範囲で結論を述べます。
+依頼されたメモは、必要な調査と検証を終えてからまとめます。仮説と確定結果は見分けられる形にし、検証した条件の範囲で結論を述べます。
 成功した修正や反証が得られた場合は、元の失敗から新しい結果へ参照を接続します。
 Issue / PR、設計、handoff には同じ topic の locator を載せます。
 
@@ -81,10 +81,10 @@ Issue / PR、設計、handoff には同じ topic の locator を載せます。
 - `documents/notes/failures/`: 再現条件と検証結果を持つ failure knowledge。
 - `documents/`: repository の恒久規約を所有する正本。
 
-### 3. Keep The Worktree Log Thin
+### 3. Optional Knowledge Outputs
 
-action log は時系列と参照を担当します。長く使う知見は topic record に集約し、
-action log、Issue / PR、handoff から同じ記録へ接続します。
+長く使う知見を文書化する場合は選んだ保存先へまとめます。通常の作業を進めるための
+action log や並行した台帳は作りません。
 
 ## Promotion Rules
 
@@ -97,8 +97,8 @@ action log、Issue / PR、handoff から同じ記録へ接続します。
 
 ## Closeout Readback
 
-今回の失敗検証が topic に保存され、読み戻せることを確認します。採用・却下の判断を
-検証結果へ、次回の判断を topic 検索へ接続します。既存記録の更新、反証、昇格がある場合は
+依頼された知見メモが完成した内容と再現条件を伝えていることを確認します。
+採用・却下の理由は実際の検証結果に基づいて説明します。既存記録の更新、反証、昇格がある場合は
 参照も同期します。private log の保存・同期は各操作の実際の結果を示します。
 
 ## Templates
