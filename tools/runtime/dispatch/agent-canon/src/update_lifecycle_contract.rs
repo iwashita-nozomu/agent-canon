@@ -1,12 +1,16 @@
 // @dependency-start
 // contract implementation
-// responsibility Owns native immutable update-lifecycle record binding and gate-verdict mechanics.
+// responsibility Owns native immutable update-lifecycle records, binding, and gate-verdict mechanics.
 // upstream design ../../../../../documents/agent-canon/agent-canon-update-route.md owns update lifecycle meaning
 // upstream implementation artifacts/artifact_identity.rs owns canonical JSON bytes and body hashes
 // upstream implementation ../../../../../tools/runtime/lifecycle/update_lifecycle_contract.py remains the full lifecycle owner until later slices migrate
+// upstream implementation ../src/python_json.rs owns Python-compatible DSV text and byte payload parsing
 // downstream implementation ../../../../../tests/agent_tools/test_publication_integrator.py checks gate identity replay stability
 // downstream implementation ../../../../../tests/agent_tools/test_github_publish.py consumes G3 gate verdicts
 // downstream implementation ../../../../../tests/agent_tools/test_bootstrap_and_close.py consumes gate chains at closeout
+// downstream test ../tests/update_lifecycle_dsv_native.rs freezes DSV envelope values, bytes, and errors
+// downstream test ../tests/update_lifecycle_records_native.rs freezes snapshot, evidence, and checkpoint record validation
+// downstream test ../tests/update_lifecycle_transaction_native.rs freezes update transaction validation
 // downstream test ../tests/update_lifecycle_pr_native.rs freezes the native PR lifecycle APIs against CPython outputs
 // downstream test ../tests/update_lifecycle_publication_native.rs freezes publication readback receipts and transitions
 // downstream test ../tests/update_lifecycle_queue_native.rs freezes queue keys, receipts, and replay behavior
@@ -14,8 +18,14 @@
 // downstream test ../tests/update_lifecycle_terminal_native.rs freezes closeout receipts, cleanup, and token hashes
 // @dependency-end
 
-use crate::artifacts::artifact_identity::{canonical_body_sha256, canonical_json_bytes};
+use crate::artifacts::artifact_identity::{
+    canonical_body_sha256, canonical_json_bytes, ArtifactIdentityError,
+};
 use crate::python_json::python_json_equal_after_float_rejection;
+use crate::python_json::{
+    canonical_utf8_surrogate_range, contains_float, parse_json_bytes, parse_json_python_string,
+    to_serde_json_value, JsonString as PythonJsonString, JsonValue as PythonJsonValue,
+};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -154,6 +164,26 @@ const CHECKPOINT_IDS: &[&str] = &[
     "G6",
     "nested_lifecycle_cleanup",
 ];
+const DECISION_SUFFICIENCY_SCHEMA: &str = "agent-canon.decision-sufficiency.v1";
+const STATE_CHECKPOINT_PREFIX: &[(&str, usize)] = &[
+    ("created", 0),
+    ("prepared", 1),
+    ("generated", 2),
+    ("gates_ready", 4),
+    ("reviewed", 4),
+    ("pr_open", 5),
+    ("pr_merged", 5),
+    ("source_main_readback", 6),
+    ("queue_enqueued", 7),
+    ("frontier_accepted", 9),
+    ("remote_readback", 11),
+    ("durable_handback", 12),
+    ("descendants_closed", 13),
+    ("reservations_released", 14),
+    ("cleanup_proven", 15),
+    ("nested_lifecycle_cleanup", 17),
+    ("closed", CHECKPOINT_IDS.len()),
+];
 const BINDING_FIELDS: &[&str] = &[
     "transaction_id",
     "snapshot_id",
@@ -189,6 +219,10 @@ const GATE_VERDICT_FIELDS: &[&str] = &[
 const CANDIDATE_FREEZE_SCHEMA: &str = "agent-canon.candidate-freeze-receipt.v1";
 const CANDIDATE_REVIEW_SCHEMA: &str = "agent-canon.candidate-review-receipt.v1";
 const CANDIDATE_CAS_SCHEMA: &str = "agent-canon.candidate-cas-receipt.v1";
+const SNAPSHOT_SCHEMA: &str = "agent-canon.snapshot.v1";
+const EVIDENCE_IDENTITY_SCHEMA: &str = "agent-canon.evidence-identity.v1";
+const CHECKPOINT_RECEIPT_SCHEMA: &str = "agent-canon.checkpoint-receipt.v1";
+const UPDATE_TRANSACTION_SCHEMA: &str = "agent-canon.update-transaction.v1";
 const QUEUE_RECEIPT_SCHEMA: &str = "agent-canon.queue-receipt.v1";
 const DEPENDENCY_FRONTIER_SCHEMA: &str = "agent-canon.dependency-frontier.v1";
 const DURABLE_HANDBACK_SCHEMA: &str = "agent-canon.durable-handback.v1";
@@ -198,6 +232,7 @@ const CLEANUP_PROOF_SCHEMA: &str = "agent-canon.cleanup-proof.v1";
 const CLOSE_AGENT_TOOL_CALL_SCHEMA: &str = "agent-canon.close-agent-tool-call.v1";
 const CLOSE_AGENT_ARGS_SCHEMA: &str = "agent-canon.close-agent.args.v1";
 const PUBLICATION_READBACK_SCHEMA: &str = "agent-canon.publication-readback-receipt.v1";
+const SOURCE_PROJECTION_PACKET_SCHEMA: &str = "agent-canon.source-projection-packet.v1";
 const PULL_REQUEST_LIFECYCLE_SCHEMA: &str = "agent-canon.pull-request-lifecycle.v1";
 const PR_KINDS: &[&str] = &["user", "fork", "contributor"];
 const PR_STATES: &[&str] = &[
@@ -285,6 +320,44 @@ impl From<crate::artifacts::artifact_identity::ArtifactIdentityError> for Lifecy
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecisionSufficiencyEnvelopeError {
+    Lifecycle(LifecycleContractError),
+    ArtifactIdentity(ArtifactIdentityError),
+    UnicodeEncodeError { message: String },
+}
+
+impl fmt::Display for DecisionSufficiencyEnvelopeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lifecycle(error) => fmt::Display::fmt(error, formatter),
+            Self::ArtifactIdentity(error) => fmt::Display::fmt(error, formatter),
+            Self::UnicodeEncodeError { message } => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for DecisionSufficiencyEnvelopeError {}
+
+impl From<LifecycleContractError> for DecisionSufficiencyEnvelopeError {
+    fn from(error: LifecycleContractError) -> Self {
+        Self::Lifecycle(error)
+    }
+}
+
+impl From<ArtifactIdentityError> for DecisionSufficiencyEnvelopeError {
+    fn from(error: ArtifactIdentityError) -> Self {
+        Self::ArtifactIdentity(error)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum DecisionSufficiencyInput<'a> {
+    Mapping(&'a PythonJsonValue),
+    Text(&'a PythonJsonString),
+    Bytes(&'a [u8]),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RecordBindingIdentity {
     pub transaction_id: String,
@@ -328,6 +401,44 @@ pub struct CloseAgentToolCallInput<'a> {
     pub completed_but_open: bool,
     pub unknown_descendants: bool,
     pub reservation_leak: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SourceProjectionPacketInput<'a> {
+    pub binding: &'a JsonValue,
+    pub source_main_rebind_receipt: &'a JsonValue,
+    pub candidate_cas_receipt: &'a JsonValue,
+    pub pull_request_lifecycle: &'a JsonValue,
+    pub publication_readback_receipt: &'a JsonValue,
+    pub source_gate_verdicts: &'a [JsonValue],
+    pub ordered_predecessor_evidence: &'a [JsonValue],
+    pub acceptance_evidence_ref: &'a str,
+}
+
+pub type SourceProjectionG2Callback<'a, Error> =
+    dyn Fn(&JsonValue, &str, &str, &[JsonValue]) -> Result<JsonValue, Error> + 'a;
+pub type SourceProjectionG3Callback<'a, Error> =
+    dyn Fn(&JsonValue, &JsonValue, &JsonValue, &[JsonValue]) -> Result<JsonValue, Error> + 'a;
+
+pub struct SourceProjectionGateOwnerApis<'a, G2Error, G3Error> {
+    pub generated_completeness_check_ids: &'a [String],
+    pub materialize_generated_completeness_receipt: &'a SourceProjectionG2Callback<'a, G2Error>,
+    pub materialize_pr_identity_gate: &'a SourceProjectionG3Callback<'a, G3Error>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FreshCloneSourceProjectionError<G2Error, G3Error> {
+    Lifecycle(LifecycleContractError),
+    G2Owner(G2Error),
+    G3Owner(G3Error),
+}
+
+impl<G2Error, G3Error> From<LifecycleContractError>
+    for FreshCloneSourceProjectionError<G2Error, G3Error>
+{
+    fn from(error: LifecycleContractError) -> Self {
+        Self::Lifecycle(error)
+    }
 }
 
 fn fail(code: &str, detail: &str) -> LifecycleContractError {
@@ -776,11 +887,1014 @@ pub fn validate_record_binding(value: &JsonValue) -> Result<JsonValue, Lifecycle
     canonical_clone(value)
 }
 
+pub fn validate_snapshot(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let snapshot = mapping(value, "snapshot")?;
+    exact_keys(
+        snapshot,
+        &["schema", "binding", "source_namespace", "base_identity"],
+        &[],
+        "snapshot",
+    )?;
+    if snapshot.get("schema").and_then(JsonValue::as_str) != Some(SNAPSHOT_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", SNAPSHOT_SCHEMA));
+    }
+    validate_record_binding(required_value(snapshot, "binding", "snapshot")?)?;
+    let source_namespace = required_string(snapshot, "source_namespace", "snapshot")?;
+    if !std::path::Path::new(&source_namespace).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "snapshot.source_namespace",
+        ));
+    }
+    validate_remote_git_identity(
+        required_value(snapshot, "base_identity", "snapshot")?,
+        "snapshot.base_identity",
+    )?;
+    canonical_clone(value)
+}
+
+pub fn validate_evidence_identity(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let evidence = mapping(value, "evidence_identity")?;
+    exact_keys(
+        evidence,
+        &[
+            "schema",
+            "binding",
+            "producer_path",
+            "producer_symbol",
+            "observed_at",
+            "sequence",
+        ],
+        &[],
+        "evidence_identity",
+    )?;
+    if evidence.get("schema").and_then(JsonValue::as_str) != Some(EVIDENCE_IDENTITY_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", EVIDENCE_IDENTITY_SCHEMA));
+    }
+    validate_record_binding(required_value(evidence, "binding", "evidence_identity")?)?;
+    let producer_path = required_string(evidence, "producer_path", "evidence_identity")?;
+    if !std::path::Path::new(&producer_path).is_absolute() {
+        return Err(fail(
+            "lifecycle:path_not_absolute",
+            "evidence_identity.producer_path",
+        ));
+    }
+    required_string(evidence, "producer_symbol", "evidence_identity")?;
+    rfc3339(
+        required_value(evidence, "observed_at", "evidence_identity")?,
+        "evidence_identity.observed_at",
+    )?;
+    positive_integer(
+        required_value(evidence, "sequence", "evidence_identity")?,
+        "evidence_identity.sequence",
+        false,
+    )?;
+    canonical_clone(value)
+}
+
+pub fn validate_checkpoint_receipt(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let receipt = mapping(value, "checkpoint_receipt")?;
+    exact_keys(
+        receipt,
+        &[
+            "schema",
+            "binding",
+            "checkpoint_id",
+            "verdict",
+            "failure_code",
+        ],
+        &[],
+        "checkpoint_receipt",
+    )?;
+    if receipt.get("schema").and_then(JsonValue::as_str) != Some(CHECKPOINT_RECEIPT_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", CHECKPOINT_RECEIPT_SCHEMA));
+    }
+    validate_record_binding(required_value(receipt, "binding", "checkpoint_receipt")?)?;
+    one_of(
+        required_value(receipt, "checkpoint_id", "checkpoint_receipt")?,
+        CHECKPOINT_IDS,
+        "checkpoint_receipt.checkpoint_id",
+    )?;
+    let verdict = one_of(
+        required_value(receipt, "verdict", "checkpoint_receipt")?,
+        &["pass", "fail", "skip"],
+        "checkpoint_receipt.verdict",
+    )?;
+    let failure_code = required_value(receipt, "failure_code", "checkpoint_receipt")?;
+    if verdict == "fail" {
+        string_value(failure_code, "checkpoint_receipt.failure_code")?;
+    } else if !failure_code.is_null() {
+        return Err(fail(
+            "lifecycle:failure_code_forbidden",
+            "checkpoint_receipt",
+        ));
+    }
+    canonical_clone(value)
+}
+
+pub fn validate_update_transaction(value: &JsonValue) -> Result<JsonValue, LifecycleContractError> {
+    let transaction = mapping(value, "update_transaction")?;
+    exact_keys(
+        transaction,
+        &[
+            "schema",
+            "binding",
+            "state",
+            "checkpoints",
+            "first_missing_checkpoint",
+            "gate_verdict_evidence_refs",
+            "queue_receipt_id",
+            "frontier_id",
+            "successor_transaction_id",
+            "source_main_rebind_receipt_id",
+        ],
+        &[],
+        "update_transaction",
+    )?;
+    if transaction.get("schema").and_then(JsonValue::as_str) != Some(UPDATE_TRANSACTION_SCHEMA) {
+        return Err(fail("lifecycle:schema_invalid", UPDATE_TRANSACTION_SCHEMA));
+    }
+    let binding = validate_record_binding(required_value(
+        transaction,
+        "binding",
+        "update_transaction",
+    )?)?;
+    let state = one_of(
+        required_value(transaction, "state", "update_transaction")?,
+        TRANSACTION_STATES,
+        "update_transaction.state",
+    )?;
+    let checkpoint_values = required_value(transaction, "checkpoints", "update_transaction")?
+        .as_array()
+        .ok_or_else(|| {
+            fail(
+                "lifecycle:sequence_required",
+                "update_transaction.checkpoints",
+            )
+        })?;
+    let mut checkpoints = Vec::with_capacity(checkpoint_values.len());
+    for checkpoint in checkpoint_values {
+        checkpoints.push(validate_checkpoint_receipt(checkpoint)?);
+    }
+
+    let expected_binding_identity = binding_identity(&binding)?;
+    let mut seen = BTreeMap::new();
+    for receipt in checkpoints {
+        let receipt_map = mapping(&receipt, "checkpoint_receipt")?;
+        let receipt_binding = required_value(receipt_map, "binding", "checkpoint_receipt")?;
+        if binding_identity(receipt_binding)? != expected_binding_identity {
+            return Err(fail(
+                "input_identity_mismatch",
+                "update_transaction.checkpoints",
+            ));
+        }
+        let checkpoint_id = required_string(receipt_map, "checkpoint_id", "checkpoint_receipt")?;
+        if seen.contains_key(&checkpoint_id) {
+            return Err(fail("lifecycle:checkpoint_duplicate", &checkpoint_id));
+        }
+        seen.insert(checkpoint_id, receipt);
+    }
+
+    let passed = seen
+        .iter()
+        .filter_map(|(checkpoint_id, receipt)| {
+            matches!(
+                receipt.get("verdict").and_then(JsonValue::as_str),
+                Some("pass" | "skip")
+            )
+            .then_some(checkpoint_id.clone())
+        })
+        .collect::<BTreeSet<_>>();
+    let passed_prefix = CHECKPOINT_IDS
+        .iter()
+        .take_while(|checkpoint_id| passed.contains(**checkpoint_id))
+        .count();
+    if CHECKPOINT_IDS
+        .iter()
+        .skip(passed_prefix + 1)
+        .any(|checkpoint_id| passed.contains(*checkpoint_id))
+    {
+        return Err(fail("lifecycle:checkpoint_out_of_order", ""));
+    }
+
+    let computed_missing = CHECKPOINT_IDS.iter().copied().find(|checkpoint_id| {
+        seen.get(*checkpoint_id).is_none_or(|receipt| {
+            !matches!(
+                receipt.get("verdict").and_then(JsonValue::as_str),
+                Some("pass" | "skip")
+            )
+        })
+    });
+    let computed_missing = computed_missing
+        .map(|checkpoint_id| JsonValue::String(checkpoint_id.to_owned()))
+        .unwrap_or(JsonValue::Null);
+    if required_value(
+        transaction,
+        "first_missing_checkpoint",
+        "update_transaction",
+    )? != &computed_missing
+    {
+        return Err(fail("lifecycle:first_missing_checkpoint_mismatch", ""));
+    }
+
+    let gate_refs = string_list(
+        required_value(
+            transaction,
+            "gate_verdict_evidence_refs",
+            "update_transaction",
+        )?,
+        "update_transaction.gate_verdict_evidence_refs",
+        false,
+        true,
+        Some(valid_evidence_ref),
+    )?;
+    let mut passed_gate_refs = Vec::new();
+    for gate_id in GATE_IDS {
+        if let Some(receipt) = seen.get(*gate_id) {
+            let receipt_map = mapping(receipt, "checkpoint_receipt")?;
+            if matches!(
+                required_value(receipt_map, "verdict", "checkpoint_receipt")?.as_str(),
+                Some("pass" | "skip")
+            ) {
+                let receipt_binding = mapping(
+                    required_value(receipt_map, "binding", "checkpoint_receipt")?,
+                    "binding",
+                )?;
+                passed_gate_refs.push(required_string(receipt_binding, "evidence_ref", "binding")?);
+            }
+        }
+    }
+    if gate_refs != passed_gate_refs {
+        return Err(fail("lifecycle:gate_evidence_mismatch", ""));
+    }
+
+    for (field, prefix) in [
+        ("queue_receipt_id", "queue:"),
+        ("frontier_id", "frontier:"),
+        ("successor_transaction_id", "tx:"),
+        ("source_main_rebind_receipt_id", "rebind:"),
+    ] {
+        let value = required_value(transaction, field, "update_transaction")?;
+        if !value.is_null() {
+            let error_field = format!("update_transaction.{field}");
+            let identity = pattern_value(value, &error_field, valid_hash_id)?;
+            if !identity.starts_with(prefix) {
+                return Err(fail("lifecycle:identity_invalid", &error_field));
+            }
+        }
+    }
+
+    let successor_transaction_id = required_value(
+        transaction,
+        "successor_transaction_id",
+        "update_transaction",
+    )?;
+    if state == "successor_required" && successor_transaction_id.is_null() {
+        return Err(fail("lifecycle:successor_missing", ""));
+    }
+    if state != "successor_required" && !successor_transaction_id.is_null() {
+        return Err(fail("lifecycle:successor_forbidden", ""));
+    }
+
+    if let Some((_, required_prefix)) = STATE_CHECKPOINT_PREFIX
+        .iter()
+        .find(|(prefix_state, _)| *prefix_state == state.as_str())
+    {
+        if passed_prefix != *required_prefix {
+            return Err(fail("lifecycle:state_checkpoint_mismatch", &state));
+        }
+    }
+
+    let source_main_rebind_receipt_id = required_value(
+        transaction,
+        "source_main_rebind_receipt_id",
+        "update_transaction",
+    )?;
+    if matches!(
+        state.as_str(),
+        "reviewed"
+            | "pr_open"
+            | "pr_merged"
+            | "source_main_readback"
+            | "queue_enqueued"
+            | "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && source_main_rebind_receipt_id.is_null()
+    {
+        return Err(fail("lifecycle:rebind_receipt_required", &state));
+    }
+
+    let queue_receipt_id = required_value(transaction, "queue_receipt_id", "update_transaction")?;
+    if matches!(
+        state.as_str(),
+        "queue_enqueued"
+            | "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && queue_receipt_id.is_null()
+    {
+        return Err(fail("lifecycle:queue_receipt_required", &state));
+    }
+
+    let frontier_id = required_value(transaction, "frontier_id", "update_transaction")?;
+    if matches!(
+        state.as_str(),
+        "frontier_accepted"
+            | "remote_readback"
+            | "durable_handback"
+            | "descendants_closed"
+            | "reservations_released"
+            | "cleanup_proven"
+            | "nested_lifecycle_cleanup"
+            | "closed"
+    ) && frontier_id.is_null()
+    {
+        return Err(fail("lifecycle:frontier_required", &state));
+    }
+    canonical_clone(value)
+}
+
 pub fn binding_identity(
     value: &JsonValue,
 ) -> Result<RecordBindingIdentity, LifecycleContractError> {
     let binding = validate_record_binding(value)?;
     binding_identity_from_validated(&binding)
+}
+
+/// Validate the immutable packet consumed by the source projection stage.
+pub fn validate_source_projection_packet(
+    value: &JsonValue,
+) -> Result<JsonValue, LifecycleContractError> {
+    let packet = mapping(value, "source_projection_packet")?;
+    exact_keys(
+        packet,
+        &[
+            "schema",
+            "binding",
+            "source_main_rebind_receipt",
+            "candidate_cas_receipt",
+            "pull_request_lifecycle",
+            "publication_readback_receipt",
+            "source_gate_verdicts",
+            "ordered_predecessor_evidence",
+            "acceptance_evidence_ref",
+        ],
+        &[],
+        "source_projection_packet",
+    )?;
+    if packet.get("schema").and_then(JsonValue::as_str) != Some(SOURCE_PROJECTION_PACKET_SCHEMA) {
+        return Err(fail(
+            "lifecycle:schema_invalid",
+            SOURCE_PROJECTION_PACKET_SCHEMA,
+        ));
+    }
+
+    let binding = validate_record_binding(required_value(
+        packet,
+        "binding",
+        "source_projection_packet",
+    )?)?;
+    let rebind = validate_source_main_rebind_receipt(required_value(
+        packet,
+        "source_main_rebind_receipt",
+        "source_projection_packet",
+    )?)?;
+    let cas = validate_candidate_cas_receipt(required_value(
+        packet,
+        "candidate_cas_receipt",
+        "source_projection_packet",
+    )?)?;
+    let lifecycle = validate_candidate_cas_pr_transition(
+        &cas,
+        required_value(packet, "pull_request_lifecycle", "source_projection_packet")?,
+    )?;
+    let readback = validate_publication_readback_transition(
+        &cas,
+        &lifecycle,
+        required_value(
+            packet,
+            "publication_readback_receipt",
+            "source_projection_packet",
+        )?,
+    )?;
+    let gates_value = required_value(packet, "source_gate_verdicts", "source_projection_packet")?;
+    let gates = gates_value.as_array().ok_or_else(|| {
+        fail(
+            "lifecycle:sequence_required",
+            "source_projection_packet.source_gate_verdicts",
+        )
+    })?;
+    let source_gates = validate_gate_chain(gates, Some(&["G1", "G2", "G3"]), true)?;
+
+    for (field, record) in [
+        ("rebind", &rebind),
+        ("cas", &cas),
+        ("pr", &lifecycle),
+        ("readback", &readback),
+    ] {
+        let record = mapping(record, field)?;
+        same_binding(
+            &binding,
+            required_value(record, "binding", field)?,
+            &format!("source_projection_packet.{field}"),
+        )?;
+    }
+    validate_candidate_cas_rebind_transition(&rebind, &cas)?;
+
+    let packet_binding_identity = binding_identity(&binding)?;
+    for gate in &source_gates {
+        let gate = mapping(gate, "gate_verdict")?;
+        let gate_binding = required_value(gate, "binding", "gate_verdict")?;
+        if binding_identity(gate_binding)? != packet_binding_identity {
+            return Err(fail("lifecycle:gate_identity_mismatch", ""));
+        }
+    }
+
+    let g3 = source_gates
+        .get(2)
+        .expect("the validated G1-G2-G3 chain contains G3");
+    let g3 = mapping(g3, "gate_verdict")?;
+    let g3_inputs = required_value(g3, "ordered_input_evidence_refs", "gate_verdict")?
+        .as_array()
+        .expect("validated gate input evidence is an array");
+    let cas_map = mapping(&cas, "candidate_cas_receipt")?;
+    let cas_binding = mapping(
+        required_value(cas_map, "binding", "candidate_cas_receipt")?,
+        "candidate_cas_receipt.binding",
+    )?;
+    let cas_evidence =
+        required_value(cas_binding, "evidence_ref", "candidate_cas_receipt.binding")?;
+    if !g3_inputs.contains(cas_evidence) {
+        return Err(fail("lifecycle:gate_predecessor_mismatch", "G3"));
+    }
+
+    let readback = mapping(&readback, "publication_readback_receipt")?;
+    let rebind = mapping(&rebind, "source_main_rebind_receipt")?;
+    if required_value(
+        readback,
+        "rebind_receipt_evidence_id",
+        "publication_readback_receipt",
+    )? != required_value(rebind, "rebind_receipt_id", "source_main_rebind_receipt")?
+    {
+        return Err(fail(
+            "lifecycle:rebind_mismatch",
+            "source_projection_packet",
+        ));
+    }
+
+    let predecessors_value = required_value(
+        packet,
+        "ordered_predecessor_evidence",
+        "source_projection_packet",
+    )?;
+    let predecessors = predecessors_value.as_array().ok_or_else(|| {
+        fail(
+            "lifecycle:sequence_required",
+            "source_projection_packet.ordered_predecessor_evidence",
+        )
+    })?;
+    if predecessors.len() != 2 {
+        return Err(fail("frontier:predecessor_order_invalid", ""));
+    }
+    for (index, (value, (expected_number, expected_pr))) in predecessors
+        .iter()
+        .zip([(388, "#388"), (389, "#389")])
+        .enumerate()
+    {
+        let field = format!("source_projection_packet.ordered_predecessor_evidence[{index}]");
+        let item = mapping(value, &field)?;
+        let optional = if index == 1 {
+            &["source_pr_sha"][..]
+        } else {
+            &[][..]
+        };
+        exact_keys(
+            item,
+            &["queue_number", "source_pr", "publication_evidence_id"],
+            optional,
+            &field,
+        )?;
+        if !frontier_queue_number_matches(
+            required_value(item, "queue_number", &field)?,
+            expected_number,
+        ) || required_value(item, "source_pr", &field)?.as_str() != Some(expected_pr)
+        {
+            return Err(fail("frontier:predecessor_order_invalid", ""));
+        }
+        pattern_value(
+            required_value(item, "publication_evidence_id", &field)?,
+            &format!("{field}.publication_evidence_id"),
+            valid_evidence_ref,
+        )?;
+        if index == 1 {
+            let missing = JsonValue::Null;
+            pattern_value(
+                item.get("source_pr_sha").unwrap_or(&missing),
+                "source_projection_packet.ordered_predecessor_evidence[1].source_pr_sha",
+                |text| lower_hex(text, 40),
+            )?;
+        }
+    }
+    pattern_value(
+        required_value(
+            packet,
+            "acceptance_evidence_ref",
+            "source_projection_packet",
+        )?,
+        "source_projection_packet.acceptance_evidence_ref",
+        valid_evidence_ref,
+    )?;
+    canonical_clone(value)
+}
+
+/// Build a source projection packet from already-materialized lifecycle receipts.
+pub fn materialize_source_projection_packet(
+    input: &SourceProjectionPacketInput<'_>,
+) -> Result<JsonValue, LifecycleContractError> {
+    let mut packet = JsonMap::new();
+    packet.insert(
+        "schema".to_owned(),
+        JsonValue::String(SOURCE_PROJECTION_PACKET_SCHEMA.to_owned()),
+    );
+    packet.insert("binding".to_owned(), input.binding.clone());
+    packet.insert(
+        "source_main_rebind_receipt".to_owned(),
+        input.source_main_rebind_receipt.clone(),
+    );
+    packet.insert(
+        "candidate_cas_receipt".to_owned(),
+        input.candidate_cas_receipt.clone(),
+    );
+    packet.insert(
+        "pull_request_lifecycle".to_owned(),
+        input.pull_request_lifecycle.clone(),
+    );
+    packet.insert(
+        "publication_readback_receipt".to_owned(),
+        input.publication_readback_receipt.clone(),
+    );
+    packet.insert(
+        "source_gate_verdicts".to_owned(),
+        JsonValue::Array(input.source_gate_verdicts.to_vec()),
+    );
+    packet.insert(
+        "ordered_predecessor_evidence".to_owned(),
+        JsonValue::Array(input.ordered_predecessor_evidence.to_vec()),
+    );
+    packet.insert(
+        "acceptance_evidence_ref".to_owned(),
+        JsonValue::String(input.acceptance_evidence_ref.to_owned()),
+    );
+    validate_source_projection_packet(&JsonValue::Object(packet))
+}
+
+fn fresh_clone_projection_digest(
+    label: &str,
+    value: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    let record = serde_json::json!({"label": label, "value": value});
+    let canonical = canonical_json_bytes(&record).map_err(LifecycleContractError::from)?;
+    Ok(Sha256::digest(canonical)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn fresh_clone_projection_evidence(
+    label: &str,
+    value: &JsonValue,
+) -> Result<String, LifecycleContractError> {
+    Ok(format!(
+        "evidence:{}",
+        fresh_clone_projection_digest(label, value)?
+    ))
+}
+
+/// Materialize a fresh-clone source packet from observed identities and owner callbacks.
+/// `source_root` is the resolved Python lifecycle module root serialized in owner paths.
+pub fn materialize_fresh_clone_source_projection_packet<G2Error, G3Error>(
+    candidate_sha: &str,
+    candidate_tree_sha: &str,
+    publication_sha: &str,
+    publication_tree_sha: &str,
+    source_root: &Path,
+    gate_owner_apis: &SourceProjectionGateOwnerApis<'_, G2Error, G3Error>,
+) -> Result<JsonValue, FreshCloneSourceProjectionError<G2Error, G3Error>> {
+    for (value, field) in [
+        (candidate_sha, "fresh_clone.candidate_sha"),
+        (candidate_tree_sha, "fresh_clone.candidate_tree_sha"),
+        (publication_sha, "fresh_clone.publication_sha"),
+        (publication_tree_sha, "fresh_clone.publication_tree_sha"),
+    ] {
+        pattern_value(&JsonValue::String(value.to_owned()), field, |text| {
+            lower_hex(text, 40)
+        })?;
+    }
+
+    let identity = serde_json::json!({
+        "candidate_sha": candidate_sha,
+        "candidate_tree_sha": candidate_tree_sha,
+        "publication_sha": publication_sha,
+        "publication_tree_sha": publication_tree_sha,
+    });
+    let input_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-input", &identity)?
+    );
+    let transaction_id = format!(
+        "tx:{}",
+        fresh_clone_projection_digest("fresh-clone-transaction", &identity)?
+    );
+    let snapshot_id = format!(
+        "snapshot:{}",
+        fresh_clone_projection_digest("fresh-clone-snapshot", &identity)?
+    );
+    let binding_evidence = fresh_clone_projection_evidence("fresh-clone-binding", &identity)?;
+    let binding_evidence_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-binding", &identity)?
+    );
+    let binding = serde_json::json!({
+        "transaction_id": transaction_id,
+        "snapshot_id": snapshot_id,
+        "candidate_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+        "input_digest": input_digest,
+        "tool_id": "update-agent-canon",
+        "tool_version": "fresh-clone-acceptance.v1",
+        "evidence_ref": binding_evidence,
+        "evidence_digest": binding_evidence_digest,
+        "timing": {
+            "started_at": "2026-01-01T00:00:00Z",
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "duration_ms": 0,
+            "attempt": 1,
+            "replayed": false,
+        },
+    });
+    let checked_binding = validate_record_binding(&binding)?;
+    let base_identity = serde_json::json!({
+        "remote": "origin",
+        "ref": "refs/heads/main",
+        "commit_sha": candidate_sha,
+        "tree_sha": candidate_tree_sha,
+    });
+    let rebind_readback_evidence =
+        fresh_clone_projection_evidence("fresh-clone-origin-main-readback", &identity)?;
+    let rebind = materialize_source_main_rebind_receipt(
+        &checked_binding,
+        &base_identity,
+        &base_identity,
+        &rebind_readback_evidence,
+    )?;
+
+    let cas_evidence_digest = fresh_clone_projection_digest("fresh-clone-cas", &identity)?;
+    let cas_evidence_ref = format!("evidence:{cas_evidence_digest}");
+    let mut cas_binding = checked_binding.clone();
+    let cas_binding = cas_binding
+        .as_object_mut()
+        .expect("validated binding is an object");
+    cas_binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(cas_evidence_ref.clone()),
+    );
+    cas_binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(format!("sha256:{cas_evidence_digest}")),
+    );
+    let rebind_map = rebind
+        .as_object()
+        .expect("validated source-main rebind receipt is an object");
+    let binding_map = checked_binding
+        .as_object()
+        .expect("validated binding is an object");
+    let cas_receipt = serde_json::json!({
+        "schema": CANDIDATE_CAS_SCHEMA,
+        "cas_receipt_id": format!(
+            "cas:{}",
+            fresh_clone_projection_digest("fresh-clone-cas-id", &identity)?
+        ),
+        "binding": JsonValue::Object(cas_binding.clone()),
+        "predecessor_evidence_id": binding_map.get("evidence_ref").expect("validated binding has evidence"),
+        "rebind_receipt_evidence_id": rebind_map.get("rebind_receipt_id").expect("validated rebind has an ID"),
+        "candidate_identity": {
+            "candidate_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "cas_base_identity": {
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "cas_evidence_ref": cas_evidence_ref,
+        "cas_stage": "cas",
+    });
+    let cas = validate_candidate_cas_rebind_transition(&rebind, &cas_receipt)?;
+
+    let repository_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-remote-url", &identity)?
+    );
+    let branch_ref = "refs/heads/canon/fresh-clone-acceptance";
+    let lifecycle_evidence =
+        fresh_clone_projection_evidence("fresh-clone-pr-lifecycle", &identity)?;
+    let lifecycle_evidence_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-pr-lifecycle", &identity)?
+    );
+    let mut lifecycle_binding = checked_binding.clone();
+    let lifecycle_binding = lifecycle_binding
+        .as_object_mut()
+        .expect("validated binding is an object");
+    lifecycle_binding.insert(
+        "evidence_ref".to_owned(),
+        JsonValue::String(lifecycle_evidence),
+    );
+    lifecycle_binding.insert(
+        "evidence_digest".to_owned(),
+        JsonValue::String(lifecycle_evidence_digest),
+    );
+    let lifecycle = serde_json::json!({
+        "schema": PULL_REQUEST_LIFECYCLE_SCHEMA,
+        "kind": "user",
+        "binding": JsonValue::Object(lifecycle_binding.clone()),
+        "state": "merged",
+        "remote_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "remote_name": "origin",
+            "url_digest": repository_digest,
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "base_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": "refs/heads/main",
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "head_identity": {
+            "repo_owner": "fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "ref": branch_ref,
+            "commit_sha": candidate_sha,
+            "tree_sha": candidate_tree_sha,
+        },
+        "branch": pull_request_branch_table(),
+        "permission_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "permission_state": "verified_true",
+            "permission_evidence_id": fresh_clone_projection_evidence(
+                "fresh-clone-permission", &identity
+            )?,
+            "authority_source": "canonical fresh-clone acceptance fixture",
+            "assumption_forbidden": true,
+        },
+        "pr_essence": {
+            "problem": "exercise standalone source publication from a fresh clone",
+            "intent": "queue the observed AgentCanon source branch update",
+            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+            "contract_delta": "fresh-clone source PR",
+            "evidence_refs": [fresh_clone_projection_evidence(
+                "fresh-clone-pr-essence", &identity
+            )?],
+        },
+        "reviews": [],
+        "user_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "display_name": "Fresh Clone Acceptance",
+        },
+    });
+    let checked_lifecycle = validate_candidate_cas_pr_transition(&cas, &lifecycle)?;
+
+    let authoritative_pr_readback = serde_json::json!({
+        "number": 1,
+        "state": "MERGED",
+        "baseRefName": "main",
+        "baseRefOid": publication_sha,
+        "mergeCasBaseOid": candidate_sha,
+        "mergeCasBaseTreeOid": candidate_tree_sha,
+        "headRefName": "canon/fresh-clone-acceptance",
+        "headRefOid": candidate_sha,
+        "headRepository": {
+            "nameWithOwner": "fresh-clone-acceptance/agent-canon",
+        },
+        "mergeCommit": {"oid": publication_sha},
+        "mergeTreeOid": publication_tree_sha,
+    });
+    let readback = materialize_publication_readback_receipt(
+        &cas,
+        &checked_lifecycle,
+        &authoritative_pr_readback,
+    )?;
+
+    let g1_owner_path = "tools/repository/github/publication_integrator.py";
+    let g1_owner = format!(
+        "{}#resolve_publication_eligibility",
+        source_root.join(g1_owner_path).to_string_lossy()
+    );
+    let g1_output_digest = format!(
+        "sha256:{}",
+        fresh_clone_projection_digest("fresh-clone-g1", &identity)?
+    );
+    let g1 = materialize_gate_verdict(&GateVerdictInput {
+        binding: checked_binding.clone(),
+        gate_id: "G1".to_owned(),
+        ordered_input_evidence_refs: vec![binding_map
+            .get("evidence_ref")
+            .and_then(JsonValue::as_str)
+            .expect("validated binding has evidence")
+            .to_owned()],
+        invariant: "source_correctness".to_owned(),
+        output_digest: g1_output_digest,
+        owner: g1_owner,
+        verdict: "pass".to_owned(),
+        retry_reason: None,
+        next_checkpoint: None,
+    })?;
+
+    let check_results = gate_owner_apis
+        .generated_completeness_check_ids
+        .iter()
+        .map(|check_id| serde_json::json!({"check_id": check_id, "status": "pass"}))
+        .collect::<Vec<_>>();
+    let g2 = (gate_owner_apis.materialize_generated_completeness_receipt)(
+        &g1,
+        candidate_sha,
+        candidate_tree_sha,
+        &check_results,
+    )
+    .map_err(FreshCloneSourceProjectionError::G2Owner)?;
+    let upstream_gates = [g1.clone(), g2.clone()];
+    let g3 = (gate_owner_apis.materialize_pr_identity_gate)(
+        &checked_lifecycle,
+        &cas,
+        &rebind,
+        &upstream_gates,
+    )
+    .map_err(FreshCloneSourceProjectionError::G3Owner)?;
+
+    let predecessor_388 =
+        fresh_clone_projection_evidence("fresh-clone-predecessor-388", &identity)?;
+    let predecessor_389_digest =
+        fresh_clone_projection_digest("fresh-clone-predecessor-389", &identity)?;
+    let predecessor_389_sha = predecessor_389_digest[..40].to_owned();
+    let predecessor_389 = format!("evidence:{predecessor_389_digest}");
+    let acceptance_evidence_ref =
+        fresh_clone_projection_evidence("fresh-clone-frontier-acceptance", &identity)?;
+    let predecessors = [
+        serde_json::json!({
+            "queue_number": 388,
+            "source_pr": "#388",
+            "publication_evidence_id": predecessor_388,
+        }),
+        serde_json::json!({
+            "queue_number": 389,
+            "source_pr": "#389",
+            "source_pr_sha": predecessor_389_sha,
+            "publication_evidence_id": predecessor_389,
+        }),
+    ];
+    let gates = [g1, g2, g3];
+    materialize_source_projection_packet(&SourceProjectionPacketInput {
+        binding: &checked_binding,
+        source_main_rebind_receipt: &rebind,
+        candidate_cas_receipt: &cas,
+        pull_request_lifecycle: &checked_lifecycle,
+        publication_readback_receipt: &readback,
+        source_gate_verdicts: &gates,
+        ordered_predecessor_evidence: &predecessors,
+        acceptance_evidence_ref: &acceptance_evidence_ref,
+    })
+    .map_err(FreshCloneSourceProjectionError::Lifecycle)
+}
+
+fn dsv_envelope(value: &PythonJsonValue) -> Result<(), DecisionSufficiencyEnvelopeError> {
+    let PythonJsonValue::Object(object) = value else {
+        return Err(fail("lifecycle:mapping_required", "decision_sufficiency_packet").into());
+    };
+    let schema = object
+        .0
+        .iter()
+        .rev()
+        .find(|(key, _)| key.equals_text("schema"))
+        .map(|(_, value)| value);
+    if !matches!(
+        schema,
+        Some(PythonJsonValue::String(value))
+            if value.equals_text(DECISION_SUFFICIENCY_SCHEMA)
+    ) {
+        return Err(fail("decision_sufficiency:envelope_schema_invalid", "").into());
+    }
+    Ok(())
+}
+
+fn dsv_json_invalid() -> DecisionSufficiencyEnvelopeError {
+    fail("decision_sufficiency:envelope_json_invalid", "").into()
+}
+
+fn dsv_artifact_json_invalid(detail: String) -> DecisionSufficiencyEnvelopeError {
+    DecisionSufficiencyEnvelopeError::ArtifactIdentity(ArtifactIdentityError {
+        code: "artifact_identity:json_invalid",
+        detail,
+    })
+}
+
+fn dsv_canonical_json_bytes(
+    value: &PythonJsonValue,
+) -> Result<Vec<u8>, DecisionSufficiencyEnvelopeError> {
+    if contains_float(value) {
+        return Err(DecisionSufficiencyEnvelopeError::ArtifactIdentity(
+            ArtifactIdentityError {
+                code: "artifact_identity:float_forbidden",
+                detail: String::new(),
+            },
+        ));
+    }
+    if let Some((start, end, codepoint)) =
+        canonical_utf8_surrogate_range(value).map_err(dsv_artifact_json_invalid)?
+    {
+        let message = if start == end {
+            let escaped = format!("\\u{codepoint:04x}");
+            format!(
+                "'utf-8' codec can't encode character '{escaped}' in position {start}: surrogates not allowed"
+            )
+        } else {
+            format!(
+                "'utf-8' codec can't encode characters in position {start}-{end}: surrogates not allowed"
+            )
+        };
+        return Err(DecisionSufficiencyEnvelopeError::UnicodeEncodeError { message });
+    }
+    let serde_value = to_serde_json_value(value).map_err(dsv_artifact_json_invalid)?;
+    canonical_json_bytes(&serde_value).map_err(DecisionSufficiencyEnvelopeError::ArtifactIdentity)
+}
+
+fn clone_dsv_envelope(
+    value: &PythonJsonValue,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
+    let bytes = dsv_canonical_json_bytes(value)?;
+    parse_json_bytes(&bytes).map_err(|_| dsv_json_invalid())
+}
+
+fn parse_dsv_mapping(
+    value: &PythonJsonValue,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
+    dsv_envelope(value)?;
+    clone_dsv_envelope(value)
+}
+
+pub fn parse_decision_sufficiency_verdict(
+    payload: DecisionSufficiencyInput<'_>,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
+    match payload {
+        DecisionSufficiencyInput::Mapping(value) => parse_dsv_mapping(value),
+        DecisionSufficiencyInput::Text(value) => {
+            let parsed = parse_json_python_string(value).map_err(|_| dsv_json_invalid())?;
+            parse_dsv_mapping(&parsed)
+        }
+        DecisionSufficiencyInput::Bytes(value) => {
+            let parsed = parse_json_bytes(value).map_err(|_| dsv_json_invalid())?;
+            parse_dsv_mapping(&parsed)
+        }
+    }
+}
+
+pub fn serialize_decision_sufficiency_verdict(
+    packet: &PythonJsonValue,
+) -> Result<Vec<u8>, DecisionSufficiencyEnvelopeError> {
+    dsv_envelope(packet)?;
+    dsv_canonical_json_bytes(packet)
+}
+
+pub fn import_decision_sufficiency_verdict(
+    payload: DecisionSufficiencyInput<'_>,
+    expected_digest: Option<&str>,
+) -> Result<PythonJsonValue, DecisionSufficiencyEnvelopeError> {
+    let packet = parse_decision_sufficiency_verdict(payload)?;
+    let bytes = dsv_canonical_json_bytes(&packet)?;
+    let digest = Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let digest = format!("sha256:{digest}");
+    if expected_digest.is_some_and(|expected| expected != digest) {
+        return Err(fail("decision_sufficiency:envelope_digest_mismatch", "").into());
+    }
+    Ok(packet)
 }
 
 #[derive(Clone, Copy)]
