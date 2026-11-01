@@ -524,7 +524,9 @@ def validate_project_hooks() -> None:
                     f"{event} hook command must be a string",
                 )
 
-    dispatcher = os.environ.get("AGENT_CANON_CLI") or str(ROOT / "tools/bin/agent-canon")
+    dispatcher = os.environ.get("AGENT_CANON_CLI") or str(
+        ROOT / "tools/bin/agent-canon"
+    )
     result = subprocess.run(
         [dispatcher, "codex-hook", "--contract"],
         cwd=ROOT,

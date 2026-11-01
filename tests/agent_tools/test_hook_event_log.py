@@ -247,7 +247,9 @@ class HookEventLogHotPathTest(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0)
             self.assertEqual(json.loads(result.stdout)["decision"], "block")
-            self.assertEqual(spool_blocker.read_text(encoding="utf-8"), "fixture append failure")
+            self.assertEqual(
+                spool_blocker.read_text(encoding="utf-8"), "fixture append failure"
+            )
 
     def test_h05_dispatch_spool_is_fingerprint_only(self) -> None:
         payload = {
@@ -268,7 +270,14 @@ class HookEventLogHotPathTest(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["decision"], "block")
         self.assertEqual(event["payload_fingerprint"], hashlib.sha256(raw).hexdigest())
         self.assertEqual(event["status"], "blocked_destructive_git")
-        for field in ("prompt", "command", "tool_input", "tool_response", "stdout", "stderr"):
+        for field in (
+            "prompt",
+            "command",
+            "tool_input",
+            "tool_response",
+            "stdout",
+            "stderr",
+        ):
             self.assertNotIn(field, event)
 
 
