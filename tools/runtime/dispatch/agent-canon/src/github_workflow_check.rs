@@ -92,14 +92,13 @@ fn workflows(root: &Path) -> Vec<PathBuf> {
     };
     let mut files: Vec<_> = entries
         .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.is_file()
-                && path
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| ext.starts_with('y'))
+        .filter(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            #[cfg(windows)]
+            let name = name.to_ascii_lowercase();
+            crate::dependency_headers::fnmatch_case(&name, "*.y*ml")
         })
+        .map(|entry| entry.path())
         .collect();
     files.sort();
     files
@@ -433,8 +432,12 @@ mod tests {
     fn captured_legacy_cli_corpus_matches_native_owned_api() {
         for case in corpus()["cli_cases"].as_array().unwrap() {
             let root = TestRoot::new(case["name"].as_str().unwrap());
-            for (relative, text) in corpus()["shared_files"].as_object().unwrap() {
-                write_corpus_file(&root.0, relative, text.as_str().unwrap().as_bytes());
+            for (relative, encoded) in corpus()["shared_files"].as_object().unwrap() {
+                write_corpus_file(
+                    &root.0,
+                    relative,
+                    &STANDARD.decode(encoded.as_str().unwrap()).unwrap(),
+                );
             }
             for (relative, encoded) in case["files_delta"].as_object().unwrap() {
                 let path = root.0.join(relative);
