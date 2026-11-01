@@ -9,9 +9,10 @@ use agent_canon::python_json::{
     canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonString, JsonValue,
 };
 use agent_canon::skill_lane_detector::{
-    detect_skill_lane_evidence, structural_skill_lane_concept_matches, EvidenceGroupsByCategory,
-    SkillLaneEvidence, StructuralSkillLaneConcept, StructuralSkillLaneMatch,
-    ValidationFailureRepairConcept, ValidationFailureRepairMatch,
+    detect_skill_lane_evidence, structural_skill_lane_concept_matches,
+    validation_failure_repair_concept_matches, EvidenceGroupsByCategory, SkillLaneEvidence,
+    StructuralSkillLaneConcept, StructuralSkillLaneMatch, ValidationFailureRepairConcept,
+    ValidationFailureRepairMatch,
 };
 use sha2::{Digest, Sha256};
 
