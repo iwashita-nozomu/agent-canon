@@ -598,6 +598,51 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
 }
 
 #[test]
+fn missing_runtime_directory_does_not_change_safety_or_create_files() {
+    let temp = TempDir::new();
+    git_repo(temp.path());
+    let source = temp.path().join("source");
+    fs::create_dir(&source).unwrap();
+    let missing_runtime = temp.path().join("uncreated-runtime");
+    let mut values = environment(&source, &temp.path().join("unused-results"));
+    values.remove("AGENT_CANON_HOOK_RESULTS_DIR");
+    values.insert(
+        "AGENT_CANON_RUNTIME_ROOT".to_owned(),
+        missing_runtime.display().to_string(),
+    );
+    values.insert("AGENT_CANON_PARENT_ROOT".to_owned(), String::new());
+    for (payload, blocked) in [
+        (
+            br#"{"tool_name":"Bash","tool_input":{"command":"git status"}}"#.as_slice(),
+            false,
+        ),
+        (
+            br#"{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}"#.as_slice(),
+            true,
+        ),
+    ] {
+        let result = run_with_input(&["PreToolUse".to_owned()], payload, &values, &source);
+        assert_eq!(
+            result.exit_code,
+            0,
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(result.stderr.is_empty());
+        if blocked {
+            let output = parse_json(std::str::from_utf8(&result.stdout).unwrap()).unwrap();
+            assert_eq!(text(field(&output, "decision").unwrap()), "block");
+        } else {
+            assert!(result.stdout.is_empty());
+        }
+        assert!(
+            !missing_runtime.exists(),
+            "path calculation creates no runtime directory"
+        );
+    }
+}
+
+#[test]
 fn dispatcher_preserves_parent_denial_and_authenticated_child_admission() {
     for role in ["parent", "implementer"] {
         let temp = TempDir::new();
