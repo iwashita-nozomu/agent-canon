@@ -1369,9 +1369,8 @@ def test_hook_report_requires_parent_capability() -> None:
                 "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(target),
             },
         )
-        event = fixture._spooled_event(root)
         assert result.stdout == ""
-        assert event["workflow_monitor_report_dir"] == ""
+        assert not list(root.parent.glob("spool/hook-events/**/*.json"))
         assert not (target / "workflow_monitoring.md").exists()
 
 

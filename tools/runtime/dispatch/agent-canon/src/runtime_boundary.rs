@@ -1060,48 +1060,17 @@ impl RuntimeArtifactBoundary {
     }
 
     pub fn resolve(&self, path: &Path) -> Result<PathBuf, String> {
-        let canonical_absolute = if path.is_absolute() {
-            reject_symlink_components(path, Path::new("/"))?;
-            Some(canonicalize_with_missing_suffix(path)?)
-        } else {
-            None
-        };
-        let relative = if let Some(canonical_absolute) = &canonical_absolute {
-            canonical_absolute
-                .strip_prefix(&self.root)
-                .map_err(|_| format!("path escapes runtime root: {}", path.display()))?
-        } else {
-            path
-        };
-        let mut parts = Vec::new();
-        for component in relative.components() {
-            match component {
-                Component::Normal(part) => parts.push(part.to_os_string()),
-                _ => return Err(format!("unsafe runtime-relative path: {}", path.display())),
-            }
-        }
-        if parts.is_empty() {
-            return Err("runtime root itself is not an artifact".to_string());
-        }
-        if self.spool_only {
-            let first = parts[0].to_string_lossy();
-            if !SOURCE_RUNTIME_ALLOWED_TOP_LEVELS
-                .iter()
-                .any(|allowed| first == *allowed)
-            {
-                return Err(format!(
-                    "runtime spool path is outside bootstrap spool/control paths: {}",
-                    path.display()
-                ));
-            }
-        }
-        let mut relative = PathBuf::new();
-        for part in &parts {
-            relative.push(part);
-        }
-        let joined = self.root.join(&relative);
-        reject_symlink_components(&joined, &self.root)?;
-        match self.directory.parent(&relative, false) {
+        let joined = resolve_runtime_path(
+            &self.source_root,
+            &self.root,
+            path,
+            self.spool_only,
+            self.source_runtime_spool,
+        )?;
+        let relative = joined
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("path escapes runtime root: {}", path.display()))?;
+        match self.directory.parent(relative, false) {
             Ok((parent, name)) => match parent.directory.symlink_metadata(&name) {
                 Ok(metadata) if metadata.is_symlink() => {
                     return Err(format!("runtime target is a symlink: {}", joined.display()))
@@ -1122,12 +1091,6 @@ impl RuntimeArtifactBoundary {
                     joined.display()
                 ))
             }
-        }
-        if self.source_runtime_spool && !joined.starts_with(&self.source_root) {
-            return Err(format!(
-                "source runtime path escaped source root: {}",
-                joined.display()
-            ));
         }
         Ok(joined)
     }
@@ -1226,7 +1189,103 @@ impl RuntimeArtifactBoundary {
     }
 }
 
+fn resolve_runtime_path(
+    source_root: &Path,
+    root: &Path,
+    path: &Path,
+    spool_only: bool,
+    source_runtime_spool: bool,
+) -> Result<PathBuf, String> {
+    let canonical_absolute = if path.is_absolute() {
+        reject_symlink_components(path, Path::new("/"))?;
+        Some(canonicalize_with_missing_suffix(path)?)
+    } else {
+        None
+    };
+    let relative = if let Some(canonical_absolute) = &canonical_absolute {
+        canonical_absolute
+            .strip_prefix(root)
+            .map_err(|_| format!("path escapes runtime root: {}", path.display()))?
+    } else {
+        path
+    };
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_os_string()),
+            _ => return Err(format!("unsafe runtime-relative path: {}", path.display())),
+        }
+    }
+    if parts.is_empty() {
+        return Err("runtime root itself is not an artifact".to_string());
+    }
+    if spool_only {
+        let first = parts[0].to_string_lossy();
+        if !SOURCE_RUNTIME_ALLOWED_TOP_LEVELS
+            .iter()
+            .any(|allowed| first == *allowed)
+        {
+            return Err(format!(
+                "runtime spool path is outside bootstrap spool/control paths: {}",
+                path.display()
+            ));
+        }
+    }
+    let mut relative = PathBuf::new();
+    for part in &parts {
+        relative.push(part);
+    }
+    let joined = root.join(&relative);
+    reject_symlink_components(&joined, root)?;
+    if source_runtime_spool && !joined.starts_with(source_root) {
+        return Err(format!(
+            "source runtime path escaped source root: {}",
+            joined.display()
+        ));
+    }
+    Ok(joined)
+}
+
 impl RuntimeSpoolBoundary {
+    /// Resolve a spool destination without creating or opening a runtime directory.
+    /// Publication still requires the existing attested no-follow write capability.
+    pub fn resolve_path(
+        source_root: &Path,
+        requested: &Path,
+        path: &Path,
+    ) -> Result<PathBuf, String> {
+        let source = fs::canonicalize(expand_user_path(source_root)?).map_err(|error| {
+            format!(
+                "source root is unavailable: {}: {error}",
+                source_root.display()
+            )
+        })?;
+        let requested = expand_user_path(requested)?;
+        if !requested.is_absolute() {
+            return Err(format!(
+                "runtime root must be absolute: {}",
+                requested.display()
+            ));
+        }
+        reject_symlink_components(&requested, Path::new("/"))?;
+        let root = canonicalize_with_missing_suffix(&requested)?;
+        let source_runtime_spool = root == source.join(SOURCE_RUNTIME_DIRECTORY);
+        if !source_runtime_spool && (root == source || root.starts_with(&source)) {
+            return Err(format!(
+                "runtime root must not be inside source root: source={} runtime={}",
+                source.display(),
+                root.display()
+            ));
+        }
+        if source_runtime_spool && root.exists() && !root.is_dir() {
+            return Err(format!(
+                "source runtime root is not a directory: {}",
+                root.display()
+            ));
+        }
+        resolve_runtime_path(&source, &root, path, true, source_runtime_spool)
+    }
+
     pub fn for_source(
         source_root: &Path,
         requested: Option<&Path>,

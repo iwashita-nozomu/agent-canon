@@ -104,8 +104,6 @@ impl HookLogContext {
                 "explicit runtime root required; pass --runtime-root or set {RUNTIME_ROOT_ENV}"
             ));
         }
-        let boundary =
-            RuntimeSpoolBoundary::for_source(&source_root, Some(Path::new(&runtime_root)), false)?;
         let repository_key = repo_log_key(&source_root, &self.environment)
             .map_err(|error| format!("cannot resolve source repository key: {error}"))?;
         let override_root = env_value(&self.environment, HOOK_EVENT_SPOOL_DIR_ENV);
@@ -116,7 +114,7 @@ impl HookLogContext {
         } else {
             PathBuf::from(override_root).join(repository_key)
         };
-        boundary.resolve(&candidate)
+        RuntimeSpoolBoundary::resolve_path(&source_root, Path::new(&runtime_root), &candidate)
     }
 
     pub fn event_path(&self, hook_run_id: &str) -> Result<PathBuf, String> {

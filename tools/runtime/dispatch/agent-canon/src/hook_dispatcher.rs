@@ -1176,9 +1176,17 @@ fn dispatch_event(
         let runtime_root = env_value(environment, crate::runtime_boundary::RUNTIME_ROOT_ENV);
         let runtime_root = (!runtime_root.is_empty()).then(|| PathBuf::from(runtime_root));
         if let (Some(behavior), Some(report_dir)) = (behavior.as_ref(), report_dir.as_ref()) {
+            // workspace_scope's existing artifact source is the tools tree.
+            // Packaged binaries use the resident's declared source location.
+            let compiled_source = source_root_fallback();
+            let source_root = if compiled_source.join("tools").is_dir() {
+                compiled_source
+            } else {
+                PathBuf::from(env_value(environment, "AGENT_CANON_SOURCE_ROOT"))
+            };
             let _ = emit_behavior_projection(
                 report_dir,
-                &root_state.active_root,
+                &source_root.join("tools"),
                 runtime_root.as_deref(),
                 behavior.as_json_value(),
             );
