@@ -62,6 +62,7 @@ pub mod generated_completeness;
 pub mod environment_dependencies;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
+pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod native_release;
