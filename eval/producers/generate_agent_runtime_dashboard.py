@@ -199,6 +199,7 @@ MARKDOWN_TOOL_IDS = (
 TOOL_SELECTION_ALIASES = {
     "docs check": "agent-canon-cli",
     "docs format": "agent-canon-cli",
+    "docs links": "agent-canon-cli",
 }
 SELECTION_SOURCE_CANDIDATE_RE = re.compile(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*")
 SELECTION_EVIDENCE_TARGET = "compact report Selection Evidence Drilldown"

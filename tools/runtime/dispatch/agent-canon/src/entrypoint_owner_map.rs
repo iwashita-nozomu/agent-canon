@@ -5,7 +5,7 @@
 // upstream implementation ../../../../../tools/validation/semantic/convention/convention_compliance_contracts.toml operational marker ownership manifest
 // upstream implementation python_cli_integer.rs provides the shared argparse negative-integer token rule
 // downstream implementation docs.rs routes the docs check-entrypoints command
-// downstream implementation main.rs registers this docs-family module
+// downstream implementation lib.rs registers this owner for the shared docs module
 // downstream implementation ../../../../../tests/agent_tools/test_check_entrypoint_owner_map.py preserves entrypoint behavior oracles
 // downstream implementation ../../../../../.github/workflows/entrypoint-owner-map.yml verifies the exact built source binary
 // @dependency-end
