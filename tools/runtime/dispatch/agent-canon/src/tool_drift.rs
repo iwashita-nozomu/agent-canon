@@ -113,7 +113,7 @@ impl Finding {
 const CONTRACTS: &[ToolContract] = &[
     ToolContract {
         name: "github_pr_flow",
-        tool: "tools/validation/ci/checks/check_github_workflows.py",
+        tool: "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
         links: &[
             direct_link("agents/skills/agent-canon-update.md"),
             direct_link(".github/AGENTS.md"),
@@ -259,7 +259,7 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link("tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs"),
             direct_link("tools/validation/semantic/runtime/check_agent_runtime_alignment.py"),
             direct_link("tools/validation/semantic/convention/check_convention_compliance.py"),
-            direct_link("tools/validation/ci/checks/check_github_workflows.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"),
         ],
         text_checks: &[TextCheck {
             path: "tools/validation/ci/checks/check_agent_canon_pr.sh",

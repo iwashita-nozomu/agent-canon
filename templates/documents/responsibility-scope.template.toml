@@ -95,7 +95,7 @@ paths = [
   ".github/**",
 ]
 protecting_tools = [
-  "tools/validation/ci/checks/check_github_workflows.py",
+  "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
   "tools/repository/github/github_status_lifecycle.py",
 ]
 issues = []

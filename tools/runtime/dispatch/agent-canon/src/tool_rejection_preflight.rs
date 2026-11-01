@@ -147,7 +147,7 @@ const STRICT_SCHEMA_DEPENDENCY_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate 
 }];
 const GITHUB_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "github_workflow_check",
-    command_template: "python3 tools/validation/ci/checks/check_github_workflows.py",
+    command_template: "tools/bin/agent-canon check-github-workflows",
     handoff: "include workflow checkout, permissions, and artifact evidence",
 }];
 const HOOK_RUNTIME_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {

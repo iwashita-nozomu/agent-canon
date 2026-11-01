@@ -1586,12 +1586,12 @@ entries:
 
   - id: check-github-workflows
     summary: Validates GitHub Actions and PR template surfaces.
-    path: tools/validation/ci/checks/check_github_workflows.py
+    path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker
     status: canonical
-    command: python3 tools/validation/ci/checks/check_github_workflows.py
-    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_github_workflows.py"]}
+    command: tools/bin/agent-canon check-github-workflows
+    dispatch: {argv: ["tools/bin/agent-canon", "check-github-workflows"]}
     writes: false
     default_wiring:
       ci: true

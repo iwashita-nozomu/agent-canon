@@ -526,6 +526,70 @@ def test_docs_unit_executes_native_checker_and_propagates_failure(
     assert calls.read_text().splitlines() == expected
 
 
+@pytest.mark.parametrize("explicit_cli", [False, True])
+@pytest.mark.parametrize("checker_exit", [0, 9])
+def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
+    tmp_path: Path, explicit_cli: bool, checker_exit: int
+) -> None:
+    fixture_root = executable_fixture_root(tmp_path)
+    root = fixture_root / "target with spaces"
+    cache = fixture_root / "cache with spaces"
+    wrapper = root / "tools/bin/agent-canon"
+    wrapper.parent.mkdir(parents=True)
+    wrapper.write_bytes((ROOT / "tools/bin/agent-canon").read_bytes())
+    wrapper.chmod(0o755)
+    (cache / "bin").mkdir(parents=True)
+    for label, path in (
+        ("default", cache / "bin/agent-canon"),
+        ("explicit", fixture_root / "selected native"),
+    ):
+        path.write_text(
+            "#!/usr/bin/env bash\n"
+            'printf "native:' + label + '\\n" >> "$TRACE"\n'
+            'printf "%s\\n" "$@" > "$CALLS"\n'
+            'exit "$CHECKER_EXIT"\n'
+        )
+        path.chmod(0o755)
+    text = RUNNER.read_text()
+    body = (
+        "run_workflow_container() {"
+        + text.split("run_workflow_container() {", 1)[1].split("\n}\n\ncase ", 1)[0]
+        + "\n}\n"
+    )
+    setup = (
+        'unset AGENT_CANON_NATIVE_BIN\npython3() { printf "pytest\\n" >> "$TRACE"; }\n'
+    )
+    if explicit_cli:
+        setup += (
+            "export AGENT_CANON_CLI="
+            + shlex.quote(str(fixture_root / "selected native"))
+            + "\n"
+        )
+    else:
+        setup += "unset AGENT_CANON_CLI\n"
+    calls, trace = fixture_root / "calls", fixture_root / "trace"
+    result = run_shell(
+        body + setup + "run_workflow_container",
+        root=root,
+        ROOT=str(root),
+        AGENT_CANON_SOURCE_ROOT=str(root),
+        AGENT_CANON_CACHE_ROOT=str(cache),
+        CHECKER_EXIT=str(checker_exit),
+        CALLS=str(calls),
+        TRACE=str(trace),
+    )
+    assert result.returncode == checker_exit, result.stderr
+    assert calls.read_text().splitlines() == [
+        "check-github-workflows",
+        "--root",
+        str(root),
+    ]
+    expected_trace = ["pytest", "native:" + ("explicit" if explicit_cli else "default")]
+    if checker_exit == 0:
+        expected_trace.append("pytest")
+    assert trace.read_text().splitlines() == expected_trace
+
+
 def test_runner_places_xdg_cache_under_the_task_runtime() -> None:
     text = RUNNER.read_text()
     runtime_root_setup = text.index(
@@ -625,7 +689,7 @@ def test_units_do_not_duplicate_rust_or_full_wrapper_commands() -> None:
         "cargo build",
         "tool-catalog",
         "run_accumulated_agent_evals.py",
-        "check_github_workflows.py",
+        "check-github-workflows",
     ):
         assert command not in wrapper
 

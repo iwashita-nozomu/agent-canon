@@ -19,9 +19,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 SELECTOR = "tool-rejection-preflight"
 # Golden stdout was captured from the retired Python owner at 20a78515; the
-# test permits only the self-command replacement declared in python_golden.
+# test permits only the explicit command and source-owner relocations below.
 LEGACY_COMMAND = "python3 tools/validation/semantic/tools/tool_rejection_preflight.py"
 NATIVE_COMMAND = "tools/bin/agent-canon tool-rejection-preflight"
+LEGACY_WORKFLOW_SOURCE = "tools/validation/ci/checks/check_github_workflows.py"
+NATIVE_WORKFLOW_SOURCE = "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs"
 ORACLE_ROOT = PROJECT_ROOT / "tests" / "fixtures" / "tool_rejection_preflight"
 COMBINED_PATHS = (
     "tools/agent_tools/new_shared_checker_oracle.py",
@@ -61,6 +63,11 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         baseline = (ORACLE_ROOT / filename).read_text(encoding="utf-8")
         self.assertIn(LEGACY_COMMAND, baseline)
         expected = baseline.replace(LEGACY_COMMAND, NATIVE_COMMAND)
+        expected = expected.replace(
+            "python3 " + LEGACY_WORKFLOW_SOURCE,
+            "tools/bin/agent-canon check-github-workflows",
+        )
+        expected = expected.replace(LEGACY_WORKFLOW_SOURCE, NATIVE_WORKFLOW_SOURCE)
         self.assertNotIn(LEGACY_COMMAND, expected)
         return expected
 

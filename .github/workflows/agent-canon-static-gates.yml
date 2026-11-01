@@ -6,7 +6,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md canonical eval archive storage
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/classify_path_risk.rs canonical changed-path selector and unit mapping
 # upstream implementation ../../tools/validation/ci/runners/run_standalone_static_gate_unit.sh executes one selected static-gate unit
-# downstream implementation ../../tools/validation/ci/checks/check_github_workflows.py validates workflow and PR template conventions
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs validates workflow and PR template conventions
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 
