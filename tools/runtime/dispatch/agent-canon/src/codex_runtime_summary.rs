@@ -814,7 +814,7 @@ fn append_parent_jsonl(path: &Path, record: &JsonValue) -> Result<(), String> {
     line.push(b'\n');
     let source = source_artifact_root()?;
     let boundary = RuntimeArtifactBoundary::for_source(&source, None, true)?;
-    boundary.append_bytes(path, &line, 0o600)?;
+    boundary.append_bytes_with_empty_lock(path, &line, 0o600)?;
     Ok(())
 }
 

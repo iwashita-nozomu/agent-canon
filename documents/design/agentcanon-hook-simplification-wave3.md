@@ -325,7 +325,7 @@ The canonical tuple rows are fixed as follows; no row may be inferred from a nea
 | `log_surface_inventory_guard.py` | `tools/runtime/archive/log_surface_inventory.py` | `command-only:python3 tools/runtime/archive/log_surface_inventory.py --root . --check` |
 | `notebook_quality_guard.py` | `tools/validation/notebooks/notebook_quality.py` | `command-only:python3 tools/validation/notebooks/notebook_quality.py` |
 | `goal_completion_guard.py` | `$adaptive-improvement-loop` | `skill-only:$adaptive-improvement-loop` |
-| `codex_runtime_summary_logger.py` | `tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs` | `command-only:agent-canon export-codex-runtime-summary` |
+| `codex_runtime_summary_logger.py` | `tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs` | `command-only:tools/bin/agent-canon export-codex-runtime-summary` |
 | `runtime_log_auto_sync.py` | `tools/runtime/archive/runtime_log_archive_git.py` | `command-only:python3 tools/runtime/archive/runtime_log_archive_git.py sync` |
 | `execution_resource_plan_projection_guard.py` | `tools/runtime/container/execution_resource_projection.py` | `import-only:tools.runtime.container.execution_resource_projection:validate_projection_bytes` |
 | `skill_usage_logger.py` | `tools/runtime/archive/behavior_event_assembly.py` | `import-only:tools.runtime.archive.behavior_event_assembly:record_hook_invocation` |

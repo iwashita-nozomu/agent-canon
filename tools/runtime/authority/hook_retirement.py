@@ -148,7 +148,7 @@ RETIRED_CHILD_TOMBSTONES: tuple[RetiredChildTombstone, ...] = (
     _row(
         "codex_runtime_summary_logger.py",
         "tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs",
-        "command-only:agent-canon export-codex-runtime-summary",
+        "command-only:tools/bin/agent-canon export-codex-runtime-summary",
         "runtime summary",
         "summary is bounded derived evidence",
     ),
