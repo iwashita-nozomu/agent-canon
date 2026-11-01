@@ -129,7 +129,7 @@ def contract_payload(root: Path) -> dict[str, object]:
     present_files = [f".codex/hooks/{name.filename}" for name in RETIRED_CHILD_TOMBSTONES if (root / ".codex" / "hooks" / name.filename).exists()]
     present_files.extend([old_path for old_path in moved_source_old_paths if (root / old_path).exists()])
     artifacts = [
-        {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/archive/historical_skill_usage_reader.py", "consumers": ["tools/runtime/archive/historical_skill_usage_reader.py", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
+        {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs", "consumers": ["tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
         {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/runtime/archive/behavior_event_assembly.py", "parser": "tools/runtime/archive/behavior_event_assembly.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"]},
         {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/runtime/lifecycle/workflow_monitor.py", "parser": "tools/runtime/lifecycle/workflow_monitor.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py", "tools/runtime/dispatch/agent-canon/src/task_close.rs"]},
     ]

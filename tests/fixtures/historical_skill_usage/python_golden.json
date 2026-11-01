@@ -1,0 +1,136 @@
+{
+  "source": "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6",
+  "script_sha256": "daa9a1d1cf9cab68ebc59f742bb3104cc1253e606b785abd0dced93fb0f3f831",
+  "cases": [
+    {
+      "name": "missing",
+      "input_base64": null,
+      "expected": {
+        "records": [],
+        "accepted_count": 0,
+        "malformed_count": 0,
+        "ignored_count": 0,
+        "malformed_by_reason": null,
+        "status": "missing"
+      }
+    },
+    {
+      "name": "directory",
+      "input_base64": "directory",
+      "expected": {
+        "records": [],
+        "accepted_count": 0,
+        "malformed_count": 1,
+        "ignored_count": 0,
+        "malformed_by_reason": {
+          "line_encoding": 1
+        },
+        "status": "malformed"
+      }
+    },
+    {
+      "name": "empty",
+      "input_base64": "",
+      "expected": {
+        "records": [],
+        "accepted_count": 0,
+        "malformed_count": 0,
+        "ignored_count": 0,
+        "malformed_by_reason": {},
+        "status": "present"
+      }
+    },
+    {
+      "name": "cr-lf-crlf",
+      "input_base64": "e30NeyAieCI6IDEgfQp7InkiOnRydWV9DQo=",
+      "expected": {
+        "records": [
+          {},
+          {
+            "x": 1
+          },
+          {
+            "y": true
+          }
+        ],
+        "accepted_count": 3,
+        "malformed_count": 0,
+        "ignored_count": 0,
+        "malformed_by_reason": {},
+        "status": "present"
+      }
+    },
+    {
+      "name": "bytes-only-line-boundaries",
+      "input_base64": "eyJhIjoieOKAqHkifQp7ICJiIjogMiB9C3sgImMiOiAzIH0K",
+      "expected": {
+        "records": [
+          {
+            "a": "x\u2028y"
+          }
+        ],
+        "accepted_count": 1,
+        "malformed_count": 1,
+        "ignored_count": 0,
+        "malformed_by_reason": {
+          "json": 1
+        },
+        "status": "malformed"
+      }
+    },
+    {
+      "name": "malformed-and-nonobjects",
+      "input_base64": "IAkNCltdCnRydWUKbnVsbAoxCiJ0ZXh0Igp7YmFkfQr/Cnsib2siOiAxfQo=",
+      "expected": {
+        "records": [
+          {
+            "ok": 1
+          }
+        ],
+        "accepted_count": 1,
+        "malformed_count": 7,
+        "ignored_count": 1,
+        "malformed_by_reason": {
+          "field_type": 5,
+          "json": 2
+        },
+        "status": "malformed"
+      }
+    },
+    {
+      "name": "duplicates-and-large-integer",
+      "input_base64": "eyJ4IjoxLCJ4IjoyLCJiaWciOjEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTB9Cg==",
+      "expected": {
+        "records": [
+          {
+            "x": 2,
+            "big": 1234567890123456789012345678901234567890
+          }
+        ],
+        "accepted_count": 1,
+        "malformed_count": 0,
+        "ignored_count": 0,
+        "malformed_by_reason": {},
+        "status": "present"
+      }
+    },
+    {
+      "name": "python-nonfinite",
+      "input_base64": "eyJ4IjpOYU4sImEiOkluZmluaXR5LCJiIjotSW5maW5pdHl9Cg==",
+      "expected": {
+        "records": [
+          {
+            "x": NaN,
+            "a": Infinity,
+            "b": -Infinity
+          }
+        ],
+        "accepted_count": 1,
+        "malformed_count": 0,
+        "ignored_count": 0,
+        "malformed_by_reason": {},
+        "status": "present"
+      }
+    }
+  ]
+}

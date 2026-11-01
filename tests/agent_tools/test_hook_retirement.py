@@ -36,6 +36,26 @@ class HookRetirementTest(unittest.TestCase):
         self.assertEqual(caller_audit["moved_source_old_paths"], [".codex/hooks/hook_safety.py"])
         self.assertNotIn("hook_safety.py", caller_audit["retired_child_basenames"])
 
+    def test_historical_skill_usage_uses_native_read_only_parser(self) -> None:
+        payload = contract_payload(PROJECT_ROOT)
+        artifacts = payload["caller_audit"]["artifacts"]
+        history = next(item for item in artifacts if item["name"] == "skill_usage.jsonl")
+
+        self.assertEqual(history["mode"], "historical_read_only")
+        self.assertEqual(history["producer"], "none")
+        self.assertEqual(
+            history["parser"],
+            "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs",
+        )
+        self.assertEqual(
+            history["consumers"],
+            [
+                "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs",
+                "eval/producers/generate_agent_improvement_guide.py",
+                "eval/producers/generate_agent_runtime_dashboard.py",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,7 @@
 // downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
 // downstream implementation task_close.rs consumes the task-close terminal predicates
+// downstream implementation historical_skill_usage.rs reads archived skill-use history without writes
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
 // downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
@@ -72,6 +73,7 @@ pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
 pub mod execution_resource_projection;
 pub mod generated_completeness;
+pub mod historical_skill_usage;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
