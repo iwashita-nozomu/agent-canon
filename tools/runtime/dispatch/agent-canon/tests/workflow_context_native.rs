@@ -131,8 +131,10 @@ fn prepare_case_path(root: &Path, case: &JsonValue, index: usize) -> PathBuf {
             .expect("write symlink target");
             #[cfg(unix)]
             std::os::unix::fs::symlink(&target, &path).expect("create file symlink");
-            #[cfg(not(unix))]
-            fs::copy(&target, &path).expect("materialize symlink target on this platform");
+            #[cfg(windows)]
+            std::os::windows::fs::symlink_file(&target, &path).expect("create file symlink");
+            #[cfg(not(any(unix, windows)))]
+            panic!("workflow context symlink oracle is unsupported on this platform");
         }
         other => panic!("unknown fixture path kind {other}"),
     }
