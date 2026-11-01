@@ -59,10 +59,13 @@ def _environment(control: Path, runtime: Path, native: Path) -> dict[str, str]:
 
 def test_wrapper_uses_the_configured_native_cli(tmp_path: Path) -> None:
     source, control, runtime, native, captured = _fixture(tmp_path)
+    environment = _environment(control, runtime, native)
+    environment.pop("AGENT_CANON_CONTROL_PARENT_ROOT")
+    environment.pop("AGENT_CANON_RUNTIME_ROOT")
     result = subprocess.run(
         [str(source / "tools/bin/agent-canon"), "--version", "a value"],
         cwd=source,
-        env=_environment(control, runtime, native),
+        env=environment,
         check=False,
         capture_output=True,
         text=True,
