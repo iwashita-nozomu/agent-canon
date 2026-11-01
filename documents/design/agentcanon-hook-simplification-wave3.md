@@ -3,12 +3,12 @@
 contract design
 responsibility Defines the implementation-ready AgentCanon Wave 3 hook simplification target after the completed caller audit and reviewer-finding correction.
 upstream design ../../.codex/README.md owns the project-scoped hook design and reader route.
-upstream implementation ../../.codex/hooks/hook_dispatcher.py owns the active lifecycle dispatch contract.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the active lifecycle dispatch contract.
 upstream implementation ../../.codex/hooks/hook_event_log.py owns no-replace per-event spool transport for canonical hook telemetry.
 upstream implementation ../../tools/runtime/archive/log_surface_inventory.py emits telemetry field inventory on demand.
 upstream design ../../tools/catalog.yaml owns canonical tool registration.
 upstream design ../../responsibility-scope.toml owns top-level responsibility coverage.
-downstream implementation ../../.codex/hooks/hook_dispatcher.py implements the selected active contract.
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs implements the selected active contract.
 downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates active event and retired-name readback.
 @dependency-end
 -->
@@ -16,6 +16,9 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 # AgentCanon Hook Simplification Wave 3 Design
 
 この文書は、2026-07-30 時点の親 `main` が pin する AgentCanon `0e3fe239` を基準に、完了済み hook caller audit と reviewer findings を反映した実装用 target state を固定する。これは設計文書だけの変更であり、production code、test code、catalog、inventory の実装変更、削除、commit はこの wave に含めない。
+
+現在の実装は `tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs` が所有し、
+`tools/bin/agent-canon codex-hook --contract` で読み戻します。以下は移行前の設計記録です。
 
 ## Authority と設計境界
 

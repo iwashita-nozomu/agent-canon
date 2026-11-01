@@ -4,7 +4,7 @@
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
 // upstream implementation ../../../container/execution_resource_projection.py owns existing behavior semantics.
 // downstream test ../tests/execution_resource_projection_native.rs validates frozen CPython 3.12.3 behavior.
-// downstream implementation ../../../../../.codex/hooks/hook_dispatcher.py maps failures to invalid_projection without consuming diagnostics.
+// downstream implementation ../../../../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs maps failures to invalid_projection without consuming diagnostics.
 // @dependency-end
 
 //! Pure validation and wrapper construction for PostToolUse execution-resource projections.

@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Dispatches the bounded active Hook contract through existing pure safety, authority, selection, assembly, and spool owners.
-// upstream implementation ../../../../../.codex/hooks/hook_dispatcher.py owns the active CLI and event contract.
+// upstream evidence ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the previous active CLI and event contract.
 // upstream implementation ./hook_safety.rs owns secret and protected-Git decisions.
 // upstream implementation ./mutation_authority.rs owns writer-target and child-scope admission.
 // upstream implementation ./hook_event_log.rs owns append-only hook event publication.

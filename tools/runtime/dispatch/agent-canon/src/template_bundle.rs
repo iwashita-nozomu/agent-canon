@@ -1620,11 +1620,10 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
             "Codex user bundle contains unmanifested files",
         ));
     }
-    const REQUIRED: [&str; 9] = [
+    const REQUIRED: [&str; 8] = [
         "bootstrap.sh",
         "bootstrap/host/lifecycle/entrypoint.sh",
         "tools/runtime/container/bootstrap_runtime.py",
-        ".codex/hooks/hook_dispatcher.py",
         "hooks/hooks.json",
         "plugin.json",
         CODEX_MARKETPLACE,

@@ -85,9 +85,9 @@ trust admission and target-mount transaction. Its dispatcher composes the native
 safety, mutation-authority, event-assembly, spool, and report owners. Frozen old
 CLI cases check both the library and real command; integration tests retain
 report selection and containment, privacy, append/report failures, parent
-mutation denial, and authenticated child admission. The Python dispatcher and
-shared Python helpers remain until their remaining test and consumer references
-are migrated; native source presence does not count them as retired.
+mutation denial, and authenticated child admission. The Python dispatcher is retired after its direct tests and consumers move to
+the native command. Shared Python helpers retain their remaining consumers and
+remain in the migration inventory.
 
 The stable entrypoint is `tools/bin/agent-canon`; native source belongs under
 `tools/runtime/dispatch/agent-canon/src`. Use the selected shared build and
