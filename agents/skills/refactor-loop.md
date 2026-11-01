@@ -18,7 +18,7 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 
 ## Reader Map
 
-局所 refactor は対象、差分、既存契約から始めます。refactor の change mapping と review は
+局所 refactor は対象、差分、既存契約から始めます。refactor の変更方針と review は
 この skill の owner であり、design drift invariant は routine に委譲します。一般原則の意味、
 競合時の優先順位、KISS / YAGNI / DRY、abstraction admission は
 [documents/conventions/software-engineering-principles.md](../../documents/conventions/software-engineering-principles.md)
@@ -61,8 +61,7 @@ refactor は、[ソフトウェア工学原則](../../documents/conventions/soft
 を解決し、必要な範囲だけから replaceable unit を選びます。移動、rename、split、
 abstraction の変更があるときは、`Allowed Structural Delta` と
 `Forbidden Semantic Delta` を区別して契約、failure semantics、lifecycle を守ります。
-判断へ影響した `SEP-*` clause と evidence だけを既存 packet / handoff に記録します。
-これらの判断は dependency に従いますが、全タスクへ同じ調査・記録・実装順を要求しません。
+判断に必要な契約と根拠は現在の context に揃えます。
 
 ## Validation route
 
@@ -87,7 +86,7 @@ source 単位の検証・公開と、全体移行の完了は別です。未公�
 で互換性なく同時変更する組は一つの検証可能な commit に閉じます。変更依存が
 循環する組を別 wave にして相互の完了を待たず、既存の
 [commit 境界](../../documents/operations/BRANCH_SCOPE.md#commit-correctness-contract) で単位をまとめます。
-各編集段階に checker を追加せず、依存が揃った単位と最後の全体で必要な検証を行います。
+移行先、必要な利用側、旧実装の整理を揃えてから最終状態をまとめて検証します。
 この実行順の所有者は `refactor-loop` であり、`structure-refactor` は構造
 surface / runtime boundary の分類を、`agent-canon-update` は AgentCanon 固有の
 source / pin routing を参照として担当します。
@@ -131,7 +130,7 @@ accepting a path or dependency-direction change.
    most recently incorporated implementation, and existing reuse evidence. A
    prior refactor sequence is not a reason to repeat its stages.
 2. Decide the change before editing: select the owner, complete replaceable unit,
-   mechanism, affected callers, replacement/deletion mapping, and validation
+   mechanism, affected callers, obsolete code to remove, and validation
    route. Group dependent changes so each unit can finish its implementation and
    retirement together. Follow the ordered execution in
    [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md#5-implementation).
@@ -145,9 +144,9 @@ accepting a path or dependency-direction change.
    `tool-finding-report`, or a domain reviewer only when the changed contract or
    unresolved risk requires that owner. Prompt/doc/static-contract changes use the
    selected static or targeted validation route.
-5. After implementing the complete unit, review its diff and replacement/deletion
-   mapping for obsolete code, remaining references, exclusive support, and omitted
-   deletions. Finish that closure review, then run only the selected validation.
+5. After implementing the planned migration, review its whole diff for obsolete
+   code, remaining references, exclusive support, and omitted deletions. Finish
+   that closure review, then run the selected validation together on the final state.
    Use source-backed findings to settle the next complete repair decision before
    editing. Reuse existing receipts and return unavailable or unrelated work to
    its owner.

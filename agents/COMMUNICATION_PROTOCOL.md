@@ -499,10 +499,8 @@ An unavailable or unused predictor does not block otherwise authorized work;
 do not require a pending blocker, pass, or skip record for it. Required
 validation, authorization, and safety checks retain their own failure semantics.
 
-Only when diagnostic results inform the work, carry them in the existing handoff
-or work log using `pre_edit_rejection_prediction`, `predicted_tool_rejection_gates`,
-`rejection_preflight_command`, and `gate_specific_repair_plan` as applicable.
-These are optional fields, not a second receipt. The diagnostic
+Use diagnostic results in the current conversation only when they change a
+decision. No diagnostic work log or status fields are required. The diagnostic
 `responsibility_scope` gate records the `responsibility-scope.toml` scope,
 owner, class, and protecting tools for each planned path; it does not replace
 the owner's contract or prove that those checks ran.
