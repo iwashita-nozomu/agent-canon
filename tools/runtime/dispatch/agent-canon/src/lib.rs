@@ -47,6 +47,7 @@
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
 // downstream implementation lsp_code_analysis.rs owns the reusable native LSP analysis API
+// downstream implementation extract_docx.rs owns native DOCX bundle extraction
 // downstream implementation path_expansion.rs owns shared user-home path expansion
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
@@ -71,6 +72,7 @@ pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
 pub mod execution_resource_projection;
+pub mod extract_docx;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
