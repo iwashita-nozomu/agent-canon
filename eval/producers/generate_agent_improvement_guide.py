@@ -72,13 +72,18 @@ def _native_skill_usage_records(path: Path) -> tuple[dict[str, object], ...]:
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise RuntimeError("native historical skill-usage output is malformed JSON") from error
+        raise RuntimeError(
+            "native historical skill-usage output is malformed JSON"
+        ) from error
     if not isinstance(payload, dict):
         raise RuntimeError("native historical skill-usage output must be an object")
     records = payload.get("records")
-    if not isinstance(records, list) or not all(isinstance(record, dict) for record in records):
+    if not isinstance(records, list) or not all(
+        isinstance(record, dict) for record in records
+    ):
         raise RuntimeError("native historical skill-usage records are malformed")
     return tuple(cast(dict[str, object], record) for record in records)
+
 
 COMMIT_TIME_FORMAT = "%ct"
 GIT_LOG_TIMEOUT_SECONDS = 5

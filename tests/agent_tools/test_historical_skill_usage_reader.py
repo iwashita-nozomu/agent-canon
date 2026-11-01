@@ -45,15 +45,16 @@ def native_cli() -> str:
 class HistoricalSkillUsageReaderTest(unittest.TestCase):
     def test_old_python_readback_cases_match_native_cli(self) -> None:
         """The native boundary preserves the frozen bytes, counts, reasons, and records."""
-        self.assertEqual(
-            GOLDEN["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6"
-        )
+        self.assertEqual(GOLDEN["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6")
         self.assertEqual(
             GOLDEN["script_sha256"],
             "daa9a1d1cf9cab68ebc59f742bb3104cc1253e606b785abd0dced93fb0f3f831",
         )
         for case in GOLDEN["cases"]:
-            with self.subTest(case=case["name"]), tempfile.TemporaryDirectory() as temporary:
+            with (
+                self.subTest(case=case["name"]),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
                 path = Path(temporary) / "skill_usage.jsonl"
                 input_base64 = case["input_base64"]
                 before: bytes | None = None
@@ -82,9 +83,13 @@ class HistoricalSkillUsageReaderTest(unittest.TestCase):
                 expected = case["expected"]
                 self.assertEqual(set(readback), set(expected))
                 self.assertEqual(readback["accepted_count"], expected["accepted_count"])
-                self.assertEqual(readback["malformed_count"], expected["malformed_count"])
+                self.assertEqual(
+                    readback["malformed_count"], expected["malformed_count"]
+                )
                 self.assertEqual(readback["ignored_count"], expected["ignored_count"])
-                self.assertEqual(readback["malformed_by_reason"], expected["malformed_by_reason"])
+                self.assertEqual(
+                    readback["malformed_by_reason"], expected["malformed_by_reason"]
+                )
                 self.assertEqual(readback["status"], expected["status"])
                 actual_records = readback["records"]
                 self.assertEqual(len(actual_records), len(expected["records"]))

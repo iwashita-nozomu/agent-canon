@@ -28,17 +28,34 @@ from tools.runtime.authority.hook_retirement import (
 )
 
 EXECUTABLE_SCAN_PATHS = (
-    ".codex/hooks.json", ".codex/config.toml", ".codex/agents", "templates", "tools/catalog.yaml",
-    "tools/validation/ci/checks/run_python_quality_checks.sh", "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
-    "tools/validation/semantic/convention/check_convention_compliance.py", "tools/validation/semantic/convention/convention_compliance_contracts.toml",
-    "eval/producers/generate_agent_runtime_dashboard.py", "tools/agent/skills/skill_lane_detector.py",
-    "tools/runtime/artifacts/report_artifact_checks.py", "tools/runtime/lifecycle/workflow_monitor.py",
-    "agents/skills/worktree-health.md", ".codex/personal/skills/worktree-health/SKILL.md",
-    "documents/experiments/gpu-admission-r5-source-packet.md", "AGENTS.md", "ROOT_AGENTS.md", "README.md",
-    "documents/runtime/runtime-log-archive.md", "tools/README.md", "tools/experiments/execution/execution_resource_plan.py",
+    ".codex/hooks.json",
+    ".codex/config.toml",
+    ".codex/agents",
+    "templates",
+    "tools/catalog.yaml",
+    "tools/validation/ci/checks/run_python_quality_checks.sh",
+    "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+    "tools/validation/semantic/convention/check_convention_compliance.py",
+    "tools/validation/semantic/convention/convention_compliance_contracts.toml",
+    "eval/producers/generate_agent_runtime_dashboard.py",
+    "tools/agent/skills/skill_lane_detector.py",
+    "tools/runtime/artifacts/report_artifact_checks.py",
+    "tools/runtime/lifecycle/workflow_monitor.py",
+    "agents/skills/worktree-health.md",
+    ".codex/personal/skills/worktree-health/SKILL.md",
+    "documents/experiments/gpu-admission-r5-source-packet.md",
+    "AGENTS.md",
+    "ROOT_AGENTS.md",
+    "README.md",
+    "documents/runtime/runtime-log-archive.md",
+    "tools/README.md",
+    "tools/experiments/execution/execution_resource_plan.py",
     "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs",
 )
-METADATA_ALLOWLIST = {"tools/runtime/authority/hook_retirement.py", "documents/design/agentcanon-hook-simplification-wave3.md"}
+METADATA_ALLOWLIST = {
+    "tools/runtime/authority/hook_retirement.py",
+    "documents/design/agentcanon-hook-simplification-wave3.md",
+}
 _COMMAND_RE = re.compile(
     r"^(?:"
     r"import-only:tools\.[A-Za-z0-9_.]+:[A-Za-z0-9_]+"
@@ -118,7 +135,9 @@ def contract_payload(root: Path) -> dict[str, object]:
     )
     matches = child_matches + moved_matches
     executable_references: list[dict[str, object]] = []
-    executable_files = [path for relative in EXECUTABLE_SCAN_PATHS for path in _files(root, relative)]
+    executable_files = [
+        path for relative in EXECUTABLE_SCAN_PATHS for path in _files(root, relative)
+    ]
     for tokens, retirement_kind in (
         (child_basenames, "retired_child_basename"),
         (moved_source_old_paths, "moved_source_old_path"),
@@ -126,12 +145,43 @@ def contract_payload(root: Path) -> dict[str, object]:
         for match in _matches(root, executable_files, tokens, retirement_kind):
             if match["path"] not in METADATA_ALLOWLIST:
                 executable_references.append(match)
-    present_files = [f".codex/hooks/{name.filename}" for name in RETIRED_CHILD_TOMBSTONES if (root / ".codex" / "hooks" / name.filename).exists()]
-    present_files.extend([old_path for old_path in moved_source_old_paths if (root / old_path).exists()])
+    present_files = [
+        f".codex/hooks/{name.filename}"
+        for name in RETIRED_CHILD_TOMBSTONES
+        if (root / ".codex" / "hooks" / name.filename).exists()
+    ]
+    present_files.extend(
+        [old_path for old_path in moved_source_old_paths if (root / old_path).exists()]
+    )
     artifacts = [
-        {"name": "skill_usage.jsonl", "mode": "historical_read_only", "producer": "none", "parser": "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs", "consumers": ["tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs", "eval/producers/generate_agent_improvement_guide.py", "eval/producers/generate_agent_runtime_dashboard.py"]},
-        {"name": "behavior_events.jsonl", "mode": "active_canonical", "producer": "tools/runtime/archive/behavior_event_assembly.py", "parser": "tools/runtime/archive/behavior_event_assembly.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"]},
-        {"name": "workflow_monitoring.md", "mode": "projection", "producer": "tools/runtime/lifecycle/workflow_monitor.py", "parser": "tools/runtime/lifecycle/workflow_monitor.py", "consumers": ["eval/producers/generate_agent_runtime_dashboard.py", "tools/runtime/dispatch/agent-canon/src/task_close.rs"]},
+        {
+            "name": "skill_usage.jsonl",
+            "mode": "historical_read_only",
+            "producer": "none",
+            "parser": "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs",
+            "consumers": [
+                "tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs",
+                "eval/producers/generate_agent_improvement_guide.py",
+                "eval/producers/generate_agent_runtime_dashboard.py",
+            ],
+        },
+        {
+            "name": "behavior_events.jsonl",
+            "mode": "active_canonical",
+            "producer": "tools/runtime/archive/behavior_event_assembly.py",
+            "parser": "tools/runtime/archive/behavior_event_assembly.py",
+            "consumers": ["eval/producers/generate_agent_runtime_dashboard.py"],
+        },
+        {
+            "name": "workflow_monitoring.md",
+            "mode": "projection",
+            "producer": "tools/runtime/lifecycle/workflow_monitor.py",
+            "parser": "tools/runtime/lifecycle/workflow_monitor.py",
+            "consumers": [
+                "eval/producers/generate_agent_runtime_dashboard.py",
+                "tools/runtime/dispatch/agent-canon/src/task_close.rs",
+            ],
+        },
     ]
     active, inactive = _active_events(root)
     malformed = [match for match in matches if not isinstance(match.get("token"), str)]
@@ -139,12 +189,19 @@ def contract_payload(root: Path) -> dict[str, object]:
         "schema": TOMBSTONE_SCHEMA,
         "retired_child_tombstones": children,
         "moved_source_absences": moved,
-        "counts": {"retired_child_tombstones": len(children), "moved_source_absences": len(moved), "retired_filenames": len(child_basenames) + len(moved_source_old_paths)},
+        "counts": {
+            "retired_child_tombstones": len(children),
+            "moved_source_absences": len(moved),
+            "retired_filenames": len(child_basenames) + len(moved_source_old_paths),
+        },
         "active_events": active,
         "inactive_events": inactive,
         "source_digest": source_digest(),
         "missing_files": sorted(present_files),
-        "executable_references": sorted(executable_references, key=lambda item: (str(item["path"]), int(item["line"]), str(item["token"]))),
+        "executable_references": sorted(
+            executable_references,
+            key=lambda item: (str(item["path"]), int(item["line"]), str(item["token"])),
+        ),
         "caller_audit": {
             "schema": CALLER_AUDIT_SCHEMA,
             "retired_child_basenames": child_basenames,
@@ -170,9 +227,22 @@ def check_payload(payload: dict[str, object]) -> list[str]:
     if payload.get("executable_references"):
         errors.append("executable_references")
     children = payload.get("retired_child_tombstones", [])
-    if any(not isinstance(row, dict) or not isinstance(row.get("command_or_skill"), str) or not _COMMAND_RE.fullmatch(row["command_or_skill"]) or any(bad in row["command_or_skill"] for bad in (".codex/hooks/", "compat", "wrapper", "shim", "fallback")) for row in children):
+    if any(
+        not isinstance(row, dict)
+        or not isinstance(row.get("command_or_skill"), str)
+        or not _COMMAND_RE.fullmatch(row["command_or_skill"])
+        or any(
+            bad in row["command_or_skill"]
+            for bad in (".codex/hooks/", "compat", "wrapper", "shim", "fallback")
+        )
+        for row in children
+    ):
         errors.append("command_or_skill_grammar")
-    if payload.get("active_events") != ["UserPromptSubmit", "PreToolUse", "PostToolUse"]:
+    if payload.get("active_events") != [
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+    ]:
         errors.append("active_events")
     if payload.get("inactive_events") != ["Stop"]:
         errors.append("inactive_events")
