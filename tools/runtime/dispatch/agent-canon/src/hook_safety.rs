@@ -7,6 +7,7 @@
 // @dependency-end
 //! Pure hook safety leaves used by the future native hook consumer.
 
+use crate::python_json::{JsonString, JsonValue};
 use crate::python_text::{is_python_whitespace, python_strip};
 use regex::Regex;
 use serde::Serialize;
@@ -164,6 +165,28 @@ pub fn secret_kind(prompt: &str) -> Option<&'static str> {
         .find_map(|(pattern, kind)| pattern.is_match(prompt).then_some(*kind))
 }
 
+/// Return the first old secret class from a Python-compatible string.
+/// Lone surrogates divide valid text runs and behave as non-word boundaries.
+pub fn secret_kind_json(prompt: &JsonString) -> Option<&'static str> {
+    for (pattern, kind) in SECRET_PATTERNS.iter() {
+        let mut valid_run = String::new();
+        for &codepoint in &prompt.0 {
+            if let Some(character) = char::from_u32(codepoint) {
+                valid_run.push(character);
+            } else {
+                if pattern.is_match(&valid_run) {
+                    return Some(*kind);
+                }
+                valid_run.clear();
+            }
+        }
+        if pattern.is_match(&valid_run) {
+            return Some(*kind);
+        }
+    }
+    None
+}
+
 /// Return a block payload without retaining the matched prompt.
 pub fn secret_block_payload(secret: &str) -> Value {
     json!({
@@ -218,6 +241,56 @@ pub fn payload_tool_command(payload: &Value) -> &str {
 /// Return the prompt when the value is a string.
 pub fn payload_prompt(payload: &Value) -> &str {
     payload.get("prompt").and_then(Value::as_str).unwrap_or("")
+}
+
+/// Return the shell tool name from the shared Python-compatible JSON value.
+pub fn payload_tool_name_json(payload: &JsonValue) -> JsonString {
+    json_object_string(payload, "tool_name")
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// Return the first nested or top-level command without losing lone surrogates.
+pub fn payload_tool_command_json(payload: &JsonValue) -> JsonString {
+    if let Some(tool_input) = json_object_member(payload, "tool_input") {
+        for key in ["command", "cmd"] {
+            if let Some(JsonValue::String(value)) = json_object_member(tool_input, key) {
+                return value.clone();
+            }
+        }
+    }
+    for key in ["command", "cmd"] {
+        if let Some(JsonValue::String(value)) = json_object_member(payload, key) {
+            return value.clone();
+        }
+    }
+    JsonString::default()
+}
+
+/// Return the prompt from the shared Python-compatible JSON value.
+pub fn payload_prompt_json(payload: &JsonValue) -> JsonString {
+    json_object_string(payload, "prompt")
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn json_object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
+    let JsonValue::Object(object) = value else {
+        return None;
+    };
+    object
+        .0
+        .iter()
+        .rev()
+        .find(|(candidate, _)| candidate.equals_text(key))
+        .map(|(_, value)| value)
+}
+
+fn json_object_string<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonString> {
+    match json_object_member(value, key)? {
+        JsonValue::String(value) => Some(value),
+        _ => None,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
