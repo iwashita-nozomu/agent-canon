@@ -89,29 +89,10 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "documents/design/runtime-log-repository-lifecycle-correspondence.json": {"RL-014"},
     "documents/runtime/runtime-log-archive.md": {"RL-013"},
     "documents/tools/README.md": {"RL-013"},
-    "tests/agent_tools/test_runtime_log_archive_git.py": {
-        "RL-004",
-        "RL-005",
-        "RL-006",
-        "RL-007",
-        "RL-008",
-        "RL-011",
-        "RL-013",
-        "RL-014",
-        "RL-015",
-    },
+    "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
     "tests/tools/test_bootstrap_container_contract.py": {"RL-002", "RL-004"},
     "tests/bootstrap/test_bootstrap_runtime.py": {"RL-002", "RL-004"},
-    "tools/runtime/archive/runtime_log_archive_git.py": {
-        "RL-004",
-        "RL-005",
-        "RL-006",
-        "RL-007",
-        "RL-008",
-        "RL-011",
-        "RL-013",
-        "RL-015",
-    },
+    "tools/runtime/archive/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
     "tools/runtime/container/bootstrap_runtime.py": {"RL-002", "RL-004"},
 }
 from tools.runtime.archive import runtime_log_archive_git  # noqa: E402
@@ -150,9 +131,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
         )
         self._old_git_ceiling = os.environ.get("GIT_CEILING_DIRECTORIES")
-        os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = (
-            "https://github.com/test/source.git"
-        )
+        os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
         # Every archive fixture owns its temporary tree.  The ceiling prevents
         # Git from walking through the managed checkout when a fixture is
         # intentionally an empty/non-Git source or canon root.
@@ -298,7 +277,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             context_bytes = b"{}\n"
             runtime_bytes = (
-                json.dumps({"artifact_sha256": "a" * 64}, separators=(",", ":")) + "\n"
+                json.dumps(
+                    {"artifact_sha256": "a" * 64}, separators=(",", ":")
+                )
+                + "\n"
             ).encode("utf-8")
             context_target = root / "context" / "certificate.json"
             runtime_target = root / "runtime" / "runtime-event.json"
@@ -345,10 +327,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     ) -> None:
         """Writable projections fail closed without weakening identity checks."""
         for scenario in ("attempt_directory", "attempt_lock"):
-            with (
-                self.subTest(scenario=scenario),
-                tempfile.TemporaryDirectory() as tmp_dir,
-            ):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as tmp_dir:
                 source = Path(tmp_dir) / "source"
                 source.mkdir()
                 original_fstat = os.fstat
@@ -482,18 +461,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(tuple(moved_parent.glob(".*.tmp")), ())
             self.assertFalse((moved_parent / target.name).exists())
 
-    def test_writer_without_parent_root_fails_before_external_file_creation(
-        self,
-    ) -> None:
+    def test_writer_without_parent_root_fails_before_external_file_creation(self) -> None:
         """A representative adapter cannot fall back to an unbounded writer."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             target = root / "external-summary.json"
             with patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
-                with self.assertRaises(
-                    github_publish.ParentRootSideEffectError
-                ) as raised:
+                with self.assertRaises(github_publish.ParentRootSideEffectError) as raised:
                     github_publish._write_publication_summary(target, b"{}\n")
             self.assertEqual(
                 raised.exception.reject,
@@ -502,9 +477,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertEqual(tuple(root.iterdir()), ())
 
-    def test_secure_publication_reports_cleanup_failure_without_suppression(
-        self,
-    ) -> None:
+    def test_secure_publication_reports_cleanup_failure_without_suppression(self) -> None:
         """A failed temp cleanup is typed and never silently discarded."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -560,11 +533,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         env = os.environ.copy()
         env["GIT_CONFIG_GLOBAL"] = os.devnull
         env["AGENT_CANON_LOG_ENV"] = "test-env"
-        for env_name in (
-            "CODEX_THREAD_ID",
-            "CODEX_SESSION_ID",
-            "CODEX_CONVERSATION_ID",
-        ):
+        for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
             env.pop(env_name, None)
         if extra_env:
             env.update(extra_env)
@@ -599,32 +568,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         remote = root / "agent-canon-log.git"
         seed.mkdir()
         subprocess.run(["git", "init"], cwd=seed, check=True, capture_output=True)
-        subprocess.run(
-            ["git", "config", "user.email", "test@example.invalid"],
-            cwd=seed,
-            check=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"], cwd=seed, check=True
-        )
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=seed, check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=seed, check=True)
         (seed / "README.md").write_text("# Runtime Log Archive\n", encoding="utf-8")
-        subprocess.run(
-            ["git", "add", "README.md"], cwd=seed, check=True, capture_output=True
-        )
-        subprocess.run(
-            ["git", "commit", "-m", "InitialCommit"],
-            cwd=seed,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "branch", "-M", "main"], cwd=seed, check=True, capture_output=True
-        )
-        subprocess.run(
-            ["git", "clone", "--bare", str(seed), str(remote)],
-            check=True,
-            capture_output=True,
-        )
+        subprocess.run(["git", "add", "README.md"], cwd=seed, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "InitialCommit"], cwd=seed, check=True, capture_output=True)
+        subprocess.run(["git", "branch", "-M", "main"], cwd=seed, check=True, capture_output=True)
+        subprocess.run(["git", "clone", "--bare", str(seed), str(remote)], check=True, capture_output=True)
         return remote
 
     def runtime_root(self, root: Path) -> Path:
@@ -634,16 +584,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     def source_snapshot(self, source: Path) -> tuple[tuple[str, str, str], ...]:
         """Capture source bytes and entry kinds without including external runtime state."""
         entries: list[tuple[str, str, str]] = []
-        for path in sorted(
-            source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()
-        ):
+        for path in sorted(source.rglob("*"), key=lambda item: item.relative_to(source).as_posix()):
             relative = path.relative_to(source).as_posix()
             if path.is_dir():
                 entries.append((relative, "dir", ""))
             elif path.is_file():
-                entries.append(
-                    (relative, "file", hashlib.sha256(path.read_bytes()).hexdigest())
-                )
+                entries.append((relative, "file", hashlib.sha256(path.read_bytes()).hexdigest()))
             else:
                 entries.append((relative, "other", ""))
         return tuple(entries)
@@ -728,7 +674,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         session_root = root / "sessions"
         session_day = session_root / "2026" / "07" / "17"
         session_day.mkdir(parents=True)
-        rollout = session_day / (f"rollout-2026-07-17T12-00-00.123Z-{context_id}.jsonl")
+        rollout = session_day / (
+            f"rollout-2026-07-17T12-00-00.123Z-{context_id}.jsonl"
+        )
         session_meta = {
             "type": "session_meta",
             "payload": {
@@ -743,11 +691,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                             "agent_role": "worker",
                         }
                     }
-                },
-            },
+                }
+            }
         }
         records = [
-            json.dumps({"type": "noop", "index": index}, separators=(",", ":")) + "\n"
+            json.dumps({"type": "noop", "index": index}, separators=(",", ":"))
+            + "\n"
             for index in range(870)
         ]
         records.extend(
@@ -890,7 +839,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(
             stdout,
-            f"CONTEXT_DISCOVERY_ERROR_CODE={code}\nCONTEXT_DISCOVERY_APPEND=fail\n",
+            f"CONTEXT_DISCOVERY_ERROR_CODE={code}\n"
+            "CONTEXT_DISCOVERY_APPEND=fail\n",
         )
         self.assertEqual(stderr, "")
 
@@ -954,12 +904,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         self, fixture: RuntimeMaterializationFixture, attempt_id: str
     ) -> Path:
         """Return the exact attempt-local observation directory."""
-        return (
-            runtime_event_publication_outcome_spool_root(
-                fixture.source, fixture.context.runtime_root
-            )
-            / attempt_id
-        )
+        return runtime_event_publication_outcome_spool_root(
+            fixture.source, fixture.context.runtime_root
+        ) / attempt_id
 
     def archive_branch(self, archive: Path) -> str:
         """Return the currently checked out archive branch."""
@@ -993,31 +940,17 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         expected_branch = self.expected_branch(source, chat_key)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPO_KEY={key}", result.stdout)
-        self.assertIn(
-            f"RUNTIME_LOG_ARCHIVE_BRANCH_KEY={stable_source_repository_id(os.environ['AGENT_CANON_SOURCE_REPOSITORY_REMOTE'])}",
-            result.stdout,
-        )
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH_KEY={stable_source_repository_id(os.environ['AGENT_CANON_SOURCE_REPOSITORY_REMOTE'])}", result.stdout)
         self.assertIn(f"RUNTIME_LOG_ARCHIVE_BRANCH={expected_branch}", result.stdout)
-        self.assertIn(
-            f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}",
-            result.stdout,
-        )
-        self.assertIn(
-            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={expected_branch}",
-            result.stdout,
-        )
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL={source / 'reports' / 'agents'}", result.stdout)
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH={expected_branch}", result.stdout)
         self.assertIn(
             f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR={mounted_log_archive_root(canon, self.runtime_root(root)) / 'agent-reports' / key}",
             result.stdout,
         )
-        self.assertIn(
-            f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}",
-            result.stdout,
-        )
+        self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", result.stdout)
 
-    def test_repo_key_defaults_to_canon_root_when_run_inside_canon_checkout(
-        self,
-    ) -> None:
+    def test_repo_key_defaults_to_canon_root_when_run_inside_canon_checkout(self) -> None:
         """Running from AgentCanon itself should key logs to the AgentCanon checkout."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1028,11 +961,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             env = os.environ.copy()
             env["GIT_CONFIG_GLOBAL"] = os.devnull
             env["AGENT_CANON_LOG_ENV"] = "test-env"
-            for env_name in (
-                "CODEX_THREAD_ID",
-                "CODEX_SESSION_ID",
-                "CODEX_CONVERSATION_ID",
-            ):
+            for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
                 env.pop(env_name, None)
 
             result = subprocess.run(
@@ -1070,9 +999,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             remote = self.make_remote(root)
             key = repo_log_key(source)
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_ENSURE=pass", ensure.stdout)
 
@@ -1088,9 +1015,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 self.expected_branch(source),
             )
 
-            log_path = (
-                archive / "hook-runs" / key / "test" / "skill_usage-no-git-head.jsonl"
-            )
+            log_path = archive / "hook-runs" / key / "test" / "skill_usage-no-git-head.jsonl"
             log_path.parent.mkdir(parents=True)
             log_path.write_text(
                 json.dumps(
@@ -1125,17 +1050,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertNotEqual(
-                dirty_clean_check.returncode, 0, dirty_clean_check.stdout
-            )
+            self.assertNotEqual(dirty_clean_check.returncode, 0, dirty_clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", dirty_clean_check.stdout)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", dirty_clean_check.stdout
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", dirty_clean_check.stdout)
 
-            push = self.run_tool(
-                "push", source_root=source, canon_root=canon, remote=remote
-            )
+            push = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(push.returncode, 0, push.stdout + push.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", push.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_PUSH=pass", push.stdout)
@@ -1146,9 +1065,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                clean_check.returncode, 0, clean_check.stdout + clean_check.stderr
-            )
+            self.assertEqual(clean_check.returncode, 0, clean_check.stdout + clean_check.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=pass", clean_check.stdout)
             self.assertEqual(
@@ -1162,14 +1079,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
 
             remote_ref = subprocess.run(
-                [
-                    "git",
-                    "--git-dir",
-                    str(remote),
-                    "show-ref",
-                    "--verify",
-                    f"refs/heads/{self.expected_branch(source)}",
-                ],
+                ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/{self.expected_branch(source)}"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1195,13 +1105,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr
-            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            self.assertEqual(
-                self.archive_branch(archive), self.expected_branch(other_source)
-            )
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
 
             log_path = archive / "hook-runs" / key / "runtime" / "skill_usage.jsonl"
             log_path.parent.mkdir(parents=True)
@@ -1218,9 +1124,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_ENSURE=pass", ensure.stdout)
             self.assertEqual(self.archive_branch(archive), self.expected_branch(source))
@@ -1245,29 +1149,19 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr
-            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            foreign_log = (
-                archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
-            )
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage.jsonl"
             foreign_log.parent.mkdir(parents=True)
-            foreign_log.write_text(
-                '{"hook_run_id": "foreign-dirty"}\n', encoding="utf-8"
-            )
+            foreign_log.write_text('{"hook_run_id": "foreign-dirty"}\n', encoding="utf-8")
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_ENSURE=pass", ensure.stdout)
             self.assertEqual(self.archive_branch(archive), self.expected_branch(source))
             self.assertTrue(foreign_log.exists())
 
-    def test_ensure_rejects_archive_level_dirty_paths_before_branch_switch(
-        self,
-    ) -> None:
+    def test_ensure_rejects_archive_level_dirty_paths_before_branch_switch(self) -> None:
         """Ensure should not auto-preserve archive-level policy/tool dirt."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1285,21 +1179,15 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr
-            )
+            self.assertEqual(other_ensure.returncode, 0, other_ensure.stdout + other_ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
             tool_path = archive / "tools" / "runtime_log_dashboard.py"
             tool_path.parent.mkdir(parents=True)
             tool_path.write_text("# dashboard change\n", encoding="utf-8")
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
-            self.assertEqual(
-                self.archive_branch(archive), self.expected_branch(other_source)
-            )
+            self.assertEqual(self.archive_branch(archive), self.expected_branch(other_source))
             self.assertTrue(tool_path.exists())
 
     def test_status_reports_foreign_repo_key_dirty_paths(self) -> None:
@@ -1316,18 +1204,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             key = repo_log_key(source)
             other_key = repo_log_key(other_source)
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            foreign_log = (
-                archive
-                / "hook-runs"
-                / other_key
-                / "runtime"
-                / "module_boundary_guard-no-git-head.jsonl"
-            )
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "module_boundary_guard-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
                 json.dumps(
@@ -1379,18 +1259,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             remote = self.make_remote(root)
             other_key = stable_source_repository_id("https://github.com/test/other.git")
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            foreign_log = (
-                archive
-                / "hook-runs"
-                / other_key
-                / "runtime"
-                / "skill_usage-no-git-head.jsonl"
-            )
+            foreign_log = archive / "hook-runs" / other_key / "runtime" / "skill_usage-no-git-head.jsonl"
             foreign_log.parent.mkdir(parents=True)
             foreign_log.write_text(
                 json.dumps(
@@ -1404,26 +1276,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(archive),
-                    "config",
-                    "user.email",
-                    "test@example.invalid",
-                ],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(archive), "config", "user.name", "Test User"],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(archive), "add", "hook-runs"],
-                check=True,
-                capture_output=True,
-            )
+            subprocess.run(["git", "-C", str(archive), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(archive), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(archive), "add", "hook-runs"], check=True, capture_output=True)
             subprocess.run(
                 ["git", "-C", str(archive), "commit", "-m", "Commit foreign tree"],
                 check=True,
@@ -1437,14 +1292,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertNotEqual(
-                clean_check.returncode, 0, clean_check.stdout + clean_check.stderr
-            )
+            self.assertNotEqual(clean_check.returncode, 0, clean_check.stdout + clean_check.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_DIRTY=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_DIRTY=no", clean_check.stdout)
-            self.assertIn(
-                f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={other_key}", clean_check.stdout
-            )
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS={other_key}", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=yes", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CHECK_CLEAN=fail", clean_check.stdout)
@@ -1460,18 +1311,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             remote = self.make_remote(root)
             canon_key = repo_log_key(canon)
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            canon_log = (
-                archive
-                / "hook-runs"
-                / canon_key
-                / "runtime"
-                / "skill_usage-no-git-head.jsonl"
-            )
+            canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage-no-git-head.jsonl"
             canon_log.parent.mkdir(parents=True)
             canon_log.write_text(
                 json.dumps(
@@ -1485,35 +1328,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 + "\n",
                 encoding="utf-8",
             )
+            subprocess.run(["git", "-C", str(archive), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(archive), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(archive), "add", "hook-runs"], check=True, capture_output=True)
             subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(archive),
-                    "config",
-                    "user.email",
-                    "test@example.invalid",
-                ],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(archive), "config", "user.name", "Test User"],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(archive), "add", "hook-runs"],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(archive),
-                    "commit",
-                    "-m",
-                    "Commit associated canon tree",
-                ],
+                ["git", "-C", str(archive), "commit", "-m", "Commit associated canon tree"],
                 check=True,
                 capture_output=True,
             )
@@ -1525,12 +1344,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                clean_check.returncode, 0, clean_check.stdout + clean_check.stderr
-            )
-            self.assertIn(
-                f"RUNTIME_LOG_ARCHIVE_TREE_KEYS={canon_key}", clean_check.stdout
-            )
+            self.assertEqual(clean_check.returncode, 0, clean_check.stdout + clean_check.stderr)
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_TREE_KEYS={canon_key}", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE_KEYS=", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_FOREIGN_TREE=no", clean_check.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_CLEAN=yes", clean_check.stdout)
@@ -1547,14 +1362,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             remote = self.make_remote(root)
             canon_key = repo_log_key(canon)
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            canon_log = (
-                archive / "hook-runs" / canon_key / "runtime" / "skill_usage.jsonl"
-            )
+            canon_log = archive / "hook-runs" / canon_key / "runtime" / "skill_usage.jsonl"
             canon_log.parent.mkdir(parents=True)
             canon_log.write_text(
                 json.dumps(
@@ -1591,9 +1402,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             canon.mkdir()
             remote = self.make_remote(root)
 
-            ensure = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensure = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensure.returncode, 0, ensure.stdout + ensure.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
             tool_path = archive / "tools" / "runtime_log_dashboard.py"
@@ -1627,15 +1436,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             key = repo_log_key(source)
             run_dir = source / "reports" / "agents" / "run-1"
             run_dir.mkdir(parents=True)
-            (source / "reports" / "agents" / ".active_run").write_text(
-                "run-1\n", encoding="utf-8"
-            )
+            (source / "reports" / "agents" / ".active_run").write_text("run-1\n", encoding="utf-8")
             (run_dir / "summary.md").write_text("# Summary\n", encoding="utf-8")
             (run_dir / "state.json").write_text('{"ok": true}\n', encoding="utf-8")
 
-            ensured = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
 
             archived = self.run_tool(
@@ -1648,28 +1453,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_FILES=2", archived.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_COPIED=2", archived.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SKIPPED=0", archived.stdout)
-            self.assertIn(
-                f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}",
-                archived.stdout,
-            )
+            self.assertIn(f"RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_REL=agent-reports/{key}", archived.stdout)
 
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            snapshot_line = next(
-                line
-                for line in archived.stdout.splitlines()
-                if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
-            )
+            snapshot_line = next(line for line in archived.stdout.splitlines() if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT="))
             snapshot = snapshot_line.split("=", 1)[1]
-            self.assertTrue(
-                (
-                    archive / "agent-reports" / key / "run-1" / snapshot / "summary.md"
-                ).exists()
-            )
-            self.assertTrue(
-                (
-                    archive / "agent-reports" / key / "run-1" / snapshot / "state.json"
-                ).exists()
-            )
+            self.assertTrue((archive / "agent-reports" / key / "run-1" / snapshot / "summary.md").exists())
+            self.assertTrue((archive / "agent-reports" / key / "run-1" / snapshot / "state.json").exists())
             self.assertFalse((archive / "agent-reports" / key / ".active_run").exists())
 
             pushed = self.run_tool(
@@ -1694,24 +1484,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             remote = self.make_remote(root)
             key = repo_log_key(source)
 
-            ensured = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            runtime_summary = (
-                archive
-                / "codex-runtime"
-                / key
-                / "chats"
-                / "thread-1"
-                / "summary-no-git-head.jsonl"
-            )
+            runtime_summary = archive / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl"
             runtime_summary.parent.mkdir(parents=True)
-            runtime_summary.write_text(
-                '{"conversation_id": "thread-1", "thread_id": "thread-1"}\n',
-                encoding="utf-8",
-            )
+            runtime_summary.write_text('{"conversation_id": "thread-1", "thread_id": "thread-1"}\n', encoding="utf-8")
             runtime_index = archive / "codex-runtime" / key / "index.jsonl"
             runtime_index.write_text(
                 '{"conversation_id": "thread-1", "summary_path": "chats/thread-1/summary-no-git-head.jsonl"}\n',
@@ -1719,46 +1497,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             run_dir = source / "reports" / "agents" / "run-2"
             run_dir.mkdir(parents=True)
-            (run_dir / "closeout_gate.md").write_text(
-                "closeout=yes\n", encoding="utf-8"
-            )
+            (run_dir / "closeout_gate.md").write_text("closeout=yes\n", encoding="utf-8")
 
-            synced = self.run_tool(
-                "sync", source_root=source, canon_root=canon, remote=remote
-            )
+            synced = self.run_tool("sync", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", synced.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=yes", synced.stdout)
 
             clone = root / "verification"
-            subprocess.run(
-                ["git", "clone", str(remote), str(clone)],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(clone), "switch", self.expected_branch(source)],
-                check=True,
-                capture_output=True,
-            )
-            self.assertTrue(
-                (
-                    clone
-                    / "codex-runtime"
-                    / key
-                    / "chats"
-                    / "thread-1"
-                    / "summary-no-git-head.jsonl"
-                ).exists()
-            )
+            subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "switch", self.expected_branch(source)], check=True, capture_output=True)
+            self.assertTrue((clone / "codex-runtime" / key / "chats" / "thread-1" / "summary-no-git-head.jsonl").exists())
             self.assertTrue((clone / "codex-runtime" / key / "index.jsonl").exists())
             snapshots = list((clone / "agent-reports" / key / "run-2").iterdir())
             self.assertEqual(len(snapshots), 1)
             self.assertTrue((snapshots[0] / "closeout_gate.md").exists())
 
-    def test_sync_with_explicit_archive_root_keeps_reports_in_archive_clone(
-        self,
-    ) -> None:
+    def test_sync_with_explicit_archive_root_keeps_reports_in_archive_clone(self) -> None:
         """Explicit private archive roots must not create a runtime archive clone."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1847,9 +1602,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_SYNC=pass", rerun.stdout)
             self.assertFalse((runtime / "archive").exists())
 
-    def test_external_runtime_bare_remote_readback_duplicate_noop_and_conflict(
-        self,
-    ) -> None:
+    def test_external_runtime_bare_remote_readback_duplicate_noop_and_conflict(self) -> None:
         """The external runtime flow proves remote objects, replay no-op, and conflict retention."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -1913,34 +1666,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             clone = root / "readback-clone"
-            subprocess.run(
-                ["git", "clone", str(remote), str(clone)],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(clone), "switch", branch],
-                check=True,
-                capture_output=True,
-            )
-            projection = (
-                clone
-                / "hook-runs"
-                / key
-                / "test-runtime"
-                / "posttooluse-no-git-head.jsonl"
-            )
+            subprocess.run(["git", "clone", str(remote), str(clone)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "switch", branch], check=True, capture_output=True)
+            projection = clone / "hook-runs" / key / "test-runtime" / "posttooluse-no-git-head.jsonl"
             self.assertEqual(projection.read_bytes(), event_bytes)
             self.assertEqual(
                 subprocess.run(
-                    [
-                        "git",
-                        "--git-dir",
-                        str(remote),
-                        "show-ref",
-                        "--verify",
-                        f"refs/heads/{branch}",
-                    ],
+                    ["git", "--git-dir", str(remote), "show-ref", "--verify", f"refs/heads/{branch}"],
                     check=True,
                     capture_output=True,
                     text=True,
@@ -1955,13 +1687,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ).stdout.splitlines()
             self.assertIn(projection.relative_to(clone).as_posix(), tree_paths)
             blob_oid = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(clone),
-                    "rev-parse",
-                    f"HEAD:{projection.relative_to(clone).as_posix()}",
-                ],
+                ["git", "-C", str(clone), "rev-parse", f"HEAD:{projection.relative_to(clone).as_posix()}"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -1983,9 +1709,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
                 runtime_root=runtime_root,
             )
-            self.assertEqual(
-                duplicate.returncode, 0, duplicate.stdout + duplicate.stderr
-            )
+            self.assertEqual(duplicate.returncode, 0, duplicate.stdout + duplicate.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_SPOOL_SOURCE_EVENTS=0", duplicate.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", duplicate.stdout)
             self.assertEqual(
@@ -1999,63 +1723,21 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
 
             diverged = root / "diverged"
-            subprocess.run(
-                ["git", "clone", str(remote), str(diverged)],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(diverged), "switch", branch],
-                check=True,
-                capture_output=True,
-            )
+            subprocess.run(["git", "clone", str(remote), str(diverged)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(diverged), "switch", branch], check=True, capture_output=True)
             diverged_cursor = diverged / "hook-runs" / key / ".spool-cursor.json"
             self.assertTrue(diverged_cursor.is_file())
             diverged_cursor.write_text('{"remote_conflict":true}\n', encoding="utf-8")
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(diverged),
-                    "config",
-                    "user.email",
-                    "test@example.invalid",
-                ],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(diverged), "config", "user.name", "Test User"],
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(diverged),
-                    "add",
-                    str(diverged_cursor.relative_to(diverged)),
-                ],
-                check=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(diverged), "commit", "-m", "remote conflict"],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "-C", str(diverged), "push", "origin", f"HEAD:{branch}"],
-                check=True,
-                capture_output=True,
-            )
+            subprocess.run(["git", "-C", str(diverged), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(diverged), "config", "user.name", "Test User"], check=True)
+            subprocess.run(["git", "-C", str(diverged), "add", str(diverged_cursor.relative_to(diverged))], check=True)
+            subprocess.run(["git", "-C", str(diverged), "commit", "-m", "remote conflict"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(diverged), "push", "origin", f"HEAD:{branch}"], check=True, capture_output=True)
 
             second_id = "hook-20260822-external-conflict"
             second_path = spool_path.with_name(f"{second_id}.json")
-            second_event = dict(
-                event, hook_run_id=second_id, payload_fingerprint="external-conflict"
-            )
-            second_path.write_bytes(
-                runtime_log_archive_git._canonical_compact_json(second_event) + b"\n"
-            )
+            second_event = dict(event, hook_run_id=second_id, payload_fingerprint="external-conflict")
+            second_path.write_bytes(runtime_log_archive_git._canonical_compact_json(second_event) + b"\n")
             conflict = self.run_tool(
                 "sync",
                 "--no-agent-reports",
@@ -2065,16 +1747,12 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 runtime_root=runtime_root,
             )
             self.assertNotEqual(conflict.returncode, 0)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=uncertain", conflict.stdout
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=uncertain", conflict.stdout)
             self.assertIn("conflict:", conflict.stdout)
             self.assertTrue(second_path.exists())
             self.assertEqual(self.source_snapshot(source), source_before)
 
-    def test_archive_eval_switches_repository_branch_inside_shared_transaction(
-        self,
-    ) -> None:
+    def test_archive_eval_switches_repository_branch_inside_shared_transaction(self) -> None:
         """Sequential eval publication selects each source branch under one lease."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2193,9 +1871,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             canon.mkdir()
             remote = self.make_remote(root)
 
-            legacy = (
-                canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
-            )
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
             legacy.mkdir(parents=True)
             source_log = legacy / "skill_usage.jsonl"
             source_log.write_text(
@@ -2219,9 +1895,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_FILES=1", imported.stdout)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", imported.stdout
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", imported.stdout)
             self.assertFalse(source_log.exists())
 
             archive_log = (
@@ -2262,17 +1936,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             root_notice = results / "README.md"
             hook_notice = hook_dir / "README.md"
             family_notice = skill_dir / "README.md"
-            report = (
-                skill_dir
-                / "skill-eval-20260517T010203040506Z-1234567890-pass-agent-orchestration.md"
-            )
+            report = skill_dir / "skill-eval-20260517T010203040506Z-1234567890-pass-agent-orchestration.md"
             root_notice.write_text("source notice\n", encoding="utf-8")
             hook_notice.write_text("hook notice\n", encoding="utf-8")
             family_notice.write_text("family notice\n", encoding="utf-8")
-            report.write_text(
-                "EVAL_RUN_ID=skill-eval-20260517T010203040506Z-1234567890\n",
-                encoding="utf-8",
-            )
+            report.write_text("EVAL_RUN_ID=skill-eval-20260517T010203040506Z-1234567890\n", encoding="utf-8")
 
             imported = self.run_tool(
                 "import-eval-results",
@@ -2282,35 +1950,18 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=3", imported.stdout
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=3",
-                imported.stdout,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1",
-                imported.stdout,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1",
-                imported.stdout,
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_FILES=3", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=3", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1", imported.stdout)
             self.assertFalse(root_notice.exists())
             self.assertTrue(hook_notice.exists())
             self.assertFalse(family_notice.exists())
             self.assertFalse(report.exists())
 
-            archive = (
-                mounted_log_archive_root(canon, self.runtime_root(root))
-                / "legacy-import"
-                / "eval-results"
-            )
+            archive = mounted_log_archive_root(canon, self.runtime_root(root)) / "legacy-import" / "eval-results"
             self.assertTrue((archive / "README.md").exists())
-            self.assertTrue(
-                (archive / "skill-workflow-prompt" / family_notice.name).exists()
-            )
+            self.assertTrue((archive / "skill-workflow-prompt" / family_notice.name).exists())
             self.assertTrue((archive / "skill-workflow-prompt" / report.name).exists())
             self.assertFalse((archive / "hook-runs" / hook_notice.name).exists())
 
@@ -2325,9 +1976,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertIn("RUNTIME_LOG_ARCHIVE_COMMITTED=no", pushed.stdout)
 
-    def test_import_eval_results_reports_no_deletion_when_all_records_are_preserved(
-        self,
-    ) -> None:
+    def test_import_eval_results_reports_no_deletion_when_all_records_are_preserved(self) -> None:
         """All destinationless records report no deletion after successful readback."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2337,9 +1986,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             canon.mkdir()
             remote = self.make_remote(root)
 
-            hook_notice = (
-                canon / "agents" / "evals" / "results" / "hook-runs" / "README.md"
-            )
+            hook_notice = canon / "agents" / "evals" / "results" / "hook-runs" / "README.md"
             hook_notice.parent.mkdir(parents=True)
             hook_notice.write_text("hook notice\n", encoding="utf-8")
 
@@ -2351,34 +1998,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(imported.returncode, 0, imported.stdout + imported.stderr)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS=0", imported.stdout
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED=1", imported.stdout
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED=1", imported.stdout
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=0",
-                imported.stdout,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1",
-                imported.stdout,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1",
-                imported.stdout,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", imported.stdout
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no",
-                imported.stdout,
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_DELETIONS=0", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_PRESERVED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_SOURCE_NOT_IMPORTED=1", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=no", imported.stdout)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no", imported.stdout)
             self.assertTrue(hook_notice.exists())
 
     def test_correspondence_reverse_map_and_root_commands_read_back(self) -> None:
@@ -2426,9 +2053,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     continue
                 self.assertTrue((PROJECT_ROOT / path).is_file(), token)
 
-    def test_legacy_delete_waits_for_remote_readback_and_retains_on_failure(
-        self,
-    ) -> None:
+    def test_legacy_delete_waits_for_remote_readback_and_retains_on_failure(self) -> None:
         """Legacy source remains when archive push fails, then deletes after retry readback."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2437,12 +2062,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source.mkdir()
             canon.mkdir()
             remote = self.make_remote(root)
-            legacy = (
-                canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
-            )
+            legacy = canon / "agents" / "evals" / "results" / "hook-runs" / "old-runtime"
             legacy.mkdir(parents=True)
             source_log = legacy / "skill_usage.jsonl"
-            source_log.write_text('{"hook_run_id":"retained"}\n', encoding="utf-8")
+            source_log.write_text("{\"hook_run_id\":\"retained\"}\n", encoding="utf-8")
             reject_hook = remote / "hooks" / "pre-receive"
             reject_hook.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
             reject_hook.chmod(reject_hook.stat().st_mode | stat.S_IXUSR)
@@ -2466,13 +2089,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                recovered.returncode, 0, recovered.stdout + recovered.stderr
-            )
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
             self.assertFalse(source_log.exists())
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", recovered.stdout
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_DELETED_SOURCE=yes", recovered.stdout)
 
     def test_normal_sync_and_push_have_no_source_delete_authority(self) -> None:
         """Normal runtime publication cannot delete a legacy source file."""
@@ -2496,22 +2115,15 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
-            pushed = self.run_tool(
-                "push", source_root=source, canon_root=canon, remote=remote
-            )
+            pushed = self.run_tool("push", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(pushed.returncode, 0, pushed.stdout + pushed.stderr)
             self.assertTrue(source_log.exists())
 
     def test_preflight_and_internal_transaction_order_is_explicit(self) -> None:
         """The public sync entry and publication helper preserve the design state order."""
         sync_source = inspect.getsource(runtime_log_archive_git.command_sync)
-        publish_source = inspect.getsource(
-            runtime_log_archive_git.publish_prepared_archive
-        )
-        self.assertLess(
-            sync_source.index("prepare_archive_transaction"),
-            sync_source.index("snapshot_hook_spool_events"),
-        )
+        publish_source = inspect.getsource(runtime_log_archive_git.publish_prepared_archive)
+        self.assertLess(sync_source.index("prepare_archive_transaction"), sync_source.index("snapshot_hook_spool_events"))
         for earlier, later in (
             ("stage_archive_paths", "ensure_commit_identity"),
             ("ensure_commit_identity", "_compare_and_push"),
@@ -2540,16 +2152,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             report_dir = source / "reports" / "agents" / "run-1"
             report_dir.mkdir(parents=True)
-            (report_dir / "verification.txt").write_text(
-                "status=pass\n", encoding="utf-8"
-            )
-            (report_dir / "work_log.md").write_text(
-                "# Work Log\n\n- done\n", encoding="utf-8"
-            )
+            (report_dir / "verification.txt").write_text("status=pass\n", encoding="utf-8")
+            (report_dir / "work_log.md").write_text("# Work Log\n\n- done\n", encoding="utf-8")
 
-            ensured = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
 
             archived = self.run_tool(
@@ -2568,26 +2174,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 if line.startswith("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_SNAPSHOT=")
             )
             snapshot = snapshot_line.split("=", 1)[1]
-            archive = (
-                mounted_log_archive_root(canon, self.runtime_root(root))
-                / "agent-reports"
-                / key
-                / "run-1"
-                / snapshot
-            )
+            archive = mounted_log_archive_root(canon, self.runtime_root(root)) / "agent-reports" / key / "run-1" / snapshot
             self.assertTrue((archive / "verification.txt").exists())
             self.assertTrue((archive / "archive_manifest.json").exists())
-            manifest = json.loads(
-                (archive / "archive_manifest.json").read_text(encoding="utf-8")
-            )
+            manifest = json.loads((archive / "archive_manifest.json").read_text(encoding="utf-8"))
             self.assertIn("codex_trace_key", manifest)
             self.assertIn("source_git_head", manifest)
-            index_path = (
-                mounted_log_archive_root(canon, self.runtime_root(root))
-                / "agent-reports"
-                / key
-                / "index.jsonl"
-            )
+            index_path = mounted_log_archive_root(canon, self.runtime_root(root)) / "agent-reports" / key / "index.jsonl"
             first_index = index_path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(first_index), 1)
 
@@ -2599,18 +2192,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                archived_again.returncode,
-                0,
-                archived_again.stdout + archived_again.stderr,
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no",
-                archived_again.stdout,
-            )
-            self.assertEqual(
-                index_path.read_text(encoding="utf-8").splitlines(), first_index
-            )
+            self.assertEqual(archived_again.returncode, 0, archived_again.stdout + archived_again.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", archived_again.stdout)
+            self.assertEqual(index_path.read_text(encoding="utf-8").splitlines(), first_index)
 
             pushed = self.run_tool(
                 "push",
@@ -2640,9 +2224,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertIn("agent-reports", remote_tree.stdout)
 
-    def test_prepared_sanitized_report_publishes_provenance_and_supersession(
-        self,
-    ) -> None:
+    def test_prepared_sanitized_report_publishes_provenance_and_supersession(self) -> None:
         """Prepared v1 provenance is read back without rewriting the old snapshot."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -2651,27 +2233,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source.mkdir()
             canon.mkdir()
             remote = self.make_remote(root)
+            subprocess.run(["git", "init", "-b", "main", str(source)], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=source, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=source, check=True)
             subprocess.run(
-                ["git", "init", "-b", "main", str(source)],
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "config", "user.name", "Test User"], cwd=source, check=True
-            )
-            subprocess.run(
-                ["git", "config", "user.email", "test@example.invalid"],
-                cwd=source,
-                check=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "remote",
-                    "add",
-                    "origin",
-                    "https://github.com/test/source.git",
-                ],
+                ["git", "remote", "add", "origin", "https://github.com/test/source.git"],
                 cwd=source,
                 check=True,
             )
@@ -2680,16 +2246,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             original = report / "summary.md"
             original.write_text("summary\n", encoding="utf-8")
             subprocess.run(["git", "add", "reports"], cwd=source, check=True)
-            subprocess.run(
-                ["git", "commit", "-m", "source"],
-                cwd=source,
-                check=True,
-                capture_output=True,
-            )
+            subprocess.run(["git", "commit", "-m", "source"], cwd=source, check=True, capture_output=True)
 
-            ensured = self.run_tool(
-                "ensure", source_root=source, canon_root=canon, remote=remote
-            )
+            ensured = self.run_tool("ensure", source_root=source, canon_root=canon, remote=remote)
             self.assertEqual(ensured.returncode, 0, ensured.stdout + ensured.stderr)
             old_archive = self.run_tool(
                 "archive-agent-report",
@@ -2699,9 +2258,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                old_archive.returncode, 0, old_archive.stdout + old_archive.stderr
-            )
+            self.assertEqual(old_archive.returncode, 0, old_archive.stdout + old_archive.stderr)
             old_snapshot = next(
                 line.split("=", 1)[1]
                 for line in old_archive.stdout.splitlines()
@@ -2715,45 +2272,25 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                pushed_old.returncode, 0, pushed_old.stdout + pushed_old.stderr
-            )
+            self.assertEqual(pushed_old.returncode, 0, pushed_old.stdout + pushed_old.stderr)
             archive = mounted_log_archive_root(canon, self.runtime_root(root))
-            old_commit = subprocess.check_output(
-                ["git", "-C", str(archive), "rev-parse", "HEAD"], text=True
-            ).strip()
-            old_tree = subprocess.check_output(
-                ["git", "-C", str(archive), "rev-parse", "HEAD^{tree}"], text=True
-            ).strip()
+            old_commit = subprocess.check_output(["git", "-C", str(archive), "rev-parse", "HEAD"], text=True).strip()
+            old_tree = subprocess.check_output(["git", "-C", str(archive), "rev-parse", "HEAD^{tree}"], text=True).strip()
             key = repo_log_key(source)
             index_rel = f"agent-reports/{key}/index.jsonl"
             old_index_blob = subprocess.check_output(
                 ["git", "-C", str(archive), "rev-parse", f"HEAD:{index_rel}"], text=True
             ).strip()
-            old_index = json.loads(
-                (archive / index_rel).read_text(encoding="utf-8").splitlines()[0]
-            )
+            old_index = json.loads((archive / index_rel).read_text(encoding="utf-8").splitlines()[0])
 
             prepared = root / "prepared" / "run-1"
             prepared.mkdir(parents=True)
             sanitized = prepared / "summary.md"
             sanitized.write_text("summary\n", encoding="utf-8")
-            source_commit = subprocess.check_output(
-                ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
-            ).strip()
+            source_commit = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
             source_prefix = "reports/agents/run-1"
             tree_listing = subprocess.check_output(
-                [
-                    "git",
-                    "-C",
-                    str(source),
-                    "ls-tree",
-                    "-r",
-                    "-z",
-                    source_commit,
-                    "--",
-                    source_prefix,
-                ]
+                ["git", "-C", str(source), "ls-tree", "-r", "-z", source_commit, "--", source_prefix]
             )
             source_tree = hashlib.sha256(tree_listing).hexdigest()
             source_sha = hashlib.sha256(original.read_bytes()).hexdigest()
@@ -2772,30 +2309,22 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             snapshot_payload = {
                 "source_commit": source_commit,
                 "source_tree_digest_sha256": source_tree,
-                "files": [
-                    {
-                        "archive_sha256": archive_sha,
-                        "relative_path": "summary.md",
-                        "size": len(sanitized.read_bytes()),
-                    }
-                ],
+                "files": [{"archive_sha256": archive_sha, "relative_path": "summary.md", "size": len(sanitized.read_bytes())}],
                 "redaction_count": 0,
             }
             provenance = {
                 "archive_schema": "agent-report-snapshot.v1",
-                "files": [
-                    {
-                        "archive_sha256": archive_sha,
-                        "redactions": [],
-                        "redaction_count": 0,
-                        "redaction_rule_ids": [],
-                        "redaction_rule_counts": {},
-                        "relative_path": "summary.md",
-                        "size": len(sanitized.read_bytes()),
-                        "source_path": f"{source_prefix}/summary.md",
-                        "source_sha256": source_sha,
-                    }
-                ],
+                "files": [{
+                    "archive_sha256": archive_sha,
+                    "redactions": [],
+                    "redaction_count": 0,
+                    "redaction_rule_ids": [],
+                    "redaction_rule_counts": {},
+                    "relative_path": "summary.md",
+                    "size": len(sanitized.read_bytes()),
+                    "source_path": f"{source_prefix}/summary.md",
+                    "source_sha256": source_sha,
+                }],
                 "redaction_count": 0,
                 "redaction_policy": {
                     "credential_shaped_values": "replace with REDACTED_SECRET_SHA256_<sha256>",
@@ -2805,11 +2334,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 "redaction_rule_counts": {},
                 "run_id": "run-1",
                 "schema": "agent-canon-log-report-provenance.v1",
-                "snapshot_id": hashlib.sha256(
-                    json.dumps(
-                        snapshot_payload, sort_keys=True, separators=(",", ":")
-                    ).encode()
-                ).hexdigest(),
+                "snapshot_id": hashlib.sha256(json.dumps(snapshot_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
                 "source_branch": "main",
                 "source_commit": source_commit,
                 "source_file_count": 1,
@@ -2821,9 +2346,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 "supersession": supersession,
             }
             provenance_path = root / "prepared" / "provenance.json"
-            provenance_path.write_text(
-                json.dumps(provenance, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            provenance_path.write_text(json.dumps(provenance, sort_keys=True) + "\n", encoding="utf-8")
             published = self.run_tool(
                 "archive-agent-report",
                 "--report-dir",
@@ -2837,23 +2360,15 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                published.returncode, 0, published.stdout + published.stderr
-            )
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PROVENANCE=pass", published.stdout
-            )
+            self.assertEqual(published.returncode, 0, published.stdout + published.stderr)
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_PROVENANCE=pass", published.stdout)
             self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT=pass", published.stdout)
             index_lines = (archive / index_rel).read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(index_lines), 2)
             successor = json.loads(index_lines[-1])
-            self.assertEqual(
-                successor["schema"], "agent-canon-log-report-provenance.v1"
-            )
+            self.assertEqual(successor["schema"], "agent-canon-log-report-provenance.v1")
             self.assertEqual(successor["snapshot_schema"], "agent-report-snapshot.v1")
-            self.assertEqual(
-                successor["supersession"]["quarantine_status"], "quarantined"
-            )
+            self.assertEqual(successor["supersession"]["quarantine_status"], "quarantined")
             self.assertEqual(successor["supersedes"], successor["supersession"])
             self.assertEqual(successor["quarantines"], successor["supersession"])
             self.assertEqual(successor["files"][0]["archive_sha256"], archive_sha)
@@ -2871,16 +2386,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", replay.stdout
-            )
-            self.assertEqual(
-                len((archive / index_rel).read_text(encoding="utf-8").splitlines()), 2
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_AGENT_REPORT_INDEX_APPENDED=no", replay.stdout)
+            self.assertEqual(len((archive / index_rel).read_text(encoding="utf-8").splitlines()), 2)
 
-    def test_materialize_runtime_event_cli_rejects_decision_and_raw_path_inputs(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_cli_rejects_decision_and_raw_path_inputs(self) -> None:
         """The public parser exposes only fixed family and source selectors."""
         parser = runtime_log_archive_git.build_parser()
         with self.assertRaises(SystemExit):
@@ -2902,9 +2411,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 ]
             )
 
-    def test_materialize_runtime_event_binds_rollout_path_bytes_offsets_and_ids(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_binds_rollout_path_bytes_offsets_and_ids(self) -> None:
         """Context discovery returns exact path, byte range, and structural joins."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -2929,9 +2436,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source_event = record["source_event"]
             self.assertIsInstance(source_event, dict)
             source_event = source_event
-            self.assertEqual(
-                identity["rollout_path"], fixture.rollout.resolve().as_posix()
-            )
+            self.assertEqual(identity["rollout_path"], fixture.rollout.resolve().as_posix())
             task_complete = cast(dict[str, object], identity["task_complete"])
             self.assertEqual(task_complete["line"], 872)
             self.assertEqual(task_complete["byte_length"], len(fixture.raw_record))
@@ -2939,33 +2444,22 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 task_complete["byte_offset"],
                 sum(
                     len(item)
-                    for item in fixture.rollout.read_bytes().splitlines(keepends=True)[
-                        :871
-                    ]
+                    for item in fixture.rollout.read_bytes().splitlines(keepends=True)[:871]
                 ),
             )
             self.assertEqual(
-                task_complete["record_sha256"],
-                hashlib.sha256(fixture.raw_record).hexdigest(),
+                task_complete["record_sha256"], hashlib.sha256(fixture.raw_record).hexdigest()
             )
-            self.assertEqual(
-                source_event["record_bytes_b64"], identity["record_bytes_b64"]
-            )
-            self.assertEqual(
-                source_event["record_byte_offset"], task_complete["byte_offset"]
-            )
+            self.assertEqual(source_event["record_bytes_b64"], identity["record_bytes_b64"])
+            self.assertEqual(source_event["record_byte_offset"], task_complete["byte_offset"])
             self.assertEqual(source_event["agent_id"], fixture.context_id)
-            self.assertEqual(
-                source_event["parent_id"], "44444444-4444-4444-8444-444444444444"
-            )
+            self.assertEqual(source_event["parent_id"], "44444444-4444-4444-8444-444444444444")
 
     def test_context_discovery_certificate_is_canonical_and_idempotent(self) -> None:
         """The native producer publishes one hash-bound certificate and retries safely."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
-            certificate = next(
-                fixture.result_path.parent.glob("context_discovery.*.json")
-            )
+            certificate = next(fixture.result_path.parent.glob("context_discovery.*.json"))
             first_bytes = certificate.read_bytes()
             value = json.loads(first_bytes)
             self.assertEqual(
@@ -3083,7 +2577,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     fixture.rollout.unlink()
                 elif case == "rollout_ambiguous":
                     duplicate = fixture.rollout.with_name(
-                        f"rollout-2026-07-17T12-00-01.123Z-{fixture.context_id}.jsonl"
+                        "rollout-2026-07-17T12-00-01.123Z-"
+                        f"{fixture.context_id}.jsonl"
                     )
                     duplicate.write_bytes(fixture.rollout.read_bytes())
                 else:
@@ -3133,7 +2628,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 Path(tmp_dir) / "publication-failure"
             )
             publication_target = next(
-                publication_failure.result_path.parent.glob("context_discovery.*.json")
+                publication_failure.result_path.parent.glob(
+                    "context_discovery.*.json"
+                )
             )
             publication_target.unlink()
             with patch.object(
@@ -3154,31 +2651,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 (),
             )
 
-    def test_materialize_runtime_event_requires_exactly_one_context_certificate(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_requires_exactly_one_context_certificate(self) -> None:
         """The materializer rejects absent and ambiguous certificate handoffs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             absent = self.make_valid_materialization_fixture(Path(tmp_dir) / "absent")
-            certificate = next(
-                absent.result_path.parent.glob("context_discovery.*.json")
-            )
+            certificate = next(absent.result_path.parent.glob("context_discovery.*.json"))
             certificate.unlink()
             self.assert_materializer_failure(absent, "context_source_absent")
 
-            ambiguous = self.make_valid_materialization_fixture(
-                Path(tmp_dir) / "ambiguous"
+            ambiguous = self.make_valid_materialization_fixture(Path(tmp_dir) / "ambiguous")
+            certificate = next(ambiguous.result_path.parent.glob("context_discovery.*.json"))
+            duplicate = certificate.with_name(
+                "context_discovery." + "f" * 64 + ".json"
             )
-            certificate = next(
-                ambiguous.result_path.parent.glob("context_discovery.*.json")
-            )
-            duplicate = certificate.with_name("context_discovery." + "f" * 64 + ".json")
             duplicate.write_bytes(certificate.read_bytes())
             self.assert_materializer_failure(ambiguous, "context_source_ambiguous")
 
-    def test_materialize_runtime_event_uses_one_immutable_rollout_snapshot(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_uses_one_immutable_rollout_snapshot(self) -> None:
         """V-02 binds discovery, selected bytes, offsets, and hashes to one read."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -3191,7 +2680,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         "type": "event_msg",
                         "payload": {
                             "type": "task_complete",
-                            "turn_id": "66666666-6666-4666-8666-666666666666",
+                            "turn_id": "66666666-6666-4666-8666-666666666666"
                         },
                     },
                     separators=(",", ":"),
@@ -3213,7 +2702,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             with (
                 patch.dict(
                     os.environ,
-                    {"AGENT_CANON_CODEX_SESSION_ROOT": str(fixture.session_root)},
+                    {
+                        "AGENT_CANON_CODEX_SESSION_ROOT": str(
+                            fixture.session_root
+                        )
+                    },
                     clear=False,
                 ),
                 patch.object(
@@ -3254,43 +2747,20 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     def test_materialize_runtime_event_uses_fixed_result_family_specs(self) -> None:
         """All five result families have one fixed artifact and gate schema."""
         expected = {
-            "requirements": (
-                "requirements_review.md",
-                "requirements-review",
-                "ReviewArtifactV1",
-            ),
+            "requirements": ("requirements_review.md", "requirements-review", "ReviewArtifactV1"),
             "design": ("design_review.md", "design-review", "ReviewArtifactV1"),
             "review": ("change_review.md", "change-review", "ReviewArtifactV1"),
-            "validation": (
-                "validation_result.json",
-                "validation",
-                "agent_canon.runtime_result_input.v1",
-            ),
+            "validation": ("validation_result.json", "validation", "agent_canon.runtime_result_input.v1"),
             "lifecycle": ("closeout_gate.md", "closeout", "CloseoutGateV1"),
         }
-        self.assertEqual(
-            tuple(
-                item.result_family
-                for item in runtime_log_archive_git.RESULT_FAMILY_SPECS
-            ),
-            tuple(expected),
-        )
+        self.assertEqual(tuple(item.result_family for item in runtime_log_archive_git.RESULT_FAMILY_SPECS), tuple(expected))
         for family, (artifact, gate, schema) in expected.items():
             spec = runtime_log_archive_git.fixed_result_family_spec(family, gate)
-            self.assertEqual(
-                (spec.artifact_name, spec.gate_id, spec.schema),
-                (artifact, gate, schema),
-            )
-        with self.assertRaises(
-            runtime_log_archive_git.RuntimeEventMaterializationError
-        ):
-            runtime_log_archive_git.fixed_result_family_spec(
-                "review", "requirements-review"
-            )
+            self.assertEqual((spec.artifact_name, spec.gate_id, spec.schema), (artifact, gate, schema))
+        with self.assertRaises(runtime_log_archive_git.RuntimeEventMaterializationError):
+            runtime_log_archive_git.fixed_result_family_spec("review", "requirements-review")
 
-    def test_materialize_runtime_event_rejects_nested_validation_duplicate_keys(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_rejects_nested_validation_duplicate_keys(self) -> None:
         """V-03 rejects duplicate keys at nested validation-object depth."""
         raw = (
             b'{"schema":"agent_canon.runtime_result_input.v1",'
@@ -3306,9 +2776,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             runtime_log_archive_git.parse_validation_result(raw, "validation")
         self.assertEqual(raised.exception.code, "result_authority_mismatch")
 
-    def test_materialize_runtime_event_lifecycle_fields_are_section_bounded(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_lifecycle_fields_are_section_bounded(self) -> None:
         """V-03 accepts one readiness section and rejects every authority impostor."""
         valid = (
             "# Closeout\n\n"
@@ -3336,12 +2804,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 with self.assertRaises(
                     runtime_log_archive_git.RuntimeEventMaterializationError
                 ) as raised:
-                    runtime_log_archive_git.parse_lifecycle_result(document, "closeout")
-                self.assertEqual(raised.exception.code, "result_authority_mismatch")
+                    runtime_log_archive_git.parse_lifecycle_result(
+                        document, "closeout"
+                    )
+                self.assertEqual(
+                    raised.exception.code, "result_authority_mismatch"
+                )
 
-    def test_materialize_runtime_event_derives_target_blob_and_base_identities(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_derives_target_blob_and_base_identities(self) -> None:
         """Target identity verification is bound to external Git object identities."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -3358,26 +2828,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             value = json.loads(fixture.target.read_text(encoding="utf-8"))
             identity = value["target_identities"][0]
             current_blob = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(fixture.source),
-                    "hash-object",
-                    "--",
-                    fixture.target_relative,
-                ],
+                ["git", "-C", str(fixture.source), "hash-object", "--", fixture.target_relative],
                 check=True,
                 capture_output=True,
                 text=True,
             ).stdout.strip()
             base_blob = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(fixture.source),
-                    "rev-parse",
-                    f"{fixture.base_oid}:{fixture.target_relative}",
-                ],
+                ["git", "-C", str(fixture.source), "rev-parse", f"{fixture.base_oid}:{fixture.target_relative}"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -3396,80 +2853,34 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
             self.assertEqual(identity["path"], fixture.target_relative)
-            self.assertEqual(
-                identity["content_sha256"],
-                hashlib.sha256(
-                    (fixture.source / fixture.target_relative).read_bytes()
-                ).hexdigest(),
-            )
+            self.assertEqual(identity["content_sha256"], hashlib.sha256((fixture.source / fixture.target_relative).read_bytes()).hexdigest())
             self.assertEqual(identity["git_blob_oid"], current_blob)
             self.assertTrue(identity["base_present"])
-            self.assertEqual(
-                identity["base_content_sha256"],
-                hashlib.sha256(b"base target\n").hexdigest(),
-            )
+            self.assertEqual(identity["base_content_sha256"], hashlib.sha256(b"base target\n").hexdigest())
             self.assertEqual(identity["base_git_blob_oid"], base_blob)
-            self.assertEqual(
-                value["result_artifact"]["artifact_blob_oid"], artifact_blob
-            )
+            self.assertEqual(value["result_artifact"]["artifact_blob_oid"], artifact_blob)
             self.assertEqual(value["result_artifact"]["base_oid"], fixture.base_oid)
             self.assertEqual(value["source_snapshot"]["head_oid"], fixture.head_oid)
             self.assertEqual(value["source_snapshot"]["base_oid"], fixture.base_oid)
-            self.assertEqual(
-                value["result_artifact"]["target_paths"], [fixture.target_relative]
-            )
+            self.assertEqual(value["result_artifact"]["target_paths"], [fixture.target_relative])
 
-    def test_materialize_runtime_event_preserves_porcelain_columns_and_exclusions(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_preserves_porcelain_columns_and_exclusions(self) -> None:
         """Status capture preserves X/Y and excludes generated source roots."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
             (root / "tracked.txt").write_text("old\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "tracked.txt"], check=True)
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(root),
-                    "-c",
-                    "user.email=test@example.invalid",
-                    "-c",
-                    "user.name=Test",
-                    "commit",
-                    "-qm",
-                    "init",
-                ],
-                check=True,
-            )
+            subprocess.run(["git", "-C", str(root), "-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "init"], check=True)
             (root / "tracked.txt").write_text("new\n", encoding="utf-8")
             (root / "reports" / "agent-runtime-dashboard").mkdir(parents=True)
-            (root / "reports" / "agent-runtime-dashboard" / "generated.md").write_text(
-                "generated\n", encoding="utf-8"
-            )
+            (root / "reports" / "agent-runtime-dashboard" / "generated.md").write_text("generated\n", encoding="utf-8")
             statuses = runtime_log_archive_git.capture_porcelain_v1(root)
-            self.assertTrue(
-                any(
-                    item["status_x"] == " " and item["status_y"] == "M"
-                    for item in statuses
-                )
-            )
-            self.assertEqual(
-                runtime_log_archive_git.parse_porcelain_v1_line("AM tracked.txt")[
-                    "status_x"
-                ],
-                "A",
-            )
-            self.assertFalse(
-                runtime_log_archive_git.is_source_snapshot_path(
-                    Path("reports/agent-runtime-dashboard/generated.md")
-                )
-            )
+            self.assertTrue(any(item["status_x"] == " " and item["status_y"] == "M" for item in statuses))
+            self.assertEqual(runtime_log_archive_git.parse_porcelain_v1_line("AM tracked.txt")["status_x"], "A")
+            self.assertFalse(runtime_log_archive_git.is_source_snapshot_path(Path("reports/agent-runtime-dashboard/generated.md")))
 
-    def test_materialize_runtime_event_noreplace_collision_and_identical_readback(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_noreplace_collision_and_identical_readback(self) -> None:
         """V-08 binds canonical collisions, lock exclusion, and exact retry."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -3494,11 +2905,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         if path.name != ".attempt.lock"
                     )
                 )
-                paths.extend(
-                    sorted(
-                        fixture.target.parent.glob(f"{fixture.target.stem}.outcome.*")
-                    )
-                )
+                paths.extend(sorted(fixture.target.parent.glob(f"{fixture.target.stem}.outcome.*")))
                 return {path: path.read_bytes() for path in paths}
 
             def assert_success(fixture: RuntimeMaterializationFixture) -> str:
@@ -3506,13 +2913,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 result, stdout, stderr = self.invoke_materializer(fixture)
                 self.assertEqual(result, 0, stdout + stderr)
                 self.assertEqual(stderr, "")
-                self.assertEqual(
-                    stdout.splitlines()[-2:],
-                    [
-                        "RUNTIME_EVENT_OUTCOME=committed",
-                        "RUNTIME_EVENT_MATERIALIZE=pass",
-                    ],
-                )
+                self.assertEqual(stdout.splitlines()[-2:], [
+                    "RUNTIME_EVENT_OUTCOME=committed",
+                    "RUNTIME_EVENT_MATERIALIZE=pass",
+                ])
                 value = json.loads(fixture.target.read_text(encoding="utf-8"))
                 return cast(str, value["publication_intent"]["attempt_id"])
 
@@ -3568,9 +2972,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             mismatched_readback = self.make_valid_materialization_fixture(
                 root / "mismatched-readback"
             )
-            original_secure_readback = (
-                runtime_log_archive_git._read_secure_publication_target
-            )
+            original_secure_readback = runtime_log_archive_git._read_secure_publication_target
             mismatch_injected = False
 
             def mismatch_after_artifact_rename(
@@ -3722,11 +3124,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(len(uncertain_candidates), 1)
             uncertain_bytes = uncertain_candidates[0].read_bytes()
             self.assertEqual(
-                list(
-                    observation_uncertain.target.parent.glob(
-                        f"{observation_uncertain.target.stem}.outcome.*"
-                    )
-                ),
+                list(observation_uncertain.target.parent.glob(f"{observation_uncertain.target.stem}.outcome.*")),
                 [],
             )
             assert_success(observation_uncertain)
@@ -3737,9 +3135,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             original_rename = runtime_log_archive_git._renameat2_noreplace_at
 
-            def collide_observation(
-                source: str, target: str, directory_fd: int
-            ) -> None:
+            def collide_observation(source: str, target: str, directory_fd: int) -> None:
                 if runtime_log_archive_git.RUNTIME_EVENT_OBSERVATION_NAME.fullmatch(
                     target
                 ):
@@ -3777,9 +3173,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 )
             malformed_observation_attempt = cast(
                 str,
-                json.loads(malformed_observation.target.read_text(encoding="utf-8"))[
-                    "publication_intent"
-                ]["attempt_id"],
+                json.loads(
+                    malformed_observation.target.read_text(encoding="utf-8")
+                )["publication_intent"]["attempt_id"],
             )
             malformed_observation_paths = [
                 path
@@ -3816,7 +3212,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
 
             def collide_receipt(source: str, target: str, directory_fd: int) -> None:
-                if runtime_log_archive_git.RUNTIME_EVENT_RECEIPT_NAME.fullmatch(target):
+                if runtime_log_archive_git.RUNTIME_EVENT_RECEIPT_NAME.fullmatch(
+                    target
+                ):
                     descriptor = os.open(
                         target,
                         os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
@@ -3862,17 +3260,22 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             forged = json.loads(forged_path.read_text(encoding="utf-8"))
             forged_observation = forged["observation"]
-            forged_observation["evidence"]["target_directory_fsync_status"] = "failed"
+            forged_observation["evidence"][
+                "target_directory_fsync_status"
+            ] = "failed"
             forged_observation["outcome"] = "committed"
             forged_observation["observation_sha256"] = "0" * 64
             forged_observation["observation_sha256"] = hashlib.sha256(
-                (json.dumps(forged_observation, separators=(",", ":")) + "\n").encode(
-                    "utf-8"
-                )
+                (
+                    json.dumps(forged_observation, separators=(",", ":"))
+                    + "\n"
+                ).encode("utf-8")
             ).hexdigest()
             forged["receipt_sha256"] = "0" * 64
             forged["receipt_sha256"] = hashlib.sha256(
-                (json.dumps(forged, separators=(",", ":")) + "\n").encode("utf-8")
+                (json.dumps(forged, separators=(",", ":")) + "\n").encode(
+                    "utf-8"
+                )
             ).hexdigest()
             forged_path.write_text(
                 json.dumps(forged, separators=(",", ":")) + "\n",
@@ -3913,12 +3316,15 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 first_observation_path.read_text(encoding="utf-8")
             )
             duplicate_value["outcome"] = "uncertain"
-            duplicate_value["evidence"]["target_directory_fsync_status"] = "failed"
+            duplicate_value["evidence"][
+                "target_directory_fsync_status"
+            ] = "failed"
             duplicate_value["observation_sha256"] = "0" * 64
             duplicate_value["observation_sha256"] = hashlib.sha256(
-                (json.dumps(duplicate_value, separators=(",", ":")) + "\n").encode(
-                    "utf-8"
-                )
+                (
+                    json.dumps(duplicate_value, separators=(",", ":"))
+                    + "\n"
+                ).encode("utf-8")
             ).hexdigest()
             duplicate_path = first_observation_path.with_name(
                 f"000001-{duplicate_value['observation_sha256']}.json"
@@ -3963,7 +3369,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 root / "invalid-lock"
             )
             with fail_artifact_rename(invalid_lock):
-                self.assert_materializer_failure(invalid_lock, "publication_failure")
+                self.assert_materializer_failure(
+                    invalid_lock, "publication_failure"
+                )
             invalid_root = runtime_event_publication_outcome_spool_root(
                 invalid_lock.source, invalid_lock.context.runtime_root
             )
@@ -3978,9 +3386,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertFalse(invalid_lock.target.exists())
 
-    def test_materialize_runtime_event_pre_rename_failure_preserves_old_state(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_pre_rename_failure_preserves_old_state(self) -> None:
         """A source failure before publication leaves no new record."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -3999,9 +3405,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     side_effect=OSError(5, "injected pre-rename failure"),
                 ),
             ):
-                with self.assertRaises(
-                    runtime_log_archive_git.RuntimeEventMaterializationError
-                ) as raised:
+                with self.assertRaises(runtime_log_archive_git.RuntimeEventMaterializationError) as raised:
                     runtime_log_archive_git.command_materialize_runtime_event(
                         fixture.context, fixture.args
                     )
@@ -4009,9 +3413,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertFalse(fixture.target.exists())
             self.assertEqual(fixture.old_state.read_bytes(), b"old-state\n")
 
-    def test_materialize_runtime_event_post_rename_fsync_is_uncertain_not_success(
-        self,
-    ) -> None:
+    def test_materialize_runtime_event_post_rename_fsync_is_uncertain_not_success(self) -> None:
         """V-07 appends uncertainty, then recovers without rewriting history."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
@@ -4023,9 +3425,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     raise OSError(5, "injected artifact parent fsync failure")
                 original_fsync(path, purpose)
 
-            def fail_sequence_one_receipt(
-                source: str, target: str, directory_fd: int
-            ) -> None:
+            def fail_sequence_one_receipt(source: str, target: str, directory_fd: int) -> None:
                 match = runtime_log_archive_git.RUNTIME_EVENT_RECEIPT_NAME.fullmatch(
                     target
                 )
@@ -4056,9 +3456,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 contextlib.redirect_stdout(first_stdout),
                 contextlib.redirect_stderr(first_stderr),
             ):
-                with self.assertRaises(
-                    runtime_log_archive_git.RuntimeEventMaterializationError
-                ) as raised:
+                with self.assertRaises(runtime_log_archive_git.RuntimeEventMaterializationError) as raised:
                     runtime_log_archive_git.command_materialize_runtime_event(
                         fixture.context, fixture.args
                     )
@@ -4082,9 +3480,10 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(
                 artifact["artifact_sha256"],
                 hashlib.sha256(
-                    (json.dumps(zeroed_artifact, separators=(",", ":")) + "\n").encode(
-                        "utf-8"
-                    )
+                    (
+                        json.dumps(zeroed_artifact, separators=(",", ":"))
+                        + "\n"
+                    ).encode("utf-8")
                 ).hexdigest(),
             )
 
@@ -4109,9 +3508,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 first_observation["evidence"]["target_directory_fsync_status"],
                 "failed",
             )
-            self.assertEqual(
-                first_observation["evidence"]["readback_status"], "verified"
-            )
+            self.assertEqual(first_observation["evidence"]["readback_status"], "verified")
             self.assertEqual(
                 first_observation["evidence"]["readback_sha256"],
                 artifact["artifact_sha256"],
@@ -4142,9 +3539,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 )
             self.assertEqual(recovery_stderr.getvalue(), "")
             self.assertEqual(fixture.target.read_bytes(), artifact_bytes)
-            self.assertEqual(
-                first_observation_path.read_bytes(), first_observation_bytes
-            )
+            self.assertEqual(first_observation_path.read_bytes(), first_observation_bytes)
             first_receipt_bytes = first_receipt_path.read_bytes()
             first_receipt = json.loads(first_receipt_bytes)
             second_receipt_path = fixture.target.with_name(
@@ -4166,12 +3561,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 first_receipt["receipt_sha256"],
             )
             self.assertEqual(second_observation["outcome"], "committed")
-            self.assertEqual(
-                second_observation_path.read_bytes(),
-                (json.dumps(second_observation, separators=(",", ":")) + "\n").encode(
-                    "utf-8"
-                ),
-            )
+            self.assertEqual(second_observation_path.read_bytes(), (
+                json.dumps(second_observation, separators=(",", ":")) + "\n"
+            ).encode("utf-8"))
             expected_success = [
                 f"RUNTIME_EVENT_PATH={fixture.target.relative_to(fixture.source).as_posix()}",
                 f"RUNTIME_EVENT_UNIT_ID={fixture.target.stem.rsplit('.', 1)[-1]}",
@@ -4183,17 +3575,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 "RUNTIME_EVENT_OUTCOME=committed",
                 "RUNTIME_EVENT_MATERIALIZE=pass",
             ]
-            self.assertEqual(
-                recovery_stdout.getvalue(), "\n".join(expected_success) + "\n"
-            )
+            self.assertEqual(recovery_stdout.getvalue(), "\n".join(expected_success) + "\n")
 
             result, _stdout, stderr = self.invoke_materializer(fixture)
             self.assertEqual(result, 0)
             self.assertEqual(stderr, "")
             self.assertEqual(fixture.target.read_bytes(), artifact_bytes)
-            self.assertEqual(
-                first_observation_path.read_bytes(), first_observation_bytes
-            )
+            self.assertEqual(first_observation_path.read_bytes(), first_observation_bytes)
             self.assertEqual(first_receipt_path.read_bytes(), first_receipt_bytes)
             self.assertEqual(second_receipt_path.read_bytes(), second_receipt_bytes)
 
@@ -4314,13 +3702,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 )
                 event_bytes.append(payload)
 
-            projection_path = (
-                archive
-                / "hook-runs"
-                / key
-                / "test-runtime"
-                / "posttooluse-no-git-head.jsonl"
-            )
+            projection_path = archive / "hook-runs" / key / "test-runtime" / "posttooluse-no-git-head.jsonl"
             existing_bytes = event_bytes[0]
             projection_path.parent.mkdir(parents=True, exist_ok=True)
             projection_path.write_bytes(existing_bytes)
@@ -4352,9 +3734,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
 
             self.assertEqual(len(result.accepted_events), 2)
             self.assertEqual(projection_reads, [projection_path])
-            self.assertEqual(
-                projection_path.read_bytes(), existing_bytes + event_bytes[1]
-            )
+            self.assertEqual(projection_path.read_bytes(), existing_bytes + event_bytes[1])
             index_entries = runtime_log_archive_git._parse_spool_index_bytes(
                 result.dedup_index_path.read_bytes()
             )
@@ -4420,9 +3800,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     / f"{hook_name}-projection.jsonl"
                 )
                 projection_path = archive / projection_relative
-                projection_bytes[projection_path] = (
-                    projection_bytes.get(projection_path, b"") + payload
-                )
+                projection_bytes[projection_path] = projection_bytes.get(projection_path, b"") + payload
                 index_rows.append(
                     runtime_log_archive_git._canonical_compact_json(
                         {
@@ -4438,9 +3816,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     + b"\n"
                 )
 
-            index_relative = (
-                Path("hook-runs") / key / runtime_log_archive_git.HOOK_SPOOL_INDEX_NAME
-            )
+            index_relative = Path("hook-runs") / key / runtime_log_archive_git.HOOK_SPOOL_INDEX_NAME
             index_bytes = b"".join(index_rows)
             ingest_result = runtime_log_archive_git.HookSpoolIngestResult(
                 transaction_id="transaction",
@@ -4451,10 +3827,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 source_set_sha256="source-set",
                 dedup_index_path=archive / index_relative,
                 dedup_index_sha256=hashlib.sha256(index_bytes).hexdigest(),
-                cursor_path=archive
-                / "hook-runs"
-                / key
-                / runtime_log_archive_git.HOOK_SPOOL_CURSOR_NAME,
+                cursor_path=archive / "hook-runs" / key / runtime_log_archive_git.HOOK_SPOOL_CURSOR_NAME,
                 cursor_sha256="cursor-sha",
             )
             receipt = runtime_log_archive_git.ArchivePublicationReceipt(
@@ -4500,9 +3873,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(removed, len(events))
             self.assertEqual(archive_calls.count(index_relative), 1)
             for projection_path in projection_bytes:
-                self.assertEqual(
-                    archive_calls.count(projection_path.relative_to(archive)), 1
-                )
+                self.assertEqual(archive_calls.count(projection_path.relative_to(archive)), 1)
             self.assertTrue(all(not event.path.exists() for event in events))
 
     def test_h03_sync_materializes_projection_cursor_and_replay_dedup(self) -> None:
@@ -4554,9 +3925,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 remote=remote,
             )
             self.assertEqual(synced.returncode, 0, synced.stdout + synced.stderr)
-            self.assertIn(
-                "RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=committed", synced.stdout
-            )
+            self.assertIn("RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=committed", synced.stdout)
             self.assertFalse(spool_path.exists())
 
             archive_root = mounted_log_archive_root(canon, self.runtime_root(root))
@@ -4570,9 +3939,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(len(index_lines), 1)
             index_row = json.loads(index_lines[0])
             self.assertEqual(index_row["event_id"], event_id)
-            self.assertEqual(
-                index_row["event_sha256"], hashlib.sha256(event_bytes).hexdigest()
-            )
+            self.assertEqual(index_row["event_sha256"], hashlib.sha256(event_bytes).hexdigest())
             self.assertEqual(projection_path.read_bytes(), event_bytes)
 
             cursor = json.loads(cursor_path.read_text(encoding="utf-8"))
@@ -4600,9 +3967,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr)
             self.assertFalse(spool_path.exists())
-            self.assertEqual(
-                index_path.read_text(encoding="utf-8").splitlines(), index_lines
-            )
+            self.assertEqual(index_path.read_text(encoding="utf-8").splitlines(), index_lines)
             self.assertEqual(projection_path.read_bytes(), event_bytes)
 
     def test_h04_partial_busy_and_malformed_transactions_retain_spool(self) -> None:
@@ -4627,9 +3992,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 "timestamp": "2026-07-18T00:00:00Z",
             }
             event_bytes = (
-                json.dumps(
-                    event, ensure_ascii=True, sort_keys=True, separators=(",", ":")
-                )
+                json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
                 + "\n"
             ).encode("utf-8")
             runtime_root = self.runtime_root(root)
@@ -4780,16 +4143,14 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             assert_inconsistent()
             projection_path.write_bytes(projection_bytes)
 
-            projection_path.write_bytes(
-                projection_bytes.replace(b'"partial"', b'"warn"')
-            )
+            projection_path.write_bytes(projection_bytes.replace(b'"partial"', b'"warn"'))
             assert_inconsistent()
             projection_path.write_bytes(projection_bytes)
 
             stale_cursor = json.loads(cursor_bytes)
             stale_cursor["dedup_index_sha256"] = "0" * 64
-            stale_cursor["cursor_body_sha256"] = (
-                runtime_log_archive_git._cursor_body_sha256(stale_cursor)
+            stale_cursor["cursor_body_sha256"] = runtime_log_archive_git._cursor_body_sha256(
+                stale_cursor
             )
             cursor_path.write_bytes(
                 runtime_log_archive_git._canonical_compact_json(stale_cursor) + b"\n"
@@ -4804,9 +4165,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                recovered.returncode, 0, recovered.stdout + recovered.stderr
-            )
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
             self.assertFalse(spool_path.exists())
             self.assertEqual(index_path.read_bytes(), index_bytes)
             self.assertEqual(projection_path.read_bytes(), projection_bytes)
@@ -4876,9 +4235,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 / ".spool-index.jsonl"
             )
             self.assertTrue(local_index.is_file())
-            self.assertEqual(
-                len(local_index.read_text(encoding="utf-8").splitlines()), 1
-            )
+            self.assertEqual(len(local_index.read_text(encoding="utf-8").splitlines()), 1)
 
             reject_hook.unlink()
             recovered = self.run_tool(
@@ -4888,17 +4245,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 canon_root=canon,
                 remote=remote,
             )
-            self.assertEqual(
-                recovered.returncode, 0, recovered.stdout + recovered.stderr
-            )
+            self.assertEqual(recovered.returncode, 0, recovered.stdout + recovered.stderr)
             self.assertIn(
                 "RUNTIME_LOG_ARCHIVE_PUBLICATION_STATUS=committed",
                 recovered.stdout,
             )
             self.assertFalse(spool_path.exists())
-            self.assertEqual(
-                len(local_index.read_text(encoding="utf-8").splitlines()), 1
-            )
+            self.assertEqual(len(local_index.read_text(encoding="utf-8").splitlines()), 1)
 
 
 if __name__ == "__main__":
