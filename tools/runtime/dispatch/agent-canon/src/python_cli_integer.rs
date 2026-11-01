@@ -53,7 +53,7 @@ fn is_python_decimal_digit(character: char) -> bool {
     decimal_digit_pattern().is_match(character.encode_utf8(&mut encoded))
 }
 
-pub(crate) fn decimal_digit_value(character: char) -> Option<u8> {
+pub fn decimal_digit_value(character: char) -> Option<u8> {
     if !is_python_decimal_digit(character) {
         return None;
     }
@@ -71,14 +71,14 @@ pub(crate) fn decimal_digit_value(character: char) -> Option<u8> {
     u8::try_from(codepoint.checked_sub(zero)? % 10).ok()
 }
 
-pub(crate) fn is_python_digit(character: char) -> bool {
+pub fn is_python_digit(character: char) -> bool {
     decimal_digit_value(character).is_some()
         || PYTHON_NONDECIMAL_DIGIT_RANGES
             .iter()
             .any(|(start, end)| (*start..=*end).contains(&(character as u32)))
 }
 
-pub(crate) fn parse(value: &str) -> Option<BigInt> {
+pub fn parse(value: &str) -> Option<BigInt> {
     let value = value.trim();
     let (sign, digits) = if let Some(digits) = value.strip_prefix('+') {
         ("+", digits)
@@ -119,7 +119,7 @@ pub(crate) fn parse(value: &str) -> Option<BigInt> {
     normalized.parse().ok()
 }
 
-pub(crate) fn is_argparse_negative_number(value: &str) -> bool {
+pub fn is_argparse_negative_number(value: &str) -> bool {
     value
         .strip_prefix('-')
         .is_some_and(|digits| !digits.is_empty() && digits.chars().all(is_python_decimal_digit))
