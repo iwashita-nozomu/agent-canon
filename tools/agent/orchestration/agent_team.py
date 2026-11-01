@@ -10,7 +10,6 @@
 # upstream implementation ../../runtime/manifest/manifest_rendering.py provides the approved rendering APIs.
 # upstream implementation ../../repository/workspace/workspace_scope.py provides the approved scope APIs.
 # downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes the facade allowlist.
-# downstream implementation ../../runtime/lifecycle/task_close.py consumes the facade allowlist.
 # @dependency-end
 """Public facade for the AgentTeam owner modules."""
 

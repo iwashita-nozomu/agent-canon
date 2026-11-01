@@ -6,6 +6,7 @@
 // upstream design ../../../../../templates/agents/workflow_monitoring.md defines monitoring evidence
 // upstream implementation eval_manifest_paths.rs resolves canonical and legacy Eval manifests
 // upstream implementation report_artifact_checks.rs owns pure report artifact checks
+// downstream implementation task_close.rs consumes shared report status fields at terminal closeout
 // upstream implementation runtime_boundary.rs owns the external output capability
 // downstream implementation ../../../../../tools/catalog.yaml registers the native CLI route
 // downstream test ../tests/run_evaluation_native.rs verifies native scoring and CLI behavior
@@ -705,19 +706,12 @@ fn parse_markdown_status(
     reader: &RunBundleReader,
     name: &str,
 ) -> Result<BTreeMap<String, String>, RunEvaluationError> {
-    static STATUS_LINE: OnceLock<Regex> = OnceLock::new();
-    let pattern = STATUS_LINE
-        .get_or_init(|| Regex::new(r"^- ([a-zA-Z0-9_]+): (.+)$").expect("fixed status regex"));
-    let mut data = BTreeMap::new();
     let Some(text) = reader.read_text(name)? else {
-        return Ok(data);
+        return Ok(BTreeMap::new());
     };
-    for line in text.lines() {
-        if let Some(captures) = pattern.captures(line.trim()) {
-            data.insert(captures[1].to_string(), captures[2].trim().to_string());
-        }
-    }
-    Ok(data)
+    Ok(crate::report_artifact_checks::parse_markdown_status_lines(
+        &text,
+    ))
 }
 
 fn markdown_decision(reader: &RunBundleReader, name: &str) -> Result<String, RunEvaluationError> {

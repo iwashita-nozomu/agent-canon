@@ -1,0 +1,2847 @@
+{
+  "source": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/g6-packet-oracle-isolated-oybeq4lu/source/tools/agent/orchestration/packets.py",
+  "source_sha256": "cf7613c0345756f7879df525ebb4bc079f72c99ae9e737ba0db81071ec0d41fe",
+  "cases": [
+    {
+      "name": "normalized-base",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        "canonical_ascii_hex": "7b22617574686f726974795f726566223a22757365723a6f7264696e6172792d646f636b65722d6275696c64222c2263616e6469646174655f646967657374223a2263616e6469646174653a31222c22636f72726573706f6e64656e63655f7374617465223a227665726966696564222c22646f776e73747265616d5f6564676573223a5b5d2c22657865637574696f6e5f706c616e65223a22746f6f6c2d636f6e7461696e6572222c226661696c7572655f73656d616e74696373223a22646f636b6572206661696c7572652069732072657475726e656420776974686f757420636c61696d696e672073756363657373222c22696e76616c69646174696f6e5f696e70757473223a5b2263616e6469646174655f646967657374222c226d656368616e69736d5f726566222c226566666563745f636c6f73757265222c22746f6f6c5f696e7075745f6c6f6361746f72225d2c226d656368616e69736d5f726566223a22626f6f7473747261702e7368236275696c64222c226d656368616e69736d5f73756666696369656e6379223a2274686520696d6167652069732070726f6475636564206279207468652073656c6563746564206275696c642070617468222c226d656368616e69736d5f7472616e736974696f6e223a22636865636b6f75742d3e696d616765222c226e6f745f67756172616e74656564223a5b22686f73742d6461656d6f6e2d6361706162696c697479222c2270726f6a6563742d7465737473225d2c226f62736572766174696f6e5f6f7574636f6d65223a226f627365727665645f70617373222c226f776e65725f726566223a22626f6f7473747261702d72756e74696d652d6f776e6572222c227072696d6172795f6f62736572766174696f6e5f726566223a22726563656970743a626f6f7473747261702d72756e74696d652d6f776e65723a636f6e74726163743a746f6f6c2d696d6167653a746f6f6c2d636f6e7461696e6572222c2270726f70657274795f726566223a22636f6e74726163743a746f6f6c2d696d616765222c22736368656d61223a226167656e742d63616e6f6e2e6f776e65722d67756172616e7465652e7631222c22736f757263655f736e617073686f74223a226769743a3234383666313739222c22746f6f6c5f696e7075745f6c6f6361746f72223a22636f6d6d616e643a646f636b65722d6275696c64227d",
+        "canonical_ascii_sha256": "155d038b53ebbdc5f3984208914d33cbba54b9055f831df73f3167c17ced6c67"
+      }
+    },
+    {
+      "name": "python-strip-control",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "\u001c agent-canon.owner-guarantee.v1 \u001c",
+          "owner_ref": "\u001c bootstrap-runtime-owner \u001c",
+          "candidate_digest": "\u001c candidate:1 \u001c",
+          "property_ref": "\u001c contract:tool-image \u001c",
+          "mechanism_ref": "\u001c bootstrap.sh#build \u001c",
+          "mechanism_transition": "\u001c checkout->image \u001c",
+          "mechanism_sufficiency": "\u001c the image is produced by the selected build path \u001c",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "\u001c docker failure is returned without claiming success \u001c",
+          "execution_plane": "\u001c tool-container \u001c",
+          "tool_input_locator": "\u001c command:docker-build \u001c",
+          "primary_observation_ref": "\u001c receipt:bootstrap-runtime-owner:contract:tool-image:tool-container \u001c",
+          "observation_outcome": "\u001c observed_pass \u001c",
+          "correspondence_state": "\u001c verified \u001c",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "\u001c git:2486f179 \u001c",
+          "authority_ref": "\u001c user:ordinary-docker-build \u001c"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        "canonical_ascii_hex": "7b22617574686f726974795f726566223a22757365723a6f7264696e6172792d646f636b65722d6275696c64222c2263616e6469646174655f646967657374223a2263616e6469646174653a31222c22636f72726573706f6e64656e63655f7374617465223a227665726966696564222c22646f776e73747265616d5f6564676573223a5b5d2c22657865637574696f6e5f706c616e65223a22746f6f6c2d636f6e7461696e6572222c226661696c7572655f73656d616e74696373223a22646f636b6572206661696c7572652069732072657475726e656420776974686f757420636c61696d696e672073756363657373222c22696e76616c69646174696f6e5f696e70757473223a5b2263616e6469646174655f646967657374222c226d656368616e69736d5f726566222c226566666563745f636c6f73757265222c22746f6f6c5f696e7075745f6c6f6361746f72225d2c226d656368616e69736d5f726566223a22626f6f7473747261702e7368236275696c64222c226d656368616e69736d5f73756666696369656e6379223a2274686520696d6167652069732070726f6475636564206279207468652073656c6563746564206275696c642070617468222c226d656368616e69736d5f7472616e736974696f6e223a22636865636b6f75742d3e696d616765222c226e6f745f67756172616e74656564223a5b22686f73742d6461656d6f6e2d6361706162696c697479222c2270726f6a6563742d7465737473225d2c226f62736572766174696f6e5f6f7574636f6d65223a226f627365727665645f70617373222c226f776e65725f726566223a22626f6f7473747261702d72756e74696d652d6f776e6572222c227072696d6172795f6f62736572766174696f6e5f726566223a22726563656970743a626f6f7473747261702d72756e74696d652d6f776e65723a636f6e74726163743a746f6f6c2d696d6167653a746f6f6c2d636f6e7461696e6572222c2270726f70657274795f726566223a22636f6e74726163743a746f6f6c2d696d616765222c22736368656d61223a226167656e742d63616e6f6e2e6f776e65722d67756172616e7465652e7631222c22736f757263655f736e617073686f74223a226769743a3234383666313739222c22746f6f6c5f696e7075745f6c6f6361746f72223a22636f6d6d616e643a646f636b65722d6275696c64227d",
+        "canonical_ascii_sha256": "155d038b53ebbdc5f3984208914d33cbba54b9055f831df73f3167c17ced6c67"
+      }
+    },
+    {
+      "name": "lone-surrogate-text",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "valid-\ud800",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "valid-\ud800",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        "canonical_ascii_hex": "7b22617574686f726974795f726566223a22757365723a6f7264696e6172792d646f636b65722d6275696c64222c2263616e6469646174655f646967657374223a2263616e6469646174653a31222c22636f72726573706f6e64656e63655f7374617465223a227665726966696564222c22646f776e73747265616d5f6564676573223a5b5d2c22657865637574696f6e5f706c616e65223a22746f6f6c2d636f6e7461696e6572222c226661696c7572655f73656d616e74696373223a22646f636b6572206661696c7572652069732072657475726e656420776974686f757420636c61696d696e672073756363657373222c22696e76616c69646174696f6e5f696e70757473223a5b2263616e6469646174655f646967657374222c226d656368616e69736d5f726566222c226566666563745f636c6f73757265222c22746f6f6c5f696e7075745f6c6f6361746f72225d2c226d656368616e69736d5f726566223a22626f6f7473747261702e7368236275696c64222c226d656368616e69736d5f73756666696369656e6379223a2276616c69642d5c7564383030222c226d656368616e69736d5f7472616e736974696f6e223a22636865636b6f75742d3e696d616765222c226e6f745f67756172616e74656564223a5b22686f73742d6461656d6f6e2d6361706162696c697479222c2270726f6a6563742d7465737473225d2c226f62736572766174696f6e5f6f7574636f6d65223a226f627365727665645f70617373222c226f776e65725f726566223a22626f6f7473747261702d72756e74696d652d6f776e6572222c227072696d6172795f6f62736572766174696f6e5f726566223a22726563656970743a626f6f7473747261702d72756e74696d652d6f776e65723a636f6e74726163743a746f6f6c2d696d6167653a746f6f6c2d636f6e7461696e6572222c2270726f70657274795f726566223a22636f6e74726163743a746f6f6c2d696d616765222c22736368656d61223a226167656e742d63616e6f6e2e6f776e65722d67756172616e7465652e7631222c22736f757263655f736e617073686f74223a226769743a3234383666313739222c22746f6f6c5f696e7075745f6c6f6361746f72223a22636f6d6d616e643a646f636b65722d6275696c64227d",
+        "canonical_ascii_sha256": "c50507e908308958e578f96e7d14283ef19934a3ef19ed3e62b02fb356d4cbce"
+      }
+    },
+    {
+      "name": "missing-authority_ref",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:authority_ref"
+      }
+    },
+    {
+      "name": "missing-candidate_digest",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:candidate_digest"
+      }
+    },
+    {
+      "name": "missing-correspondence_state",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:correspondence_state"
+      }
+    },
+    {
+      "name": "missing-downstream_edges",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:downstream_edges"
+      }
+    },
+    {
+      "name": "missing-execution_plane",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:execution_plane"
+      }
+    },
+    {
+      "name": "missing-failure_semantics",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:failure_semantics"
+      }
+    },
+    {
+      "name": "missing-invalidation_inputs",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:invalidation_inputs"
+      }
+    },
+    {
+      "name": "missing-mechanism_ref",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:mechanism_ref"
+      }
+    },
+    {
+      "name": "missing-mechanism_sufficiency",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:mechanism_sufficiency"
+      }
+    },
+    {
+      "name": "missing-mechanism_transition",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:mechanism_transition"
+      }
+    },
+    {
+      "name": "missing-not_guaranteed",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:not_guaranteed"
+      }
+    },
+    {
+      "name": "missing-observation_outcome",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:observation_outcome"
+      }
+    },
+    {
+      "name": "missing-owner_ref",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:owner_ref"
+      }
+    },
+    {
+      "name": "missing-primary_observation_ref",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:primary_observation_ref"
+      }
+    },
+    {
+      "name": "missing-property_ref",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:property_ref"
+      }
+    },
+    {
+      "name": "missing-schema",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:schema"
+      }
+    },
+    {
+      "name": "missing-source_snapshot",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:source_snapshot"
+      }
+    },
+    {
+      "name": "missing-tool_input_locator",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:field_missing:tool_input_locator"
+      }
+    },
+    {
+      "name": "unknown-before-missing",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build",
+          "zzz": 1,
+          "aaa": 2
+        }
+      ],
+      "kwargs": {
+        "field_prefix": "custom"
+      },
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "custom:field_unknown:aaa,zzz"
+      }
+    },
+    {
+      "name": "mapping-null",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        null
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:mapping_required"
+      }
+    },
+    {
+      "name": "mapping-array",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        []
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:mapping_required"
+      }
+    },
+    {
+      "name": "mapping-number",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        12
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee:mapping_required"
+      }
+    },
+    {
+      "name": "invalid-schema-25",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "unknown",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.schema:unknown:unknown"
+      }
+    },
+    {
+      "name": "invalid-observation_outcome-26",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "bad",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.observation_outcome:invalid"
+      }
+    },
+    {
+      "name": "invalid-correspondence_state-27",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "bad",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.correspondence_state:invalid"
+      }
+    },
+    {
+      "name": "invalid-owner_ref-28",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": " ",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.owner_ref:required"
+      }
+    },
+    {
+      "name": "invalid-not_guaranteed-29",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.not_guaranteed:list_required"
+      }
+    },
+    {
+      "name": "invalid-not_guaranteed-30",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            1
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.not_guaranteed[0]:required"
+      }
+    },
+    {
+      "name": "invalid-downstream_edges-31",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [
+            null
+          ],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.downstream_edges[0]:required"
+      }
+    },
+    {
+      "name": "invalid-invalidation_inputs-32",
+      "operation": "normalize_owner_guarantee_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "mechanism_ref"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_guarantee.invalidation_inputs:candidate_digest_missing"
+      }
+    },
+    {
+      "name": "receipt-key",
+      "operation": "owner_receipt_key",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": [
+          "candidate:1",
+          "contract:tool-image",
+          "bootstrap-runtime-owner",
+          "tool-container",
+          "command:docker-build"
+        ],
+        "canonical_ascii_hex": "5b2263616e6469646174653a31222c22636f6e74726163743a746f6f6c2d696d616765222c22626f6f7473747261702d72756e74696d652d6f776e6572222c22746f6f6c2d636f6e7461696e6572222c22636f6d6d616e643a646f636b65722d6275696c64225d",
+        "canonical_ascii_sha256": "304694a940084c57e778c716d0949824275d63c85d81da0c62ce429010839b48"
+      }
+    },
+    {
+      "name": "compatible-default",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "compatible-candidate_digest",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "candidate_digest": "candidate:1"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-candidate_digest",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "candidate_digest": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "compatible-property_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "property_ref": "contract:tool-image"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-property_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "property_ref": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "compatible-owner_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "owner_ref": "bootstrap-runtime-owner"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-owner_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "owner_ref": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "compatible-execution_plane",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "execution_plane": "tool-container"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-execution_plane",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "execution_plane": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "compatible-tool_input_locator",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "tool_input_locator": "command:docker-build"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-tool_input_locator",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "tool_input_locator": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "compatible-mechanism_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "mechanism_ref": "bootstrap.sh#build"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "mismatch-mechanism_ref",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {
+        "mechanism_ref": "different"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "not-verified-correspondence_state",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "advisory",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "not-verified-observation_outcome",
+      "operation": "owner_receipt_is_compatible",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "bootstrap-runtime-owner",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:bootstrap-runtime-owner:contract:tool-image:tool-container",
+          "observation_outcome": "inconclusive",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "invalidation-normalize",
+      "operation": "normalize_owner_invalidation_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        },
+        "canonical_ascii_hex": "7b2261666665637465645f65646765223a226f776e65722d612d3e6f776e65722d62222c2263616e6469646174655f646967657374223a2263616e6469646174653a31222c226368616e6765645f6d656368616e69736d5f726566223a22626f6f7473747261702e7368236275696c64222c2266726f6d5f6f776e6572223a226f776e65722d61222c22696e76616c6964617465645f70726f70657274795f726566223a22636f6e74726163743a746f6f6c2d696d616765222c22696e76616c6964617465645f726563656970745f726566223a22726563656970743a6f776e65722d613a636f6e74726163743a746f6f6c2d696d6167653a746f6f6c2d636f6e7461696e6572222c226f776e65725f616374696f6e223a2272656576616c756174655f6c6f63616c5f636f72726573706f6e64656e6365222c22726561736f6e223a226d656368616e69736d5f6368616e676564222c22736368656d61223a226167656e742d63616e6f6e2e6f776e65722d696e76616c69646174696f6e2e7631222c22746f5f6f776e6572223a226f776e65722d62227d",
+        "canonical_ascii_sha256": "04a159d310f44684bc954606fbb3c6d4b1289e9f7c74a159a1a53c9bc4299070"
+      }
+    },
+    {
+      "name": "invalidation-invalid-schema",
+      "operation": "normalize_owner_invalidation_packet",
+      "args": [
+        {
+          "schema": "unknown",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_invalidation.schema:unknown:unknown"
+      }
+    },
+    {
+      "name": "invalidation-invalid-reason",
+      "operation": "normalize_owner_invalidation_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "unknown",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_invalidation.reason:invalid"
+      }
+    },
+    {
+      "name": "invalidation-invalid-owner_action",
+      "operation": "normalize_owner_invalidation_packet",
+      "args": [
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "none"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "error",
+        "class": "RuntimeError",
+        "message": "owner_invalidation.owner_action:invalid"
+      }
+    },
+    {
+      "name": "invalidation-target-owner-a",
+      "operation": "owner_receipt_is_invalidated",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "owner-a",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "invalidation-target-owner-b",
+      "operation": "owner_receipt_is_invalidated",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "owner-b",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:owner-b:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": true,
+        "canonical_ascii_hex": "74727565",
+        "canonical_ascii_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    },
+    {
+      "name": "invalidation-target-owner-c",
+      "operation": "owner_receipt_is_invalidated",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "owner-c",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:owner-c:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "candidate:1",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "invalidation-other-candidate",
+      "operation": "owner_receipt_is_invalidated",
+      "args": [
+        {
+          "schema": "agent-canon.owner-guarantee.v1",
+          "owner_ref": "owner-a",
+          "candidate_digest": "candidate:1",
+          "property_ref": "contract:tool-image",
+          "mechanism_ref": "bootstrap.sh#build",
+          "mechanism_transition": "checkout->image",
+          "mechanism_sufficiency": "the image is produced by the selected build path",
+          "not_guaranteed": [
+            "host-daemon-capability",
+            "project-tests"
+          ],
+          "failure_semantics": "docker failure is returned without claiming success",
+          "execution_plane": "tool-container",
+          "tool_input_locator": "command:docker-build",
+          "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "observation_outcome": "observed_pass",
+          "correspondence_state": "verified",
+          "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator"
+          ],
+          "downstream_edges": [],
+          "source_snapshot": "git:2486f179",
+          "authority_ref": "user:ordinary-docker-build"
+        },
+        {
+          "schema": "agent-canon.owner-invalidation.v1",
+          "from_owner": "owner-a",
+          "to_owner": "owner-b",
+          "candidate_digest": "other",
+          "changed_mechanism_ref": "bootstrap.sh#build",
+          "invalidated_property_ref": "contract:tool-image",
+          "invalidated_receipt_ref": "receipt:owner-a:contract:tool-image:tool-container",
+          "reason": "mechanism_changed",
+          "affected_edge": "owner-a->owner-b",
+          "owner_action": "reevaluate_local_correspondence"
+        }
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": false,
+        "canonical_ascii_hex": "66616c7365",
+        "canonical_ascii_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+      }
+    },
+    {
+      "name": "closeout-empty",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        []
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": true,
+          "reasons": []
+        },
+        "canonical_ascii_hex": "7b227265616479223a747275652c22726561736f6e73223a5b5d7d",
+        "canonical_ascii_sha256": "4d52e0f4b29ca92ff680df9f3033f8782b2fdc09fe6fc6d578cbf39204a87b60"
+      }
+    },
+    {
+      "name": "closeout-ready",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          },
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-b",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-b:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "dependency_edges": [
+          "owner-a->owner-b"
+        ]
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": true,
+          "reasons": []
+        },
+        "canonical_ascii_hex": "7b227265616479223a747275652c22726561736f6e73223a5b5d7d",
+        "canonical_ascii_sha256": "4d52e0f4b29ca92ff680df9f3033f8782b2fdc09fe6fc6d578cbf39204a87b60"
+      }
+    },
+    {
+      "name": "closeout-missing-owner",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "required_owner_refs": [
+          "owner-b",
+          "owner-c"
+        ]
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "missing_owner:owner-b",
+            "missing_owner:owner-c"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b226d697373696e675f6f776e65723a6f776e65722d62222c226d697373696e675f6f776e65723a6f776e65722d63225d7d",
+        "canonical_ascii_sha256": "8cfc7229d2328654ebac55c9019e335bb765af417d17c1fa1180559e7dbddbcc"
+      }
+    },
+    {
+      "name": "closeout-missing-edge",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "dependency_edges": [
+          "owner-b->owner-c"
+        ]
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "missing_dependency_edge:owner-b->owner-c"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b226d697373696e675f646570656e64656e63795f656467653a6f776e65722d622d3e6f776e65722d63225d7d",
+        "canonical_ascii_sha256": "4651ecf37505b5431835d7759c06f7d9b2236512385280962ffecb58ece008e5"
+      }
+    },
+    {
+      "name": "closeout-different-candidate",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "candidate_digest": "other"
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "incompatible:receipt:owner-a:contract:tool-image:tool-container"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b22696e636f6d70617469626c653a726563656970743a6f776e65722d613a636f6e74726163743a746f6f6c2d696d6167653a746f6f6c2d636f6e7461696e6572225d7d",
+        "canonical_ascii_sha256": "d03ec102085a4b11b4f51fe36ff671b9c3917cab869f439832b17c96572ceea2"
+      }
+    },
+    {
+      "name": "closeout-advisory",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "advisory",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:advisory:contract:tool-image:tool-container",
+            "observation_outcome": "inconclusive",
+            "correspondence_state": "advisory",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": true,
+          "reasons": []
+        },
+        "canonical_ascii_hex": "7b227265616479223a747275652c22726561736f6e73223a5b5d7d",
+        "canonical_ascii_sha256": "4d52e0f4b29ca92ff680df9f3033f8782b2fdc09fe6fc6d578cbf39204a87b60"
+      }
+    },
+    {
+      "name": "closeout-advisory-required",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "advisory",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:advisory:contract:tool-image:tool-container",
+            "observation_outcome": "inconclusive",
+            "correspondence_state": "advisory",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "required_owner_refs": [
+          "advisory"
+        ]
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "missing_owner:advisory"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b226d697373696e675f6f776e65723a61647669736f7279225d7d",
+        "canonical_ascii_sha256": "6d770cd0b67ab06344931750c044164905c93c40fe45af45c8053858be9aec3f"
+      }
+    },
+    {
+      "name": "closeout-dedupe",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          },
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          },
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-b",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-b:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          }
+        ]
+      ],
+      "kwargs": {
+        "required_owner_refs": [
+          "owner-a",
+          "owner-b"
+        ]
+      },
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": true,
+          "reasons": []
+        },
+        "canonical_ascii_hex": "7b227265616479223a747275652c22726561736f6e73223a5b5d7d",
+        "canonical_ascii_sha256": "4d52e0f4b29ca92ff680df9f3033f8782b2fdc09fe6fc6d578cbf39204a87b60"
+      }
+    },
+    {
+      "name": "closeout-malformed",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {}
+        ]
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "owner_receipts[0]:field_missing:authority_ref,candidate_digest,correspondence_state,downstream_edges,execution_plane,failure_semantics,invalidation_inputs,mechanism_ref,mechanism_sufficiency,mechanism_transition,not_guaranteed,observation_outcome,owner_ref,primary_observation_ref,property_ref,schema,source_snapshot,tool_input_locator"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b226f776e65725f72656365697074735b305d3a6669656c645f6d697373696e673a617574686f726974795f7265662c63616e6469646174655f6469676573742c636f72726573706f6e64656e63655f73746174652c646f776e73747265616d5f65646765732c657865637574696f6e5f706c616e652c6661696c7572655f73656d616e746963732c696e76616c69646174696f6e5f696e707574732c6d656368616e69736d5f7265662c6d656368616e69736d5f73756666696369656e63792c6d656368616e69736d5f7472616e736974696f6e2c6e6f745f67756172616e746565642c6f62736572766174696f6e5f6f7574636f6d652c6f776e65725f7265662c7072696d6172795f6f62736572766174696f6e5f7265662c70726f70657274795f7265662c736368656d612c736f757263655f736e617073686f742c746f6f6c5f696e7075745f6c6f6361746f72225d7d",
+        "canonical_ascii_sha256": "aea8af94cd0304fa78bf4b2ce4ba47edb0fa92ae93254c8497939decb57d58a8"
+      }
+    },
+    {
+      "name": "closeout-malformed-prefix",
+      "operation": "owner_receipt_closeout_state",
+      "args": [
+        [
+          {
+            "schema": "agent-canon.owner-guarantee.v1",
+            "owner_ref": "owner-a",
+            "candidate_digest": "candidate:1",
+            "property_ref": "contract:tool-image",
+            "mechanism_ref": "bootstrap.sh#build",
+            "mechanism_transition": "checkout->image",
+            "mechanism_sufficiency": "the image is produced by the selected build path",
+            "not_guaranteed": [
+              "host-daemon-capability",
+              "project-tests"
+            ],
+            "failure_semantics": "docker failure is returned without claiming success",
+            "execution_plane": "tool-container",
+            "tool_input_locator": "command:docker-build",
+            "primary_observation_ref": "receipt:owner-a:contract:tool-image:tool-container",
+            "observation_outcome": "observed_pass",
+            "correspondence_state": "verified",
+            "invalidation_inputs": [
+              "candidate_digest",
+              "mechanism_ref",
+              "effect_closure",
+              "tool_input_locator"
+            ],
+            "downstream_edges": [
+              "owner-a->owner-b"
+            ],
+            "source_snapshot": "git:2486f179",
+            "authority_ref": "user:ordinary-docker-build"
+          },
+          {}
+        ]
+      ],
+      "kwargs": {},
+      "outcome": {
+        "status": "ok",
+        "result": {
+          "ready": false,
+          "reasons": [
+            "owner_receipts[1]:field_missing:authority_ref,candidate_digest,correspondence_state,downstream_edges,execution_plane,failure_semantics,invalidation_inputs,mechanism_ref,mechanism_sufficiency,mechanism_transition,not_guaranteed,observation_outcome,owner_ref,primary_observation_ref,property_ref,schema,source_snapshot,tool_input_locator"
+          ]
+        },
+        "canonical_ascii_hex": "7b227265616479223a66616c73652c22726561736f6e73223a5b226f776e65725f72656365697074735b315d3a6669656c645f6d697373696e673a617574686f726974795f7265662c63616e6469646174655f6469676573742c636f72726573706f6e64656e63655f73746174652c646f776e73747265616d5f65646765732c657865637574696f6e5f706c616e652c6661696c7572655f73656d616e746963732c696e76616c69646174696f6e5f696e707574732c6d656368616e69736d5f7265662c6d656368616e69736d5f73756666696369656e63792c6d656368616e69736d5f7472616e736974696f6e2c6e6f745f67756172616e746565642c6f62736572766174696f6e5f6f7574636f6d652c6f776e65725f7265662c7072696d6172795f6f62736572766174696f6e5f7265662c70726f70657274795f7265662c736368656d612c736f757263655f736e617073686f742c746f6f6c5f696e7075745f6c6f6361746f72225d7d",
+        "canonical_ascii_sha256": "97cdc63b53d2313bd5637620de0bf43ce4ab29a958cf619f133dabca36c92311"
+      }
+    }
+  ]
+}

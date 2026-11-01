@@ -8,7 +8,6 @@
 # downstream implementation ../../repository/github/publication_integrator.py imports approval and publication identities.
 # downstream implementation ../../repository/github/github_publish.py verifies publication packet identities before network mutation.
 # downstream implementation ./report_artifact_checks.py recomputes artifact identity equality.
-# downstream implementation ../lifecycle/task_close.py rejects stale or hand-transcribed artifact identities.
 # downstream implementation ../../../tests/agent_tools/test_artifact_identity.py validates exact byte and source readback.
 # @dependency-end
 """Materialize exact artifact identities from Git objects or stable file bytes."""
