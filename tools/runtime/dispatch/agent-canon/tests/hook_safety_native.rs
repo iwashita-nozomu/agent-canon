@@ -134,71 +134,147 @@ fn git_intent_and_redacted_payload_match_frozen_commands_and_old_api_results() {
 
 #[test]
 fn unicode_secret_boundaries_match_supplemental_python_probe_results() {
-    let github = "ghp_test_canary_00000000000000000000000000000000";
-    let github_cases = [
+    // Exact synthetic inputs and old results from the parent-accepted probe.
+    let cases: [(&str, &str, Option<&str>); 41] = [
         (
             "combining-prefix",
-            format!("\u{0301}{github}"),
+            "\u{301}ghp_test_canary_00000000000000000000000000000000",
             Some("GitHub token"),
         ),
         (
             "combining-suffix",
-            format!("{github}\u{0301}"),
+            "ghp_test_canary_00000000000000000000000000000000\u{301}",
             Some("GitHub token"),
         ),
         (
             "joiner-prefix",
-            format!("\u{200d}{github}"),
+            "\u{200d}ghp_test_canary_00000000000000000000000000000000",
             Some("GitHub token"),
         ),
-        ("letter-prefix", format!("é{github}"), None),
+        (
+            "letter-prefix",
+            "\u{e9}ghp_test_canary_00000000000000000000000000000000",
+            None,
+        ),
         (
             "unicode16-prefix",
-            format!("\u{1c89}{github}"),
+            "\u{1c89}ghp_test_canary_00000000000000000000000000000000",
             Some("GitHub token"),
         ),
+        ("sk-5", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", None),
+        ("sk-6", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{e9}", None),
+        ("sk-7", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{301}", None),
+        (
+            "sk-8",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-9", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-", None),
+        ("sk-10", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{e9}", None),
+        ("sk-11", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{301}", None),
+        (
+            "sk-12",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-X",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-13", "sk--------------------------------", None),
+        ("sk-14", "sk--------------------------------\u{e9}", None),
+        ("sk-15", "sk--------------------------------\u{301}", None),
+        (
+            "sk-16",
+            "sk--------------------------------X",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-17",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-18", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{e9}", None),
+        (
+            "sk-19",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{301}",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-20",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-21", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-", None),
+        (
+            "sk-22",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{e9}",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-23", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{301}", None),
+        (
+            "sk-24",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-X",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-25", "sk---------------------------------", None),
+        (
+            "sk-26",
+            "sk---------------------------------\u{e9}",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-27", "sk---------------------------------\u{301}", None),
+        (
+            "sk-28",
+            "sk---------------------------------X",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-29",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-30", "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{e9}", None),
+        (
+            "sk-31",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{301}",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-32",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-33",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-34",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{e9}",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-35",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-\u{301}",
+            Some("OpenAI-style API key"),
+        ),
+        (
+            "sk-36",
+            "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-X",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-37", "sk----------------------------------", None),
+        (
+            "sk-38",
+            "sk----------------------------------\u{e9}",
+            Some("OpenAI-style API key"),
+        ),
+        ("sk-39", "sk----------------------------------\u{301}", None),
+        (
+            "sk-40",
+            "sk----------------------------------X",
+            Some("OpenAI-style API key"),
+        ),
     ];
-    let mut case_count = 0;
-    for (case_id, prompt, expected) in github_cases {
-        assert_eq!(secret_kind(&prompt), expected, "{case_id}");
-        case_count += 1;
+    for (case_id, prompt, expected) in cases {
+        assert_eq!(secret_kind(prompt), expected, "{case_id}");
     }
-
-    let openai = Some("OpenAI-style API key");
-    let openai_tail_cases = [
-        ("a31", "a".repeat(31), [None, None, None, openai]),
-        (
-            "a30-dash",
-            format!("{}-", "a".repeat(30)),
-            [None, None, None, openai],
-        ),
-        ("dashes32", "-".repeat(32), [None, None, None, openai]),
-        ("a32", "a".repeat(32), [openai, None, openai, openai]),
-        (
-            "a31-dash",
-            format!("{}-", "a".repeat(31)),
-            [None, openai, None, openai],
-        ),
-        ("dashes33", "-".repeat(33), [None, openai, None, openai]),
-        ("a33", "a".repeat(33), [openai, None, openai, openai]),
-        (
-            "a32-dash",
-            format!("{}-", "a".repeat(32)),
-            [openai, openai, openai, openai],
-        ),
-        ("dashes34", "-".repeat(34), [None, openai, None, openai]),
-    ];
-    let suffixes = ["", "é", "\u{0301}", "X"];
-    for (tail_case, tail, expected_by_suffix) in openai_tail_cases {
-        for (suffix_index, suffix) in suffixes.iter().enumerate() {
-            let prompt = format!("sk-{tail}{suffix}");
-            assert_eq!(
-                secret_kind(&prompt),
-                expected_by_suffix[suffix_index],
-                "OpenAI synthetic tail case {tail_case}, suffix index {suffix_index}"
-            );
-            case_count += 1;
-        }
-    }
-    assert_eq!(case_count, 41);
 }
