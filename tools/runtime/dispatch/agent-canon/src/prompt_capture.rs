@@ -9,9 +9,7 @@
 // @dependency-end
 //! Pure prompt redaction and bounded prompt evidence capture.
 
-use crate::hook_safety::{
-    PYTHON_15_END_BOUNDARY, PYTHON_15_NONWORD_CHAR, PYTHON_15_START_BOUNDARY, PYTHON_15_WORD_CHAR,
-};
+use crate::hook_safety::PYTHON_15_WORD_CHAR;
 use crate::python_json::{JsonObject, JsonString, JsonValue};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -20,11 +18,14 @@ use std::sync::LazyLock;
 pub const DEFAULT_EXCERPT_LIMIT: usize = 600;
 const REDACTED_SECRET: &str = "[REDACTED_SECRET]";
 
-static SECRET_RE: LazyLock<Regex> = LazyLock::new(|| {
-    let pattern = format!(
-        r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----|{PYTHON_15_START_BOUNDARY}AKIA[0-9A-Z]{{16}}{PYTHON_15_END_BOUNDARY}|{PYTHON_15_START_BOUNDARY}gh[pousr]_[A-Za-z0-9_]{{30,}}{PYTHON_15_END_BOUNDARY}|{PYTHON_15_START_BOUNDARY}sk-(?:[A-Za-z0-9_-]{{31,}}[A-Za-z0-9_](?:\z|{PYTHON_15_NONWORD_CHAR})|[A-Za-z0-9_-]{{31,}}-{PYTHON_15_WORD_CHAR})"
-    );
-    Regex::new(&pattern).expect("static prompt redaction pattern is valid")
+static SECRET_BODY_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"-----BEGIN (RSA |DSA |EC |OPENSSH |)PRIVATE KEY-----|AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{30,}|sk-[A-Za-z0-9_-]{32,}",
+    )
+    .expect("static prompt redaction body pattern is valid")
+});
+static PYTHON_15_WORD_CHAR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(PYTHON_15_WORD_CHAR).expect("shared Python Unicode 15 word class is valid")
 });
 
 /// One bounded, redacted prompt observation.
@@ -78,8 +79,78 @@ pub fn redact_sensitive_text(text: &JsonString) -> JsonString {
 }
 
 fn append_redacted_run(value: &str, output: &mut Vec<u32>) {
-    let redacted = SECRET_RE.replace_all(value, REDACTED_SECRET);
-    output.extend(redacted.chars().map(u32::from));
+    let mut output_offset = 0;
+    let mut search_offset = 0;
+
+    while let Some(candidate) = SECRET_BODY_RE.find_at(value, search_offset) {
+        let body = candidate.as_str();
+        let body_end = if body.starts_with("-----BEGIN ") {
+            candidate.end()
+        } else {
+            if !has_python_15_left_boundary(value, candidate.start()) {
+                search_offset = candidate.start() + 1;
+                continue;
+            }
+            let Some(end) = secret_body_end(value, candidate.start(), candidate.end(), body) else {
+                search_offset = candidate.start() + 1;
+                continue;
+            };
+            end
+        };
+
+        output.extend(
+            value[output_offset..candidate.start()]
+                .chars()
+                .map(u32::from),
+        );
+        output.extend(REDACTED_SECRET.chars().map(u32::from));
+        output_offset = body_end;
+        // Python's \b is zero-width. Resume at the body end so this same
+        // boundary can establish the next adjacent secret match.
+        search_offset = body_end;
+    }
+
+    output.extend(value[output_offset..].chars().map(u32::from));
+}
+
+fn secret_body_end(value: &str, start: usize, greedy_end: usize, body: &str) -> Option<usize> {
+    if body.starts_with("sk-") {
+        let minimum_end = start + "sk-".len() + 32;
+        let mut end = greedy_end;
+        while end >= minimum_end {
+            if has_python_15_right_boundary(value, end) {
+                return Some(end);
+            }
+            // The OpenAI-style body alphabet is ASCII, so each regex
+            // backtracking step moves one byte and one code point.
+            end -= 1;
+        }
+        None
+    } else if has_python_15_right_boundary(value, greedy_end) {
+        Some(greedy_end)
+    } else {
+        None
+    }
+}
+
+fn has_python_15_left_boundary(value: &str, index: usize) -> bool {
+    let previous = value[..index].chars().next_back();
+    let first = value[index..].chars().next();
+    is_python_15_word_char(previous) != is_python_15_word_char(first)
+}
+
+fn has_python_15_right_boundary(value: &str, index: usize) -> bool {
+    let previous = value[..index].chars().next_back();
+    let next = value[index..].chars().next();
+    is_python_15_word_char(previous) != is_python_15_word_char(next)
+}
+
+fn is_python_15_word_char(character: Option<char>) -> bool {
+    let Some(character) = character else {
+        return false;
+    };
+    let mut buffer = [0; 4];
+    PYTHON_15_WORD_CHAR_RE.is_match(character.encode_utf8(&mut buffer))
 }
 
 /// Capture a JSON prompt using the standard 600-codepoint excerpt bound.
