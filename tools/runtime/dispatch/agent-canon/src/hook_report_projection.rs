@@ -168,7 +168,6 @@ fn update_monitoring_file(
 ) -> Result<PathBuf, String> {
     let mut file = OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
         .append(true)
         .open(path)
