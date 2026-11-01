@@ -4,6 +4,7 @@
 // downstream implementation source_dependency_graph.rs delegates Python-compatible path-component matching
 // downstream implementation semantic_responsibility.rs delegates its checked references to this shared resolver
 // downstream implementation lean_proof_env.rs resolves selected package and Lean source paths
+// downstream implementation hook_retirement.rs resolves the read-only audit root
 // downstream implementation token_footprints.rs expands Python-compatible session glob patterns
 // downstream implementation codex_runtime_summary.rs expands legacy session glob patterns
 // @dependency-end

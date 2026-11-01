@@ -75,7 +75,7 @@ roots = [
   "tools/runtime/artifacts/artifact_identity.py",
   "tools/runtime/artifacts/runtime_artifacts.py",
   "tools/runtime/authority/__init__.py",
-  "tools/runtime/authority/hook_retirement.py",
+  "tools/runtime/dispatch/agent-canon/src/hook_retirement.rs",
   "tools/runtime/authority/hook_safety.py",
   "tools/runtime/authority/mutation_authority.py",
   "tools/runtime/authority/writer_target.py",

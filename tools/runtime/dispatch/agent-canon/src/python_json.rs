@@ -4,6 +4,7 @@
 // downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
+// downstream implementation hook_retirement.rs parses hook config and emits compact contract JSON.
 // downstream implementation codex_runtime_summary.rs preserves Python JSON parsing and canonical append bytes.
 // downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
 // downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
