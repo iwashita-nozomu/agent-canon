@@ -1093,7 +1093,6 @@ fn inspect_archive(
             next_header_offset: directory_offset,
         });
     }
-    drop(entries);
 
     let mut physical_order = (0..members.len()).collect::<Vec<_>>();
     physical_order.sort_by(|left, right| {
@@ -1142,10 +1141,6 @@ fn inspect_archive(
         base_offset,
         members,
     })
-}
-
-fn decode_zip_name(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
-    decode_zip_name_untruncated(raw_name, utf8_name).map(|name| truncate_zip_name(&name))
 }
 
 fn decode_zip_name_untruncated(raw_name: &[u8], utf8_name: bool) -> Result<String, String> {
@@ -1282,7 +1277,6 @@ fn copy_archive_members(
                 member.original_name
             ));
         }
-        drop(local_header);
         let (compressed_start, compressed_end) = entry.compressed_data_range();
         if compressed_start < member.local_header_offset
             || compressed_end < compressed_start
@@ -1983,11 +1977,6 @@ mod tests {
             fs::create_dir(&path).expect("create test temporary directory");
             Self(path)
         }
-
-        fn capability(&self) -> Dir {
-            Dir::open_ambient_dir(&self.0, cap_std::ambient_authority())
-                .expect("open test temporary directory capability")
-        }
     }
 
     impl Drop for TestDirectory {
@@ -2019,21 +2008,18 @@ mod tests {
     #[test]
     fn zip_names_follow_flags_and_python_nul_truncation() {
         assert_eq!(
-            decode_zip_name(b"caf\xc3\xa9.bin", false).unwrap(),
+            decode_zip_name_untruncated(b"caf\xc3\xa9.bin", false).unwrap(),
             "caf├⌐.bin"
         );
         assert_eq!(
-            decode_zip_name(b"caf\xc3\xa9.bin", true).unwrap(),
+            decode_zip_name_untruncated(b"caf\xc3\xa9.bin", true).unwrap(),
             "café.bin"
         );
         assert_eq!(
-            decode_zip_name(b"assets/\x82.bin", false).unwrap(),
+            decode_zip_name_untruncated(b"assets/\x82.bin", false).unwrap(),
             "assets/é.bin"
         );
-        assert_eq!(
-            decode_zip_name(b"assets/name\0ignored", false).unwrap(),
-            "assets/name"
-        );
+        assert_eq!(truncate_zip_name("assets/name\0ignored"), "assets/name");
     }
 
     #[test]
