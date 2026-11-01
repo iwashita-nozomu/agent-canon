@@ -36,6 +36,7 @@
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
+// downstream implementation tool_selection.rs owns pure tool-selection evidence
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
 // downstream implementation theorem_graph_board.rs owns theorem-graph route-board classification and rendering
@@ -92,6 +93,7 @@ pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;
+pub mod tool_selection;
 pub mod update_lifecycle_contract;
 
 #[cfg(test)]
