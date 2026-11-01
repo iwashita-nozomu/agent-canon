@@ -868,12 +868,23 @@ entries:
 
   - id: generated-artifact-guard
     summary: Rejects mechanically regenerated report outputs left in the source tree.
-    path: tools/runtime/artifacts/generated_artifact_guard.py
+    path: tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/runtime/artifacts/generated_artifact_guard.py
-    dispatch: {argv: ["python3", "tools/runtime/artifacts/generated_artifact_guard.py"]}
+    command: tools/bin/agent-canon generated-artifact-guard [--root <repo-root>]
+    dispatch:
+      runtime: native
+      argv: [tools/bin/agent-canon, generated-artifact-guard]
+      execution_plane: tool-container
+      cwd: source-root
+      env: allowlisted
+      stdin: inherited
+      stdout: captured
+      stderr: captured
+      exit: propagate
+      signal: propagate
+      side_effect: read-only
     writes: false
     default_wiring:
       ci: false

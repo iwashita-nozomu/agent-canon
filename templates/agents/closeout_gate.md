@@ -5,6 +5,7 @@
 contract template
 responsibility Documents Closeout Gate for this repository.
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/task_close.rs enforces closeout keys
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs rejects generated report roots before closeout
 downstream design workflow_monitoring.md records in-workflow monitoring and self-improvement decisions
 @dependency-end
 -->
@@ -194,7 +195,7 @@ downstream design workflow_monitoring.md records in-workflow monitoring and self
 
 ## Report Artifact Placement Evidence（report artifact placement evidence）
 
-<!-- closeout 前に `tools/bin/agent-canon task-close` を実行し、native report checks に report placement を分類させます。generated_artifact_guard.py も実行し、source tree に残った mechanically regenerated root を拒否します。tracked durable report は regenerated tool output でない場合だけ許可します。untracked/ignored report は current `reports/agents/<run-id>/` 配下だけを許可し、older run bundle の report は archive/cleanup blocker とします。`reports/dependency-review/` や `reports/agent-eval-runs/` などの regenerated root は別 report へ移さず削除して rerun します。 -->
+<!-- closeout 前に `tools/bin/agent-canon task-close` を実行し、native report checks に report placement を分類させます。`agent-canon generated-artifact-guard` も実行し、source tree に残った mechanically regenerated root を拒否します。tracked durable report は regenerated tool output でない場合だけ許可します。untracked/ignored report は current `reports/agents/<run-id>/` 配下だけを許可し、older run bundle の report は archive/cleanup blocker とします。`reports/dependency-review/` や `reports/agent-eval-runs/` などの regenerated root は別 report へ移さず削除して rerun します。 -->
 
 - report_artifact_placement_status:
 - report_artifact_outside_current_run_bundle:
