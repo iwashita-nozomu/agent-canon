@@ -7,7 +7,7 @@ upstream design ../canonical/CODEX_WORKFLOW.md task execution and closeout contr
 upstream design ../canonical/CODEX_SUBAGENTS.md subagent routing and role contract
 upstream design ../COMMUNICATION_PROTOCOL.md bounded context and handoff contract
 upstream implementation ../../.codex/config.toml shared runtime limits and defaults
-upstream implementation ../../eval/checkers/compare_codex_token_footprints.py equivalent session comparison
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs equivalent session comparison
 upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py observed role evidence
 downstream design ./structure-refactor.md repairs independently activated responsibilities coupled into one read
 downstream design ./agent-log-analysis.md structured token evidence routing
@@ -61,7 +61,7 @@ do not create an unrelated baseline or a new metric/threshold.
   relevant task family only as needed. Team, role, and context choices belong to
   `$agent-orchestration` and `$subagent-bootstrap`.
 - For an actual session comparison, reuse or select
-  `eval/checkers/compare_codex_token_footprints.py`. Use
+  `tools/bin/agent-canon compare-codex-token-footprints`. Use
   `eval/producers/evaluate_codex_agent_roles.py` only when role attribution is
   unresolved. For an accumulated trend question, use existing dashboard
   summaries and `eval/producers/generate_agent_runtime_dashboard.py` as its

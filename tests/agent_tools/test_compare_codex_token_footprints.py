@@ -1,7 +1,7 @@
 # @dependency-start
-# contract test
+# contract implementation
 # responsibility Tests Codex token footprint comparison behavior.
-# upstream implementation ../../eval/checkers/compare_codex_token_footprints.py token comparer
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs token comparer
 # upstream design ../../agents/skills/tokens.md token protocol
 # @dependency-end
 """Tests for Codex session token footprint comparison."""
@@ -11,14 +11,17 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "checkers" / "compare_codex_token_footprints.py"
+NATIVE_CLI = (
+    os.environ.get("AGENT_CANON_NATIVE_BIN")
+    or os.environ.get("AGENT_CANON_CLI")
+    or str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 
 
 def write_session(path: Path, total_tokens: int) -> None:
@@ -102,8 +105,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "compare-codex-token-footprints",
                     "--baseline-session",
                     str(baseline),
                     "--candidate-session",
@@ -128,7 +131,9 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("token_footprint_comparison=pass", monitor_text)
-            self.assertIn("token footprint measured from Codex session logs", monitor_text)
+            self.assertIn(
+                "token footprint measured from Codex session logs", monitor_text
+            )
 
     def test_candidate_token_footprint_above_half_fails(self) -> None:
         """A candidate above the target ratio should fail mechanically."""
@@ -141,8 +146,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "compare-codex-token-footprints",
                     "--baseline-session",
                     str(baseline),
                     "--candidate-session",
@@ -171,8 +176,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "compare-codex-token-footprints",
                     "--session-glob",
                     str(sessions / "*.jsonl"),
                     "--moving-average-window",
@@ -192,7 +197,9 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             self.assertIn("TOKEN_USAGE_SUMMARY=pass", result.stdout)
             self.assertIn("TOKEN_USAGE_SESSION_COUNT=2", result.stdout)
             self.assertIn("TOKEN_USAGE_TOKEN_EVENT_COUNT=3", result.stdout)
-            self.assertIn("TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=150.000", result.stdout)
+            self.assertIn(
+                "TOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL=150.000", result.stdout
+            )
             report_text = report.read_text(encoding="utf-8")
             self.assertIn("token_usage_summary_status: present", report_text)
             monitor_text = (report_dir / "workflow_monitoring.md").read_text(
@@ -216,8 +223,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "compare-codex-token-footprints",
                     "--session-glob",
                     str(sessions / "*.jsonl"),
                     "--recent-days",
@@ -233,6 +240,66 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             self.assertIn("TOKEN_USAGE_SESSION_COUNT=1", result.stdout)
             self.assertIn("TOKEN_USAGE_TOTAL_TOKENS=300", result.stdout)
             self.assertIn("TOKEN_USAGE_RECENT_DAYS=5", result.stdout)
+
+    def test_recursive_session_glob_preserves_hidden_symlink_dedup_and_order(
+        self,
+    ) -> None:
+        """Recursive glob summaries skip hidden paths and resolve duplicate symlink matches."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            sessions = root / "sessions"
+            external = root / "external"
+            hidden = sessions / ".private"
+            sessions.mkdir()
+            external.mkdir()
+            hidden.mkdir()
+            write_session(sessions / "session-b.jsonl", total_tokens=200)
+            write_session(sessions / "session-a.jsonl", total_tokens=100)
+            write_session(hidden / "session-c.jsonl", total_tokens=900)
+            write_session(external / "session-c.jsonl", total_tokens=300)
+
+            alias = sessions / "alias"
+            has_directory_symlink = True
+            try:
+                alias.symlink_to(external, target_is_directory=True)
+            except (NotImplementedError, OSError):
+                has_directory_symlink = False
+
+            pattern = str(sessions / "**" / "session-[abc].jsonl")
+            report = root / "summary.md"
+            result = subprocess.run(
+                [
+                    NATIVE_CLI,
+                    "compare-codex-token-footprints",
+                    "--session-glob",
+                    pattern,
+                    "--session-glob",
+                    pattern,
+                    "--report-out",
+                    str(report),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            expected_count = 3 if has_directory_symlink else 2
+            expected_total = 600 if has_directory_symlink else 300
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f"TOKEN_USAGE_SESSION_COUNT={expected_count}", result.stdout)
+            self.assertIn(f"TOKEN_USAGE_TOTAL_TOKENS={expected_total}", result.stdout)
+            report_text = report.read_text(encoding="utf-8")
+            self.assertNotIn(str(hidden / "session-c.jsonl"), report_text)
+            first = str(external / "session-c.jsonl")
+            second = str(sessions / "session-a.jsonl")
+            if has_directory_symlink:
+                self.assertIn(first, report_text)
+                self.assertLess(report_text.index(first), report_text.index(second))
+            self.assertLess(
+                report_text.index(second),
+                report_text.index(str(sessions / "session-b.jsonl")),
+            )
 
 
 if __name__ == "__main__":
