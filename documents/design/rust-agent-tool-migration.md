@@ -80,6 +80,15 @@ still visible. Host archive Git/annex publication remains at its existing owner.
 
 ## Runtime and External Providers
 
+The active host Hook route calls native `codex-hook` after the existing resident
+trust admission and target-mount transaction. Its dispatcher composes the native
+safety, mutation-authority, event-assembly, spool, and report owners. Frozen old
+CLI cases check both the library and real command; integration tests retain
+report selection and containment, privacy, append/report failures, parent
+mutation denial, and authenticated child admission. The Python dispatcher and
+shared Python helpers remain until their remaining test and consumer references
+are migrated; native source presence does not count them as retired.
+
 The stable entrypoint is `tools/bin/agent-canon`; native source belongs under
 `tools/runtime/dispatch/agent-canon/src`. Use the selected shared build and
 release route. Consumer project images, runtime dependencies, and credentials
