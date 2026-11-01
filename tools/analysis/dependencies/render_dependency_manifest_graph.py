@@ -656,7 +656,9 @@ def _read_committed_tree(
     root: Path, source_revision: str
 ) -> tuple[str, dict[str, GitTreeEntry]]:
     """Read committed Git entries through the native template-bundle owner."""
-    cli = os.environ.get("AGENT_CANON_CLI") or str(REPOSITORY_ROOT / "tools/bin/agent-canon")
+    cli = os.environ.get("AGENT_CANON_CLI") or str(
+        REPOSITORY_ROOT / "tools/bin/agent-canon"
+    )
     try:
         result = subprocess.run(
             (
@@ -678,33 +680,51 @@ def _read_committed_tree(
         detail = result.stderr.strip() or result.stdout.strip()
         try:
             error_payload = json.loads(detail)
-            if isinstance(error_payload, dict) and isinstance(error_payload.get("error"), str):
+            if isinstance(error_payload, dict) and isinstance(
+                error_payload.get("error"), str
+            ):
                 detail = error_payload["error"]
         except json.JSONDecodeError:
             pass
-        raise ValueError(f"unable to read selected Git tree: {detail or 'native CLI failed'}")
+        raise ValueError(
+            f"unable to read selected Git tree: {detail or 'native CLI failed'}"
+        )
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise ValueError(f"unable to read selected Git tree: invalid native JSON: {error}") from error
+        raise ValueError(
+            f"unable to read selected Git tree: invalid native JSON: {error}"
+        ) from error
     if not isinstance(payload, dict):
-        raise ValueError("unable to read selected Git tree: native response is not an object")
+        raise ValueError(
+            "unable to read selected Git tree: native response is not an object"
+        )
     revision = payload.get("source_commit")
     entries_value = payload.get("entries")
     if not isinstance(revision, str) or not isinstance(entries_value, list):
-        raise ValueError("unable to read selected Git tree: native response is incomplete")
+        raise ValueError(
+            "unable to read selected Git tree: native response is incomplete"
+        )
     entries: dict[str, GitTreeEntry] = {}
     for value in entries_value:
         if not isinstance(value, dict):
-            raise ValueError("unable to read selected Git tree: native entry is not an object")
+            raise ValueError(
+                "unable to read selected Git tree: native entry is not an object"
+            )
         mode = value.get("mode")
         object_type = value.get("object_type")
         object_id = value.get("object_id")
         path = value.get("path")
-        if not all(isinstance(field, str) for field in (mode, object_type, object_id, path)):
-            raise ValueError("unable to read selected Git tree: native entry is incomplete")
+        if not all(
+            isinstance(field, str) for field in (mode, object_type, object_id, path)
+        ):
+            raise ValueError(
+                "unable to read selected Git tree: native entry is incomplete"
+            )
         if path in entries:
-            raise ValueError(f"unable to read selected Git tree: duplicate path: {path}")
+            raise ValueError(
+                f"unable to read selected Git tree: duplicate path: {path}"
+            )
         entries[path] = GitTreeEntry(
             mode=mode,
             object_type=object_type,

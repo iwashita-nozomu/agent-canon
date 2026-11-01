@@ -66,7 +66,7 @@ def _allowlist_text(paths: list[str], **extra: object) -> str:
         'source_repository = "iwashita-nozomu/agent-canon"',
         "files = [",
     ]
-    lines.extend(f'  {json.dumps(path)},' for path in sorted(paths))
+    lines.extend(f"  {json.dumps(path)}," for path in sorted(paths))
     lines.append("]")
     for key, value in extra.items():
         lines.append(f"{key} = {json.dumps(value)}")
@@ -180,7 +180,9 @@ def _tree_snapshot(root: Path) -> tuple[tuple[str, int, bytes], ...]:
 
 
 def _assert_source_free_seed(testcase: unittest.TestCase, root: Path) -> None:
-    files = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
+    files = {
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    }
     testcase.assertEqual(
         files,
         {
@@ -194,7 +196,9 @@ def _assert_source_free_seed(testcase: unittest.TestCase, root: Path) -> None:
         testcase.assertFalse(path.is_symlink(), path)
         if path.is_file():
             testcase.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
-    config = tomllib.loads((root / ".codex" / "config.toml").read_text(encoding="utf-8"))
+    config = tomllib.loads(
+        (root / ".codex" / "config.toml").read_text(encoding="utf-8")
+    )
     for role, value in config["agents"].items():
         if not isinstance(value, dict) or "config_file" not in value:
             continue
@@ -231,12 +235,16 @@ class ExportStaticSeedTest(unittest.TestCase):
             self.assertEqual(second_result.returncode, 0, second_result.stderr)
             self.assertEqual(_tree_snapshot(first), _tree_snapshot(second))
             self.assertNotIn("unlisted.txt", {row[0] for row in _tree_snapshot(first)})
-            provenance = json.loads((first / PROVENANCE_PATH).read_text(encoding="utf-8"))
+            provenance = json.loads(
+                (first / PROVENANCE_PATH).read_text(encoding="utf-8")
+            )
             self.assertEqual(
                 set(provenance),
                 {"schema_version", "source_commit", "source_repository"},
             )
-            self.assertEqual(provenance["source_commit"], _git(repo, "rev-parse", "HEAD"))
+            self.assertEqual(
+                provenance["source_commit"], _git(repo, "rev-parse", "HEAD")
+            )
             self.assertEqual(
                 provenance["source_repository"],
                 "iwashita-nozomu/agent-canon",
@@ -254,7 +262,9 @@ class ExportStaticSeedTest(unittest.TestCase):
             repo.rename(hidden)
             _assert_source_free_seed(self, output)
 
-    def test_canonical_37_role_fixture_is_deterministic_closed_and_source_hidden(self) -> None:
+    def test_canonical_37_role_fixture_is_deterministic_closed_and_source_hidden(
+        self,
+    ) -> None:
         """The real canonical role set exports as one closed source-free snapshot."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -268,7 +278,9 @@ class ExportStaticSeedTest(unittest.TestCase):
             self.assertEqual(_tree_snapshot(first), _tree_snapshot(second))
             role_files = sorted(first.glob(".codex/agents/*.toml"))
             self.assertEqual(len(role_files), 37)
-            config = tomllib.loads((first / ".codex" / "config.toml").read_text(encoding="utf-8"))
+            config = tomllib.loads(
+                (first / ".codex" / "config.toml").read_text(encoding="utf-8")
+            )
             self.assertEqual(
                 {
                     f".codex/{value['config_file']}"
@@ -309,7 +321,10 @@ class ExportStaticSeedTest(unittest.TestCase):
             ".github/workflows/update.yml",
         )
         for forbidden_path in cases:
-            with self.subTest(path=forbidden_path), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(path=forbidden_path),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 repo = _make_fixture(root)
                 if not forbidden_path.startswith("../"):
@@ -393,7 +408,10 @@ class ExportStaticSeedTest(unittest.TestCase):
             'update_state = "sync-state.json"\n',
         )
         for payload in cases:
-            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(payload=payload),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 repo = _make_fixture(root)
                 (repo / ".codex" / "agents" / "worker.toml").write_text(
@@ -408,7 +426,9 @@ class ExportStaticSeedTest(unittest.TestCase):
                 self.assertIn("AGENT_CANON_STATIC_SEED=fail", result.stderr)
                 self.assertFalse((root / "seed").exists())
 
-    def test_exact_case_normalized_producer_prefixes_are_rejected_before_output(self) -> None:
+    def test_exact_case_normalized_producer_prefixes_are_rejected_before_output(
+        self,
+    ) -> None:
         """Every exact forbidden producer prefix is rejected case-insensitively."""
         prefixes = (
             "AgEnTs/SkIlLs/",
@@ -468,6 +488,7 @@ class ExportStaticSeedTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unsupported keys", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
