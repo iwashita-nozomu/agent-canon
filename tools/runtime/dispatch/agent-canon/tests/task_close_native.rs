@@ -18,7 +18,9 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
+#[cfg(target_os = "linux")]
+use std::process::Output;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const PYTHON_GOLDEN: &str =
