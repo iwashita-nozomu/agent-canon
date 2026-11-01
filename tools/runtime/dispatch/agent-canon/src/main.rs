@@ -49,6 +49,7 @@
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
+// downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
@@ -103,7 +104,7 @@ mod tool_rejection_preflight;
 use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
-    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
+    codex_runtime_summary, report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
     theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage, waterfall_gate,
     work_log,
 };
@@ -144,6 +145,7 @@ Commands:
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
   compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
+  export-codex-runtime-summary [options]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
@@ -243,6 +245,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "compare-codex-token-footprints" {
         std::process::exit(token_footprints::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "export-codex-runtime-summary" {
+        std::process::exit(codex_runtime_summary::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {

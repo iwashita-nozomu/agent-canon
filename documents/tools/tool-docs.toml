@@ -159,6 +159,14 @@ language = "rust"
 summary = "Git diff, optional SCIP impact, and dependency-header expansion summary documentation."
 
 [[tool]]
+id = "export-codex-runtime-summary"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs"
+doc = "documents/tools/codex_runtime_summary.md"
+language = "rust"
+summary = "Bounded and prompt-free Codex runtime summary export documentation."
+
+[[tool]]
 id = "scip-index"
 classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/scip_index.rs"

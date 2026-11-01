@@ -3,7 +3,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex runtime summary export into the AgentCanon log archive.
-# upstream implementation ../../tools/runtime/archive/export_codex_runtime_summary.py exports bounded Codex runtime summaries
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves codex-runtime archive paths
 # upstream design ../../documents/runtime/runtime-log-archive.md documents runtime log archive ownership
 # @dependency-end
@@ -21,7 +21,11 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "archive" / "export_codex_runtime_summary.py"
+NATIVE_CLI = (
+    os.environ.get("AGENT_CANON_NATIVE_BIN")
+    or os.environ.get("AGENT_CANON_CLI")
+    or str(PROJECT_ROOT / "tools" / "bin" / "agent-canon")
+)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
     codex_runtime_index_path,
@@ -137,8 +141,8 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "export-codex-runtime-summary",
                     "--source-root",
                     str(source),
                     "--canon-root",
@@ -180,8 +184,8 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
 
             result = subprocess.run(
                 [
-                    sys.executable,
-                    str(SCRIPT),
+                    NATIVE_CLI,
+                    "export-codex-runtime-summary",
                     "--source-root",
                     str(source),
                     "--canon-root",
@@ -209,8 +213,8 @@ def run_exporter(
     """Run the exporter against test fixtures."""
     return subprocess.run(
         [
-            sys.executable,
-            str(SCRIPT),
+            NATIVE_CLI,
+            "export-codex-runtime-summary",
             "--source-root",
             str(source),
             "--canon-root",

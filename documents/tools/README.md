@@ -45,7 +45,7 @@ global Python executable, or Host Cargo fallback.
 | typed dispatch and route selection | `tools/runtime/dispatch/tool_dispatch.py`, `tools/catalog.yaml` |
 | search and source/dependency analysis | Rust `agent_search.rs`, source graph, GraphClient, LSP API, and semantic index; Python LSP and graph adapters remain for other callers |
 | runtime artifact boundary | `runtime_artifacts.py`, `bootstrap_runtime.py` |
-| eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py` |
+| eval and archive | `run_accumulated_agent_evals.py`, `runtime_log_archive_git.py`, Rust `codex_runtime_summary.rs` |
 | docs and structure | Rust `agent-canon docs`, `repo_structure_contract.py` |
 | Skill loading | `bootstrap.sh ... tool run --root <registered-project> skill-document-reader -- ...` via the persistent AgentCanon tool container (bounded UTF-8 chunks and EOF admission) |
 | review and closeout | `review_dispatch.py`, `tools/bin/agent-canon task-close`, canonical workflow |
@@ -66,6 +66,7 @@ promote an internal tool, require a check, or revalidate a historical record.
 | Reader task | Guides |
 | --- | --- |
 | Select a task route or inspect the CLI | [Task routing](route.md), [AgentCanon CLI and docs formatting](agent-canon.md) |
+| Export bounded Codex runtime summaries | [Codex runtime summary export](codex_runtime_summary.md), [Runtime Log Archive](../runtime/runtime-log-archive.md) |
 | Search and inspect source | [Repository search](search-coordination.md), [LSP analysis](lsp_code_analysis.md), [Semantic index](semantic_index.md), [Provider comparison reports](semantic_provider_html_report.md) |
 | Plan dependency or repository changes | [SCIP code impact](scip_index.md), [Dependency diff summary](git_dependency_diff_summary.md), [Dependency module changes](dependency_module_change.md), [Repository topic checkouts](repository_topic_clone.md) |
 | Inspect repository structure and design evidence | [Repository structure](repo_structure_contract.md), [Path-risk classification](classify_path_risk.md), [Semantic responsibility contracts](semantic_responsibility.md) |
