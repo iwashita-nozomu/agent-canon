@@ -2,7 +2,7 @@
 // contract test
 // responsibility Checks the native prompt classifier against captured CPython 3.12.3 input/output cases.
 // upstream implementation ../src/prompt_classifier.rs owns pure prompt classification.
-// upstream evidence ../../../../../tests/fixtures/prompt_classifier/python_golden.json freezes old API inputs and results.
+// upstream reference ../../../../../tests/fixtures/prompt_classifier/python_golden.json freezes old API inputs and results.
 // @dependency-end
 
 use agent_canon::prompt_classifier::{

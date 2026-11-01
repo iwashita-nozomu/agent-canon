@@ -6,7 +6,7 @@
 // upstream implementation ./python_json.rs owns Python-compatible JSON strings and values.
 // upstream implementation ./python_text.rs owns Python-compatible Unicode whitespace.
 // downstream implementation ../tests/prompt_classifier_native.rs checks the frozen CPython 3.12.3 classifier corpus.
-// downstream evidence ../../../../../tests/fixtures/prompt_classifier/python_golden.json freezes old classifier inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/prompt_classifier/python_golden.json freezes old classifier inputs and outputs.
 // @dependency-end
 //! Pure prompt-intake classification over caller-injected evidence.
 

@@ -2,7 +2,7 @@
 // contract test
 // responsibility Checks native read-only workflow context loading against captured CPython 3.12.3 results.
 // upstream implementation ../src/workflow_context.rs owns the typed fail-open context loader.
-// upstream evidence ../../../../../tests/fixtures/workflow_context/python_golden.json freezes old input bytes and outputs.
+// upstream reference ../../../../../tests/fixtures/workflow_context/python_golden.json freezes old input bytes and outputs.
 // @dependency-end
 
 use agent_canon::python_json::{

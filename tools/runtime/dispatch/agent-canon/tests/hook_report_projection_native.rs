@@ -3,7 +3,7 @@
 // responsibility Compares native hook monitor projection bytes and result fields with the frozen old API oracle.
 // upstream implementation ../src/hook_report_projection.rs owns the hook-only behavior-event write.
 // upstream implementation ../src/runtime_boundary.rs owns explicit external path resolution.
-// upstream evidence ../../../../../tests/fixtures/hook_report_projection/python_golden.json freezes actual old API results and document bytes.
+// upstream reference ../../../../../tests/fixtures/hook_report_projection/python_golden.json freezes actual old API results and document bytes.
 // @dependency-end
 
 use agent_canon::hook_report_projection::{emit_behavior_projection_at, MonitorProjectionResult};

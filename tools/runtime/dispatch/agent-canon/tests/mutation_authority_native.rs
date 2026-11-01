@@ -4,9 +4,9 @@
 // upstream implementation ../src/mutation_authority.rs owns mutation classification and authority decisions
 // upstream implementation ../src/writer_target.rs owns the static writer-target packet boundary
 // upstream implementation ../src/python_json.rs owns the shared JSON representation and canonical receipt bytes
-// upstream evidence ../../../../../tests/fixtures/mutation_authority/python_golden.json freezes 31 old basic API cases
-// upstream evidence ../../../../../tests/fixtures/mutation_authority/git_python_golden.json freezes 16 old real-Git cases
-// upstream evidence ../../../../../tests/fixtures/mutation_authority/parser/python_golden.json freezes 15 old parser boundary cases
+// upstream reference ../../../../../tests/fixtures/mutation_authority/python_golden.json freezes 31 old basic API cases
+// upstream reference ../../../../../tests/fixtures/mutation_authority/git_python_golden.json freezes 16 old real-Git cases
+// upstream reference ../../../../../tests/fixtures/mutation_authority/parser/python_golden.json freezes 15 old parser boundary cases
 // @dependency-end
 
 use agent_canon::mutation_authority::{

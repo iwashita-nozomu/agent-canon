@@ -3,7 +3,7 @@
 // responsibility Loads read-only workflow attribution context with fail-open empty-state semantics.
 // upstream implementation ../../../../../tools/agent/orchestration/workflow_context.py owns the current load API contract.
 // downstream implementation ../tests/workflow_context_native.rs checks the frozen CPython 3.12.3 load corpus.
-// downstream evidence ../../../../../tests/fixtures/workflow_context/python_golden.json freezes old load inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/workflow_context/python_golden.json freezes old load inputs and outputs.
 // @dependency-end
 //! Read-only workflow context loading for native consumers.
 

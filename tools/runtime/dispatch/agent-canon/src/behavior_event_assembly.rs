@@ -9,7 +9,7 @@
 // upstream implementation ./workflow_context.rs owns read-only workflow context values.
 // upstream implementation ./python_json.rs owns Python-compatible canonical JSON bytes.
 // downstream implementation ../tests/behavior_event_assembly_native.rs checks the frozen CPython 3.12.3 assembly oracle.
-// downstream evidence ../../../../../tests/fixtures/behavior_event_assembly/python_golden.json freezes old assembly inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/behavior_event_assembly/python_golden.json freezes old assembly inputs and outputs.
 // @dependency-end
 //! Pure behavior-event eligibility and assembly from typed hook observations.
 

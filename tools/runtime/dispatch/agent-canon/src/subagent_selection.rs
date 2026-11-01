@@ -5,7 +5,7 @@
 // upstream implementation ./python_json.rs owns Python-compatible strings and JSON values.
 // upstream implementation ./agent_search.rs reuses ICU CaseMapper::fold_string for Unicode 15 case folding.
 // downstream implementation ../tests/subagent_selection_native.rs checks the frozen CPython 3.12.3 API corpus.
-// downstream evidence ../../../../../tests/fixtures/subagent_selection/python_golden.json freezes old API inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/subagent_selection/python_golden.json freezes old API inputs and outputs.
 // @dependency-end
 //! Pure observation of subagent selection and collaboration-result receipts.
 

@@ -1,13 +1,13 @@
 // @dependency-start
 // contract implementation
 // responsibility Dispatches the bounded active Hook contract through existing pure safety, authority, selection, assembly, and spool owners.
-// upstream evidence ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the previous active CLI and event contract.
+// upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the previous active CLI and event contract.
 // upstream implementation ./hook_safety.rs owns secret and protected-Git decisions.
 // upstream implementation ./mutation_authority.rs owns writer-target and child-scope admission.
 // upstream implementation ./hook_event_log.rs owns append-only hook event publication.
 // downstream implementation main.rs exposes the native codex-hook CLI route.
 // downstream implementation ../tests/hook_dispatcher_native.rs checks the captured CPython CLI corpus.
-// downstream evidence ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes old CLI inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes old CLI inputs and outputs.
 // @dependency-end
 //! Native active Codex hook CLI and event dispatcher.
 

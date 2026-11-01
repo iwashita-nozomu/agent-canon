@@ -4,7 +4,7 @@
 // upstream implementation ../src/writer_target.rs owns typed target and packet validation
 // upstream implementation ../src/path_resolution.rs owns non-strict path resolution
 // upstream implementation ../src/path_expansion.rs owns user-home expansion
-// upstream evidence ../../../../../tests/fixtures/writer_target/python_golden.json freezes actual old API outcomes
+// upstream reference ../../../../../tests/fixtures/writer_target/python_golden.json freezes actual old API outcomes
 // @dependency-end
 
 use agent_canon::python_json::{

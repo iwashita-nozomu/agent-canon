@@ -3,7 +3,7 @@
 // responsibility Owns pure native secret matching, protected Git intent classification, and redacted safety payloads.
 // upstream implementation ../../../../../tools/runtime/authority/hook_safety.py owns the currently active Python leaf contract.
 // downstream implementation ../tests/hook_safety_native.rs checks frozen old-API inputs and outputs.
-// downstream evidence ../../../../../tests/fixtures/hook_safety/python_golden.json freezes the accepted CPython 3.12.3 oracle.
+// downstream reference ../../../../../tests/fixtures/hook_safety/python_golden.json freezes the accepted CPython 3.12.3 oracle.
 // @dependency-end
 //! Pure hook safety leaves used by the future native hook consumer.
 

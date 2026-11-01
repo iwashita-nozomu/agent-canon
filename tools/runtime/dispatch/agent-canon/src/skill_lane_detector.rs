@@ -5,7 +5,7 @@
 // upstream implementation ../../../../../tools/agent/orchestration/prompt_classifier.py consumes injected SkillLaneEvidence.
 // upstream implementation python_text.rs owns Python-compatible whitespace.
 // downstream implementation ../tests/skill_lane_detector_native.rs checks frozen CPython 3.12.3 lane outputs.
-// downstream evidence ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old detector inputs and outputs.
+// downstream reference ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old detector inputs and outputs.
 // @dependency-end
 //! Pure structural skill-lane and validation-repair evidence detection.
 
