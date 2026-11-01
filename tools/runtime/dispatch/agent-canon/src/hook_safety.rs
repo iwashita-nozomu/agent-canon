@@ -79,6 +79,10 @@ const OPAQUE_GIT_OPTIONS_WITH_VALUES: [&str; 7] = [
     "--config-env",
 ];
 const PUNCTUATION_CHARS: &str = ";&|(){}!";
+const PYTHON_15_WORD_CHAR: &str = r"[\p{Age:15.0}&&[\pL\pN_]]";
+const PYTHON_15_NONWORD_CHAR: &str = r"[^[\p{Age:15.0}&&[\pL\pN_]]]";
+const PYTHON_15_START_BOUNDARY: &str = r"(?:\A|[^[\p{Age:15.0}&&[\pL\pN_]]])";
+const PYTHON_15_END_BOUNDARY: &str = r"(?:\z|[^[\p{Age:15.0}&&[\pL\pN_]]])";
 
 static SECRET_PATTERNS: LazyLock<[(Regex, &'static str); 4]> = LazyLock::new(|| {
     [
@@ -88,16 +92,24 @@ static SECRET_PATTERNS: LazyLock<[(Regex, &'static str); 4]> = LazyLock::new(|| 
             "private key block",
         ),
         (
-            Regex::new(r"\bAKIA[0-9A-Z]{16}\b").expect("static AWS key pattern is valid"),
+            Regex::new(&format!(
+                r"{PYTHON_15_START_BOUNDARY}AKIA[0-9A-Z]{{16}}{PYTHON_15_END_BOUNDARY}"
+            ))
+            .expect("static AWS key pattern is valid"),
             "AWS access key id",
         ),
         (
-            Regex::new(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b")
-                .expect("static GitHub token pattern is valid"),
+            Regex::new(&format!(
+                r"{PYTHON_15_START_BOUNDARY}gh[pousr]_[A-Za-z0-9_]{{30,}}{PYTHON_15_END_BOUNDARY}"
+            ))
+            .expect("static GitHub token pattern is valid"),
             "GitHub token",
         ),
         (
-            Regex::new(r"\bsk-[A-Za-z0-9_-]{32,}\b").expect("static API key pattern is valid"),
+            Regex::new(&format!(
+                r"{PYTHON_15_START_BOUNDARY}sk-(?:[A-Za-z0-9_-]{{31,}}[A-Za-z0-9_](?:\z|{PYTHON_15_NONWORD_CHAR})|[A-Za-z0-9_-]{{31,}}-{PYTHON_15_WORD_CHAR})"
+            ))
+            .expect("static API key pattern is valid"),
             "OpenAI-style API key",
         ),
     ]

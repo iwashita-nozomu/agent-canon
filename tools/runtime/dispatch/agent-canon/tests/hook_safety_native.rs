@@ -131,3 +131,74 @@ fn git_intent_and_redacted_payload_match_frozen_commands_and_old_api_results() {
         }
     }
 }
+
+#[test]
+fn unicode_secret_boundaries_match_supplemental_python_probe_results() {
+    let github = "ghp_test_canary_00000000000000000000000000000000";
+    let github_cases = [
+        (
+            "combining-prefix",
+            format!("\u{0301}{github}"),
+            Some("GitHub token"),
+        ),
+        (
+            "combining-suffix",
+            format!("{github}\u{0301}"),
+            Some("GitHub token"),
+        ),
+        (
+            "joiner-prefix",
+            format!("\u{200d}{github}"),
+            Some("GitHub token"),
+        ),
+        ("letter-prefix", format!("é{github}"), None),
+        (
+            "unicode16-prefix",
+            format!("\u{1c89}{github}"),
+            Some("GitHub token"),
+        ),
+    ];
+    let mut case_count = 0;
+    for (case_id, prompt, expected) in github_cases {
+        assert_eq!(secret_kind(&prompt), expected, "{case_id}");
+        case_count += 1;
+    }
+
+    let openai = Some("OpenAI-style API key");
+    let openai_tail_cases = [
+        ("a31", "a".repeat(31), [None, None, None, openai]),
+        (
+            "a30-dash",
+            format!("{}-", "a".repeat(30)),
+            [None, None, None, openai],
+        ),
+        ("dashes32", "-".repeat(32), [None, None, None, openai]),
+        ("a32", "a".repeat(32), [openai, None, openai, openai]),
+        (
+            "a31-dash",
+            format!("{}-", "a".repeat(31)),
+            [None, openai, None, openai],
+        ),
+        ("dashes33", "-".repeat(33), [None, openai, None, openai]),
+        ("a33", "a".repeat(33), [openai, None, openai, openai]),
+        (
+            "a32-dash",
+            format!("{}-", "a".repeat(32)),
+            [openai, openai, openai, openai],
+        ),
+        ("dashes34", "-".repeat(34), [None, openai, None, openai]),
+    ];
+    let suffixes = ["", "é", "\u{0301}", "X"];
+    for (tail_case, tail, expected_by_suffix) in openai_tail_cases {
+        for (suffix_index, suffix) in suffixes.iter().enumerate() {
+            let prompt = format!("sk-{tail}{suffix}");
+            assert_eq!(
+                secret_kind(&prompt),
+                expected_by_suffix[suffix_index],
+                "OpenAI synthetic tail case {tail_case}, suffix index {suffix_index}"
+            );
+            case_count += 1;
+        }
+    }
+    assert_eq!(case_count, 41);
+}
