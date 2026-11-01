@@ -422,12 +422,14 @@ fn copy_source_symlink(
     source: &Path,
     target: &Path,
 ) -> Result<()> {
-    let link_text = source_directory.read_link(source_name).map_err(|error| {
-        SourceMutationError::new(format!(
-            "cannot read source symlink {}: {error}",
-            source.display()
-        ))
-    })?;
+    let link_text = source_directory
+        .read_link_contents(source_name)
+        .map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot read source symlink {}: {error}",
+                source.display()
+            ))
+        })?;
     let source_metadata = source_directory
         .symlink_metadata(source_name)
         .map_err(|error| {
