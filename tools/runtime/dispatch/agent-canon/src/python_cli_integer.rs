@@ -3,7 +3,7 @@
 // responsibility Parses Python-compatible signed decimal CLI integers and exactly divides them to binary64.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md native CLI compatibility
 // upstream environment ../Cargo.toml pins exact rational and numeric trait dependencies
-// upstream reference ../tests/fixtures/python_integer_division/python_golden.json freezes CPython 3.12.3 integer division results
+// upstream reference ../../../../../tests/fixtures/python_integer_division/python_golden.json freezes CPython 3.12.3 integer division results
 // downstream implementation token_footprints.rs uses Python-compatible integer division for token ratios
 // downstream implementation skill_document_reader.rs parses bounded reader options
 // downstream implementation notebook_quality.rs parses Python-compatible notebook thresholds
@@ -119,7 +119,7 @@ mod true_divide_tests {
     use sha2::{Digest, Sha256};
 
     const PYTHON_ORACLE: &str =
-        include_str!("../tests/fixtures/python_integer_division/python_golden.json");
+        include_str!("../../../../../tests/fixtures/python_integer_division/python_golden.json");
     const PYTHON_ORACLE_SHA256: &str =
         "71559659ff717ba81880ee65b1870bca7aa526f2b6c959125a268d90479e4b4b";
 

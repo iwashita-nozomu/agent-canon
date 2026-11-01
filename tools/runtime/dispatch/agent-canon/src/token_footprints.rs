@@ -7,7 +7,7 @@
 // upstream implementation python_json.rs preserves Python JSON values and float formatting
 // upstream implementation python_text.rs preserves Python-compatible whitespace and line splitting
 // upstream implementation path_resolution.rs preserves non-strict resolved paths
-// upstream reference ../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
+// upstream reference ../../../../../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
 // upstream implementation source_dependency_graph.rs supplies Python-compatible component matching
 // upstream implementation hook_report_projection.rs appends optional run-local monitoring evidence
 // downstream implementation main.rs exposes the token footprint CLI
@@ -1036,7 +1036,7 @@ mod exact_ratio_status_tests {
     use serde_json::Value;
 
     const PYTHON_ORACLE: &str =
-        include_str!("../tests/fixtures/python_integer_division/python_golden.json");
+        include_str!("../../../../../tests/fixtures/python_integer_division/python_golden.json");
 
     #[test]
     fn comparison_status_uses_the_cpython_rounded_ratio_at_the_half_threshold() {
