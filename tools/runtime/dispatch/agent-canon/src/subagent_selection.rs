@@ -169,7 +169,7 @@ fn python_truthy(value: Option<&JsonValue>) -> bool {
 fn normalize_operation(tool_name: &JsonString, action: JsonString) -> JsonString {
     if ALIASED_OPERATIONS
         .iter()
-        .any(|operation| action.equals_text(*operation))
+        .any(|operation| action.equals_text(operation))
     {
         return action;
     }
@@ -347,7 +347,7 @@ pub fn build_coordination_receipt(
     if !event_name.equals_text("PostToolUse")
         || !COLLABORATION_OPERATIONS
             .iter()
-            .any(|operation| selection.action.equals_text(*operation))
+            .any(|operation| selection.action.equals_text(operation))
     {
         return None;
     }
