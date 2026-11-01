@@ -88,10 +88,8 @@ fn concurrent_identical_behavior_projection_entries_are_written_once() {
             })
             .collect::<Vec<_>>();
         for result in results {
-            assert_eq!(
-                result.join().expect("projection thread completes").status,
-                "spooled"
-            );
+            let result = result.join().expect("projection thread completes");
+            assert_eq!(result.status, "spooled", "{}", result.error);
         }
     });
 
@@ -119,7 +117,7 @@ fn configured_runtime_root_keeps_projection_inside_the_external_boundary() {
         "2026-01-02 03:04 JST",
     );
 
-    assert_eq!(result.status, "spooled");
+    assert_eq!(result.status, "spooled", "{}", result.error);
     assert_eq!(result.path, report_dir.join("workflow_monitoring.md"));
     assert!(result.path.is_file());
 }
@@ -210,7 +208,8 @@ fn assert_result_fields(
         string_field(expected, "status")
             .to_text()
             .expect("result status is text"),
-        "{case_name}: result status"
+        "{case_name}: result status: {}",
+        actual.error
     );
     assert_eq!(
         actual.path,

@@ -166,10 +166,12 @@ fn update_monitoring_file(
     entry: &str,
     timestamp: Option<&str>,
 ) -> Result<PathBuf, String> {
+    // The locked update rewrites the document and needs Windows truncation access.
     let mut file = OpenOptions::new()
         .read(true)
+        .write(true)
         .create(true)
-        .append(true)
+        .truncate(false)
         .open(path)
         .map_err(|error| format!("cannot open monitor document {}: {error}", path.display()))?;
     file.lock()
