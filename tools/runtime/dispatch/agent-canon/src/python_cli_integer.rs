@@ -26,7 +26,7 @@ fn is_python_decimal_digit(character: char) -> bool {
     decimal_digit_pattern().is_match(character.encode_utf8(&mut encoded))
 }
 
-fn decimal_digit_value(character: char) -> Option<u8> {
+pub(crate) fn decimal_digit_value(character: char) -> Option<u8> {
     if !is_python_decimal_digit(character) {
         return None;
     }

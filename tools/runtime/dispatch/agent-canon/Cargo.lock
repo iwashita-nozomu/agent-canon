@@ -28,6 +28,7 @@ dependencies = [
  "rusqlite",
  "rustix",
  "rustpython-ast",
+ "rustpython-literal",
  "rustpython-parser",
  "scip",
  "serde",
