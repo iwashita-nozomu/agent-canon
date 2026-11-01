@@ -9,7 +9,7 @@ upstream design ../design/dependency-manifest-design.md defines dependency manif
 upstream design ../../tools/analysis/dependencies/render_dependency_manifest_graph.py documents dependency graph report rendering
 upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh emits dependency manifest graph artifacts
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph.rs owns canonical graph storage and query projections
-upstream implementation ../../tools/analysis/dependencies/graph_client.py exposes typed Python graph responses
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/graph_client.rs exposes typed native graph responses
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/scip_index.rs projects bounded SCIP symbol/reference evidence separately
 @dependency-end
 -->
