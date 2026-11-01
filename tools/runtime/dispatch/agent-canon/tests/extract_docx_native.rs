@@ -7,67 +7,83 @@
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use expat_rs::{Event, Parser};
+use expat::internal::parse::{Handler, HandlerSet, Parser, Status};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 const GOLDEN: &str = include_str!("../../../../../tests/fixtures/docx_xml/python_golden.json");
 
-fn expanded_name(name: &str, namespace: Option<&str>) -> String {
-    match namespace {
-        Some(namespace) => format!("{{{namespace}}}{}", expat_rs::local_name(name)),
+fn expanded_name(name: &[u8]) -> String {
+    let name = std::str::from_utf8(name).expect("the parser emits UTF-8 names");
+    match name.split_once('\u{1f}') {
+        Some((namespace, local)) => format!("{{{namespace}}}{local}"),
         None => name.to_owned(),
     }
 }
 
-fn provider_events(bytes: &[u8]) -> Result<Vec<Value>, String> {
-    let decoded = expat_rs::decode(bytes).map_err(|error| error.to_string())?;
-    let mut parser = Parser::new(&decoded).with_namespaces();
-    let mut events: Vec<Value> = Vec::new();
-    let mut names = Vec::new();
-    while let Some(event) = parser.next_event().map_err(|error| error.to_string())? {
-        match event {
-            Event::StartElement {
-                name,
-                namespace,
-                attributes,
-            } => {
-                let qualified = name.to_string();
-                let expanded = expanded_name(&name, namespace.as_deref());
-                let attributes = attributes
-                    .into_iter()
-                    .map(|attribute| {
-                        (
-                            expanded_name(&attribute.name, attribute.namespace.as_deref()),
-                            Value::String(attribute.value.into_owned()),
-                        )
-                    })
-                    .collect::<Map<_, _>>();
-                names.push((qualified, expanded.clone()));
-                events.push(json!({"kind":"start", "name":expanded, "attributes":attributes}));
-            }
-            Event::EndElement(name) => {
-                let (qualified, expanded) = names.pop().ok_or("unmatched end event")?;
-                if name != qualified {
-                    return Err("end event differs from its start event".to_owned());
-                }
-                events.push(json!({"kind":"end", "name":expanded}));
-            }
-            Event::Text(text) | Event::CData(text) if !names.is_empty() && !text.is_empty() => {
-                if let Some(Value::Object(previous)) = events.last_mut() {
-                    if previous.get("kind").and_then(Value::as_str) == Some("text") {
-                        if let Some(Value::String(value)) = previous.get_mut("text") {
-                            value.push_str(&text);
-                            continue;
-                        }
-                    }
-                }
-                events.push(json!({"kind":"text", "text":text.as_ref()}));
-            }
-            _ => {}
-        }
+#[derive(Default)]
+struct ElementEvents {
+    values: Vec<Value>,
+    depth: usize,
+}
+
+impl Handler for ElementEvents {
+    fn start_element(&mut self, name: &[u8], attributes: &[(&[u8], &[u8])], _: i32) {
+        let attributes = attributes
+            .iter()
+            .map(|(name, value)| {
+                (
+                    expanded_name(name),
+                    Value::String(std::str::from_utf8(value).expect("UTF-8 value").to_owned()),
+                )
+            })
+            .collect::<Map<_, _>>();
+        self.depth += 1;
+        self.values
+            .push(json!({"kind":"start", "name":expanded_name(name), "attributes":attributes}));
     }
-    Ok(events)
+
+    fn end_element(&mut self, name: &[u8]) {
+        self.depth -= 1;
+        self.values
+            .push(json!({"kind":"end", "name":expanded_name(name)}));
+    }
+
+    fn character_data(&mut self, text: &[u8]) {
+        if self.depth == 0 || text.is_empty() {
+            return;
+        }
+        let text = std::str::from_utf8(text).expect("UTF-8 character data");
+        if let Some(Value::Object(previous)) = self.values.last_mut() {
+            if previous.get("kind").and_then(Value::as_str) == Some("text") {
+                if let Some(Value::String(value)) = previous.get_mut("text") {
+                    value.push_str(text);
+                    return;
+                }
+            }
+        }
+        self.values.push(json!({"kind":"text", "text":text}));
+    }
+}
+
+fn provider_events(bytes: &[u8]) -> Result<Vec<Value>, String> {
+    let mut salt = [0; 16];
+    getrandom::getrandom(&mut salt).map_err(|error| error.to_string())?;
+    let mut parser = Parser::new(None, Some(b'\x1f'), salt);
+    parser.set_handlers(HandlerSet {
+        start_element: true,
+        end_element: true,
+        character_data: true,
+        // ElementTree rejects external references through its handler. The
+        // provider's default handler refuses them without loading any resource.
+        external_entity_ref: true,
+        ..HandlerSet::default()
+    });
+    let mut events = ElementEvents::default();
+    match parser.parse(&mut events, bytes, true) {
+        Status::Ok => Ok(events.values),
+        _ => Err(format!("{:?}", parser.error_code())),
+    }
 }
 
 #[test]

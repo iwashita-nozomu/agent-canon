@@ -16,7 +16,7 @@ dependencies = [
  "cap-fs-ext",
  "cap-primitives",
  "cap-std",
- "expat-rs",
+ "expat",
  "flate2",
  "getrandom 0.2.17",
  "hmac",
@@ -291,13 +291,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "expat-rs"
-version = "0.2.0"
+name = "expat"
+version = "0.1.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4048d4264aea89714216bcdb1a9a64b835efef3bfc2d17e0470cb189f051c71d"
-dependencies = [
- "thiserror",
-]
+checksum = "c0dc55ad7938332ca7356b51c68f033cb53479b0a1a3928c088d4c6a08f2d572"
 
 [[package]]
 name = "fallible-iterator"
