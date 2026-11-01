@@ -140,6 +140,39 @@ fn canonicalize_with_missing_suffix(path: &Path) -> Result<PathBuf, String> {
     }
 }
 
+/// Resolve one absolute external artifact path when no runtime root is configured.
+///
+/// This preserves the additive explicit-path route while refusing source-local
+/// artifacts and symlink components.
+pub(crate) fn resolve_external_artifact_path(
+    source_root: &Path,
+    path: &Path,
+) -> Result<PathBuf, String> {
+    let candidate = expand_user_path(path)?;
+    if !candidate.is_absolute() {
+        return Err(format!(
+            "explicit external runtime root required for relative artifact path: {}; pass --runtime-root or set {RUNTIME_ROOT_ENV}",
+            candidate.display()
+        ));
+    }
+    reject_symlink_components(&candidate, Path::new("/"))?;
+    let source_root = expand_user_path(source_root)?;
+    let source = fs::canonicalize(&source_root).map_err(|error| {
+        format!(
+            "canonicalize source root {}: {error}",
+            source_root.display()
+        )
+    })?;
+    let resolved = canonicalize_with_missing_suffix(&candidate)?;
+    if resolved == source || resolved.starts_with(&source) {
+        return Err(format!(
+            "runtime artifact must not resolve into AgentCanon source: {}",
+            resolved.display()
+        ));
+    }
+    Ok(resolved)
+}
+
 /// Resolve the process/task runtime root and prove that it is not the source.
 ///
 /// Production callers must provide `AGENT_CANON_RUNTIME_ROOT`.  Unit tests

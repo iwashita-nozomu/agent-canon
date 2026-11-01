@@ -985,7 +985,7 @@ fn resolve_active_report_dir(
     Ok(Some(report_dir))
 }
 
-fn python_timestamp_jst() -> Result<String, String> {
+pub(crate) fn python_timestamp_jst() -> Result<String, String> {
     // Match Python's host-local datetime.now() while retaining its literal suffix.
     let now = OffsetDateTime::now_utc();
     let local_offset = UtcOffset::local_offset_at(now)
