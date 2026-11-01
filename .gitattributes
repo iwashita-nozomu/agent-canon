@@ -12,6 +12,10 @@ tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
 # The dependency-plan golden binds to these tracked manifest bytes on every host.
 bootstrap/container/image/dependencies.toml text eol=lf
 
+# Frozen Python JSON goldens are byte-hashed by native tests; preserve LF bytes on every host.
+tests/fixtures/update_lifecycle/*_python_golden.json text eol=lf
+tests/fixtures/owner_guarantee/python_golden.json text eol=lf
+
 # These frozen oracles bind their exact UTF-8 bytes on every host.
 tests/fixtures/design_similarity/python_golden.json text eol=lf
 tests/fixtures/design_similarity/float_python_golden.json text eol=lf
@@ -23,3 +27,5 @@ tests/fixtures/nvidia/*.xml -diff
 
 # Frozen design-organizer oracle bytes are checked in on every host.
 tests/fixtures/design_organizer/python_golden.json text eol=lf
+# The TaskClose baseline corpus is byte-hashed by native tests on every host.
+tests/fixtures/task_close/python_golden.json text eol=lf

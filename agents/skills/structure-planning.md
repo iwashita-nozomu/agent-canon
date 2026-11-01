@@ -9,7 +9,7 @@ upstream design ../../documents/conventions/common/05_docs.md document responsib
 upstream design ../../documents/design/README.md design canon reader route
 upstream design code-visualization.md sole public visualization owner and typed projection contract
 downstream implementation ../../.codex/personal/skills/structure-planning/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/runtime/lifecycle/task_close.py consumes document_split_decision when a structural decision actually occurs
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/task_close.rs consumes document_split_decision when a structural decision actually occurs
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/dependency_headers.rs validates this adapter dependency header
 @dependency-end
 -->
