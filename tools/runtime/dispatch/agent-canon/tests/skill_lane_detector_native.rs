@@ -2,7 +2,7 @@
 // contract test
 // responsibility Checks native structural and validation-repair lane APIs against captured CPython 3.12.3 outputs.
 // upstream implementation ../src/skill_lane_detector.rs owns pure lane evidence detection.
-// upstream test ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old API inputs and results.
+// upstream evidence ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old API inputs and results.
 // @dependency-end
 
 use agent_canon::python_json::{

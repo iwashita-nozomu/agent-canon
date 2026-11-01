@@ -2,7 +2,7 @@
 // contract test
 // responsibility Checks native prompt redaction and bounded capture against captured CPython 3.12.3 results.
 // upstream implementation ../src/prompt_capture.rs owns default redaction and prompt capture.
-// upstream test ../../../../../tests/fixtures/prompt_capture/python_golden.json freezes old API inputs and results.
+// upstream evidence ../../../../../tests/fixtures/prompt_capture/python_golden.json freezes old API inputs and results.
 // @dependency-end
 
 use agent_canon::prompt_capture::{

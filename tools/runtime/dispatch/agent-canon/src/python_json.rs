@@ -4,9 +4,9 @@
 // downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
-// downstream test ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
-// downstream test ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
-// downstream test ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
+// downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
+// downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
+// downstream implementation ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
 // @dependency-end
 
 use serde::de::{self, Visitor};

@@ -4,7 +4,7 @@
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
 // upstream implementation runtime_boundary.rs owns external runtime path and write capabilities.
 // downstream implementation report_artifact_checks.rs validates the visible work-log completion view.
-// downstream test ../tests/work_log_native.rs preserves ledger and CLI oracles.
+// downstream implementation ../tests/work_log_native.rs preserves ledger and CLI oracles.
 // @dependency-end
 
 use crate::python_json::{

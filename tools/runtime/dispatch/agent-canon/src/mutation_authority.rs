@@ -5,7 +5,7 @@
 // upstream implementation writer_target.rs owns static checkout target validation
 // upstream implementation path_resolution.rs owns non-strict filesystem path resolution
 // upstream implementation path_expansion.rs owns user-home expansion
-// downstream test ../tests/mutation_authority_native.rs compares full decisions with frozen Python cases
+// downstream implementation ../tests/mutation_authority_native.rs compares full decisions with frozen Python cases
 // @dependency-end
 
 use crate::path_expansion::expand_user_path;

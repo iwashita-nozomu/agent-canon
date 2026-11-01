@@ -2,7 +2,7 @@
 // contract test
 // responsibility Checks pure native behavior-event assembly, eligibility, and record suppression against CPython 3.12.3 outputs.
 // upstream implementation ../src/behavior_event_assembly.rs owns typed assembly and event identity.
-// upstream test ../../../../../tests/fixtures/behavior_event_assembly/python_golden.json freezes old assembly inputs and outputs.
+// upstream evidence ../../../../../tests/fixtures/behavior_event_assembly/python_golden.json freezes old assembly inputs and outputs.
 // @dependency-end
 
 use agent_canon::behavior_event_assembly::{

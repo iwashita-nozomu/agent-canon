@@ -7,8 +7,8 @@
 // downstream implementation lib.rs shared native Template library
 // downstream implementation main.rs template-bundle CLI route
 // downstream implementation native_release.rs source-bound release package verifier
-// downstream test template_tests.rs profile, Codex and native package oracles
-// downstream test ../tests/native_release_native.rs source-bound native release oracles
+// downstream implementation template_tests.rs profile, Codex and native package oracles
+// downstream implementation ../tests/native_release_native.rs source-bound native release oracles
 // @dependency-end
 
 use crate::entrypoint_composer::Composition;

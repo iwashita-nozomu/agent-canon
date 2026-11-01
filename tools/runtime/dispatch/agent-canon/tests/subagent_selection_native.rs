@@ -2,7 +2,7 @@
 // contract test
 // responsibility Calls the native subagent-selection and receipt APIs from frozen Python inputs and compares old outputs.
 // upstream implementation ../src/subagent_selection.rs owns the pure native APIs.
-// upstream test ../../../../../tests/fixtures/subagent_selection/python_golden.json freezes CPython 3.12.3 outputs.
+// upstream evidence ../../../../../tests/fixtures/subagent_selection/python_golden.json freezes CPython 3.12.3 outputs.
 // @dependency-end
 
 use agent_canon::python_json::{

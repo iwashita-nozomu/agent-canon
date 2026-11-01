@@ -5,7 +5,7 @@
 // upstream implementation runtime_boundary.rs owns explicit external runtime path resolution and file boundaries
 // upstream implementation work_log.rs owns the host-local timestamp format used by workflow monitoring
 // upstream implementation behavior_event_assembly.rs owns the behavior-event payload
-// downstream test ../tests/hook_report_projection_native.rs compares complete document bytes with the old API oracle
+// downstream implementation ../tests/hook_report_projection_native.rs compares complete document bytes with the old API oracle
 // @dependency-end
 
 use crate::python_json::{canonical_json_ascii_bytes, JsonValue};

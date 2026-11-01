@@ -2,7 +2,7 @@
 // contract test
 // responsibility Calls the native hook-safety API from frozen synthetic inputs and compares independent CPython 3.12.3 outputs.
 // upstream implementation ../src/hook_safety.rs owns the pure native API.
-// upstream test ../../../../../tests/fixtures/hook_safety/python_golden.json freezes old Python inputs and outputs.
+// upstream evidence ../../../../../tests/fixtures/hook_safety/python_golden.json freezes old Python inputs and outputs.
 // @dependency-end
 
 use agent_canon::hook_safety::{

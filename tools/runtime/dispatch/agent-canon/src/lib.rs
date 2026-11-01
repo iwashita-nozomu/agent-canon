@@ -51,13 +51,13 @@
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
-// downstream test ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
-// downstream test ../tests/artifacts_native.rs validates the shared artifact API
-// downstream test ../tests/catalog_native.rs validates the shared catalog API
-// downstream test ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
-// downstream test template_tests.rs validates native Template APIs
-// downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
-// downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
+// downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
+// downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
+// downstream implementation ../tests/catalog_native.rs validates the shared catalog API
+// downstream implementation ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
+// downstream implementation template_tests.rs validates native Template APIs
+// downstream implementation ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
+// downstream implementation ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
 pub mod active_design_packet;

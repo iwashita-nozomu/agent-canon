@@ -3,9 +3,9 @@
 // responsibility Detects structural project-skill lanes and same-intent validation repair evidence.
 // upstream implementation ../../../../../tools/agent/skills/skill_lane_detector.py owns the current Python matching contract.
 // upstream implementation ../../../../../tools/agent/orchestration/prompt_classifier.py consumes injected SkillLaneEvidence.
-// upstream implementation ../python_text.rs owns Python-compatible whitespace.
-// downstream test ../tests/skill_lane_detector_native.rs checks frozen CPython 3.12.3 lane outputs.
-// downstream test ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old detector inputs and outputs.
+// upstream implementation python_text.rs owns Python-compatible whitespace.
+// downstream implementation ../tests/skill_lane_detector_native.rs checks frozen CPython 3.12.3 lane outputs.
+// downstream evidence ../../../../../tests/fixtures/skill_lane_detector/python_golden.json freezes old detector inputs and outputs.
 // @dependency-end
 //! Pure structural skill-lane and validation-repair evidence detection.
 

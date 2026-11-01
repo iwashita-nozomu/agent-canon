@@ -5,7 +5,7 @@
 // responsibility Owns canonical hook event bytes, local spool paths, and no-replace publication.
 // upstream implementation authority/mod.rs owns the attested parent no-replace capability
 // upstream implementation runtime_boundary.rs owns explicit runtime spool paths
-// downstream test ../tests/hook_event_log_native.rs checks Python bytes and append behavior
+// downstream implementation ../tests/hook_event_log_native.rs checks Python bytes and append behavior
 // @dependency-end
 
 use crate::authority::{AttestedParent, NonEmptyTrimmedString, ParentOwnedNoReplaceOutcome};
