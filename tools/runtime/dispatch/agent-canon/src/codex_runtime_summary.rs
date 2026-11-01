@@ -66,7 +66,7 @@ const CODEX_CHAT_DIRECTORY: &str = "chats";
 const CODEX_INDEX_FILE: &str = "index.jsonl";
 const GIT_COMMIT_KEY_LENGTH: usize = 12;
 const GIT_HEAD_TIMEOUT: Duration = Duration::from_secs(5);
-const HELP: &str = "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT] [--canon-root CANON_ROOT]\n                                                 [--thread-id THREAD_ID] [--all-threads]\n                                                 [--history-jsonl HISTORY_JSONL]\n                                                 [--sqlite-log SQLITE_LOG] [--session-glob SESSION_GLOB]\n                                                 [--recent-days RECENT_DAYS] [--all-time]\n                                                 [--output OUTPUT] [--dry-run] [--print-json]\n\nExport bounded Codex runtime summaries into the AgentCanon log archive.\n\noptions:\n  -h, --help            show this help message and exit\n  --source-root SOURCE_ROOT\n  --canon-root CANON_ROOT\n  --thread-id THREAD_ID\n  --all-threads\n  --history-jsonl HISTORY_JSONL\n  --sqlite-log SQLITE_LOG\n  --session-glob SESSION_GLOB\n  --recent-days RECENT_DAYS\n  --all-time\n  --output OUTPUT\n  --dry-run\n  --print-json\n";
+const HELP: &str = "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\n\nExport bounded Codex runtime summaries into the AgentCanon log archive.\n\noptions:\n  -h, --help            show this help message and exit\n  --source-root SOURCE_ROOT\n  --canon-root CANON_ROOT\n  --thread-id THREAD_ID\n  --all-threads\n  --history-jsonl HISTORY_JSONL\n  --sqlite-log SQLITE_LOG\n  --session-glob SESSION_GLOB\n  --recent-days RECENT_DAYS\n  --all-time\n  --output OUTPUT\n  --dry-run\n  --print-json\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HistorySummary {
@@ -362,8 +362,12 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             OptionName::SqliteLog => options.sqlite_log = PathBuf::from(value),
             OptionName::SessionGlob => options.session_globs.push(value),
             OptionName::RecentDays => {
-                options.recent_days = python_cli_integer::parse(&value)
-                    .ok_or_else(|| format!("argument {option}: invalid int value: '{value}'"))?;
+                options.recent_days = python_cli_integer::parse(&value).ok_or_else(|| {
+                    format!(
+                        "argument {option}: invalid int value: {}",
+                        rustpython_ast::Constant::Str(value.clone())
+                    )
+                })?;
             }
             OptionName::AllTime => unreachable!("flag options were handled above"),
             OptionName::Output => options.output = Some(PathBuf::from(value)),
@@ -377,7 +381,8 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
 }
 
 fn usage_error(message: &str) -> i32 {
-    eprintln!("{HELP}export_codex_runtime_summary.py: error: {message}");
+    let usage = HELP.split_once("\n\n").map_or(HELP, |(usage, _)| usage);
+    eprintln!("{usage}\nexport_codex_runtime_summary.py: error: {message}");
     2
 }
 
