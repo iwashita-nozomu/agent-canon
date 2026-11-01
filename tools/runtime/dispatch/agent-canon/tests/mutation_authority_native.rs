@@ -132,9 +132,17 @@ fn verify_case(case: &Value, has_git_recipe: bool) {
         },
     );
     let actual_decision = normalize_product_roots(decision.as_dict(), &root.0);
-    let expected_decision = case.get("decision").expect("case freezes decision");
+    let mut expected_decision = case.get("decision").expect("case freezes decision").clone();
+    if cfg!(windows) {
+        let reference = expected_decision["evidence_ref"]
+            .as_str()
+            .unwrap_or_default();
+        if reference.starts_with("$ROOT/") || reference.starts_with("$ROOT_PARENT/") {
+            expected_decision["evidence_ref"] = Value::String(reference.replace('/', "\\"));
+        }
+    }
     assert_eq!(
-        actual_decision, *expected_decision,
+        actual_decision, expected_decision,
         "{name}: complete decision projection"
     );
 
