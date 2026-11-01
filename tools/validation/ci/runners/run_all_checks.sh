@@ -455,7 +455,7 @@ fi
 echo "RUST_CHECKS=owned_by_bootstrap_container_static_gate"
 if [ "$SKIP_GITHUB_WORKFLOWS" -eq 1 ]; then
   echo "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "${WORKSPACE_ROOT}/tools/bin/agent-canon" check-github-workflows --root "${WORKSPACE_ROOT}" 2>&1; then
+elif run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}" 2>&1; then
   echo "✅ GitHub workflow / PR template checks 成功"
 else
   echo "❌ GitHub workflow / PR template checks 失敗"

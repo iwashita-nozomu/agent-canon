@@ -274,7 +274,7 @@ consume_source_correctness_receipt
 echo ""
 
 echo "1️⃣  GitHub workflow and PR template checks"
-"${WORKSPACE_ROOT}/tools/bin/agent-canon" check-github-workflows --root "${WORKSPACE_ROOT}"
+run_agent_canon check-github-workflows --root "${WORKSPACE_ROOT}"
 echo ""
 
 echo "2️⃣  changed AgentCanon paths"
