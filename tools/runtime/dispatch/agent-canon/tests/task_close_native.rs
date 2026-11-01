@@ -133,11 +133,11 @@ fn create_main706_workspace(destination: &Path) -> PathBuf {
     destination.to_path_buf()
 }
 
-fn rewrite_g6_source_context(artifact: &mut Value, source_root: &str) {
+fn rewrite_g6_source_context(artifact: &mut Value, logical_source_root: &str) {
     let gates = artifact["gate_verdicts"]
         .as_array()
         .expect("closeout artifact has gate verdicts");
-    // The valid case needs the host-local source identity in G6; the missing-G6
+    // The valid case needs the caller's logical source identity in G6; the missing-G6
     // negative fixture remains byte-semantic input to its earlier cardinality guard.
     if gates.len() != 6 {
         return;
@@ -161,7 +161,7 @@ fn rewrite_g6_source_context(artifact: &mut Value, source_root: &str) {
         .as_str()
         .expect("durable handback carries its agent id");
     let materialized = materialize_close_agent_tool_call(CloseAgentLifecycleOwnerInput {
-        source_root,
+        source_root: logical_source_root,
         run_id,
         agent_id,
         evidence: CloseAgentLifecycleEvidence {
@@ -236,7 +236,7 @@ fn rewrite_non_absolute_cleanup_fixture_path(artifact: &mut Value, fixture: &Fix
     true
 }
 
-fn write_cli_case(fixture: &Fixture, source_root: &Path, case: &Value) -> PathBuf {
+fn write_cli_case(fixture: &Fixture, g6_source_root: &str, case: &Value) -> PathBuf {
     let run_id = case["run_id"].as_str().expect("CLI case has run id");
     let report_root = fixture.runtime().join("reports/agents");
     let report_dir = report_root.join(run_id);
@@ -263,12 +263,7 @@ fn write_cli_case(fixture: &Fixture, source_root: &Path, case: &Value) -> PathBu
             let mut artifact: Value =
                 serde_json::from_slice(&bytes).expect("old lifecycle closeout fixture is JSON");
             rewrite_non_absolute_cleanup_fixture_path(&mut artifact, fixture);
-            rewrite_g6_source_context(
-                &mut artifact,
-                source_root
-                    .to_str()
-                    .expect("temporary source path is UTF-8"),
-            );
+            rewrite_g6_source_context(&mut artifact, g6_source_root);
             write_bytes(
                 &target,
                 &serde_json::to_vec(&artifact).expect("mapped lifecycle artifact serializes"),
@@ -396,7 +391,10 @@ fn task_close_rejects_a_forged_child_receipt() {
         RuntimeArtifactBoundary::for_source(&fixture.source(), Some(&fixture.runtime()), false)
             .expect("open read-only TaskClose runtime boundary");
     let ready_case = &corpus["task_close_cli_cases"][0];
-    write_cli_case(&fixture, &fixture.source(), ready_case);
+    let g6_source_root = corpus["source"]["source_root"]
+        .as_str()
+        .expect("old source context is recorded");
+    write_cli_case(&fixture, g6_source_root, ready_case);
     let report_dir = fixture.report_dir(ready_case["run_id"].as_str().expect("run id is text"));
     let verifier_path = report_dir.join("runtime/verifier_receipt.json");
     let verifier = fs::read_to_string(&verifier_path)
@@ -434,6 +432,9 @@ fn task_close_cli_replays_frozen_stdout_results_and_all_status_fields() {
     let fixture = Fixture::new("cli");
     let source_root = create_main706_workspace(&fixture.0.join("source"));
     let workspace = create_main706_workspace(&fixture.0.join("workspace"));
+    let g6_source_root = source_root
+        .to_str()
+        .expect("temporary source path is UTF-8");
     let runtime = fixture.runtime();
     fs::create_dir_all(&runtime).expect("create external runtime root");
     let cases = corpus["task_close_cli_cases"]
@@ -445,7 +446,7 @@ fn task_close_cli_replays_frozen_stdout_results_and_all_status_fields() {
         "both ready and three blocker routes stay covered"
     );
     for case in cases {
-        let report_dir = write_cli_case(&fixture, &source_root, case);
+        let report_dir = write_cli_case(&fixture, g6_source_root, case);
         let run_id = case["run_id"].as_str().expect("CLI case has run id");
         let mut command = Command::new(env!("CARGO_BIN_EXE_agent-canon"));
         command
