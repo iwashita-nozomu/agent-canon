@@ -166,13 +166,14 @@ fn missing_fields(mapping: &BTreeMap<&str, &Yaml>, expected: &[&str]) -> Vec<Str
 
 fn required_string(
     mapping: &BTreeMap<&str, &Yaml>,
-    field: &str,
+    key: &str,
+    diagnostic_field: &str,
 ) -> Result<String, ActiveDesignPacketError> {
     mapping
-        .get(field)
+        .get(key)
         .and_then(|value| value.as_str())
         .map(str::to_owned)
-        .ok_or_else(|| ActiveDesignPacketError::new(format!("{field} must be a string")))
+        .ok_or_else(|| ActiveDesignPacketError::new(format!("{diagnostic_field} must be a string")))
 }
 
 fn string_tuple(value: &Yaml, field: &str) -> Result<Vec<String>, ActiveDesignPacketError> {
@@ -345,7 +346,7 @@ fn normalize_entry(
             missing.join(",")
         )));
     }
-    let entry_id = required_string(&entry, &format!("{field}.entry_id"))?;
+    let entry_id = required_string(&entry, "entry_id", &format!("{field}.entry_id"))?;
     let expected_id = match section {
         "abstract_design_frame" => "abstract-design-frame",
         "implementation_source_packet" => "implementation-source-packet",
@@ -362,7 +363,11 @@ fn normalize_entry(
             "{field}.entry_id:invalid"
         )));
     }
-    let responsibility_id = required_string(&entry, &format!("{field}.responsibility_id"))?;
+    let responsibility_id = required_string(
+        &entry,
+        "responsibility_id",
+        &format!("{field}.responsibility_id"),
+    )?;
     let mut references = BTreeMap::new();
     for reference_field in REFERENCE_FIELDS {
         let value = entry.get(reference_field).ok_or_else(|| {
@@ -404,7 +409,7 @@ pub fn normalize_active_design_packet_config(
             missing.join(",")
         )));
     }
-    let schema = required_string(&packet, &format!("{field_prefix}.schema"))?;
+    let schema = required_string(&packet, "schema", &format!("{field_prefix}.schema"))?;
     if schema != ACTIVE_DESIGN_PACKET_SCHEMA {
         return Err(ActiveDesignPacketError::new(format!(
             "{field_prefix}:schema_unknown:{schema}"
@@ -412,7 +417,7 @@ pub fn normalize_active_design_packet_config(
     }
     let mut paths = BTreeMap::new();
     for field in ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS {
-        let value = required_string(&packet, &format!("{field_prefix}.{field}"))?;
+        let value = required_string(&packet, field, &format!("{field_prefix}.{field}"))?;
         let path = Path::new(&value);
         if path.is_absolute()
             || path
@@ -459,8 +464,10 @@ pub fn normalize_active_design_packet_config(
                 missing.join(",")
             )));
         }
-        let clause_id = required_string(&clause, &format!("{clause_field}.clause_id"))?;
-        let source_ref = required_string(&clause, &format!("{clause_field}.source_ref"))?;
+        let clause_id =
+            required_string(&clause, "clause_id", &format!("{clause_field}.clause_id"))?;
+        let source_ref =
+            required_string(&clause, "source_ref", &format!("{clause_field}.source_ref"))?;
         if clause_id.is_empty()
             || !clause_id.chars().enumerate().all(|(index, character)| {
                 if index == 0 {

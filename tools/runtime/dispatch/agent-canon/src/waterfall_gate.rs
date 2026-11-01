@@ -13,8 +13,9 @@
 use crate::active_design_packet::{
     active_design_packet_mapping, normalize_active_design_packet_config,
     validate_active_design_packet_reference_projection, ActiveDesignPacketConfig,
-    ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS, ACTIVE_DESIGN_PACKET_FIELDS,
+    ACTIVE_DESIGN_PACKET_FIELDS,
 };
+use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::report_artifact_checks::{
     check_schedule_artifact, check_work_log_artifact, has_approve_decision,
     is_placeholder_only_section, section_has_content, table_body_rows,
@@ -194,6 +195,23 @@ enum ParseResult {
     Parsed(Arguments),
 }
 
+#[derive(Clone, Copy)]
+enum ArgumentName {
+    RunId,
+    ReportDir,
+    ReportRoot,
+    Gate,
+    Help,
+}
+
+const ARGUMENTS: [(&str, ArgumentName); 5] = [
+    ("--run-id", ArgumentName::RunId),
+    ("--report-dir", ArgumentName::ReportDir),
+    ("--gate", ArgumentName::Gate),
+    ("--report-root", ArgumentName::ReportRoot),
+    ("--help", ArgumentName::Help),
+];
+
 struct BundleReader {
     root: PathBuf,
     directory: Option<RuntimeDirectory>,
@@ -263,27 +281,39 @@ fn parse_args(args: &[String]) -> Result<ParseResult, String> {
             .map_or((argument.as_str(), None), |(option, value)| {
                 (option, Some(value.to_owned()))
             });
-        let value = match option {
-            "--run-id" | "--report-dir" | "--report-root" | "--gate" => {
-                let value = if let Some(value) = inline_value {
-                    value
-                } else {
-                    index += 1;
-                    args.get(index)
-                        .filter(|value| !value.starts_with("--"))
-                        .cloned()
-                        .ok_or_else(|| format!("{option} requires one value"))?
-                };
-                Some(value)
-            }
-            _ => return Err(format!("unrecognized argument: {argument}")),
+        if !option.starts_with("--") {
+            return Err(format!("unrecognized argument: {argument}"));
+        }
+        let name = resolve_long_option_prefix(option, &ARGUMENTS).map_err(|error| match error {
+            LongOptionError::Unrecognized => format!("unrecognized argument: {argument}"),
+            LongOptionError::Ambiguous(matches) => format!(
+                "ambiguous option: {option} could match {}",
+                matches.join(", ")
+            ),
+        })?;
+        if matches!(name, ArgumentName::Help) {
+            return match inline_value {
+                Some(value) => Err(format!(
+                    "argument -h/--help: ignored explicit argument '{value}'"
+                )),
+                None => Ok(ParseResult::Help),
+            };
+        }
+        let value = if let Some(value) = inline_value {
+            value
+        } else {
+            index += 1;
+            args.get(index)
+                .filter(|value| !value.starts_with("--"))
+                .cloned()
+                .ok_or_else(|| format!("{option} requires one value"))?
         };
-        match option {
-            "--run-id" => run_id = value,
-            "--report-dir" => report_dir = value,
-            "--report-root" => report_root = value,
-            "--gate" => gate = value,
-            _ => unreachable!("handled option has a value"),
+        match name {
+            ArgumentName::RunId => run_id = Some(value),
+            ArgumentName::ReportDir => report_dir = Some(value),
+            ArgumentName::ReportRoot => report_root = Some(value),
+            ArgumentName::Gate => gate = Some(value),
+            ArgumentName::Help => unreachable!("help option handled before value parsing"),
         }
         index += 1;
     }
@@ -793,7 +823,7 @@ fn check_active_document_flow_review(packet: &ActiveDesignPacket) -> Vec<GateBlo
     )
 }
 
-fn section_body<'a>(text: &'a str, heading: &str) -> String {
+fn section_body(text: &str, heading: &str) -> String {
     let mut in_section = false;
     let mut body = Vec::new();
     for line in text.lines() {
@@ -888,8 +918,7 @@ fn check_user_request_contract(text: &str) -> Vec<String> {
                 let slug = heading
                     .trim_start_matches("## ")
                     .to_lowercase()
-                    .replace('-', "_")
-                    .replace(' ', "_");
+                    .replace(['-', ' '], "_");
                 blockers.push(format!(
                     "user_request_contract.md:active_unknown_clause:{slug}"
                 ));
@@ -1032,9 +1061,8 @@ pub fn run(args: &[String]) -> i32 {
     let arguments = match parse_args(args) {
         Ok(ParseResult::Help) => {
             println!(
-                "{}\n\n{}",
-                usage(),
-                "Fail unless the requested intermediate waterfall gate is ready."
+                "{}\n\nFail unless the requested intermediate waterfall gate is ready.",
+                usage()
             );
             return 0;
         }
