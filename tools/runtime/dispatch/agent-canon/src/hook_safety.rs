@@ -79,10 +79,10 @@ const OPAQUE_GIT_OPTIONS_WITH_VALUES: [&str; 7] = [
     "--config-env",
 ];
 const PUNCTUATION_CHARS: &str = ";&|(){}!";
-const PYTHON_15_WORD_CHAR: &str = r"[\p{Age:15.0}&&[\pL\pN_]]";
-const PYTHON_15_NONWORD_CHAR: &str = r"[^[\p{Age:15.0}&&[\pL\pN_]]]";
-const PYTHON_15_START_BOUNDARY: &str = r"(?:\A|[^[\p{Age:15.0}&&[\pL\pN_]]])";
-const PYTHON_15_END_BOUNDARY: &str = r"(?:\z|[^[\p{Age:15.0}&&[\pL\pN_]]])";
+pub(crate) const PYTHON_15_WORD_CHAR: &str = r"[\p{Age:15.0}&&[\pL\pN_]]";
+pub(crate) const PYTHON_15_NONWORD_CHAR: &str = r"[^[\p{Age:15.0}&&[\pL\pN_]]]";
+pub(crate) const PYTHON_15_START_BOUNDARY: &str = r"(?:\A|[^[\p{Age:15.0}&&[\pL\pN_]]])";
+pub(crate) const PYTHON_15_END_BOUNDARY: &str = r"(?:\z|[^[\p{Age:15.0}&&[\pL\pN_]]])";
 
 static SECRET_PATTERNS: LazyLock<[(Regex, &'static str); 4]> = LazyLock::new(|| {
     [

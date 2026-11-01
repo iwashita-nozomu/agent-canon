@@ -75,6 +75,7 @@ pub mod owner_guarantee;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
+pub mod prompt_capture;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
 pub(crate) mod python_cli_integer;
