@@ -576,8 +576,13 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
                 let JsonValue::Object(fields) = &projected else {
                     panic!("projected event is an object");
                 };
+                assert_eq!(text(field(&projected, "hook_log_namespace").unwrap()), "");
+                assert_eq!(text(field(event, "hook_log_namespace").unwrap()), "fixture");
                 for (name, expected) in &fields.0 {
                     let name = name.to_text().unwrap();
+                    if name == "hook_log_namespace" {
+                        continue;
+                    }
                     assert_eq!(
                         canonical_json_ascii_bytes(
                             field(event, &name).expect("projection field belongs to spooled event")
