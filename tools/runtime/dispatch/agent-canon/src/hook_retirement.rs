@@ -633,6 +633,7 @@ pub fn contract_payload(root: &Path) -> JsonValue {
             .map(|row| format!(".codex/hooks/{}", row.filename))
             .filter(|path| root.join(path).exists()),
     );
+    missing_files.sort();
 
     let artifacts = vec![
         value_object(vec![
