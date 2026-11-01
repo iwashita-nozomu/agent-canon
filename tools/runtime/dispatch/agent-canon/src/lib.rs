@@ -94,6 +94,7 @@ pub mod scip_index;
 pub mod skill_lane_detector;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod subagent_selection;
 pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
