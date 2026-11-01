@@ -12,7 +12,7 @@ downstream implementation ../../bootstrap.sh host bootstrap entrypoint
 downstream implementation ../../bootstrap/container/image/Dockerfile shared Python, Rust, and native CLI tool image
 downstream implementation ../../tools/runtime/container/bootstrap_runtime.py resident container lifecycle and mount registry
 downstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py external runtime artifact boundary
-downstream implementation ../../tools/runtime/dispatch/tool_dispatch.py catalog-namespaced typed dispatcher
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs native catalog-namespaced typed dispatcher
 downstream implementation ../../tests/bootstrap/test_bootstrap_runtime.py bootstrap lifecycle and compatibility tests
 downstream implementation ../../.github/workflows/agent-canon-native-release.yml builds and publishes native CLI archives
 @dependency-end
@@ -49,8 +49,8 @@ native executable. It uses AGENT_CANON_NATIVE_BIN when set; otherwise it looks
 in the crate's target/release and target/debug directories. Rust commands do
 not start bootstrap, Docker, or Cargo builds implicitly.
 
-The generic agent-canon tool run catalog dispatcher remains a transitional
-route and still requires its registered shared runtime. Archives also include
+The generic agent-canon tool run catalog dispatcher uses the native CLI and
+still requires its registered shared runtime. Archives also include
 the optional knowledge/feedback Python adapter, which is found beside the
 installed executable under share/agent-canon and requires host Python 3.10 or
 newer. The adapter supports private spool reads and writes. Host/container sync
@@ -357,7 +357,7 @@ id, typed argv, runtime, execution_plane, cwd policy, env policy,
 stdin/stdout/stderr policy, exit/signal policy, side_effect_policy, output_root
 ```
 
-`tools/runtime/dispatch/tool_dispatch.py` は `tool-container` と
+`tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs` は `tool-container` と
 `read-only`、`external-artifact`、`explicit-target-write` を列挙値にします。
 `native` runtime は catalog が宣言した executable argv を認証済み tool
 container 内で直接起動し、child argument を shell 評価しません。source mount
@@ -542,7 +542,7 @@ unhealthy、archive publish failure、rollback、session restart、cleanup readb
 | `update` | current checkout reconciled in existing v2 lifecycle | ordinary Docker result and existing state/container readback |
 | `start` | exactly one healthy container | inspect, limits, mounts, generation |
 | `target add` | new mount generation active | lock, zero tasks, health, mount readback |
-| `tool run` | typed catalog dispatch | `tools/runtime/dispatch/tool_dispatch.py` receipt |
+| `tool run` | typed catalog dispatch | native dispatcher request and bootstrap receipt |
 | `template export` | external template bundle exported | container-plane receipt and bundle provenance |
 | `codex prepare` | isolated managed surfaces active | collision result, link/digest/readback |
 | `eval collect` | external eval bundle complete | producer matrix, source unchanged |

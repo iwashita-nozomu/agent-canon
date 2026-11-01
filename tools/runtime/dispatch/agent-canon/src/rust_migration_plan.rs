@@ -359,7 +359,6 @@ fn family_for(path: &str) -> &'static str {
         return "source-analysis";
     }
     if path.starts_with("tools/runtime/container/")
-        || path.ends_with("/tool_dispatch.py")
         || path.starts_with("tools/validation/ci/runners/")
     {
         return "runtime-execution";
