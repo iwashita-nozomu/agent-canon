@@ -93,7 +93,6 @@ replaceable responsibility unit として定めます。
   `tools/agent/skills/skill_shim_materializer.py`、
   `eval/checkers/smoke_test_research_perspective_pack.py`、
   `tools/validation/semantic/authority/validate_role_write_scope.py`、
-  `tools/validation/semantic/lifecycle/waterfall_gate_check.py`、
   `tools/runtime/archive/work_log.py`、
   `tools/runtime/lifecycle/workflow_monitor.py` から収集します。
 - 静的 import graph は `agent_team.py` の package 分岐で
@@ -147,13 +146,15 @@ tools/
 | `EVALUATE_SET` | `eval/producers/evaluate_codex_agent_roles.py` |
 | `PACK_SET` | `eval/checkers/smoke_test_research_perspective_pack.py` |
 | `SCOPE_SET` | `tools/validation/semantic/authority/validate_role_write_scope.py` |
-| `WATERFALL_SET` | `tools/validation/semantic/lifecycle/waterfall_gate_check.py` |
+| retired Python `WATERFALL_SET` | Native Rust gate: `tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs` |
 | `SINGLE_SET` | `eval/producers/evaluate_agent_run.py`、`tools/runtime/archive/work_log.py` |
 | `TOOL_CALL_SET` | `tools/agent/skills/skill_shim_materializer.py` |
 | `MONITOR_SET` | `tools/runtime/lifecycle/workflow_monitor.py` |
 
 Native coordinated TaskClose is registered in `tools/catalog.yaml` and does not
 import this Python facade.
+The native Waterfall gate is a separate consumer of persisted active packets
+and does not import this Python facade.
 
 `STARTER_SET` は `ACTIVE_DESIGN_PACKET_SCHEMA`, `ActiveDesignPacketConfig`,
 `AgentTypeSelection`, `Role`, `RunBundleSpec`, `TaskCatalog`, `TeamConfig`,
@@ -202,11 +203,10 @@ import this Python facade.
 `load_team_config`, `validate_role_write_scope`, `write_directory_snapshot`,
 `write_workspace_change_snapshot` です。
 
-`WATERFALL_SET` は `ACTIVE_DESIGN_PACKET_ARTIFACT_FIELDS`,
-`ACTIVE_DESIGN_PACKET_FIELDS`, `ACTIVE_DESIGN_PACKET_SCHEMA`,
-`ReportBundleArtifactPathError`, `active_design_packet_mapping`,
-`normalize_active_design_packet_config`, `resolve_report_bundle_artifact_path`,
-`resolve_report_root` です。`SINGLE_SET` は `resolve_report_root`、
+The former Python `WATERFALL_SET` was retired with the Rust gate migration.
+`waterfall_gate.rs` reads the persisted packet through `active_design_packet.rs`;
+Python `packets.py` remains the packet/config owner for its other callers.
+`SINGLE_SET` は `resolve_report_root`、
 `TOOL_CALL_SET` は `materialize_tool_call_token`, `materialize_dynamic_route_tool_call_token`、`MONITOR_SET` は
 `resolve_report_root`, `schedule_wave_row` です。
 
@@ -218,7 +218,7 @@ test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact
 | `tests/agent_tools/test_check_agent_runtime_alignment.py` | `TaskCatalog`, `codex_runtime_max_depth`, `load_team_config`, `resolve_active_design_packet_config`, `resolve_cross_cutting_document_packet`, `resolve_document_section_locators`, `resolve_role`, `resolve_role_document_packet`, `workflow_topology_policy_violations` | owner module を直接 import する |
 | `tests/agent_tools/test_evaluate_codex_agent_roles.py` | `load_task_catalog`, `load_team_config`, `recommended_dynamic_expansion_wave_slots`, `recommended_initial_subagent_wave`, `select_roles` | facade または owner module の explicit API |
 | `tests/agent_tools/test_bootstrap_and_close.py` | `AgentTypeSelection`, `load_team_config`, `validate_agent_type_selections`, `CloseAgentLifecycleEvidence`, `active_design_packet_mapping`, `default_quality_check_agent_types`, `load_task_catalog`, `materialize_close_agent_tool_call`, `recommended_dynamic_expansion_wave_slots`, `recommended_initial_subagent_wave`, `resolve_active_design_packet_config`, `select_roles`, `unique_codex_agents_for_roles`, `workflow_spawn_budget` | public facade の allowlist または owner module に移す |
-| `tests/agent_tools/test_waterfall_gate_check.py` | `ACTIVE_DESIGN_PACKET_SCHEMA`, `RunBundleSpec`, `active_design_packet_mapping`, `active_design_packet_reference_projection`, `load_team_config`, `normalize_active_design_packet_config`, `resolve_active_design_packet_config` | packet/config owner の explicit API に移す |
+| `tests/agent_tools/test_waterfall_gate_check.py` | `ACTIVE_DESIGN_PACKET_SCHEMA`, `RunBundleSpec`, `active_design_packet_mapping`, `active_design_packet_reference_projection`, `load_team_config`, `normalize_active_design_packet_config`, `resolve_active_design_packet_config` | Python packet/config owner builds test premises; migrated CLI action runs the Rust gate |
 
 ### 3.3 direct-script と package import の current contract
 

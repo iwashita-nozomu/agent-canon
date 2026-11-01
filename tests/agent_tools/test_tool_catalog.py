@@ -58,7 +58,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.assertEqual(
             rows["waterfall-gate-check"]["path"],
-            "tools/validation/semantic/lifecycle/waterfall_gate_check.py",
+            "tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs",
         )
         self.assertEqual(
             rows["quarto"]["path"], "tools/runtime/dispatch/tool_dispatch.py"
