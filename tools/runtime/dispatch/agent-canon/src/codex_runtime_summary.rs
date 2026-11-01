@@ -135,7 +135,6 @@ impl OrderedCounter {
     }
 }
 
-#[derive(Debug)]
 struct SummaryOutput {
     payload: JsonValue,
     summary_id: String,
@@ -991,12 +990,10 @@ fn read_history(
                 .take()
                 .map_or_else(|| timestamp.clone(), |value| value.min(timestamp.clone())),
         );
-        result.last_ts = Some(
-            result
-                .last_ts
-                .take()
-                .map_or_else(|| timestamp.clone(), |value| value.max(timestamp)),
-        );
+        result.last_ts = Some(match result.last_ts.take() {
+            Some(value) => value.max(timestamp),
+            None => timestamp,
+        });
         Ok(())
     })?;
     Ok(result)
@@ -1370,15 +1367,6 @@ fn iter_session_paths(
         selected.push(path);
     }
     Ok(selected)
-}
-
-fn path_posix(path: &Path) -> String {
-    let value = path.to_string_lossy();
-    if cfg!(windows) {
-        value.replace('\\', "/")
-    } else {
-        value.into_owned()
-    }
 }
 
 fn python_path_components(path: &Path) -> Vec<String> {
