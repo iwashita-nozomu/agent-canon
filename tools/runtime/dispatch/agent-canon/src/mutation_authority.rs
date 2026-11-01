@@ -1935,11 +1935,20 @@ fn git_repository_redirect(
     let observed = String::from_utf8_lossy(&output.stdout)
         .trim_end_matches('\n')
         .to_owned();
-    let expected = resolve_non_strict(active_root)
-        .ok()
-        .map(|path| path.to_string_lossy().into_owned());
-    if expected.as_deref() != Some(observed.as_str()) {
-        return Some((vec![observed], "git_repository_redirect".to_owned()));
+    let (Ok(observed), Ok(expected)) = (
+        resolve_non_strict(Path::new(&observed)),
+        resolve_non_strict(active_root),
+    ) else {
+        return Some((
+            vec![UNRESOLVED_SHELL_PATH.to_owned()],
+            "git_repository_redirect_unresolved".to_owned(),
+        ));
+    };
+    if observed != expected {
+        return Some((
+            vec![observed.to_string_lossy().into_owned()],
+            "git_repository_redirect".to_owned(),
+        ));
     }
     None
 }
