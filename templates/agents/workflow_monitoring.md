@@ -9,7 +9,7 @@ upstream design ../../documents/runtime/task-contract-observation.md defines tas
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py appends canonical monitoring and measurement entries
 downstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py validates and summarizes contract observations
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs evaluates monitoring evidence
-downstream implementation ../../tools/validation/semantic/tools/tool_rejection_preflight.py predicts pre-edit rejection gates
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts pre-edit rejection gates
 @dependency-end
 -->
 

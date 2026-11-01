@@ -12,7 +12,7 @@ downstream design TASK_WORKFLOWS.md routes active design packet ownership
 downstream design skills/codex-task-workflow.md consumes the active design packet contract
 downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs validates persisted active design packets
-downstream implementation ../tools/validation/semantic/tools/tool_rejection_preflight.py predicts edit-time tool rejection gates
+downstream implementation ../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts edit-time tool rejection gates
 @dependency-end
 -->
 
@@ -490,7 +490,7 @@ When those are known, proceed directly; path-based rejection prediction is an
 optional diagnostic, not an edit, handoff, or completion gate:
 
 ```bash
-python3 tools/validation/semantic/tools/tool_rejection_preflight.py --root . <planned-edit-paths>
+tools/bin/agent-canon tool-rejection-preflight --root . <planned-edit-paths>
 ```
 
 Use it only to resolve uncertainty about relevant checks. Predictions are

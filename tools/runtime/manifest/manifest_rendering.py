@@ -1030,7 +1030,7 @@ def manifest_run_lines(
             f"    implementation_surface_route_command: {public_command_for_spec(spec, ('tools/bin/agent-canon', 'agent-search', '--query-file', '<request-or-design-question.txt>', '--providers', 'semantic', '--format', 'json'))!r}",
             "    tool_reuse_ledger_status: required_before_custom_implementation",
             "    pre_edit_rejection_prediction_status: optional_diagnostic",
-            f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('python3', 'tools/validation/semantic/tools/tool_rejection_preflight.py', '--root', '.', '<planned-edit-paths>'))!r}",
+            f"    pre_edit_rejection_command: {public_command_for_spec(spec, ('tools/bin/agent-canon', 'tool-rejection-preflight', '--root', '.', '<planned-edit-paths>'))!r}",
             *manifest_user_facing_language_policy_lines(),
             *manifest_contract_complete_implementation_policy_lines(
                 spec.task,

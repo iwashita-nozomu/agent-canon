@@ -129,7 +129,7 @@ Issue history is recreated as a compatibility surface.
 | B2 | `skill_usage_logger.py` → evaluator and prompt-eval tests | pure prompt-to-workflow/skill classification | new `tools/agent/orchestration/prompt_classifier.py`; evaluator imports it directly |
 | B3 | `prompt_secret_guard.py` → prompt safety and dispatcher | secret classification and redacted block payload | `tools/runtime/authority/hook_safety.py` |
 | B4 | `branch_worktree_guard.py` and workflow docs → dispatcher | destructive Git intent, same-segment authority, redacted payload | the same `tools/runtime/authority/hook_safety.py`; policy wording remains [agents/canonical/CODEX_WORKFLOW.md](../../agents/canonical/CODEX_WORKFLOW.md) |
-| B5 | `cause_investigation_guard.py` → preflight gate | cause evidence preflight | existing `tools/validation/semantic/tools/tool_rejection_preflight.py` |
+| B5 | `cause_investigation_guard.py` → preflight gate | cause evidence preflight | native `tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs` |
 | B6 | `module_boundary_guard.py` → preflight gate | import boundary finding | existing `tools/analysis/code/import_responsibility.py` |
 | B7 | `library_implementation_guard.py`, `first_party_library_guard.py` | dependency/public-surface authority | final decision owner: `tools/runtime/authority/task_authority.py`; `responsibility_scope.py` and `$dependency-module-change` are read-only consumers/callers |
 | B8 | `style_checker_guard.py` and quality script | Markdown/style validation | `tools/bin/agent-canon docs check` and `$md-style-check` |
@@ -141,7 +141,7 @@ The 14 direct-retirement positions are: `log_archive_mount_warning.py`, `referen
 
 | group | final decision owner | read-only consumers/callers | one execution route |
 | --- | --- | --- | --- |
-| B7 | `tools/runtime/authority/task_authority.py:first_party_library_authorized` | `responsibility_scope.py` projects scope evidence; `$dependency-module-change` supplies dependency-source context; `tool_rejection_preflight.py` reports the finding | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
+| B7 | `tools/runtime/authority/task_authority.py:first_party_library_authorized` | `responsibility_scope.rs` projects scope evidence; `$dependency-module-change` supplies dependency-source context; the native tool rejection preflight reports the finding | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
 | B9 | `tools/agent/orchestration/review_dispatch.py:resolve_current_review_state` | `report_artifact_checks.py` consumes the typed review state; `task_close.py` consumes readiness; `tools/validation/ci/checks/run_python_quality_checks.sh` invokes the existing validation set | `import-only:tools.agent.orchestration.review_dispatch:resolve_current_review_state` |
 
 The read-only consumers may not emit an independent B7/B9 decision, approval, or alternate execution route. Their fields are projections of the decision owner result: B7 exposes authority `allowed/reason`; B9 exposes the current candidate, decision, dispatch blocker, and `publication_unlocked`. A missing or malformed owner result is a blocking finding, not a consumer-local fallback.
@@ -328,7 +328,7 @@ The canonical tuple rows are fixed as follows; no row may be inferred from a nea
 | `skill_usage_logger.py` | `tools/runtime/archive/behavior_event_assembly.py` | `import-only:tools.runtime.archive.behavior_event_assembly:record_hook_invocation` |
 | `prompt_secret_guard.py` | `tools/runtime/authority/hook_safety.py` | `import-only:tools.runtime.authority.hook_safety:secret_block_payload` |
 | `branch_worktree_guard.py` | `tools/runtime/authority/hook_safety.py` | `import-only:tools.runtime.authority.hook_safety:first_block` |
-| `cause_investigation_guard.py` | `tools/validation/semantic/tools/tool_rejection_preflight.py` | `command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation` |
+| `cause_investigation_guard.py` | `tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs` | `command-only:tools/bin/agent-canon tool-rejection-preflight --gate cause_investigation` |
 | `module_boundary_guard.py` | `tools/analysis/code/import_responsibility.py` | `command-only:python3 tools/analysis/code/import_responsibility.py` |
 | `library_implementation_guard.py` | `tools/runtime/authority/task_authority.py` | `import-only:tools.runtime.authority.task_authority:first_party_library_authorized` |
 | `style_checker_guard.py` | `$md-style-check` | `docs-only:tools/bin/agent-canon docs check` |
@@ -658,7 +658,7 @@ The parser aggregates malformed records without aborting the batch: `malformed_b
 | `tools/runtime/authority/hook_safety.py` | import-only pure API listed above; no standalone safety CLI | dispatcher direct import; old hook safety path deleted |
 | `tools/runtime/authority/hook_retirement.py` | import-only constants/dataclass; no executable entrypoint | dispatcher and `check_hook_retirement.py` share one manifest |
 | `tools/validation/semantic/hooks/check_hook_retirement.py` | `python3 tools/validation/semantic/hooks/check_hook_retirement.py --root . --check`; readback via `--contract` | imports both typed tuples, computes digest, and generates the 24-basename caller query |
-| `tools/validation/semantic/tools/tool_rejection_preflight.py` | existing CLI and typed gate output | four old gate templates become direct owner commands |
+| `tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs` | native CLI and typed gate output | four old gate templates become direct owner commands |
 | `tools/analysis/code/import_responsibility.py` | existing checker CLI/JSON | module-boundary owner |
 | `tools/runtime/authority/task_authority.py` | import-only final B7 route: `first_party_library_authorized` | `responsibility_scope.py` and `$dependency-module-change` consume its result read-only |
 | `tools/agent/orchestration/review_dispatch.py` | import-only final B9 route: `resolve_current_review_state` | sole review decision producer |

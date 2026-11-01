@@ -117,17 +117,17 @@ path: tools/validation/ci/checks/check_github_workflows.py
     "documents/design/responsibility-scope-management.md": "agent-canon responsibility-scope\n",
     "documents/tools/README.md": (
         "tool_catalog.rs tool_drift.rs notebook-quality "
-        "tool_rejection_preflight.py agent-canon responsibility-scope responsibility-scope.toml "
+        "tool_rejection_preflight.rs agent-canon responsibility-scope responsibility-scope.toml "
         "protecting tools\n"
     ),
     "documents/notes/guardrails/engineering_avoidances.md": "implementation avoidances\n",
     "tools/README.md": (
         "tool_catalog.rs tool_drift.rs notebook-quality "
         "agent-canon docs render-runtime-profile agent-canon docs check "
-        "tool_rejection_preflight.py "
+        "tool_rejection_preflight.rs "
         "agent-canon responsibility-scope responsibility-scope.toml protecting tools\n"
     ),
-    "tools/validation/semantic/tools/tool_rejection_preflight.py": "preflight owner\n",
+    "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs": "preflight owner\n",
     "agents/COMMUNICATION_PROTOCOL.md": "communication protocol\n",
     "agents/canonical/CODEX_WORKFLOW.md": ("Codex Workflow phase reader map\n"),
     "agents/canonical/CODEX_INTAKE.md": "repository task intake\n",

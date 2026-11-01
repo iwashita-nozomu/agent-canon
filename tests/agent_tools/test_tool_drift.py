@@ -514,17 +514,17 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         """Write fixtures for the tool rejection preflight contract."""
         self.write_file(
             root,
-            "tools/validation/semantic/tools/tool_rejection_preflight.py",
+            "tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs",
             "\n".join(
                 [
                     "# @dependency-start",
                     "# responsibility Prechecks edit-time risk class.",
-                    "# upstream design ../../../../agents/COMMUNICATION_PROTOCOL.md protocol",
-                    "# upstream design ../../../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../../../tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs scope",
-                    "# upstream design ../../../README.md tool entrypoints",
-                    "# upstream design ../../../../documents/tools/README.md user-facing routes",
-                    "# upstream implementation ../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
+                    "# upstream design ../../../../../agents/COMMUNICATION_PROTOCOL.md protocol",
+                    "# upstream design ../../../../../agents/skills/codex-task-workflow.md workflow",
+                    "# upstream implementation responsibility_scope.rs scope",
+                    "# upstream design ../../../../../tools/README.md tool entrypoints",
+                    "# upstream design ../../../../../documents/tools/README.md user-facing routes",
+                    "# downstream test ../../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
                     "",
                 ]
