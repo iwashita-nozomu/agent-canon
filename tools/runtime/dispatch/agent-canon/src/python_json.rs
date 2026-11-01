@@ -675,6 +675,7 @@ impl<'a> JsonParser<'a> {
             is_float = true;
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
                 if self.reject_duplicates {
+                    self.index = fraction_start;
                     return Ok(JsonValue::Number(JsonNumber::from_raw(
                         &self.input[start..fraction_start],
                     )));
@@ -694,6 +695,7 @@ impl<'a> JsonParser<'a> {
             }
             if !matches!(self.peek(), Some(b'0'..=b'9')) {
                 if self.reject_duplicates {
+                    self.index = exponent_start;
                     return Ok(JsonValue::Number(JsonNumber::from_raw(
                         &self.input[start..exponent_start],
                     )));
