@@ -48,6 +48,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
@@ -81,7 +82,7 @@ mod python_structure_hash;
 mod python_structure_hash_impact;
 mod python_structure_hash_report;
 mod python_structure_hash_scope_plan;
-mod python_text;
+use agent_canon::python_text;
 mod responsibility_scope;
 mod result_logs;
 mod rule_inventory;
@@ -95,6 +96,7 @@ pub mod source_dependency_graph;
 mod structured_analysis;
 mod surface_manifest;
 mod test_design;
+mod token_footprints;
 mod tool_drift;
 mod tool_rejection_preflight;
 
@@ -142,6 +144,7 @@ Commands:
   work-log [--report-dir PATH|--run-id ID] --message TEXT [options]
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
+  compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
@@ -238,6 +241,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "compare-agent-run-paths" {
         std::process::exit(compare_agent_run_paths::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "compare-codex-token-footprints" {
+        std::process::exit(token_footprints::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
