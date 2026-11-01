@@ -21,6 +21,7 @@
 // upstream implementation lib.rs exposes shared user-home path expansion
 // downstream implementation tool_drift.rs checks tool, workflow, and documentation traces
 // downstream implementation github_workflow_check.rs validates standalone workflows and PR templates
+// downstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
 // downstream implementation theorem_graph_board.rs builds formal-proof theorem route summaries
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py exercises docs formatter coverage readback through this CLI
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
@@ -68,6 +69,7 @@ mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
 mod python_cli_integer;
+mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
 mod python_structure_hash;

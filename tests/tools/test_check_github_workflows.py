@@ -239,6 +239,32 @@ def run_checker(root: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def test_native_checker_cli_help_and_argparse_root_spellings() -> None:
+    for option in ("-h", "--help"):
+        help_result = subprocess.run(
+            [_native_cli(), "check-github-workflows", option],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert help_result.returncode == 0, help_result.stderr
+        assert "usage:" in help_result.stdout
+        assert "--root ROOT" in help_result.stdout
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        copy_required_surfaces(root)
+        for root_args in ((f"--root={root}",), ("--r", str(root))):
+            result = subprocess.run(
+                [_native_cli(), "check-github-workflows", *root_args],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            assert result.returncode == 0, result.stdout + result.stderr
+            assert "GITHUB_WORKFLOWS_CHECKED=0" in result.stdout
+
+
 def copy_required_surfaces(root: Path) -> None:
     """Copy only standalone surfaces consumed by the checker."""
     for relative in (

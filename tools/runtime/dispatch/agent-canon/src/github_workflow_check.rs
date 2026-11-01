@@ -3,12 +3,14 @@
 // responsibility Checks standalone GitHub workflows and AgentCanon PR-template contracts.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md native tool owner policy
 // upstream implementation ../../../../../tools/validation/ci/config/actionlint.yaml canonical pinned actionlint configuration
+// upstream implementation python_cli_options.rs resolves unique argparse-compatible option prefixes
 // downstream implementation main.rs exposes the native checker command
 // downstream implementation ../../../../../tests/tools/test_check_github_workflows.py exercises the native CLI
 // @dependency-end
 
 use regex::Regex;
 use std::fs;
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -186,7 +188,8 @@ fn check_headers(root: &Path) -> Vec<Finding> {
             let guard = fs::read_to_string(&path)
                 .ok()
                 .and_then(|text| YamlLoader::load_from_str(&text).ok())
-                .and_then(|docs| docs.into_iter().next())
+                .filter(|docs| docs.len() == 1)
+                .and_then(|mut docs| docs.pop())
                 .and_then(|yaml| yaml["jobs"]["dashboard"]["if"].as_str().map(str::to_owned));
             if guard.as_deref() != Some("github.event_name != 'pull_request'") {
                 findings.push(Finding {
@@ -223,7 +226,7 @@ fn temp_config() -> Result<TempConfig, std::io::Error> {
             "agent-canon-actionlint-{}-{id}",
             std::process::id()
         ));
-        match fs::create_dir(&dir) {
+        match create_private_temp_dir(&dir) {
             Ok(()) => {
                 let path = dir.join("actionlint.yaml");
                 if let Err(error) = fs::write(&path, ACTIONLINT_CONFIG) {
@@ -242,6 +245,20 @@ fn temp_config() -> Result<TempConfig, std::io::Error> {
     ))
 }
 
+fn create_private_temp_dir(path: &Path) -> Result<(), std::io::Error> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut builder = fs::DirBuilder::new();
+        builder.mode(0o700);
+        builder.create(path)
+    }
+    #[cfg(not(unix))]
+    {
+        fs::create_dir(path)
+    }
+}
+
 struct TempConfig {
     dir: PathBuf,
     path: PathBuf,
@@ -250,6 +267,10 @@ impl Drop for TempConfig {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.dir);
     }
+}
+
+fn flush_stdout() {
+    let _flush_result = std::io::stdout().flush();
 }
 
 fn run_one(name: &str, executable: &str, args: &[String], root: &Path) -> i32 {
@@ -264,6 +285,7 @@ fn run_one(name: &str, executable: &str, args: &[String], root: &Path) -> i32 {
         Ok(status) => {
             let code = status.code().unwrap_or(1);
             println!("GITHUB_WORKFLOW_TOOL_EXIT={name} code={code}");
+            flush_stdout();
             code
         }
         Err(error) => {
@@ -287,10 +309,12 @@ fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
         })
         .collect();
     println!("GITHUB_WORKFLOW_NATIVE_INPUTS={}", args.join(","));
+    flush_stdout();
     let mut statuses = Vec::with_capacity(2);
     let config = match temp_config() {
         Ok(temp) => {
             println!("GITHUB_WORKFLOW_NATIVE_TOOL=actionlint executable={ACTIONLINT} config={} shellcheck={SHELLCHECK}", temp.path.display());
+            flush_stdout();
             let mut argv = vec![
                 "-no-color".into(),
                 "-config-file".into(),
@@ -309,6 +333,7 @@ fn run_providers(root: &Path, files: &[PathBuf]) -> Vec<i32> {
     };
     drop(config);
     println!("GITHUB_WORKFLOW_NATIVE_TOOL=zizmor executable={ZIZMOR} policy=default");
+    flush_stdout();
     let mut argv = vec![
         "--strict-collection".into(),
         "--format=plain".into(),
@@ -359,18 +384,76 @@ fn run_with_statuses(root: &Path, statuses: &[i32]) -> (String, i32) {
     )
 }
 
-pub fn run(args: &[String]) -> i32 {
+const HELP: &str = "usage: agent-canon check-github-workflows [-h] [--root ROOT]\n\nRun native GitHub workflow analyzers and check AgentCanon workflow and PR-template contracts.\n\noptions:\n  -h, --help   show this help message and exit\n  --root ROOT  repository root to check";
+
+#[derive(Clone, Copy)]
+enum CheckerOption {
+    Help,
+    Root,
+}
+
+const CHECKER_OPTIONS: &[(&str, CheckerOption)] = &[
+    ("--help", CheckerOption::Help),
+    ("--root", CheckerOption::Root),
+];
+
+enum ParseError {
+    InvalidArguments,
+}
+
+fn parse_args(args: &[String]) -> Result<Option<PathBuf>, ParseError> {
     let mut root = PathBuf::from(".");
     let mut index = 0;
     while index < args.len() {
-        if args[index] == "--root" && index + 1 < args.len() {
-            root = PathBuf::from(&args[index + 1]);
-            index += 2;
-        } else {
-            eprintln!("usage: agent-canon check-github-workflows [--root <repo-root>]");
+        let argument = args[index].as_str();
+        if argument == "-h" {
+            return Ok(None);
+        }
+        let (option, inline_value) = argument
+            .split_once('=')
+            .map_or((argument, None), |(option, value)| (option, Some(value)));
+        let resolved =
+            crate::python_cli_options::resolve_long_option_prefix(option, CHECKER_OPTIONS)
+                .map_err(|_| ParseError::InvalidArguments)?;
+        match resolved {
+            CheckerOption::Help if inline_value.is_none() => return Ok(None),
+            CheckerOption::Help => return Err(ParseError::InvalidArguments),
+            CheckerOption::Root => {
+                let value: &str = if let Some(value) = inline_value {
+                    value
+                } else {
+                    let Some(value) = args.get(index + 1) else {
+                        return Err(ParseError::InvalidArguments);
+                    };
+                    if value.starts_with('-')
+                        && value != "-"
+                        && !crate::python_cli_integer::is_argparse_negative_number(value)
+                    {
+                        return Err(ParseError::InvalidArguments);
+                    }
+                    index += 1;
+                    value.as_str()
+                };
+                root = PathBuf::from(if value.is_empty() { "." } else { value });
+            }
+        }
+        index += 1;
+    }
+    Ok(Some(root))
+}
+
+pub fn run(args: &[String]) -> i32 {
+    let root = match parse_args(args) {
+        Ok(None) => {
+            println!("{HELP}");
+            return 0;
+        }
+        Ok(Some(root)) => root,
+        Err(ParseError::InvalidArguments) => {
+            eprintln!("usage: agent-canon check-github-workflows [-h] [--root ROOT]");
             return 2;
         }
-    }
+    };
     let root = root.canonicalize().unwrap_or(root);
     let files = workflows(&root);
     let findings = check_owned(&root);
@@ -489,13 +572,49 @@ mod tests {
             assert_eq!(actual.len(), expected.len(), "{}", case["name"]);
             for (finding, expected) in actual.iter().zip(expected) {
                 assert_eq!(finding.severity, expected["severity"].as_str().unwrap());
+                let relative_path = finding.path.strip_prefix(&root.0).unwrap();
                 assert_eq!(
-                    finding.path.to_string_lossy(),
+                    relative_path.to_string_lossy().replace('\\', "/"),
                     expected["path"].as_str().unwrap()
                 );
                 assert_eq!(finding.message, expected["message"].as_str().unwrap());
             }
         }
+    }
+
+    #[test]
+    fn python_base_loader_contract_rejects_an_additional_yaml_document() {
+        // The valid dashboard input comes from the captured Python header oracle.
+        // At cfac45c7:tools/validation/ci/checks/check_github_workflows.py,
+        // check_root_copy_headers uses yaml.load(..., Loader=yaml.BaseLoader).
+        // Its old finding for this input is the missing dashboard guard below.
+        let captured = corpus();
+        let case = &captured["header_cases"][0];
+        let root = TestRoot::new("extra-yaml-document");
+        let encoded = case["files"][".github/workflows/agent-runtime-dashboard.yml"]
+            .as_str()
+            .unwrap();
+        let mut workflow = STANDARD.decode(encoded).unwrap();
+        workflow.extend_from_slice(b"\n---\nsecond: document\n");
+        write_corpus_file(
+            &root.0,
+            ".github/workflows/agent-runtime-dashboard.yml",
+            &workflow,
+        );
+        let findings = check_headers(&root.0);
+        assert_eq!(findings.len(), 1);
+        let finding = &findings[0];
+        assert_eq!(finding.severity, "error");
+        assert_eq!(
+            finding
+                .path
+                .strip_prefix(&root.0)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/"),
+            ".github/workflows/agent-runtime-dashboard.yml"
+        );
+        assert_eq!(finding.message, "missing_dashboard_pr_job_exclusion");
     }
 
     #[test]
