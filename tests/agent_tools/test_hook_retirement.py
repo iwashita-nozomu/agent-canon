@@ -5,6 +5,7 @@
 # upstream reference ../../tests/fixtures/hook_retirement/python_golden.json freezes the old CLI outcomes.
 # @dependency-end
 """Focused tests for the native hook-retirement guard."""
+
 from __future__ import annotations
 
 import base64
@@ -90,7 +91,9 @@ class HookRetirementTest(unittest.TestCase):
             "agent-canon.hook-retirement-caller-audit.v1",
         )
 
-    def test_actual_tree_distinguishes_moved_safety_source_from_retired_children(self) -> None:
+    def test_actual_tree_distinguishes_moved_safety_source_from_retired_children(
+        self,
+    ) -> None:
         """The moved safety owner is allowed while its old hook path remains absent."""
         result, payload = self.run_checker(PROJECT_ROOT, "--check")
         caller_audit = payload["caller_audit"]
@@ -98,11 +101,17 @@ class HookRetirementTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(payload["missing_files"], [])
         self.assertEqual(payload["executable_references"], [])
-        self.assertFalse((PROJECT_ROOT / ".codex" / "hooks" / "hook_safety.py").exists())
-        self.assertTrue(
-            (PROJECT_ROOT / "tools" / "runtime" / "authority" / "hook_safety.py").is_file()
+        self.assertFalse(
+            (PROJECT_ROOT / ".codex" / "hooks" / "hook_safety.py").exists()
         )
-        self.assertEqual(caller_audit["moved_source_old_paths"], [".codex/hooks/hook_safety.py"])
+        self.assertTrue(
+            (
+                PROJECT_ROOT / "tools" / "runtime" / "authority" / "hook_safety.py"
+            ).is_file()
+        )
+        self.assertEqual(
+            caller_audit["moved_source_old_paths"], [".codex/hooks/hook_safety.py"]
+        )
         self.assertNotIn("hook_safety.py", caller_audit["retired_child_basenames"])
 
     def test_clean_and_violation_fixtures_keep_their_retirement_contract(self) -> None:

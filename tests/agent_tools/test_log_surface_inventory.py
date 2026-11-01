@@ -88,10 +88,10 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             )
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
-                'fn main() {\n'
+                "fn main() {\n"
                 '    println!("RUST_TOOL_STATUS=pass");\n'
                 '\u001f println!("CONTROL_RUST=1");\n'
-                '}\n',
+                "}\n",
                 encoding="utf-8",
             )
             skill = root / "agents" / "skills" / "sample.md"
