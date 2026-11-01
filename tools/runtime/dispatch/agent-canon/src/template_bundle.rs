@@ -1,7 +1,7 @@
 //! Git-bound template profile export, source-free Codex projection, and native packages.
 // @dependency-start
 // contract implementation
-// responsibility Exports source-commit-bound template profiles and produces/verifies deterministic native CLI packages.
+// responsibility Exports source-commit-bound template profiles/static seeds, reads committed trees, and produces/verifies deterministic native CLI packages.
 // upstream design ../../../../../documents/contracts/template-bundle-manifest.toml profile roots and native package layout
 // upstream design ../../../../../documents/contracts/static-seed-export.md static-seed producer and source-free consumer boundary
 // upstream design ../../../../../documents/contracts/static-seed-allowlist.toml exact static-seed paths
@@ -123,7 +123,7 @@ struct StaticSeedFile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct StaticSeedPlan {
+pub(crate) struct StaticSeedPlan {
     source_commit: String,
     source_repository: String,
     files: Vec<StaticSeedFile>,
@@ -707,7 +707,19 @@ fn validate_static_seed_codex_config(files: &[StaticSeedFile]) -> BundleResult<(
     Ok(())
 }
 
-fn load_static_seed_plan(source: &GitSource, source_ref: &str) -> BundleResult<StaticSeedPlan> {
+/// Load and validate source-independent static-seed bytes from one committed tree.
+pub(crate) fn load_static_seed_plan(
+    source_root: &Path,
+    source_ref: &str,
+) -> BundleResult<StaticSeedPlan> {
+    let source = GitSource::open(source_root)?;
+    load_static_seed_plan_from_source(&source, source_ref)
+}
+
+fn load_static_seed_plan_from_source(
+    source: &GitSource,
+    source_ref: &str,
+) -> BundleResult<StaticSeedPlan> {
     let source_commit = source.commit(source_ref)?;
     let tree: BTreeMap<String, CommittedTreeEntry> = source
         .tree_entries(&source_commit)?
@@ -801,28 +813,7 @@ fn set_static_seed_mode(path: &Path, mode: u32) -> BundleResult<()> {
 }
 
 fn write_static_seed_file(path: &Path, content: &[u8]) -> BundleResult<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| bundle_error(format!("output file has no parent: {}", path.display())))?;
-    fs::create_dir_all(parent).map_err(|error| {
-        bundle_error(format!(
-            "create output directory {}: {error}",
-            parent.display()
-        ))
-    })?;
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o644);
-    }
-    let mut file = options
-        .open(path)
-        .map_err(|error| bundle_error(format!("write output file {}: {error}", path.display())))?;
-    file.write_all(content)
-        .and_then(|()| file.flush())
-        .map_err(|error| bundle_error(format!("write output file {}: {error}", path.display())))?;
+    write_output_file(path, content, 0o644)?;
     set_static_seed_mode(path, 0o644)
 }
 
@@ -907,7 +898,8 @@ fn stage_static_seed_directory(parent: &Path, label: &str) -> BundleResult<Stage
     Ok(staged)
 }
 
-fn write_static_seed(plan: &StaticSeedPlan, output: &Path) -> BundleResult<PathBuf> {
+/// Publish a validated static-seed plan without reopening its source repository.
+pub(crate) fn write_static_seed(plan: &StaticSeedPlan, output: &Path) -> BundleResult<PathBuf> {
     let output = resolve_output(output)?;
     let destination = canonicalize_allow_missing(&output)
         .map_err(|error| bundle_error(format!("resolve output: {error}")))?;
@@ -960,7 +952,7 @@ fn static_seed_export_value(plan: &StaticSeedPlan, output: &Path) -> Value {
 }
 
 fn export_static_seed(source: &GitSource, source_ref: &str, output: &Path) -> BundleResult<Value> {
-    let plan = load_static_seed_plan(source, source_ref)?;
+    let plan = load_static_seed_plan_from_source(source, source_ref)?;
     let destination = write_static_seed(&plan, output)?;
     Ok(static_seed_export_value(&plan, &destination))
 }
