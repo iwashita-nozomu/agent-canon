@@ -4,7 +4,7 @@
 // contract implementation
 // responsibility Provides the AgentCanon Rust CLI entrypoint.
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
-// upstream implementation lib.rs shares runtime-boundary and artifact APIs with the CLI
+// upstream implementation lib.rs exposes report_artifact_checks.rs and shares runtime-boundary and artifact APIs with the CLI
 // downstream implementation lib.rs owns the existing private-feedback command route
 // downstream implementation native_release.rs routes native release planning and publication
 // downstream implementation lib.rs exposes the shared native docs command API
@@ -92,8 +92,8 @@ mod tool_drift;
 use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
-    run_evaluation, stablehlo_value_closure, template_bundle, theorem_graph_board,
-    theorem_graph_circularity_check, tool_proof_coverage,
+    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
+    theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage,
 };
 use std::env;
 
@@ -115,6 +115,7 @@ Commands:
   task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
+  generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
@@ -259,6 +260,12 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "git-dependency-diff-summary" {
         std::process::exit(agent_canon::git_dependency_diff_summary::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == report_artifact_checks::GENERATED_ARTIFACT_GUARD_SELECTOR {
+        std::process::exit(report_artifact_checks::run_generated_artifact_guard(
+            &args[2..],
+        ));
     }
 
     if args.len() >= 2
