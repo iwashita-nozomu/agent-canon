@@ -1,14 +1,14 @@
 // @dependency-start
 // contract implementation
 // responsibility Owns the canonical run-local work log and semantic event ledger.
-// upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
+// upstream implementation python_json.rs owns Python-compatible JSON parsing, canonical bytes, and equality.
 // upstream implementation runtime_boundary.rs owns external runtime path and write capabilities.
 // downstream implementation report_artifact_checks.rs validates the visible work-log completion view.
 // downstream implementation ../tests/work_log_native.rs preserves ledger and CLI oracles.
 // @dependency-end
 
 use crate::python_json::{
-    canonical_json_ascii_bytes, parse_json, JsonNumber, JsonObject, JsonString, JsonValue,
+    canonical_json_ascii_bytes, parse_json, python_json_equal, JsonObject, JsonString, JsonValue,
 };
 use crate::runtime_boundary::{RuntimeArtifactBoundary, RuntimeDirectory};
 use sha2::{Digest, Sha256};
@@ -603,85 +603,6 @@ fn canonical_event_array_bytes(events: &[JsonValue]) -> Result<Vec<u8>, String> 
     }
     bytes.push(b']');
     Ok(bytes)
-}
-
-fn python_number_equal(left: &JsonNumber, right: &JsonNumber) -> bool {
-    match (left, right) {
-        (JsonNumber::Integer(left), JsonNumber::Integer(right)) => {
-            normalized_integer(left) == normalized_integer(right)
-        }
-        (JsonNumber::Float(left), JsonNumber::Float(right)) => left == right,
-        (JsonNumber::Integer(integer), JsonNumber::Float(float))
-        | (JsonNumber::Float(float), JsonNumber::Integer(integer)) => {
-            integer_equals_float(integer, *float)
-        }
-    }
-}
-
-fn normalized_integer(value: &str) -> &str {
-    if value == "-0" {
-        "0"
-    } else {
-        value
-    }
-}
-
-fn integer_equals_float(integer: &str, float: f64) -> bool {
-    if !float.is_finite() || float.fract() != 0.0 {
-        return false;
-    }
-    let rendered = format!("{float:.0}");
-    normalized_integer(integer)
-        == if rendered == "-0" {
-            "0"
-        } else {
-            rendered.as_str()
-        }
-}
-
-fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
-    let mut pending = vec![(left, right)];
-    while let Some((left, right)) = pending.pop() {
-        match (left, right) {
-            (JsonValue::Null, JsonValue::Null) => {}
-            (JsonValue::Bool(left), JsonValue::Bool(right)) if left == right => {}
-            (JsonValue::Bool(value), JsonValue::Number(number))
-            | (JsonValue::Number(number), JsonValue::Bool(value)) => {
-                let integer = if *value { "1" } else { "0" };
-                let equal = match number {
-                    JsonNumber::Integer(number) => normalized_integer(number) == integer,
-                    JsonNumber::Float(number) => integer_equals_float(integer, *number),
-                };
-                if !equal {
-                    return false;
-                }
-            }
-            (JsonValue::Number(left), JsonValue::Number(right))
-                if python_number_equal(left, right) => {}
-            (JsonValue::String(left), JsonValue::String(right)) if left == right => {}
-            (JsonValue::Array(left), JsonValue::Array(right)) => {
-                if left.0.len() != right.0.len() {
-                    return false;
-                }
-                pending.extend(left.0.iter().zip(&right.0));
-            }
-            (JsonValue::Object(left), JsonValue::Object(right)) => {
-                if left.0.len() != right.0.len() {
-                    return false;
-                }
-                for (left_key, left_value) in &left.0 {
-                    let Some((_, right_value)) =
-                        right.0.iter().find(|(right_key, _)| right_key == left_key)
-                    else {
-                        return false;
-                    };
-                    pending.push((left_value, right_value));
-                }
-            }
-            _ => return false,
-        }
-    }
-    true
 }
 
 enum ReprAction<'a> {

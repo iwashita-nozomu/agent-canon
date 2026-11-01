@@ -8,7 +8,7 @@
 // upstream implementation eval_manifest_paths.rs resolves canonical and legacy registry paths
 // upstream implementation runtime_boundary.rs owns external artifact reads and compact summary writes
 // upstream implementation prompt_capture.rs owns prompt secret redaction patterns
-// upstream implementation python_json.rs owns Python-compatible JSON values and parsing
+// upstream implementation python_json.rs owns Python-compatible JSON values, parsing, and equality
 // upstream implementation python_text.rs owns Python-compatible Unicode text and line splitting
 // downstream implementation ../../../../../tools/validation/ci/runners/run_all_checks.sh runs eval accumulation checks
 // downstream implementation ../../../../../tests/agent_tools/test_eval_accumulation_check.py exercises the native CLI
@@ -23,7 +23,9 @@ use crate::eval_archive_paths::{
 use crate::eval_manifest_paths::{eval_manifest_path, resolve_eval_manifest};
 use crate::prompt_capture::redact_sensitive_text;
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
-use crate::python_json::{parse_json, JsonArray, JsonNumber, JsonObject, JsonString, JsonValue};
+use crate::python_json::{
+    parse_json, python_json_equal, JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
+};
 use crate::python_text::{is_python_whitespace, python_splitlines, python_strip};
 use crate::runtime_boundary::{RuntimeArtifactBoundary, RUNTIME_ROOT_ENV};
 use regex::Regex;
@@ -343,79 +345,8 @@ fn string_equals(value: Option<&JsonValue>, expected: &str) -> bool {
 }
 
 fn value_equals_usize(value: &JsonValue, expected: usize) -> bool {
-    match value {
-        JsonValue::Bool(boolean) => (if *boolean { 1 } else { 0 }) == expected,
-        JsonValue::Number(JsonNumber::Integer(integer)) => integer
-            .parse::<usize>()
-            .is_ok_and(|value| value == expected),
-        JsonValue::Number(JsonNumber::Float(float)) => *float == expected as f64,
-        _ => false,
-    }
-}
-
-fn integer_float_equal(integer: &str, float: f64) -> bool {
-    if !float.is_finite() || float.fract() != 0.0 {
-        return false;
-    }
-    let formatted = if float == 0.0 {
-        "0".to_owned()
-    } else {
-        format!("{float:.0}")
-    };
-    integer == formatted.as_str()
-}
-
-fn numbers_equal(left: &JsonNumber, right: &JsonNumber) -> bool {
-    match (left, right) {
-        (JsonNumber::Integer(left), JsonNumber::Integer(right)) => left == right,
-        (JsonNumber::Float(left), JsonNumber::Float(right)) => left == right,
-        (JsonNumber::Integer(integer), JsonNumber::Float(float))
-        | (JsonNumber::Float(float), JsonNumber::Integer(integer)) => {
-            integer_float_equal(integer, *float)
-        }
-    }
-}
-
-fn bool_number_equal(boolean: bool, number: &JsonNumber) -> bool {
-    match number {
-        JsonNumber::Integer(integer) => integer.as_str() == if boolean { "1" } else { "0" },
-        JsonNumber::Float(float) => *float == f64::from(u8::from(boolean)),
-    }
-}
-
-fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
-    let mut pending = vec![(left, right)];
-    while let Some((left, right)) = pending.pop() {
-        match (left, right) {
-            (JsonValue::Null, JsonValue::Null) => {}
-            (JsonValue::Bool(left), JsonValue::Bool(right)) if left == right => {}
-            (JsonValue::Bool(boolean), JsonValue::Number(number))
-            | (JsonValue::Number(number), JsonValue::Bool(boolean))
-                if bool_number_equal(*boolean, number) => {}
-            (JsonValue::Number(left), JsonValue::Number(right)) if numbers_equal(left, right) => {}
-            (JsonValue::String(left), JsonValue::String(right)) if left == right => {}
-            (JsonValue::Array(JsonArray(left)), JsonValue::Array(JsonArray(right))) => {
-                if left.len() != right.len() {
-                    return false;
-                }
-                pending.extend(left.iter().zip(right));
-            }
-            (JsonValue::Object(JsonObject(left)), JsonValue::Object(JsonObject(right))) => {
-                if left.len() != right.len() {
-                    return false;
-                }
-                for (left_key, left_value) in left {
-                    let Some((_, right_value)) = right.iter().find(|(key, _)| key == left_key)
-                    else {
-                        return false;
-                    };
-                    pending.push((left_value, right_value));
-                }
-            }
-            _ => return false,
-        }
-    }
-    true
+    let expected = JsonValue::Number(JsonNumber::Integer(expected.to_string()));
+    python_json_equal(value, &expected)
 }
 
 fn workflow_value_present(value: Option<&JsonValue>) -> bool {
