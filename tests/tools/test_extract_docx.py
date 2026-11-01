@@ -1,41 +1,26 @@
 # @dependency-start
 # contract test
-# responsibility Tests the standard-library DOCX reference bundle extractor.
-# upstream implementation ../../tools/analysis/documents/extraction/extract_docx.py owns DOCX decomposition and bundle output
+# responsibility Tests the native DOCX reference bundle command through its public CLI.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/extract_docx.rs owns DOCX decomposition and bundle output
+# upstream implementation ../../tools/bin/agent-canon exposes the stable native command
 # downstream design ../../documents/tools/extract_docx.md documents the bundle contract
 # @dependency-end
 
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import stat
+import struct
 import subprocess
-import sys
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest import mock
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = PROJECT_ROOT / "tools" / "analysis" / "documents" / "extraction" / "extract_docx.py"
-
-
-def load_extractor():
-    """Load the script module so transaction readback failures can be injected."""
-    spec = importlib.util.spec_from_file_location("extract_docx_under_test", SCRIPT_PATH)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {SCRIPT_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-EXTRACTOR = load_extractor()
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 def safe_document_xml() -> str:
@@ -78,13 +63,62 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def rewrite_zip_member_name(
+    path: Path,
+    original_name: str,
+    raw_name: bytes,
+    *,
+    clear_utf8_flag: bool = False,
+) -> None:
+    """Patch a stored ZIP name without changing either header's byte length."""
+    original = original_name.encode("utf-8")
+    if len(original) != len(raw_name):
+        raise ValueError("raw ZIP test names must preserve the encoded length")
+    data = bytearray(path.read_bytes())
+    local_count = 0
+    offset = 0
+    while data[offset : offset + 4] == b"PK\x03\x04":
+        name_length, extra_length = struct.unpack_from("<HH", data, offset + 26)
+        name_start = offset + 30
+        name_end = name_start + name_length
+        if data[name_start:name_end] == original:
+            data[name_start:name_end] = raw_name
+            if clear_utf8_flag:
+                flags = struct.unpack_from("<H", data, offset + 6)[0] & ~0x0800
+                struct.pack_into("<H", data, offset + 6, flags)
+            local_count += 1
+        compressed_size = struct.unpack_from("<I", data, offset + 18)[0]
+        offset = name_end + extra_length + compressed_size
+
+    central_count = 0
+    offset = data.find(b"PK\x01\x02")
+    while offset >= 0 and data[offset : offset + 4] == b"PK\x01\x02":
+        name_length, extra_length, comment_length = struct.unpack_from(
+            "<HHH", data, offset + 28
+        )
+        name_start = offset + 46
+        name_end = name_start + name_length
+        if data[name_start:name_end] == original:
+            data[name_start:name_end] = raw_name
+            if clear_utf8_flag:
+                flags = struct.unpack_from("<H", data, offset + 8)[0] & ~0x0800
+                struct.pack_into("<H", data, offset + 8, flags)
+            central_count += 1
+        offset = name_end + extra_length + comment_length
+        if data[offset : offset + 4] != b"PK\x01\x02":
+            break
+    if local_count != 1 or central_count != 1:
+        raise AssertionError("expected exactly one local and central ZIP member header")
+    path.write_bytes(data)
+
+
 class ExtractDocxTest(unittest.TestCase):
     """Exercise DOCX extraction and archive safety through the CLI."""
 
     def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the extractor and capture its output."""
         return subprocess.run(
-            [sys.executable, str(SCRIPT_PATH), *args],
+            [str(AGENT_CANON_CLI), "extract-docx", *args],
             cwd=PROJECT_ROOT,
             check=False,
             capture_output=True,
@@ -217,6 +251,41 @@ class ExtractDocxTest(unittest.TestCase):
             self.assertFalse(bundle.exists())
             self.assert_no_staging_paths(bundle)
 
+    def test_member_names_use_zip_flags_cp437_and_nul_truncation(self) -> None:
+        """Raw ZIP name flags match Python's CP437/UTF-8 selection and NUL cut."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "names.docx"
+            bundle = root / "bundle"
+            write_docx(
+                source,
+                extra_members=("assets/x.bin", "assets/é.bin", "assets/nameX.bin"),
+            )
+            rewrite_zip_member_name(source, "assets/x.bin", b"assets/\x82.bin")
+            rewrite_zip_member_name(
+                source,
+                "assets/é.bin",
+                "assets/é.bin".encode("utf-8"),
+                clear_utf8_flag=True,
+            )
+            rewrite_zip_member_name(
+                source,
+                "assets/nameX.bin",
+                b"assets/name\x00.bin",
+            )
+
+            result = self.run_cli(str(source), "--output-dir", str(bundle))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+            member_names = [member["name"] for member in manifest["zip_members"]]
+            self.assertIn("assets/é.bin", member_names)
+            self.assertIn("assets/├⌐.bin", member_names)
+            self.assertIn("assets/name", member_names)
+            self.assertEqual((bundle / "raw" / "assets" / "é.bin").read_bytes(), b"extra")
+            self.assertEqual((bundle / "raw" / "assets" / "├⌐.bin").read_bytes(), b"extra")
+            self.assertEqual((bundle / "raw" / "assets" / "name").read_bytes(), b"extra")
+
     def test_rejects_nonempty_output_directory_without_mutation(self) -> None:
         """Existing content is never overwritten implicitly."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -302,32 +371,6 @@ class ExtractDocxTest(unittest.TestCase):
             self.assertTrue((bundle / "manifest.json").is_file())
             self.assertTrue((bundle / "source" / source.name).is_file())
             self.assert_no_staging_paths(bundle)
-
-    def test_source_hash_readback_failure_aborts_publication(self) -> None:
-        """A source-copy hash mismatch is a transaction failure, not a warning."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "input.docx"
-            bundle = root / "bundle"
-            write_docx(source)
-            original = EXTRACTOR.verify_file_digest
-
-            def fail_source_copy(path, expected, *, label):
-                if label == "source copy":
-                    raise ValueError("source copy readback mismatch: injected")
-                return original(path, expected, label=label)
-
-            with mock.patch.object(
-                EXTRACTOR,
-                "verify_file_digest",
-                side_effect=fail_source_copy,
-            ):
-                with self.assertRaisesRegex(ValueError, "source copy readback mismatch"):
-                    EXTRACTOR.extract_bundle(source, bundle)
-
-            self.assertFalse(bundle.exists())
-            self.assert_no_staging_paths(bundle)
-
 
 if __name__ == "__main__":
     unittest.main()

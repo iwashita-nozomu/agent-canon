@@ -1,10 +1,11 @@
 // @dependency-start
 // contract test
-// responsibility Qualifies the XML provider against the existing DOCX extractor's parsed inputs.
+// responsibility Qualifies the XML provider and Markdown projection against the frozen DOCX XML corpus.
 // upstream implementation ../Cargo.toml selects the safe XML provider candidate
 // upstream evidence ../../../../../tests/fixtures/docx_xml/python_golden.json freezes old ElementTree events and product Markdown
 // @dependency-end
 
+use agent_canon::extract_docx::extract_markdown;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use expat::internal::parse::{Handler, HandlerSet, Parser, Status};
@@ -86,6 +87,12 @@ fn provider_events(bytes: &[u8]) -> Result<Vec<Value>, String> {
     }
 }
 
+fn heading_document(style: &str) -> String {
+    format!(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr><w:r><w:t>Section</w:t></w:r></w:p></w:body></w:document>"#
+    )
+}
+
 #[test]
 fn xml_provider_preserves_old_docx_input_acceptance_and_element_values() {
     assert_eq!(
@@ -108,6 +115,20 @@ fn xml_provider_preserves_old_docx_input_acceptance_and_element_values() {
                 if Value::Array(events) != case["events"] {
                     mismatches.push(format!("{name}: element values differ"));
                 }
+                if let Some(expected_markdown) = case["markdown"].as_str() {
+                    match extract_markdown(&input, "reference.docx") {
+                        Ok(markdown) if markdown == expected_markdown => {}
+                        Ok(_) => mismatches.push(format!("{name}: product Markdown differs")),
+                        Err(error) => {
+                            mismatches.push(format!("{name}: product projection failed: {error}"))
+                        }
+                    }
+                } else if name == "valid-no-body" {
+                    match extract_markdown(&input, "reference.docx") {
+                        Err(error) if error.contains("has no document body") => {}
+                        _ => mismatches.push(format!("{name}: missing-body product error differs")),
+                    }
+                }
             }
             Ok(_) => mismatches.push(format!("{name}: accepted an old rejected input")),
             Err(error) if expected_acceptance => {
@@ -117,4 +138,59 @@ fn xml_provider_preserves_old_docx_input_acceptance_and_element_values() {
         }
     }
     assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+#[test]
+fn product_heading_suffix_matches_python_unicode_digit_then_int_behavior() {
+    for suffix in ["٢", "２"] {
+        let xml = heading_document(&format!("Heading{suffix}"));
+        let markdown = extract_markdown(xml.as_bytes(), "reference.docx").unwrap();
+        assert!(
+            markdown.contains("## Section"),
+            "suffix={suffix:?}: {markdown}"
+        );
+    }
+
+    let superscript = heading_document("Heading²");
+    assert_eq!(
+        extract_markdown(superscript.as_bytes(), "reference.docx").unwrap_err(),
+        "invalid literal for int() with base 10: '²'"
+    );
+
+    let fraction = heading_document("Heading½");
+    let markdown = extract_markdown(fraction.as_bytes(), "reference.docx").unwrap();
+    assert!(markdown.contains("# Section"), "{markdown}");
+
+    let multiple_properties = format!(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:rPr/></w:pPr><w:pPr><w:pStyle w:val="Heading２"/></w:pPr><w:r><w:t>Section</w:t></w:r></w:p></w:body></w:document>"#
+    );
+    let markdown = extract_markdown(multiple_properties.as_bytes(), "reference.docx").unwrap();
+    assert!(markdown.contains("## Section"), "{markdown}");
+}
+
+#[test]
+fn product_projection_walks_and_drops_deep_xml_iteratively() {
+    let depth = 10_000;
+    let mut xml = String::from(
+        "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">",
+    );
+    for _ in 0..depth {
+        xml.push_str("<x>");
+    }
+    xml.push_str("<w:body><w:p>");
+    for _ in 0..depth {
+        xml.push_str("<x>");
+    }
+    xml.push_str("<w:t>Deep</w:t>");
+    for _ in 0..depth {
+        xml.push_str("</x>");
+    }
+    xml.push_str("</w:p></w:body>");
+    for _ in 0..depth {
+        xml.push_str("</x>");
+    }
+    xml.push_str("</w:document>");
+
+    let markdown = extract_markdown(xml.as_bytes(), "reference.docx").unwrap();
+    assert!(markdown.contains("\nDeep\n"), "{markdown}");
 }

@@ -2676,14 +2676,14 @@ entries:
   - id: extract-docx
     public: true
     summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
-    path: tools/analysis/documents/extraction/extract_docx.py
+    path: tools/runtime/dispatch/agent-canon/src/extract_docx.rs
     family: docs
     role: helper
     status: canonical
     audience: user
     placement: user_entrypoint
-    command: python3 tools/analysis/documents/extraction/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
-    dispatch: {argv: ["python3", "tools/analysis/documents/extraction/extract_docx.py", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
+    command: tools/bin/agent-canon extract-docx INPUT.docx --output-dir OUTPUT_DIR
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "extract-docx", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
     writes: true
     default_wiring:
       ci: false
