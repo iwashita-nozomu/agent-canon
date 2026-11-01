@@ -317,6 +317,19 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         assert (
             live[role_id].rendered_instructions != static[role_id].rendered_instructions
         )
+    for role_id in ("spark_worker", "worker"):
+        instructions = live[role_id].rendered_instructions
+        assert "Source-edit handoffs must carry writer_target" in instructions
+        assert "do not echo the target/path list in the result" in instructions
+        assert (
+            "refer to the existing readback without repeating its fields"
+            in instructions
+        )
+        assert (
+            "explicitly assigned action is canonical repository-topic-clone.prepare"
+            in instructions
+        )
+        assert "preexisting target is not required for preparation" in instructions
     generated_config = json.loads(
         (root / "agents" / "agents_config.json").read_text(encoding="utf-8")
     )
