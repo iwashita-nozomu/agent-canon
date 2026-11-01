@@ -462,17 +462,65 @@ def validate_retired_command_or_skill(value: str, child: str) -> None:
         value,
     )
     if native_command:
-        from tools.runtime.dispatch.tool_dispatch import load_specs
-
         selector = native_command.group(1)
-        specs, _schema = load_specs(ROOT)
+        native_environment = {
+            "PATH": os.environ.get("PATH", ""),
+            "AGENT_CANON_SOURCE_ROOT": str(ROOT),
+        }
+        if os.environ.get("AGENT_CANON_NATIVE_BIN"):
+            native_cli = os.environ["AGENT_CANON_NATIVE_BIN"]
+            native_environment["AGENT_CANON_NATIVE_BIN"] = os.environ[
+                "AGENT_CANON_NATIVE_BIN"
+            ]
+        else:
+            cached_cli = (
+                Path(
+                    os.environ.get("AGENT_CANON_CACHE_ROOT")
+                    or "/var/lib/agent-canon/cache"
+                )
+                / "bin"
+                / "agent-canon"
+            )
+            native_cli = (
+                str(cached_cli)
+                if cached_cli.is_file() and os.access(cached_cli, os.X_OK)
+                else str(ROOT / "tools" / "bin" / "agent-canon")
+            )
+        try:
+            completed = subprocess.run(
+                [
+                    native_cli,
+                    "tool",
+                    "inventory",
+                    "--root",
+                    str(ROOT),
+                    "--json",
+                ],
+                cwd=ROOT,
+                env=native_environment,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise ValueError("native tool inventory command failed")
+            inventory = json.loads(completed.stdout)
+            specs = inventory["entries"]
+            if not isinstance(specs, list):
+                raise TypeError("native tool inventory entries are invalid")
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            ensure(False, f"native tool inventory is unavailable: {error}")
+            specs = []
         matching_specs = [
             spec
-            for spec in specs.values()
-            if spec.runtime == "rust"
-            and len(spec.argv) >= 2
-            and spec.argv[0] == "tools/bin/agent-canon"
-            and spec.argv[1] == selector
+            for spec in specs
+            if isinstance(spec, dict)
+            and spec.get("runtime") == "rust"
+            and isinstance(spec.get("argv"), list)
+            and len(spec["argv"]) >= 2
+            and spec["argv"][0] == "tools/bin/agent-canon"
+            and spec["argv"][1] == selector
         ]
         ensure(
             bool(matching_specs),

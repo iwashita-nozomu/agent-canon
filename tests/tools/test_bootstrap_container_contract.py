@@ -23,8 +23,6 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-from tools.runtime.dispatch import tool_dispatch
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTAINER = ROOT / "bootstrap" / "container"
 DOCKERFILE = CONTAINER / "image" / "Dockerfile"
@@ -32,6 +30,10 @@ ENTRYPOINT = CONTAINER / "lifecycle" / "entrypoint.sh"
 DEPENDENCIES = CONTAINER / "image" / "dependencies.toml"
 ROOT_DOCKERIGNORE = ROOT / ".dockerignore"
 WRAPPER = CONTAINER / "dispatch" / "tool-wrapper.sh"
+CONTAINER_MARKER = b"agent-canon-tool-container/v1\n"
+RUNTIME_MARKER = b"agent-canon-runtime/v1\n"
+CONTAINER_MARKER_NAME = ".agent-canon-tool-container"
+RUNTIME_MARKER_NAME = ".agent-canon-runtime"
 
 
 def test_legacy_agent_canon_devcontainer_surface_is_absent() -> None:
@@ -125,14 +127,10 @@ def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    image_digest = (
-        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
-    )
-    runtime_digest = (
-        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
-    )
-    assert tool_dispatch.CONTAINER_MARKER == b"agent-canon-tool-container/v1\n"
-    assert tool_dispatch.RUNTIME_MARKER == b"agent-canon-runtime/v1\n"
+    image_digest = "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest()
+    runtime_digest = "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest()
+    assert CONTAINER_MARKER == b"agent-canon-tool-container/v1\n"
+    assert RUNTIME_MARKER == b"agent-canon-runtime/v1\n"
     assert "printf 'agent-canon-tool-container/v1\\n'" in text
     assert "printf 'agent-canon-runtime/v1\\n'" in text
     assert "chmod 0444" in text
@@ -146,31 +144,21 @@ def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     assert f"AGENT_CANON_RUNTIME_MARKER_DIGEST={runtime_digest}" in text
 
 
-def test_dispatcher_marker_fixture_accepts_root_owned_read_only_files(
-    tmp_path: Path,
-) -> None:
+def test_dispatcher_marker_fixture_matches_the_image_contract(tmp_path: Path) -> None:
     image_root = tmp_path / "image"
     runtime_root = image_root / "runtime"
     image_root.mkdir()
     runtime_root.mkdir()
-    image_marker = image_root / tool_dispatch.CONTAINER_MARKER_NAME
-    runtime_marker = runtime_root / tool_dispatch.RUNTIME_MARKER_NAME
-    image_marker.write_bytes(tool_dispatch.CONTAINER_MARKER)
-    runtime_marker.write_bytes(tool_dispatch.RUNTIME_MARKER)
+    image_marker = image_root / CONTAINER_MARKER_NAME
+    runtime_marker = runtime_root / RUNTIME_MARKER_NAME
+    image_marker.write_bytes(CONTAINER_MARKER)
+    runtime_marker.write_bytes(RUNTIME_MARKER)
     image_marker.chmod(0o444)
     runtime_marker.chmod(0o444)
-    assert (
-        tool_dispatch._immutable_file(
-            image_marker, tool_dispatch.CONTAINER_MARKER, field="image"
-        )
-        == hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest()
-    )
-    assert (
-        tool_dispatch._immutable_file(
-            runtime_marker, tool_dispatch.RUNTIME_MARKER, field="runtime"
-        )
-        == hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest()
-    )
+    assert image_marker.read_bytes() == CONTAINER_MARKER
+    assert runtime_marker.read_bytes() == RUNTIME_MARKER
+    assert image_marker.stat().st_mode & 0o222 == 0
+    assert runtime_marker.stat().st_mode & 0o222 == 0
 
 
 def test_dockerfile_declares_run_side_contract_and_healthcheck() -> None:
@@ -266,7 +254,8 @@ def test_typed_tool_wrapper_rejects_arbitrary_dispatch() -> None:
     assert mode & stat.S_IXUSR
     text = WRAPPER.read_text(encoding="utf-8")
     assert "tool" in text and "run" in text
-    assert "tool_dispatch.py" in text
+    assert "tool_dispatch.py" not in text
+    assert '"$cache_root/bin/agent-canon"' in text
     assert "--container-exec" in text
     assert "AGENT_CANON_EXECUTION_PLANE=tool-container" in text
     assert "--root /opt/agent-canon/source" in text

@@ -39,13 +39,10 @@ from tools.runtime.container.bootstrap_runtime import (  # noqa: E402
     build_parser,
     run,
 )
-from tools.runtime.dispatch import tool_dispatch  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def resident_private_log_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def resident_private_log_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Give controller operations their explicitly mounted private-log surface."""
     private_log = tmp_path / "private-log"
     private_log.mkdir()
@@ -277,6 +274,80 @@ def test_template_export_passes_the_validated_source_path(
     assert observed == [source.resolve()]
 
 
+def test_direct_tool_run_reads_output_capability_from_native_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = runtime(tmp_path, repository_root=REPOSITORY_ROOT)
+    manager._ensure_layout()
+    target = tmp_path / "registered-target"
+    target.mkdir()
+    digest = hashlib.sha256(str(target.resolve()).encode("utf-8")).hexdigest()
+    target_record = {
+        "digest": digest,
+        "host_root": str(target),
+        "root": f"/targets/{digest}",
+        "mode": "read-only",
+    }
+    state = manager._new_state()
+    state.update(
+        {
+            "state": "ready",
+            "targets": {digest: target_record},
+            "resources": manager._resource_records(),
+        }
+    )
+    manager._write_mounts(state)
+    manager._write_mount_manifest(state)
+    manager._write_state(state)
+    monkeypatch.setenv("AGENT_CANON_TARGET_DIGEST", digest)
+
+    native_cli = manager.paths.cache / "bin" / "agent-canon"
+    native_cli.parent.mkdir(parents=True)
+    native_args = tmp_path / "native-args.json"
+    native_cli.write_text(
+        f"#!{sys.executable}\n"
+        "import json, pathlib, sys\n"
+        f"pathlib.Path({str(native_args)!r}).write_text(json.dumps(sys.argv[1:]))\n"
+        "print(json.dumps({'entries': [{'id': 'quarto', 'output_root': 'external-runtime'}]}))\n",
+        encoding="utf-8",
+    )
+    native_cli.chmod(native_cli.stat().st_mode | 0o111)
+    captured: dict[str, Any] = {}
+
+    def capture_exec(
+        root: Path,
+        argv: list[str],
+        *,
+        extra_environment: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        captured.update({"root": root, "argv": argv, "environment": extra_environment})
+        return {"code": "captured"}
+
+    monkeypatch.setattr(manager, "exec", capture_exec)
+    assert manager.tool_run("quarto", ["--version"], root=target) == {
+        "code": "captured"
+    }
+    assert json.loads(native_args.read_text(encoding="utf-8")) == [
+        "tool",
+        "inventory",
+        "--root",
+        str(REPOSITORY_ROOT),
+        "--json",
+    ]
+    assert captured["root"] == Path(f"/targets/{digest}")
+    assert captured["argv"] == [
+        "agent-canon-tool",
+        "tool",
+        "run",
+        "quarto",
+        "--",
+        "--version",
+    ]
+    assert captured["environment"] == {
+        "AGENT_CANON_OUTPUT_ROOT": f"{bootstrap_runtime_module.CONTAINER_RUNTIME_DESTINATION}/tool-output"
+    }
+
+
 def test_resident_state_lock_cannot_be_bypassed_by_environment_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -294,8 +365,6 @@ def test_resident_state_lock_cannot_be_bypassed_by_environment_marker(
         pass
 
     assert flock_calls == [fcntl.LOCK_EX, fcntl.LOCK_UN]
-
-
 
 
 def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
@@ -328,30 +397,6 @@ def test_runtime_paths_preserve_host_roots_and_fixed_container_destinations(
     assert paths.archive == host_surfaces["ARCHIVE"]
     assert paths.cache == host_surfaces["CACHE"]
     assert paths.container_runtime == exchange
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _admit_process_owned_task(
@@ -400,13 +445,13 @@ def _ready_runtime_with_target(
     target.mkdir()
     manager._ensure_layout()
     state = manager._new_state()
-    state.update(state="ready", generation_counter=1, current_generation="generation-0001")
+    state.update(
+        state="ready", generation_counter=1, current_generation="generation-0001"
+    )
     target_record = manager._target_record(target, "read-only")
     state["targets"] = {target_record["digest"]: target_record}
     resources = manager._resource_records()
-    resources["image"].update(
-        {"id": "sha256:" + "a" * 64, "state": "present"}
-    )
+    resources["image"].update({"id": "sha256:" + "a" * 64, "state": "present"})
     resources["container"].update({"id": "resident", "state": "running"})
     state["resources"] = resources
     state["generations"]["generation-0001"] = {
@@ -449,7 +494,7 @@ def test_resident_exec_passes_process_lease_to_worker(
 
 
 def test_process_lease_survives_controller_death_until_worker_exits(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """A live child keeps its lease after controller death until admission recovers."""
     manager, target = _ready_runtime_with_target(tmp_path)
@@ -555,7 +600,7 @@ def test_process_lease_survives_controller_death_until_worker_exits(
 
 
 def test_dead_process_task_lease_is_reconciled_before_next_admission(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """An unlocked exec lease is released before it can keep its target busy."""
     manager, target = _ready_runtime_with_target(tmp_path)
@@ -575,7 +620,7 @@ def test_dead_process_task_lease_is_reconciled_before_next_admission(
 
 
 def test_live_process_task_lease_and_manual_release_stay_protected(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """A held worker lock blocks both admission and explicit task release."""
     manager, target = _ready_runtime_with_target(tmp_path)
@@ -594,7 +639,7 @@ def test_live_process_task_lease_and_manual_release_stay_protected(
 
 
 def test_manual_task_lease_remains_persistent_without_process_marker(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """Caller-owned reservations remain pinned until their explicit release."""
     manager, target = _ready_runtime_with_target(tmp_path)
@@ -610,9 +655,7 @@ def test_manual_task_lease_remains_persistent_without_process_marker(
     manager.release_task("caller-lease")
 
 
-def test_closed_admission_does_not_reconcile_process_task_lease(
-    tmp_path: Path
-) -> None:
+def test_closed_admission_does_not_reconcile_process_task_lease(tmp_path: Path) -> None:
     """Closed lifecycle states reject before reconciliation mutates task state."""
     manager, target = _ready_runtime_with_target(tmp_path)
     record, lease_fd = _admit_process_owned_task(manager, "exec-old", target)
@@ -628,14 +671,6 @@ def test_closed_admission_does_not_reconcile_process_task_lease(
     after = json.loads(manager.paths.state.read_text(encoding="utf-8"))
     assert after["tasks"][record["id"]]["state"] == "active"
     assert after["tasks"][record["id"]]["pinned"] is True
-
-
-
-
-
-
-
-
 
 
 def test_container_control_maps_structured_tool_request_to_registered_mounts(
@@ -784,28 +819,38 @@ def test_container_control_maps_structured_tool_request_to_registered_mounts(
     assert mapped["AGENT_CANON_HOOK_ARCHIVE_DIR"] == "/var/lib/agent-canon/private-log"
     assert "AWS_SECRET_ACCESS_KEY" not in mapped
 
-    # Exercise the real host dispatcher request through the resident receiver.
-    # The runtime type is already in the allowlisted child environment; it is
-    # not a field in the receiver's request schema.
-    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control))
-    monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
-    monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(target))
-    monkeypatch.setattr(
-        tool_dispatch, "_registered_roots", lambda _runtime: (target.resolve(),)
-    )
-    native_spec = tool_dispatch.load_specs(REPOSITORY_ROOT)[0]["quarto"]
+    # Exercise the native dispatch request shape through the resident receiver.
+    # The Rust dispatcher owns request construction; this is a fixed receiver
+    # input oracle and the runtime selector remains in the child environment.
     native_output = runtime_root / "tool-output"
-    native_command, _native_environment = tool_dispatch._bootstrap_command(
-        REPOSITORY_ROOT,
-        runtime_root,
-        native_spec,
-        ("pandoc", "paper.md"),
-        target,
-        native_output,
-    )
-    native_request = json.loads(
-        native_command[native_command.index("--request-json") + 1]
-    )
+    native_request = {
+        "schema": "agent-canon.tool-exec-request.v1",
+        "tool_id": "quarto",
+        "argv": ["quarto", "pandoc", "paper.md"],
+        "source_root": str(REPOSITORY_ROOT),
+        "cwd": str(target),
+        "cwd_policy": "target-root",
+        "target_root": str(target),
+        "child_args": ["pandoc", "paper.md"],
+        "environment": {
+            "AGENT_CANON_SOURCE_ROOT": str(REPOSITORY_ROOT),
+            "AGENT_CANON_ROOT": str(REPOSITORY_ROOT),
+            "AGENT_CANON_DISPATCH_ENTRY_ID": "quarto",
+            "AGENT_CANON_DISPATCH_RUNTIME": "native",
+            "AGENT_CANON_RUNTIME_ROOT": str(runtime_root),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
+            "AGENT_CANON_TARGET_ROOT": str(target),
+            "AGENT_CANON_OUTPUT_ROOT": str(native_output),
+        },
+        "stdin": "inherited",
+        "stdout": "inherited",
+        "stderr": "inherited",
+        "exit": "propagate",
+        "signal": "propagate",
+        "side_effect": "external-artifact",
+        "output_root": str(native_output),
+        "written_paths": [],
+    }
     assert "runtime" not in native_request
     captured.clear()
     native_args = build_parser().parse_args(
@@ -974,14 +1019,13 @@ def test_codex_hook_admission_requires_explicit_trusted_project_config(
     assert "private prompt" not in admitted
 
     untrusted_config = (
-        f"[projects.{json.dumps(str(untrusted))}]\n"
-        'trust_level = "untrusted"\n'
+        f'[projects.{json.dumps(str(untrusted))}]\ntrust_level = "untrusted"\n'
     ).encode()
     assert (
         bootstrap_runtime_module._trusted_project_from_hook_input(
-            untrusted_config + b"\0" + payload.replace(
-                str(project).encode(), str(untrusted).encode()
-            )
+            untrusted_config
+            + b"\0"
+            + payload.replace(str(project).encode(), str(untrusted).encode())
         )
         is None
     )
@@ -1175,9 +1219,7 @@ def test_exec_projects_registered_host_root_only_for_host_bound_target(
         observed.update(kwargs["env"])
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(
-        bootstrap_runtime_module.subprocess, "run", capture_environment
-    )
+    monkeypatch.setattr(bootstrap_runtime_module.subprocess, "run", capture_environment)
     manager.exec(
         exec_root,
         ["agent-canon", "ok"],
@@ -1210,10 +1252,6 @@ def test_exec_rejects_project_commands_before_container_admission(
     assert failure.value.code == "tool_plane_command_rejected"
     assert not manager.paths.state.exists()
     assert not manager.paths.tasks.exists()
-
-
-
-
 
 
 def test_container_rollback_restores_previous_targets_and_generation_state(
@@ -1585,7 +1623,7 @@ def test_symlink_state_write_fails_closed(tmp_path: Path) -> None:
 
 
 def test_gc_high_water_keeps_current_rollback_and_unpublished_spool(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """Expose LRU candidates without deleting protected unpublished state."""
     manager = runtime(tmp_path)
@@ -1680,10 +1718,8 @@ def test_resident_gc_cleans_local_cache_without_host_resource_fields(
     assert not cached.exists()
 
 
-
-
 def test_gc_enforces_archive_quota_only_without_unpublished_spool(
-    tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """Prune a reproducible archive cache, but never while a spool is pending."""
     manifest = tmp_path / "manifest.toml"
@@ -1753,9 +1789,7 @@ def test_parser_has_typed_exec_tool_codex_and_eval_routes() -> None:
     )
     assert (
         build_parser()
-        .parse_args(
-            base + ["codex", "hook-admission", "--event", "UserPromptSubmit"]
-        )
+        .parse_args(base + ["codex", "hook-admission", "--event", "UserPromptSubmit"])
         .codex_operation
         == "hook-admission"
     )

@@ -4,7 +4,7 @@
 # contract test
 # responsibility Verifies VS Code commands resolve the canonical AgentCanon tool root in both layouts.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared VS Code surface policy
-# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py shared AgentCanon tool root
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs shared AgentCanon tool root
 # downstream implementation ../../.vscode/tasks.json shared validation task commands
 # @dependency-end
 

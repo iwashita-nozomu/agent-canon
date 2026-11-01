@@ -3,7 +3,7 @@
 # responsibility Tests paper-writing's native local citeproc route and failure.
 # upstream design ../../agents/skills/paper-writing.md paper citation command contract
 # upstream design ../../documents/contracts/quarto-html-output.toml Quarto provider pin
-# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py native CLI route
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs native CLI route
 # @dependency-end
 
 """Exercise offline Pandoc citeproc through the shared Quarto CLI."""
@@ -13,12 +13,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
-from tools.runtime.dispatch import tool_dispatch
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CONTAINER_MARKER = b"agent-canon-tool-container/v1\n"
+RUNTIME_MARKER = b"agent-canon-runtime/v1\n"
+CONTAINER_MARKER_NAME = ".agent-canon-tool-container"
+RUNTIME_MARKER_NAME = ".agent-canon-runtime"
+NATIVE_WRAPPER = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 CSL_AUTHOR_DATE = """<?xml version="1.0" encoding="utf-8"?>
 <style
@@ -60,24 +64,26 @@ CSL_AUTHOR_DATE = """<?xml version="1.0" encoding="utf-8"?>
 def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
     """Provide the authenticated image and registered-target context for dispatch."""
     image_root = tmp_path.parent / f"{tmp_path.name}-image"
-    runtime_root = tmp_path.parent / f"{tmp_path.name}-runtime"
+    control_root = tmp_path.parent / f"{tmp_path.name}-control"
+    runtime_root = control_root / "runtime"
     dependencies_root = image_root / "image-dependencies"
     image_runtime = image_root / "runtime"
     dependencies_root.mkdir(parents=True)
     image_runtime.mkdir(parents=True)
     marker_paths = (
-        image_root / tool_dispatch.CONTAINER_MARKER_NAME,
-        image_runtime / tool_dispatch.RUNTIME_MARKER_NAME,
+        image_root / CONTAINER_MARKER_NAME,
+        image_runtime / RUNTIME_MARKER_NAME,
         dependencies_root / "plan.json",
     )
-    marker_paths[0].write_bytes(tool_dispatch.CONTAINER_MARKER)
-    marker_paths[1].write_bytes(tool_dispatch.RUNTIME_MARKER)
+    marker_paths[0].write_bytes(CONTAINER_MARKER)
+    marker_paths[1].write_bytes(RUNTIME_MARKER)
     marker_paths[2].write_text(
         '{"schema":"agent-canon-test-image/v1"}\n', encoding="utf-8"
     )
     for marker in marker_paths:
         marker.chmod(0o444)
 
+    control_root.mkdir()
     runtime_root.mkdir()
     output_root = runtime_root / "tool-output"
     home = runtime_root / "cache" / "home"
@@ -87,16 +93,17 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
         encoding="utf-8",
     )
     monkeypatch.setenv("AGENT_CANON_EXECUTION_PLANE", "tool-container")
+    monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control_root))
     monkeypatch.setenv("AGENT_CANON_IMAGE_ROOT", str(image_root))
     monkeypatch.setenv("AGENT_CANON_IMAGE_DEPENDENCIES_ROOT", str(dependencies_root))
     monkeypatch.setenv("AGENT_CANON_RUNTIME_TOOLS_ROOT", str(PROJECT_ROOT))
     monkeypatch.setenv(
         "AGENT_CANON_IMAGE_MARKER_DIGEST",
-        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
+        "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest(),
     )
     monkeypatch.setenv(
         "AGENT_CANON_RUNTIME_MARKER_DIGEST",
-        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
+        "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest(),
     )
     monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
     monkeypatch.setenv("AGENT_CANON_TARGET_ROOT", str(tmp_path))
@@ -108,41 +115,122 @@ def _configure_native_tool_route(tmp_path: Path, monkeypatch) -> Path:
     return output_root
 
 
+def _direct_quarto_environment() -> dict[str, str]:
+    """Build the expected child environment independently for the direct probe."""
+    allowed = (
+        "PATH",
+        "PYTHONHOME",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+        "TMPDIR",
+        "RUST_BACKTRACE",
+        "CARGO_TERM_COLOR",
+    )
+    environment = {key: os.environ[key] for key in allowed if key in os.environ}
+    source_root = str(PROJECT_ROOT.resolve())
+    target_root = str(Path(os.environ["AGENT_CANON_TARGET_ROOT"]).resolve())
+    inherited_pythonpath = environment.get("PYTHONPATH", "")
+    pythonpath_entries = [source_root]
+    pythonpath_entries.extend(
+        entry
+        for entry in inherited_pythonpath.split(os.pathsep)
+        if entry and entry != source_root
+    )
+    environment.update(
+        {
+            "AGENT_CANON_SOURCE_ROOT": source_root,
+            "AGENT_CANON_ROOT": source_root,
+            "AGENT_CANON_DISPATCH_ENTRY_ID": "quarto",
+            "AGENT_CANON_DISPATCH_RUNTIME": "native",
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(
+                Path(os.environ["AGENT_CANON_CONTROL_PARENT_ROOT"]).resolve()
+            ),
+            "AGENT_CANON_RUNTIME_ROOT": str(
+                Path(os.environ["AGENT_CANON_RUNTIME_ROOT"]).resolve()
+            ),
+            "AGENT_CANON_TARGET_ROOT": target_root,
+            "AGENT_CANON_OUTPUT_ROOT": str(
+                Path(os.environ["AGENT_CANON_OUTPUT_ROOT"]).resolve()
+            ),
+            "PYTHONPATH": os.pathsep.join(pythonpath_entries),
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "safe.directory",
+            "GIT_CONFIG_VALUE_0": target_root,
+        }
+    )
+    return environment
+
+
+def _native_cli() -> Path:
+    """Use the selected native binary, including the runtime cache install."""
+    configured = os.environ.get("AGENT_CANON_NATIVE_BIN")
+    if configured:
+        return Path(configured)
+    cache_root = Path(
+        os.environ.get("AGENT_CANON_CACHE_ROOT") or "/var/lib/agent-canon/cache"
+    )
+    cached_cli = cache_root / "bin" / "agent-canon"
+    if cached_cli.is_file() and os.access(cached_cli, os.X_OK):
+        return cached_cli
+    crate = PROJECT_ROOT / "tools/runtime/dispatch/agent-canon"
+    target = Path(os.environ.get("CARGO_TARGET_DIR") or crate / "target")
+    for profile in ("debug", "release"):
+        candidate = target / profile / "agent-canon"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return NATIVE_WRAPPER
+
+
+def _run_native_quarto(args: list[str]) -> subprocess.CompletedProcess[bytes]:
+    """Run authenticated container dispatch through the native public CLI."""
+    return subprocess.run(
+        [
+            str(_native_cli()),
+            "tool",
+            "run",
+            "--container-exec",
+            "--root",
+            str(PROJECT_ROOT),
+            "quarto",
+            "--",
+            *args,
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+    )
+
+
 def test_quarto_native_argv_matches_direct_probe_in_same_environment(
     tmp_path: Path,
     monkeypatch,
-    capfd,
 ) -> None:
     """The catalog route preserves direct Quarto argv, cwd, streams, and status."""
     output_root = _configure_native_tool_route(tmp_path, monkeypatch)
-    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
     probe_args = ("pandoc", "--version")
-    environment = tool_dispatch._environment(
-        PROJECT_ROOT, spec, output_root.parent, output_root
-    )
+    environment = _direct_quarto_environment()
     direct = subprocess.run(
-        [*spec.argv, *probe_args],
+        ["quarto", *probe_args],
         cwd=tmp_path,
         env=environment,
         check=False,
         capture_output=True,
     )
-    routed_status = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
-        probe_args,
-    )
-    routed_output = capfd.readouterr()
+    routed = _run_native_quarto(list(probe_args))
     direct_result = {
         "exit_code": direct.returncode,
         "stdout_sha256": hashlib.sha256(direct.stdout).hexdigest(),
         "stderr_sha256": hashlib.sha256(direct.stderr).hexdigest(),
         "written_paths": [],
     }
-    routed_stdout = routed_output.out.encode("utf-8")
-    routed_stderr = routed_output.err.encode("utf-8")
+    routed_stdout = routed.stdout
+    routed_stderr = routed.stderr
     routed_result = {
-        "exit_code": routed_status,
+        "exit_code": routed.returncode,
         "stdout_sha256": hashlib.sha256(routed_stdout).hexdigest(),
         "stderr_sha256": hashlib.sha256(routed_stderr).hexdigest(),
         "written_paths": [],
@@ -156,7 +244,6 @@ def test_quarto_native_argv_matches_direct_probe_in_same_environment(
 def test_local_citations_render_and_unknown_key_fails_natively(
     tmp_path: Path,
     monkeypatch,
-    capfd,
 ) -> None:
     """The registered native Quarto route formats local keys and propagates failure."""
     output_root = _configure_native_tool_route(tmp_path, monkeypatch)
@@ -205,10 +292,7 @@ def test_local_citations_render_and_unknown_key_fails_natively(
         "--fail-if-warnings",
     ]
     rendered_path = output_root / "paper.html"
-    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
-    render_status = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
+    rendered = _run_native_quarto(
         [
             "pandoc",
             manuscript_path.name,
@@ -218,8 +302,7 @@ def test_local_citations_render_and_unknown_key_fails_natively(
         ],
     )
 
-    render_output = capfd.readouterr()
-    assert render_status == 0, render_output.out + render_output.err
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
     assert rendered_path.is_file()
     rendered = rendered_path.read_text(encoding="utf-8")
     assert "Alpha 2020" in rendered
@@ -233,9 +316,7 @@ def test_local_citations_render_and_unknown_key_fails_natively(
         "An unresolved citation [@unknown-source].\n",
         encoding="utf-8",
     )
-    failed_status = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
+    failed = _run_native_quarto(
         [
             "pandoc",
             unresolved_path.name,
@@ -244,16 +325,13 @@ def test_local_citations_render_and_unknown_key_fails_natively(
             str(output_root / "unresolved.html"),
         ],
     )
-    failure_output = capfd.readouterr()
-
-    assert failed_status != 0, failure_output.out + failure_output.err
-    assert "unknown-source" in failure_output.out + failure_output.err
+    assert failed.returncode != 0, failed.stdout + failed.stderr
+    assert b"unknown-source" in failed.stdout + failed.stderr
 
 
 def test_quarto_render_reads_back_citations_with_local_svg_asset(
     tmp_path: Path,
     monkeypatch,
-    capfd,
 ) -> None:
     """One native HTML render contains both local citeproc output and asset data."""
     output_root = _configure_native_tool_route(tmp_path, monkeypatch)
@@ -283,7 +361,7 @@ def test_quarto_render_reads_back_citations_with_local_svg_asset(
     )
     asset_bytes = (
         b'<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2">'
-        b'<title>local-asset-citation-fixture</title>'
+        b"<title>local-asset-citation-fixture</title>"
         b'<rect width="2" height="2" fill="#123456"/></svg>\n'
     )
     (tmp_path / "figure.svg").write_bytes(asset_bytes)
@@ -304,11 +382,8 @@ def test_quarto_render_reads_back_citations_with_local_svg_asset(
         encoding="utf-8",
     )
 
-    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
     output = output_root / "citation-with-asset.html"
-    render_status = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
+    rendered_result = _run_native_quarto(
         [
             "render",
             source.name,
@@ -321,16 +396,15 @@ def test_quarto_render_reads_back_citations_with_local_svg_asset(
             output.name,
         ],
     )
-    render_output = capfd.readouterr()
-
-    assert render_status == 0, render_output.out + render_output.err
+    assert rendered_result.returncode == 0, (
+        rendered_result.stdout + rendered_result.stderr
+    )
     assert output.is_file()
     rendered = output.read_text(encoding="utf-8")
     assert "Alpha 2020" in rendered
     assert "LOCAL STYLE: Local asset citation fixture" in rendered
-    asset_data_uri = (
-        "data:image/svg+xml;base64,"
-        + base64.b64encode(asset_bytes).decode("ascii")
-    )
+    asset_data_uri = "data:image/svg+xml;base64," + base64.b64encode(
+        asset_bytes
+    ).decode("ascii")
     assert asset_data_uri in rendered
     assert "[@alpha]" not in rendered
