@@ -1257,12 +1257,11 @@ fn run_process(
     argv: &[String],
     cwd: &Path,
     environment: &BTreeMap<String, String>,
-    stdin_policy: &str,
-    stdout_policy: &str,
-    stderr_policy: &str,
+    stream_policies: [&str; 3],
     error_code: &str,
     tool_id: &str,
 ) -> Result<i32, DispatchError> {
+    let [stdin_policy, stdout_policy, stderr_policy] = stream_policies;
     let Some(program) = argv.first() else {
         return Err(DispatchError::new("invalid-argv", tool_id));
     };
@@ -1329,7 +1328,7 @@ fn status_code(status: ExitStatus) -> i32 {
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt;
-        return 128 + status.signal().unwrap_or(0);
+        128 + status.signal().unwrap_or(0)
     }
     #[cfg(not(unix))]
     {
@@ -1380,9 +1379,7 @@ fn run_container_spec(root: &Path, spec: &ToolSpec, args: &[String]) -> Result<i
         &command,
         &cwd,
         &child_environment,
-        &spec.stdin_policy,
-        &spec.stdout_policy,
-        &spec.stderr_policy,
+        [&spec.stdin_policy, &spec.stdout_policy, &spec.stderr_policy],
         "container-exec-failed",
         &spec.tool_id,
     )
@@ -1411,9 +1408,7 @@ fn run_spec(
         &command,
         root,
         &child_environment,
-        "inherited",
-        "inherited",
-        "inherited",
+        ["inherited", "inherited", "inherited"],
         "bootstrap-exec-failed",
         &spec.tool_id,
     )
@@ -1485,9 +1480,7 @@ fn run_rust_cli(root: &Path, args: &[String]) -> Result<i32, DispatchError> {
         &command,
         root,
         &child_environment,
-        "inherited",
-        "inherited",
-        "inherited",
+        ["inherited", "inherited", "inherited"],
         "bootstrap-exec-failed",
         "rust-cli",
     )
@@ -1666,7 +1659,7 @@ pub fn run_cli(args: &[String]) -> i32 {
             }
             run_rust_cli(&root, &arguments[index + 1..])
         })();
-        return result.unwrap_or_else(|error| print_error(error));
+        return result.unwrap_or_else(print_error);
     }
     if !arguments.first().is_some_and(|argument| argument == "run") {
         return print_error(DispatchError::new(
