@@ -5,7 +5,7 @@
 // upstream implementation source_dependency_graph.rs derives dependency query and context without runtime state
 // upstream implementation graph.rs owns opt-in persisted graph build/status and non-dependency relations
 // downstream implementation main.rs exposes the native GraphClient API to in-process callers
-// downstream implementation ../../../../analysis/dependencies/graph_client.py retains the Python compatibility adapter during caller migration
+// downstream implementation ../../../../analysis/documents/prose_reasoning_graph.py consumes the native typed source query route
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
 // downstream implementation agent_search.rs consumes selected source-derived dependency facts
 // downstream implementation source_dependency_tests.rs verifies source and persisted client behavior
@@ -14,6 +14,7 @@
 use crate::source_dependency_graph::{
     build_context_projection_default, build_dependency_projection,
 };
+use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -22,6 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
 const GRAPH_COMMANDS: &[&str] = &["build", "status", "query", "context"];
+const GRAPH_CLIENT_COMMANDS: &[&str] = &["status", "query", "context"];
 const GRAPH_RELATIONS: &[&str] = &[
     "all",
     "dependency",
@@ -64,14 +66,14 @@ impl fmt::Display for GraphClientError {
 
 impl std::error::Error for GraphClientError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct GraphSourceIdentity {
     pub snapshot_commit: String,
     pub source_path: String,
     pub content_sha256: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct GraphDependencyFact {
     pub id: String,
     pub direction: String,
@@ -162,6 +164,30 @@ impl GraphResponse {
             payload,
             exit_code,
         })
+    }
+
+    /// Project the response and typed source-derived records for native CLI consumers.
+    pub fn consumer_payload(&self) -> Result<Value, GraphClientError> {
+        let successful_response = self.status == "fresh" && self.exit_code == 0;
+        let dependency_facts = if self.command == "query" && successful_response {
+            self.dependency_facts()?
+        } else {
+            Vec::new()
+        };
+        let source_identity = if self.command == "context" && successful_response {
+            self.source_identity()?
+        } else {
+            None
+        };
+        Ok(json!({
+            "schema": self.schema.clone(),
+            "command": self.command.clone(),
+            "status": self.status.clone(),
+            "payload": self.payload.clone(),
+            "exit_code": self.exit_code,
+            "dependency_facts": dependency_facts,
+            "source_identity": source_identity,
+        }))
     }
 
     /// Return the source-bound identity carried by dependency context.
@@ -494,6 +520,152 @@ impl GraphClient {
         let exit_code = process_exit_code(&output.status);
         GraphResponse::from_payload(command, payload, Some(exit_code))
     }
+}
+
+/// Run one typed GraphClient operation and return its validated response as JSON.
+pub fn run(args: &[String]) -> i32 {
+    if args
+        .first()
+        .is_some_and(|argument| matches!(argument.as_str(), "-h" | "--help"))
+    {
+        println!("{}", graph_client_usage());
+        return 0;
+    }
+    let options = match GraphClientCli::parse(args) {
+        Ok(options) => options,
+        Err(error) => {
+            eprintln!("GRAPH_CLIENT=fail reason={error}");
+            return 2;
+        }
+    };
+    let client = match options.executable.as_deref() {
+        Some(executable) => GraphClient::with_executable(&options.root, executable),
+        None => GraphClient::new(&options.root),
+    };
+    let result = client.and_then(|client| match options.command.as_str() {
+        "status" => client.status(),
+        "query" => client.query(
+            options.path.as_deref(),
+            &options.relation,
+            &options.direction,
+            options.depth,
+            options.all_nodes,
+        ),
+        "context" => {
+            let path = options
+                .path
+                .as_deref()
+                .ok_or_else(|| GraphClientError::new("graph context requires --path"))?;
+            client.context(path, options.token.as_deref())
+        }
+        _ => unreachable!("GraphClientCli validates the command"),
+    });
+    match result.and_then(|response| {
+        let exit_code = response.exit_code;
+        let payload = response.consumer_payload()?;
+        Ok((payload, exit_code))
+    }) {
+        Ok((payload, exit_code)) => {
+            match serde_json::to_string(&payload) {
+                Ok(payload) => println!("{payload}"),
+                Err(error) => {
+                    eprintln!("GRAPH_CLIENT=fail reason=response serialization failed: {error}");
+                    return 1;
+                }
+            }
+            exit_code
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            1
+        }
+    }
+}
+
+struct GraphClientCli {
+    command: String,
+    root: PathBuf,
+    path: Option<String>,
+    token: Option<String>,
+    relation: String,
+    direction: String,
+    depth: i64,
+    all_nodes: bool,
+    executable: Option<PathBuf>,
+}
+
+impl GraphClientCli {
+    fn parse(args: &[String]) -> Result<Self, String> {
+        let Some(command) = args.first() else {
+            return Err(graph_client_usage());
+        };
+        if !GRAPH_CLIENT_COMMANDS.contains(&command.as_str()) {
+            return Err(format!("unsupported graph command: {command}"));
+        }
+        let mut root = None;
+        let mut path = None;
+        let mut token = None;
+        let mut relation = "dependency".to_owned();
+        let mut direction = "both".to_owned();
+        let mut depth = 0_i64;
+        let mut all_nodes = false;
+        let mut executable = None;
+        let mut format = "json".to_owned();
+        let mut index = 1;
+        while index < args.len() {
+            let option = &args[index];
+            let value = |index: &mut usize| -> Result<String, String> {
+                let Some(value) = args.get(*index + 1) else {
+                    return Err(format!("{option}: expected one argument"));
+                };
+                if value.starts_with('-') {
+                    return Err(format!("{option}: expected one argument"));
+                }
+                *index += 1;
+                Ok(value.clone())
+            };
+            match option.as_str() {
+                "--root" => root = Some(PathBuf::from(value(&mut index)?)),
+                "--path" => path = Some(value(&mut index)?),
+                "--token" => token = Some(value(&mut index)?),
+                "--relation" => relation = value(&mut index)?,
+                "--direction" => direction = value(&mut index)?,
+                "--depth" => {
+                    depth = value(&mut index)?
+                        .parse()
+                        .map_err(|_| "graph query depth must be an integer".to_owned())?;
+                }
+                "--executable" => executable = Some(PathBuf::from(value(&mut index)?)),
+                "--format" => format = value(&mut index)?,
+                "--all" => all_nodes = true,
+                "-h" | "--help" => return Err(graph_client_usage()),
+                _ => return Err(format!("unrecognized argument: {option}")),
+            }
+            index += 1;
+        }
+        let root = root.ok_or_else(|| "--root is required".to_owned())?;
+        if format != "json" {
+            return Err("--format must be json".to_owned());
+        }
+        if *command == "context" && path.is_none() {
+            return Err("graph context requires --path".to_owned());
+        }
+        Ok(Self {
+            command: command.clone(),
+            root,
+            path,
+            token,
+            relation,
+            direction,
+            depth,
+            all_nodes,
+            executable,
+        })
+    }
+}
+
+fn graph_client_usage() -> String {
+    "usage: agent-canon graph-client <status|query|context> --root ROOT [--path PATH] [--token TOKEN] [--relation RELATION] [--direction DIRECTION] [--depth N] [--all] [--executable PATH] [--format json]".to_owned()
 }
 
 fn process_exit_code(status: &ExitStatus) -> i32 {

@@ -234,12 +234,13 @@ and stale-evidence checks. The existing
 [runtime-surface owner](../runtime/SHARED_RUNTIME_SURFACES.md) defines this
 version transition and the retained external interface.
 
-The Python skill-projection library remains for `source_dependency_graph.py`
-and supplies an independent comparison oracle. Its implementation stays in the
-pending inventory until that Python consumer is ported. External Python
-execution selected by an explicit v2 identity is a retained provider capability;
-it does not mean the native default delegates to an owned Python tool. This
-port does not complete other migration families.
+The native skill-projection registry serves both
+`source_dependency_graph.rs` and `surface_manifest.rs`; the source graph CLI and
+its active consumers now use the native owner. The frozen Python source-query,
+context, and export corpus remains an independent compatibility oracle.
+External Python execution selected by an explicit v2 identity is a retained
+provider capability; it does not mean the native default delegates to an owned
+Python tool. This port does not complete other migration families.
 
 ## Plan and Audit Interfaces
 
