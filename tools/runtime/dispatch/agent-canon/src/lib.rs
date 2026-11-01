@@ -98,6 +98,7 @@ pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
 pub mod work_log;
+pub mod workflow_context;
 
 #[cfg(test)]
 mod template_tests;
