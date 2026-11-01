@@ -184,6 +184,58 @@ fn rewrite_g6_source_context(artifact: &mut Value, source_root: &str) {
         materialized["reservations_released_evidence_ref"].clone();
 }
 
+fn rewrite_non_absolute_cleanup_fixture_path(artifact: &mut Value, fixture: &Fixture) -> bool {
+    // Keep the frozen POSIX path unchanged when the host already accepts it.
+    const FROZEN_CLEANUP_PATH: &str = "/tmp/agent-canon-update-owned";
+    if Path::new(FROZEN_CLEANUP_PATH).is_absolute() {
+        return false;
+    }
+
+    let fixture_path = fixture
+        .0
+        .join("agent-canon-update-owned")
+        .to_str()
+        .expect("temporary cleanup fixture path is UTF-8")
+        .to_owned();
+    assert!(
+        Path::new(&fixture_path).is_absolute(),
+        "host cleanup fixture path is absolute"
+    );
+    let cleanup = artifact["cleanup_proof"]
+        .as_object_mut()
+        .expect("closeout artifact has cleanup proof");
+    for field in ["task_owned_paths", "cleaned_paths"] {
+        let paths = cleanup
+            .get_mut(field)
+            .expect("cleanup proof has path collection")
+            .as_array_mut()
+            .expect("cleanup path collection is an array");
+        assert_eq!(paths.len(), 1, "frozen cleanup fixture has one owned path");
+        assert_eq!(
+            paths[0].as_str(),
+            Some(FROZEN_CLEANUP_PATH),
+            "frozen cleanup fixture keeps its known synthetic path"
+        );
+        paths[0] = Value::String(fixture_path.clone());
+    }
+    for field in ["task_owned_state_before", "task_owned_state_after"] {
+        let state = cleanup
+            .get_mut(field)
+            .expect("cleanup proof has task-owned state")
+            .as_object_mut()
+            .expect("cleanup task-owned state is an object");
+        let value = state
+            .remove(FROZEN_CLEANUP_PATH)
+            .expect("cleanup state is keyed by the frozen owned path");
+        assert!(
+            !state.contains_key(&fixture_path),
+            "mapped cleanup path is not already a fixture key"
+        );
+        state.insert(fixture_path.clone(), value);
+    }
+    true
+}
+
 fn write_cli_case(fixture: &Fixture, source_root: &Path, case: &Value) -> PathBuf {
     let run_id = case["run_id"].as_str().expect("CLI case has run id");
     let report_root = fixture.runtime().join("reports/agents");
@@ -210,6 +262,7 @@ fn write_cli_case(fixture: &Fixture, source_root: &Path, case: &Value) -> PathBu
         if relative.ends_with("update_lifecycle_closeout.json") {
             let mut artifact: Value =
                 serde_json::from_slice(&bytes).expect("old lifecycle closeout fixture is JSON");
+            rewrite_non_absolute_cleanup_fixture_path(&mut artifact, fixture);
             rewrite_g6_source_context(
                 &mut artifact,
                 source_root
@@ -250,7 +303,26 @@ fn task_close_g6_consumer_matches_all_six_frozen_python_cases() {
     for (index, case) in cases.iter().enumerate() {
         let report_dir = fixture.runtime().join(format!("api-case-{index}"));
         fs::create_dir_all(&report_dir).expect("create case-local report directory");
-        let artifact = serde_json::to_vec(&case["input"])
+        let mut artifact = case["input"].clone();
+        let cleanup_path_rewritten =
+            rewrite_non_absolute_cleanup_fixture_path(&mut artifact, &fixture);
+        let mut expected = case["result"].clone();
+        if expected["ready"].as_bool() == Some(true) && cleanup_path_rewritten {
+            rewrite_g6_source_context(&mut artifact, source_root);
+            let gates = artifact["gate_verdicts"]
+                .as_array()
+                .expect("positive closeout input has gate verdicts");
+            assert_eq!(gates.len(), 6, "positive closeout keeps all six gates");
+            expected["gate_evidence_refs"] = Value::Array(
+                gates
+                    .iter()
+                    .map(|gate| gate["binding"]["evidence_ref"].clone())
+                    .collect(),
+            );
+            expected["close_agent_token_id"] =
+                artifact["close_agent_tool_call"]["token_id"].clone();
+        }
+        let artifact = serde_json::to_vec(&artifact)
             .expect("frozen API input serializes for read-only consumption");
         write_bytes(
             &report_dir.join("update_lifecycle_closeout.json"),
@@ -259,7 +331,7 @@ fn task_close_g6_consumer_matches_all_six_frozen_python_cases() {
         let decision = update_lifecycle_closeout_consumer(&boundary, &report_dir, source_root);
         assert_eq!(
             decision.to_json_value(),
-            case["result"],
+            expected,
             "TaskClose consumer case {}",
             case["test_name"].as_str().unwrap_or("unknown")
         );
