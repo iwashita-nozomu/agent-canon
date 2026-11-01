@@ -31,6 +31,8 @@
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
+// downstream implementation active_design_packet.rs owns native persisted active-design packet normalization
+// downstream implementation waterfall_gate.rs owns the native Waterfall CLI gate
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
@@ -49,11 +51,13 @@
 // downstream test ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
+// downstream test ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
 // downstream test template_tests.rs validates native Template APIs
 // downstream test ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
+pub mod active_design_packet;
 pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
@@ -97,6 +101,7 @@ pub mod theorem_graph_circularity_check;
 pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
+pub mod waterfall_gate;
 pub mod work_log;
 
 #[cfg(test)]

@@ -23,3 +23,8 @@ tests/fixtures/design_similarity/float_python_golden.json text eol=lf
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
 tests/fixtures/nvidia/*.xml -diff
+# The TaskClose baseline corpus is byte-hashed by native tests on every host.
+tests/fixtures/task_close/python_golden.json text eol=lf
+
+# The Waterfall CLI baseline corpus is byte-hashed by native tests on every host.
+tests/fixtures/waterfall_gate/python_golden.jsonl text eol=lf
