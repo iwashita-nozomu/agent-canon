@@ -2,7 +2,7 @@
 // contract test
 // responsibility Qualifies the XML provider and Markdown projection against the frozen DOCX XML corpus.
 // upstream implementation ../Cargo.toml selects the safe XML provider candidate
-// upstream evidence ../../../../../tests/fixtures/docx_xml/python_golden.json freezes old ElementTree events and product Markdown
+// upstream reference ../../../../../tests/fixtures/docx_xml/python_golden.json freezes old ElementTree events and product Markdown
 // @dependency-end
 
 use agent_canon::extract_docx::extract_markdown;

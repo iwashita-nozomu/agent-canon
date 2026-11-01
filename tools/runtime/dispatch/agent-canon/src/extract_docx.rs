@@ -4,7 +4,7 @@
 // upstream design ../../../../../documents/tools/extract_docx.md defines the bundle and CLI contract
 // upstream design ../../../../../documents/design/rust-agent-tool-migration.md defines native ownership and caller closure
 // upstream implementation ../Cargo.toml selects ZIP offset detection, the native reader/codecs, XML, Unicode, and filesystem providers
-// upstream implementation ../python_cli_integer.rs shares Python Unicode 15 digit classification
+// upstream implementation python_cli_integer.rs shares Python Unicode 15 digit classification
 // downstream implementation ../tests/extract_docx_native.rs qualifies the XML parser and native DOCX projection
 // downstream implementation ../../../../../tests/tools/test_extract_docx.py checks the public CLI and transaction behavior
 // @dependency-end
