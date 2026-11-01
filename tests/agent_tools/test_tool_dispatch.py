@@ -45,7 +45,9 @@ def _native_binary() -> Path:
     candidate = cache_root / "bin" / "agent-canon"
     if candidate.is_file() and os.access(candidate, os.X_OK):
         return candidate
-    raise AssertionError("the native agent-canon CLI must be built before tool dispatch tests")
+    raise AssertionError(
+        "the native agent-canon CLI must be built before tool dispatch tests"
+    )
 
 
 def _entry(
@@ -167,7 +169,9 @@ class NativeToolDispatchTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _run(self, *args: str, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[bytes]:
+    def _run(
+        self, *args: str, extra_env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
         environment = dict(self.env)
         if extra_env:
             environment.update(extra_env)
@@ -199,8 +203,10 @@ class NativeToolDispatchTests(unittest.TestCase):
             "AGENT_CANON_IMAGE_ROOT": str(image_root),
             "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(dependencies_root),
             "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(self.root),
-            "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest(),
-            "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest(),
+            "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:"
+            + hashlib.sha256(CONTAINER_MARKER).hexdigest(),
+            "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
+            + hashlib.sha256(RUNTIME_MARKER).hexdigest(),
         }
 
     def test_inventory_is_a_stable_versioned_json_projection(self) -> None:
@@ -217,7 +223,9 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertEqual(payload["entries"][0]["side_effect"], "read-only")
         self.assertEqual(payload["entries"][0]["output_root"], "none")
 
-    def test_repository_inventory_keeps_native_and_python_dispatch_entries(self) -> None:
+    def test_repository_inventory_keeps_native_and_python_dispatch_entries(
+        self,
+    ) -> None:
         result = subprocess.run(
             [
                 str(_native_binary()),
@@ -232,21 +240,23 @@ class NativeToolDispatchTests(unittest.TestCase):
             capture_output=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        entries = {
-            entry["id"]: entry for entry in json.loads(result.stdout)["entries"]
-        }
+        entries = {entry["id"]: entry for entry in json.loads(result.stdout)["entries"]}
         self.assertEqual(entries["quarto"]["runtime"], "native")
         self.assertEqual(entries["quarto"]["argv"], ["quarto"])
         self.assertEqual(
             entries["quarto"]["path"],
             "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
-        self.assertEqual(entries["generate-agent-runtime-dashboard"]["runtime"], "python")
+        self.assertEqual(
+            entries["generate-agent-runtime-dashboard"]["runtime"], "python"
+        )
         for entry in entries.values():
             self.assertIn(entry["runtime"], {"python", "rust", "native"})
             self.assertTrue(entry["argv"])
             self.assertEqual(entry["execution_plane"], "tool-container")
-            self.assertIn(entry["cwd"], {"source-root", "target-root", "task-root", "explicit"})
+            self.assertIn(
+                entry["cwd"], {"source-root", "target-root", "task-root", "explicit"}
+            )
             self.assertIn(entry["env"], {"allowlisted", "clean"})
             self.assertIn(
                 entry["side_effect"],
@@ -284,7 +294,10 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertEqual(request["schema"], "agent-canon.tool-exec-request.v1")
         self.assertEqual(request["tool_id"], "echo")
         self.assertEqual(request["source_root"], str(self.root))
-        self.assertEqual(request["argv"], ["python3", "tools/echo.py", "two words", "$(touch marker)"])
+        self.assertEqual(
+            request["argv"],
+            ["python3", "tools/echo.py", "two words", "$(touch marker)"],
+        )
         self.assertEqual(request["child_args"], ["two words", "$(touch marker)"])
         self.assertEqual(request["cwd"], str(self.target))
         self.assertEqual(request["cwd_policy"], "target-root")
@@ -302,7 +315,9 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertNotIn("AGENT_CANON_SECRET", request["environment"])
         self.assertNotIn("GIT_CONFIG_KEY_1", request["environment"])
         self.assertEqual(request["environment"]["GIT_CONFIG_COUNT"], "1")
-        self.assertEqual(request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "python")
+        self.assertEqual(
+            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "python"
+        )
 
     def test_native_descriptor_uses_the_same_typed_bootstrap_envelope(self) -> None:
         self._write_catalog(
@@ -341,7 +356,9 @@ class NativeToolDispatchTests(unittest.TestCase):
         request = json.loads(self.captured_request.read_text(encoding="utf-8"))
         self.assertEqual(request["argv"], ["quarto", "pandoc", "paper.md"])
         self.assertEqual(request["child_args"], ["pandoc", "paper.md"])
-        self.assertEqual(request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "native")
+        self.assertEqual(
+            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "native"
+        )
         self.assertEqual(request["side_effect"], "external-artifact")
         self.assertEqual(request["output_root"], str(output_root))
         self.assertNotIn("runtime", request)
@@ -379,7 +396,9 @@ class NativeToolDispatchTests(unittest.TestCase):
             "run", "--root", str(self.root), "issue-sync", "--", "--issues"
         )
         self.assertEqual(rejected.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=container-route-restricted:", rejected.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-route-restricted:", rejected.stderr
+        )
         self.assertFalse(self.captured_request.exists())
         accepted = self._run(
             "run",
@@ -395,11 +414,15 @@ class NativeToolDispatchTests(unittest.TestCase):
         request = json.loads(self.captured_request.read_text(encoding="utf-8"))
         self.assertEqual(request["child_args"][0], "--receipt-preflight")
 
-    def test_catalog_validation_fails_closed_for_shell_strings_missing_dispatch_and_duplicates(self) -> None:
+    def test_catalog_validation_fails_closed_for_shell_strings_missing_dispatch_and_duplicates(
+        self,
+    ) -> None:
         self._write_catalog([_entry(argv="python3 tools/echo.py")])
         shell_string = self._run("inventory", "--root", str(self.root), "--json")
         self.assertEqual(shell_string.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=shell-string-rejected:", shell_string.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=shell-string-rejected:", shell_string.stderr
+        )
 
         entry = _entry()
         del entry["dispatch"]
@@ -415,7 +438,15 @@ class NativeToolDispatchTests(unittest.TestCase):
 
     def test_cli_errors_retain_explicit_runtime_and_argument_boundaries(self) -> None:
         no_runtime = subprocess.run(
-            [str(_native_binary()), "tool", "run", "--root", str(self.root), "echo", "--"],
+            [
+                str(_native_binary()),
+                "tool",
+                "run",
+                "--root",
+                str(self.root),
+                "echo",
+                "--",
+            ],
             cwd=self.root,
             env={"PATH": self.env["PATH"]},
             check=False,
@@ -425,15 +456,22 @@ class NativeToolDispatchTests(unittest.TestCase):
         self.assertIn(b"TOOL_DISPATCH_ERROR=runtime-root-required:", no_runtime.stderr)
         missing_delimiter = self._run("run", "--root", str(self.root), "echo")
         self.assertEqual(missing_delimiter.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=missing-argument-delimiter:echo", missing_delimiter.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=missing-argument-delimiter:echo",
+            missing_delimiter.stderr,
+        )
         unknown_option = self._run("run", "--root", str(self.root), "--unknown")
         self.assertEqual(unknown_option.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=unknown-option:--unknown", unknown_option.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=unknown-option:--unknown", unknown_option.stderr
+        )
         unknown_id = self._run("run", "--root", str(self.root), "missing", "--")
         self.assertEqual(unknown_id.returncode, 2)
         self.assertIn(b"TOOL_DISPATCH_ERROR=unknown-id:missing", unknown_id.stderr)
 
-    def test_container_dispatch_authenticates_markers_and_uses_registered_target(self) -> None:
+    def test_container_dispatch_authenticates_markers_and_uses_registered_target(
+        self,
+    ) -> None:
         environment = self._container_environment()
         environment["AGENT_CANON_OUTPUT_ROOT"] = ""
         environment["AGENT_CANON_TARGET_ROOT"] = str(self.target)
@@ -546,10 +584,15 @@ class NativeToolDispatchTests(unittest.TestCase):
             extra_env=environment,
         )
         self.assertEqual(spoofed.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=container-marker-digest-mismatch:image", spoofed.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-marker-digest-mismatch:image",
+            spoofed.stderr,
+        )
 
         environment = self._container_environment()
-        image_marker = Path(environment["AGENT_CANON_IMAGE_ROOT"]) / CONTAINER_MARKER_NAME
+        image_marker = (
+            Path(environment["AGENT_CANON_IMAGE_ROOT"]) / CONTAINER_MARKER_NAME
+        )
         image_marker.chmod(0o644)
         writable = self._run(
             "run",
@@ -561,7 +604,9 @@ class NativeToolDispatchTests(unittest.TestCase):
             extra_env=environment,
         )
         self.assertEqual(writable.returncode, 2)
-        self.assertIn(b"TOOL_DISPATCH_ERROR=container-marker-writable:", writable.stderr)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-marker-writable:", writable.stderr
+        )
 
     def test_external_artifact_output_root_is_created_only_inside_runtime(self) -> None:
         environment = self._container_environment()
@@ -611,7 +656,13 @@ def _native_vl_convert_route(
     target_root = tmp_path / "target"
     output_root = runtime_root / "tool-output"
     home = runtime_root / "cache" / "home"
-    for directory in (image_runtime, dependencies_root, runtime_root, target_root, home):
+    for directory in (
+        image_runtime,
+        dependencies_root,
+        runtime_root,
+        target_root,
+        home,
+    ):
         directory.mkdir(parents=True, exist_ok=True)
 
     marker_paths = (

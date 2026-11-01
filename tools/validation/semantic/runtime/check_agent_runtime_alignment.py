@@ -474,7 +474,10 @@ def validate_retired_command_or_skill(value: str, child: str) -> None:
             ]
         else:
             cached_cli = (
-                Path(os.environ.get("AGENT_CANON_CACHE_ROOT") or "/var/lib/agent-canon/cache")
+                Path(
+                    os.environ.get("AGENT_CANON_CACHE_ROOT")
+                    or "/var/lib/agent-canon/cache"
+                )
                 / "bin"
                 / "agent-canon"
             )

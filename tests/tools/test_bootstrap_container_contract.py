@@ -127,12 +127,8 @@ def test_runtime_manifest_owns_apt_tools_and_build_tools_are_absent() -> None:
 
 def test_dockerfile_publishes_dispatcher_marker_contract() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
-    image_digest = (
-        "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest()
-    )
-    runtime_digest = (
-        "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest()
-    )
+    image_digest = "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest()
+    runtime_digest = "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest()
     assert CONTAINER_MARKER == b"agent-canon-tool-container/v1\n"
     assert RUNTIME_MARKER == b"agent-canon-runtime/v1\n"
     assert "printf 'agent-canon-tool-container/v1\\n'" in text

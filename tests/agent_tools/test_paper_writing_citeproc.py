@@ -361,7 +361,7 @@ def test_quarto_render_reads_back_citations_with_local_svg_asset(
     )
     asset_bytes = (
         b'<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2">'
-        b'<title>local-asset-citation-fixture</title>'
+        b"<title>local-asset-citation-fixture</title>"
         b'<rect width="2" height="2" fill="#123456"/></svg>\n'
     )
     (tmp_path / "figure.svg").write_bytes(asset_bytes)
@@ -396,14 +396,15 @@ def test_quarto_render_reads_back_citations_with_local_svg_asset(
             output.name,
         ],
     )
-    assert rendered_result.returncode == 0, rendered_result.stdout + rendered_result.stderr
+    assert rendered_result.returncode == 0, (
+        rendered_result.stdout + rendered_result.stderr
+    )
     assert output.is_file()
     rendered = output.read_text(encoding="utf-8")
     assert "Alpha 2020" in rendered
     assert "LOCAL STYLE: Local asset citation fixture" in rendered
-    asset_data_uri = (
-        "data:image/svg+xml;base64,"
-        + base64.b64encode(asset_bytes).decode("ascii")
-    )
+    asset_data_uri = "data:image/svg+xml;base64," + base64.b64encode(
+        asset_bytes
+    ).decode("ascii")
     assert asset_data_uri in rendered
     assert "[@alpha]" not in rendered
