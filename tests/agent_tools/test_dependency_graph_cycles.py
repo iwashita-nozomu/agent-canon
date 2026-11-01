@@ -404,15 +404,15 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
-            write(
-                root / "tools" / "consumer.py",
-                """
-                # @dependency-start
-                # contract tool
-                # responsibility References the generated skill view.
-                # downstream implementation ../.codex/personal/skills/example/SKILL.md canonical owner
-                # @dependency-end
-                """,
+            consumer = root / "tools" / "consumer.py"
+            consumer.parent.mkdir()
+            consumer.write_text(
+                "# @dependency-start\n"
+                "# contract tool\n"
+                "# responsibility References the generated skill view.\n"
+                "# downstream implementation ../.codex/personal/skills/example/SKILL.md canonical owner\n"
+                "# @dependency-end\n",
+                encoding="utf-8",
             )
             shim = root / ".codex/personal/skills/example/SKILL.md"
             shim.parent.mkdir(parents=True)
