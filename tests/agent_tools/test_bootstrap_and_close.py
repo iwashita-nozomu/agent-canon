@@ -75,6 +75,14 @@ def task_close_command() -> list[str]:
     return [selected_cli, "task-close"]
 
 
+def codex_hook_command(event: str) -> list[str]:
+    """Select the registered native Codex Hook CLI for integration tests."""
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the native Hook CLI")
+    return [selected_cli, "codex-hook", event]
+
+
 WORKTREE_START_SCRIPT = (
     PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
 )
@@ -1856,11 +1864,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             hook_result = subprocess.run(
-                [
-                    sys.executable,
-                    str(PROJECT_ROOT / ".codex/hooks/hook_dispatcher.py"),
-                    "UserPromptSubmit",
-                ],
+                codex_hook_command("UserPromptSubmit"),
                 cwd=workspace_root,
                 input=json.dumps({"hookEventName": "UserPromptSubmit"}),
                 check=False,

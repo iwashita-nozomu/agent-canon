@@ -114,6 +114,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     native_binary = native_cli_input
     fake_docker = ROOT / "tests" / "bootstrap" / "fake_docker.py"
     state_path = tmp_path / "docker-state.json"
+    calls_path = tmp_path / "docker-calls.tsv"
     environment = {
         **os.environ,
         "HOME": str(home),
@@ -121,6 +122,7 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
         "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
         "AGENT_CANON_DOCKER": str(fake_docker),
         "FAKE_DOCKER_STATE": str(state_path),
+        "FAKE_DOCKER_CALLS": str(calls_path),
         "FAKE_DOCKER_VALID_IMAGE_IDS": "1",
         "FAKE_DOCKER_NATIVE_BIN": str(native_binary),
         "AGENT_CANON_RUNTIME_ROOT": str(control / ".runtime"),
@@ -200,6 +202,14 @@ def test_codex_hook_routes_register_only_trusted_project_targets(
     assert source_hook.returncode == 0, source_hook.stderr
     assert source_hook.stdout == ""
     assert source_hook.stderr == ""
+    calls = calls_path.read_text(encoding="utf-8").splitlines()
+    assert any(
+        "\tcodex\thook-admission\t--event\tUserPromptSubmit" in call for call in calls
+    )
+    assert any(
+        "/cache/bin/agent-canon\tcodex-hook\tUserPromptSubmit" in call for call in calls
+    )
+    assert not any("\tcodex\thook\t--event\t" in call for call in calls)
     assert codex_config.read_bytes() == config_before
     mounts = control / ".runtime" / "container-state" / "mounts.tsv"
     assert {

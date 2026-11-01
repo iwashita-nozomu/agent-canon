@@ -7,8 +7,8 @@
 // downstream implementation lib.rs shared native Template library
 // downstream implementation main.rs template-bundle CLI route
 // downstream implementation native_release.rs source-bound release package verifier
-// downstream test template_tests.rs profile, Codex and native package oracles
-// downstream test ../tests/native_release_native.rs source-bound native release oracles
+// downstream implementation template_tests.rs profile, Codex and native package oracles
+// downstream implementation ../tests/native_release_native.rs source-bound native release oracles
 // @dependency-end
 
 use crate::entrypoint_composer::Composition;
@@ -1620,11 +1620,10 @@ fn verify_codex_user_bundle_inner(root: &Path) -> BundleResult<Value> {
             "Codex user bundle contains unmanifested files",
         ));
     }
-    const REQUIRED: [&str; 9] = [
+    const REQUIRED: [&str; 8] = [
         "bootstrap.sh",
         "bootstrap/host/lifecycle/entrypoint.sh",
         "tools/runtime/container/bootstrap_runtime.py",
-        ".codex/hooks/hook_dispatcher.py",
         "hooks/hooks.json",
         "plugin.json",
         CODEX_MARKETPLACE,

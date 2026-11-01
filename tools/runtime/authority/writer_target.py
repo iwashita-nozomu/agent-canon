@@ -6,7 +6,7 @@
 # upstream implementation ./checkout_identity.py provides the observational checkout readback.
 # downstream implementation ../../agent/orchestration/implementation_dispatch.py validates fixed implementation handoffs.
 # downstream implementation ../manifest/manifest_rendering.py projects the handoff fields into team manifests.
-# downstream implementation ../../../.codex/hooks/hook_dispatcher.py enforces the active target at mutation time.
+# downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs enforces the active target at mutation time.
 # downstream implementation ../../../tests/agent_tools/test_writer_target.py validates collision and mutation boundaries.
 # @dependency-end
 """Pure writer-target validation for the shared checkout boundary.

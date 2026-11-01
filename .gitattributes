@@ -13,21 +13,14 @@ tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
 bootstrap/container/image/dependencies.toml text eol=lf
 
 # Frozen Python JSON goldens are byte-hashed by native tests; preserve LF bytes on every host.
-tests/fixtures/update_lifecycle/*_python_golden.json text eol=lf
-tests/fixtures/**/python_golden.json text eol=lf
+tests/fixtures/**/*python_golden.json text eol=lf
 
 # The embedded actionlint config is byte-hashed by the native checker; preserve LF bytes on every host.
 tools/validation/ci/config/actionlint.yaml text eol=lf
-
-# These frozen oracles bind their exact UTF-8 bytes on every host.
-tests/fixtures/design_similarity/float_python_golden.json text eol=lf
 
 # NVIDIA parser fixtures intentionally retain invalid whitespace/CRLF bytes as
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
 tests/fixtures/nvidia/*.xml -diff
-# The TaskClose baseline corpus is byte-hashed by native tests on every host.
-tests/fixtures/task_close/python_golden.json text eol=lf
-
 # The Waterfall CLI baseline corpus is byte-hashed by native tests on every host.
 tests/fixtures/waterfall_gate/python_golden.jsonl text eol=lf

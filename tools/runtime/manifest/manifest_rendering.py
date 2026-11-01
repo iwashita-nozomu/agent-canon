@@ -368,7 +368,7 @@ DEFAULT_QUALITY_CHECK_STATIC_COMMANDS = (
 
 CANONICAL_FORMAT_CHECK_ROUTE = DEFAULT_QUALITY_CHECK_STATIC_COMMANDS[0]
 
-OFFICIAL_HOOK_DISPATCHER = ".codex/hooks/hook_dispatcher.py"
+OFFICIAL_HOOK_DISPATCHER = "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs"
 
 OFFICIAL_HOOK_SCHEMA = "agent-canon.posttooluse-stop.v1"
 

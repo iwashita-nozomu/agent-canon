@@ -590,6 +590,73 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
     assert trace.read_text().splitlines() == expected_trace
 
 
+@pytest.mark.parametrize("explicit_cli", [False, True])
+@pytest.mark.parametrize("checker_exit", [0, 9])
+def test_contract_unit_passes_selected_native_cli_to_alignment(
+    tmp_path: Path, explicit_cli: bool, checker_exit: int
+) -> None:
+    fixture_root = executable_fixture_root(tmp_path)
+    root = fixture_root / "target with spaces"
+    cache = fixture_root / "cache with spaces"
+    alignment = (
+        root / "tools/validation/semantic/runtime/check_agent_runtime_alignment.py"
+    )
+    alignment.parent.mkdir(parents=True)
+    alignment.write_text(
+        "import os, subprocess, sys\n"
+        "result = subprocess.run([os.environ['AGENT_CANON_CLI'], 'codex-hook', '--contract'])\n"
+        "sys.exit(result.returncode)\n"
+    )
+    (cache / "bin").mkdir(parents=True)
+    for label, path in (
+        ("default", cache / "bin/agent-canon"),
+        ("explicit", fixture_root / "selected native"),
+    ):
+        path.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [[ "$1" == codex-hook ]]; then\n'
+            '  printf "' + label + '\\n" > "$SELECTED"\n'
+            '  printf "%s\\n" "$@" > "$CALLS"\n'
+            '  exit "$CHECKER_EXIT"\n'
+            "fi\n"
+        )
+        path.chmod(0o755)
+    text = RUNNER.read_text()
+    body = (
+        "run_contracts() {"
+        + text.split("run_contracts() {", 1)[1].split("\n}\n\nrun_eval()", 1)[0]
+        + "\n}\n"
+    )
+    setup = (
+        "unset AGENT_CANON_NATIVE_BIN\n"
+        "node() { :; }\n"
+        'python3() { if [[ "$1" == *check_agent_runtime_alignment.py ]]; then '
+        'command python3 "$@"; fi; }\n'
+    )
+    if explicit_cli:
+        setup += (
+            "export AGENT_CANON_CLI="
+            + shlex.quote(str(fixture_root / "selected native"))
+            + "\n"
+        )
+    else:
+        setup += "unset AGENT_CANON_CLI\n"
+    calls, selected = fixture_root / "calls", fixture_root / "selected"
+    result = run_shell(
+        body + setup + "run_contracts",
+        root=root,
+        ROOT=str(root),
+        TOOLS_ROOT=str(root / "tools"),
+        AGENT_CANON_CACHE_ROOT=str(cache),
+        CHECKER_EXIT=str(checker_exit),
+        CALLS=str(calls),
+        SELECTED=str(selected),
+    )
+    assert result.returncode == checker_exit, result.stderr
+    assert selected.read_text().strip() == ("explicit" if explicit_cli else "default")
+    assert calls.read_text().splitlines() == ["codex-hook", "--contract"]
+
+
 def test_runner_places_xdg_cache_under_the_task_runtime() -> None:
     text = RUNNER.read_text()
     runtime_root_setup = text.index(

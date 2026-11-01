@@ -1004,14 +1004,14 @@ def test_codex_hook_cli_delegates_raw_event_to_canonical_dispatcher(
 ) -> None:
     """The resident entry passes the event bytes to the packaged dispatcher."""
     captured: dict[str, object] = {}
-    dispatcher = types.ModuleType("hook_dispatcher")
 
-    def dispatch_event(event: str, payload: bytes) -> int:
-        captured.update({"event": event, "payload": payload})
-        return 23
+    def run_native_hook(
+        argv: list[str], *, input: bytes, check: bool
+    ) -> subprocess.CompletedProcess[bytes]:
+        captured.update({"argv": argv, "payload": input, "check": check})
+        return subprocess.CompletedProcess(argv, 23)
 
-    setattr(dispatcher, "dispatch_event", dispatch_event)
-    monkeypatch.setitem(sys.modules, "hook_dispatcher", dispatcher)
+    monkeypatch.setattr(bootstrap_runtime_module.subprocess, "run", run_native_hook)
     raw_payload = b'{"hook_event_name":"UserPromptSubmit","cwd":"/tmp/project"}'
     monkeypatch.setattr(
         bootstrap_runtime_module.sys,
@@ -1035,7 +1035,11 @@ def test_codex_hook_cli_delegates_raw_event_to_canonical_dispatcher(
     )
 
     assert result == 23
-    assert captured == {"event": "UserPromptSubmit", "payload": raw_payload}
+    assert captured == {
+        "argv": ["agent-canon", "codex-hook", "UserPromptSubmit"],
+        "payload": raw_payload,
+        "check": False,
+    }
 
 
 def test_structured_tool_environment_rejects_private_log_self_claim(

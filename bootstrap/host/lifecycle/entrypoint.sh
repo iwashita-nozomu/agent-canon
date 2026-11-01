@@ -4614,11 +4614,7 @@ _agent_canon_codex_hook() {
   fi
 
   printf '%s' "$payload" | _agent_canon_container_exec "$container" --stdin \
-    python3 "$AGENT_CANON_SOURCE_DESTINATION/tools/runtime/container/bootstrap_runtime.py" \
-    --repository-root "$AGENT_CANON_SOURCE_DESTINATION" \
-    --control-parent-root /var/lib/agent-canon \
-    --runtime-root /var/lib/agent-canon/runtime \
-    codex hook --event "$event"
+    "$AGENT_CANON_CACHE_DESTINATION/bin/agent-canon" codex-hook "$event"
 }
 
 _agent_canon_codex_bundle_install_locked() {
