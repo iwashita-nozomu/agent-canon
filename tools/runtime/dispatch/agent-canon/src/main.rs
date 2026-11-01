@@ -51,6 +51,7 @@
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
+// downstream implementation tool_dispatch.rs routes typed catalog commands through the native CLI
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // downstream implementation extract_docx.rs routes the native DOCX extraction command
 // @dependency-end
@@ -105,8 +106,8 @@ use agent_canon::runtime_boundary;
 use agent_canon::{
     catalog, compare_agent_run_paths, entrypoint_composer, extract_docx, generated_completeness,
     native_release, report_artifact_checks, run_evaluation, stablehlo_value_closure,
-    template_bundle, theorem_graph_board, theorem_graph_circularity_check, tool_proof_coverage,
-    waterfall_gate, work_log,
+    template_bundle, theorem_graph_board, theorem_graph_circularity_check, tool_dispatch,
+    tool_proof_coverage, waterfall_gate, work_log,
 };
 use std::env;
 
@@ -146,6 +147,7 @@ Commands:
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
   compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
+  tool <run|inventory|rust-cli> [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -261,6 +263,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "tool" {
+        std::process::exit(tool_dispatch::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {

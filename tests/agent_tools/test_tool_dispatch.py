@@ -1,156 +1,622 @@
-"""Focused tests for the versioned namespaced tool dispatcher."""
-
 # @dependency-start
 # contract test
-# responsibility Tests typed catalog loading and argv-safe dispatch.
-# upstream implementation ../../tools/runtime/dispatch/tool_dispatch.py owns dispatcher behavior
+# responsibility Tests typed catalog loading and argv-safe native dispatch.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs owns dispatcher behavior
 # upstream design ../../tools/catalog.yaml owns runtime schema and public inventory
 # downstream implementation ../../tools/bin/agent-canon owns the stable CLI namespace
 # @dependency-end
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
 import json
 import os
+import signal
 import stat
 import subprocess
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from typing import Any
 
 import yaml
 
-from tools.runtime.dispatch import tool_dispatch
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CONTAINER_MARKER = b"agent-canon-tool-container/v1\n"
+RUNTIME_MARKER = b"agent-canon-runtime/v1\n"
+CONTAINER_MARKER_NAME = ".agent-canon-tool-container"
+RUNTIME_MARKER_NAME = ".agent-canon-runtime"
 
 
-class ToolDispatchTest(unittest.TestCase):
-    """Exercise the dispatcher without starting Docker or a resident runtime."""
+def _native_binary() -> Path:
+    """Resolve the already-built native CLI without a Python fallback."""
+    configured = os.environ.get("AGENT_CANON_NATIVE_BIN")
+    if configured:
+        return Path(configured)
+    crate = PROJECT_ROOT / "tools/runtime/dispatch/agent-canon"
+    target = Path(os.environ.get("CARGO_TARGET_DIR") or crate / "target")
+    for profile in ("debug", "release"):
+        candidate = target / profile / "agent-canon"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    cache_root = Path(
+        os.environ.get("AGENT_CANON_CACHE_ROOT") or "/var/lib/agent-canon/cache"
+    )
+    candidate = cache_root / "bin" / "agent-canon"
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return candidate
+    raise AssertionError(
+        "the native agent-canon CLI must be built before tool dispatch tests"
+    )
 
-    def test_child_git_trust_is_scoped_to_the_admitted_target(self) -> None:
-        specs, _ = tool_dispatch.load_specs(PROJECT_ROOT)
-        with tempfile.TemporaryDirectory() as temporary:
-            target = Path(temporary) / "target"
-            target.mkdir()
-            for policy in ("allowlisted", "clean"):
-                with (
-                    self.subTest(policy=policy),
-                    patch.dict(
-                        os.environ,
-                        {
-                            "AGENT_CANON_TARGET_ROOT": str(target),
-                            "GIT_CONFIG_COUNT": "2",
-                            "GIT_CONFIG_KEY_0": "color.ui",
-                            "GIT_CONFIG_VALUE_0": "always",
-                            "GIT_CONFIG_KEY_1": "safe.directory",
-                            "GIT_CONFIG_VALUE_1": "*",
-                        },
-                    ),
-                ):
-                    environment = tool_dispatch._environment(
-                        PROJECT_ROOT,
-                        replace(specs["template-bundle"], env_policy=policy),
-                        Path(temporary) / "runtime",
-                        None,
-                    )
-                    self.assertEqual(environment["GIT_CONFIG_COUNT"], "1")
-                    self.assertEqual(environment["GIT_CONFIG_KEY_0"], "safe.directory")
-                    self.assertEqual(
-                        environment["GIT_CONFIG_VALUE_0"], str(target.resolve())
-                    )
-                    self.assertNotIn("GIT_CONFIG_KEY_1", environment)
 
-    def test_repository_inventory_is_typed_and_versioned(self) -> None:
-        """The repository publishes typed Python, Rust, and native catalog surfaces."""
-        specs, schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        self.assertEqual(schema["version"], 2)
-        for spec in specs.values():
-            self.assertIn(spec.runtime, {"python", "rust", "native"})
-            self.assertIsInstance(spec.argv, tuple)
-            self.assertTrue(spec.argv)
-            self.assertEqual(spec.execution_plane, "tool-container")
-            self.assertIn(
-                spec.cwd_policy, {"source-root", "target-root", "task-root", "explicit"}
-            )
-            self.assertIn(spec.env_policy, {"allowlisted", "clean"})
-            self.assertIn(
-                spec.side_effect_policy,
-                {"read-only", "external-artifact", "explicit-target-write"},
-            )
-        self.assertEqual(specs["rust-docs"].argv[:2], ("tools/bin/agent-canon", "docs"))
-        self.assertEqual(specs["rust-python-module-groups-check"].runtime, "rust")
-        self.assertEqual(specs["quarto"].runtime, "native")
-        self.assertEqual(specs["quarto"].argv, ("quarto",))
-        self.assertEqual(specs["vl-convert"].runtime, "native")
-        self.assertEqual(specs["vl-convert"].argv, ("vl-convert",))
-        self.assertEqual(specs["vl-convert"].runtime, "native")
-        self.assertEqual(specs["vl-convert"].argv, ("vl-convert",))
+def _entry(
+    tool_id: str = "echo",
+    *,
+    path: str = "tools/echo.py",
+    argv: list[str] | str | None = None,
+    dispatch: dict[str, object] | None = None,
+    writes: bool = False,
+) -> dict[str, object]:
+    descriptor: dict[str, object] = {
+        "runtime": "python",
+        "argv": ["python3", "tools/echo.py"] if argv is None else argv,
+        "cwd": "target-root",
+        "env": "allowlisted",
+        "stdin": "captured",
+        "stdout": "captured",
+        "stderr": "captured",
+        "exit": "propagate",
+        "signal": "propagate",
+        "side_effect": "read-only",
+        "output_root": "none",
+        "written_paths": [],
+    }
+    if dispatch is not None:
+        descriptor.update(dispatch)
+    return {
+        "id": tool_id,
+        "path": path,
+        "command": "python3 tools/echo.py $(must-never-be-evaluated)",
+        "writes": writes,
+        "dispatch": descriptor,
+    }
 
-    def test_inventory_is_stable_json(self) -> None:
-        """Inventory output has one versioned row per normalized surface."""
-        payload = tool_dispatch.inventory(PROJECT_ROOT)
+
+class NativeToolDispatchTests(unittest.TestCase):
+    """Exercise native tool dispatch through its public JSON and process routes."""
+
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.root = self.base / "source"
+        self.tools = self.root / "tools"
+        self.tools.mkdir(parents=True)
+        self.target = self.base / "target"
+        self.target.mkdir()
+        self.control = self.base / "control"
+        self.runtime = self.control / "runtime"
+        self.runtime.mkdir(parents=True)
+        self.image_number = 0
+        (self.runtime / "state.json").write_text(
+            json.dumps({"targets": {"fixture": {"root": str(self.target)}}}),
+            encoding="utf-8",
+        )
+        self.captured_request = self.base / "request.json"
+        self._write_echo_tool()
+        self._write_bootstrap()
+        self.env = {
+            "PATH": os.environ.get("PATH", ""),
+            "AGENT_CANON_CONTROL_PARENT_ROOT": str(self.control),
+            "AGENT_CANON_RUNTIME_ROOT": str(self.runtime),
+            "AGENT_CANON_TARGET_ROOT": str(self.target),
+            "DISPATCH_TEST_SECRET": "must-not-be-forwarded",
+            "AGENT_CANON_SECRET": "must-not-be-forwarded",
+        }
+        self._write_catalog([_entry()])
+
+    def _write_echo_tool(self) -> None:
+        (self.tools / "echo.py").write_text(
+            "import json, os, signal, sys\n"
+            "payload = {\n"
+            "  'args': sys.argv[1:],\n"
+            "  'cwd': os.getcwd(),\n"
+            "  'secret': os.environ.get('DISPATCH_TEST_SECRET'),\n"
+            "  'git_config_count': os.environ.get('GIT_CONFIG_COUNT'),\n"
+            "  'git_config_key_0': os.environ.get('GIT_CONFIG_KEY_0'),\n"
+            "  'git_config_value_0': os.environ.get('GIT_CONFIG_VALUE_0'),\n"
+            "  'git_config_key_1': os.environ.get('GIT_CONFIG_KEY_1'),\n"
+            "  'stdin': sys.stdin.buffer.read().decode('utf-8'),\n"
+            "}\n"
+            "print(json.dumps(payload, sort_keys=True))\n"
+            "print('dispatch-stderr', file=sys.stderr)\n"
+            "if payload['args'][:1] == ['exit']:\n"
+            "    raise SystemExit(int(payload['args'][1]))\n"
+            "if payload['args'][:1] == ['signal']:\n"
+            "    os.kill(os.getpid(), signal.SIGTERM)\n",
+            encoding="utf-8",
+        )
+
+    def _write_bootstrap(self) -> None:
+        bootstrap = self.root / "bootstrap.sh"
+        bootstrap.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, pathlib, sys\n"
+            f"capture = pathlib.Path({str(self.captured_request)!r})\n"
+            "if '--request-json' in sys.argv:\n"
+            "    request = json.loads(sys.argv[sys.argv.index('--request-json') + 1])\n"
+            "    capture.write_text(json.dumps(request, sort_keys=True))\n"
+            "    if request['child_args'][:1] == ['exit']:\n"
+            "        raise SystemExit(int(request['child_args'][1]))\n"
+            "else:\n"
+            "    capture.write_text(json.dumps({'argv': sys.argv[1:]}))\n",
+            encoding="utf-8",
+        )
+        bootstrap.chmod(bootstrap.stat().st_mode | stat.S_IXUSR)
+
+    def _write_catalog(self, entries: list[dict[str, object]]) -> None:
+        (self.tools / "catalog.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "version": 1,
+                    "catalog_kind": "agent_canon_tool_catalog",
+                    "runtime_schema": {"version": 2},
+                    "entries": entries,
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    def _run(
+        self, *args: str, extra_env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        environment = dict(self.env)
+        if extra_env:
+            environment.update(extra_env)
+        return subprocess.run(
+            [str(_native_binary()), "tool", *args],
+            cwd=self.root,
+            env=environment,
+            check=False,
+            capture_output=True,
+        )
+
+    def _container_environment(self) -> dict[str, str]:
+        image_root = self.base / f"image-{self.image_number}"
+        self.image_number += 1
+        dependencies_root = image_root / "image-dependencies"
+        image_runtime = image_root / "runtime"
+        dependencies_root.mkdir(parents=True)
+        image_runtime.mkdir(parents=True)
+        container_marker = image_root / CONTAINER_MARKER_NAME
+        runtime_marker = image_runtime / RUNTIME_MARKER_NAME
+        plan = dependencies_root / "plan.json"
+        container_marker.write_bytes(CONTAINER_MARKER)
+        runtime_marker.write_bytes(RUNTIME_MARKER)
+        plan.write_text('{"schema":"agent-canon-test-image/v1"}\n', encoding="utf-8")
+        for marker in (container_marker, runtime_marker, plan):
+            marker.chmod(0o444)
+        return {
+            "AGENT_CANON_EXECUTION_PLANE": "tool-container",
+            "AGENT_CANON_IMAGE_ROOT": str(image_root),
+            "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(dependencies_root),
+            "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(self.root),
+            "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:"
+            + hashlib.sha256(CONTAINER_MARKER).hexdigest(),
+            "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
+            + hashlib.sha256(RUNTIME_MARKER).hexdigest(),
+        }
+
+    def test_inventory_is_a_stable_versioned_json_projection(self) -> None:
+        first = self._run("inventory", "--root", str(self.root), "--json")
+        second = self._run("inventory", "--root", str(self.root), "--json")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(first.stdout, second.stdout)
+        payload = json.loads(first.stdout)
         self.assertEqual(payload["schema"], "agent-canon-tool-inventory/v1")
-        rows = payload["entries"]
-        self.assertEqual(len(rows), len({row["id"] for row in rows}))
-        self.assertEqual(rows, sorted(rows, key=lambda row: row["id"]))
+        self.assertEqual(payload["catalog_runtime_schema"], 2)
+        self.assertEqual(payload["entries"][0]["id"], "echo")
+        self.assertEqual(payload["entries"][0]["argv"], ["python3", "tools/echo.py"])
+        self.assertEqual(payload["entries"][0]["cwd"], "target-root")
+        self.assertEqual(payload["entries"][0]["side_effect"], "read-only")
+        self.assertEqual(payload["entries"][0]["output_root"], "none")
 
-    def test_issue_sync_uses_resident_container_and_external_receipt_route(
+    def test_repository_inventory_keeps_native_and_python_dispatch_entries(
         self,
     ) -> None:
-        """Issue publication receipts use the registered container tool route."""
-        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        issue_sync = specs["issue-sync"]
-        self.assertEqual(
-            issue_sync.argv,
-            ("python3", "tools/repository/github/issue_sync.py"),
+        result = subprocess.run(
+            [
+                str(_native_binary()),
+                "tool",
+                "inventory",
+                "--root",
+                str(PROJECT_ROOT),
+                "--json",
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
         )
-        self.assertEqual(issue_sync.execution_plane, "tool-container")
-        self.assertEqual(issue_sync.cwd_policy, "target-root")
-        self.assertEqual(issue_sync.side_effect_policy, "external-artifact")
-        self.assertEqual(issue_sync.output_root, "external-runtime")
-
-    def test_issue_sync_rejects_online_issue_lookup_on_container_route(self) -> None:
-        """Online GitHub reads cannot cross the body-free receipt boundary."""
-        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        with self.assertRaisesRegex(
-            tool_dispatch.DispatchError, "container-route-restricted"
-        ):
-            tool_dispatch.run_tool(
-                PROJECT_ROOT,
-                specs["issue-sync"],
-                ("--issue-url", "https://github.com/owner/repo/issues/1"),
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entries = {entry["id"]: entry for entry in json.loads(result.stdout)["entries"]}
+        self.assertEqual(entries["quarto"]["runtime"], "native")
+        self.assertEqual(entries["quarto"]["argv"], ["quarto"])
+        self.assertEqual(
+            entries["quarto"]["path"],
+            "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
+        )
+        self.assertEqual(
+            entries["generate-agent-runtime-dashboard"]["runtime"], "python"
+        )
+        for entry in entries.values():
+            self.assertIn(entry["runtime"], {"python", "rust", "native"})
+            self.assertTrue(entry["argv"])
+            self.assertEqual(entry["execution_plane"], "tool-container")
+            self.assertIn(
+                entry["cwd"], {"source-root", "target-root", "task-root", "explicit"}
             )
-
-    def test_dashboard_uses_container_and_external_artifact_route(self) -> None:
-        """The canonical dashboard route keeps source read-only and output external."""
-        specs, _schema = tool_dispatch.load_specs(PROJECT_ROOT)
-        dashboard = specs["generate-agent-runtime-dashboard"]
+            self.assertIn(entry["env"], {"allowlisted", "clean"})
+            self.assertIn(
+                entry["side_effect"],
+                {"read-only", "external-artifact", "explicit-target-write"},
+            )
         self.assertEqual(
-            dashboard.argv,
-            ("python3", "eval/producers/generate_agent_runtime_dashboard.py"),
+            entries["issue-sync"]["argv"],
+            ["python3", "tools/repository/github/issue_sync.py"],
         )
-        self.assertEqual(dashboard.execution_plane, "tool-container")
-        self.assertEqual(dashboard.cwd_policy, "target-root")
-        self.assertEqual(dashboard.side_effect_policy, "external-artifact")
-        self.assertEqual(dashboard.output_root, "external-runtime")
-        self.assertEqual(dashboard.written_paths, ())
+        self.assertEqual(entries["issue-sync"]["output_root"], "external-runtime")
+        self.assertEqual(
+            entries["generate-agent-runtime-dashboard"]["side_effect"],
+            "external-artifact",
+        )
 
-    def test_dashboard_route_builds_typed_bootstrap_request(self) -> None:
-        """Dashboard dispatch starts at bootstrap, never at a host Python path."""
-        root = self._minimal_root(
+    def test_run_builds_typed_bootstrap_request_without_shell_splitting(self) -> None:
+        result = self._run(
+            "run",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            "two words",
+            "$(touch marker)",
+            extra_env={
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": "color.ui",
+                "GIT_CONFIG_VALUE_0": "always",
+                "GIT_CONFIG_KEY_1": "safe.directory",
+                "GIT_CONFIG_VALUE_1": "*",
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        request = json.loads(self.captured_request.read_text(encoding="utf-8"))
+        self.assertEqual(request["schema"], "agent-canon.tool-exec-request.v1")
+        self.assertEqual(request["tool_id"], "echo")
+        self.assertEqual(request["source_root"], str(self.root))
+        self.assertEqual(
+            request["argv"],
+            ["python3", "tools/echo.py", "two words", "$(touch marker)"],
+        )
+        self.assertEqual(request["child_args"], ["two words", "$(touch marker)"])
+        self.assertEqual(request["cwd"], str(self.target))
+        self.assertEqual(request["cwd_policy"], "target-root")
+        self.assertEqual(request["target_root"], str(self.target))
+        self.assertEqual(request["stdin"], "captured")
+        self.assertEqual(request["stdout"], "captured")
+        self.assertEqual(request["stderr"], "captured")
+        self.assertEqual(request["exit"], "propagate")
+        self.assertEqual(request["signal"], "propagate")
+        self.assertEqual(request["environment"]["GIT_CONFIG_COUNT"], "1")
+        self.assertEqual(request["environment"]["GIT_CONFIG_KEY_0"], "safe.directory")
+        self.assertEqual(request["environment"]["GIT_CONFIG_VALUE_0"], str(self.target))
+        self.assertNotIn("command", request)
+        self.assertNotIn("DISPATCH_TEST_SECRET", request["environment"])
+        self.assertNotIn("AGENT_CANON_SECRET", request["environment"])
+        self.assertNotIn("GIT_CONFIG_KEY_1", request["environment"])
+        self.assertEqual(request["environment"]["GIT_CONFIG_COUNT"], "1")
+        self.assertEqual(
+            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "python"
+        )
+
+    def test_native_descriptor_uses_the_same_typed_bootstrap_envelope(self) -> None:
+        self._write_catalog(
+            [
+                _entry(
+                    path="documents/native-command.md",
+                    dispatch={
+                        "runtime": "native",
+                        "argv": ["quarto"],
+                        "cwd": "target-root",
+                        "env": "allowlisted",
+                        "stdin": "inherited",
+                        "stdout": "inherited",
+                        "stderr": "inherited",
+                        "exit": "propagate",
+                        "signal": "propagate",
+                        "side_effect": "external-artifact",
+                        "output_root": "external-runtime",
+                        "written_paths": [],
+                    },
+                )
+            ]
+        )
+        output_root = self.runtime / "tool-output"
+        result = self._run(
+            "run",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            "pandoc",
+            "paper.md",
+            extra_env={"AGENT_CANON_OUTPUT_ROOT": str(output_root)},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        request = json.loads(self.captured_request.read_text(encoding="utf-8"))
+        self.assertEqual(request["argv"], ["quarto", "pandoc", "paper.md"])
+        self.assertEqual(request["child_args"], ["pandoc", "paper.md"])
+        self.assertEqual(
+            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "native"
+        )
+        self.assertEqual(request["side_effect"], "external-artifact")
+        self.assertEqual(request["output_root"], str(output_root))
+        self.assertNotIn("runtime", request)
+
+    def test_host_dispatch_forwards_bootstrap_exit_status(self) -> None:
+        result = self._run("run", "--root", str(self.root), "echo", "--", "exit", "7")
+        self.assertEqual(result.returncode, 7)
+
+    def test_rust_cli_route_uses_registered_target_and_forwards_argv(self) -> None:
+        result = self._run(
+            "rust-cli", "--root", str(self.root), "--", "--version", "two words"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        request = json.loads(self.captured_request.read_text(encoding="utf-8"))
+        self.assertEqual(
+            request["argv"],
+            [
+                "--control-parent-root",
+                str(self.control),
+                "--runtime-root",
+                str(self.runtime),
+                "exec",
+                "--root",
+                str(self.target),
+                "--",
+                "agent-canon",
+                "--version",
+                "two words",
+            ],
+        )
+
+    def test_issue_sync_accepts_only_receipt_operations(self) -> None:
+        self._write_catalog([_entry("issue-sync", path="tools/issue_sync.py")])
+        rejected = self._run(
+            "run", "--root", str(self.root), "issue-sync", "--", "--issues"
+        )
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-route-restricted:", rejected.stderr
+        )
+        self.assertFalse(self.captured_request.exists())
+        accepted = self._run(
+            "run",
+            "--root",
+            str(self.root),
+            "issue-sync",
+            "--",
+            "--receipt-preflight",
+            "--repo",
+            "iwashita-nozomu/agent-canon",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        request = json.loads(self.captured_request.read_text(encoding="utf-8"))
+        self.assertEqual(request["child_args"][0], "--receipt-preflight")
+
+    def test_catalog_validation_fails_closed_for_shell_strings_missing_dispatch_and_duplicates(
+        self,
+    ) -> None:
+        self._write_catalog([_entry(argv="python3 tools/echo.py")])
+        shell_string = self._run("inventory", "--root", str(self.root), "--json")
+        self.assertEqual(shell_string.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=shell-string-rejected:", shell_string.stderr
+        )
+
+        entry = _entry()
+        del entry["dispatch"]
+        self._write_catalog([entry])
+        missing_dispatch = self._run("inventory", "--root", str(self.root), "--json")
+        self.assertEqual(missing_dispatch.returncode, 2)
+        self.assertIn(b"TOOL_DISPATCH_ERROR=missing-dispatch:", missing_dispatch.stderr)
+
+        self._write_catalog([_entry(), _entry()])
+        duplicate = self._run("inventory", "--root", str(self.root), "--json")
+        self.assertEqual(duplicate.returncode, 2)
+        self.assertIn(b"TOOL_DISPATCH_ERROR=duplicate-id:echo", duplicate.stderr)
+
+    def test_cli_errors_retain_explicit_runtime_and_argument_boundaries(self) -> None:
+        no_runtime = subprocess.run(
+            [
+                str(_native_binary()),
+                "tool",
+                "run",
+                "--root",
+                str(self.root),
+                "echo",
+                "--",
+            ],
+            cwd=self.root,
+            env={"PATH": self.env["PATH"]},
+            check=False,
+            capture_output=True,
+        )
+        self.assertEqual(no_runtime.returncode, 2)
+        self.assertIn(b"TOOL_DISPATCH_ERROR=runtime-root-required:", no_runtime.stderr)
+        missing_delimiter = self._run("run", "--root", str(self.root), "echo")
+        self.assertEqual(missing_delimiter.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=missing-argument-delimiter:echo",
+            missing_delimiter.stderr,
+        )
+        unknown_option = self._run("run", "--root", str(self.root), "--unknown")
+        self.assertEqual(unknown_option.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=unknown-option:--unknown", unknown_option.stderr
+        )
+        unknown_id = self._run("run", "--root", str(self.root), "missing", "--")
+        self.assertEqual(unknown_id.returncode, 2)
+        self.assertIn(b"TOOL_DISPATCH_ERROR=unknown-id:missing", unknown_id.stderr)
+
+    def test_container_dispatch_authenticates_markers_and_uses_registered_target(
+        self,
+    ) -> None:
+        environment = self._container_environment()
+        environment["AGENT_CANON_OUTPUT_ROOT"] = ""
+        environment["AGENT_CANON_TARGET_ROOT"] = str(self.target)
+        self._write_catalog(
+            [
+                _entry(
+                    dispatch={
+                        "runtime": "python",
+                        "argv": ["python3", "tools/echo.py"],
+                        "cwd": "target-root",
+                        "env": "clean",
+                        "stdin": "captured",
+                        "stdout": "captured",
+                        "stderr": "captured",
+                        "exit": "propagate",
+                        "signal": "propagate",
+                        "side_effect": "read-only",
+                        "output_root": "none",
+                        "written_paths": [],
+                    }
+                )
+            ]
+        )
+        environment.pop("AGENT_CANON_OUTPUT_ROOT")
+        result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            "two words",
+            "tools/relative-child.txt",
+            extra_env={
+                **environment,
+                "GIT_CONFIG_COUNT": "2",
+                "GIT_CONFIG_KEY_0": "color.ui",
+                "GIT_CONFIG_VALUE_0": "always",
+                "GIT_CONFIG_KEY_1": "safe.directory",
+                "GIT_CONFIG_VALUE_1": "*",
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["args"], ["two words", "tools/relative-child.txt"])
+        self.assertEqual(payload["cwd"], str(self.target))
+        self.assertIsNone(payload["secret"])
+        self.assertEqual(payload["git_config_count"], "1")
+        self.assertEqual(payload["git_config_key_0"], "safe.directory")
+        self.assertEqual(payload["git_config_value_0"], str(self.target))
+        self.assertIsNone(payload["git_config_key_1"])
+        self.assertEqual(payload["stdin"], "")
+        self.assertEqual(result.stderr, b"dispatch-stderr\n")
+
+    def test_container_execution_requires_the_authenticated_plane(self) -> None:
+        environment = self._container_environment()
+        environment.pop("AGENT_CANON_EXECUTION_PLANE")
+        result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            extra_env=environment,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-exec-not-authorized:", result.stderr
+        )
+
+    def test_container_dispatch_propagates_exit_and_signal_status(self) -> None:
+        environment = self._container_environment()
+        read_only = _entry()
+        self._write_catalog([read_only])
+        exit_result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            "exit",
+            "9",
+            extra_env=environment,
+        )
+        self.assertEqual(exit_result.returncode, 9)
+        signal_result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            "signal",
+            extra_env=environment,
+        )
+        self.assertEqual(signal_result.returncode, 128 + signal.SIGTERM)
+
+    def test_container_dispatch_rejects_spoofed_or_writable_markers(self) -> None:
+        environment = self._container_environment()
+        environment["AGENT_CANON_IMAGE_MARKER_DIGEST"] = "sha256:" + "0" * 64
+        spoofed = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            extra_env=environment,
+        )
+        self.assertEqual(spoofed.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-marker-digest-mismatch:image",
+            spoofed.stderr,
+        )
+
+        environment = self._container_environment()
+        image_marker = (
+            Path(environment["AGENT_CANON_IMAGE_ROOT"]) / CONTAINER_MARKER_NAME
+        )
+        image_marker.chmod(0o644)
+        writable = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            extra_env=environment,
+        )
+        self.assertEqual(writable.returncode, 2)
+        self.assertIn(
+            b"TOOL_DISPATCH_ERROR=container-marker-writable:", writable.stderr
+        )
+
+    def test_external_artifact_output_root_is_created_only_inside_runtime(self) -> None:
+        environment = self._container_environment()
+        output = self.runtime / "tool-output"
+        environment["AGENT_CANON_OUTPUT_ROOT"] = str(output)
+        descriptor = _entry(
+            writes=True,
             dispatch={
                 "runtime": "python",
-                "argv": [
-                    "python3",
-                    "eval/producers/generate_agent_runtime_dashboard.py",
-                ],
-                "execution_plane": "tool-container",
+                "argv": ["python3", "tools/echo.py"],
                 "cwd": "target-root",
                 "env": "allowlisted",
                 "stdin": "inherited",
@@ -162,558 +628,19 @@ class ToolDispatchTest(unittest.TestCase):
                 "output_root": "external-runtime",
                 "written_paths": [],
             },
-            tool_id="generate-agent-runtime-dashboard",
-            path="eval/producers/generate_agent_runtime_dashboard.py",
         )
-        output_root = root / "control" / "runtime" / "reports"
-        output_root.mkdir()
-        previous_target_digest = os.environ.pop("AGENT_CANON_TARGET_DIGEST", None)
-        self.addCleanup(
-            self._restore_optional_environment,
-            "AGENT_CANON_TARGET_DIGEST",
-            previous_target_digest,
+        self._write_catalog([descriptor])
+        result = self._run(
+            "run",
+            "--container-exec",
+            "--root",
+            str(self.root),
+            "echo",
+            "--",
+            extra_env=environment,
         )
-        previous_output_root = os.environ.get("AGENT_CANON_OUTPUT_ROOT")
-        self.addCleanup(
-            self._restore_optional_environment,
-            "AGENT_CANON_OUTPUT_ROOT",
-            previous_output_root,
-        )
-        os.environ["AGENT_CANON_OUTPUT_ROOT"] = str(output_root)
-        with patch(
-            "tools.runtime.dispatch.tool_dispatch.subprocess.run",
-            return_value=subprocess.CompletedProcess([], 0),
-        ) as run:
-            status = tool_dispatch.run_tool(
-                root,
-                tool_dispatch.load_specs(root)[0]["generate-agent-runtime-dashboard"],
-                (
-                    "--root",
-                    ".",
-                    "--compact-out",
-                    "reports/agent-runtime-dashboard/compact.md",
-                    "--api-out",
-                    "reports/agent-runtime-dashboard/api.json",
-                ),
-            )
-
-        self.assertEqual(status, 0)
-        command = run.call_args.args[0]
-        request = json.loads(command[command.index("--request-json") + 1])
-        self.assertEqual(command[0], str(root / "bootstrap.sh"))
-        digest_index = command.index("--target-digest")
-        self.assertEqual(
-            command[digest_index + 1],
-            hashlib.sha256(str(root).encode("utf-8")).hexdigest(),
-        )
-        self.assertEqual(request["tool_id"], "generate-agent-runtime-dashboard")
-        self.assertEqual(request["side_effect"], "external-artifact")
-        self.assertEqual(request["output_root"], str(output_root))
-        self.assertEqual(
-            request["argv"],
-            [
-                "python3",
-                "eval/producers/generate_agent_runtime_dashboard.py",
-                "--root",
-                ".",
-                "--compact-out",
-                "reports/agent-runtime-dashboard/compact.md",
-                "--api-out",
-                "reports/agent-runtime-dashboard/api.json",
-            ],
-        )
-
-    def test_dashboard_container_route_selects_container_executor(self) -> None:
-        """The typed dashboard route is delegated to the resident container."""
-        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0][
-            "generate-agent-runtime-dashboard"
-        ]
-        with patch.object(
-            tool_dispatch, "_run_container_spec", return_value=0
-        ) as container_run:
-            status = tool_dispatch.run_container_tool(
-                PROJECT_ROOT,
-                spec,
-                ("--help",),
-            )
-
-        self.assertEqual(status, 0)
-        container_run.assert_called_once_with(PROJECT_ROOT, spec, ("--help",))
-
-    def test_native_tool_route_selects_container_executor(self) -> None:
-        """Native catalog runtimes use the same authenticated container route."""
-        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
-        with patch.object(
-            tool_dispatch, "_run_container_spec", return_value=0
-        ) as container_run:
-            status = tool_dispatch.run_container_tool(
-                PROJECT_ROOT,
-                spec,
-                ("pandoc", "--version"),
-            )
-
-        self.assertEqual(status, 0)
-        container_run.assert_called_once_with(
-            PROJECT_ROOT, spec, ("pandoc", "--version")
-        )
-
-    def test_native_runtime_does_not_require_a_python_or_rust_source_path(self) -> None:
-        """A native executable can use its existing catalog owner document path."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "native",
-                "argv": ["quarto"],
-            },
-            path="documents/native-command.md",
-        )
-
-        spec = tool_dispatch.load_specs(root)[0]["echo"]
-
-        self.assertEqual(spec.runtime, "native")
-        self.assertEqual(spec.path, "documents/native-command.md")
-
-    def test_native_tool_builds_the_existing_typed_bootstrap_request(self) -> None:
-        """The host route carries a native argv through the existing request envelope."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "native",
-                "argv": ["quarto"],
-                "output_root": "external-runtime",
-                "side_effect": "external-artifact",
-            },
-            path="documents/native-command.md",
-        )
-        spec = tool_dispatch.load_specs(root)[0]["echo"]
-        runtime = Path(os.environ["AGENT_CANON_RUNTIME_ROOT"])
-        target = Path(os.environ["AGENT_CANON_TARGET_ROOT"])
-        output = runtime / "tool-output"
-
-        command, environment = tool_dispatch._bootstrap_command(
-            root,
-            runtime,
-            spec,
-            ("pandoc", "paper.md"),
-            target,
-            output,
-        )
-        request = json.loads(command[command.index("--request-json") + 1])
-
-        self.assertNotIn("runtime", request)
-        self.assertEqual(request["argv"], ["quarto", "pandoc", "paper.md"])
-        self.assertEqual(request["child_args"], ["pandoc", "paper.md"])
-        self.assertEqual(
-            request["environment"]["AGENT_CANON_DISPATCH_RUNTIME"], "native"
-        )
-        self.assertEqual(environment["AGENT_CANON_RUNTIME_ROOT"], str(runtime))
-
-    def test_native_arguments_remain_relative_to_registered_target(self) -> None:
-        """Only catalog-owned source paths are rebased into the image source."""
-        spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["quarto"]
-        args = ("pandoc", "--bibliography", "tools/catalog.yaml")
-
-        self.assertEqual(
-            tool_dispatch._resolve_container_argv(PROJECT_ROOT, spec, args),
-            ["quarto", *args],
-        )
-
-    def test_unknown_dispatch_option_is_rejected_before_catalog_lookup(self) -> None:
-        """Dispatcher options cannot be smuggled into a child command."""
-        error = io.StringIO()
-        with contextlib.redirect_stderr(error):
-            status = tool_dispatch.main(
-                ("run", "--not-a-dispatch-option", "route", "--")
-            )
-        self.assertEqual(status, 2)
-        self.assertIn("unknown-option", error.getvalue())
-
-    def test_cli_requires_explicit_external_runtime(self) -> None:
-        """The public route cannot fall back to source-local cache state."""
-        root_environment = (
-            "AGENT_CANON_CONTROL_PARENT_ROOT",
-            "AGENT_CANON_RUNTIME_ROOT",
-            "AGENT_CANON_TARGET_ROOT",
-            "AGENT_CANON_MOUNT_REGISTRY",
-            "AGENT_CANON_OUTPUT_ROOT",
-        )
-        previous = {key: os.environ.get(key) for key in root_environment}
-        try:
-            for key in root_environment:
-                os.environ.pop(key, None)
-            error = io.StringIO()
-            with contextlib.redirect_stderr(error):
-                status = tool_dispatch.main(("run", "route", "--", "--help"))
-        finally:
-            self._restore_environment(previous)
-        self.assertEqual(status, 2)
-        self.assertIn("runtime-root-required", error.getvalue())
-
-    def test_child_arguments_are_not_shell_split(self) -> None:
-        """The child delimiter preserves an argument containing whitespace."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-            }
-        )
-        marker = root / "argument.json"
-        (root / "tools" / "echo.py").write_text(
-            "import json, pathlib, sys\n"
-            "pathlib.Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))\n",
-            encoding="utf-8",
-        )
-        status = tool_dispatch.run_tool(
-            root,
-            tool_dispatch.load_specs(root)[0]["echo"],
-            (str(marker), "a value", "--literal"),
-        )
-        self.assertEqual(status, 0)
-        self.assertEqual(
-            json.loads(marker.read_text(encoding="utf-8")), ["a value", "--literal"]
-        )
-
-    def test_shell_string_descriptor_is_rejected(self) -> None:
-        """A string argv cannot become dispatcher authority."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": "python3 tools/echo.py",
-            }
-        )
-        with self.assertRaisesRegex(
-            tool_dispatch.DispatchError, "shell-string-rejected"
-        ):
-            tool_dispatch.load_specs(root)
-
-    def test_missing_dispatch_fails_before_execution(self) -> None:
-        """An executable catalog entry must declare an explicit argv route."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-            }
-        )
-        catalog_path = root / "tools/catalog.yaml"
-        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-        catalog["entries"][0].pop("dispatch")
-        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-        with self.assertRaisesRegex(tool_dispatch.DispatchError, "missing-dispatch"):
-            tool_dispatch.load_specs(root)
-
-    def test_command_display_metadata_is_never_tokenized(self) -> None:
-        """Shell-looking display metadata cannot alter the explicit argv route."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-            }
-        )
-        catalog_path = root / "tools/catalog.yaml"
-        catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
-        catalog["entries"][0]["command"] = (
-            "python3 tools/echo.py | touch SHOULD_NOT_EXIST"
-        )
-        catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
-        specs, _ = tool_dispatch.load_specs(root)
-        self.assertEqual(specs["echo"].argv, ("python3", "tools/echo.py"))
-
-    def test_unknown_agent_canon_environment_is_not_forwarded(self) -> None:
-        """The dispatcher uses exact names, never an AGENT_CANON_* wildcard."""
-        root = self._minimal_root(
-            dispatch={
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-            }
-        )
-        previous = os.environ.get("AGENT_CANON_SECRET")
-        os.environ["AGENT_CANON_SECRET"] = "canary"
-        try:
-            tool_dispatch.run_tool(root, tool_dispatch.load_specs(root)[0]["echo"], ())
-        finally:
-            if previous is None:
-                os.environ.pop("AGENT_CANON_SECRET", None)
-            else:
-                os.environ["AGENT_CANON_SECRET"] = previous
-        self.assertNotIn(
-            "AGENT_CANON_SECRET",
-            tool_dispatch._environment(
-                root,
-                tool_dispatch.load_specs(root)[0]["echo"],
-                root / "control/runtime",
-                None,
-            ),
-        )
-
-    def test_container_exec_requires_authenticated_image_and_runtime(self) -> None:
-        """The explicit container route executes locally only after marker checks."""
-        image, root, control, runtime = self._container_root()
-        previous = {
-            key: os.environ.get(key)
-            for key in (
-                "AGENT_CANON_EXECUTION_PLANE",
-                "AGENT_CANON_CONTAINER_USER",
-                "AGENT_CANON_IMAGE_ROOT",
-                "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT",
-                "AGENT_CANON_RUNTIME_TOOLS_ROOT",
-                "AGENT_CANON_IMAGE_MARKER_DIGEST",
-                "AGENT_CANON_RUNTIME_MARKER_DIGEST",
-                "AGENT_CANON_CONTROL_PARENT_ROOT",
-                "AGENT_CANON_RUNTIME_ROOT",
-                "AGENT_CANON_TARGET_ROOT",
-            )
-        }
-        try:
-            os.environ.update(
-                {
-                    "AGENT_CANON_EXECUTION_PLANE": "tool-container",
-                    "AGENT_CANON_CONTAINER_USER": "agentcanon",
-                    "AGENT_CANON_IMAGE_ROOT": str(image),
-                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(
-                        image / "image-dependencies"
-                    ),
-                    "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
-                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:"
-                    + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
-                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
-                    + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
-                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
-                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
-                }
-            )
-            status = tool_dispatch.main(
-                (
-                    "--container-exec",
-                    "--root",
-                    str(root),
-                    "run",
-                    "echo",
-                    "--",
-                    "a value",
-                )
-            )
-            self.assertEqual(status, 0)
-        finally:
-            self._restore_environment(previous)
-
-    def test_container_exec_rejects_spoofed_plane_or_marker(self) -> None:
-        """A spoofed execution-plane variable cannot activate local execution."""
-        _image, root, control, runtime = self._container_root()
-        previous = {
-            key: os.environ.get(key)
-            for key in (
-                "AGENT_CANON_EXECUTION_PLANE",
-                "AGENT_CANON_CONTAINER_USER",
-                "AGENT_CANON_IMAGE_ROOT",
-                "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT",
-                "AGENT_CANON_RUNTIME_TOOLS_ROOT",
-                "AGENT_CANON_IMAGE_MARKER_DIGEST",
-                "AGENT_CANON_RUNTIME_MARKER_DIGEST",
-                "AGENT_CANON_CONTROL_PARENT_ROOT",
-                "AGENT_CANON_RUNTIME_ROOT",
-            )
-        }
-        try:
-            os.environ.update(
-                {
-                    "AGENT_CANON_EXECUTION_PLANE": "host",
-                    "AGENT_CANON_CONTAINER_USER": "agentcanon",
-                    "AGENT_CANON_IMAGE_ROOT": str(_image),
-                    "AGENT_CANON_IMAGE_DEPENDENCIES_ROOT": str(
-                        _image / "image-dependencies"
-                    ),
-                    "AGENT_CANON_RUNTIME_TOOLS_ROOT": str(root),
-                    "AGENT_CANON_IMAGE_MARKER_DIGEST": "sha256:" + "0" * 64,
-                    "AGENT_CANON_RUNTIME_MARKER_DIGEST": "sha256:"
-                    + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
-                    "AGENT_CANON_CONTROL_PARENT_ROOT": str(control),
-                    "AGENT_CANON_RUNTIME_ROOT": str(runtime),
-                }
-            )
-            with self.assertRaisesRegex(
-                tool_dispatch.DispatchError, "container-exec-not-authorized"
-            ):
-                tool_dispatch._validate_container_context(root)
-            os.environ["AGENT_CANON_EXECUTION_PLANE"] = "tool-container"
-            with self.assertRaisesRegex(
-                tool_dispatch.DispatchError, "container-marker-digest-mismatch"
-            ):
-                tool_dispatch._validate_container_context(root)
-        finally:
-            self._restore_environment(previous)
-
-    def test_duplicate_ids_fail_closed(self) -> None:
-        """Duplicate IDs cannot select an ambiguous execution target."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "tools").mkdir()
-            (root / "tools/echo.py").write_text("print('ok')\n", encoding="utf-8")
-            catalog = self._catalog(
-                [
-                    self._entry("echo"),
-                    self._entry("echo"),
-                ]
-            )
-            (root / "tools/catalog.yaml").write_text(
-                yaml.safe_dump(catalog), encoding="utf-8"
-            )
-            with self.assertRaisesRegex(tool_dispatch.DispatchError, "duplicate-id"):
-                tool_dispatch.load_specs(root)
-
-    def _entry(
-        self,
-        tool_id: str,
-        dispatch: dict[str, object] | None = None,
-        path: str = "tools/echo.py",
-    ) -> dict[str, object]:
-        """Build one minimal public entry for a fixture repository."""
-        return {
-            "id": tool_id,
-            "path": path,
-            "summary": "fixture",
-            "family": "agent_tools",
-            "role": "helper",
-            "status": "canonical",
-            "command": "python3 tools/echo.py",
-            "writes": False,
-            "dispatch": dispatch
-            or {
-                "runtime": "python",
-                "argv": ["python3", "tools/echo.py"],
-            },
-        }
-
-    def _catalog(self, entries: list[dict[str, object]]) -> dict[str, object]:
-        """Build the smallest v2 runtime catalog."""
-        return {
-            "version": 1,
-            "catalog_kind": "agent_canon_tool_catalog",
-            "runtime_schema": {
-                "version": 2,
-            },
-            "entries": entries,
-        }
-
-    def _minimal_root(
-        self,
-        dispatch: dict[str, object],
-        *,
-        tool_id: str = "echo",
-        path: str = "tools/echo.py",
-    ) -> Path:
-        """Create a temporary public-tool fixture root."""
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        root = Path(temporary.name)
-        (root / "tools").mkdir()
-        tool_path = root / path
-        tool_path.parent.mkdir(parents=True, exist_ok=True)
-        tool_path.write_text("print('ok')\n", encoding="utf-8")
-        bootstrap = root / "bootstrap.sh"
-        bootstrap.write_text(
-            "#!/usr/bin/env python3\n"
-            "import json, os, subprocess, sys\n"
-            "request = json.loads(sys.argv[sys.argv.index('--request-json') + 1])\n"
-            "env = os.environ.copy(); env.update(request['environment'])\n"
-            "raise SystemExit(subprocess.run(request['argv'], cwd=request['cwd'], env=env).returncode)\n",
-            encoding="utf-8",
-        )
-        bootstrap.chmod(bootstrap.stat().st_mode | stat.S_IXUSR)
-        control = root / "control"
-        runtime = control / "runtime"
-        runtime.mkdir(parents=True)
-        previous = {
-            key: os.environ.get(key)
-            for key in (
-                "AGENT_CANON_CONTROL_PARENT_ROOT",
-                "AGENT_CANON_RUNTIME_ROOT",
-                "AGENT_CANON_TARGET_ROOT",
-                "AGENT_CANON_MOUNT_REGISTRY",
-                "AGENT_CANON_OUTPUT_ROOT",
-            )
-        }
-        self.addCleanup(self._restore_environment, previous)
-        os.environ["AGENT_CANON_CONTROL_PARENT_ROOT"] = str(control)
-        os.environ["AGENT_CANON_RUNTIME_ROOT"] = str(runtime)
-        os.environ["AGENT_CANON_TARGET_ROOT"] = str(root)
-        # The fixture's state.json owns its targets; do not inherit the
-        # resident's read-only mount registry for a different checkout.
-        os.environ.pop("AGENT_CANON_MOUNT_REGISTRY", None)
-        os.environ.pop("AGENT_CANON_OUTPUT_ROOT", None)
-        (runtime / "state.json").write_text(
-            json.dumps({"targets": {"fixture": {"root": str(root)}}}),
-            encoding="utf-8",
-        )
-        (root / "tools/catalog.yaml").write_text(
-            yaml.safe_dump(self._catalog([self._entry(tool_id, dispatch, path)])),
-            encoding="utf-8",
-        )
-        return root
-
-    def _container_root(self) -> tuple[Path, Path, Path, Path]:
-        """Create a read-only image/runtime fixture with immutable markers."""
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        base = Path(temporary.name)
-        image = base / "image"
-        root = image / "runtime"
-        (root / "tools").mkdir(parents=True)
-        (root / "tools/echo.py").write_text(
-            "import sys; print(*sys.argv[1:])\n", encoding="utf-8"
-        )
-        (root / "tools/catalog.yaml").write_text(
-            yaml.safe_dump(
-                self._catalog(
-                    [
-                        self._entry(
-                            "echo",
-                            {
-                                "runtime": "python",
-                                "argv": ["python3", "tools/echo.py"],
-                            },
-                        )
-                    ]
-                )
-            ),
-            encoding="utf-8",
-        )
-        dependencies = image / "image-dependencies"
-        dependencies.mkdir(parents=True)
-        (dependencies / "plan.json").write_text(
-            '{"schema":"fixture"}\n', encoding="utf-8"
-        )
-        (image / tool_dispatch.CONTAINER_MARKER_NAME).write_bytes(
-            tool_dispatch.CONTAINER_MARKER
-        )
-        (root / tool_dispatch.RUNTIME_MARKER_NAME).write_bytes(
-            tool_dispatch.RUNTIME_MARKER
-        )
-        for path in (
-            image / tool_dispatch.CONTAINER_MARKER_NAME,
-            root / tool_dispatch.RUNTIME_MARKER_NAME,
-            dependencies / "plan.json",
-        ):
-            path.chmod(0o444)
-        root.chmod(0o555)
-        control = base / "control"
-        runtime = control / "runtime"
-        runtime.mkdir(parents=True)
-        return image, root, control, runtime
-
-    @staticmethod
-    def _restore_environment(previous: dict[str, str | None]) -> None:
-        """Restore process environment after a fake bootstrap run."""
-        for key, value in previous.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
-
-    @staticmethod
-    def _restore_optional_environment(key: str, value: str | None) -> None:
-        """Restore one optional environment variable after a focused test."""
-        if value is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = value
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(output.is_dir())
 
 
 def _native_vl_convert_route(
@@ -739,12 +666,12 @@ def _native_vl_convert_route(
         directory.mkdir(parents=True, exist_ok=True)
 
     marker_paths = (
-        image_root / tool_dispatch.CONTAINER_MARKER_NAME,
-        image_runtime / tool_dispatch.RUNTIME_MARKER_NAME,
+        image_root / CONTAINER_MARKER_NAME,
+        image_runtime / RUNTIME_MARKER_NAME,
         dependencies_root / "plan.json",
     )
-    marker_paths[0].write_bytes(tool_dispatch.CONTAINER_MARKER)
-    marker_paths[1].write_bytes(tool_dispatch.RUNTIME_MARKER)
+    marker_paths[0].write_bytes(CONTAINER_MARKER)
+    marker_paths[1].write_bytes(RUNTIME_MARKER)
     marker_paths[2].write_text(
         '{"schema":"agent-canon-test-image/v1"}\n', encoding="utf-8"
     )
@@ -761,11 +688,11 @@ def _native_vl_convert_route(
     monkeypatch.setenv("AGENT_CANON_RUNTIME_TOOLS_ROOT", str(PROJECT_ROOT))
     monkeypatch.setenv(
         "AGENT_CANON_IMAGE_MARKER_DIGEST",
-        "sha256:" + hashlib.sha256(tool_dispatch.CONTAINER_MARKER).hexdigest(),
+        "sha256:" + hashlib.sha256(CONTAINER_MARKER).hexdigest(),
     )
     monkeypatch.setenv(
         "AGENT_CANON_RUNTIME_MARKER_DIGEST",
-        "sha256:" + hashlib.sha256(tool_dispatch.RUNTIME_MARKER).hexdigest(),
+        "sha256:" + hashlib.sha256(RUNTIME_MARKER).hexdigest(),
     )
     monkeypatch.setenv("AGENT_CANON_CONTROL_PARENT_ROOT", str(control_root))
     monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
@@ -779,13 +706,11 @@ def _native_vl_convert_route(
 def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
     tmp_path: Path,
     monkeypatch,
-    capfd,
 ) -> None:
     """The native renderer emits SVG and preserves its invalid-input failure."""
-    target_root, runtime_root, output_root = _native_vl_convert_route(
+    target_root, _runtime_root, output_root = _native_vl_convert_route(
         tmp_path, monkeypatch
     )
-    spec = tool_dispatch.load_specs(PROJECT_ROOT)[0]["vl-convert"]
     input_path = target_root / "figure.vl.json"
     input_path.write_text(
         json.dumps(
@@ -800,10 +725,16 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
         encoding="utf-8",
     )
     output_path = output_root / "figure.svg"
-    rendered = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
-        (
+    rendered = subprocess.run(
+        [
+            str(_native_binary()),
+            "tool",
+            "run",
+            "--container-exec",
+            "--root",
+            str(PROJECT_ROOT),
+            "vl-convert",
+            "--",
             "vl2svg",
             "--input",
             input_path.name,
@@ -811,9 +742,12 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
             str(output_path),
             "--vl-version",
             "6.1",
-        ),
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
     )
-    assert rendered == 0
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
     rendered_svg = output_path.read_bytes()
     assert b"<svg" in rendered_svg[:512]
     assert b"renderer smoke" in rendered_svg
@@ -821,10 +755,16 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
     invalid_path = target_root / "invalid.vl.json"
     invalid_path.write_text("{", encoding="utf-8")
     failed_output = output_root / "invalid.svg"
-    failure_status = tool_dispatch.run_container_tool(
-        PROJECT_ROOT,
-        spec,
-        (
+    failed = subprocess.run(
+        [
+            str(_native_binary()),
+            "tool",
+            "run",
+            "--container-exec",
+            "--root",
+            str(PROJECT_ROOT),
+            "vl-convert",
+            "--",
             "vl2svg",
             "--input",
             invalid_path.name,
@@ -832,11 +772,13 @@ def test_vl_convert_renders_selected_spec_and_propagates_invalid_input(
             str(failed_output),
             "--vl-version",
             "6.1",
-        ),
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
     )
-    failure_output = capfd.readouterr()
-    assert failure_status != 0
-    assert failure_output.err or failure_output.out
+    assert failed.returncode != 0
+    assert failed.stdout or failed.stderr
     assert not failed_output.exists()
 
 

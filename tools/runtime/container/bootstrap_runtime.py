@@ -2205,21 +2205,46 @@ class BootstrapRuntime:
             # continue to receive no output capability at all.
             environment = {}
             try:
-                from ..dispatch.tool_dispatch import load_specs  # type: ignore[import-not-found]
-            except ImportError:
-                from tools.runtime.dispatch.tool_dispatch import load_specs  # type: ignore[no-redef]
-            try:
-                specs, _schema = load_specs(self.repository_root)
-                spec = specs.get(catalog_id)
+                native_cli = self.paths.cache / "bin" / "agent-canon"
+                completed = subprocess.run(
+                    [
+                        str(native_cli),
+                        "tool",
+                        "inventory",
+                        "--root",
+                        str(self.repository_root),
+                        "--json",
+                    ],
+                    cwd=self.repository_root,
+                    env={},
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if completed.returncode != 0:
+                    raise ValueError("native tool inventory failed")
+                inventory = json.loads(completed.stdout)
+                entries = inventory["entries"]
+                if not isinstance(entries, list):
+                    raise TypeError("native tool inventory entries are invalid")
+                spec = next(
+                    (
+                        entry
+                        for entry in entries
+                        if isinstance(entry, dict) and entry.get("id") == catalog_id
+                    ),
+                    None,
+                )
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 raise BootstrapError(
                     "tool_catalog_invalid", "cannot resolve tool output capability"
                 ) from exc
-            if spec is not None and spec.output_root == "external-runtime":
+            if spec is not None and spec.get("output_root") == "external-runtime":
                 environment = {
                     "AGENT_CANON_OUTPUT_ROOT": f"{CONTAINER_RUNTIME_DESTINATION}/tool-output"
                 }
-            elif spec is not None and spec.output_root == "explicit-target":
+            elif spec is not None and spec.get("output_root") == "explicit-target":
                 environment = {"AGENT_CANON_OUTPUT_ROOT": str(target["root"])}
         return self.exec(
             Path(target["root"]),
