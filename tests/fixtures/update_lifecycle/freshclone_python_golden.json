@@ -1,0 +1,1097 @@
+{
+  "source_path": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/runtime/lifecycle/update_lifecycle_contract.py",
+  "source_sha256": "5a720a719685b8e33be9276d604dc5f51bda542ccaeffee44868b453cba41c63",
+  "inputs": {
+    "candidate_sha": "1111111111111111111111111111111111111111",
+    "candidate_tree_sha": "2222222222222222222222222222222222222222",
+    "publication_sha": "3333333333333333333333333333333333333333",
+    "publication_tree_sha": "4444444444444444444444444444444444444444"
+  },
+  "g2_check_ids": [
+    "standalone_static_gate_ci",
+    "documentation_checks",
+    "repository_quick_ci",
+    "generated_artifact_guard"
+  ],
+  "actual_owner_callback_calls": [
+    {
+      "owner": "G2:materialize_generated_completeness_receipt",
+      "arguments": {
+        "g1_gate": {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+            "evidence_ref": "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa"
+          ],
+          "output_digest": "sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        "candidate_sha": "1111111111111111111111111111111111111111",
+        "tree_sha": "2222222222222222222222222222222222222222",
+        "check_results": [
+          {
+            "check_id": "standalone_static_gate_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "documentation_checks",
+            "status": "pass"
+          },
+          {
+            "check_id": "repository_quick_ci",
+            "status": "pass"
+          },
+          {
+            "check_id": "generated_artifact_guard",
+            "status": "pass"
+          }
+        ]
+      },
+      "returned": {
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+          "evidence_ref": "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "gate_id": "G2",
+        "invariant": "generated_completeness",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d"
+        ],
+        "output_digest": "sha256:7326c019bf99b77687952cab0ca3073e1e5c1ddca80ec93548574c1a4a6f5eb3",
+        "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      }
+    },
+    {
+      "owner": "G3:materialize_pr_identity_gate",
+      "arguments": {
+        "lifecycle": {
+          "base_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "ref": "refs/heads/main",
+            "repo_name": "agent-canon",
+            "repo_owner": "fresh-clone-acceptance",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+            "evidence_ref": "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "branch": {
+            "contributor": {
+              "forbidden": [
+                "user_identity",
+                "fork_identity"
+              ],
+              "required": [
+                "contributor_identity",
+                "contributor_diff"
+              ]
+            },
+            "fork": {
+              "forbidden": [
+                "user_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "fork_identity"
+              ]
+            },
+            "user": {
+              "forbidden": [
+                "fork_identity",
+                "contributor_identity",
+                "contributor_diff"
+              ],
+              "required": [
+                "user_identity"
+              ]
+            }
+          },
+          "head_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "ref": "refs/heads/canon/fresh-clone-acceptance",
+            "repo_name": "agent-canon",
+            "repo_owner": "fresh-clone-acceptance",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "kind": "user",
+          "permission_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "assumption_forbidden": true,
+            "authority_source": "canonical fresh-clone acceptance fixture",
+            "permission_evidence_id": "evidence:fd09e42bfa427e2553ef18f3f6196a1f5848054c44ad02230e1e559899bb0614",
+            "permission_state": "verified_true"
+          },
+          "pr_essence": {
+            "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+            "contract_delta": "fresh-clone source PR",
+            "evidence_refs": [
+              "evidence:99ad23f944a2af6232c8e58e14fbd7f5f9373c0f5c9caae36e922050c2f8bc33"
+            ],
+            "intent": "queue the observed AgentCanon source branch update",
+            "problem": "exercise standalone source publication from a fresh clone"
+          },
+          "remote_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "ref": "refs/heads/canon/fresh-clone-acceptance",
+            "remote_name": "origin",
+            "repo_name": "agent-canon",
+            "repo_owner": "fresh-clone-acceptance",
+            "tree_sha": "2222222222222222222222222222222222222222",
+            "url_digest": "sha256:65f256cb626f5c3c5ae3960c530ef5613a7abf26a12c62eb5c2a597c119090d1"
+          },
+          "reviews": [],
+          "schema": "agent-canon.pull-request-lifecycle.v1",
+          "state": "merged",
+          "user_identity": {
+            "actor_id": "fresh-clone-acceptance",
+            "display_name": "Fresh Clone Acceptance"
+          }
+        },
+        "candidate_cas_receipt": {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+            "evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "candidate_identity": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "cas_base_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "cas_evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+          "cas_receipt_id": "cas:9fd73238ba71ac9bda0d49f28027d89962c3bb2ee918f2e13de44dfb2fdf52cd",
+          "cas_stage": "cas",
+          "predecessor_evidence_id": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+          "rebind_receipt_evidence_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+          "schema": "agent-canon.candidate-cas-receipt.v1"
+        },
+        "source_main_rebind_receipt": {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+            "evidence_ref": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "input_identity": {
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "tool": "cmd_latest"
+          },
+          "new_base_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "ref": "refs/heads/main",
+            "remote": "origin",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "old_base_identity": {
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "ref": "refs/heads/main",
+            "remote": "origin",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "origin_main_readback": {
+            "command": "git ls-remote origin refs/heads/main",
+            "commit_sha": "1111111111111111111111111111111111111111",
+            "evidence_ref": "evidence:817252daaba4c114456dcd03e74ddc619d9ab60868020c5df918a9981f25861c",
+            "ref": "refs/heads/main",
+            "remote": "origin"
+          },
+          "rebind_receipt_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+          "schema": "agent-canon.source-main-rebind-receipt.v1"
+        },
+        "upstream_gate_verdicts": [
+          {
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+              "evidence_ref": "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "gate_id": "G1",
+            "invariant": "source_correctness",
+            "next_checkpoint": null,
+            "ordered_input_evidence_refs": [
+              "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa"
+            ],
+            "output_digest": "sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66",
+            "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+            "retry_reason": null,
+            "schema": "agent-canon.gate-verdict.v1",
+            "verdict": "pass"
+          },
+          {
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+              "evidence_ref": "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "gate_id": "G2",
+            "invariant": "generated_completeness",
+            "next_checkpoint": null,
+            "ordered_input_evidence_refs": [
+              "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d"
+            ],
+            "output_digest": "sha256:7326c019bf99b77687952cab0ca3073e1e5c1ddca80ec93548574c1a4a6f5eb3",
+            "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+            "retry_reason": null,
+            "schema": "agent-canon.gate-verdict.v1",
+            "verdict": "pass"
+          }
+        ]
+      },
+      "returned": {
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31",
+          "evidence_ref": "evidence:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "gate_id": "G3",
+        "invariant": "pr_identity_cas",
+        "next_checkpoint": null,
+        "ordered_input_evidence_refs": [
+          "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+          "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+          "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+          "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833"
+        ],
+        "output_digest": "sha256:3832f2b2f8b36c71fd3da5921303f24ca1ccc3e251bb73fe256cd940f79e4578",
+        "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/github_publish.py#materialize_pr_identity_gate",
+        "retry_reason": null,
+        "schema": "agent-canon.gate-verdict.v1",
+        "verdict": "pass"
+      }
+    }
+  ],
+  "frozen_callback_replay": {
+    "call_order": [
+      "G2:frozen-input",
+      "G3:frozen-input"
+    ],
+    "calls": [
+      {
+        "owner": "G2:frozen-input",
+        "arguments": {
+          "g1_gate": {
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+              "evidence_ref": "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "gate_id": "G1",
+            "invariant": "source_correctness",
+            "next_checkpoint": null,
+            "ordered_input_evidence_refs": [
+              "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa"
+            ],
+            "output_digest": "sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66",
+            "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+            "retry_reason": null,
+            "schema": "agent-canon.gate-verdict.v1",
+            "verdict": "pass"
+          },
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "tree_sha": "2222222222222222222222222222222222222222",
+          "check_results": [
+            {
+              "check_id": "standalone_static_gate_ci",
+              "status": "pass"
+            },
+            {
+              "check_id": "documentation_checks",
+              "status": "pass"
+            },
+            {
+              "check_id": "repository_quick_ci",
+              "status": "pass"
+            },
+            {
+              "check_id": "generated_artifact_guard",
+              "status": "pass"
+            }
+          ]
+        }
+      },
+      {
+        "owner": "G3:frozen-input",
+        "arguments": {
+          "lifecycle": {
+            "base_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "ref": "refs/heads/main",
+              "repo_name": "agent-canon",
+              "repo_owner": "fresh-clone-acceptance",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+              "evidence_ref": "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "branch": {
+              "contributor": {
+                "forbidden": [
+                  "user_identity",
+                  "fork_identity"
+                ],
+                "required": [
+                  "contributor_identity",
+                  "contributor_diff"
+                ]
+              },
+              "fork": {
+                "forbidden": [
+                  "user_identity",
+                  "contributor_identity",
+                  "contributor_diff"
+                ],
+                "required": [
+                  "fork_identity"
+                ]
+              },
+              "user": {
+                "forbidden": [
+                  "fork_identity",
+                  "contributor_identity",
+                  "contributor_diff"
+                ],
+                "required": [
+                  "user_identity"
+                ]
+              }
+            },
+            "head_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "ref": "refs/heads/canon/fresh-clone-acceptance",
+              "repo_name": "agent-canon",
+              "repo_owner": "fresh-clone-acceptance",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "kind": "user",
+            "permission_identity": {
+              "actor_id": "fresh-clone-acceptance",
+              "assumption_forbidden": true,
+              "authority_source": "canonical fresh-clone acceptance fixture",
+              "permission_evidence_id": "evidence:fd09e42bfa427e2553ef18f3f6196a1f5848054c44ad02230e1e559899bb0614",
+              "permission_state": "verified_true"
+            },
+            "pr_essence": {
+              "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+              "contract_delta": "fresh-clone source PR",
+              "evidence_refs": [
+                "evidence:99ad23f944a2af6232c8e58e14fbd7f5f9373c0f5c9caae36e922050c2f8bc33"
+              ],
+              "intent": "queue the observed AgentCanon source branch update",
+              "problem": "exercise standalone source publication from a fresh clone"
+            },
+            "remote_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "ref": "refs/heads/canon/fresh-clone-acceptance",
+              "remote_name": "origin",
+              "repo_name": "agent-canon",
+              "repo_owner": "fresh-clone-acceptance",
+              "tree_sha": "2222222222222222222222222222222222222222",
+              "url_digest": "sha256:65f256cb626f5c3c5ae3960c530ef5613a7abf26a12c62eb5c2a597c119090d1"
+            },
+            "reviews": [],
+            "schema": "agent-canon.pull-request-lifecycle.v1",
+            "state": "merged",
+            "user_identity": {
+              "actor_id": "fresh-clone-acceptance",
+              "display_name": "Fresh Clone Acceptance"
+            }
+          },
+          "candidate_cas_receipt": {
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+              "evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "candidate_identity": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "cas_base_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "cas_evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+            "cas_receipt_id": "cas:9fd73238ba71ac9bda0d49f28027d89962c3bb2ee918f2e13de44dfb2fdf52cd",
+            "cas_stage": "cas",
+            "predecessor_evidence_id": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+            "rebind_receipt_evidence_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+            "schema": "agent-canon.candidate-cas-receipt.v1"
+          },
+          "source_main_rebind_receipt": {
+            "binding": {
+              "candidate_sha": "1111111111111111111111111111111111111111",
+              "evidence_digest": "sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+              "evidence_ref": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+              "timing": {
+                "attempt": 1,
+                "duration_ms": 0,
+                "finished_at": "2026-01-01T00:00:00Z",
+                "last_attempt_at": "2026-01-01T00:00:00Z",
+                "replayed": false,
+                "started_at": "2026-01-01T00:00:00Z"
+              },
+              "tool_id": "update-agent-canon",
+              "tool_version": "fresh-clone-acceptance.v1",
+              "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "input_identity": {
+              "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+              "tool": "cmd_latest"
+            },
+            "new_base_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "ref": "refs/heads/main",
+              "remote": "origin",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "old_base_identity": {
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "ref": "refs/heads/main",
+              "remote": "origin",
+              "tree_sha": "2222222222222222222222222222222222222222"
+            },
+            "origin_main_readback": {
+              "command": "git ls-remote origin refs/heads/main",
+              "commit_sha": "1111111111111111111111111111111111111111",
+              "evidence_ref": "evidence:817252daaba4c114456dcd03e74ddc619d9ab60868020c5df918a9981f25861c",
+              "ref": "refs/heads/main",
+              "remote": "origin"
+            },
+            "rebind_receipt_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+            "schema": "agent-canon.source-main-rebind-receipt.v1"
+          },
+          "upstream_gate_verdicts": [
+            {
+              "binding": {
+                "candidate_sha": "1111111111111111111111111111111111111111",
+                "evidence_digest": "sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+                "evidence_ref": "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+                "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+                "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+                "timing": {
+                  "attempt": 1,
+                  "duration_ms": 0,
+                  "finished_at": "2026-01-01T00:00:00Z",
+                  "last_attempt_at": "2026-01-01T00:00:00Z",
+                  "replayed": false,
+                  "started_at": "2026-01-01T00:00:00Z"
+                },
+                "tool_id": "update-agent-canon",
+                "tool_version": "fresh-clone-acceptance.v1",
+                "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+                "tree_sha": "2222222222222222222222222222222222222222"
+              },
+              "gate_id": "G1",
+              "invariant": "source_correctness",
+              "next_checkpoint": null,
+              "ordered_input_evidence_refs": [
+                "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa"
+              ],
+              "output_digest": "sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66",
+              "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+              "retry_reason": null,
+              "schema": "agent-canon.gate-verdict.v1",
+              "verdict": "pass"
+            },
+            {
+              "binding": {
+                "candidate_sha": "1111111111111111111111111111111111111111",
+                "evidence_digest": "sha256:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+                "evidence_ref": "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+                "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+                "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+                "timing": {
+                  "attempt": 1,
+                  "duration_ms": 0,
+                  "finished_at": "2026-01-01T00:00:00Z",
+                  "last_attempt_at": "2026-01-01T00:00:00Z",
+                  "replayed": false,
+                  "started_at": "2026-01-01T00:00:00Z"
+                },
+                "tool_id": "update-agent-canon",
+                "tool_version": "fresh-clone-acceptance.v1",
+                "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+                "tree_sha": "2222222222222222222222222222222222222222"
+              },
+              "gate_id": "G2",
+              "invariant": "generated_completeness",
+              "next_checkpoint": null,
+              "ordered_input_evidence_refs": [
+                "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d"
+              ],
+              "output_digest": "sha256:7326c019bf99b77687952cab0ca3073e1e5c1ddca80ec93548574c1a4a6f5eb3",
+              "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+              "retry_reason": null,
+              "schema": "agent-canon.gate-verdict.v1",
+              "verdict": "pass"
+            }
+          ]
+        }
+      }
+    ],
+    "packet": {
+      "acceptance_evidence_ref": "evidence:6f46701085df9825931a4a7a96e296d57ccdd2e0320b2c6c7633d09c8b8dba3b",
+      "binding": {
+        "candidate_sha": "1111111111111111111111111111111111111111",
+        "evidence_digest": "sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+        "evidence_ref": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+        "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+        "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+        "timing": {
+          "attempt": 1,
+          "duration_ms": 0,
+          "finished_at": "2026-01-01T00:00:00Z",
+          "last_attempt_at": "2026-01-01T00:00:00Z",
+          "replayed": false,
+          "started_at": "2026-01-01T00:00:00Z"
+        },
+        "tool_id": "update-agent-canon",
+        "tool_version": "fresh-clone-acceptance.v1",
+        "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+        "tree_sha": "2222222222222222222222222222222222222222"
+      },
+      "candidate_cas_receipt": {
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+          "evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "candidate_identity": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "cas_base_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "cas_evidence_ref": "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+        "cas_receipt_id": "cas:9fd73238ba71ac9bda0d49f28027d89962c3bb2ee918f2e13de44dfb2fdf52cd",
+        "cas_stage": "cas",
+        "predecessor_evidence_id": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+        "rebind_receipt_evidence_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+        "schema": "agent-canon.candidate-cas-receipt.v1"
+      },
+      "ordered_predecessor_evidence": [
+        {
+          "publication_evidence_id": "evidence:8392ea3ca689aa742a572f8fcf8e314118bed24e4ea7c406960187fdd8b959b0",
+          "queue_number": 388,
+          "source_pr": "#388"
+        },
+        {
+          "publication_evidence_id": "evidence:6fd142330a3bb3f0848edaa44dfbcac2567bbea5402d9ad99bebd13a704845fb",
+          "queue_number": 389,
+          "source_pr": "#389",
+          "source_pr_sha": "6fd142330a3bb3f0848edaa44dfbcac2567bbea5"
+        }
+      ],
+      "publication_readback_receipt": {
+        "authoritative_readback_digest": "sha256:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98",
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98",
+          "evidence_ref": "evidence:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "candidate_identity": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "pr_identity": {
+          "base_ref": "refs/heads/main",
+          "head_ref": "refs/heads/canon/fresh-clone-acceptance",
+          "head_repo_name": "agent-canon",
+          "head_repo_owner": "fresh-clone-acceptance",
+          "head_sha": "1111111111111111111111111111111111111111",
+          "merge_cas_base_sha": "1111111111111111111111111111111111111111",
+          "merge_cas_base_tree_sha": "2222222222222222222222222222222222222222",
+          "merge_commit_sha": "3333333333333333333333333333333333333333",
+          "merge_tree_sha": "4444444444444444444444444444444444444444",
+          "number": 1,
+          "post_merge_base_ref_sha": "3333333333333333333333333333333333333333",
+          "remote_name": "origin"
+        },
+        "predecessor_evidence_id": "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+        "publication_evidence_ref": "evidence:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98",
+        "readback_receipt_id": "publication-readback:c56482c32ca97d35e4f6ae185fd68f0655a97316e14f4ff98c7718767f6ef82c",
+        "readback_stage": "publication_readback",
+        "rebind_receipt_evidence_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+        "schema": "agent-canon.publication-readback-receipt.v1"
+      },
+      "pull_request_lifecycle": {
+        "base_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/main",
+          "repo_name": "agent-canon",
+          "repo_owner": "fresh-clone-acceptance",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+          "evidence_ref": "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "branch": {
+          "contributor": {
+            "forbidden": [
+              "user_identity",
+              "fork_identity"
+            ],
+            "required": [
+              "contributor_identity",
+              "contributor_diff"
+            ]
+          },
+          "fork": {
+            "forbidden": [
+              "user_identity",
+              "contributor_identity",
+              "contributor_diff"
+            ],
+            "required": [
+              "fork_identity"
+            ]
+          },
+          "user": {
+            "forbidden": [
+              "fork_identity",
+              "contributor_identity",
+              "contributor_diff"
+            ],
+            "required": [
+              "user_identity"
+            ]
+          }
+        },
+        "head_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/canon/fresh-clone-acceptance",
+          "repo_name": "agent-canon",
+          "repo_owner": "fresh-clone-acceptance",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "kind": "user",
+        "permission_identity": {
+          "actor_id": "fresh-clone-acceptance",
+          "assumption_forbidden": true,
+          "authority_source": "canonical fresh-clone acceptance fixture",
+          "permission_evidence_id": "evidence:fd09e42bfa427e2553ef18f3f6196a1f5848054c44ad02230e1e559899bb0614",
+          "permission_state": "verified_true"
+        },
+        "pr_essence": {
+          "canonical_owner": "tools/repository/workspace/repository_topic_clone.py",
+          "contract_delta": "fresh-clone source PR",
+          "evidence_refs": [
+            "evidence:99ad23f944a2af6232c8e58e14fbd7f5f9373c0f5c9caae36e922050c2f8bc33"
+          ],
+          "intent": "queue the observed AgentCanon source branch update",
+          "problem": "exercise standalone source publication from a fresh clone"
+        },
+        "remote_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/canon/fresh-clone-acceptance",
+          "remote_name": "origin",
+          "repo_name": "agent-canon",
+          "repo_owner": "fresh-clone-acceptance",
+          "tree_sha": "2222222222222222222222222222222222222222",
+          "url_digest": "sha256:65f256cb626f5c3c5ae3960c530ef5613a7abf26a12c62eb5c2a597c119090d1"
+        },
+        "reviews": [],
+        "schema": "agent-canon.pull-request-lifecycle.v1",
+        "state": "merged",
+        "user_identity": {
+          "actor_id": "fresh-clone-acceptance",
+          "display_name": "Fresh Clone Acceptance"
+        }
+      },
+      "schema": "agent-canon.source-projection-packet.v1",
+      "source_gate_verdicts": [
+        {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+            "evidence_ref": "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "gate_id": "G1",
+          "invariant": "source_correctness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa"
+          ],
+          "output_digest": "sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+            "evidence_ref": "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "gate_id": "G2",
+          "invariant": "generated_completeness",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d"
+          ],
+          "output_digest": "sha256:7326c019bf99b77687952cab0ca3073e1e5c1ddca80ec93548574c1a4a6f5eb3",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        },
+        {
+          "binding": {
+            "candidate_sha": "1111111111111111111111111111111111111111",
+            "evidence_digest": "sha256:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31",
+            "evidence_ref": "evidence:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31",
+            "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+            "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+            "timing": {
+              "attempt": 1,
+              "duration_ms": 0,
+              "finished_at": "2026-01-01T00:00:00Z",
+              "last_attempt_at": "2026-01-01T00:00:00Z",
+              "replayed": false,
+              "started_at": "2026-01-01T00:00:00Z"
+            },
+            "tool_id": "update-agent-canon",
+            "tool_version": "fresh-clone-acceptance.v1",
+            "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+            "tree_sha": "2222222222222222222222222222222222222222"
+          },
+          "gate_id": "G3",
+          "invariant": "pr_identity_cas",
+          "next_checkpoint": null,
+          "ordered_input_evidence_refs": [
+            "evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d",
+            "evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca",
+            "evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1",
+            "evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833"
+          ],
+          "output_digest": "sha256:3832f2b2f8b36c71fd3da5921303f24ca1ccc3e251bb73fe256cd940f79e4578",
+          "owner": "/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/github_publish.py#materialize_pr_identity_gate",
+          "retry_reason": null,
+          "schema": "agent-canon.gate-verdict.v1",
+          "verdict": "pass"
+        }
+      ],
+      "source_main_rebind_receipt": {
+        "binding": {
+          "candidate_sha": "1111111111111111111111111111111111111111",
+          "evidence_digest": "sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+          "evidence_ref": "evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa",
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "snapshot_id": "snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18",
+          "timing": {
+            "attempt": 1,
+            "duration_ms": 0,
+            "finished_at": "2026-01-01T00:00:00Z",
+            "last_attempt_at": "2026-01-01T00:00:00Z",
+            "replayed": false,
+            "started_at": "2026-01-01T00:00:00Z"
+          },
+          "tool_id": "update-agent-canon",
+          "tool_version": "fresh-clone-acceptance.v1",
+          "transaction_id": "tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "input_identity": {
+          "input_digest": "sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9",
+          "tool": "cmd_latest"
+        },
+        "new_base_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "old_base_identity": {
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/main",
+          "remote": "origin",
+          "tree_sha": "2222222222222222222222222222222222222222"
+        },
+        "origin_main_readback": {
+          "command": "git ls-remote origin refs/heads/main",
+          "commit_sha": "1111111111111111111111111111111111111111",
+          "evidence_ref": "evidence:817252daaba4c114456dcd03e74ddc619d9ab60868020c5df918a9981f25861c",
+          "ref": "refs/heads/main",
+          "remote": "origin"
+        },
+        "rebind_receipt_id": "rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b",
+        "schema": "agent-canon.source-main-rebind-receipt.v1"
+      }
+    },
+    "canonical_utf8": "{\"acceptance_evidence_ref\":\"evidence:6f46701085df9825931a4a7a96e296d57ccdd2e0320b2c6c7633d09c8b8dba3b\",\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\",\"evidence_ref\":\"evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"candidate_cas_receipt\":{\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1\",\"evidence_ref\":\"evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"candidate_identity\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"cas_base_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"cas_evidence_ref\":\"evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1\",\"cas_receipt_id\":\"cas:9fd73238ba71ac9bda0d49f28027d89962c3bb2ee918f2e13de44dfb2fdf52cd\",\"cas_stage\":\"cas\",\"predecessor_evidence_id\":\"evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\",\"rebind_receipt_evidence_id\":\"rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b\",\"schema\":\"agent-canon.candidate-cas-receipt.v1\"},\"ordered_predecessor_evidence\":[{\"publication_evidence_id\":\"evidence:8392ea3ca689aa742a572f8fcf8e314118bed24e4ea7c406960187fdd8b959b0\",\"queue_number\":388,\"source_pr\":\"#388\"},{\"publication_evidence_id\":\"evidence:6fd142330a3bb3f0848edaa44dfbcac2567bbea5402d9ad99bebd13a704845fb\",\"queue_number\":389,\"source_pr\":\"#389\",\"source_pr_sha\":\"6fd142330a3bb3f0848edaa44dfbcac2567bbea5\"}],\"publication_readback_receipt\":{\"authoritative_readback_digest\":\"sha256:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98\",\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98\",\"evidence_ref\":\"evidence:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"candidate_identity\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"pr_identity\":{\"base_ref\":\"refs/heads/main\",\"head_ref\":\"refs/heads/canon/fresh-clone-acceptance\",\"head_repo_name\":\"agent-canon\",\"head_repo_owner\":\"fresh-clone-acceptance\",\"head_sha\":\"1111111111111111111111111111111111111111\",\"merge_cas_base_sha\":\"1111111111111111111111111111111111111111\",\"merge_cas_base_tree_sha\":\"2222222222222222222222222222222222222222\",\"merge_commit_sha\":\"3333333333333333333333333333333333333333\",\"merge_tree_sha\":\"4444444444444444444444444444444444444444\",\"number\":1,\"post_merge_base_ref_sha\":\"3333333333333333333333333333333333333333\",\"remote_name\":\"origin\"},\"predecessor_evidence_id\":\"evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833\",\"publication_evidence_ref\":\"evidence:69e460b034763d625ec2aaccfafdbeb91bf4de405695978dc72ab00034db5e98\",\"readback_receipt_id\":\"publication-readback:c56482c32ca97d35e4f6ae185fd68f0655a97316e14f4ff98c7718767f6ef82c\",\"readback_stage\":\"publication_readback\",\"rebind_receipt_evidence_id\":\"rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b\",\"schema\":\"agent-canon.publication-readback-receipt.v1\"},\"pull_request_lifecycle\":{\"base_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"ref\":\"refs/heads/main\",\"repo_name\":\"agent-canon\",\"repo_owner\":\"fresh-clone-acceptance\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833\",\"evidence_ref\":\"evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"branch\":{\"contributor\":{\"forbidden\":[\"user_identity\",\"fork_identity\"],\"required\":[\"contributor_identity\",\"contributor_diff\"]},\"fork\":{\"forbidden\":[\"user_identity\",\"contributor_identity\",\"contributor_diff\"],\"required\":[\"fork_identity\"]},\"user\":{\"forbidden\":[\"fork_identity\",\"contributor_identity\",\"contributor_diff\"],\"required\":[\"user_identity\"]}},\"head_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"ref\":\"refs/heads/canon/fresh-clone-acceptance\",\"repo_name\":\"agent-canon\",\"repo_owner\":\"fresh-clone-acceptance\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"kind\":\"user\",\"permission_identity\":{\"actor_id\":\"fresh-clone-acceptance\",\"assumption_forbidden\":true,\"authority_source\":\"canonical fresh-clone acceptance fixture\",\"permission_evidence_id\":\"evidence:fd09e42bfa427e2553ef18f3f6196a1f5848054c44ad02230e1e559899bb0614\",\"permission_state\":\"verified_true\"},\"pr_essence\":{\"canonical_owner\":\"tools/repository/workspace/repository_topic_clone.py\",\"contract_delta\":\"fresh-clone source PR\",\"evidence_refs\":[\"evidence:99ad23f944a2af6232c8e58e14fbd7f5f9373c0f5c9caae36e922050c2f8bc33\"],\"intent\":\"queue the observed AgentCanon source branch update\",\"problem\":\"exercise standalone source publication from a fresh clone\"},\"remote_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"ref\":\"refs/heads/canon/fresh-clone-acceptance\",\"remote_name\":\"origin\",\"repo_name\":\"agent-canon\",\"repo_owner\":\"fresh-clone-acceptance\",\"tree_sha\":\"2222222222222222222222222222222222222222\",\"url_digest\":\"sha256:65f256cb626f5c3c5ae3960c530ef5613a7abf26a12c62eb5c2a597c119090d1\"},\"reviews\":[],\"schema\":\"agent-canon.pull-request-lifecycle.v1\",\"state\":\"merged\",\"user_identity\":{\"actor_id\":\"fresh-clone-acceptance\",\"display_name\":\"Fresh Clone Acceptance\"}},\"schema\":\"agent-canon.source-projection-packet.v1\",\"source_gate_verdicts\":[{\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d\",\"evidence_ref\":\"evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"gate_id\":\"G1\",\"invariant\":\"source_correctness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\"],\"output_digest\":\"sha256:00af0043d9675699438d4464e626cdfd4978d10b3e48dafd4d294f5c7cce8d66\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/publication_integrator.py#resolve_publication_eligibility\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"},{\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca\",\"evidence_ref\":\"evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"gate_id\":\"G2\",\"invariant\":\"generated_completeness\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d\"],\"output_digest\":\"sha256:7326c019bf99b77687952cab0ca3073e1e5c1ddca80ec93548574c1a4a6f5eb3\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/validation/ci/checks/check_agent_canon_pr.py#materialize_generated_completeness_receipt\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"},{\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31\",\"evidence_ref\":\"evidence:4c8e614bea67fcddb299d81e6021f3c5ccd550b78b371b62ab2c1114a2715c31\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"gate_id\":\"G3\",\"invariant\":\"pr_identity_cas\",\"next_checkpoint\":null,\"ordered_input_evidence_refs\":[\"evidence:88556e8b1c920a5ff40e00add6c9db36410a220457b70e608710ca4f1e084f9d\",\"evidence:57b5e626819125a902e1429966ecacfb6b3bb9f591502599a79b0815ac3805ca\",\"evidence:de55bae8ccd91051089eba1a27840734048d81d0f51533de07f52686b81df7a1\",\"evidence:caec2d59d740c430a5f12c2f0fdaddc0ac234ecea25d7aa41c53a6046cbaf833\"],\"output_digest\":\"sha256:3832f2b2f8b36c71fd3da5921303f24ca1ccc3e251bb73fe256cd940f79e4578\",\"owner\":\"/var/lib/agent-canon/runtime/tasks/full-rust-migration-20261030-sz8q_p4z/freshowner7b50-qualification-hay0w5k2/source/tools/repository/github/github_publish.py#materialize_pr_identity_gate\",\"retry_reason\":null,\"schema\":\"agent-canon.gate-verdict.v1\",\"verdict\":\"pass\"}],\"source_main_rebind_receipt\":{\"binding\":{\"candidate_sha\":\"1111111111111111111111111111111111111111\",\"evidence_digest\":\"sha256:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\",\"evidence_ref\":\"evidence:e02ac3d13bdc4af96aa2c090f6ff02ba37ccbb9ba5a3bb8381c0ba2bd138d7aa\",\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"snapshot_id\":\"snapshot:dd76126310b961e3e38c1f349d460ff71c7f9b1766d507e387a2eddda35abc18\",\"timing\":{\"attempt\":1,\"duration_ms\":0,\"finished_at\":\"2026-01-01T00:00:00Z\",\"last_attempt_at\":\"2026-01-01T00:00:00Z\",\"replayed\":false,\"started_at\":\"2026-01-01T00:00:00Z\"},\"tool_id\":\"update-agent-canon\",\"tool_version\":\"fresh-clone-acceptance.v1\",\"transaction_id\":\"tx:2d244adb5c5d74f34855627484e9a3669503514864f9309727a4f7a22ff59099\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"input_identity\":{\"input_digest\":\"sha256:ed2e137f18a7ddbf0c76d3dcbd53ca9d1bfc9cec0fcafda4d3e397031d975ac9\",\"tool\":\"cmd_latest\"},\"new_base_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"old_base_identity\":{\"commit_sha\":\"1111111111111111111111111111111111111111\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\",\"tree_sha\":\"2222222222222222222222222222222222222222\"},\"origin_main_readback\":{\"command\":\"git ls-remote origin refs/heads/main\",\"commit_sha\":\"1111111111111111111111111111111111111111\",\"evidence_ref\":\"evidence:817252daaba4c114456dcd03e74ddc619d9ab60868020c5df918a9981f25861c\",\"ref\":\"refs/heads/main\",\"remote\":\"origin\"},\"rebind_receipt_id\":\"rebind:e6bf82ab0b42c79e487ac1eeea58dfb8b5d91a9856e6f5ca67a56fa7ee24c62b\",\"schema\":\"agent-canon.source-main-rebind-receipt.v1\"}}",
+    "sha256": "d9b360b788c63018f06c4614a6c32ba5895927a6e8d4c6b5cd974129a4897050"
+  },
+  "callback_error_order": [
+    {
+      "failing_owner": "G2",
+      "call_order": [
+        "G2"
+      ],
+      "exception_class": "OwnerCallbackSentinel",
+      "message": "supplied G2 callback failure"
+    },
+    {
+      "failing_owner": "G3",
+      "call_order": [
+        "G2",
+        "G3"
+      ],
+      "exception_class": "OwnerCallbackSentinel",
+      "message": "supplied G3 callback failure"
+    }
+  ],
+  "git_clone_or_network_invoked": false
+}
