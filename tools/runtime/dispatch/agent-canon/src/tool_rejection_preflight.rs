@@ -358,17 +358,17 @@ fn planned_paths(
     raw_paths: &[String],
     use_changed: bool,
 ) -> Result<Vec<String>, String> {
-    let selected = if !raw_paths.is_empty() {
-        raw_paths.to_vec()
-    } else if use_changed {
-        changed_paths(root)?
-    } else {
-        Vec::new()
-    };
+    if raw_paths.is_empty() {
+        return if use_changed {
+            changed_paths(root)
+        } else {
+            Ok(Vec::new())
+        };
+    }
     let mut seen = BTreeSet::new();
     let mut paths = Vec::new();
-    for raw_path in selected {
-        let normalized = normalize_path(root, &raw_path)?;
+    for raw_path in raw_paths {
+        let normalized = normalize_path(root, raw_path)?;
         if seen.insert(normalized.clone()) {
             paths.push(normalized);
         }
@@ -419,7 +419,15 @@ fn normalize_path(root: &Path, raw_path: &str) -> Result<String, String> {
 }
 
 fn path_text(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
+    if path.as_os_str().is_empty() {
+        return ".".to_owned();
+    }
+    let path = path.to_string_lossy();
+    if cfg!(windows) {
+        path.replace('\\', "/")
+    } else {
+        path.into_owned()
+    }
 }
 
 fn predict_gates(

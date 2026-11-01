@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -62,6 +63,29 @@ class ToolRejectionPreflightTest(unittest.TestCase):
         expected = baseline.replace(LEGACY_COMMAND, NATIVE_COMMAND)
         self.assertNotIn(LEGACY_COMMAND, expected)
         return expected
+
+    def test_repository_root_aliases_report_one_dot_path(self) -> None:
+        """Empty and dot inputs identify the repository root as a single path."""
+        result = self.run_native(
+            "--root", str(PROJECT_ROOT), "--format", "json", "", ".", "./"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["predicted_gate_count"], 1)
+        self.assertEqual(payload["predicted_gates"][0]["path"], ".")
+
+    def test_backslash_paths_keep_the_platform_path_meaning(self) -> None:
+        """POSIX backslashes remain filename characters in paths and routing."""
+        result = self.run_native(
+            "--root", str(PROJECT_ROOT), "--format", "json", "tools\\literal.py"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        gates = json.loads(result.stdout)["predicted_gates"]
+        expected = "tools/literal.py" if os.name == "nt" else "tools\\literal.py"
+        self.assertEqual({gate["path"] for gate in gates}, {expected})
+        self.assertEqual(
+            any(gate["gate"] == "tool_catalog" for gate in gates), os.name == "nt"
+        )
 
     def test_help_describes_prediction_as_optional_diagnostic(self) -> None:
         """CLI guidance must not reintroduce a mandatory edit preflight."""
@@ -123,7 +147,15 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             (root / "changed.py").write_text("value = 1\n", encoding="utf-8")
             (root / "deleted.md").write_text("base\n", encoding="utf-8")
             subprocess.run(
-                ["git", "-C", str(root), "add", ".gitignore", "changed.py", "deleted.md"],
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "add",
+                    ".gitignore",
+                    "changed.py",
+                    "deleted.md",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -463,7 +495,13 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             root = Path(tmp_dir)
             subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
             result = subprocess.run(
-                [str(TOOL), "tool-rejection-preflight", "--root", str(root), "--changed"],
+                [
+                    str(TOOL),
+                    "tool-rejection-preflight",
+                    "--root",
+                    str(root),
+                    "--changed",
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
