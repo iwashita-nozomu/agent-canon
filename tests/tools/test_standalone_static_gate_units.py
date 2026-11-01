@@ -544,7 +544,7 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         ("explicit", fixture_root / "selected native"),
     ):
         path.write_text(
-            '#!/usr/bin/env bash\n'
+            "#!/usr/bin/env bash\n"
             'printf "native:' + label + '\\n" >> "$TRACE"\n'
             'printf "%s\\n" "$@" > "$CALLS"\n'
             'exit "$CHECKER_EXIT"\n'
@@ -557,11 +557,14 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         + "\n}\n"
     )
     setup = (
-        "unset AGENT_CANON_NATIVE_BIN\n"
-        'python3() { printf "pytest\\n" >> "$TRACE"; }\n'
+        'unset AGENT_CANON_NATIVE_BIN\npython3() { printf "pytest\\n" >> "$TRACE"; }\n'
     )
     if explicit_cli:
-        setup += "export AGENT_CANON_CLI=" + shlex.quote(str(fixture_root / "selected native")) + "\n"
+        setup += (
+            "export AGENT_CANON_CLI="
+            + shlex.quote(str(fixture_root / "selected native"))
+            + "\n"
+        )
     else:
         setup += "unset AGENT_CANON_CLI\n"
     calls, trace = fixture_root / "calls", fixture_root / "trace"
@@ -576,7 +579,11 @@ def test_workflow_unit_passes_selected_native_cli_to_source_wrapper(
         TRACE=str(trace),
     )
     assert result.returncode == checker_exit, result.stderr
-    assert calls.read_text().splitlines() == ["check-github-workflows", "--root", str(root)]
+    assert calls.read_text().splitlines() == [
+        "check-github-workflows",
+        "--root",
+        str(root),
+    ]
     expected_trace = ["pytest", "native:" + ("explicit" if explicit_cli else "default")]
     if checker_exit == 0:
         expected_trace.append("pytest")
