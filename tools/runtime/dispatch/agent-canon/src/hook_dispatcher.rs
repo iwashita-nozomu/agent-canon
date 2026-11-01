@@ -31,17 +31,17 @@ use crate::hook_safety::{
 };
 use crate::mutation_authority::{
     evaluate_mutation_authority, mutation_block_payload, MutationAuthorityContext,
-    MutationAuthorityDecision,
 };
+use crate::path_resolution::resolve_non_strict;
 use crate::prompt_classifier::PromptClassifierInputs;
 use crate::python_json::{
     canonical_json_ascii_bytes_reject_nonfinite, parse_json, parse_json_reject_duplicates,
     python_json_ascii_bytes, JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
 };
 use crate::python_text::python_strip;
-use crate::subagent_selection::{build_coordination_receipt, select_subagents, SubagentSelection};
-use crate::tool_selection::{select_tools, ToolSelection};
-use crate::workflow_context::{load_workflow_context, WorkflowContext};
+use crate::subagent_selection::{build_coordination_receipt, select_subagents};
+use crate::tool_selection::select_tools;
+use crate::workflow_context::load_workflow_context;
 use icu_casemap::CaseMapper;
 use serde_json::Value as SerdeValue;
 use sha2::{Digest, Sha256};
@@ -1055,7 +1055,7 @@ fn dispatch_event(
     }
 
     let empty_payload = empty_object();
-    let payload_data = effective_payload_with_empty(payload.as_ref(), &empty_payload);
+    let payload_data = payload.as_ref().unwrap_or(&empty_payload);
     let workflow_context = report_dir
         .as_ref()
         .map(|report_dir| load_workflow_context(&report_dir.join("skill_usage_context.json")))
@@ -1169,7 +1169,7 @@ fn dispatch_event(
     } else {
         attest_parent_root(Path::new(&parent_root), "hook-event-spool")
     };
-    let append_result = log_context.append(spool_entry, event_parent.as_ref());
+    let append_result = log_context.append(JsonValue::Object(spool_entry), event_parent.as_ref());
     if behavior.is_some() && append_result.status == "spooled" && report_dir.is_some() {
         let runtime_root = env_value(environment, crate::runtime_boundary::RUNTIME_ROOT_ENV);
         let runtime_root = (!runtime_root.is_empty()).then(|| PathBuf::from(runtime_root));
@@ -1196,7 +1196,7 @@ fn spool_event(
     root: &Path,
     telemetry: &BTreeMap<String, String>,
     environment: &BTreeMap<String, String>,
-) -> Result<(JsonValue, HookLogContext, String, String), String> {
+) -> Result<(JsonObject, HookLogContext, String, String), String> {
     let timestamp = utc_now();
     let payload_fingerprint = sha256_hex(raw_payload);
     let context = HookLogContext {
@@ -1206,32 +1206,29 @@ fn spool_event(
         environment: environment.clone(),
     };
     let hook_run_id = context.run_id(&timestamp, &payload_fingerprint)?;
-    let mut entry = object(vec![
+    let entry = object(vec![
         ("hook_run_id", text_value(&hook_run_id)),
         ("timestamp", text_value(&timestamp)),
         ("payload_fingerprint", text_value(&payload_fingerprint)),
         ("status", text_value(status)),
         ("hook_event_name", text_value(event)),
     ]);
-    let JsonValue::Object(fields) = &mut entry else {
+    let JsonValue::Object(mut fields) = entry else {
         unreachable!("hook spool base entry is an object");
     };
     for (key, value) in telemetry {
         if !value.is_empty() {
-            set_field(fields, key, text_value(value));
+            set_field(&mut fields, key, text_value(value));
         }
     }
-    Ok((entry, context, timestamp, payload_fingerprint))
+    Ok((fields, context, timestamp, payload_fingerprint))
 }
 
 fn integer_is_zero(value: &JsonValue) -> bool {
     matches!(value, JsonValue::Number(JsonNumber::Integer(value)) if value == "0")
 }
 
-fn merge_object_fields(destination: &mut JsonValue, source: JsonValue) -> Result<(), String> {
-    let JsonValue::Object(destination) = destination else {
-        return Err("hook spool entry is not an object".to_owned());
-    };
+fn merge_object_fields(destination: &mut JsonObject, source: JsonValue) -> Result<(), String> {
     let JsonValue::Object(mut source) = source else {
         return Err("behavior event is not an object".to_owned());
     };
