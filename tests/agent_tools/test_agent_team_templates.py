@@ -871,8 +871,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("checkout_identity", calls[0][1])
         self.assertIn("cwd", calls[0][1])
         self.assertIn("git_root", calls[0][1])
-        self.assertIn("incoming write-capable handoff", calls[0][1])
-        self.assertIn("do not echo it or its path list in the result", calls[0][1])
+        self.assertIn("Source-edit handoffs must carry writer_target", calls[0][1])
+        self.assertIn("do not echo the target/path list in the result", calls[0][1])
         self.assertIn(
             "refer to the existing readback without repeating its fields", calls[0][1]
         )

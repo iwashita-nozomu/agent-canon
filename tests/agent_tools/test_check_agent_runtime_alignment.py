@@ -451,22 +451,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         )
         self.assertNotIn("writer_target", implementer_prompt_fields)
         self.assertIn("writer_target", integration_prompt_fields)
-        implementer_fields = role_prompt_must_include(
-            resolve_role(config, "implementer")
-        )
-        integration_fields = role_prompt_must_include(
-            resolve_role(config, "integration_executor")
-        )
-        self.assertNotIn("writer_target", implementer_fields)
-        self.assertIn("writer_target", integration_fields)
-        implementer_fields = role_prompt_must_include(
-            resolve_role(config, "implementer")
-        )
-        integration_fields = role_prompt_must_include(
-            resolve_role(config, "integration_executor")
-        )
-        self.assertNotIn("writer_target", implementer_fields)
-        self.assertIn("writer_target", integration_fields)
 
     def test_alignment_rejects_worker_model_policy_drift(self) -> None:
         """Alignment enforces the exact worker model and effort."""
