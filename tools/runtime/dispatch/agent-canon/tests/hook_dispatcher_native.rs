@@ -240,7 +240,7 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
         case_bytes(case, "stdout_base64"),
         "stdout bytes for {name}"
     );
-    if name == "surrogate-command" {
+    if text(field(case, "name").expect("case name")) == "surrogate-command" {
         assert!(
             !result.stderr.is_empty(),
             "unencodable command is refused with a native diagnostic"
