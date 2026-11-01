@@ -87,6 +87,7 @@ fn write_text(path: &Path, text: &str) {
     write_bytes(path, text.as_bytes());
 }
 
+#[cfg(target_os = "linux")]
 fn git(root: &Path, args: &[&str]) -> Output {
     Command::new("git")
         .arg("-C")
