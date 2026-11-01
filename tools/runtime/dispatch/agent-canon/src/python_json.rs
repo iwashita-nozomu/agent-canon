@@ -1,6 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Provides Python-compatible JSON values, parsing, number formatting, and compact ASCII canonicalization.
+// downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
 // downstream test ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
@@ -191,7 +192,13 @@ impl JsonNumber {
 }
 
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {
-    JsonParser::new(input.as_bytes()).parse()
+    JsonParser::new(input.as_bytes(), false).parse()
+}
+
+/// Parse JSON while rejecting duplicate object keys and non-finite constants.
+/// Existing callers retain `parse_json`'s last-key-wins and constant behavior.
+pub fn parse_json_reject_duplicates(input: &str) -> Result<JsonValue, String> {
+    JsonParser::new(input.as_bytes(), true).parse()
 }
 
 fn append_wtf8(codepoint: u32, output: &mut Vec<u8>) -> Result<(), String> {
@@ -226,7 +233,7 @@ pub fn parse_json_python_string(value: &JsonString) -> Result<JsonValue, String>
     for &codepoint in &value.0 {
         append_wtf8(codepoint, &mut bytes)?;
     }
-    JsonParser::new(&bytes).parse()
+    JsonParser::new(&bytes, false).parse()
 }
 
 #[derive(Clone, Copy)]
@@ -413,11 +420,16 @@ impl JsonFrame {
 struct JsonParser<'a> {
     bytes: &'a [u8],
     index: usize,
+    strict: bool,
 }
 
 impl<'a> JsonParser<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, index: 0 }
+    fn new(bytes: &'a [u8], strict: bool) -> Self {
+        Self {
+            bytes,
+            index: 0,
+            strict,
+        }
     }
 
     fn parse(mut self) -> Result<JsonValue, String> {
@@ -442,6 +454,9 @@ impl<'a> JsonParser<'a> {
                             if let Some(position) =
                                 values.0.iter().position(|(existing, _)| existing == &key)
                             {
+                                if self.strict {
+                                    return Err("duplicate JSON key".to_owned());
+                                }
                                 values.0[position].1 = value;
                             } else {
                                 values.0.push((key, value));
@@ -584,14 +599,23 @@ impl<'a> JsonParser<'a> {
             }
             Some(b'N') => {
                 self.consume_literal("NaN")?;
+                if self.strict {
+                    return Err("non-finite JSON constants are not accepted".to_owned());
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::NAN))))
             }
             Some(b'I') => {
                 self.consume_literal("Infinity")?;
+                if self.strict {
+                    return Err("non-finite JSON constants are not accepted".to_owned());
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(f64::INFINITY))))
             }
             Some(b'-') if self.bytes[self.index..].starts_with(b"-Infinity") => {
                 self.consume_literal("-Infinity")?;
+                if self.strict {
+                    return Err("non-finite JSON constants are not accepted".to_owned());
+                }
                 Ok(Some(JsonValue::Number(JsonNumber::Float(
                     f64::NEG_INFINITY,
                 ))))
@@ -793,6 +817,18 @@ fn is_json_integer(value: &str) -> bool {
 
 /// Serialize with Python's `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)` bytes.
 pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_nonfinite(value, false)
+}
+
+/// Serialize with the same canonical form, rejecting non-finite floats as `allow_nan=False` does.
+pub fn canonical_json_ascii_bytes_reject_nonfinite(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_nonfinite(value, true)
+}
+
+fn canonical_json_ascii_bytes_with_nonfinite(
+    value: &JsonValue,
+    reject_nonfinite: bool,
+) -> Result<Vec<u8>, String> {
     enum Action<'a> {
         Value(&'a JsonValue),
         String(&'a JsonString),
@@ -820,6 +856,9 @@ pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> 
                     }
                 }
                 JsonValue::Number(JsonNumber::Float(value)) => {
+                    if reject_nonfinite && !value.is_finite() {
+                        return Err("non-finite floats are not valid canonical JSON".to_owned());
+                    }
                     bytes.extend_from_slice(json_float(*value).as_bytes());
                 }
                 JsonValue::String(value) => actions.push(Action::String(value)),
