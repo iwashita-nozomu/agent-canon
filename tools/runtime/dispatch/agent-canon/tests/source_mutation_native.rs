@@ -376,7 +376,7 @@ fn source_capability_copies_external_absolute_symlink_text_and_rejects_collision
     let support_root = root.0.join("support");
     fs::create_dir_all(source_root.join("documents/design"))
         .expect("source design root is created");
-    fs::create_dir_all(support_root).expect("external support root is created");
+    fs::create_dir_all(&support_root).expect("external support root is created");
     let support_file = support_root.join("real.md");
     fs::write(&support_file, "external support content\n")
         .expect("external support file is written");
