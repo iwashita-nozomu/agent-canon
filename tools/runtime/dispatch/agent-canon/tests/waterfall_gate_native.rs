@@ -353,15 +353,14 @@ fn waterfall_python_cli_corpus_replays_through_native_gate() {
         let case_id = json_string(record, "case_id");
         let fixture = Fixture::new(case_id);
         let report_dir = fixture.report_dir(case_id);
-        materialize_report(
-            &report_dir,
-            record["input_manifest"]
-                .as_array()
-                .expect("frozen input manifest is a list"),
-        );
+        let expected_input = record["input_manifest"]
+            .as_array()
+            .expect("frozen input manifest is a list");
+        materialize_report(&report_dir, expected_input);
         let before = snapshot_report(&report_dir);
         assert_eq!(
-            before, record["input_manifest"],
+            before.as_slice(),
+            expected_input.as_slice(),
             "materialized bytes match corpus"
         );
 
