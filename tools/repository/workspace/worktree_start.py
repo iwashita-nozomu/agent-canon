@@ -190,7 +190,7 @@ def main() -> int:
     print("  1. Confirm legacy action log, branch summary, and carry-over targets are current.")
     print("  2. Run git status --short --branch and git worktree list --porcelain.")
     print(
-        "  3. Use python3 tools/runtime/archive/work_log.py --run-id <run-id> "
+        "  3. Use tools/bin/agent-canon work-log --run-id <run-id> "
         "--kind <kind> --message '<what changed>' --next '<next>' "
         "after each meaningful step."
     )
