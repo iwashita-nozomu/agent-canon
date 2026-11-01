@@ -1326,3 +1326,53 @@ fn run_resolve_targets(args: &[String]) -> i32 {
         }
     }
 }
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn supplied_snapshot_survives_catalog_changes_and_empty_snapshot_stays_empty() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "source-projection-snapshot-{}-{nonce}",
+            std::process::id()
+        ));
+        let catalog = root.join("agents/skills/catalog.yaml");
+        fs::create_dir_all(catalog.parent().unwrap()).unwrap();
+        fs::write(&catalog, "skill_families:\n  - id: example\n    canonical_doc: agents/skills/example.md\n    shim: .codex/personal/skills/example/SKILL.md\n").unwrap();
+        fs::write(root.join("agents/skills/example.md"), "# Example\n").unwrap();
+        fs::write(root.join("a.py"), "# @dependency-start\n# contract test\n# responsibility Declares an ordinary dependency.\n# downstream implementation b.py ordinary target\n# @dependency-end\n").unwrap();
+        fs::write(root.join("b.py"), "# Ordinary target\n").unwrap();
+        let snapshot = generated_skill_projections(&root).unwrap();
+        fs::write(&catalog, "invalid catalog\n").unwrap();
+
+        let generated = ".codex/personal/skills/example/SKILL.md";
+        let document =
+            parse_manifest_document_with_projections(&root, generated, Some(&snapshot)).unwrap();
+        assert_eq!(document.path, "agents/skills/example.md");
+        let error =
+            parse_manifest_document_with_projections(&root, generated, Some(&[])).unwrap_err();
+        assert!(
+            error.to_string().contains("unknown generated skill"),
+            "{error}"
+        );
+        assert!(parse_manifest_document(&root, generated)
+            .unwrap_err()
+            .to_string()
+            .contains("skill catalog"));
+
+        assert_eq!(resolve_source_path(&root, "a.py").unwrap().0, "a.py");
+        let ordinary = parse_manifest_document(&root, "a.py").unwrap();
+        assert_eq!(ordinary.edges[0].target, "b.py");
+        assert_eq!(
+            resolve_source_dependency_targets(&root, &root.join("a.py"), "b.py").unwrap(),
+            vec!["b.py"]
+        );
+        fs::remove_dir_all(&root).unwrap();
+    }
+}
