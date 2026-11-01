@@ -24,8 +24,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 AGENT_CANON_CLI = Path(
     os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
 )
-SOURCE_GOLDEN = Path(__file__).resolve().parents[1] / "fixtures/source_dependency_projection/python_golden.json"
-SOURCE_GOLDEN_SHA256 = "fabfc4a93967e32c4c00c7c732340dc2e437683b45a0985993706ee2da21f119"
+SOURCE_GOLDEN = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures/source_dependency_projection/python_golden.json"
+)
+SOURCE_GOLDEN_SHA256 = (
+    "fabfc4a93967e32c4c00c7c732340dc2e437683b45a0985993706ee2da21f119"
+)
 
 
 def write(path: Path, content: str) -> None:
@@ -34,7 +39,9 @@ def write(path: Path, content: str) -> None:
     path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
 
 
-def run_graph_client(root: Path, command: str, *options: str) -> subprocess.CompletedProcess[str]:
+def run_graph_client(
+    root: Path, command: str, *options: str
+) -> subprocess.CompletedProcess[str]:
     """Invoke the native typed GraphClient route selected by the test runner."""
     return subprocess.run(
         [
@@ -57,7 +64,9 @@ def run_graph_client(root: Path, command: str, *options: str) -> subprocess.Comp
 class GraphClientSourceProjectionTest(unittest.TestCase):
     """Verify dependency reads are pure functions of tracked source bytes."""
 
-    def run_client(self, root: Path, command: str, *options: str) -> subprocess.CompletedProcess[str]:
+    def run_client(
+        self, root: Path, command: str, *options: str
+    ) -> subprocess.CompletedProcess[str]:
         return run_graph_client(root, command, *options)
 
     def error_text(self, result: subprocess.CompletedProcess[str]) -> str:
@@ -239,7 +248,9 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             )
             self.assertFalse((root / ".agent-canon").exists())
 
-    def test_explicit_persisted_graph_operations_still_use_the_selected_provider(self) -> None:
+    def test_explicit_persisted_graph_operations_still_use_the_selected_provider(
+        self,
+    ) -> None:
         """Status and non-source queries keep their explicit persisted provider route."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -247,10 +258,35 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             missing = str(root / "missing-agent-canon")
             for command, options in (
                 ("status", ()),
-                ("query", ("--all", "--relation", "owner", "--direction", "both", "--depth", "0")),
-                ("query", ("--path", "documents/design/feature.md", "--relation", "dependency", "--direction", "outgoing", "--depth", "1")),
+                (
+                    "query",
+                    (
+                        "--all",
+                        "--relation",
+                        "owner",
+                        "--direction",
+                        "both",
+                        "--depth",
+                        "0",
+                    ),
+                ),
+                (
+                    "query",
+                    (
+                        "--path",
+                        "documents/design/feature.md",
+                        "--relation",
+                        "dependency",
+                        "--direction",
+                        "outgoing",
+                        "--depth",
+                        "1",
+                    ),
+                ),
             ):
-                result = self.run_client(root, command, *options, "--executable", missing)
+                result = self.run_client(
+                    root, command, *options, "--executable", missing
+                )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("process launch failed", self.error_text(result))
 
@@ -374,9 +410,7 @@ class GraphClientSourceProjectionTest(unittest.TestCase):
             context = json.loads(context_result.stdout)
             identity = context["source_identity"]
             self.assertIsNotNone(identity)
-            self.assertEqual(
-                identity["source_path"], "agents/skills/example.md"
-            )
+            self.assertEqual(identity["source_path"], "agents/skills/example.md")
 
     def test_unknown_generated_skill_view_is_rejected(self) -> None:
         """A stale generated skill path cannot become an implicit graph node."""

@@ -1360,18 +1360,26 @@ def graph_dependency_records_for_inputs(
         prefix = "GRAPH_CLIENT=fail reason="
         if detail.startswith(prefix):
             detail = detail.removeprefix(prefix)
-        raise ValueError(f"canonical graph dependency query failed: {detail}") from error
+        raise ValueError(
+            f"canonical graph dependency query failed: {detail}"
+        ) from error
     if not isinstance(result, dict):
-        raise ValueError("canonical graph dependency query failed: graph response must be an object")
+        raise ValueError(
+            "canonical graph dependency query failed: graph response must be an object"
+        )
     if (
         result.get("command") != "query"
         or type(result.get("exit_code")) is not int
         or result.get("exit_code") != process.returncode
     ):
-        raise ValueError("canonical graph dependency query failed: graph response identity is invalid")
+        raise ValueError(
+            "canonical graph dependency query failed: graph response identity is invalid"
+        )
     payload_value = result.get("payload")
     if not isinstance(payload_value, dict):
-        raise ValueError("canonical graph dependency query failed: graph payload must be an object")
+        raise ValueError(
+            "canonical graph dependency query failed: graph payload must be an object"
+        )
     payload = cast(dict[str, object], payload_value)
     if result.get("status") != "fresh" or result.get("exit_code") != 0:
         raise ValueError(

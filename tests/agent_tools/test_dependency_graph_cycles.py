@@ -35,7 +35,9 @@ def run_source_graph(root: Path, *args: str) -> subprocess.CompletedProcess[str]
     )
 
 
-def run_graph_client(root: Path, command: str, *args: str) -> subprocess.CompletedProcess[str]:
+def run_graph_client(
+    root: Path, command: str, *args: str
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             str(AGENT_CANON_CLI),
@@ -96,9 +98,13 @@ def commit_fixture(root: Path) -> None:
         ("init", "-q"),
         ("add", "."),
         (
-            "-c", "user.name=Dependency Fixture",
-            "-c", "user.email=dependency@example.invalid",
-            "commit", "-qm", "fixture",
+            "-c",
+            "user.name=Dependency Fixture",
+            "-c",
+            "user.email=dependency@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
         ),
     ):
         subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
@@ -205,7 +211,8 @@ class DependencyCycleScopeTest(unittest.TestCase):
             root = Path(directory)
             write_graph(
                 root,
-                CYCLE + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
+                CYCLE
+                + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
             )
             result = self.check(root)
             self.assertEqual(
@@ -219,7 +226,8 @@ class DependencyCycleScopeTest(unittest.TestCase):
             root = Path(directory)
             write_graph(
                 root,
-                CYCLE + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
+                CYCLE
+                + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
             )
             result = self.check(root, "a.py")
             self.assertEqual(
@@ -300,16 +308,22 @@ class DependencyCycleScopeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for bits in range(1 << len(pairs)):
-                edges = [edge for index, edge in enumerate(pairs) if bits & (1 << index)]
+                edges = [
+                    edge for index, edge in enumerate(pairs) if bits & (1 << index)
+                ]
                 reachable = set(edges) | {(node, node) for node in nodes}
                 for middle in nodes:
                     for first in nodes:
                         for last in nodes:
-                            if (first, middle) in reachable and (middle, last) in reachable:
+                            if (first, middle) in reachable and (
+                                middle,
+                                last,
+                            ) in reachable:
                                 reachable.add((first, last))
                 components = {
                     frozenset(
-                        other for other in nodes
+                        other
+                        for other in nodes
                         if (node, other) in reachable and (other, node) in reachable
                     )
                     for node in nodes
@@ -323,19 +337,23 @@ class DependencyCycleScopeTest(unittest.TestCase):
                         )
                         declarations.append(
                             (consumer, "upstream", prerequisite)
-                            if upstream else (prerequisite, "downstream", consumer)
+                            if upstream
+                            else (prerequisite, "downstream", consumer)
                         )
                         if encoding == 2:
                             declarations.append((consumer, "upstream", prerequisite))
                     if encoding == 5:
                         declarations.reverse()
                     for node in nodes:
-                        (root / node).write_text("# no dependencies\n", encoding="utf-8")
+                        (root / node).write_text(
+                            "# no dependencies\n", encoding="utf-8"
+                        )
                     write_graph(root, tuple(declarations))
                     with self.subTest(topology=bits, encoding=encoding):
                         result = self.check(root)
                         self.assertEqual(
-                            result.returncode, int(bool(expected)),
+                            result.returncode,
+                            int(bool(expected)),
                             result.stdout + result.stderr,
                         )
                         self.assertEqual(reported_components(result.stdout), expected)
@@ -357,7 +375,9 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
         write_graph(root, (("a.py", "downstream", "b.py"),))
         return catalog
 
-    def resolve_target(self, root: Path, source: Path, target: str) -> subprocess.CompletedProcess[str]:
+    def resolve_target(
+        self, root: Path, source: Path, target: str
+    ) -> subprocess.CompletedProcess[str]:
         return run_source_graph(
             root,
             "resolve-targets",
@@ -378,7 +398,9 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, "b.py\n")
 
-    def test_whole_scan_projects_materialized_generated_view_to_canonical_owner(self) -> None:
+    def test_whole_scan_projects_materialized_generated_view_to_canonical_owner(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
@@ -410,17 +432,16 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
             response = json.loads(result.stdout)
             facts = response["dependency_facts"]
             self.assertEqual(
-                sum(
-                    fact["target"] == "agents/skills/example.md"
-                    for fact in facts
-                ),
+                sum(fact["target"] == "agents/skills/example.md" for fact in facts),
                 1,
             )
             self.assertFalse(
                 any(fact["target"].startswith(".codex/") for fact in facts)
             )
 
-    def test_generated_view_target_resolves_to_canonical_source_without_materializing_view(self) -> None:
+    def test_generated_view_target_resolves_to_canonical_source_without_materializing_view(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
@@ -458,7 +479,9 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
                 ".codex/personal/skills/missing-*/SKILL.md",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, ".codex/personal/skills/missing-*/SKILL.md\n")
+            self.assertEqual(
+                result.stdout, ".codex/personal/skills/missing-*/SKILL.md\n"
+            )
 
     def test_missing_generated_owner_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -471,7 +494,9 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
                 ".codex/personal/skills/example/SKILL.md",
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("generated skill canonical source is unavailable", result.stderr)
+            self.assertIn(
+                "generated skill canonical source is unavailable", result.stderr
+            )
 
     def test_ordinary_missing_escape_and_symlink_fail_without_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
