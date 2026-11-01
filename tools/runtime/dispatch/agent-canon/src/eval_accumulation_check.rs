@@ -643,7 +643,7 @@ fn prompt_missing_fields_are_coherent(entry: &JsonObject) -> bool {
     let empty_string = JsonValue::String(JsonString::default());
     let zero = JsonValue::Number(JsonNumber::Integer("0".to_owned()));
     let false_value = JsonValue::Bool(false);
-    [
+    let coherent = [
         object_value(entry, "prompt_excerpt_redacted"),
         object_value(entry, "prompt_fingerprint"),
         object_value(entry, "prompt_char_count"),
@@ -651,7 +651,8 @@ fn prompt_missing_fields_are_coherent(entry: &JsonObject) -> bool {
     ]
     .into_iter()
     .zip([&empty_string, &empty_string, &zero, &false_value])
-    .all(|(actual, expected)| actual.is_some_and(|actual| python_json_equal(actual, expected)))
+    .all(|(actual, expected)| actual.is_some_and(|actual| python_json_equal(actual, expected)));
+    coherent
 }
 
 fn prompt_char_count_is_positive_int_instance(value: Option<&JsonValue>) -> bool {
@@ -1038,7 +1039,7 @@ fn load_family_contracts(registry_path: &Path) -> Result<Vec<EvalFamilyContract>
     let mut contracts = Vec::with_capacity(families.len());
     let mut seen_ids = HashSet::new();
     let mut seen_labels = HashSet::new();
-    for family in families.iter() {
+    for family in families {
         let family_id = registry_string(family, "id")?;
         let check_id = registry_string(family, "check_id")?;
         let count_label = registry_string(family, "count_label")?;
