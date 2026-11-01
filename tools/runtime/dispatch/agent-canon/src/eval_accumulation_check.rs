@@ -1104,9 +1104,10 @@ fn eval_family_findings(
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default();
-        if filename_pattern.find(file_name).is_none_or(|matched| {
-            matched.start() != 0 || matched.end() != file_name.len()
-        }) {
+        if filename_pattern
+            .find(file_name)
+            .is_none_or(|matched| matched.start() != 0 || matched.end() != file_name.len())
+        {
             findings.push(finding(&contract.check_id, &label, "invalid-report-name"));
         }
         let text = fs::read_to_string(path)
