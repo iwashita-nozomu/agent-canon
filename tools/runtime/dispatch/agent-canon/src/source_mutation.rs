@@ -104,7 +104,7 @@ impl SourceMutationCapability {
         if !relative_path_is_allowed(relative, &self.allowed_paths) {
             return Err(SourceMutationError::new(format!(
                 "mutation target is outside allowed_paths: {}",
-                relative.display()
+                relative_path_as_posix(relative)
             )));
         }
         Ok(resolved)
@@ -948,6 +948,18 @@ fn open_file_parent_nofollow(
 
 fn same_file(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
     left.dev() == right.dev() && left.ino() == right.ino()
+}
+
+fn relative_path_as_posix(path: &Path) -> String {
+    let components = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    if components.is_empty() {
+        ".".to_string()
+    } else {
+        components.join("/")
+    }
 }
 
 fn relative_path_is_allowed(relative: &Path, allowed_paths: &[PathBuf]) -> bool {
