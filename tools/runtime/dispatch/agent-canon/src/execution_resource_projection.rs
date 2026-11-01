@@ -4,15 +4,17 @@
 // upstream implementation python_json.rs owns Python-compatible JSON parsing and canonical bytes.
 // upstream implementation ../../../container/execution_resource_projection.py owns existing behavior semantics.
 // downstream test ../tests/execution_resource_projection_native.rs validates frozen CPython 3.12.3 behavior.
+// downstream implementation ../../../../../.codex/hooks/hook_dispatcher.py maps failures to invalid_projection without consuming diagnostics.
 // @dependency-end
 
 //! Pure validation and wrapper construction for PostToolUse execution-resource projections.
 
 use crate::python_json::{
     canonical_json_ascii_bytes_reject_nonfinite, parse_json_reject_duplicates, JsonNumber,
-    JsonObject, JsonParseError, JsonString, JsonValue,
+    JsonObject, JsonString, JsonValue,
 };
 use sha2::{Digest, Sha256};
+use std::fmt;
 
 const OFFICIAL_HOOK_SCHEMA: &str = "agent-canon.posttooluse-stop.v1";
 const NORMALIZED_INPUT_SCHEMA: &str = "agent-canon-post-tool-use-input/v1";
@@ -51,51 +53,27 @@ const PROJECTION_ERROR_KINDS: &[&str] = &[
     "see_execution_resource_plan",
 ];
 
-/// A projection validation error whose JSON string can retain lone surrogates.
+/// A projection validation failure with a generic native diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProjectionError {
-    error_type: &'static str,
-    message: JsonString,
-}
+pub struct ProjectionError(String);
 
 impl ProjectionError {
-    pub fn error_type(&self) -> &'static str {
-        self.error_type
-    }
-
-    pub fn message(&self) -> &JsonString {
-        &self.message
-    }
-
-    fn value_error(message: String) -> Self {
-        Self {
-            error_type: "ValueError",
-            message: JsonString::from_text(&message),
-        }
+    pub fn message(&self) -> &str {
+        &self.0
     }
 }
+
+impl fmt::Display for ProjectionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for ProjectionError {}
 
 impl From<String> for ProjectionError {
     fn from(message: String) -> Self {
-        Self {
-            error_type: "ProjectionError",
-            message: JsonString::from_text(&message),
-        }
-    }
-}
-
-impl From<JsonParseError> for ProjectionError {
-    fn from(error: JsonParseError) -> Self {
-        let error_type = match &error {
-            JsonParseError::Syntax { .. } => "JSONDecodeError",
-            JsonParseError::DuplicateKey(_) | JsonParseError::NonFiniteConstant(_) => {
-                "ProjectionError"
-            }
-        };
-        Self {
-            error_type,
-            message: error.message(),
-        }
+        Self(message)
     }
 }
 
@@ -123,8 +101,7 @@ pub fn validate_normalized_input(payload: &JsonValue) -> Result<(), ProjectionEr
     object(tool_input).ok_or_else(|| "normalized tool_input is not an object".to_owned())?;
     let fingerprint = string_field(fields, "tool_input_fingerprint");
     require_sha256(fingerprint.as_deref(), "tool_input_fingerprint")?;
-    let canonical = canonical_json_ascii_bytes_reject_nonfinite(tool_input)
-        .map_err(ProjectionError::value_error)?;
+    let canonical = canonical_json_ascii_bytes_reject_nonfinite(tool_input)?;
     let expected_fingerprint = sha256_hex(&canonical);
     if fingerprint.as_deref() != Some(expected_fingerprint.as_str()) {
         return Err("tool_input_fingerprint does not match tool_input"
@@ -209,8 +186,7 @@ pub fn validate_projection_bytes(stdout: &str) -> Result<JsonValue, ProjectionEr
     require_sha256(plan_fingerprint.as_deref(), "plan_fingerprint")?;
     validate_admission(field(fields, "admission").expect("exact projection fields"))?;
     validate_error(field(fields, "error").expect("exact projection fields"))?;
-    let canonical = canonical_json_ascii_bytes_reject_nonfinite(&projection)
-        .map_err(ProjectionError::value_error)?;
+    let canonical = canonical_json_ascii_bytes_reject_nonfinite(&projection)?;
     if canonical.as_slice() != line.as_bytes() {
         return Err("projection bytes are not canonical".to_owned().into());
     }
