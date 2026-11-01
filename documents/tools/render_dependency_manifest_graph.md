@@ -3,7 +3,7 @@
 contract reference
 responsibility Documents native dependency graph inputs, bundles, and output projections.
 upstream implementation ../../tools/analysis/dependencies/render_dependency_manifest_graph.py renders native graph reports.
-upstream implementation ../../tools/runtime/source/export_static_seed.py resolves committed tree entries for repository structure.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs exposes committed tree entries for repository structure.
 upstream design ../design/dependency-manifest-design.md defines dependency manifest semantics.
 upstream design ../structured-analysis/graph-dsl.md defines shared graph storage and projection contract.
 upstream design ../prose-reasoning-graph/dsl-spec.md defines prose graph adapter vocabulary when dependency graph views are embedded in prose workflows.
@@ -52,8 +52,10 @@ python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
 - `--scope` is passed to `check_dependency_graph.sh` when the renderer generates
   its input TSV. `full` is the default and `changed` is explicit.
 - `--source-revision <commit-ish>` selects the committed Git tree used for
-  repository structure; it defaults to `HEAD`. The renderer reads the local
-  commit object only and does not fetch. The tracked-path structure is the full
+  repository structure; it defaults to `HEAD`. The renderer reads the tree
+  through `agent-canon template-bundle committed-tree`, using `AGENT_CANON_CLI`
+  when set and otherwise `tools/bin/agent-canon`. The native owner reads local
+  commit objects only and does not fetch. The tracked-path structure is the full
   selected commit even when dependency TSV scope is `changed`.
 - Pass `--graph-tsv <path>` to render an existing checker TSV. In this mode the
   TSV rows are the renderer input and `--scope` does not filter them.
@@ -87,7 +89,7 @@ locators used to produce each projection. An embedded prose workflow may
 summarize a claim, but it cannot promote that summary into a new dependency row.
 
 The renderer also reads the complete tracked path set from the selected Git
-tree through the existing committed-tree reader. Tracked files that have no
+tree through the native committed-tree command. Tracked files that have no
 dependency edge still appear as `artifact` nodes, and inferred directory
 containment appears as `artifact` edges with relation/kind `contains`. These
 structural edges are separate from TSV dependency rows and do not affect the

@@ -950,12 +950,12 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
 
   - id: template-bundle
-    summary: Exports one canonical template profile to a fresh external directory.
+    summary: Exports canonical template profiles and static seeds, and reads committed tree entries.
     path: tools/runtime/dispatch/agent-canon/src/template_bundle.rs
     family: agent_tools
     role: helper
     status: canonical
-    command: tools/bin/agent-canon template-bundle <export|verify|native-package|native-verify|native-version> [options]
+    command: tools/bin/agent-canon template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
     writes: true
     dispatch:
       runtime: native
@@ -977,10 +977,16 @@ entries:
     docs:
       - templates/README.md
       - documents/contracts/template-bundle-manifest.toml
+      - documents/contracts/static-seed-export.md
+      - documents/contracts/static-seed-allowlist.toml
+      - documents/tools/export_static_seed.md
+      - documents/tools/agent-canon.md
     tests:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
       - tools/runtime/dispatch/agent-canon/tests/native_release_native.rs
       - tests/agent_tools/test_native_cli_distribution.py
+      - tests/agent_tools/test_export_static_seed.py
+      - tests/agent_tools/test_render_dependency_manifest_graph.py
 
   - id: create-experiment-topic
     public: true
