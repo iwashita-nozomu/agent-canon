@@ -12,7 +12,7 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -154,6 +154,7 @@ enum FirstBlockWorkItem {
     Command(String),
     Direct(String),
     Segments(std::vec::IntoIter<Vec<String>>),
+    EvalWords(VecDeque<String>),
 }
 
 /// Return the first high-confidence secret class in prompt text.
@@ -555,6 +556,26 @@ fn command_segments(tokens: Vec<String>) -> Vec<Vec<String>> {
         segments.push(current);
     }
     segments
+}
+
+fn eval_join_preserves_shell_tokens(tokens: &[String]) -> bool {
+    if tokens.is_empty()
+        || tokens.iter().any(|token| {
+            token.is_empty()
+                || token.chars().any(|character| {
+                    is_shlex_whitespace(character)
+                        || matches!(character, '\'' | '"' | '\\' | '#' | '\u{0060}')
+                        || is_punctuation(character)
+                })
+                || token.chars().next().is_some_and(is_python_whitespace)
+        })
+    {
+        return false;
+    }
+    !tokens
+        .last()
+        .and_then(|token| token.chars().last())
+        .is_some_and(is_python_whitespace)
 }
 
 fn is_leading_grouping(token: &str) -> bool {
@@ -1229,6 +1250,17 @@ pub fn first_block(command: &str) -> Option<GitIntent> {
                 if !segments.as_slice().is_empty() {
                     work.push(FirstBlockWorkItem::Segments(segments));
                 }
+                if segment
+                    .first()
+                    .is_some_and(|token| command_basename(token) == "eval")
+                    && eval_join_preserves_shell_tokens(&segment[1..])
+                {
+                    let words = segment.into_iter().skip(1).collect::<VecDeque<_>>();
+                    if !words.is_empty() {
+                        work.push(FirstBlockWorkItem::EvalWords(words));
+                    }
+                    continue;
+                }
                 let script = wrapper_script(&segment);
                 if !script.is_empty() {
                     drop(segment);
@@ -1253,6 +1285,19 @@ pub fn first_block(command: &str) -> Option<GitIntent> {
                 }
                 if let Some(intent) = opaque_protected_intent(&segment.join(" ")) {
                     return Some(intent);
+                }
+            }
+            FirstBlockWorkItem::EvalWords(mut words) => {
+                while words
+                    .front()
+                    .is_some_and(|token| command_basename(token) == "eval")
+                {
+                    words.pop_front();
+                }
+                if !words.is_empty() {
+                    let tokens = words.into_iter().collect();
+                    let segments = command_segments(tokens).into_iter();
+                    work.push(FirstBlockWorkItem::Segments(segments));
                 }
             }
         }
