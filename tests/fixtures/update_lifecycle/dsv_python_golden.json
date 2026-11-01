@@ -1,0 +1,694 @@
+{
+  "source": "06e720e0190c4e803efbdef3920d283a213c1f76",
+  "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+  "cases": [
+    {
+      "name": "mapping",
+      "api": "parse",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "agent-canon.decision-sufficiency.v1",
+          "opaque_policy": {
+            "unknown_field": "\u4fdd\u6301",
+            "decision": true
+          },
+          "huge": 1000000000000000000000000000000000000000000000000000000000000
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "text",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque_policy\":{\"unknown_field\":\"\u4fdd\u6301\",\"decision\":true},\"huge\":1000000000000000000000000000000000000000000000000000000000000}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "serialize-nonascii",
+      "api": "serialize",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "agent-canon.decision-sufficiency.v1",
+          "opaque_policy": {
+            "unknown_field": "\u4fdd\u6301",
+            "decision": true
+          },
+          "huge": 1000000000000000000000000000000000000000000000000000000000000
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output_bytes_hex": "7b2268756765223a313030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030302c226f70617175655f706f6c696379223a7b226465636973696f6e223a747275652c22756e6b6e6f776e5f6669656c64223a22e4bf9de68c81227d2c22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631227d",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "import-match",
+      "api": "import",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "agent-canon.decision-sufficiency.v1",
+          "opaque_policy": {
+            "unknown_field": "\u4fdd\u6301",
+            "decision": true
+          },
+          "huge": 1000000000000000000000000000000000000000000000000000000000000
+        }
+      },
+      "expected_digest": "sha256:b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee",
+      "digest_supplied": true,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "import-mismatch",
+      "api": "import",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque_policy\":{\"unknown_field\":\"\u4fdd\u6301\",\"decision\":true},\"huge\":1000000000000000000000000000000000000000000000000000000000000}"
+      },
+      "expected_digest": "not-a-digest",
+      "digest_supplied": true,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_digest_mismatch",
+        "detail": ""
+      }
+    },
+    {
+      "name": "import-no-digest",
+      "api": "import",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque_policy\":{\"unknown_field\":\"\u4fdd\u6301\",\"decision\":true},\"huge\":1000000000000000000000000000000000000000000000000000000000000}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-8",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631222c226f70617175655f706f6c696379223a7b22756e6b6e6f776e5f6669656c64223a22e4bf9de68c81222c226465636973696f6e223a747275657d2c2268756765223a313030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030307d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-8-sig",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "efbbbf7b22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631222c226f70617175655f706f6c696379223a7b22756e6b6e6f776e5f6669656c64223a22e4bf9de68c81222c226465636973696f6e223a747275657d2c2268756765223a313030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030307d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-16",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "fffe7b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c0022006f00700061007100750065005f0070006f006c0069006300790022003a007b00220075006e006b006e006f0077006e005f006600690065006c00640022003a002200dd4f016322002c0022006400650063006900730069006f006e0022003a0074007200750065007d002c002200680075006700650022003a0031003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030007d00"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-16-le",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c0022006f00700061007100750065005f0070006f006c0069006300790022003a007b00220075006e006b006e006f0077006e005f006600690065006c00640022003a002200dd4f016322002c0022006400650063006900730069006f006e0022003a0074007200750065007d002c002200680075006700650022003a0031003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030007d00"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-16-be",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "007b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c0022006f00700061007100750065005f0070006f006c0069006300790022003a007b00220075006e006b006e006f0077006e005f006600690065006c00640022003a00224fdd63010022002c0022006400650063006900730069006f006e0022003a0074007200750065007d002c002200680075006700650022003a0031003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030003000300030007d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-32",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "fffe00007b00000022000000730000006300000068000000650000006d00000061000000220000003a000000220000006100000067000000650000006e000000740000002d00000063000000610000006e0000006f0000006e0000002e0000006400000065000000630000006900000073000000690000006f0000006e0000002d00000073000000750000006600000066000000690000006300000069000000650000006e00000063000000790000002e0000007600000031000000220000002c000000220000006f00000070000000610000007100000075000000650000005f000000700000006f0000006c000000690000006300000079000000220000003a0000007b00000022000000750000006e0000006b0000006e0000006f000000770000006e0000005f0000006600000069000000650000006c00000064000000220000003a00000022000000dd4f000001630000220000002c000000220000006400000065000000630000006900000073000000690000006f0000006e000000220000003a000000740000007200000075000000650000007d0000002c0000002200000068000000750000006700000065000000220000003a000000310000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000007d000000"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-32-le",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b00000022000000730000006300000068000000650000006d00000061000000220000003a000000220000006100000067000000650000006e000000740000002d00000063000000610000006e0000006f0000006e0000002e0000006400000065000000630000006900000073000000690000006f0000006e0000002d00000073000000750000006600000066000000690000006300000069000000650000006e00000063000000790000002e0000007600000031000000220000002c000000220000006f00000070000000610000007100000075000000650000005f000000700000006f0000006c000000690000006300000079000000220000003a0000007b00000022000000750000006e0000006b0000006e0000006f000000770000006e0000005f0000006600000069000000650000006c00000064000000220000003a00000022000000dd4f000001630000220000002c000000220000006400000065000000630000006900000073000000690000006f0000006e000000220000003a000000740000007200000075000000650000007d0000002c0000002200000068000000750000006700000065000000220000003a000000310000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000007d000000"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "utf-32-be",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "0000007b00000022000000730000006300000068000000650000006d00000061000000220000003a000000220000006100000067000000650000006e000000740000002d00000063000000610000006e0000006f0000006e0000002e0000006400000065000000630000006900000073000000690000006f0000006e0000002d00000073000000750000006600000066000000690000006300000069000000650000006e00000063000000790000002e0000007600000031000000220000002c000000220000006f00000070000000610000007100000075000000650000005f000000700000006f0000006c000000690000006300000079000000220000003a0000007b00000022000000750000006e0000006b0000006e0000006f000000770000006e0000005f0000006600000069000000650000006c00000064000000220000003a0000002200004fdd00006301000000220000002c000000220000006400000065000000630000006900000073000000690000006f0000006e000000220000003a000000740000007200000075000000650000007d0000002c0000002200000068000000750000006700000065000000220000003a000000310000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000003000000030000000300000007d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "huge": 1000000000000000000000000000000000000000000000000000000000000,
+        "opaque_policy": {
+          "decision": true,
+          "unknown_field": "\u4fdd\u6301"
+        },
+        "schema": "agent-canon.decision-sufficiency.v1"
+      },
+      "canonical_utf8": "{\"huge\":1000000000000000000000000000000000000000000000000000000000000,\"opaque_policy\":{\"decision\":true,\"unknown_field\":\"\u4fdd\u6301\"},\"schema\":\"agent-canon.decision-sufficiency.v1\"}",
+      "sha256": "b02beb535733a8608af060513cb1cd997bad834cdebb3d7dabb3e301fc22b7ee"
+    },
+    {
+      "name": "duplicate-last-wins",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"bad\",\"schema\":\"agent-canon.decision-sufficiency.v1\",\"x\":1,\"x\":2}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "output": {
+        "schema": "agent-canon.decision-sufficiency.v1",
+        "x": 2
+      },
+      "canonical_utf8": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"x\":2}",
+      "sha256": "21a07f5acfcf2ebce86aa3ebbecd15011ed24db29598e1f0086041de0d01f64a"
+    },
+    {
+      "name": "malformed",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_json_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "array",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "[]"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "lifecycle:mapping_required",
+        "detail": "decision_sufficiency_packet"
+      }
+    },
+    {
+      "name": "root-null",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "null"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "lifecycle:mapping_required",
+        "detail": "decision_sufficiency_packet"
+      }
+    },
+    {
+      "name": "root-string",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "\"str\""
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "lifecycle:mapping_required",
+        "detail": "decision_sufficiency_packet"
+      }
+    },
+    {
+      "name": "missing-schema",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "wrong-schema",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"bad\"}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "float-after-schema",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"x\":1.5}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "ArtifactIdentityError",
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    },
+    {
+      "name": "nan-after-schema",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"x\":NaN}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "ArtifactIdentityError",
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    },
+    {
+      "name": "wrong-schema-before-float",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"bad\",\"x\":1.5}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "text-bom",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "\ufeff{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque_policy\":{\"unknown_field\":\"\u4fdd\u6301\",\"decision\":true},\"huge\":1000000000000000000000000000000000000000000000000000000000000}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_json_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "invalid-utf8",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "fffeff"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_json_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "invalid-json-bytes",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_json_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "serialize-wrong-schema",
+      "api": "serialize",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "bad",
+          "x": 1.5
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "serialize-float",
+      "api": "serialize",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "agent-canon.decision-sufficiency.v1",
+          "x": 1.5
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "ArtifactIdentityError",
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    },
+    {
+      "name": "import-schema-before-digest",
+      "api": "import",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "bad"
+        }
+      },
+      "expected_digest": "bad",
+      "digest_supplied": true,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "escaped-lone-surrogate-text",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque\":\"\\ud800\"}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "raw-lone-surrogate-text",
+      "api": "parse",
+      "payload": {
+        "kind": "text",
+        "value": "{\"schema\":\"agent-canon.decision-sufficiency.v1\",\"opaque\":\"\ud800\"}"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "raw-utf8-wtf8-surrogate-bytes",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631222c226f7061717565223a22eda080227d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "raw-utf16le-surrogatepass-bytes",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c0022006f007000610071007500650022003a00220000d822007d00"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "raw-utf16-bom-surrogatepass-bytes",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "fffe7b00220073006300680065006d00610022003a0022006100670065006e0074002d00630061006e006f006e002e006400650063006900730069006f006e002d00730075006600660069006300690065006e00630079002e007600310022002c0022006f007000610071007500650022003a00220000d822007d00"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "raw-utf32be-surrogatepass-bytes",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "0000007b00000022000000730000006300000068000000650000006d00000061000000220000003a000000220000006100000067000000650000006e000000740000002d00000063000000610000006e0000006f0000006e0000002e0000006400000065000000630000006900000073000000690000006f0000006e0000002d00000073000000750000006600000066000000690000006300000069000000650000006e00000063000000790000002e0000007600000031000000220000002c000000220000006f0000007000000061000000710000007500000065000000220000003a000000220000d800000000220000007d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "UnicodeEncodeError",
+        "message": "'utf-8' codec can't encode character '\\ud800' in position 11: surrogates not allowed"
+      }
+    },
+    {
+      "name": "wrong-schema-before-surrogate-encoding",
+      "api": "parse",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "wrong",
+          "opaque": "\ud800"
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "float-rejected-before-surrogate-encoding",
+      "api": "parse",
+      "payload": {
+        "kind": "mapping",
+        "value": {
+          "schema": "agent-canon.decision-sufficiency.v1",
+          "opaque": "\ud800",
+          "float_after_surrogate": 1.5
+        }
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "ArtifactIdentityError",
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    },
+    {
+      "name": "raw-utf8-wrong-schema-before-surrogate-encoding",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b22736368656d61223a2277726f6e67222c226f7061717565223a22eda080227d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "LifecycleContractError",
+        "code": "decision_sufficiency:envelope_schema_invalid",
+        "detail": ""
+      }
+    },
+    {
+      "name": "raw-utf8-float-before-surrogate-encoding",
+      "api": "parse",
+      "payload": {
+        "kind": "bytes",
+        "hex": "7b22736368656d61223a226167656e742d63616e6f6e2e6465636973696f6e2d73756666696369656e63792e7631222c226f7061717565223a22eda080222c22666c6f61745f61667465725f737572726f67617465223a312e357d"
+      },
+      "expected_digest": null,
+      "digest_supplied": false,
+      "error": {
+        "exception_class": "ArtifactIdentityError",
+        "code": "artifact_identity:float_forbidden",
+        "detail": ""
+      }
+    }
+  ]
+}
