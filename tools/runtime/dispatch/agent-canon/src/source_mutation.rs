@@ -175,6 +175,23 @@ impl SourceMutationCapability {
                     target.display()
                 ))
             })?;
+        // Keep the full no-delete-share chain alive while Windows creates an
+        // absolute symlink path below the canonical capability root.
+        #[cfg(windows)]
+        let (target_directories, target_name, target_link_path) =
+            open_file_parent_chain_nofollow(&self.source_root, target_relative, true).map_err(
+                |error| {
+                    SourceMutationError::new(format!(
+                        "cannot create mutation parent for {}: {error}",
+                        target.display()
+                    ))
+                },
+            )?;
+        #[cfg(windows)]
+        let target_directory = target_directories
+            .last()
+            .expect("target parent chain includes the volume root");
+        #[cfg(not(windows))]
         let (target_directory, target_name) =
             open_file_parent_nofollow(&self.source_root, target_relative, true).map_err(
                 |error| {
@@ -216,6 +233,17 @@ impl SourceMutationCapability {
                 ))
             })?;
         if source_entry.is_symlink() {
+            #[cfg(windows)]
+            return copy_source_symlink(
+                &source_directory,
+                &source_name,
+                target_directory,
+                &target_name,
+                source,
+                target,
+                &target_link_path,
+            );
+            #[cfg(not(windows))]
             return copy_source_symlink(
                 &source_directory,
                 &source_name,
@@ -421,6 +449,7 @@ fn copy_source_symlink(
     target_name: &OsStr,
     source: &Path,
     target: &Path,
+    #[cfg(windows)] target_link_path: &Path,
 ) -> Result<()> {
     let link_text = source_directory
         .read_link_contents(source_name)
@@ -439,7 +468,7 @@ fn copy_source_symlink(
             ))
         })?;
     #[cfg(windows)]
-    let create_link = target_directory.symlink_file(&link_text, target_name);
+    let create_link = std::os::windows::fs::symlink_file(&link_text, target_link_path);
     #[cfg(not(windows))]
     let create_link = target_directory.symlink_contents(&link_text, target_name);
     create_link.map_err(|error| {
@@ -946,6 +975,66 @@ fn open_file_parent_nofollow(
     Ok((directory, name.to_os_string()))
 }
 
+#[cfg(windows)]
+fn open_file_parent_chain_nofollow(
+    root: &Path,
+    relative: &Path,
+    create_missing: bool,
+) -> io::Result<(Vec<cap_std::fs::Dir>, OsString, PathBuf)> {
+    let mut components = relative.components().collect::<Vec<_>>();
+    let Some(Component::Normal(name)) = components.pop() else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source mutation target must name a file",
+        ));
+    };
+    let mut target_path = root.to_path_buf();
+    for component in relative.components() {
+        let Component::Normal(name) = component else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "unsafe source mutation target path",
+            ));
+        };
+        target_path.push(name);
+    }
+
+    let parent = components
+        .into_iter()
+        .map(|component| match component {
+            Component::Normal(name) => Ok(name.to_os_string()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "unsafe source mutation parent path",
+            )),
+        })
+        .collect::<io::Result<Vec<_>>>()?;
+    let mut directories = open_root_nofollow_chain(root)?;
+    for part in parent {
+        let next = match directories
+            .last()
+            .expect("root chain contains the volume root")
+            .open_dir_nofollow(&part)
+        {
+            Ok(child) => child,
+            Err(error) if create_missing && error.kind() == io::ErrorKind::NotFound => {
+                let parent = directories
+                    .last()
+                    .expect("root chain contains the volume root");
+                match parent.create_dir(&part) {
+                    Ok(()) => {}
+                    Err(create_error) if create_error.kind() == io::ErrorKind::AlreadyExists => {}
+                    Err(create_error) => return Err(create_error),
+                }
+                parent.open_dir_nofollow(&part)?
+            }
+            Err(error) => return Err(error),
+        };
+        directories.push(next);
+    }
+    Ok((directories, name.to_os_string(), target_path))
+}
+
 fn same_file(left: &cap_std::fs::Metadata, right: &cap_std::fs::Metadata) -> bool {
     left.dev() == right.dev() && left.ino() == right.ino()
 }
@@ -1125,44 +1214,72 @@ fn resolve_with_missing(path: &Path) -> Result<PathBuf> {
     }
 }
 
+#[cfg(windows)]
 fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
+    open_root_nofollow_chain(root)?
+        .pop()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "empty source root chain"))
+}
+
+#[cfg(windows)]
+fn open_root_nofollow_chain(root: &Path) -> io::Result<Vec<cap_std::fs::Dir>> {
     let mut components = root.components();
-    #[cfg(windows)]
-    let mut directory = {
-        let prefix = match components.next() {
-            Some(Component::Prefix(prefix)) => prefix,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "absolute source root requires a volume prefix",
-                ))
-            }
-        };
-        if !matches!(components.next(), Some(Component::RootDir)) {
+    let prefix = match components.next() {
+        Some(Component::Prefix(prefix)) => prefix,
+        _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "absolute source root requires a volume root",
-            ));
+                "absolute source root requires a volume prefix",
+            ))
         }
-        let mut volume_root = PathBuf::from(prefix.as_os_str());
-        volume_root.push(std::path::MAIN_SEPARATOR.to_string());
-        cap_std::fs::Dir::open_ambient_dir(&volume_root, cap_std::ambient_authority())?
     };
-    #[cfg(not(windows))]
-    let mut directory = {
-        if !matches!(components.next(), Some(Component::RootDir)) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "absolute source root requires a root component",
-            ));
-        }
-        cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())?
-    };
+    if !matches!(components.next(), Some(Component::RootDir)) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "absolute source root requires a volume root",
+        ));
+    }
+    let mut volume_root = PathBuf::from(prefix.as_os_str());
+    volume_root.push(std::path::MAIN_SEPARATOR.to_string());
+    let mut directories = vec![cap_std::fs::Dir::open_ambient_dir(
+        &volume_root,
+        cap_std::ambient_authority(),
+    )?];
     for component in components {
         match component {
             Component::Normal(name) => {
-                directory = directory.open_dir_nofollow(name)?;
+                let child = directories
+                    .last()
+                    .expect("root chain contains the volume root")
+                    .open_dir_nofollow(name)?;
+                directories.push(child);
             }
+            Component::RootDir => {}
+            Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "source root path is not canonical",
+                ))
+            }
+        }
+    }
+    Ok(directories)
+}
+
+#[cfg(not(windows))]
+fn open_root_nofollow(root: &Path) -> io::Result<cap_std::fs::Dir> {
+    let mut components = root.components();
+    if !matches!(components.next(), Some(Component::RootDir)) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "absolute source root requires a root component",
+        ));
+    }
+    let mut directory =
+        cap_std::fs::Dir::open_ambient_dir(Path::new("/"), cap_std::ambient_authority())?;
+    for component in components {
+        match component {
+            Component::Normal(name) => directory = directory.open_dir_nofollow(name)?,
             Component::RootDir => {}
             Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
                 return Err(io::Error::new(
@@ -1313,5 +1430,63 @@ mod tests {
             flags,
             "copy2-style symlink copy preserves nonzero link flags"
         );
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+    struct TempRoot(PathBuf);
+
+    impl TempRoot {
+        fn new() -> Self {
+            let nonce = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock is after epoch")
+                .as_nanos();
+            let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir().join(format!(
+                "agent-canon-source-chain-{}-{sequence}-{nonce}",
+                std::process::id()
+            ));
+            fs::create_dir_all(path.join("docs/parent"))
+                .expect("target ancestor fixture is created");
+            Self(path.canonicalize().expect("target root is canonical"))
+        }
+    }
+
+    impl Drop for TempRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn target_parent_chain_blocks_ancestor_rename_until_released() {
+        let root = TempRoot::new();
+        let relative = Path::new("docs/parent/link.md");
+        let (directories, name, target_path) =
+            open_file_parent_chain_nofollow(&root.0, relative, false)
+                .expect("target directory chain opens");
+        assert_eq!(name, OsStr::new("link.md"));
+        assert_eq!(
+            target_path,
+            root.0.join("docs").join("parent").join("link.md")
+        );
+        let renamed = root.0.join("docs-renamed");
+
+        assert!(
+            fs::rename(root.0.join("docs"), &renamed).is_err(),
+            "held non-delete-share directory handles block ancestor rename"
+        );
+
+        drop(directories);
+        fs::rename(root.0.join("docs"), renamed)
+            .expect("ancestor can be renamed after the chain is released");
     }
 }

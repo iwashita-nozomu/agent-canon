@@ -366,6 +366,69 @@ fn source_capability_copies_symlink_xattrs_when_the_filesystem_allows_them() {
     assert_eq!(actual, xattr_value);
 }
 
+#[cfg(windows)]
+#[test]
+fn source_capability_copies_external_absolute_symlink_text_and_rejects_collision() {
+    use std::os::windows::fs::symlink_file;
+
+    let root = TempRoot::new();
+    let source_root = root.0.join("source");
+    let support_root = root.0.join("support");
+    fs::create_dir_all(source_root.join("documents/design"))
+        .expect("source design root is created");
+    fs::create_dir_all(support_root).expect("external support root is created");
+    let support_file = support_root.join("real.md");
+    fs::write(&support_file, "external support content\n")
+        .expect("external support file is written");
+    let source_link = source_root.join("documents/design/a.md");
+    symlink_file(&support_file, &source_link).expect("absolute external source link is created");
+    let target_directory = source_root.join("documents/design/foo");
+    fs::create_dir_all(&target_directory).expect("target parent is created");
+    let copied_link = target_directory.join("copied.md");
+    let collision = target_directory.join("collision.md");
+    fs::write(&collision, "existing target remains\n").expect("collision target is seeded");
+    let source_link_text = fs::read_link(&source_link).expect("source link text is read");
+    let capability = capability(
+        &source_root,
+        &[
+            "documents/design/foo/copied.md",
+            "documents/design/foo/collision.md",
+        ],
+    );
+
+    capability
+        .copy_file_with_metadata(&source_link, &copied_link)
+        .expect("absolute external link is copied beneath the source grant");
+
+    assert_eq!(
+        fs::read_link(&copied_link).expect("copied external link text is read"),
+        source_link_text,
+        "the copy preserves the source link's raw absolute target text"
+    );
+    assert_eq!(
+        fs::read(&support_file).expect("external support content remains readable"),
+        b"external support content\n",
+        "copying the link does not mutate its external target"
+    );
+
+    assert!(
+        capability
+            .copy_file_with_metadata(&source_link, &collision)
+            .is_err(),
+        "an existing destination fails atomically"
+    );
+    assert_eq!(
+        fs::read(&collision).expect("existing collision target remains readable"),
+        b"existing target remains\n",
+        "failed link creation leaves the existing destination unchanged"
+    );
+    assert_eq!(
+        fs::read(&support_file).expect("external support content remains readable"),
+        b"external support content\n",
+        "the collision path does not mutate the external target"
+    );
+}
+
 #[test]
 fn source_capability_rejects_malformed_fields_and_escaping_paths() {
     let root = TempRoot::new();
