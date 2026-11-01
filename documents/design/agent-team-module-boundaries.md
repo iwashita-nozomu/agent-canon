@@ -16,7 +16,6 @@ downstream implementation ../../tools/repository/workspace/workspace_scope.py ow
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/python_helper_function_inventory.rs function/class inventory producer
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py run-bundle caller
 downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py task-start caller
-downstream implementation ../../tools/runtime/lifecycle/task_close.py close-agent caller
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment caller
 downstream implementation ../../tools/validation/semantic/authority/validate_role_write_scope.py write-scope caller
 downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py lifecycle event caller
@@ -87,7 +86,6 @@ replaceable responsibility unit として定めます。
   behavior の evidence とは分類しません。
 - caller evidence は `tools/runtime/lifecycle/bootstrap_agent_run.py`、
   `tools/runtime/lifecycle/bootstrap_agent_run.py`、
-  `tools/runtime/lifecycle/task_close.py`、
   `tools/validation/semantic/runtime/check_agent_runtime_alignment.py`、
   `tools/analysis/documents/doc_start.py`、
   `eval/producers/evaluate_agent_run.py`、
@@ -124,7 +122,6 @@ tools/
 └── agent_tools/
     ├── agent_team.py
     ├── bootstrap_agent_run.py
-    ├── task_close.py
     ├── check_agent_runtime_alignment.py
     ├── validate_role_write_scope.py
     └── workflow_monitor.py
@@ -149,12 +146,14 @@ tools/
 | `DOC_START_SET` | `tools/analysis/documents/doc_start.py` |
 | `EVALUATE_SET` | `eval/producers/evaluate_codex_agent_roles.py` |
 | `PACK_SET` | `eval/checkers/smoke_test_research_perspective_pack.py` |
-| `CLOSE_SET` | `tools/runtime/lifecycle/task_close.py` |
 | `SCOPE_SET` | `tools/validation/semantic/authority/validate_role_write_scope.py` |
 | `WATERFALL_SET` | `tools/validation/semantic/lifecycle/waterfall_gate_check.py` |
 | `SINGLE_SET` | `eval/producers/evaluate_agent_run.py`、`tools/runtime/archive/work_log.py` |
 | `TOOL_CALL_SET` | `tools/agent/skills/skill_shim_materializer.py` |
 | `MONITOR_SET` | `tools/runtime/lifecycle/workflow_monitor.py` |
+
+Native coordinated TaskClose is registered in `tools/catalog.yaml` and does not
+import this Python facade.
 
 `STARTER_SET` は `ACTIVE_DESIGN_PACKET_SCHEMA`, `ActiveDesignPacketConfig`,
 `AgentTypeSelection`, `Role`, `RunBundleSpec`, `TaskCatalog`, `TeamConfig`,

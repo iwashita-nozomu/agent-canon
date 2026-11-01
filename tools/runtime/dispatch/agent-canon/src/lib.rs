@@ -13,6 +13,9 @@
 // upstream implementation artifacts/external_artifact_binding.rs owns projection acknowledgements
 // downstream implementation authority/mod.rs owns authenticated parent-root and child-handoff APIs
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
+// downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
+// downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
+// downstream implementation task_close.rs consumes the task-close terminal predicates
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
 // downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
@@ -41,6 +44,7 @@
 // downstream implementation scip_index.rs owns the native generated-index reader and SCIP command
 // downstream implementation git_dependency_diff_summary.rs owns native Git dependency summaries
 // downstream implementation main.rs consumes the shared runtime and CLI library APIs
+// downstream test ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream test ../tests/artifacts_native.rs validates the shared artifact API
 // downstream test ../tests/catalog_native.rs validates the shared catalog API
 // downstream test template_tests.rs validates native Template APIs
@@ -48,6 +52,7 @@
 // downstream test ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
 // @dependency-end
 
+pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
@@ -65,6 +70,7 @@ pub mod git_dependency_diff_summary;
 pub mod lean_proof_env;
 pub mod lsp_code_analysis;
 pub mod native_release;
+pub mod owner_guarantee;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;
@@ -81,6 +87,7 @@ pub mod runtime_boundary;
 pub mod scip_index;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;

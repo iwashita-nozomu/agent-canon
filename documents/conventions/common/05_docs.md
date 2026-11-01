@@ -7,7 +7,7 @@ downstream design ../../../agents/skills/structure-planning.md applies responsib
 downstream design ../../../agents/skills/structure-refactor.md repairs overloaded document boundaries
 downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/docs.rs enforces Markdown math notation and fence rules
 downstream implementation ../../../tools/validation/semantic/convention/check_convention_compliance.py validates document claim grounding
-downstream implementation ../../../tools/runtime/lifecycle/task_close.py validates document split decision closeout evidence
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/task_close.rs validates document split decision closeout evidence
 @dependency-end
 -->
 
@@ -128,7 +128,7 @@ validation route、更新頻度、正本 owner の組み合わせで判断しま
   文書サイズの減少と実セッションの token 削減実測は別の結果として扱います。
 - closeout の Document Structure Evidence は `document_split_decision` を記録し、
   `python3 tools/validation/semantic/convention/check_convention_compliance.py` と
-  `python3 tools/runtime/lifecycle/task_close.py` がこの field の有無を確認します。
+  `tools/bin/agent-canon task-close` がこの field の有無を確認します。
 
 ## Claim Grounding
 

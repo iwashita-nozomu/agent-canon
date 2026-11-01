@@ -202,7 +202,7 @@ change. A no-change or unselected route records its rationale as evidence.
 - コンフリクトがないこと
 - tracked tree に current tree head 以外の implementation truth や古い説明文書が残っていないこと
 - README、guide、workflow、規約文書が最新実装を説明していること
-- terminal readiness は [`task_close.py`](../../tools/runtime/lifecycle/task_close.py) の closeout predicate が返すこと
+- terminal readiness は native [`task-close` owner](../../tools/runtime/dispatch/agent-canon/src/task_close.rs) の closeout predicate が返すこと
 
 ## エビデンス保存
 
