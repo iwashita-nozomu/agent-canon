@@ -1,12 +1,14 @@
 // @dependency-start
-// contract test
-// responsibility Compares native hook monitor projection bytes and result fields with the frozen old API oracle.
-// upstream implementation ../src/hook_report_projection.rs owns the hook-only behavior-event write.
+// contract implementation
+// responsibility Preserves native hook projection bytes and verifies the generic locked monitoring append.
+// upstream implementation ../src/hook_report_projection.rs owns the shared monitor projection.
 // upstream implementation ../src/runtime_boundary.rs owns explicit external path resolution.
 // upstream reference ../../../../../tests/fixtures/hook_report_projection/python_golden.json freezes actual old API results and document bytes.
 // @dependency-end
 
-use agent_canon::hook_report_projection::{emit_behavior_projection_at, MonitorProjectionResult};
+use agent_canon::hook_report_projection::{
+    append_monitoring_projection_at, emit_behavior_projection_at, MonitorProjectionResult,
+};
 use agent_canon::python_json::{
     parse_json, JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
 };
@@ -96,6 +98,30 @@ fn concurrent_identical_behavior_projection_entries_are_written_once() {
     let text = fs::read_to_string(report_dir.join("workflow_monitoring.md"))
         .expect("monitor document is readable");
     assert_eq!(text.matches("behavior_event_json=").count(), 1);
+}
+
+#[test]
+fn generic_monitoring_append_preserves_sections_and_writes_behavior_and_intervention_entries() {
+    let root = TempRoot::new();
+    let report_dir = root.0.join("reports").join("run-token-summary");
+    let behavior_events = vec!["token_usage_summary=present session_count=2".to_owned()];
+    let interventions =
+        vec!["token usage moving average measured from Codex session logs".to_owned()];
+    let path = append_monitoring_projection_at(
+        &report_dir,
+        workspace_scope_source_root(),
+        None,
+        &behavior_events,
+        &interventions,
+        "2026-11-02 12:34 JST",
+    )
+    .expect("generic monitor append succeeds");
+
+    assert_eq!(path, report_dir.join("workflow_monitoring.md"));
+    assert_eq!(
+        fs::read_to_string(path).expect("monitor document is readable"),
+        "# Workflow Monitoring\n<!--\n@dependency-start\nresponsibility Records workflow monitoring for this run bundle.\nupstream design ../../../templates/agents/workflow_monitoring.md template\n@dependency-end\n-->\n\n- Run ID: run-token-summary\n\n## Signals\n\n## Behavior Events\n\n- `2026-11-02 12:34 JST` token_usage_summary=present session_count=2\n## Tool Warnings\n\n- tool_warnings_status: pending\n\n## Interventions\n\n- `2026-11-02 12:34 JST` token usage moving average measured from Codex session logs\n## Improvement Decisions\n\n- skill_improvement_decision: pending\n- config_improvement_decision: pending\n- workflow_improvement_decision: pending\n- knowledge_learning_decision: pending\n"
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 // @dependency-start
 // contract implementation
-// responsibility Derives dependency graph query, review, and context projections directly from tracked source manifests.
+// responsibility Derives dependency graph projections and shares Python-compatible component matching.
 // upstream design ../../../../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
 // upstream design ../../../../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 // upstream implementation skill_projection_registry.rs resolves generated skill-view owner paths
@@ -9,6 +9,7 @@
 // downstream implementation graph_client.rs exposes typed source-derived dependency query and context
 // downstream implementation tool_drift.rs consumes source-derived dependency facts
 // downstream implementation agent_search.rs routes selected dependency requests through the source graph owner
+// downstream implementation token_footprints.rs reuses Python-compatible component matching for session globs
 // downstream implementation ../../../../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
 // downstream implementation ../../../../../tests/agent_tools/test_dependency_graph_cycles.py verifies snapshot and normal-path boundaries
 // @dependency-end
@@ -629,18 +630,21 @@ fn has_glob_magic(path: &str) -> bool {
 }
 
 fn class_match(pattern: &[char], start: usize, value: Option<char>) -> Option<(usize, bool)> {
-    let closing = (start + 1..pattern.len()).find(|index| pattern[*index] == ']')?;
+    let mut content_start = start + 1;
+    let negated = pattern.get(content_start) == Some(&'!');
+    if negated {
+        content_start += 1;
+    }
+    let leading_close = pattern.get(content_start) == Some(&']');
+    if leading_close {
+        content_start += 1;
+    }
+    let closing = (content_start..pattern.len()).find(|index| pattern[*index] == ']')?;
     let Some(value) = value else {
         return Some((closing, false));
     };
-    let mut index = start + 1;
-    let negated = pattern
-        .get(index)
-        .is_some_and(|character| *character == '!');
-    if negated {
-        index += 1;
-    }
-    let mut matched = false;
+    let mut index = content_start;
+    let mut matched = leading_close && value == ']';
     while index < closing {
         let low = pattern[index];
         if index + 2 < closing && pattern[index + 1] == '-' {
@@ -702,7 +706,7 @@ fn fnmatch_chars(
     result
 }
 
-fn fnmatch_case(value: &str, pattern: &str) -> bool {
+pub(crate) fn fnmatch_case(value: &str, pattern: &str) -> bool {
     fnmatch_chars(
         &value.chars().collect::<Vec<_>>(),
         &pattern.chars().collect::<Vec<_>>(),
@@ -710,6 +714,21 @@ fn fnmatch_case(value: &str, pattern: &str) -> bool {
         0,
         &mut BTreeMap::new(),
     )
+}
+
+#[cfg(test)]
+mod fnmatch_tests {
+    use super::fnmatch_case;
+
+    #[test]
+    fn character_classes_match_python_leading_close_bracket_rules() {
+        assert!(fnmatch_case("]", "[]]"));
+        assert!(!fnmatch_case("a", "[]]"));
+        assert!(fnmatch_case("a", "[!]]"));
+        assert!(!fnmatch_case("]", "[!]]"));
+        assert!(fnmatch_case("[]", "[]"));
+        assert!(fnmatch_case("[!]", "[!]"));
+    }
 }
 
 fn resolve_dependency_targets(
