@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents route tool usage.
 upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns explicit capability selection
 upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer delegation
 upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
 upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
@@ -16,6 +17,9 @@ downstream implementation ../../tests/agent_tools/test_route.py validates route 
 would otherwise become many long one-off tools. It maps long proposal names
 such as `profile_surface_resolver.py` or `$runtime-capability-routing` to one
 small command surface:
+
+Explicit `--capability` selection delegates preflight and decision-making to
+the native `agent-canon capability-route` command.
 
 ```bash
 python3 tools/agent/orchestration/route.py --area checks --changed README.md

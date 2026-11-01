@@ -52,6 +52,7 @@
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // downstream implementation tool_dispatch.rs routes typed catalog commands through the native CLI
+// downstream implementation catalog/skill_routes.rs routes explicit skill capabilities
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
 // downstream implementation extract_docx.rs routes the native DOCX extraction command
 // @dependency-end
@@ -148,6 +149,7 @@ Commands:
   compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
+  capability-route [--capability ID] [--mode routing-only|repo-changing] [--format text|json|markdown] [--root PATH]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
   tool-proof-coverage [--root <repo-root>] [--format text|json|markdown] [--tool-id ID]... [--require-lean-verified]
   theorem-graph-board --graph <path> [--out <path>] [--format json|markdown] [--fail-on-open] [--fail-on-unknown]
@@ -267,6 +269,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool" {
         std::process::exit(tool_dispatch::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "capability-route" {
+        std::process::exit(catalog::skill_routes::run_capability_route(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "check-github-workflows" {

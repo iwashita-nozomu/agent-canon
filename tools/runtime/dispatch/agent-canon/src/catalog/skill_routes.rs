@@ -1,4 +1,18 @@
+// @dependency-start
+// contract implementation
+// responsibility Owns typed skill-route catalog loading, dependency validation, and explicit capability decisions.
+// upstream design ../../../../../../agents/skills/catalog.yaml canonical public skill-route inputs
+// upstream design ../../../../../../agents/skills/skill-dependencies.yaml ordered dependency inputs
+// upstream implementation ../path_expansion.rs shared user-home expansion
+// upstream implementation ../path_resolution.rs shared non-strict filesystem resolution
+// upstream implementation ../python_text.rs Python-compatible route text normalization
+// downstream implementation ../main.rs native capability-route command
+// downstream implementation ../../../../../../tools/agent/orchestration/route.py public route facade
+// downstream implementation ../../../../../../tests/agent_tools/test_route.py capability route contract tests
+// @dependency-end
+
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::env;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -17,6 +31,10 @@ pub const SKILL_DEPENDENCY_MAP_PATH: &str = "agents/skills/skill-dependencies.ya
 pub const TOOL_CATALOG_PATH: &str = "tools/catalog.yaml";
 pub const CATALOG_SCHEMA_ROOT: &str = "schemas/agent-canon";
 pub const PRIVATE_SKILL_PREFIX: &str = "_";
+pub const CAPABILITY_ROUTE_SCHEMA: &str = "agent_canon.route.capability_route.v1";
+pub const CAPABILITY_FORMAT_VALUES: [&str; 3] = ["text", "json", "markdown"];
+pub const CAPABILITY_MODE_VALUES: [&str; 2] = ["routing-only", "repo-changing"];
+pub const CAPABILITY_RISK_VALUES: [&str; 5] = ["routine", "focused", "profile", "shared", "large"];
 
 pub const CATALOG_SCHEMA_PATHS: [(&str, &str); 3] = [
     (
@@ -153,6 +171,54 @@ pub struct CapabilityIndex {
     pub owner_ambiguities: Vec<CapabilityId>,
     pub duplicate_definitions: Vec<CapabilityId>,
 }
+
+/// Raw argument validation result for explicit capability routing.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityPreflight {
+    pub capability_ids: Vec<CapabilityId>,
+    pub mode: String,
+    pub output_format: String,
+    pub error_code: String,
+    pub root: Option<PathBuf>,
+}
+
+/// Stable output envelope for explicit capability routing.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct CapabilityRouteDecision {
+    pub schema: String,
+    pub route: String,
+    pub mode: String,
+    pub status: String,
+    pub error_code: String,
+    pub capability_ids: Vec<CapabilityId>,
+    pub matches: Vec<CapabilityRoute>,
+    pub skills: Vec<String>,
+    pub active_skills: Vec<String>,
+    pub deferred_skills: Vec<String>,
+    pub related_skill_candidates: Vec<String>,
+    pub related_skills: OrderedMap<String, Vec<String>>,
+    pub reasons: Vec<String>,
+}
+
+/// One fixed invalid direct capability-match precondition error.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapabilityRouteError {
+    pub code: String,
+}
+
+impl CapabilityRouteError {
+    fn new(code: impl Into<String>) -> Self {
+        Self { code: code.into() }
+    }
+}
+
+impl fmt::Display for CapabilityRouteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.code)
+    }
+}
+
+impl std::error::Error for CapabilityRouteError {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CapabilityCatalogError {
@@ -698,7 +764,7 @@ pub fn derive_skill_invocation_order(
 
 /// Normalizes and validates one explicit capability identifier.
 pub fn capability_id_from_raw(value: &str) -> Result<CapabilityId, String> {
-    let raw = value.trim();
+    let raw = crate::python_text::python_strip(value);
     if raw.is_empty() || !CAPABILITY_ID_RE.is_match(raw) {
         return Err(format!("invalid-capability-id:{value}"));
     }
@@ -732,7 +798,10 @@ pub fn capability_routes(
             return Err(capability_catalog_error(skill, &record_field));
         };
         let keys: BTreeSet<&str> = entries.keys().filter_map(Yaml::as_str).collect();
-        if keys != required {
+        if entries.len() != required.len()
+            || entries.keys().any(|key| key.as_str().is_none())
+            || keys != required
+        {
             return Err(capability_catalog_error(skill, &record_field));
         }
         let mut values = BTreeMap::new();
@@ -996,6 +1065,634 @@ pub fn related_skill_candidates(
     (related_by_source, ordered_unique(&candidates))
 }
 
+fn capability_value_option(option: &str) -> Option<&'static str> {
+    match option {
+        "--capability" | "--format" | "--mode" | "--risk" | "--root" => Some(option),
+        "--name" | "--area" | "--prompt" | "--request" | "--purpose" | "--task" => {
+            Some("--prompt")
+        }
+        "--prompt-file" | "--request-file" | "--query-file" => Some("--prompt-file"),
+        _ => None,
+    }
+}
+
+fn capability_boolean_option(option: &str) -> Option<&'static str> {
+    match option {
+        "--prompt-stdin" | "--request-stdin" | "--query-stdin" => Some("--prompt-stdin"),
+        "--list" => Some("--list"),
+        _ => None,
+    }
+}
+
+/// Returns the first raw-argument conflict for explicit capability mode.
+pub fn capability_flag_conflict(argv: &[String]) -> Option<String> {
+    let capability_present = argv
+        .iter()
+        .any(|token| token == "--capability" || token.starts_with("--capability="));
+    if !capability_present {
+        return None;
+    }
+    let mut index = 0;
+    while index < argv.len() {
+        let token = &argv[index];
+        if token == "--capability" || token.starts_with("--capability=") {
+            index += 1;
+            if token == "--capability"
+                && index < argv.len()
+                && !argv[index].starts_with("--")
+            {
+                index += 1;
+            }
+            continue;
+        }
+        if token.starts_with("--") && token.contains('=') {
+            let option = token.split_once('=').map_or(token.as_str(), |(option, _)| option);
+            if let Some(canonical) = capability_value_option(option) {
+                if !matches!(canonical, "--format" | "--mode" | "--risk" | "--root") {
+                    return Some(format!("capability-input-conflict:{canonical}"));
+                }
+                index += 1;
+                continue;
+            }
+            if let Some(canonical) = capability_boolean_option(option) {
+                return Some(format!("capability-input-conflict:{canonical}"));
+            }
+            if option == "--changed" {
+                return Some("capability-input-conflict:--changed".to_owned());
+            }
+            return Some(format!("capability-unsupported-option:{token}"));
+        }
+        if let Some(canonical) = capability_value_option(token) {
+            if !matches!(canonical, "--capability" | "--format" | "--mode" | "--risk" | "--root") {
+                return Some(format!("capability-input-conflict:{canonical}"));
+            }
+            index += 1;
+            if index >= argv.len() || argv[index].starts_with("--") {
+                if !matches!(canonical, "--format" | "--mode" | "--risk" | "--root") {
+                    return Some(format!("capability-input-conflict:{canonical}"));
+                }
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if let Some(canonical) = capability_boolean_option(token) {
+            return Some(format!("capability-input-conflict:{canonical}"));
+        }
+        if token == "--changed" || token.starts_with("--changed=") {
+            return Some("capability-input-conflict:--changed".to_owned());
+        }
+        if token.starts_with("--") {
+            return Some(format!("capability-unsupported-option:{token}"));
+        }
+        return Some("capability-input-conflict:--prompt".to_owned());
+    }
+    None
+}
+
+/// Validate raw capability arguments before catalog loading or route parsing.
+pub fn preflight_capability_argv(argv: &[String]) -> CapabilityPreflight {
+    let mut values = Vec::new();
+    let mut output_format = "text".to_owned();
+    let mut mode = "routing-only".to_owned();
+    let mut root = None;
+    let mut format_raw = None;
+    let mut mode_raw = None;
+    let mut risk_raw = None;
+    let mut capability_present = false;
+    let mut index = 0;
+    while index < argv.len() {
+        let token = &argv[index];
+        if token == "--capability" || token.starts_with("--capability=") {
+            capability_present = true;
+            if token == "--capability" {
+                if index + 1 >= argv.len() || argv[index + 1].starts_with("--") {
+                    return CapabilityPreflight {
+                        capability_ids: Vec::new(),
+                        mode,
+                        output_format,
+                        error_code: "missing-capability-value".to_owned(),
+                        root,
+                    };
+                }
+                values.push(argv[index + 1].clone());
+                index += 2;
+                continue;
+            }
+            values.push(token.split_once('=').map_or("", |(_, value)| value).to_owned());
+            index += 1;
+            continue;
+        }
+        let option = if token.starts_with("--") {
+            token.split_once('=').map_or(token.as_str(), |(option, _)| option)
+        } else {
+            ""
+        };
+        let has_equals = token.starts_with("--") && token.contains('=');
+        if matches!(option, "--format" | "--mode" | "--risk" | "--root") {
+            let value = if has_equals {
+                token.split_once('=').map_or("", |(_, value)| value).to_owned()
+            } else if index + 1 >= argv.len() || argv[index + 1].starts_with("--") {
+                let error_code = match option {
+                    "--format" => "missing-format-value",
+                    "--mode" => "missing-mode-value",
+                    "--risk" => "missing-risk-value",
+                    _ => "missing-root-value",
+                };
+                return CapabilityPreflight {
+                    capability_ids: Vec::new(),
+                    mode,
+                    output_format,
+                    error_code: error_code.to_owned(),
+                    root,
+                };
+            } else {
+                index += 1;
+                argv[index].clone()
+            };
+            match option {
+                "--format" => {
+                    format_raw = Some(value.clone());
+                    output_format = if CAPABILITY_FORMAT_VALUES.contains(&value.as_str()) {
+                        value
+                    } else {
+                        "text".to_owned()
+                    };
+                }
+                "--mode" => {
+                    mode_raw = Some(value.clone());
+                    mode = if CAPABILITY_MODE_VALUES.contains(&value.as_str()) {
+                        value
+                    } else {
+                        "routing-only".to_owned()
+                    };
+                }
+                "--risk" => risk_raw = Some(value),
+                "--root" => root = Some(PathBuf::from(value)),
+                _ => unreachable!("capability option was matched above"),
+            }
+            index += 1;
+            continue;
+        }
+        index += 1;
+    }
+
+    if !capability_present {
+        return CapabilityPreflight {
+            capability_ids: Vec::new(),
+            mode,
+            output_format,
+            error_code: String::new(),
+            root,
+        };
+    }
+    let normalized_ids = match values
+        .iter()
+        .map(|value| capability_id_from_raw(value))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(values) => values,
+        Err(error) => {
+            return CapabilityPreflight {
+                capability_ids: Vec::new(),
+                mode,
+                output_format,
+                error_code: error,
+                root,
+            };
+        }
+    };
+    if let Some(duplicate) = normalized_ids.iter().enumerate().find_map(|(position, value)| {
+        normalized_ids[..position]
+            .contains(value)
+            .then_some(value)
+    }) {
+        return CapabilityPreflight {
+            capability_ids: normalized_ids,
+            mode,
+            output_format,
+            error_code: format!("duplicate-capability:{duplicate}"),
+            root,
+        };
+    }
+    if let Some(error_code) = capability_flag_conflict(argv) {
+        return CapabilityPreflight {
+            capability_ids: normalized_ids,
+            mode,
+            output_format,
+            error_code,
+            root,
+        };
+    }
+    if let Some(format) = format_raw {
+        if !CAPABILITY_FORMAT_VALUES.contains(&format.as_str()) {
+            return CapabilityPreflight {
+                capability_ids: normalized_ids,
+                mode,
+                output_format: "text".to_owned(),
+                error_code: format!("invalid-capability-format:{format}"),
+                root,
+            };
+        }
+    }
+    if let Some(mode_value) = mode_raw {
+        if !CAPABILITY_MODE_VALUES.contains(&mode_value.as_str()) {
+            return CapabilityPreflight {
+                capability_ids: normalized_ids,
+                mode: "routing-only".to_owned(),
+                output_format,
+                error_code: format!("invalid-capability-mode:{mode_value}"),
+                root,
+            };
+        }
+    }
+    if let Some(risk) = risk_raw {
+        if !CAPABILITY_RISK_VALUES.contains(&risk.as_str()) || risk != "focused" {
+            return CapabilityPreflight {
+                capability_ids: normalized_ids,
+                mode,
+                output_format,
+                error_code: "capability-risk-conflict".to_owned(),
+                root,
+            };
+        }
+    }
+    CapabilityPreflight {
+        capability_ids: normalized_ids,
+        mode,
+        output_format,
+        error_code: String::new(),
+        root,
+    }
+}
+
+/// Validates one capability selection against the catalog index.
+pub fn capability_skill_routes(
+    capability_ids: &[String],
+    index: &CapabilityIndex,
+) -> Result<Vec<CapabilityRoute>, CapabilityRouteError> {
+    if capability_ids.is_empty() {
+        return Err(CapabilityRouteError::new("unknown-capability:"));
+    }
+    let mut normalized = Vec::new();
+    for raw in capability_ids {
+        let capability_id = capability_id_from_raw(raw)
+            .map_err(|_| CapabilityRouteError::new(format!("invalid-capability-id:{raw}")))?;
+        if normalized.contains(&capability_id) {
+            return Err(CapabilityRouteError::new(format!(
+                "duplicate-capability:{capability_id}"
+            )));
+        }
+        normalized.push(capability_id);
+    }
+    if normalized.len() > 1 {
+        return Err(CapabilityRouteError::new(
+            "multiple-capabilities-not-supported",
+        ));
+    }
+    let route = index.routes.get(&normalized[0]).ok_or_else(|| {
+        CapabilityRouteError::new(format!("unknown-capability:{}", normalized[0]))
+    })?;
+    Ok(vec![route.clone()])
+}
+
+/// Selects the sole deterministic capability diagnostic.
+pub fn capability_error_code(
+    capability_ids: &[String],
+    preflight: &CapabilityPreflight,
+    index: &CapabilityIndex,
+) -> String {
+    if !preflight.error_code.is_empty() {
+        return preflight.error_code.clone();
+    }
+    for capability_id in &index.owner_ambiguities {
+        if capability_ids.contains(capability_id) {
+            return format!("capability-owner-ambiguity:{capability_id}");
+        }
+    }
+    for capability_id in &index.duplicate_definitions {
+        if capability_ids.contains(capability_id) {
+            return format!("duplicate-capability-definition:{capability_id}");
+        }
+    }
+    let mut normalized = Vec::new();
+    for raw in capability_ids {
+        let capability_id = match capability_id_from_raw(raw) {
+            Ok(value) => value,
+            Err(_) => return format!("invalid-capability-id:{raw}"),
+        };
+        if normalized.contains(&capability_id) {
+            return format!("duplicate-capability:{capability_id}");
+        }
+        normalized.push(capability_id);
+    }
+    if normalized.len() > 1 {
+        return "multiple-capabilities-not-supported".to_owned();
+    }
+    if let Some(capability_id) = normalized.first() {
+        if !index.routes.contains_key(capability_id) {
+            return format!("unknown-capability:{capability_id}");
+        }
+    }
+    String::new()
+}
+
+/// Creates one deterministic failure envelope without rendering.
+pub fn capability_failure_decision(
+    error_code: &str,
+    capability_ids: &[String],
+    mode: &str,
+) -> CapabilityRouteDecision {
+    let capability_ids = if error_code.starts_with("invalid-capability-id:") {
+        Vec::new()
+    } else {
+        capability_ids.to_vec()
+    };
+    CapabilityRouteDecision {
+        schema: CAPABILITY_ROUTE_SCHEMA.to_owned(),
+        route: "capability-selection".to_owned(),
+        mode: if CAPABILITY_MODE_VALUES.contains(&mode) {
+            mode.to_owned()
+        } else {
+            "routing-only".to_owned()
+        },
+        status: "fail".to_owned(),
+        error_code: error_code.to_owned(),
+        capability_ids,
+        matches: Vec::new(),
+        skills: Vec::new(),
+        active_skills: Vec::new(),
+        deferred_skills: Vec::new(),
+        related_skill_candidates: Vec::new(),
+        related_skills: OrderedMap::new(),
+        reasons: Vec::new(),
+    }
+}
+
+/// Builds the capability-owned route decision without prompt inference.
+pub fn decide_capabilities(
+    capability_ids: &[String],
+    mode: &str,
+    index: &CapabilityIndex,
+    preflight: &CapabilityPreflight,
+) -> CapabilityRouteDecision {
+    let error_code = capability_error_code(capability_ids, preflight, index);
+    if !error_code.is_empty() {
+        return capability_failure_decision(&error_code, capability_ids, mode);
+    }
+    let matches = match capability_skill_routes(capability_ids, index) {
+        Ok(matches) => matches,
+        Err(error) => return capability_failure_decision(&error.code, capability_ids, mode),
+    };
+    let matched = &matches[0];
+    let mut skills = vec!["agent-orchestration".to_owned()];
+    if mode == "repo-changing" {
+        skills.push("codex-task-workflow".to_owned());
+    }
+    skills.push(matched.skill.clone());
+    let skills = ordered_unique(&skills);
+    let active_skills = ordered_unique(&[
+        "agent-orchestration".to_owned(),
+        matched.skill.clone(),
+    ]);
+    let deferred_skills = skills
+        .iter()
+        .filter(|skill| !active_skills.contains(skill))
+        .cloned()
+        .collect();
+    let (related_skills, related_skill_candidates) = related_skill_candidates(
+        &[matched.skill.clone()],
+        &index.rules_by_skill,
+        &[matched.skill.clone()],
+    );
+    let reason = format!(
+        "capability={};owner={};phase={};activation={}",
+        matched.capability_id, matched.owner, matched.phase, matched.activation
+    );
+    let reasons = vec![format!("{}:{reason}", matched.skill)];
+    CapabilityRouteDecision {
+        schema: CAPABILITY_ROUTE_SCHEMA.to_owned(),
+        route: "capability-selection".to_owned(),
+        mode: mode.to_owned(),
+        status: "pass".to_owned(),
+        error_code: String::new(),
+        capability_ids: capability_ids.to_vec(),
+        matches,
+        skills,
+        active_skills,
+        deferred_skills,
+        related_skill_candidates,
+        related_skills,
+        reasons,
+    }
+}
+
+fn route_source_override(raw: &str, code: &str) -> Result<PathBuf, (String, String)> {
+    let expanded = crate::path_expansion::expand_user_path(Path::new(raw))
+        .map_err(|error| (code.to_owned(), format!("Unable to resolve {raw}: {error}")))?;
+    let resolved = crate::path_resolution::resolve_non_strict(&expanded)
+        .map_err(|error| (code.to_owned(), format!("Unable to resolve {raw}: {error}")))?;
+    if resolved != expanded && !(expanded.is_absolute() && resolved.starts_with(&expanded)) {
+        return Err((
+            code.to_owned(),
+            format!(
+                "{raw} resolves outside its declared root: {}",
+                resolved.display()
+            ),
+        ));
+    }
+    Ok(resolved)
+}
+
+fn current_route_repository_root(raw_root: &Path) -> Result<PathBuf, String> {
+    let expanded = crate::path_expansion::expand_user_path(raw_root)
+        .map_err(|error| error.to_string())?;
+    let start = if expanded.is_absolute() {
+        expanded
+    } else {
+        crate::path_resolution::resolve_non_strict(&expanded)?
+    };
+    for candidate in start.ancestors() {
+        if has_skill_catalog(candidate) {
+            return crate::path_resolution::resolve_non_strict(candidate);
+        }
+        if candidate.join(".git").exists() {
+            return crate::path_resolution::resolve_non_strict(candidate);
+        }
+    }
+    crate::path_resolution::resolve_non_strict(&start)
+}
+
+fn resolve_capability_catalog_root(raw_root: &Path) -> Result<PathBuf, (String, String)> {
+    let current_repository_root = current_route_repository_root(raw_root)
+        .map_err(|error| ("agent_canon_source_root_missing".to_owned(), error))?;
+    let source_override = env::var("AGENT_CANON_SOURCE_ROOT")
+        .map(|value| crate::python_text::python_strip(&value).to_owned())
+        .unwrap_or_default();
+    let canon_override = env::var("AGENT_CANON_ROOT")
+        .map(|value| crate::python_text::python_strip(&value).to_owned())
+        .unwrap_or_default();
+    if !source_override.is_empty() || !canon_override.is_empty() {
+        let source_value = if source_override.is_empty() {
+            &canon_override
+        } else {
+            &source_override
+        };
+        let canon_value = if canon_override.is_empty() {
+            &source_override
+        } else {
+            &canon_override
+        };
+        let source = route_source_override(
+            source_value,
+            "agent_canon_source_root_override_invalid",
+        )?;
+        let canon = route_source_override(
+            canon_value,
+            "agent_canon_canon_root_override_invalid",
+        )?;
+        if !has_skill_catalog(&source) {
+            return Err((
+                "agent_canon_source_root_override_missing".to_owned(),
+                format!("Override source root has no AgentCanon catalog: {}", source.display()),
+            ));
+        }
+        if !has_skill_catalog(&canon) {
+            return Err((
+                "agent_canon_canon_root_override_missing".to_owned(),
+                format!("Override canon root has no AgentCanon catalog: {}", canon.display()),
+            ));
+        }
+        return Ok(source);
+    }
+    if !has_skill_catalog(&current_repository_root) {
+        return Err((
+            "agent_canon_source_root_missing".to_owned(),
+            format!(
+                "No AgentCanon catalog found at current_repository_root={}; select an external checkout with AGENT_CANON_SOURCE_ROOT",
+                current_repository_root.display()
+            ),
+        ));
+    }
+    Ok(current_repository_root)
+}
+
+fn render_capability_decision(
+    decision: &CapabilityRouteDecision,
+    output_format: &str,
+) -> String {
+    let matches = serde_json::to_string(&decision.matches).expect("matches serialize");
+    let related_skills =
+        serde_json::to_string(&decision.related_skills).expect("related skills serialize");
+    let reasons = serde_json::to_string(&decision.reasons).expect("reasons serialize");
+    let capability_ids = if decision.capability_ids.is_empty() {
+        "-".to_owned()
+    } else {
+        decision.capability_ids.join(",")
+    };
+    let join_or_dash = |values: &[String]| {
+        if values.is_empty() {
+            "-".to_owned()
+        } else {
+            values.join(",")
+        }
+    };
+    if output_format == "json" {
+        return serde_json::to_string_pretty(decision).expect("route decision serializes");
+    }
+    if output_format == "markdown" {
+        return [
+            format!("- Schema: `{}`", decision.schema),
+            format!("- Route: `{}`", decision.route),
+            format!("- Mode: `{}`", decision.mode),
+            format!("- Status: `{}`", decision.status),
+            format!("- Error code: `{}`", decision.error_code),
+            format!("- Capability IDs: `{capability_ids}`"),
+            format!("- Matches: `{matches}`"),
+            format!("- Skills: `{}`", join_or_dash(&decision.skills)),
+            format!("- Active skills: `{}`", join_or_dash(&decision.active_skills)),
+            format!("- Deferred skills: `{}`", join_or_dash(&decision.deferred_skills)),
+            format!(
+                "- Related skill candidates: `{}`",
+                join_or_dash(&decision.related_skill_candidates)
+            ),
+            format!("- Related skills: `{related_skills}`"),
+            format!("- Reasons: `{reasons}`"),
+        ]
+        .join("\n");
+    }
+    [
+        format!("CAPABILITY_ROUTE_SCHEMA={}", decision.schema),
+        format!("CAPABILITY_ROUTE={}", decision.route),
+        format!("CAPABILITY_MODE={}", decision.mode),
+        format!("CAPABILITY_ROUTE_STATUS={}", decision.status),
+        format!("CAPABILITY_ERROR_CODE={}", decision.error_code),
+        format!("CAPABILITY_IDS={capability_ids}"),
+        format!("CAPABILITY_MATCHES={matches}"),
+        format!("SKILLS={}", join_or_dash(&decision.skills)),
+        format!("ACTIVE_SKILLS={}", join_or_dash(&decision.active_skills)),
+        format!("DEFERRED_SKILLS={}", join_or_dash(&decision.deferred_skills)),
+        format!(
+            "RELATED_SKILL_CANDIDATES={}",
+            join_or_dash(&decision.related_skill_candidates)
+        ),
+        format!("RELATED_SKILLS={related_skills}"),
+        format!("REASONS={reasons}"),
+    ]
+    .join("\n")
+}
+
+/// Execute the capability-selection branch of the canonical route CLI.
+pub fn run_capability_route(args: &[String]) -> i32 {
+    let preflight = preflight_capability_argv(args);
+    if !args
+        .iter()
+        .any(|token| token == "--capability" || token.starts_with("--capability="))
+    {
+        eprintln!("usage: agent-canon capability-route --capability ID [options]");
+        return 2;
+    }
+    if !preflight.error_code.is_empty() {
+        let decision = capability_failure_decision(
+            &preflight.error_code,
+            &preflight.capability_ids,
+            &preflight.mode,
+        );
+        println!("{}", render_capability_decision(&decision, &preflight.output_format));
+        return 2;
+    }
+    let default_root = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let raw_root = preflight.root.as_deref().unwrap_or(&default_root);
+    let root = match resolve_capability_catalog_root(raw_root) {
+        Ok(root) => root,
+        Err((code, detail)) => {
+            eprintln!("ROUTE_SOURCE_ROOT_FAILURE={code}:{detail}");
+            return 2;
+        }
+    };
+    let rules = match load_skill_route_rules_from_root(&root) {
+        Ok(rules) => rules,
+        Err(_) => {
+            let decision = capability_failure_decision(
+                "capability-root-catalog-invalid",
+                &preflight.capability_ids,
+                &preflight.mode,
+            );
+            println!("{}", render_capability_decision(&decision, &preflight.output_format));
+            return 2;
+        }
+    };
+    let index = build_capability_index(&rules);
+    let decision = decide_capabilities(
+        &preflight.capability_ids,
+        &preflight.mode,
+        &index,
+        &preflight,
+    );
+    println!("{}", render_capability_decision(&decision, &preflight.output_format));
+    if decision.status == "pass" { 0 } else { 2 }
+}
+
 /// Runs the optional authoring-only YAML and JSON schema checks.
 pub fn validate_catalog_schemas(root: &Path) -> Result<Vec<JsonValue>, CapabilityRootError> {
     validate_catalog_schemas_with(root, &mut Command::output)
@@ -1050,6 +1747,134 @@ fn validate_catalog_schemas_with(
         }));
     }
     Ok(results)
+}
+
+#[cfg(test)]
+mod capability_route_tests {
+    use super::*;
+
+    fn sample_index() -> CapabilityIndex {
+        let route = CapabilityRoute {
+            skill: "oop-type-design".to_owned(),
+            capability_id: "oop_type_design".to_owned(),
+            owner: "pre_implementation_oop_type_design".to_owned(),
+            phase: "pre_implementation_design".to_owned(),
+            activation: "explicit_capability".to_owned(),
+            exclusive: true,
+        };
+        let rule = SkillRoutingRule {
+            skill: "oop-type-design".to_owned(),
+            canonical_doc: "agents/skills/oop-type-design.md".to_owned(),
+            reason: "fixture".to_owned(),
+            stage_policy: "active".to_owned(),
+            triggers: Vec::new(),
+            capabilities: vec![route],
+            related_skills: vec![
+                "python-review".to_owned(),
+                "cpp-review".to_owned(),
+                "oop-readability-check".to_owned(),
+            ],
+            required_prerequisites: Vec::new(),
+            successors: Vec::new(),
+            order_constraints: Vec::new(),
+            parallel_independent: Vec::new(),
+            responsibility_group: "design".to_owned(),
+        };
+        build_capability_index(&[rule])
+    }
+
+    #[test]
+    fn raw_preflight_preserves_capability_errors_and_defaults() {
+        let missing = preflight_capability_argv(&[
+            "--capability".to_owned(),
+            "--format".to_owned(),
+            "json".to_owned(),
+        ]);
+        assert_eq!(missing.error_code, "missing-capability-value");
+        assert_eq!(missing.output_format, "text");
+
+        let conflict = preflight_capability_argv(&[
+            "--capability".to_owned(),
+            "oop_type_design".to_owned(),
+            "--prompt".to_owned(),
+            "design".to_owned(),
+        ]);
+        assert_eq!(conflict.error_code, "capability-input-conflict:--prompt");
+        assert_eq!(conflict.mode, "routing-only");
+
+        let invalid_mode = preflight_capability_argv(&[
+            "--capability".to_owned(),
+            "oop_type_design".to_owned(),
+            "--mode".to_owned(),
+            "other".to_owned(),
+        ]);
+        assert_eq!(invalid_mode.error_code, "invalid-capability-mode:other");
+        assert_eq!(invalid_mode.mode, "routing-only");
+    }
+
+    #[test]
+    fn capability_decision_reuses_catalog_order_and_keeps_repo_change_deferred() {
+        let index = sample_index();
+        let preflight = preflight_capability_argv(&[
+            "--capability".to_owned(),
+            "oop_type_design".to_owned(),
+            "--mode".to_owned(),
+            "repo-changing".to_owned(),
+        ]);
+        let decision = decide_capabilities(
+            &preflight.capability_ids,
+            &preflight.mode,
+            &index,
+            &preflight,
+        );
+        assert_eq!(decision.status, "pass");
+        assert_eq!(decision.capability_ids, vec!["oop_type_design".to_owned()]);
+        assert_eq!(decision.matches[0].owner, "pre_implementation_oop_type_design");
+        assert_eq!(
+            decision.skills,
+            vec![
+                "agent-orchestration".to_owned(),
+                "codex-task-workflow".to_owned(),
+                "oop-type-design".to_owned(),
+            ]
+        );
+        assert_eq!(
+            decision.active_skills,
+            vec!["agent-orchestration".to_owned(), "oop-type-design".to_owned()]
+        );
+        assert_eq!(
+            decision.deferred_skills,
+            vec!["codex-task-workflow".to_owned()]
+        );
+        assert_eq!(
+            decision.related_skill_candidates,
+            vec![
+                "python-review".to_owned(),
+                "cpp-review".to_owned(),
+                "oop-readability-check".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn direct_capability_match_rejects_unknown_and_multiple_ids() {
+        let index = sample_index();
+        assert_eq!(
+            capability_skill_routes(&["unknown_capability".to_owned()], &index)
+                .expect_err("unknown capability is rejected")
+                .code,
+            "unknown-capability:unknown_capability"
+        );
+        assert_eq!(
+            capability_skill_routes(
+                &["oop_type_design".to_owned(), "other_capability".to_owned()],
+                &index,
+            )
+            .expect_err("multiple capabilities are not arbitrated")
+            .code,
+            "multiple-capabilities-not-supported"
+        );
+    }
 }
 
 #[cfg(test)]

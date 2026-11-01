@@ -7,7 +7,7 @@
 # upstream design ../../../agents/skills/catalog.yaml public skill catalog and related skill metadata
 # upstream design ../../../agents/task_catalog.yaml exclusive bounded and coordinated execution routes
 # upstream implementation ../skills/skill_route_catalog.py catalog/rule/index owner
-# upstream implementation ./capability_route.py capability preflight/decision owner
+# upstream implementation ../../runtime/dispatch/agent-canon/src/catalog/skill_routes.rs native capability preflight/decision owner
 # upstream design ../../../agents/skills/structure-refactor.md repository structure and personal runtime routing boundary
 # upstream design ../../../agents/skills/prose-reasoning-graph.md prose graph skill routing
 # upstream design ../../../agents/skills/pr-processing.md PR and Issue queue processing skill routing
@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -33,19 +35,9 @@ if __package__ in (None, ""):
 
 import yaml
 
-from tools.agent.orchestration.capability_route import (
-    FORMAT_VALUES,
-    MODE_VALUES,
-    RISK_VALUES,
-    CapabilityRouteDecision,
-    capability_failure_decision,
-    decide_capabilities,
-    preflight_capability_argv,
-)
 from tools.agent.skills.skill_route_catalog import (
     CapabilityRootError,
     SkillRoutingRule,
-    build_capability_index,
     derive_skill_invocation_order,
     load_skill_route_rules,
     load_skill_route_rules_from_root,
@@ -66,6 +58,9 @@ load_skill_related_map = _load_skill_related_map
 ROUTE_NAME = "task-routing"
 SKILL_NAME = "task-routing"
 TOOL_NAME = "route.py"
+FORMAT_VALUES = ("text", "json", "markdown")
+MODE_VALUES = ("routing-only", "repo-changing")
+RISK_VALUES = ("routine", "focused", "profile", "shared", "large")
 
 AreaData = tuple[str, str, str, str, tuple[str, ...], tuple[str, ...]]
 DEFAULT_ROOT = Path.cwd()
@@ -969,57 +964,6 @@ class RouteRenderer:
             ]
         )
 
-    def render_capability_decision(self, decision: CapabilityRouteDecision) -> str:
-        """Render one capability decision in the selected stable format."""
-        data = capability_decision_to_json_data(decision)
-        matches = json.dumps(data["matches"], separators=(",", ":"), sort_keys=False)
-        related_skills = json.dumps(
-            data["related_skills"], separators=(",", ":"), sort_keys=False
-        )
-        reasons = json.dumps(data["reasons"], separators=(",", ":"), sort_keys=False)
-        capability_ids = ",".join(decision.capability_ids) or "-"
-        skills = ",".join(decision.skills) or "-"
-        active_skills = ",".join(decision.active_skills) or "-"
-        deferred_skills = ",".join(decision.deferred_skills) or "-"
-        related_candidates = ",".join(decision.related_skill_candidates) or "-"
-        if self._format == "json":
-            return json.dumps(data, indent=2, sort_keys=False)
-        if self._format == "markdown":
-            return "\n".join(
-                [
-                    f"- Schema: `{decision.schema}`",
-                    f"- Route: `{decision.route}`",
-                    f"- Mode: `{decision.mode}`",
-                    f"- Status: `{decision.status}`",
-                    f"- Error code: `{decision.error_code}`",
-                    f"- Capability IDs: `{capability_ids}`",
-                    f"- Matches: `{matches}`",
-                    f"- Skills: `{skills}`",
-                    f"- Active skills: `{active_skills}`",
-                    f"- Deferred skills: `{deferred_skills}`",
-                    f"- Related skill candidates: `{related_candidates}`",
-                    f"- Related skills: `{related_skills}`",
-                    f"- Reasons: `{reasons}`",
-                ]
-            )
-        return "\n".join(
-            [
-                f"CAPABILITY_ROUTE_SCHEMA={decision.schema}",
-                f"CAPABILITY_ROUTE={decision.route}",
-                f"CAPABILITY_MODE={decision.mode}",
-                f"CAPABILITY_ROUTE_STATUS={decision.status}",
-                f"CAPABILITY_ERROR_CODE={decision.error_code}",
-                f"CAPABILITY_IDS={capability_ids}",
-                f"CAPABILITY_MATCHES={matches}",
-                f"SKILLS={skills}",
-                f"ACTIVE_SKILLS={active_skills}",
-                f"DEFERRED_SKILLS={deferred_skills}",
-                f"RELATED_SKILL_CANDIDATES={related_candidates}",
-                f"RELATED_SKILLS={related_skills}",
-                f"REASONS={reasons}",
-            ]
-        )
-
     def render_resolutions(self, resolutions: Sequence[NameResolution]) -> str:
         """Render compatibility name resolutions."""
         if self._format == "json":
@@ -1059,51 +1003,6 @@ class RouteRenderer:
         return "\n".join(rows)
 
 
-def capability_decision_to_json_data(
-    decision: CapabilityRouteDecision,
-) -> dict[str, object]:
-    """Convert an immutable capability decision to a fresh JSON mapping."""
-    return {
-        "schema": decision.schema,
-        "route": decision.route,
-        "mode": decision.mode,
-        "status": decision.status,
-        "error_code": decision.error_code,
-        "capability_ids": list(decision.capability_ids),
-        "matches": [
-            {
-                "skill": match.skill,
-                "capability_id": match.capability_id,
-                "owner": match.owner,
-                "phase": match.phase,
-                "activation": match.activation,
-                "exclusive": match.exclusive,
-            }
-            for match in decision.matches
-        ],
-        "skills": list(decision.skills),
-        "active_skills": list(decision.active_skills),
-        "deferred_skills": list(decision.deferred_skills),
-        "related_skill_candidates": list(decision.related_skill_candidates),
-        "related_skills": {
-            skill: list(related) for skill, related in decision.related_skills.items()
-        },
-        "reasons": list(decision.reasons),
-    }
-
-
-def render_capability_error(
-    error_code: str,
-    capability_ids: Sequence[str],
-    output_format: str,
-    mode: str,
-) -> str:
-    """Render one deterministic capability failure envelope."""
-    safe_format = output_format if output_format in FORMAT_VALUES else "text"
-    decision = capability_failure_decision(error_code, capability_ids, mode)
-    return RouteRenderer(safe_format).render_capability_decision(decision)
-
-
 def render_resolution_line(item: NameResolution) -> str:
     """Render one name resolution as machine-readable text."""
     return "\t".join(
@@ -1122,55 +1021,54 @@ def has_unknown_resolution(resolutions: Iterable[NameResolution]) -> bool:
     return any(item.status == "unknown" for item in resolutions)
 
 
+def _native_capability_cli() -> Path:
+    """Resolve the configured native CLI used for capability selection."""
+    configured = os.environ.get("AGENT_CANON_NATIVE_BIN") or os.environ.get("AGENT_CANON_CLI")
+    if configured:
+        return Path(configured)
+    source_root = Path(__file__).resolve().parents[3]
+    crate_root = source_root / "tools" / "runtime" / "dispatch" / "agent-canon"
+    target_root = Path(os.environ.get("CARGO_TARGET_DIR") or crate_root / "target")
+    for profile in ("release", "debug"):
+        candidate = target_root / profile / "agent-canon"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    cache_root = Path(
+        os.environ.get("AGENT_CANON_CACHE_ROOT") or "/var/lib/agent-canon/cache"
+    )
+    cached_cli = cache_root / "bin" / "agent-canon"
+    if cached_cli.is_file() and os.access(cached_cli, os.X_OK):
+        return cached_cli
+    return source_root / "tools" / "bin" / "agent-canon"
+
+
+def _run_native_capability_route(argv: Sequence[str]) -> int:
+    """Delegate the complete explicit-capability route to its Rust owner."""
+    try:
+        result = subprocess.run(
+            [str(_native_capability_cli()), "capability-route", *argv],
+            cwd=Path.cwd(),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        print(f"CAPABILITY_ROUTE_NATIVE_ERROR={exc}", file=sys.stderr)
+        return 2
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    return result.returncode
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the route helper."""
     raw_argv = list(sys.argv[1:] if argv is None else argv)
-    preflight = preflight_capability_argv(raw_argv)
     capability_mode = any(
         token == "--capability" or token.startswith("--capability=")
         for token in raw_argv
     )
     if capability_mode:
-        if preflight.error_code:
-            print(
-                render_capability_error(
-                    preflight.error_code,
-                    preflight.capability_ids,
-                    preflight.output_format,
-                    preflight.mode,
-                )
-            )
-            return 2
-        try:
-            catalog_root = preflight.root or DEFAULT_ROOT
-            source_root = resolve_agent_canon_source_root(catalog_root)
-            catalog = RouteCatalog.from_root(source_root.source_root)
-        except CapabilityRootError as exc:
-            print(
-                render_capability_error(
-                    exc.code,
-                    preflight.capability_ids,
-                    preflight.output_format,
-                    preflight.mode,
-                )
-            )
-            return 2
-        except SourceRootFailure as exc:
-            print(f"ROUTE_SOURCE_ROOT_FAILURE={exc.code}:{exc.detail}", file=sys.stderr)
-            return 2
-        parser = build_parser(catalog)
-        args = parser.parse_args(raw_argv)
-        index = build_capability_index(catalog.skill_rules())
-        decision = decide_capabilities(
-            preflight.capability_ids,
-            preflight.mode,
-            index,
-            preflight,
-        )
-        print(
-            RouteRenderer(preflight.output_format).render_capability_decision(decision)
-        )
-        return 0 if decision.status == "pass" else 2
+        return _run_native_capability_route(raw_argv)
 
     parser = build_parser(RouteCatalog(build_default_areas()))
     args = parser.parse_args(raw_argv)
