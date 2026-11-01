@@ -2018,8 +2018,7 @@ class CapabilityRouteTest(unittest.TestCase):
             for case in golden["cases"]:
                 with self.subTest(case=case["name"]):
                     arguments = tuple(
-                        value.replace("<ROOT>", str(root))
-                        for value in case["argv"]
+                        value.replace("<ROOT>", str(root)) for value in case["argv"]
                     )
                     result = self.run_route(*arguments)
                     self.assertEqual(result.returncode, case["exit"])
