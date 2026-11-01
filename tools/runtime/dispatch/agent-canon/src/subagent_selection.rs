@@ -35,6 +35,8 @@ const ALIASED_OPERATIONS: [&str; 9] = [
     "close",
     "resume",
 ];
+const PROMPT_UTF8_ERROR: &str =
+    "subagent prompt contains an unpaired surrogate and cannot be UTF-8 encoded";
 
 /// The normalized, observational selection consumed by hook event assembly.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -124,13 +126,6 @@ impl SubagentSelection {
     }
 }
 
-/// The Python-visible error produced when a selected prompt cannot be UTF-8 encoded.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SubagentSelectionError {
-    pub error_type: &'static str,
-    pub message: String,
-}
-
 fn object_field<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
     let JsonValue::Object(object) = value else {
         return None;
@@ -201,29 +196,11 @@ fn normalize_operation(tool_name: &JsonString, action: JsonString) -> JsonString
     action
 }
 
-fn prompt_encode_error(prompt: &JsonString) -> SubagentSelectionError {
-    let position = prompt
-        .0
-        .iter()
-        .position(|codepoint| (0xd800..=0xdfff).contains(codepoint))
-        .unwrap_or(0);
-    let codepoint = prompt.0[position];
-    let message = format!(
-        "'utf-8' codec can't encode character '\\u{codepoint:04x}' in position {position}: surrogates not allowed"
-    );
-    SubagentSelectionError {
-        error_type: "UnicodeEncodeError",
-        message,
-    }
-}
-
-fn prompt_fingerprint(prompt: &JsonString) -> Result<String, SubagentSelectionError> {
+fn prompt_fingerprint(prompt: &JsonString) -> Result<String, &'static str> {
     if prompt.is_empty() {
         return Ok(String::new());
     }
-    let Some(text) = prompt.to_text() else {
-        return Err(prompt_encode_error(prompt));
-    };
+    let text = prompt.to_text().ok_or(PROMPT_UTF8_ERROR)?;
     let digest = Sha256::digest(text.as_bytes());
     Ok(digest[..8]
         .iter()
@@ -232,10 +209,11 @@ fn prompt_fingerprint(prompt: &JsonString) -> Result<String, SubagentSelectionEr
 }
 
 /// Preserve the old pure observation behavior; workflow context remains unused.
+/// The active hook consumer only observes whether selection succeeds or fails.
 pub fn select_subagents(
     payload: &JsonValue,
     _workflow_context: Option<&JsonValue>,
-) -> Result<SubagentSelection, SubagentSelectionError> {
+) -> Result<SubagentSelection, &'static str> {
     if !matches!(payload, JsonValue::Object(_)) {
         return Ok(SubagentSelection::default());
     }

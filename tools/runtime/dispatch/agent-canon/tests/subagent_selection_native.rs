@@ -8,7 +8,9 @@
 use agent_canon::python_json::{
     canonical_json_ascii_bytes, parse_json, JsonArray, JsonObject, JsonString, JsonValue,
 };
-use agent_canon::subagent_selection::{build_coordination_receipt, select_subagents};
+use agent_canon::subagent_selection::{
+    build_coordination_receipt, select_subagents, SubagentSelection,
+};
 
 const GOLDEN: &str =
     include_str!("../../../../../tests/fixtures/subagent_selection/python_golden.json");
@@ -42,37 +44,21 @@ fn object(fields: Vec<(&str, JsonValue)>) -> JsonValue {
     ))
 }
 
-fn native_output(case: &JsonValue) -> JsonValue {
+fn native_output(case: &JsonValue, selection: &SubagentSelection) -> JsonValue {
     let payload = field(case, "payload");
     let hook_event_name = field(case, "hook_event_name");
-    match select_subagents(payload, None) {
-        Ok(selection) => {
-            let mut result = selection.to_json_value();
-            if !matches!(hook_event_name, JsonValue::Null) {
-                let receipt =
-                    build_coordination_receipt(payload, Some(&selection), hook_event_name)
-                        .unwrap_or(JsonValue::Null);
-                let JsonValue::Object(result) = &mut result else {
-                    panic!("native selection serializes as an object");
-                };
-                result
-                    .0
-                    .push((JsonString::from_text("coordination_receipt"), receipt));
-            }
-            object(vec![("ok", JsonValue::Bool(true)), ("result", result)])
-        }
-        Err(error) => object(vec![
-            ("ok", JsonValue::Bool(false)),
-            (
-                "error_type",
-                JsonValue::String(JsonString::from_text(error.error_type)),
-            ),
-            (
-                "error",
-                JsonValue::String(JsonString::from_text(&error.message)),
-            ),
-        ]),
+    let mut result = selection.to_json_value();
+    if !matches!(hook_event_name, JsonValue::Null) {
+        let receipt = build_coordination_receipt(payload, Some(selection), hook_event_name)
+            .unwrap_or(JsonValue::Null);
+        let JsonValue::Object(result) = &mut result else {
+            panic!("native selection serializes as an object");
+        };
+        result
+            .0
+            .push((JsonString::from_text("coordination_receipt"), receipt));
     }
+    object(vec![("ok", JsonValue::Bool(true)), ("result", result)])
 }
 
 #[test]
@@ -96,11 +82,24 @@ fn subagent_selection_and_receipt_match_all_frozen_cpython_cases() {
             .to_text()
             .expect("frozen case name is valid Unicode");
         let expected = field(case, "output");
-        let actual = native_output(case);
-        assert_eq!(
-            canonical_json_ascii_bytes(&actual).expect("native result serializes"),
-            canonical_json_ascii_bytes(expected).expect("frozen old result serializes"),
-            "subagent selection case {case_name}"
-        );
+        let expected_success = matches!(field(expected, "ok"), JsonValue::Bool(true));
+        match select_subagents(field(case, "payload"), None) {
+            Ok(selection) => {
+                assert!(
+                    expected_success,
+                    "native selection unexpectedly accepted {case_name}"
+                );
+                let actual = native_output(case, &selection);
+                assert_eq!(
+                    canonical_json_ascii_bytes(&actual).expect("native result serializes"),
+                    canonical_json_ascii_bytes(expected).expect("frozen old result serializes"),
+                    "subagent selection case {case_name}"
+                );
+            }
+            Err(_) => assert!(
+                !expected_success,
+                "native selection unexpectedly rejected {case_name}"
+            ),
+        }
     }
 }
