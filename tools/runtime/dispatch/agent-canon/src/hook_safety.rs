@@ -435,13 +435,10 @@ fn backtick_command_substitutions(command: &str) -> (Vec<String>, Vec<String>) {
                 && active_comment_boundary
             {
                 active_in_comment = true;
-            } else if !active_single_quoted
-                && !active_double_quoted
-                && is_shell_comment_boundary(character)
-            {
-                active_comment_boundary = true;
             } else {
-                active_comment_boundary = false;
+                active_comment_boundary = !active_single_quoted
+                    && !active_double_quoted
+                    && is_shell_comment_boundary(character);
             }
             active = Some(body);
             index += 1;
@@ -484,10 +481,9 @@ fn backtick_command_substitutions(command: &str) -> (Vec<String>, Vec<String>) {
             active_in_comment = false;
             active_comment_boundary = true;
             comment_boundary = false;
-        } else if !single_quoted && !double_quoted && is_shell_comment_boundary(character) {
-            comment_boundary = true;
         } else {
-            comment_boundary = false;
+            comment_boundary =
+                !single_quoted && !double_quoted && is_shell_comment_boundary(character);
         }
         index += 1;
     }
@@ -1035,9 +1031,7 @@ fn worktree_intent(arguments: &[String]) -> Option<GitIntent> {
 }
 
 fn git_intent(command: &GitCommand) -> Option<GitIntent> {
-    let Some(subcommand) = command.tokens.first().map(String::as_str) else {
-        return None;
-    };
+    let subcommand = command.tokens.first().map(String::as_str)?;
     let arguments = &command.tokens[1..];
     match subcommand {
         "restore" => Some(GitIntent::new(
