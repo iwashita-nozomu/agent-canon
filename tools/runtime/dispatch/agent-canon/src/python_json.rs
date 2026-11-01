@@ -1,9 +1,11 @@
 // @dependency-start
 // contract implementation
-// responsibility Provides Python-compatible JSON values, parsing, number formatting, and compact ASCII canonicalization.
+// responsibility Provides Python-compatible JSON values, parsing, equality, number formatting, and compact ASCII canonicalization.
 // downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
+// downstream implementation eval_accumulation_check.rs parses hook JSONL with Python-compatible values
+// downstream implementation work_log.rs uses Python-compatible JSON value equality for ledger deduplication
 // downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
 // downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
 // downstream implementation ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.
@@ -189,6 +191,89 @@ impl JsonNumber {
             Self::Float(value) => json_float(*value),
         }
     }
+}
+
+fn normalized_integer(value: &str) -> &str {
+    if value == "-0" {
+        "0"
+    } else {
+        value
+    }
+}
+
+fn integer_equals_float(integer: &str, float: f64) -> bool {
+    if !float.is_finite() || float.fract() != 0.0 {
+        return false;
+    }
+    let rendered = format!("{float:.0}");
+    normalized_integer(integer)
+        == if rendered == "-0" {
+            "0"
+        } else {
+            rendered.as_str()
+        }
+}
+
+fn python_number_equal(left: &JsonNumber, right: &JsonNumber) -> bool {
+    match (left, right) {
+        (JsonNumber::Integer(left), JsonNumber::Integer(right)) => {
+            normalized_integer(left) == normalized_integer(right)
+        }
+        (JsonNumber::Float(left), JsonNumber::Float(right)) => left == right,
+        (JsonNumber::Integer(integer), JsonNumber::Float(float))
+        | (JsonNumber::Float(float), JsonNumber::Integer(integer)) => {
+            integer_equals_float(integer, *float)
+        }
+    }
+}
+
+/// Compare JSON values using Python equality, including bool/int equivalence.
+///
+/// The explicit work stack preserves Python's structural equality without recursing on nested
+/// arrays or objects. Number comparisons retain arbitrary precision for integer values.
+pub fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
+    let mut pending = vec![(left, right)];
+    while let Some((left, right)) = pending.pop() {
+        match (left, right) {
+            (JsonValue::Null, JsonValue::Null) => {}
+            (JsonValue::Bool(left), JsonValue::Bool(right)) if left == right => {}
+            (JsonValue::Bool(value), JsonValue::Number(number))
+            | (JsonValue::Number(number), JsonValue::Bool(value)) => {
+                let integer = if *value { "1" } else { "0" };
+                let equal = match number {
+                    JsonNumber::Integer(number) => normalized_integer(number) == integer,
+                    JsonNumber::Float(number) => integer_equals_float(integer, *number),
+                };
+                if !equal {
+                    return false;
+                }
+            }
+            (JsonValue::Number(left), JsonValue::Number(right))
+                if python_number_equal(left, right) => {}
+            (JsonValue::String(left), JsonValue::String(right)) if left == right => {}
+            (JsonValue::Array(left), JsonValue::Array(right)) => {
+                if left.0.len() != right.0.len() {
+                    return false;
+                }
+                pending.extend(left.0.iter().zip(&right.0));
+            }
+            (JsonValue::Object(left), JsonValue::Object(right)) => {
+                if left.0.len() != right.0.len() {
+                    return false;
+                }
+                for (left_key, left_value) in &left.0 {
+                    let Some((_, right_value)) =
+                        right.0.iter().find(|(right_key, _)| right_key == left_key)
+                    else {
+                        return false;
+                    };
+                    pending.push((left_value, right_value));
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
 }
 
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {

@@ -1,0 +1,59 @@
+{
+  "source_commit": "edd5cdce7e6f7511c80fb5d6fc67125f0f4eb1fe",
+  "script_sha256": "e2faa429b5edbd3cdf914f0b97269b996d61f4fba6bc2ab9f2a5a5872655d713",
+  "cases": [
+    {
+      "name": "duplicate-compact-success",
+      "scenario": "duplicate",
+      "exit": 1,
+      "stdout": "EVAL_ACCUMULATION_HOOK_FILES=1\nEVAL_ACCUMULATION_HOOK_ENTRIES=2\nEVAL_ACCUMULATION_HOOK_LEGACY_MISSING_NAMESPACE=0\nEVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT=0\nEVAL_ACCUMULATION_WORKFLOW_SELECTION_REPORTS=1\nEVAL_ACCUMULATION_CODEX_AGENT_ROLE_REPORTS=1\nEVAL_ACCUMULATION_FAMILY_REPORTS=codex-agent-role:1\nEVAL_ACCUMULATION_FAMILY_REPORTS=workflow-selection:1\nEVAL_ACCUMULATION_FINDINGS=1\nEVAL_ACCUMULATION_BLOCKING_FINDINGS=1\nEVAL_ACCUMULATION_WARNINGS=0\nEVAL_ACCUMULATION=fail\nEVAL_ACCUMULATION_COMPACT_OUT={case}/.source.agent-canon-runtime/compact.json\n",
+      "stderr": "",
+      "argv": [
+        "--root",
+        "{case}/source",
+        "--family-registry",
+        "{repo}/eval/definitions/eval_result_families.toml",
+        "--runtime-root",
+        "{case}/.source.agent-canon-runtime",
+        "--compact-out",
+        "{case}/.source.agent-canon-runtime/compact.json"
+      ],
+      "compact_bytes": "{\n  \"blocking_finding_count\": 1,\n  \"blocking_finding_samples\": [\n    {\n      \"check\": \"hook_run_id\",\n      \"detail\": \"duplicate:{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:1\",\n      \"path\": \"{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:2\"\n    }\n  ],\n  \"codex_agent_role_reports\": 1,\n  \"eval_report_counts\": {\n    \"codex-agent-role\": 1,\n    \"workflow-selection\": 1\n  },\n  \"finding_count\": 1,\n  \"finding_counts\": {\n    \"hook_run_id\": 1\n  },\n  \"finding_samples\": [\n    {\n      \"check\": \"hook_run_id\",\n      \"detail\": \"duplicate:{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:1\",\n      \"path\": \"{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:2\"\n    }\n  ],\n  \"hook_entries\": 2,\n  \"hook_files\": 1,\n  \"hook_legacy_missing_namespace\": 0,\n  \"hook_namespace_debt\": 0,\n  \"status\": \"fail\",\n  \"warning_count\": 0,\n  \"warning_samples\": [],\n  \"workflow_selection_reports\": 1\n}\n",
+      "compact_json": {
+        "blocking_finding_count": 1,
+        "blocking_finding_samples": [
+          {
+            "check": "hook_run_id",
+            "detail": "duplicate:{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:1",
+            "path": "{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:2"
+          }
+        ],
+        "codex_agent_role_reports": 1,
+        "eval_report_counts": {
+          "codex-agent-role": 1,
+          "workflow-selection": 1
+        },
+        "finding_count": 1,
+        "finding_counts": {
+          "hook_run_id": 1
+        },
+        "finding_samples": [
+          {
+            "check": "hook_run_id",
+            "detail": "duplicate:{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:1",
+            "path": "{case}/.source.agent-canon-runtime/archive/agent-canon-log/hook-runs/unidentified-source/test/hook.jsonl:2"
+          }
+        ],
+        "hook_entries": 2,
+        "hook_files": 1,
+        "hook_legacy_missing_namespace": 0,
+        "hook_namespace_debt": 0,
+        "status": "fail",
+        "warning_count": 0,
+        "warning_samples": [],
+        "workflow_selection_reports": 1
+      },
+      "repo_log_key": "unidentified-source"
+    }
+  ]
+}
