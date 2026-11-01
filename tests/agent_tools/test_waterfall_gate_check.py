@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests test waterfall gate check behavior.
 # upstream design ../../tools/README.md validated automation surface
+# upstream design ../../agents/canonical/CODEX_IMPLEMENTATION.md owns the implementation and design contract
 # upstream implementation ../../tools/agent/orchestration/packets.py owns canonical active-packet projection loading
 # upstream implementation ../../tools/repository/workspace/workspace_scope.py owns report path resolution
 # @dependency-end
@@ -1049,18 +1050,26 @@ class WaterfallGateCheckTest(unittest.TestCase):
 
     def test_implementation_checkpoint_contract_requires_abstract_trace(self) -> None:
         """Checkpoint review surfaces should reject file-local-only justification."""
-        template_text = (PROJECT_ROOT / "templates" / "agents" / "change_review.md").read_text(
-            encoding="utf-8"
-        )
+        template_text = (
+            PROJECT_ROOT / "templates" / "agents" / "change_review.md"
+        ).read_text(encoding="utf-8")
         workflow_text = (
             PROJECT_ROOT / "agents" / "skills" / "codex-task-workflow.md"
         ).read_text(encoding="utf-8")
+        implementation_owner_text = (
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_IMPLEMENTATION.md"
+        ).read_text(encoding="utf-8")
 
-        for text in (template_text, workflow_text):
-            self.assertIn("Abstract Design Frame", text)
-            self.assertIn("Implementation Source Packet", text)
-            self.assertRegex(text, r"(?i)(responsibility model|責務 model)")
-            self.assertRegex(text, r"(?i)(file|path)")
+        self.assertIn("Abstract Design Frame", template_text)
+        self.assertIn("Implementation Source Packet", template_text)
+        self.assertRegex(template_text, r"(?i)(responsibility model|責務 model)")
+        self.assertRegex(template_text, r"(?i)(file|path)")
+        self.assertIn(
+            "[CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md)",
+            workflow_text,
+        )
+        self.assertIn("Abstract Design Frame", implementation_owner_text)
+        self.assertIn("Implementation Source Packet", implementation_owner_text)
 
     def test_final_gate_rejects_empty_work_log(self) -> None:
         """Final gate should fail when work_log.md has no concrete entries."""
