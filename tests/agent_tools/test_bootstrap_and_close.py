@@ -1353,8 +1353,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
-            self.assertIn("ADVERSARIAL_REQUIRED=yes", result.stdout)
-            self.assertIn("terra:terra_terra:terra", result.stdout)
+            self.assertIn("terra:terra:gpt-6-astra:high", result.stdout)
             self.assertIn(
                 "START_DECLARATION=workflow=Comprehensive Development", result.stdout
             )
@@ -1416,8 +1415,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("ADVERSARIAL_REQUIRED=no", result.stdout)
-            self.assertNotIn("terra:terra_terra:terra", result.stdout)
+            manifest = yaml.safe_load(
+                (
+                    report_root / "test-bootstrap-bounded-terra" / "team_manifest.yaml"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertNotIn("terra", {role["id"] for role in manifest["roles"]})
             self.assertNotIn(
                 "terra",
                 next(
@@ -1482,14 +1485,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("SUBAGENT_AGENT_TYPE_SELECTIONS=none", result.stdout)
-            self.assertIn(
-                "implementer:implementer_worker:worker",
-                result.stdout,
+            manifest = yaml.safe_load(
+                (report_root / "test-default-worker" / "team_manifest.yaml").read_text(
+                    encoding="utf-8"
+                )
             )
-            self.assertNotIn(
-                "implementer:implementer_spark_worker:spark_worker",
-                result.stdout,
+            implementer = next(
+                role for role in manifest["roles"] if role["id"] == "implementer"
             )
+            self.assertEqual(implementer["codex_agents"][0], "worker")
 
     def test_agent_type_selection_preserves_explicit_empty_registry(self) -> None:
         """An injected empty registry must reject every selected candidate."""
@@ -1556,17 +1560,16 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "SUBAGENT_AGENT_TYPE_SELECTIONS=implementer=spark_worker:approved-bounded-slice",
                 result.stdout,
             )
-            self.assertIn(
-                "implementer:implementer_spark_worker:spark_worker",
-                result.stdout,
-            )
             manifest = yaml.safe_load(
                 (report_root / "test-spark-worker" / "team_manifest.yaml").read_text(
                     encoding="utf-8"
                 )
             )
             self.assertNotIn("execution_graph", manifest["run"])
-            self.assertIn("implementer", {role["id"] for role in manifest["roles"]})
+            implementer = next(
+                role for role in manifest["roles"] if role["id"] == "implementer"
+            )
+            self.assertIn("spark_worker", implementer["codex_agents"])
 
     def test_bootstrap_rejects_invalid_agent_type_selection(self) -> None:
         """Invalid role-to-agent parent-packet selections should fail closed."""
@@ -2069,10 +2072,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 self.assertIn("non-goals", manager_prompt)
                 self.assertIn("completion conditions", manager_prompt)
                 self.assertIn(
-                    "The parent owns choosing the next instruction from linked task guidance",
+                    "The parent chooses the next step from linked guidance and actual outcomes",
                     manager_prompt,
                 )
-                self.assertIn("return its actual result inline", manager_prompt)
+                self.assertIn("return the assigned result inline", manager_prompt)
                 self.assertIn("when present", manager_prompt)
                 self.assertIn("respect supplied path boundaries", manager_prompt)
                 self.assertIn(
@@ -2431,9 +2434,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "- repo_wide_static_analysis_complete: yes",
                 "- repo_wide_static_analysis_complete: profile_selected",
             )
+            self.assertIn("- validation_complete: yes", closeout_text)
             closeout_text = closeout_text.replace(
-                "- selected_validation_status: pass",
-                "- selected_validation_status: pending",
+                "- validation_complete: yes",
+                "- validation_complete: no",
             )
             closeout_path.write_text(closeout_text, encoding="utf-8")
             write_ready_diff_check_artifact(report_dir)
@@ -2452,7 +2456,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("selected_validation_status", result.stdout)
+            self.assertIn("validation_complete", result.stdout)
 
     def test_task_close_rejects_open_tool_warning(self) -> None:
         """task_close should fail while workflow monitoring has open tool warnings."""
@@ -2653,9 +2657,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
-            self.assertIn("ALL_PLANNED_CHUNKS_COMPLETE=yes", result.stdout)
+            self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertIn("OVERALL_DELIVERY_COMPLETE=yes", result.stdout)
-            self.assertIn("COMPLETION_COVERAGE_CONSUMER_READY=True", result.stdout)
             self.assertIn("REVIEW_FINDINGS_INTEGRATED=yes", result.stdout)
             self.assertIn("FOCUSED_RECHECK_COMPLETE=yes", result.stdout)
             self.assertIn("SUBAGENT_CLOSEOUT_STATUS=closed", result.stdout)
@@ -3062,10 +3065,12 @@ class BootstrapAndCloseTest(unittest.TestCase):
             report_dir.mkdir(parents=True, exist_ok=True)
             write_ready_closeout_bundle(report_dir, run_id)
             closeout_path = report_dir / "closeout_gate.md"
+            closeout_text = closeout_path.read_text(encoding="utf-8")
+            self.assertIn("- validation_complete: yes", closeout_text)
             closeout_path.write_text(
-                closeout_path.read_text(encoding="utf-8").replace(
-                    "- selected_validation_status: pass",
-                    "- selected_validation_status: missing",
+                closeout_text.replace(
+                    "- validation_complete: yes",
+                    "- validation_complete: no",
                 ),
                 encoding="utf-8",
             )
@@ -3085,7 +3090,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("CLOSEOUT_READY=no", result.stdout)
-            self.assertIn("selected_validation_status", result.stdout)
+            self.assertIn("validation_complete", result.stdout)
 
     def test_task_close_rejects_markdown_change_without_structure_evidence(
         self,

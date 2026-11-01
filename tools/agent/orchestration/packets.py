@@ -561,7 +561,6 @@ def mathematical_intent_route_config(
                 "owner_skill": "computational-optimization",
                 "reviewer": "mathematical_correctness_reviewer",
                 "required_packet": "mathematical_intent_packet",
-                "precedes": ["design", "benchmark_reviewer"],
             }
             if dict(record) != expected:
                 raise RuntimeError(
