@@ -524,7 +524,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation responsibility_scope.rs scope",
                     "# upstream design ../../../../../tools/README.md tool entrypoints",
                     "# upstream design ../../../../../documents/tools/README.md user-facing routes",
-                    "# downstream test ../../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
+                    "# downstream implementation ../../../../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
                     "",
                 ]
