@@ -306,6 +306,15 @@ fn replace_root(value: &JsonValue, root: &Path) -> JsonValue {
     }
 }
 
+fn environment_json(environment: std::collections::BTreeMap<String, JsonString>) -> JsonValue {
+    JsonValue::Object(JsonObject(
+        environment
+            .into_iter()
+            .map(|(key, value)| (JsonString::from_text(&key), JsonValue::String(value)))
+            .collect(),
+    ))
+}
+
 fn assert_json_equal(actual: &JsonValue, expected: &JsonValue, name: &str, field: &str) {
     assert_eq!(
         canonical_json_ascii_bytes(actual).expect("actual JSON projection serializes"),
@@ -325,7 +334,7 @@ fn object_field<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
         .map(|(_, value)| value)
 }
 
-fn string_field(value: &JsonValue, key: &str) -> &JsonString {
+fn string_field<'a>(value: &'a JsonValue, key: &str) -> &'a JsonString {
     match object_field(value, key) {
         Some(JsonValue::String(value)) => value,
         _ => panic!("frozen {key} field is text"),
@@ -339,7 +348,7 @@ fn string_value(value: &JsonValue) -> &JsonString {
     }
 }
 
-fn array_field(value: &JsonValue, key: &str) -> &[JsonValue] {
+fn array_field<'a>(value: &'a JsonValue, key: &str) -> &'a [JsonValue] {
     match object_field(value, key) {
         Some(JsonValue::Array(JsonArray(values))) => values,
         _ => panic!("frozen {key} field is an array"),
