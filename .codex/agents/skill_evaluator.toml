@@ -11,4 +11,4 @@ model_reasoning_effort = "medium"
 model_context_window = 1050000
 model_auto_compact_token_limit = 900000
 
-developer_instructions = "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions; do not repeat it for ordinary commands."
+developer_instructions = "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs. Carry one checkout_identity block with cwd, git_root, branch (or detached), head, and normalized remote owner/repository at bounded workflow transitions. In a handback, refer to the existing readback without repeating its fields; refresh it only when checkout state changes."
