@@ -87,6 +87,7 @@ pub mod runtime_boundary;
 pub mod scip_index;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
+pub mod subagent_selection;
 pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
