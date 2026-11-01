@@ -278,3 +278,33 @@ fn unicode_secret_boundaries_match_supplemental_python_probe_results() {
         assert_eq!(secret_kind(prompt), expected, "{case_id}");
     }
 }
+
+#[test]
+fn deep_eval_chain_matches_frozen_old_git_intent() {
+    let golden: Value = serde_json::from_str(GOLDEN).expect("frozen old-API corpus parses");
+    let eval_case = cases(&golden, "git_intent_and_payload_results")
+        .iter()
+        .find(|case| text(field(case, "case_id")) == "eval-script-wrapper")
+        .expect("frozen corpus has the low-depth eval wrapper case");
+    let expected = field(eval_case, "intent");
+
+    let low_depth_command = text(field(field(eval_case, "synthetic_input"), "command"));
+    let low_depth_intent = first_block(low_depth_command)
+        .as_ref()
+        .map(|intent| serde_json::to_value(intent).expect("Git intent serializes"))
+        .unwrap_or(Value::Null);
+    assert_eq!(
+        low_depth_intent, *expected,
+        "the frozen low-depth eval intent is the deep-chain oracle"
+    );
+
+    let deep_command = format!("{}git reset --mixed HEAD", "eval ".repeat(4000));
+    let deep_intent = first_block(&deep_command)
+        .as_ref()
+        .map(|intent| serde_json::to_value(intent).expect("Git intent serializes"))
+        .unwrap_or(Value::Null);
+    assert_eq!(
+        deep_intent, *expected,
+        "deep eval wrappers preserve the frozen old Git intent"
+    );
+}

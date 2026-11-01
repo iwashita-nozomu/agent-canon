@@ -150,6 +150,12 @@ impl GitIntent {
     }
 }
 
+enum FirstBlockWorkItem {
+    Command(String),
+    Direct(String),
+    Segments(std::vec::IntoIter<Vec<String>>),
+}
+
 /// Return the first high-confidence secret class in prompt text.
 pub fn secret_kind(prompt: &str) -> Option<&'static str> {
     SECRET_PATTERNS
@@ -533,16 +539,16 @@ fn is_command_separator(token: &str) -> bool {
     COMMAND_SEPARATORS.contains(&token) || token.chars().all(|character| ";&|".contains(character))
 }
 
-fn command_segments(tokens: &[String]) -> Vec<Vec<String>> {
+fn command_segments(tokens: Vec<String>) -> Vec<Vec<String>> {
     let mut segments = Vec::new();
     let mut current = Vec::new();
     for token in tokens {
-        if is_command_separator(token) {
+        if is_command_separator(&token) {
             if !current.is_empty() {
                 segments.push(std::mem::take(&mut current));
             }
         } else {
-            current.push(token.clone());
+            current.push(token);
         }
     }
     if !current.is_empty() {
@@ -1192,51 +1198,66 @@ fn opaque_protected_intent(command: &str) -> Option<GitIntent> {
     None
 }
 
-fn first_block_without_backticks(command: &str) -> Option<GitIntent> {
-    let tokens = shell_tokens(command);
-    if tokens.is_empty() {
-        return opaque_protected_intent(command);
-    }
-    for segment in command_segments(&tokens) {
-        let script = wrapper_script(&segment);
-        if !script.is_empty() {
-            if let Some(intent) = first_block(&script) {
-                return Some(intent);
-            }
-            continue;
-        }
-        if let Some(git_command) = normalized_git_command(&segment) {
-            if let Some(intent) = git_intent(&git_command) {
-                if !intent_authorized(&git_command, &intent) {
-                    return Some(intent);
+/// Return the first unauthorized raw Git intent.
+pub fn first_block(command: &str) -> Option<GitIntent> {
+    let mut work = vec![FirstBlockWorkItem::Command(command.to_owned())];
+    while let Some(item) = work.pop() {
+        match item {
+            FirstBlockWorkItem::Command(command) => {
+                let (mut complete, uncertain) = backtick_command_substitutions(&command);
+                complete.extend(uncertain);
+                work.push(FirstBlockWorkItem::Direct(command));
+                for substitution in complete.into_iter().rev() {
+                    work.push(FirstBlockWorkItem::Command(substitution));
                 }
-            } else if git_command
-                .tokens
-                .first()
-                .is_some_and(|token| token.starts_with('-'))
-            {
+            }
+            FirstBlockWorkItem::Direct(command) => {
+                let tokens = shell_tokens(&command);
+                if tokens.is_empty() {
+                    if let Some(intent) = opaque_protected_intent(&command) {
+                        return Some(intent);
+                    }
+                    continue;
+                }
+                let segments = command_segments(tokens).into_iter();
+                work.push(FirstBlockWorkItem::Segments(segments));
+            }
+            FirstBlockWorkItem::Segments(mut segments) => {
+                let Some(segment) = segments.next() else {
+                    continue;
+                };
+                if !segments.as_slice().is_empty() {
+                    work.push(FirstBlockWorkItem::Segments(segments));
+                }
+                let script = wrapper_script(&segment);
+                if !script.is_empty() {
+                    drop(segment);
+                    work.push(FirstBlockWorkItem::Command(script));
+                    continue;
+                }
+                if let Some(git_command) = normalized_git_command(&segment) {
+                    if let Some(intent) = git_intent(&git_command) {
+                        if !intent_authorized(&git_command, &intent) {
+                            return Some(intent);
+                        }
+                    } else if git_command
+                        .tokens
+                        .first()
+                        .is_some_and(|token| token.starts_with('-'))
+                    {
+                        if let Some(intent) = opaque_protected_intent(&segment.join(" ")) {
+                            return Some(intent);
+                        }
+                    }
+                    continue;
+                }
                 if let Some(intent) = opaque_protected_intent(&segment.join(" ")) {
                     return Some(intent);
                 }
             }
-            continue;
-        }
-        if let Some(intent) = opaque_protected_intent(&segment.join(" ")) {
-            return Some(intent);
         }
     }
     None
-}
-
-/// Return the first unauthorized raw Git intent.
-pub fn first_block(command: &str) -> Option<GitIntent> {
-    let (complete, uncertain) = backtick_command_substitutions(command);
-    for substitution in complete.iter().chain(uncertain.iter()) {
-        if let Some(intent) = first_block(substitution) {
-            return Some(intent);
-        }
-    }
-    first_block_without_backticks(command)
 }
 
 /// Return a redacted block payload; command text never crosses the leaf boundary.
