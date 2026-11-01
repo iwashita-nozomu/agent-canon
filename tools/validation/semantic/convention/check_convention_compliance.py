@@ -137,7 +137,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "github_workflow_pr_flow": (
-        "tools/validation/ci/checks/check_github_workflows.py",
+        "tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "bootstrap_container_runtime": (

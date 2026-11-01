@@ -223,7 +223,7 @@ pub fn classify(paths: &[String]) -> Vec<PathRisk> {
         active.push(PathRisk {
             profile: "github-automation",
             reason: "github_surface_changed",
-            checks: &["python3 tools/validation/ci/checks/check_github_workflows.py"],
+            checks: &["tools/bin/agent-canon check-github-workflows"],
         });
     }
     if paths.iter().any(|path| {

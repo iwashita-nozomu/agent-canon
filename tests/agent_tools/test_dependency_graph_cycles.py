@@ -4,22 +4,58 @@
 # contract test
 # responsibility Verifies normalized SCC scope and projection snapshot boundaries.
 # upstream implementation ../../tools/analysis/dependencies/check_dependency_graph.sh reviews source topology
-# upstream implementation ../../tools/analysis/dependencies/source_dependency_graph.py resolves canonical source
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/source_dependency_graph.rs resolves canonical source
 # upstream design ../../documents/design/dependency-manifest-design.md defines prerequisite ordering
 # @dependency-end
 
 from __future__ import annotations
 
 import itertools
+import json
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from tests.agent_tools.test_dependency_manifest_tools import GRAPH, run_tool
-from tools.agent.skills import skill_projection_registry as registry
-from tools.analysis.dependencies import source_dependency_graph as source_graph
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+AGENT_CANON_CLI = Path(
+    os.environ.get("AGENT_CANON_CLI", str(PROJECT_ROOT / "tools/bin/agent-canon"))
+)
+
+
+def run_source_graph(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(AGENT_CANON_CLI), "source-dependency-graph", *args],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def run_graph_client(
+    root: Path, command: str, *args: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            str(AGENT_CANON_CLI),
+            "graph-client",
+            command,
+            "--root",
+            str(root),
+            "--format",
+            "json",
+            *args,
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
 
 CYCLE = (
     ("a.py", "downstream", "b.py"),
@@ -63,9 +99,13 @@ def commit_fixture(root: Path) -> None:
         ("init", "-q"),
         ("add", "."),
         (
-            "-c", "user.name=Dependency Fixture",
-            "-c", "user.email=dependency@example.invalid",
-            "commit", "-qm", "fixture",
+            "-c",
+            "user.name=Dependency Fixture",
+            "-c",
+            "user.email=dependency@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
         ),
     ):
         subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
@@ -172,7 +212,8 @@ class DependencyCycleScopeTest(unittest.TestCase):
             root = Path(directory)
             write_graph(
                 root,
-                CYCLE + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
+                CYCLE
+                + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
             )
             result = self.check(root)
             self.assertEqual(
@@ -186,7 +227,8 @@ class DependencyCycleScopeTest(unittest.TestCase):
             root = Path(directory)
             write_graph(
                 root,
-                CYCLE + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
+                CYCLE
+                + (("x.py", "downstream", "y.py"), ("y.py", "downstream", "x.py")),
             )
             result = self.check(root, "a.py")
             self.assertEqual(
@@ -267,16 +309,22 @@ class DependencyCycleScopeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for bits in range(1 << len(pairs)):
-                edges = [edge for index, edge in enumerate(pairs) if bits & (1 << index)]
+                edges = [
+                    edge for index, edge in enumerate(pairs) if bits & (1 << index)
+                ]
                 reachable = set(edges) | {(node, node) for node in nodes}
                 for middle in nodes:
                     for first in nodes:
                         for last in nodes:
-                            if (first, middle) in reachable and (middle, last) in reachable:
+                            if (first, middle) in reachable and (
+                                middle,
+                                last,
+                            ) in reachable:
                                 reachable.add((first, last))
                 components = {
                     frozenset(
-                        other for other in nodes
+                        other
+                        for other in nodes
                         if (node, other) in reachable and (other, node) in reachable
                     )
                     for node in nodes
@@ -290,26 +338,30 @@ class DependencyCycleScopeTest(unittest.TestCase):
                         )
                         declarations.append(
                             (consumer, "upstream", prerequisite)
-                            if upstream else (prerequisite, "downstream", consumer)
+                            if upstream
+                            else (prerequisite, "downstream", consumer)
                         )
                         if encoding == 2:
                             declarations.append((consumer, "upstream", prerequisite))
                     if encoding == 5:
                         declarations.reverse()
                     for node in nodes:
-                        (root / node).write_text("# no dependencies\n", encoding="utf-8")
+                        (root / node).write_text(
+                            "# no dependencies\n", encoding="utf-8"
+                        )
                     write_graph(root, tuple(declarations))
                     with self.subTest(topology=bits, encoding=encoding):
                         result = self.check(root)
                         self.assertEqual(
-                            result.returncode, int(bool(expected)),
+                            result.returncode,
+                            int(bool(expected)),
                             result.stdout + result.stderr,
                         )
                         self.assertEqual(reported_components(result.stdout), expected)
 
 
 class SourceProjectionSnapshotTest(unittest.TestCase):
-    """Exercise ordinary-path independence and the existing projection snapshot API."""
+    """Exercise source paths and generated-view resolution through the native owner."""
 
     def fixture(self, root: Path) -> Path:
         catalog = root / "agents/skills/catalog.yaml"
@@ -324,84 +376,128 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
         write_graph(root, (("a.py", "downstream", "b.py"),))
         return catalog
 
+    def resolve_target(
+        self, root: Path, source: Path, target: str
+    ) -> subprocess.CompletedProcess[str]:
+        return run_source_graph(
+            root,
+            "resolve-targets",
+            "--root",
+            str(root),
+            "--source",
+            str(source),
+            "--target",
+            target,
+        )
+
     def test_ordinary_source_and_targets_ignore_invalid_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             catalog = self.fixture(root)
             catalog.write_text("not: a skill catalog\n", encoding="utf-8")
-            self.assertEqual(source_graph.resolve_source_path(root, "a.py")[0], "a.py")
-            self.assertEqual(
-                source_graph.parse_manifest_document(root, "a.py").edges[0].target, "b.py"
-            )
-            self.assertEqual(
-                source_graph.resolve_dependency_targets(root, root / "a.py", "b.py"),
-                ("b.py",),
-            )
+            result = self.resolve_target(root, root / "a.py", "b.py")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "b.py\n")
 
-    def test_whole_scan_acquires_one_projection_snapshot(self) -> None:
+    def test_whole_scan_projects_materialized_generated_view_to_canonical_owner(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
+            consumer = root / "tools" / "consumer.py"
+            consumer.parent.mkdir()
+            consumer.write_text(
+                "# @dependency-start\n"
+                "# contract tool\n"
+                "# responsibility References the generated skill view.\n"
+                "# downstream implementation ../.codex/personal/skills/example/SKILL.md canonical owner\n"
+                "# @dependency-end\n",
+                encoding="utf-8",
+            )
             shim = root / ".codex/personal/skills/example/SKILL.md"
             shim.parent.mkdir(parents=True)
             shim.write_text("# Distributed adapter\n", encoding="utf-8")
-            acquire = mock.Mock(wraps=registry.generated_skill_projections)
-            with (
-                mock.patch.object(registry, "generated_skill_projections", acquire),
-                mock.patch.object(source_graph, "generated_skill_projections", acquire),
-            ):
-                documents = source_graph.dependency_documents(root)
-            self.assertEqual(acquire.call_count, 1)
-            self.assertEqual(
-                sum(doc.path == "agents/skills/example.md" for doc in documents), 1
+            result = run_graph_client(
+                root,
+                "query",
+                "--all",
+                "--relation",
+                "dependency",
+                "--direction",
+                "both",
+                "--depth",
+                "0",
             )
-            self.assertFalse(any(doc.path.startswith(".codex/") for doc in documents))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            response = json.loads(result.stdout)
+            facts = response["dependency_facts"]
+            self.assertEqual(
+                sum(fact["target"] == "agents/skills/example.md" for fact in facts),
+                1,
+            )
+            self.assertFalse(
+                any(fact["target"].startswith(".codex/") for fact in facts)
+            )
 
-    def test_explicit_snapshot_is_reused_for_generated_source(self) -> None:
+    def test_generated_view_target_resolves_to_canonical_source_without_materializing_view(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            catalog = self.fixture(root)
-            snapshot = registry.generated_skill_projections(root)
-            catalog.write_text("invalid catalog\n", encoding="utf-8")
-            document = source_graph.parse_manifest_document(
-                root, ".codex/personal/skills/example/SKILL.md", snapshot
+            self.fixture(root)
+            result = self.resolve_target(
+                root,
+                root / "a.py",
+                ".codex/personal/skills/example/SKILL.md",
             )
-            self.assertEqual(document.path, "agents/skills/example.md")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "agents/skills/example.md\n")
+            self.assertFalse(
+                (root / ".codex/personal/skills/example/SKILL.md").exists()
+            )
 
     def test_generated_view_still_requires_valid_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             catalog = self.fixture(root)
             catalog.write_text("invalid catalog\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "skill catalog"):
-                source_graph.resolve_source_path(
-                    root, ".codex/personal/skills/example/SKILL.md"
-                )
-            with self.assertRaisesRegex(ValueError, "skill catalog"):
-                source_graph.dependency_documents(root)
+            result = self.resolve_target(
+                root,
+                root / "a.py",
+                ".codex/personal/skills/example/SKILL.md",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("skill catalog", result.stderr)
 
-    def test_empty_snapshot_does_not_fall_back_to_catalog(self) -> None:
+    def test_unmatched_generated_pattern_is_rejected_by_manifest_consumer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
-            with self.assertRaisesRegex(
-                source_graph.SourceDependencyError, "unknown generated skill"
-            ):
-                source_graph.parse_manifest_document(
-                    root, ".codex/personal/skills/example/SKILL.md", ()
-                )
+            result = self.resolve_target(
+                root,
+                root / "a.py",
+                ".codex/personal/skills/missing-*/SKILL.md",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                result.stdout, ".codex/personal/skills/missing-*/SKILL.md\n"
+            )
 
     def test_missing_generated_owner_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             catalog = self.fixture(root)
             (catalog.parent / "example.md").unlink()
-            with self.assertRaisesRegex(
-                source_graph.SourceDependencyError, "unavailable"
-            ):
-                source_graph.resolve_source_path(
-                    root, ".codex/personal/skills/example/SKILL.md"
-                )
+            result = self.resolve_target(
+                root,
+                root / "a.py",
+                ".codex/personal/skills/example/SKILL.md",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "generated skill canonical source is unavailable", result.stderr
+            )
 
     def test_ordinary_missing_escape_and_symlink_fail_without_catalog(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -414,11 +510,15 @@ class SourceProjectionSnapshotTest(unittest.TestCase):
                 ("../outside.py", "escapes repository root"),
                 ("link.py", "symbolic link"),
             ):
-                with (
-                    self.subTest(path=path),
-                    self.assertRaisesRegex(source_graph.SourceDependencyError, reason),
-                ):
-                    source_graph.resolve_source_path(root, path)
+                with self.subTest(path=path):
+                    result = run_graph_client(
+                        root,
+                        "context",
+                        "--path",
+                        path,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(reason, result.stderr)
 
 
 if __name__ == "__main__":

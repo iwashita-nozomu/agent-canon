@@ -112,7 +112,7 @@ class ClassifyPathRiskTest(unittest.TestCase):
                     "profile": "github-automation",
                     "reason": "github_surface_changed",
                     "checks": [
-                        "python3 tools/validation/ci/checks/check_github_workflows.py"
+                        "tools/bin/agent-canon check-github-workflows"
                     ],
                 },
                 {

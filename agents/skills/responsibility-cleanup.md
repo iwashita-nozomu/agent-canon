@@ -52,5 +52,5 @@ python3 tools/agent/skills/skill_dependency_map.py check --root .
 
 ## Boundary
 
-詳細な unit schema、外部 tool evidence、analyzer の扱い、validation、rollback は設計正本を読みます。
+責務境界、外部 tool、analyzer の扱いと必要な最終検証は設計正本を参照します。
 この skill は個別 owner の policy や削除 oracle を複製しません。

@@ -32,6 +32,8 @@ contract. Keep cleanup within the requested unit.
 4. For numerical code, establish equations and convergence semantics before
    deletion. Use [refactor-loop](refactor-loop.md) for structural migration and
    [change-review](change-review.md) for the resulting contract and missed deletions.
-5. Validate the changed guarantees in the selected scope.
+5. After the planned migration and retirement review are complete, validate the
+   final state together in the selected scope. Intermediate edits and commits do
+   not require their own test runs.
 
 No new inventory, handoff schema, or full-repository scan is required by cleanup.

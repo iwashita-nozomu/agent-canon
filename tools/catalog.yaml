@@ -1127,13 +1127,13 @@ entries:
       - tests/agent_tools/test_check_dependency_headers.py
 
   - id: graph-client
-    summary: Provides the typed consume-only Python adapter for graph status, query, and context responses.
-    path: tools/analysis/dependencies/graph_client.py
-    family: agent_tools
-    role: helper
+    summary: Provides a typed native client for source-derived dependency query and context plus explicit persisted graph operations.
+    path: tools/runtime/dispatch/agent-canon/src/graph_client.rs
+    family: root
+    role: runner
     status: canonical
-    command: tools/bin/agent-canon graph <status|query|context> --root <repo-root> --format json
-    dispatch: {argv: ["tools/bin/agent-canon", "graph", "<status|query|context>", "--root", "<repo-root>", "--format", "json"]}
+    command: tools/bin/agent-canon graph-client <status|query|context> --root <repo-root> --format json
+    dispatch: {argv: ["tools/bin/agent-canon", "graph-client", "<status|query|context>", "--root", "<repo-root>", "--format", "json"]}
     writes: false
     default_wiring:
       ci: false
@@ -1142,8 +1142,14 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - agents/canonical/CLI_ENTRYPOINTS.md
+      - documents/design/dependency-manifest-design.md
+      - documents/design/source-owned-dependency-validation.md
     tests:
+      - tests/agent_tools/test_graph_client_source_projection.py
+      - tests/agent_tools/test_dependency_graph_cycles.py
       - tests/agent_tools/test_check_dependency_headers.py
+      - tests/agent_tools/test_prose_reasoning_graph.py
+      - tests/agent_tools/test_runtime_log_archive_git.py
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
@@ -1580,12 +1586,12 @@ entries:
 
   - id: check-github-workflows
     summary: Validates GitHub Actions and PR template surfaces.
-    path: tools/validation/ci/checks/check_github_workflows.py
+    path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     family: ci
     role: checker
     status: canonical
-    command: python3 tools/validation/ci/checks/check_github_workflows.py
-    dispatch: {argv: ["python3", "tools/validation/ci/checks/check_github_workflows.py"]}
+    command: tools/bin/agent-canon check-github-workflows
+    dispatch: {argv: ["tools/bin/agent-canon", "check-github-workflows"]}
     writes: false
     default_wiring:
       ci: true
