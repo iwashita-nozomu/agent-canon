@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -91,6 +92,61 @@ def write_two_event_session(path: Path, total_tokens: int) -> None:
 
 class CompareCodexTokenFootprintsTest(unittest.TestCase):
     """Verify session token footprint comparison status and evidence."""
+
+    def test_complete_cli_and_report_bytes_match_frozen_python_outputs(self) -> None:
+        """Only the declared report-owner locator and clock input may differ."""
+        fixture = PROJECT_ROOT / "tests/fixtures/token_footprints/python_golden.json"
+        cases = json.loads(fixture.read_text(encoding="utf-8"))["cases"]
+        old_owner = "../../eval/checkers/compare_codex_token_footprints.py"
+        native_owner = (
+            "../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs"
+        )
+
+        def normalize(text: str, root: Path) -> str:
+            text = text.replace(str(root), "{case}").replace(old_owner, native_owner)
+            return re.sub(r"`\d{4}-\d{2}-\d{2} \d{2}:\d{2} JST`", "`{timestamp}`", text)
+
+        for case in cases:
+            with self.subTest(case=case["name"]), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                for relative, contents in case["sessions"].items():
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(contents, encoding="utf-8")
+                if case["name"] == "recent":
+                    old = root / "sessions/a.jsonl"
+                    timestamp = time.time() - 10 * 24 * 60 * 60
+                    os.utime(old, (timestamp, timestamp))
+                arguments = [
+                    value.replace("{case}", str(root)) for value in case["args"]
+                ]
+                result = subprocess.run(
+                    [NATIVE_CLI, "compare-codex-token-footprints", *arguments],
+                    cwd=PROJECT_ROOT,
+                    env={**os.environ, "AGENT_CANON_RUNTIME_ROOT": str(root)},
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, case["exit"], result.stderr)
+                self.assertEqual(
+                    normalize(result.stdout, root), normalize(case["stdout"], root)
+                )
+                self.assertEqual(
+                    normalize(result.stderr, root), normalize(case["stderr"], root)
+                )
+                if "report" in case:
+                    report = (root / "report.md").read_text(encoding="utf-8")
+                    self.assertEqual(
+                        normalize(report, root), normalize(case["report"], root)
+                    )
+                if "monitor_raw" in case:
+                    monitor = (
+                        root / "reports/agents/run-1/workflow_monitoring.md"
+                    ).read_text(encoding="utf-8")
+                    self.assertEqual(
+                        normalize(monitor, root), normalize(case["monitor_raw"], root)
+                    )
 
     def test_candidate_token_footprint_below_half_passes(self) -> None:
         """A candidate at or below half the baseline should pass mechanically."""
