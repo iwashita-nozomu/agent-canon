@@ -9,6 +9,7 @@
 # downstream implementation src/rust_migration_plan.rs Rust migration planning command
 # downstream implementation src/structured_analysis.rs structured analysis document inventory and cache build commands
 # downstream implementation src/test_design.rs test design resilience diagnostics
+# downstream implementation src/extract_docx.rs native DOCX bundle extraction
 # downstream implementation src/python_cli_integer.rs exact Python integer division to binary64
 # @dependency-end
 
@@ -39,18 +40,23 @@ rustpython-literal = "=0.4.0"
 rustpython-parser = { version = "0.4.0", default-features = false, features = ["location", "num-bigint"] }
 
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
+bzip2 = "=0.6.1"
+lzma-rust2 = { version = "=0.23.0", default-features = false, features = ["std"] }
+rawzip = { version = "=0.5.2", default-features = false, features = ["std"] }
 hmac = "=0.12.1"
 base64 = "=0.22.1"
 getrandom = "=0.2.17"
 rustix = { version = "=1.1.6", features = ["fs", "time", "process"] }
 
 icu_casemap = { version = "=1.3.2", features = ["compiled_data"] }
+icu_normalizer = { version = "=1.3.2", features = ["compiled_data"] }
 lsp-server = "=0.10.0"
 tar = { version = "=0.4.46", default-features = false }
 zip = { version = "=9.1.2", default-features = false, features = ["deflate-flate2"] }
 
 scip = "=0.10.0"
 protobuf = "=3.7.2"
+expat = { version = "=0.1.0-beta.1", features = ["internal-api"] }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "=0.30.1", default-features = false, features = ["user"] }

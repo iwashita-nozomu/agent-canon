@@ -190,8 +190,8 @@ pub const RETIRED_CHILD_TOMBSTONES: &[RetiredChildTombstone] = &[
     ),
     row(
         "codex_runtime_summary_logger.py",
-        "tools/runtime/archive/export_codex_runtime_summary.py",
-        "command-only:python3 tools/runtime/archive/export_codex_runtime_summary.py",
+        "tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs",
+        "command-only:tools/bin/agent-canon export-codex-runtime-summary",
         "runtime summary",
         "summary is bounded derived evidence",
     ),

@@ -6,6 +6,7 @@
 // downstream implementation classify_path_risk.rs preserves Python changed-path file parsing
 // downstream implementation token_footprints.rs preserves Python JSONL line splitting
 // downstream implementation hook_retirement.rs preserves Python-compatible caller audit lines
+// downstream implementation codex_runtime_summary.rs preserves Python JSONL and subprocess-output line splitting
 // @dependency-end
 
 pub fn python_strip(value: &str) -> &str {
