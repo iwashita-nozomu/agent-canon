@@ -236,11 +236,28 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
         usize_value(field(case, "exit").expect("expected exit")) as i32,
         "exit status for {name}"
     );
-    assert_eq!(
-        result.stdout,
-        case_bytes(case, "stdout_base64"),
-        "stdout bytes for {name}"
-    );
+    let mut expected_stdout = case_bytes(case, "stdout_base64");
+    if matches!(
+        text(field(case, "name").unwrap()).as_str(),
+        "contract" | "contract-stop"
+    ) {
+        // Only the retired tool's owner, command, and dependent manifest digest
+        // relocate. The original captured contract bytes remain frozen.
+        let mut expected = String::from_utf8(expected_stdout).unwrap();
+        for (old, new) in [
+            ("\"owner\": \"tools/validation/semantic/tools/tool_rejection_preflight.py\"",
+             "\"owner\": \"tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs\""),
+            ("\"command_or_skill\": \"command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation\"",
+             "\"command_or_skill\": \"command-only:tools/bin/agent-canon tool-rejection-preflight\""),
+            ("cad81898e43d3891d23ed3c220c6fac6703716536a95a7f7c3c7cc323174c9ad",
+             "7fe7b7ea25b13567ba27aa93235da043460df83132162818b93236fa4c4369b9"),
+        ] {
+            assert_eq!(expected.matches(old).count(), 1, "declared contract relocation");
+            expected = expected.replace(old, new);
+        }
+        expected_stdout = expected.into_bytes();
+    }
+    assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     if text(field(case, "name").expect("case name")) == "surrogate-command" {
         assert!(
             !result.stderr.is_empty(),

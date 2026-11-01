@@ -1,0 +1,414 @@
+{
+  "predicted_gate_count": 68,
+  "predicted_gates": [
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: ../outside.rs\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "../outside.rs"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "../outside.rs"
+    },
+    {
+      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "gate": "codex_hook_runtime_alignment",
+      "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
+      "path": ".codex/hooks.json"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "preserve the strict JSON schema with top-level hooks only; record dependency context in owner docs, tests, or review artifacts",
+      "path": ".codex/hooks.json"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "path": ".codex/hooks.json"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: .codex/hooks/hook_dispatcher.py\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py && python3 -m pytest tests/agent_tools/test_codex_hooks.py -q",
+      "gate": "codex_hook_runtime_alignment",
+      "handoff": "include hook wiring, quiet-pass behavior, and runtime alignment evidence",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/python/readability.py --root . .codex/hooks/hook_dispatcher.py",
+      "gate": "oop_readability_guard",
+      "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "tools/bin/agent-canon check-solid-evidence --root . .codex/hooks/hook_dispatcher.py --evidence <oop-readability-report>",
+      "gate": "solid_evidence_gate",
+      "handoff": "attach a path-covered OOP readability JSON or Markdown report for SOLID-sensitive Python boundaries before closeout",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": ".codex/hooks/hook_dispatcher.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": ".codex/personal/skills/subagent-bootstrap/SKILL.md"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "path": ".codex/personal/skills/subagent-bootstrap/SKILL.md"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": ".codex/personal/skills/subagent-bootstrap/SKILL.md"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": ".github/workflows/build.yml"
+    },
+    {
+      "command": "python3 tools/validation/ci/checks/check_github_workflows.py",
+      "gate": "github_workflow_check",
+      "handoff": "include workflow checkout, permissions, and artifact evidence",
+      "path": ".github/workflows/build.yml"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:github-automation owner:github class:github_surface protecting_tools:tools/validation/ci/checks/check_github_workflows.py",
+      "path": ".github/workflows/build.yml"
+    },
+    {
+      "command": "python3 tools/validation/semantic/convention/check_convention_compliance.py",
+      "gate": "agent_protocol_convention",
+      "handoff": "include whether workflow, skill-routing, and hook/tool feedback protocol checks still pass",
+      "path": "agents/COMMUNICATION_PROTOCOL.md"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "agents/COMMUNICATION_PROTOCOL.md"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:runtime-entrypoints owner:agent-canon class:shared_runtime protecting_tools:tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
+      "path": "agents/COMMUNICATION_PROTOCOL.md"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "agents/COMMUNICATION_PROTOCOL.md"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "experiments/registry.toml"
+    },
+    {
+      "command": "if [ -e experiments/registry.toml ]; then python3 -m tools.validation.ci.checks.check_experiment_registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
+      "gate": "experiment_execution_surface_guard",
+      "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
+      "path": "experiments/registry.toml"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:experiment-artifacts owner:agent-canon class:durable_state protecting_tools:tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
+      "path": "experiments/registry.toml"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "notebooks/example.ipynb"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "notebooks/example.ipynb"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "scratch-drift/example.txt"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "scratch-drift/example.txt"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: scratch/emoji-\ud83d\ude00.py\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/emoji-\ud83d\ude00.py",
+      "gate": "oop_readability_guard",
+      "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "tools/bin/agent-canon check-solid-evidence --root . scratch/emoji-\ud83d\ude00.py --evidence <oop-readability-report>",
+      "gate": "solid_evidence_gate",
+      "handoff": "attach a path-covered OOP readability JSON or Markdown report for SOLID-sensitive Python boundaries before closeout",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "scratch/emoji-\ud83d\ude00.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: scratch/quote\"file.py\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/quote\"file.py",
+      "gate": "oop_readability_guard",
+      "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "tools/bin/agent-canon check-solid-evidence --root . scratch/quote\"file.py --evidence <oop-readability-report>",
+      "gate": "solid_evidence_gate",
+      "handoff": "attach a path-covered OOP readability JSON or Markdown report for SOLID-sensitive Python boundaries before closeout",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "scratch/quote\"file.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: scratch/\u65e5\u672c\u8a9e.py\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/python/readability.py --root . scratch/\u65e5\u672c\u8a9e.py",
+      "gate": "oop_readability_guard",
+      "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "tools/bin/agent-canon check-solid-evidence --root . scratch/\u65e5\u672c\u8a9e.py --evidence <oop-readability-report>",
+      "gate": "solid_evidence_gate",
+      "handoff": "attach a path-covered OOP readability JSON or Markdown report for SOLID-sensitive Python boundaries before closeout",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "scratch/\u65e5\u672c\u8a9e.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: src/model.cpp\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "src/model.cpp"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "src/model.cpp"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/cpp/readability.py --root . src/model.cpp",
+      "gate": "oop_readability_guard",
+      "handoff": "include C/C++ OOP readability risk before edits",
+      "path": "src/model.cpp"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "assign this planned path to exactly one responsibility-scope.toml scope or move the edit to an existing owner surface before editing",
+      "path": "src/model.cpp"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "src/model.cpp"
+    },
+    {
+      "command": "git status --short --branch",
+      "gate": "agentcanon_new_tool_source_route",
+      "handoff": "treat this planned path as AgentCanon-owned source: add it on the standalone AgentCanon branch/PR; do not create a parent-local copy",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: tools/agent_tools/new_shared_checker_oracle.py\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "python3 tools/validation/code/oop/python/readability.py --root . tools/agent_tools/new_shared_checker_oracle.py",
+      "gate": "oop_readability_guard",
+      "handoff": "include OOP readability risk, repair plan, and the non-blocking review_oop_boundary_signal / OOP_READABILITY_REVIEW_SIGNAL_FINDINGS disposition before implementation edits",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:shared-tooling owner:agent-canon class:tooling protecting_tools:tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs,tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "tools/bin/agent-canon check-solid-evidence --root . tools/agent_tools/new_shared_checker_oracle.py --evidence <oop-readability-report>",
+      "gate": "solid_evidence_gate",
+      "handoff": "attach a path-covered OOP readability JSON or Markdown report for SOLID-sensitive Python boundaries before closeout",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "tools/bin/agent-canon tool-catalog",
+      "gate": "tool_catalog",
+      "handoff": "include catalog/docs/tests wiring for changed canonical tool surfaces",
+      "path": "tools/agent_tools/new_shared_checker_oracle.py"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PreToolUse\",\"tool_name\":\"apply_patch\",\"tool_input\":{\"patch\":\"*** Begin Patch\\n*** Update File: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs\\n*** End Patch\\n\"}}' | python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation",
+      "gate": "cause_investigation_guard",
+      "handoff": "record Observation, Hypothesis or Root Cause, Expected Fix Surface or Selected Surface, and Validation Before Edit or Support Evidence before code edits; for validation failures include failing_contract, observation_level, cause_classification, intent_preservation, and evidence for same-intent repair or escalation before write-capable repair",
+      "path": "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+    },
+    {
+      "command": "python3 -m pytest -q tests/tools/test_notebook_quality.py",
+      "gate": "notebook_quality_contract",
+      "handoff": "preserve the notebook-quality CLI contract and run its existing Rust-backed path, content, metric, warning, output, and exit oracles",
+      "path": "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:shared-tooling owner:agent-canon class:tooling protecting_tools:tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs,tools/runtime/dispatch/agent-canon/src/tool_drift.rs",
+      "path": "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+    },
+    {
+      "command": "tools/bin/agent-canon tool-catalog",
+      "gate": "tool_catalog",
+      "handoff": "include catalog/docs/tests wiring for changed canonical tool surfaces",
+      "path": "tools/runtime/dispatch/agent-canon/src/notebook_quality.rs"
+    },
+    {
+      "command": "bash tools/analysis/dependencies/run_repo_dependency_review.sh --root . --list-changed-dependencies",
+      "gate": "dependency_review",
+      "handoff": "include available dependency evidence and the related edit-scope plan; resolve ordinary dependencies from their actual source",
+      "path": "vendor/skills/example/SKILL.md"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | import-only:tools.runtime.authority.task_authority:first_party_library_authorized",
+      "gate": "library_implementation_guard",
+      "handoff": "do not rewrite vendored or installed library internals; use wrapper, adapter, fork/upstream patch, or manifest-backed vendor import",
+      "path": "vendor/skills/example/SKILL.md"
+    },
+    {
+      "command": "tools/bin/agent-canon responsibility-scope --root . --format json",
+      "gate": "responsibility_scope",
+      "handoff": "scope:external-vendor owner:external-vendor class:external_dependency protecting_tools:tools/runtime/dispatch/agent-canon/src/responsibility_scope.rs",
+      "path": "vendor/skills/example/SKILL.md"
+    },
+    {
+      "command": "printf '%s' '{\"hookEventName\":\"PostToolUse\",\"tool_name\":\"apply_patch\"}' | tools/bin/agent-canon docs check",
+      "gate": "style_checker_guard",
+      "handoff": "include selected style checker families and unchecked changed-file coverage before continuing",
+      "path": "vendor/skills/example/SKILL.md"
+    }
+  ],
+  "status": "warn"
+}

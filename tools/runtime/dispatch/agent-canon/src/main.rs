@@ -46,6 +46,7 @@
 // downstream implementation test_design.rs routes test design resilience diagnostics
 // downstream implementation entrypoint_owner_map.rs checks root entrypoint owner-map contracts within docs
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
+// downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
@@ -96,6 +97,7 @@ mod surface_manifest;
 mod test_design;
 mod token_footprints;
 mod tool_drift;
+mod tool_rejection_preflight;
 
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
@@ -132,6 +134,7 @@ Commands:
   generated-artifact-guard [--root <repo-root>]
   check-algorithm-config-partition [--root <repo-root>] [--exclude <pattern>]... [--format text|json] [--fail-on-finding] [--fail-on-default] [paths...]
   responsibility-scope [--root <repo-root>] [--manifest <path>] [--format text|json] [--path <path>]...
+  tool-rejection-preflight [paths...] [--root <repo-root>] [--changed] [--format text|json]
   check-merge-structure --source <ref> [--target <ref>] [--compare-commit <ref>] [--repo-root <path>]
   jit-ir-to-lean --jit-ir <path> --namespace <Lean.Namespace> --out <path>
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
@@ -343,6 +346,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == responsibility_scope::SELECTOR {
         std::process::exit(responsibility_scope::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == tool_rejection_preflight::SELECTOR {
+        std::process::exit(tool_rejection_preflight::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {

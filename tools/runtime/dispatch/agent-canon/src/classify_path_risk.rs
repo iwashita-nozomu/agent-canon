@@ -6,6 +6,7 @@
 // upstream design ../../../../../agents/TASK_WORKFLOWS.md risk-scaled workflow families
 // upstream implementation python_text.rs shares Python-compatible path-file line splitting
 // downstream design ../../../../../documents/tools/classify_path_risk.md path-risk classification usage
+// downstream implementation tool_rejection_preflight.rs reuses Python splitlines and JSON escaping
 // downstream implementation ../../../../../tests/agent_tools/test_classify_path_risk.py native selector behavior oracles
 // downstream implementation ../../../../../tests/tools/test_standalone_static_gate_units.py selector and CI ownership oracles
 // downstream implementation ../../../../../.github/workflows/agent-canon-static-gates.yml source-built unit selection
@@ -129,7 +130,7 @@ fn python_strip(value: &str) -> &str {
     })
 }
 
-fn python_splitlines(text: &str) -> Vec<&str> {
+pub(crate) fn python_splitlines(text: &str) -> Vec<&str> {
     crate::python_text::python_splitlines(text)
 }
 
@@ -382,7 +383,7 @@ fn render_json_string_array(values: &[&String]) -> Result<String, serde_json::Er
     json_ensure_ascii(&serde_json::to_string(values)?)
 }
 
-fn json_ensure_ascii(serialized: &str) -> Result<String, serde_json::Error> {
+pub(crate) fn json_ensure_ascii(serialized: &str) -> Result<String, serde_json::Error> {
     let mut output = String::with_capacity(serialized.len());
     for character in serialized.chars() {
         if character.is_ascii() {
