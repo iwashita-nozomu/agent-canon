@@ -34,7 +34,7 @@ from tools.agent.orchestration.packets import (  # noqa: E402
 from tools.agent.orchestration.team_config import RunBundleSpec, load_team_config  # noqa: E402
 
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
-GATE_CHECK_SCRIPT = PROJECT_ROOT / "tools" / "validation" / "semantic" / "lifecycle" / "waterfall_gate_check.py"
+AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 
 
 def write_markdown(path: Path, lines: list[str]) -> None:
@@ -144,8 +144,8 @@ def run_gate(report_dir: Path, gate: str) -> subprocess.CompletedProcess[str]:
     """Run one waterfall gate check."""
     return subprocess.run(
         [
-            sys.executable,
-            str(GATE_CHECK_SCRIPT),
+            str(AGENT_CANON_CLI),
+            "waterfall-gate-check",
             "--report-dir",
             str(report_dir),
             "--gate",
@@ -313,7 +313,7 @@ def design_brief_lines(
             [
                 "## Canonical Tree-Head Plan",
                 (
-                    "Keep `tools/validation/semantic/lifecycle/waterfall_gate_check.py` as the only "
+                    "Keep `tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs` as the only "
                     "canonical implementation path and do not leave backup files."
                 ),
             ]
@@ -329,7 +329,7 @@ def design_brief_lines(
     lines.extend(
         [
             "## Identifier And Naming Plan",
-            "Use `waterfall_gate_check.py` after the existing task tool names.",
+            "Use `waterfall-gate-check` after the existing task tool names.",
         ]
     )
     return lines
@@ -734,20 +734,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "plan",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "plan")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("schedule.md:planned_work_units_empty", result.stdout)
@@ -1123,20 +1110,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("work_log.md:section_empty_or_missing:entries", result.stdout)
@@ -1191,20 +1165,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
@@ -1262,20 +1223,7 @@ class WaterfallGateCheckTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(GATE_CHECK_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                    "--gate",
-                    "final",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_gate(report_dir, "final")
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
