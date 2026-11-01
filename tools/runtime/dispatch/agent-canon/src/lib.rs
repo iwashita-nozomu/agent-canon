@@ -97,7 +97,7 @@ pub mod prompt_capture;
 pub mod prompt_classifier;
 #[allow(dead_code)]
 pub(crate) mod python_ast;
-pub(crate) mod python_cli_integer;
+pub mod python_cli_integer;
 pub(crate) mod python_cli_options;
 pub mod python_json;
 pub mod python_sequence_matcher;

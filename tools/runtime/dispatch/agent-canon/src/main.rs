@@ -73,7 +73,7 @@ mod notebook_quality;
 mod numeric_performance;
 mod python_algorithm_contract;
 mod python_ast;
-mod python_cli_integer;
+use agent_canon::python_cli_integer;
 mod python_cli_options;
 mod python_helper_function_inventory;
 mod python_module_groups;
