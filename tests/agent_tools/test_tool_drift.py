@@ -26,7 +26,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the actual native checker against a fixture root."""
         if not AGENT_CANON_CLI:
-            raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+            raise RuntimeError(
+                "AGENT_CANON_CLI must select the current native executable"
+            )
         return subprocess.run(
             [AGENT_CANON_CLI, "tool-drift", "--root", str(root), *args],
             cwd=PROJECT_ROOT,
@@ -208,9 +210,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         gates = [
             (
                 "generated_artifact_guard",
-                'python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                'run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"',
                 "missing-generated-artifact-pr-guard",
-                'python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py"',
+                "run_agent_canon generated-artifact-guard",
                 '--root "${WORKSPACE_ROOT}"',
             ),
         ]
@@ -298,7 +300,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 / "check_agent_canon_pr.sh"
             )
             text = script.read_text(encoding="utf-8").replace(
-                'python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"\n',
+                'run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -585,7 +587,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../../../.github/PULL_REQUEST_TEMPLATE.md standalone template",
                     "# upstream implementation ../../../repository/workspace/parent_root_side_effects.py parent-root boundary",
                     "# upstream implementation ../../../runtime/artifacts/runtime_artifacts.py runtime output boundary",
-                    "# upstream implementation ../../../runtime/artifacts/generated_artifact_guard.py generated artifact guard",
+                    "# upstream implementation ../../../runtime/dispatch/agent-canon/src/report_artifact_checks.rs generated artifact guard",
                     "# upstream implementation ../../semantic/runtime/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../../semantic/convention/check_convention_compliance.py convention gate",
                     "# upstream implementation ../../../runtime/lifecycle/update_lifecycle_contract.py lifecycle receipt",
@@ -593,7 +595,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./check_github_workflows.py github checks",
                     "# upstream implementation ./run_python_quality_checks.sh python quality",
                     "# @dependency-end",
-                    'python3 "${WORKSPACE_ROOT}/tools/runtime/artifacts/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                    'run_agent_canon generated-artifact-guard --root "${WORKSPACE_ROOT}"',
                     'python3 "${WORKSPACE_ROOT}/tools/validation/semantic/runtime/check_agent_runtime_alignment.py"',
                     "",
                 ]
@@ -604,7 +606,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             ".github/PULL_REQUEST_TEMPLATE.md",
             "tools/repository/workspace/parent_root_side_effects.py",
             "tools/runtime/artifacts/runtime_artifacts.py",
-            "tools/runtime/artifacts/generated_artifact_guard.py",
+            "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
             "tools/validation/semantic/runtime/check_agent_runtime_alignment.py",
             "tools/validation/semantic/convention/check_convention_compliance.py",
             "tools/runtime/lifecycle/update_lifecycle_contract.py",
