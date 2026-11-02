@@ -38,7 +38,7 @@ def workspace(tmp_path: Path) -> Path:
     (root / "agents").mkdir(parents=True)
     (root / ".codex" / "agents").mkdir(parents=True)
     (root / "agents" / "model_profiles.toml").write_text(
-        '''schema_id = "model_profile_registry_v1"
+        """schema_id = "model_profile_registry_v1"
 registry_id = "test"
 registry_version = 1
 [role_profile_bindings]
@@ -77,7 +77,7 @@ close_tool_target_binding = "terminal_agent_id"
 id = "core"
 text = "Use closed contracts."
 priority = 1
-''',
+""",
         encoding="utf-8",
     )
     (root / "agents" / "agents_config.json").write_text(
@@ -148,26 +148,45 @@ def test_common_claim_evidence_contract_is_validated(workspace: Path) -> None:
 
 def test_registry_rejects_unknown_profile_field(workspace: Path) -> None:
     path = workspace / "agents" / "model_profiles.toml"
-    path.write_text(path.read_text(encoding="utf-8").replace('model_alias = "sol"', 'model_alias = "sol"\nfallback = "worker"'), encoding="utf-8")
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(
+            'model_alias = "sol"', 'model_alias = "sol"\nfallback = "worker"'
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(ModelProfileRegistryError, match="unknown_fields"):
         load_model_profile_registry(workspace)
 
 
-def test_prompt_rejects_unknown_duplicate_and_forbidden_context(workspace: Path) -> None:
+def test_prompt_rejects_unknown_duplicate_and_forbidden_context(
+    workspace: Path,
+) -> None:
     registry = load_model_profile_registry(workspace)
     with pytest.raises(ModelProfileRegistryError, match="unknown"):
         materialize_prompt_capsule(
-            PromptMaterializationRequest("sol_parent_high", "sol_parent", _context() + (ContextItem("extra", "x"),), "build"),
+            PromptMaterializationRequest(
+                "sol_parent_high",
+                "sol_parent",
+                _context() + (ContextItem("extra", "x"),),
+                "build",
+            ),
             registry,
         )
     with pytest.raises(ModelProfileRegistryError, match="duplicate"):
         materialize_prompt_capsule(
-            PromptMaterializationRequest("sol_parent_high", "sol_parent", _context() + (ContextItem("context", "again"),), "build"),
+            PromptMaterializationRequest(
+                "sol_parent_high",
+                "sol_parent",
+                _context() + (ContextItem("context", "again"),),
+                "build",
+            ),
             registry,
         )
 
 
-def test_close_token_is_target_only_and_request_schema_is_closed(workspace: Path) -> None:
+def test_close_token_is_target_only_and_request_schema_is_closed(
+    workspace: Path,
+) -> None:
     registry = load_model_profile_registry(workspace)
     token = materialize_tool_call_token(
         ToolCallMaterializationRequest("sol_parent_high", "agent-1"),
@@ -195,17 +214,23 @@ def test_registry_exposes_no_decision_sufficiency_policy_api() -> None:
     assert "decision_sufficiency" not in registry_module.SCHEMA_IDS
 
 
-def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_canonical_generator_and_readback(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert main(["--root", str(workspace), "--generate-role-views"]) == 0
     assert capsys.readouterr().out == "MODEL_PROFILE_ROLE_VIEWS=generated:1\n"
-    role_text = (workspace / ".codex" / "agents" / "sol_parent.toml").read_text(encoding="utf-8")
+    role_text = (workspace / ".codex" / "agents" / "sol_parent.toml").read_text(
+        encoding="utf-8"
+    )
     assert "generated role view: generated_role_view_v1" in role_text
     assert "@dependency-start" not in role_text
     assert 'model = "model-sol"' in role_text
     assert "model_context_window = 1050000" in role_text
     assert "model_auto_compact_token_limit = 900000" in role_text
     assert "Use the role-specific contract." in role_text
-    projection = json.loads((workspace / "agents" / "agents_config.json").read_text(encoding="utf-8"))
+    projection = json.loads(
+        (workspace / "agents" / "agents_config.json").read_text(encoding="utf-8")
+    )
     assert projection["roles"][0]["projection_digest"]
     assert main(["--root", str(workspace), "--check-role-views"]) == 0
     assert capsys.readouterr().out == "MODEL_PROFILE_ROLE_VIEWS=pass\n"
@@ -213,17 +238,28 @@ def test_canonical_generator_and_readback(workspace: Path, capsys: pytest.Captur
 
 def test_generator_rejects_unbound_registered_role(workspace: Path) -> None:
     config = workspace / ".codex" / "config.toml"
-    config.write_text(config.read_text(encoding="utf-8") + '\n[agents.extra]\ndescription = "Extra"\nconfig_file = "agents/extra.toml"\n', encoding="utf-8")
+    config.write_text(
+        config.read_text(encoding="utf-8")
+        + '\n[agents.extra]\ndescription = "Extra"\nconfig_file = "agents/extra.toml"\n',
+        encoding="utf-8",
+    )
     registry = load_model_profile_registry(workspace)
-    with pytest.raises(ModelProfileRegistryError, match="binding_registration_set_mismatch"):
+    with pytest.raises(
+        ModelProfileRegistryError, match="binding_registration_set_mismatch"
+    ):
         generate_role_views(registry, workspace)
 
 
-def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant() -> None:
+def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant() -> (
+    None
+):
     """All canonical roles have source-free static clauses and one digest."""
     root = Path(__file__).resolve().parents[2]
     registry = load_model_profile_registry(root)
-    live = {view.role_id: view for view in generate_role_views(registry, root, projection="live")}
+    live = {
+        view.role_id: view
+        for view in generate_role_views(registry, root, projection="live")
+    }
     static = {
         view.role_id: view
         for view in generate_role_views(registry, root, projection="consumer-static")
@@ -236,6 +272,15 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         "parent_authority",
         "stop_handback",
     ]
+    stop_handback = next(
+        item.fragment
+        for item in STATIC_OBLIGATION_TABLE
+        if item.obligation_id == "stop_handback"
+    )
+    assert stop_handback == (
+        "return the role result and any new commit/check facts produced by "
+        "the assigned work, then stop"
+    )
     clauses = {
         clause.clause_id: clause
         for role_id in registry.role_profile_bindings
@@ -269,7 +314,22 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
             )
         )
     for role_id in ("python_reviewer", "spark_worker", "worker"):
-        assert live[role_id].rendered_instructions != static[role_id].rendered_instructions
+        assert (
+            live[role_id].rendered_instructions != static[role_id].rendered_instructions
+        )
+    for role_id in ("spark_worker", "worker"):
+        instructions = live[role_id].rendered_instructions
+        assert "Source-edit handoffs must carry writer_target" in instructions
+        assert "do not echo the target/path list in the result" in instructions
+        assert (
+            "refer to the existing readback without repeating its fields"
+            in instructions
+        )
+        assert (
+            "explicitly assigned action is canonical repository-topic-clone.prepare"
+            in instructions
+        )
+        assert "preexisting target is not required for preparation" in instructions
     generated_config = json.loads(
         (root / "agents" / "agents_config.json").read_text(encoding="utf-8")
     )
@@ -277,10 +337,16 @@ def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant
         assert generated_config["agent_views"][role_id]["developer_instructions"] == (
             view.rendered_instructions
         )
-    assert len(generated_config["agent_views"]) == len(generated_config["roles"]) == len(registry.role_profile_bindings)
+    assert (
+        len(generated_config["agent_views"])
+        == len(generated_config["roles"])
+        == len(registry.role_profile_bindings)
+    )
 
 
-def test_missing_projection_for_path_bearing_clause_is_rejected(workspace: Path) -> None:
+def test_missing_projection_for_path_bearing_clause_is_rejected(
+    workspace: Path,
+) -> None:
     """A producer path cannot silently enter a consumer-static render."""
     path = workspace / "agents" / "model_profiles.toml"
     text = path.read_text(encoding="utf-8").replace(
@@ -288,7 +354,9 @@ def test_missing_projection_for_path_bearing_clause_is_rejected(workspace: Path)
         'text = "Use agents/skills/not-a-consumer-path."',
     )
     path.write_text(text, encoding="utf-8")
-    with pytest.raises(ModelProfileRegistryError, match="consumer_static_projection_required"):
+    with pytest.raises(
+        ModelProfileRegistryError, match="consumer_static_projection_required"
+    ):
         load_model_profile_registry(workspace)
 
 
@@ -327,7 +395,9 @@ def test_canonical_clause_obligation_omission_or_wrong_set_is_rejected(
     mutated = original.replace(needle, replacement, 1)
     path.write_text(mutated, encoding="utf-8")
     try:
-        with pytest.raises(ModelProfileRegistryError, match="required_static_obligations_mismatch"):
+        with pytest.raises(
+            ModelProfileRegistryError, match="required_static_obligations_mismatch"
+        ):
             load_model_profile_registry(root)
     finally:
         path.write_text(original, encoding="utf-8")

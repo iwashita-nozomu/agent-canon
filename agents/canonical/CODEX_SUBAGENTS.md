@@ -357,7 +357,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `design_reviewer` | `detailed_design_reviewer` |
 | `document_flow_reviewer` | `document_flow_reviewer` |
 | `test_designer` | `test_designer` |
-| `implementer` | `worker` by default; the selected typed route may supply `spark_worker` for a bounded slice, with actual tool-result evidence. Both roles may commit/push and return local head/check evidence; publisher/pr-processing owns Issue/PR writes and integration_executor owns merge/conflict resolution. |
+| `implementer` | `worker` by default; the selected typed route may supply `spark_worker` for a bounded slice, with actual tool-result evidence. Both roles may commit/push; return the role result and any new commit/check facts produced by the assigned work. Publisher/pr-processing owns Issue/PR writes and integration_executor owns merge/conflict resolution. |
 | `integration_executor` | existing `worker` executable with explicit integration scope; owns merge/conflict resolution and branch/tree readback |
 | `publisher` | existing `worker` executable with explicit publication scope; owns authorized Issue/PR writes and remote readback |
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
@@ -526,7 +526,11 @@ require another read.
 ## Parallel Write Safety
 
 - parent は選択済み writer handoff で各 writer の allowed path / directory を管理します
-- write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
+- source-edit handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、
+  正規化済み `remote`、`allowed_paths`）を必須とします。明示的に割り当てられた
+  canonical `repository-topic-clone.prepare` 自体は target を作る preparation phase なので、
+  exact request と current allowed paths で実行できます。source edit は返却された target の
+  readback 後に限り、unknown/mismatched identity は既存 failure policy に従って hold します
 - 同じ `checkout_root` で write target が衝突する作業は同時に起動せず、reader は同じ checkout を共有できます
 - `repository-topic-clone.prepare` は選択済み mode の prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
 - repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
