@@ -5,6 +5,7 @@
 # upstream design ../documents/tools/repo-local-tool-imports.md legacy import disposition ledger
 # downstream implementation runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs validates this catalog
 # downstream implementation runtime/dispatch/agent-canon/src/tool_dispatch.rs loads typed runtime descriptors
+# downstream implementation runtime/dispatch/agent-canon/src/catalog/skill_routes.rs routes explicit capabilities
 # downstream implementation runtime/dispatch/agent-canon/src/tool_drift.rs checks catalog drift contracts
 # downstream design ../documents/tools/tool-docs.toml maps same-named tool docs
 # downstream implementation ../tests/agent_tools/test_tool_catalog.py validates canonical visualization tool registration
@@ -55,6 +56,9 @@ runtime_schema:
     - id: rust-version
       selector: --version
       path: tools/runtime/dispatch/agent-canon/src/main.rs
+    - id: rust-capability-route
+      selector: capability-route
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs
     - id: rust-rust-migration-audit
       selector: rust-migration-audit
       path: tools/runtime/dispatch/agent-canon/src/migration_audit.rs

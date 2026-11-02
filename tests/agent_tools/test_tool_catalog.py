@@ -40,7 +40,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
 
     def test_catalog_rows_allow_shared_native_dispatcher_path(self) -> None:
-        """Distinct native IDs may share the existing generic dispatcher."""
+        """Distinct native IDs may share the existing Rust dispatcher."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
         )
@@ -67,6 +67,16 @@ class CheckToolCatalogTest(unittest.TestCase):
             "tools/runtime/dispatch/agent-canon/src/tool_dispatch.rs",
         )
         self.assertEqual(rows["quarto"]["path"], rows["vl-convert"]["path"])
+        native_capability = next(
+            command
+            for command in catalog["runtime_schema"]["rust_public_commands"]
+            if command["id"] == "rust-capability-route"
+        )
+        self.assertEqual(native_capability["selector"], "capability-route")
+        self.assertEqual(
+            native_capability["path"],
+            "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
+        )
         self.assertTrue(rows["workflow-monitor"]["writes"])
         self.assertFalse(rows["waterfall-gate-check"]["writes"])
         result = self.run_checker(PROJECT_ROOT, "--format", "json")

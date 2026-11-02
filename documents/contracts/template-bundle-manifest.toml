@@ -49,7 +49,6 @@ roots = [
   "tools/agent/orchestration/__init__.py",
   "tools/agent/skills/__init__.py",
   "tools/agent/templates/__init__.py",
-  "tools/agent/orchestration/capability_route.py",
   "tools/agent/orchestration/mid_task_user_input_policy.py",
   "tools/agent/orchestration/prompt_capture.py",
   "tools/agent/orchestration/prompt_classifier.py",
