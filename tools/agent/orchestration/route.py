@@ -1026,7 +1026,7 @@ def _run_native_capability_route(argv: Sequence[str]) -> int:
     cli = (
         os.environ.get("AGENT_CANON_NATIVE_BIN")
         or os.environ.get("AGENT_CANON_CLI")
-        or str(Path(__file__).resolve().parents[3] / "tools" / "bin" / "agent-canon")
+        or "agent-canon"
     )
     try:
         result = subprocess.run(
