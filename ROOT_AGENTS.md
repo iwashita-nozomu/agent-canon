@@ -37,6 +37,9 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   needs separate current-user agreement.
 - **Memory safety:** preserve ownership, lifetimes, access bounds, and
   synchronization before performance or implementation convenience.
+- **Tool implementation:** write agent-authored tools and task automation in
+  shell scripts or Rust. Do not create or add Python tool implementations,
+  including temporary scripts, inline execution payloads, and generated tool code.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
 - **Investigation:** start local repair at target code, diff, and contract, without
