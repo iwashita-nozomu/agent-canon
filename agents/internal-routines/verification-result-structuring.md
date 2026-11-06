@@ -97,18 +97,15 @@ necessary context without reconstructing a private conversation.
 
 ## Terms and translation
 
-1. Before drafting, identify names the reader needs for lookup or later reference,
-   such as a product, standard, API, command, or identifier. Preserve their
-   spelling. Describe other internal labels directly through the relevant action,
-   object, and result, using words the intended reader already knows.
-2. For each necessary unfamiliar name, verify its meaning in the specification,
-   source definition, or established project usage, and briefly explain its role
-   at first use. An acronym's English expansion alone may leave that role unclear.
-   Keep the same term for the same concept and state any unresolved meaning.
-3. Reread Japanese compound nouns and English labels for the same first-use
-   clarity. Use conventional Japanese terminology or the established original
-   name. Replace word-for-word translations and unexplained internal names with
-   a concrete sentence; adding a new Japanese label does not explain the concept.
+1. Read unfamiliar terms against the relevant specification, source definition,
+   or existing project usage. Keep the same term for the same concept and make
+   a changed meaning explicit. If the meaning is unresolved, state that gap.
+2. At first use, briefly explain a necessary term's role in this task. An acronym's
+   English expansion alone may leave that role unclear. When the reader has no
+   reason to learn an internal name, describe the actual action or object instead.
+3. In Japanese, use a conventional Japanese term or retain the established
+   original spelling. Preserve searchable product, API, command, and identifier
+   names. Explain them in ordinary Japanese instead of coining a Japanese name.
 
 Apply these decisions while drafting and rereading. A brief inline explanation
 usually suffices; a glossary is useful only when the document needs repeated
