@@ -42,6 +42,9 @@ Optional document topology planning does not make the applicable steps optional.
 
 ## Reader reconstruction
 
+Apply [terms and translation](#terms-and-translation) when choosing the words
+used to explain the subject and procedure.
+
 Write for an intended reader who has the output and its explicitly identified,
 accessible references, but not the author's chat history, temporary workspace,
 or unstated assumptions. Before writeout, walk through what that reader needs
