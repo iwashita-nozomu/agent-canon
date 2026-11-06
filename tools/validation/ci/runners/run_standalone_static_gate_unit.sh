@@ -22,7 +22,7 @@ fi
 UNIT="$1"
 shift
 UNIT_ARGS=("$@")
-if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
+if [[ "${UNIT}" != "full" && "${UNIT}" != "docs" && "${UNIT}" != "rust" && "${#UNIT_ARGS[@]}" -ne 0 ]]; then
   echo "standalone static-gate unit does not accept arguments: ${UNIT}" >&2
   exit 2
 fi
@@ -149,17 +149,38 @@ run_docs() {
 }
 
 run_rust() {
-  cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
-  local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
-  if [[ ! -x "${agent_cli}" ]]; then
-    echo "AGENT_CANON_CLI_BUILD=fail" >&2
-    return 1
-  fi
-  "${agent_cli}" --version
-  cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
-  env -u AGENT_CANON_RUNTIME_ROOT \
-    cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
+  local phase="${1:-all}"
+  case "${phase}" in
+    all|prepare)
+      [[ "$#" -le 1 ]] || return 2
+      cargo build --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
+      local agent_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
+      if [[ ! -x "${agent_cli}" ]]; then
+        echo "AGENT_CANON_CLI_BUILD=fail" >&2
+        return 1
+      fi
+      "${agent_cli}" --version
+      cargo fmt --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml -- --check
+      cargo clippy --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --all-targets -- -D warnings
+      if [[ "${phase}" == "prepare" ]]; then
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline --no-run
+      else
+        env -u AGENT_CANON_RUNTIME_ROOT \
+          cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline
+      fi
+      ;;
+    lib|doc)
+      [[ "$#" -eq 1 ]] || return 2
+      env -u AGENT_CANON_RUNTIME_ROOT \
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline "--${phase}"
+      ;;
+    bin|test)
+      [[ "$#" -eq 2 ]] || return 2
+      env -u AGENT_CANON_RUNTIME_ROOT \
+        cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --locked --offline "--${phase}" "$2"
+      ;;
+    *) echo "unknown Rust validation phase: ${phase}" >&2; return 2 ;;
+  esac
 }
 
 run_contracts() {
@@ -300,7 +321,7 @@ run_workflow_container() {
 case "${UNIT}" in
   full) run_full ;;
   docs) run_docs ;;
-  rust) run_rust ;;
+  rust) run_rust "${UNIT_ARGS[@]}" ;;
   contracts) run_contracts ;;
   eval) run_eval ;;
   workflow-container) run_workflow_container ;;
