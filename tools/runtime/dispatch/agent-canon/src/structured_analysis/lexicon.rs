@@ -2,7 +2,7 @@
 
 use icu_casemap::CaseMapper;
 use icu_normalizer::ComposingNormalizer;
-use icu_segmenter::{WordSegmenter, WordType};
+use icu_segmenter::WordSegmenter;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -75,13 +75,14 @@ impl Lexicon {
 
     fn terms(&self, text: &str) -> Vec<String> {
         let normalized = self.normalize(text);
-        let mut breaks = self.segmenter.segment_str(&normalized);
         let mut start = 0;
         let mut terms = Vec::new();
-        while let Some(end) = breaks.next() {
+        for end in self.segmenter.segment_str(&normalized) {
             let word = &normalized[start..end];
             let minimum = if word.is_ascii() { 3 } else { 2 };
-            if breaks.word_type() == WordType::Letter
+            // ICU4X 1.3 can report no word type for a terminal dictionary segment.
+            // Character properties retain such Han words while excluding symbols.
+            if word.chars().any(char::is_alphabetic)
                 && word.chars().count() >= minimum
                 && !STOPWORDS.contains(&word)
             {

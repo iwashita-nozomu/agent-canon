@@ -17,7 +17,7 @@ downstream implementation ../../tests/agent_tools/test_prose_reasoning_graph.py 
 ## 語の抽出
 
 語の抽出は、既存のRustコマンド `agent-canon structured-analysis lexicon` が担当します。
-ICU4Xの辞書で日本語を区切り、句読点やemojiを除外します。抽出した語は、意味解析用の
+Unicodeを扱うライブラリICU4Xの辞書で日本語を区切り、句読点やemojiを除外します。抽出した語は、意味解析用の
 中間データ、概念、文同士の比較で共通利用します。原文と原文中の位置は変更しません。
 分野の候補は語句に基づく目安であり、実コーパスによる精度検証を表す値ではありません。
 

@@ -33,6 +33,7 @@ class ProseLexiconRegressionTest(unittest.TestCase):
     """Exercise shared word extraction through the product CLI and graph."""
 
     def test_japanese_words_are_shared_by_ir_concepts_and_domain_hints(self) -> None:
+        """Japanese dictionary words reach both stored terms and graph concepts."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = root / "japanese.md"
@@ -73,6 +74,7 @@ class ProseLexiconRegressionTest(unittest.TestCase):
             self.assertEqual(stored_source, text)
 
     def test_punctuation_only_text_does_not_create_terms_or_domain_hints(self) -> None:
+        """Symbols cannot become content words or select a domain."""
         result = subprocess.run(
             [
                 str(prose_graph.CANONICAL_GRAPH_EXECUTABLE),
