@@ -84,6 +84,7 @@ class ProseLexiconRegressionTest(unittest.TestCase):
             input=json.dumps({"texts": ["——— 。。。 😀😀😀"], "prompt": ""}),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

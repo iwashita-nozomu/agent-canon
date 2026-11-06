@@ -1622,6 +1622,7 @@ def native_lexicon(texts: Sequence[str], prompt: str = "") -> LexiconResponse:
         input=json.dumps({"texts": list(texts), "prompt": prompt}, ensure_ascii=False),
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
     if result.returncode:
