@@ -103,6 +103,10 @@ necessary context without reconstructing a private conversation.
 3. In Japanese, use a conventional Japanese term or retain the established
    original spelling. Preserve searchable product, API, command, and identifier
    names. Explain them in ordinary Japanese instead of coining a Japanese name.
+4. Reread Japanese compound nouns as well as English labels. Check that a
+   necessary term has an understandable meaning at its first appearance. If the
+   reader does not need the label to identify a component, rewrite the sentence
+   around what it does, what it acts on, and the resulting change.
 
 Apply these decisions while drafting and rereading. A brief inline explanation
 usually suffices; a glossary is useful only when the document needs repeated
