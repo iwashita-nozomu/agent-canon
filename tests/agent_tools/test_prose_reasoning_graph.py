@@ -29,6 +29,61 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "analysis" / "documents" / "prose_reasoning_graph.py"
 
 
+class ProseLexiconRegressionTest(unittest.TestCase):
+    """Exercise shared word extraction through the product CLI and graph."""
+
+    def test_japanese_words_are_shared_by_ir_concepts_and_domain_hints(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "japanese.md"
+            text = (
+                "# メモ\n\n"
+                "ソフトウェアの依存関係を調べる。こんにちは世界。\n\n"
+                "世界の研究論文を整理する。\n\n"
+                "——— 。。。 😀😀😀\n"
+            )
+            source.write_text(text, encoding="utf-8")
+            db = root / "graph.sqlite"
+            result = run_graph("ingest", str(source), "--db", str(db))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            ir = json.loads((root / "semantic_prose_ir.json").read_text(encoding="utf-8"))
+            self.assertIn("世界", ir["terms"])
+            self.assertNotIn("———", ir["terms"])
+            self.assertNotIn("。。。", ir["terms"])
+            self.assertFalse(any("。" in term or "、" in term for term in ir["terms"]))
+            self.assertIn("dictionary", ir["segmentation"])
+            hints = {hint["corpus_id"] for hint in ir["corpus_hints"]}
+            self.assertIn("software_engineering", hints)
+            self.assertIn("academic_writing", hints)
+            result = run_graph("analyze", "--db", str(db), "--profile", "all")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            with sqlite3.connect(db) as connection:
+                terms = {
+                    row[0] for row in connection.execute(
+                        "SELECT text FROM nodes WHERE layer = 'concept' AND kind = 'term'"
+                    )
+                }
+                stored_source = connection.execute(
+                    "SELECT text FROM nodes WHERE layer = 'source' AND kind = 'document'"
+                ).fetchone()[0]
+            self.assertIn("世界", terms)
+            self.assertEqual(stored_source, text)
+
+    def test_punctuation_only_text_does_not_create_terms_or_domain_hints(self) -> None:
+        result = subprocess.run(
+            [str(prose_graph.CANONICAL_GRAPH_EXECUTABLE), "structured-analysis", "lexicon"],
+            input=json.dumps({"texts": ["——— 。。。 😀😀😀"], "prompt": ""}),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["terms"], [[]])
+        self.assertEqual(payload["top_terms"], [])
+        self.assertEqual(payload["corpus_hints"], [])
+
+
 def _runtime_root_from_args(args: tuple[str, ...]) -> Path:
     """Choose one external runtime root for every path in a CLI fixture."""
     candidates: list[Path] = []
