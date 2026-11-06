@@ -46,7 +46,9 @@ class ProseLexiconRegressionTest(unittest.TestCase):
             db = root / "graph.sqlite"
             result = run_graph("ingest", str(source), "--db", str(db))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            ir = json.loads((root / "semantic_prose_ir.json").read_text(encoding="utf-8"))
+            ir = json.loads(
+                (root / "semantic_prose_ir.json").read_text(encoding="utf-8")
+            )
             self.assertIn("世界", ir["terms"])
             self.assertNotIn("———", ir["terms"])
             self.assertNotIn("。。。", ir["terms"])
@@ -59,7 +61,8 @@ class ProseLexiconRegressionTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             with sqlite3.connect(db) as connection:
                 terms = {
-                    row[0] for row in connection.execute(
+                    row[0]
+                    for row in connection.execute(
                         "SELECT text FROM nodes WHERE layer = 'concept' AND kind = 'term'"
                     )
                 }
@@ -71,7 +74,11 @@ class ProseLexiconRegressionTest(unittest.TestCase):
 
     def test_punctuation_only_text_does_not_create_terms_or_domain_hints(self) -> None:
         result = subprocess.run(
-            [str(prose_graph.CANONICAL_GRAPH_EXECUTABLE), "structured-analysis", "lexicon"],
+            [
+                str(prose_graph.CANONICAL_GRAPH_EXECUTABLE),
+                "structured-analysis",
+                "lexicon",
+            ],
             input=json.dumps({"texts": ["——— 。。。 😀😀😀"], "prompt": ""}),
             capture_output=True,
             text=True,

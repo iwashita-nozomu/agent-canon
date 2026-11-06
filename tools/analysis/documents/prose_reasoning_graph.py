@@ -1627,7 +1627,10 @@ def native_lexicon(texts: Sequence[str], prompt: str = "") -> LexiconResponse:
     if result.returncode:
         raise ValueError(f"native prose lexicon failed: {result.stderr.strip()}")
     payload = json.loads(result.stdout)
-    if not isinstance(payload, dict) or payload.get("schema") != "agent-canon.prose-lexicon.v1":
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != "agent-canon.prose-lexicon.v1"
+    ):
         raise ValueError("native prose lexicon returned an invalid schema")
     return cast(LexiconResponse, payload)
 
@@ -1639,14 +1642,15 @@ def analysis_lexicon(connection: sqlite3.Connection) -> Mapping[str, tuple[str, 
         texts[node.text] = None
         texts[str(node.payload.get("section_path", ""))] = None
         if node.layer == "source" and node.kind == "document":
-            for record in dependency_records_from_source_payload(node.payload, node.node_id):
+            for record in dependency_records_from_source_payload(
+                node.payload, node.node_id
+            ):
                 texts[record.body] = None
                 texts[record.text] = None
     inputs = tuple(texts)
     result = native_lexicon(inputs)
     return {
-        text: tuple(terms)
-        for text, terms in zip(inputs, result["terms"], strict=True)
+        text: tuple(terms) for text, terms in zip(inputs, result["terms"], strict=True)
     }
 
 
@@ -2056,7 +2060,9 @@ def add_projection_layer(
 
 
 def add_concept_layer(
-    connection: sqlite3.Connection, document_id: str, paragraphs: Sequence[Node],
+    connection: sqlite3.Connection,
+    document_id: str,
+    paragraphs: Sequence[Node],
     lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Extract concept nodes from repeated terms."""
@@ -2198,7 +2204,8 @@ def infer_phase(text: str, index: int, profile: str) -> str:
 
 
 def add_discourse_layer(
-    connection: sqlite3.Connection, paragraphs: Sequence[Node],
+    connection: sqlite3.Connection,
+    paragraphs: Sequence[Node],
     lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Add discourse edges between adjacent paragraphs."""
@@ -2387,7 +2394,9 @@ def add_evidence_layer(
                     sentence.source_end,
                 )
             )
-    evidence_nodes.extend(add_graph_dependency_evidence_nodes(connection, document_id, lexicon))
+    evidence_nodes.extend(
+        add_graph_dependency_evidence_nodes(connection, document_id, lexicon)
+    )
     for claim in claims:
         evidence = best_supporting_evidence(claim, evidence_nodes, lexicon)
         if evidence is not None:
@@ -2428,7 +2437,8 @@ def add_evidence_layer(
 
 
 def add_graph_dependency_evidence_nodes(
-    connection: sqlite3.Connection, document_id: str,
+    connection: sqlite3.Connection,
+    document_id: str,
     lexicon: Mapping[str, tuple[str, ...]],
 ) -> tuple[Node, ...]:
     """Materialize canonical-graph dependency records as prose evidence."""
@@ -2570,7 +2580,8 @@ def member_anchor_ids(*nodes: Node) -> list[str]:
 
 
 def best_supporting_evidence(
-    claim: Node, evidence_nodes: Sequence[Node],
+    claim: Node,
+    evidence_nodes: Sequence[Node],
     lexicon: Mapping[str, tuple[str, ...]],
 ) -> Node | None:
     """Choose evidence that has local relation to a claim."""
@@ -2583,7 +2594,10 @@ def best_supporting_evidence(
             if graph_dependency_covers_claim(claim, evidence, lexicon):
                 return evidence
             continue
-        if lexical_overlap(claim.text, evidence.text, lexicon) >= EVIDENCE_SUPPORT_MIN_OVERLAP:
+        if (
+            lexical_overlap(claim.text, evidence.text, lexicon)
+            >= EVIDENCE_SUPPORT_MIN_OVERLAP
+        ):
             return evidence
     return None
 
@@ -3220,7 +3234,8 @@ def required_layers_for_profile(
 
 
 def add_edit_operations(
-    connection: sqlite3.Connection, paragraphs: Sequence[Node],
+    connection: sqlite3.Connection,
+    paragraphs: Sequence[Node],
     lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Add split/merge/bridge/reorder operation candidates."""
