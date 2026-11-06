@@ -191,17 +191,18 @@ jobs:
               unit_command+=(exec --root "${GITHUB_WORKSPACE}" -- bash \
                 /opt/agent-canon/source/tools/validation/ci/runners/run_standalone_static_gate_unit.sh "${unit}" "${args[@]}")
             fi
-            unit_operation=("${unit_command[@]}")
+            result=0
             if [[ "${unit}" == "rust" ]]; then
-              unit_operation=(run_rust_checks)
+              run_rust_checks > "${receipt}" 2>&1 || result=$?
+            else
+              "${unit_command[@]}" > "${receipt}" 2>&1 || result=$?
             fi
-            if "${unit_operation[@]}" > "${receipt}" 2>&1; then
+            if [[ "${result}" -eq 0 ]]; then
               if [[ "${unit}" == "eval" ]]; then
                 eval_unit_status=pass
               fi
               printf 'unit=%s status=pass\n' "${unit}" >> "${GITHUB_STEP_SUMMARY}"
             else
-              result=$?
               if [[ "${unit}" == "eval" ]]; then
                 eval_unit_status=fail
               fi
