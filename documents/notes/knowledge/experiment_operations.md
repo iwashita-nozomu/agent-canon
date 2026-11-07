@@ -52,7 +52,6 @@ upstream design README.md notes lifecycle index
 
 ## 運用チェックリスト
 
-- `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` を action log の正本にする
 - 実装を `main` に取り込む前に関連テストを実行する
 - ドキュメント更新はコード変更と同時に持ち帰る
 - 中断した長時間 run を再開する前に、`ps` と `nvidia-smi` で child の残骸がないことを確認する

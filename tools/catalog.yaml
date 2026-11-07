@@ -2493,24 +2493,6 @@ entries:
     tests:
       - tests/agent_tools/test_compare_codex_token_footprints.py
 
-  - id: worktree-scope-lint
-    summary: Checks worktree scope and action-log discipline.
-    path: tools/repository/workspace/worktree_scope_lint.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/repository/workspace/worktree_scope_lint.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/worktree_scope_lint.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_worktree_scope_lint.py
-
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
     path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
