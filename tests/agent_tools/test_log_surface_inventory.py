@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests log surface inventory, Rust CLI field extraction, and baseline drift detection.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs inventories emitted machine-readable fields
-# downstream implementation ../../tools/validation/semantic/hooks/check_hook_retirement.py consumes inventory checks
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_retirement.rs consumes inventory checks
 # @dependency-end
 """Tests for log-surface field inventory."""
 
@@ -88,10 +88,10 @@ class LogSurfaceInventoryTest(unittest.TestCase):
             )
             rust_tool.parent.mkdir(parents=True)
             rust_tool.write_text(
-                'fn main() {\n'
+                "fn main() {\n"
                 '    println!("RUST_TOOL_STATUS=pass");\n'
                 '\u001f println!("CONTROL_RUST=1");\n'
-                '}\n',
+                "}\n",
                 encoding="utf-8",
             )
             skill = root / "agents" / "skills" / "sample.md"

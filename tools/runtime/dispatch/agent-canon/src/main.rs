@@ -48,6 +48,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation hook_retirement.rs validates tombstone and caller closure
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
@@ -131,6 +132,7 @@ Commands:
   run-evaluation (--run-id ID|--report-dir PATH) [options]
   task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
   codex-hook [EVENT|--group EVENT] [--contract|--list]
+  hook-retirement-check [--root <repo-root>] [--check] [--contract]
   waterfall-gate-check (--run-id ID|--report-dir PATH) --gate <gate> [--report-root PATH]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
@@ -225,6 +227,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "codex-hook" {
         std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::hook_retirement::SELECTOR {
+        std::process::exit(agent_canon::hook_retirement::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "task-close" {
