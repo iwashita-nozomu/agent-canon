@@ -51,8 +51,8 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - branch が複数 session 続いた場合でも、作業再開は current checkout の branch / wave で行い、`documents/notes/branches/` は summary evidence としてだけ使います。
 - 観測した drift / cleanup risk と照合する必要がある場合だけ、関係する
   [guardrails](../notes/guardrails/README.md) / [failures](../notes/failures/README.md) を参照します。
-- `python3 tools/repository/workspace/worktree_scope_lint.py --current` で stale scope の placeholder と kickoff 欄を確認します。`bash tools/repository/worktree/worktree_start.sh` は cleanup diagnostic 以外では使いません。
-- `git status --short --branch` と `git worktree list --porcelain` を確認し、必要なら `bash tools/validation/documentation/checks/check_worktree_scopes.sh` を実行します。
+- `git status --short --branch`、対象の `git diff -- <paths>`、`git worktree list --porcelain` で checkout の実際の状態を確認します。
+- 古い scope / action log は必要な内容を直接読み、引継ぎ後に選択した対象を削除します。Git の状態と current handoff に判断材料が揃うため、旧台帳の項目補完・検査・追記は終了します。
 - dirty state、conflict risk、scope drift の兆候があれば、編集前に current task record に残します。
 - `main` へ戻す場合は、integration owner が準備済み checkout 上で統合します。integration
   用 checkout が必要なら `repository-topic-clone` の selected mode を使い、手動の integration
