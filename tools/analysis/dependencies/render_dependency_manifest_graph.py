@@ -464,12 +464,6 @@ def generate_graph_tsv(root: Path, target_path: Path, *, scope: str) -> GraphInp
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0 and (
-        not target_path.exists() or target_path.stat().st_size == 0
-    ):
-        sys.stderr.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        raise SystemExit(result.returncode)
     if result.returncode != 0:
         sys.stderr.write(result.stdout)
         sys.stderr.write(result.stderr)
@@ -655,7 +649,7 @@ def detect_direction_cycles(
 def _read_committed_tree(
     root: Path, source_revision: str
 ) -> tuple[str, dict[str, GitTreeEntry]]:
-    """Read committed Git entries through the native template-bundle owner."""
+    """Consume the native owner's committed-tree contract."""
     cli = os.environ.get("AGENT_CANON_CLI") or str(
         REPOSITORY_ROOT / "tools/bin/agent-canon"
     )
@@ -670,68 +664,19 @@ def _read_committed_tree(
                 "--source-ref",
                 source_revision,
             ),
-            check=False,
+            check=True,
             capture_output=True,
             text=True,
         )
-    except OSError as error:
-        raise ValueError(f"unable to read selected Git tree: {error}") from error
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip()
-        try:
-            error_payload = json.loads(detail)
-            if isinstance(error_payload, dict) and isinstance(
-                error_payload.get("error"), str
-            ):
-                detail = error_payload["error"]
-        except json.JSONDecodeError:
-            pass
-        raise ValueError(
-            f"unable to read selected Git tree: {detail or 'native CLI failed'}"
-        )
-    try:
         payload = json.loads(result.stdout)
-    except json.JSONDecodeError as error:
-        raise ValueError(
-            f"unable to read selected Git tree: invalid native JSON: {error}"
-        ) from error
-    if not isinstance(payload, dict):
-        raise ValueError(
-            "unable to read selected Git tree: native response is not an object"
-        )
-    revision = payload.get("source_commit")
-    entries_value = payload.get("entries")
-    if not isinstance(revision, str) or not isinstance(entries_value, list):
-        raise ValueError(
-            "unable to read selected Git tree: native response is incomplete"
-        )
-    entries: dict[str, GitTreeEntry] = {}
-    for value in entries_value:
-        if not isinstance(value, dict):
-            raise ValueError(
-                "unable to read selected Git tree: native entry is not an object"
-            )
-        mode = value.get("mode")
-        object_type = value.get("object_type")
-        object_id = value.get("object_id")
-        path = value.get("path")
-        if not all(
-            isinstance(field, str) for field in (mode, object_type, object_id, path)
-        ):
-            raise ValueError(
-                "unable to read selected Git tree: native entry is incomplete"
-            )
-        if path in entries:
-            raise ValueError(
-                f"unable to read selected Git tree: duplicate path: {path}"
-            )
-        entries[path] = GitTreeEntry(
-            mode=mode,
-            object_type=object_type,
-            object_id=object_id,
-            path=path,
-        )
-    return revision, entries
+        return payload["source_commit"], {
+            entry["path"]: GitTreeEntry(**entry) for entry in payload["entries"]
+        }
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.strip() or error.stdout.strip()
+        raise ValueError(f"unable to read selected Git tree: {detail}") from error
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError(f"unable to read selected Git tree: {error}") from error
 
 
 def build_report(

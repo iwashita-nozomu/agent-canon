@@ -14,6 +14,7 @@
 // upstream implementation python_cli_integer.rs shares Python Unicode decimal-digit classification
 // upstream implementation python_sequence_matcher.rs provides CPython-compatible similarity scoring
 // downstream implementation ../../../../bin/agent-canon invokes this command through the CLI wrapper
+// downstream implementation template_bundle.rs shares static-seed TOML traversal and prefix policy
 // downstream implementation ../../../../../tests/tools/test_check_bootstrap_docs.py validates bootstrap and static-seed checks
 // downstream implementation ../../../../../tests/agent_tools/test_export_static_seed.py invokes source-free validation on native-exported seeds
 // downstream implementation ../../../../../tests/tools/test_fix_mermaid.py tests native Mermaid syntax validation
@@ -149,12 +150,12 @@ const STATIC_SEED_FORBIDDEN_CONTENT: &[&[u8]] = &[
     b"vendor/agent-canon",
 ];
 
-const STATIC_SEED_FORBIDDEN_PREFIXES: &[&[u8]] = &[
-    b"agents/skills/",
-    b"agents/model_profiles.toml",
-    b"tools/agent_tools/",
-    b"../../agents/",
-    b"../../tools/",
+pub(crate) const STATIC_SEED_FORBIDDEN_PREFIXES: &[&str] = &[
+    "agents/skills/",
+    "agents/model_profiles.toml",
+    "tools/agent_tools/",
+    "../../agents/",
+    "../../tools/",
 ];
 
 const STATIC_SEED_PROVENANCE_PATH: &str = "agent-canon-static-seed.json";
@@ -2292,53 +2293,37 @@ fn canonical_role_path(role: &str, raw_path: &str) -> Option<String> {
     (resolved == expected).then_some(resolved)
 }
 
+/// Visit semantic keys and strings using toml_edit's traversal of every TOML form.
+pub(crate) fn visit_toml_strings<'doc>(
+    table: &'doc dyn TableLike,
+    callback: impl FnMut(&'doc str, Option<&'doc str>),
+) {
+    use toml_edit::visit::Visit;
+    struct Strings<F>(F);
+    impl<'doc, F: FnMut(&'doc str, Option<&'doc str>)> Visit<'doc> for Strings<F> {
+        fn visit_table_like_kv(&mut self, key: &'doc str, node: &'doc Item) {
+            (self.0)(key, Some(key));
+            toml_edit::visit::visit_table_like_kv(self, key, node);
+        }
+        fn visit_string(&mut self, node: &'doc toml_edit::Formatted<String>) {
+            (self.0)(node.value(), None);
+        }
+    }
+    Strings(callback).visit_table_like(table);
+}
+
 fn scan_toml_table(table: &dyn TableLike, found: &mut BTreeSet<Vec<u8>>) {
-    for (key, item) in table.iter() {
-        scan_toml_string(key, found);
-        scan_toml_item(item, found);
-    }
+    visit_toml_strings(table, |value, _| {
+        let lowered = value.to_lowercase();
+        for marker in STATIC_SEED_FORBIDDEN_PREFIXES {
+            if contains_bytes(lowered.as_bytes(), marker.as_bytes()) {
+                found.insert(marker.as_bytes().to_vec());
+            }
+        }
+    });
 }
 
-fn scan_toml_item(item: &Item, found: &mut BTreeSet<Vec<u8>>) {
-    if let Some(value) = item.as_str() {
-        scan_toml_string(value, found);
-    } else if let Some(table) = item.as_table() {
-        scan_toml_table(table, found);
-    } else if let Some(tables) = item.as_array_of_tables() {
-        for table in tables.iter() {
-            scan_toml_table(table, found);
-        }
-    } else if let Some(values) = item.as_array() {
-        for value in values.iter() {
-            scan_toml_value(value, found);
-        }
-    } else if let Some(table) = item.as_inline_table() {
-        scan_toml_table(table, found);
-    }
-}
-
-fn scan_toml_value(value: &toml_edit::Value, found: &mut BTreeSet<Vec<u8>>) {
-    if let Some(value) = value.as_str() {
-        scan_toml_string(value, found);
-    } else if let Some(values) = value.as_array() {
-        for value in values.iter() {
-            scan_toml_value(value, found);
-        }
-    } else if let Some(table) = value.as_inline_table() {
-        scan_toml_table(table, found);
-    }
-}
-
-fn scan_toml_string(value: &str, found: &mut BTreeSet<Vec<u8>>) {
-    let lowered = value.to_lowercase().into_bytes();
-    for marker in STATIC_SEED_FORBIDDEN_PREFIXES {
-        if contains_bytes(&lowered, marker) {
-            found.insert(marker.to_vec());
-        }
-    }
-}
-
-fn contains_bytes(source: &[u8], needle: &[u8]) -> bool {
+pub(crate) fn contains_bytes(source: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && source.windows(needle.len()).any(|window| window == needle)
 }
 

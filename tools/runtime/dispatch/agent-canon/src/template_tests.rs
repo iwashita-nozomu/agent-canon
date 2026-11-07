@@ -582,6 +582,64 @@ fn profile_identity_binds_profile_and_manifest_inputs() {
 }
 
 #[test]
+fn committed_tree_preserves_unicode_and_delimiters_in_paths() {
+    let temporary = TemporaryDirectory::new("git-paths");
+    let source = static_seed_source_fixture(temporary.path());
+    let mut names = vec!["nested/日本語 name.toml"];
+    if cfg!(unix) {
+        names.extend(["nested/tab\tname.toml", "nested/line\nname.toml"]);
+    }
+    for name in &names {
+        write(&source, name, b"known bytes\n");
+    }
+    git(&source, &["add", "--all"]);
+    git(&source, &["commit", "-qm", "unusual paths"]);
+    let commit = git(&source, &["rev-parse", "HEAD"]).trim().to_owned();
+    write(&source, names[0], b"uncommitted bytes\n");
+    let value = template_bundle::committed_tree_value(&source, &commit).unwrap();
+    assert_eq!(value["source_commit"], commit);
+    let entries = value["entries"].as_array().unwrap();
+    for name in names {
+        let entry = entries.iter().find(|entry| entry["path"] == name).unwrap();
+        assert_eq!(entry["mode"], "100644");
+        assert_eq!(entry["object_type"], "blob");
+        assert_eq!(
+            entry["object_id"],
+            git(&source, &["rev-parse", &format!("{commit}:{name}")]).trim()
+        );
+    }
+}
+
+#[test]
+fn static_seed_checks_semantic_keys_and_nested_toml_strings() {
+    for (body, expected_error) in [
+        (
+            "# agents/skills/ in a comment\n[extra]\nvalues = [{ name = 'safe' }, ['safe']]\n",
+            None,
+        ),
+        (
+            "[extra]\nvalues = [{ name = ['AgEnTs/SkIlLs/private'] }]\n",
+            Some("forbidden producer prefix"),
+        ),
+        (
+            "[[extra]]\nvalue = { nested = { hooks = 'disabled' } }\n",
+            Some("forbidden key"),
+        ),
+    ] {
+        let temporary = TemporaryDirectory::new("toml-semantics");
+        let source = static_seed_source_fixture(temporary.path());
+        write(&source, ".codex/agents/worker.toml", body.as_bytes());
+        git(&source, &["add", "--all"]);
+        git(&source, &["commit", "-qm", "nested TOML"]);
+        let result = template_bundle::load_static_seed_plan(&source, "HEAD");
+        match expected_error {
+            None => assert!(result.is_ok(), "{result:?}"),
+            Some(message) => assert!(result.unwrap_err().to_string().contains(message)),
+        }
+    }
+}
+
+#[test]
 fn static_seed_plan_can_be_written_after_source_disappears() {
     let temporary = TemporaryDirectory::new("static-seed-plan");
     let source = static_seed_source_fixture(temporary.path());
