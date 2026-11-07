@@ -6,7 +6,7 @@ upstream design ../contracts/static-seed-export.md static-seed boundary
 upstream design ../../agents/internal-routines/design-implementation-correspondence.md DIC route
 upstream implementation ../../agents/model_profiles.toml canonical role/profile registry
 upstream implementation ../../tools/agent/orchestration/model_profile_registry.py role materializer
-downstream implementation ../../tools/runtime/source/export_static_seed.py exact-byte exporter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs exact-byte exporter
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs source-free docs check-bootstrap checker
 downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py committed-role evaluator
 @dependency-end
@@ -17,8 +17,8 @@ downstream implementation ../../eval/producers/evaluate_codex_agent_roles.py com
 ## Responsibility and committed-tree boundary
 
 Issue #715 owns one replaceable unit: the consumer-static projection of the canonical
-35-role seed. The existing model/profile registry and materializer remain the only
-instruction authority. The materializer renders and validates all 35 consumer-static
+37-role seed. The existing model/profile registry and materializer remain the only
+instruction authority. The materializer renders and validates all 37 consumer-static
 role blobs before the source commit is selected. The exporter then reads only that
 committed Git tree and copies exact bytes; it never renders, imports the registry, or
 consults a second source/role registry.
@@ -130,9 +130,9 @@ the live default. The stale test assertion that requires
 source-free comment/prefix negative assertion.
 
 The live invariance test is separate from evaluator/static parity. The implementation
-must maintain a pre-change live golden for all 35 role IDs, covering each role's
+must maintain a pre-change live golden for all 37 role IDs, covering each role's
 `developer_instructions` bytes and existing executable fields, and compare it with a
-post-change `generate_role_views(..., projection="live")` render for the same 35 IDs.
+post-change `generate_role_views(..., projection="live")` render for the same 37 IDs.
 The test fails on role-set, field, or byte drift; comparing live output only with the
 static output is not a substitute. The evaluator test suite also runs the CLI against
 the committed tree and requires zero generated-view findings.
@@ -152,19 +152,19 @@ tools/agent_tools/
 
 The exporter applies the gate to every allowlisted blob before destination creation. The
 checker applies it to provenance, `.codex/config.toml`, and every role payload. Both also
-enforce exact 35-role config closure, regular `0644` files, no symlink/gitlink, exact
+enforce exact 37-role config closure, regular `0644` files, no symlink/gitlink, exact
 allowlist closure, deterministic bytes, and source-hidden/no-source/no-runtime/no-network/
 no-updater/no-import/no-secret behavior.
 
 ## SSE clauses
 
-- `SSE-001`: The consumer-static projection is materialized for all 35 canonical roles before a commit is selected; the exporter copies only committed-tree bytes and never renders or consults a second registry.
+- `SSE-001`: The consumer-static projection is materialized for all 37 canonical roles before a commit is selected; the exporter copies only committed-tree bytes and never renders or consults a second registry.
 - `SSE-002`: A typed projection mode selects live text or consumer-static text from the single canonical model-profile registry; closed typed obligation fragments preserve validation-owner, parent-assignment, authority, stop, and handback obligations without producer paths, and validation compares typed composition rather than prose keywords.
 - `SSE-003`: The generated role schema remains generated_role_view_v1 with the existing TOML and agents_config field sets; projection mode is an input selector only, the existing projection_digest field carries the canonical digest, live executable fields/instructions remain invariant, consumer-static TOML emits only path-free schema/digest comments, and evaluate_codex_agent_roles.py explicitly validates the committed consumer-static projection rather than its live default.
 - `SSE-004`: One mode-independent projection digest covers role/profile identity, priorities, live text, consumer-static text, and obligation identifiers; live and static renders and agents_config must read back the same digest.
 - `SSE-005`: Exporter and source-free checker lower-case payload bytes and reject the exact five prefixes agents/skills/, agents/model_profiles.toml, tools/agent_tools/, ../../agents/, and ../../tools/; exporter rejects before destination creation and checker scans every role and config payload.
-- `SSE-006`: The committed static seed has exact allowlist closure: config references exactly the 35 same-named role files; every file is a regular 0644 blob; exports are byte-for-byte deterministic.
-- `SSE-007`: Source-hidden validation proves no source checkout, vendor, runtime, updater, network, import, symlink, gitlink, secret, or unallowlisted file is required to parse and validate the complete 35-role seed.
+- `SSE-006`: The committed static seed has exact allowlist closure: config references exactly the 37 same-named role files; every file is a regular 0644 blob; exports are byte-for-byte deterministic.
+- `SSE-007`: Source-hidden validation proves no source checkout, vendor, runtime, updater, network, import, symlink, gitlink, secret, or unallowlisted file is required to parse and validate the complete 37-role seed.
 - `SSE-008`: No new dependency graph, dependency-header system, source resolver, runtime checkout, updater, network access, or manually maintained role registry is introduced.
 
 ## DIC-010 closure locators
@@ -176,21 +176,21 @@ no-updater/no-import/no-secret behavior.
 - `documents/contracts/static-seed-allowlist.toml#files`
 - `agents/model_profiles.toml#role_instruction_templates`, `#model_profiles`
 - `tools/agent/orchestration/model_profile_registry.py#RoleInstructionClause`, `#ConsumerStaticClauseProjection`, `#StaticObligation`, `#STATIC_OBLIGATION_TABLE`, `#generate_role_views`, `#_render_role_view`, `#write_role_views`
-- `tools/runtime/source/export_static_seed.py#_validate_content`, `#load_export_plan`, `#_validate_codex_config`
+- `tools/runtime/dispatch/agent-canon/src/template_bundle.rs#validate_static_seed_content`, `#load_static_seed_plan`, `#validate_static_seed_codex_config`
 - `tools/runtime/dispatch/agent-canon/src/docs.rs#iter_static_seed_consumer_findings`
 - `eval/producers/evaluate_codex_agent_roles.py#evaluate_generated_role_projection`, `#evaluate_static_agent_configs`
 - `tests/agent_tools/test_model_profile_registry.py#typed obligation projection`
-- `tests/agent_tools/test_evaluate_codex_agent_roles.py#committed consumer-static evaluator`, `#pre-change live golden for all 35 roles`
-- `tests/agent_tools/test_export_static_seed.py#canonical 35-role source-hidden export`
+- `tests/agent_tools/test_evaluate_codex_agent_roles.py#committed consumer-static evaluator`, `#pre-change live golden for all 37 roles`
+- `tests/agent_tools/test_export_static_seed.py#canonical 37-role source-hidden export`
 - `tests/tools/test_check_bootstrap_docs.py#static seed consumer source-hidden validation`
 
-The real canonical 35-role source-hidden fixture and its exact closure/coherence/
+The real canonical 37-role source-hidden fixture and its exact closure/coherence/
 determinism assertions are implementation acceptance evidence, not preimplementation
 evidence. The implementation must add that fixture before this design is marked complete.
 
 ## Migration and rollback
 
-Materialize and validate all 35 static blobs, commit the generated source snapshot, export
+Materialize and validate all 37 static blobs, commit the generated source snapshot, export
 from that commit, then run the source-hidden checker before template import. Rollback reverts
 the complete projection/materializer/checker/export contract to regular tracked files only;
 it never restores a live source link, runtime checkout, updater, or network fallback.
