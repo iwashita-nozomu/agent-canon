@@ -42,8 +42,7 @@ read-only inventory で分類します。経過日数、最終更新日時、sta
 stale な worktree や古い scope を見つけた場合は、作業場所として再開せず、次を確認します。
 
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current checkout と違う場合、その scope は作業 authority ではありません。
-- [WORKTREE_LOG_TEMPLATE.md](../../documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md) 由来の action log は
-  legacy evidence として読み、current task record へ carry-over 判断だけを残します。
+- 既存の action log は必要な部分を読み、current handoff へ carry-over 判断を引き継ぎます。
 - 選択済み run bundle の継続ログは current checkout の
   `python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
   を使います。
