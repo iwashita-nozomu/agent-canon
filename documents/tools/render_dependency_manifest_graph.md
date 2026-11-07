@@ -54,7 +54,7 @@ python3 tools/analysis/dependencies/render_dependency_manifest_graph.py \
 - `--source-revision <commit-ish>` selects the committed Git tree used for
   repository structure; it defaults to `HEAD`. The renderer reads the tree
   through `agent-canon template-bundle committed-tree`, using `AGENT_CANON_CLI`
-  when set and otherwise `tools/bin/agent-canon`. The native owner reads local
+  when set and otherwise the installed `agent-canon` on `PATH`. The native owner reads local
   commit objects only and does not fetch. The tracked-path structure is the full
   selected commit even when dependency TSV scope is `changed`.
 - Pass `--graph-tsv <path>` to render an existing checker TSV. In this mode the

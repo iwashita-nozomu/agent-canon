@@ -27,8 +27,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
-
 GRAPH_TSV_FIELD_COUNT = 4
 GRAPH_IR_SCHEMA = "agent_canon.graph_ir.v2"
 BUNDLE_SCHEMA = "agent_canon.dependency_graph_bundle.v1"
@@ -650,9 +648,7 @@ def _read_committed_tree(
     root: Path, source_revision: str
 ) -> tuple[str, dict[str, GitTreeEntry]]:
     """Consume the native owner's committed-tree contract."""
-    cli = os.environ.get("AGENT_CANON_CLI") or str(
-        REPOSITORY_ROOT / "tools/bin/agent-canon"
-    )
+    cli = os.environ.get("AGENT_CANON_CLI") or "agent-canon"
     try:
         result = subprocess.run(
             (
