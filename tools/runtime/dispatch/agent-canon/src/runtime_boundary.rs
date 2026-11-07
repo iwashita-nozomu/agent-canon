@@ -764,6 +764,14 @@ impl RuntimeDirectory {
     }
 
     pub(crate) fn lock(&self, relative: &Path) -> std::io::Result<RuntimeFileLock> {
+        self.lock_with_marker(relative, true)
+    }
+
+    fn lock_with_marker(
+        &self,
+        relative: &Path,
+        seed_marker: bool,
+    ) -> std::io::Result<RuntimeFileLock> {
         use cap_fs_ext::{FollowSymlinks, OpenOptionsFollowExt};
         use std::io::Write;
         let (parent, name) = self.parent(relative, true)?;
@@ -790,7 +798,7 @@ impl RuntimeDirectory {
             use std::os::unix::fs::PermissionsExt;
             file.set_permissions(fs::Permissions::from_mode(0o600))?;
         }
-        if file.metadata()?.len() == 0 {
+        if seed_marker && file.metadata()?.len() == 0 {
             file.write_all(&[0])?;
         }
         file.lock()?;
@@ -1148,6 +1156,26 @@ impl RuntimeArtifactBoundary {
     }
 
     pub fn append_bytes(&self, path: &Path, bytes: &[u8], mode: u32) -> Result<PathBuf, String> {
+        self.append_bytes_locked(path, bytes, mode, true)
+    }
+
+    /// Preserve the empty lock file used by the historical archive writer.
+    pub(crate) fn append_bytes_with_empty_lock(
+        &self,
+        path: &Path,
+        bytes: &[u8],
+        mode: u32,
+    ) -> Result<PathBuf, String> {
+        self.append_bytes_locked(path, bytes, mode, false)
+    }
+
+    fn append_bytes_locked(
+        &self,
+        path: &Path,
+        bytes: &[u8],
+        mode: u32,
+        seed_marker: bool,
+    ) -> Result<PathBuf, String> {
         let target = self.resolve(path)?;
         let relative = target
             .strip_prefix(&self.root)
@@ -1157,9 +1185,12 @@ impl RuntimeArtifactBoundary {
             .ok_or_else(|| format!("runtime target has no filename: {}", target.display()))?;
         let lock_name = format!(".{}.lock", name.to_string_lossy());
         let lock_path = relative.parent().unwrap_or(Path::new("")).join(lock_name);
-        let _lock = self.directory.lock(&lock_path).map_err(|error| {
-            format!("external append lock failed: {}: {error}", target.display())
-        })?;
+        let _lock = self
+            .directory
+            .lock_with_marker(&lock_path, seed_marker)
+            .map_err(|error| {
+                format!("external append lock failed: {}: {error}", target.display())
+            })?;
         let mut merged = self
             .directory
             .read(relative)

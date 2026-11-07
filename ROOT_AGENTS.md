@@ -37,6 +37,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   needs separate current-user agreement.
 - **Memory safety:** preserve ownership, lifetimes, access bounds, and
   synchronization before performance or implementation convenience.
+- **Terminology:** use established terms and preserve API/tool identifiers.
+  Briefly explain necessary unfamiliar terms at first use for the intended
+  reader; replace needless internal jargon with concrete actions. In Japanese,
+  use conventional terminology or the original term rather than inventing a translation.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
 - **Investigation:** start local repair at target code, diff, and contract, without

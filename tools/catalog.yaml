@@ -1069,6 +1069,27 @@ entries:
       - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
 
+  - id: export-codex-runtime-summary
+    public: true
+    summary: Exports bounded, prompt-free Codex runtime summaries from local history, SQLite, and optional legacy session JSONL.
+    path: tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: tools/bin/agent-canon export-codex-runtime-summary
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "export-codex-runtime-summary"]}
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/codex_runtime_summary.md
+      - documents/runtime/runtime-log-archive.md
+    tests:
+      - tests/agent_tools/test_export_codex_runtime_summary.py
+
   - id: workflow-monitor
     summary: Appends observed workflow behavior and actual native-result evidence to an agent run bundle.
     path: tools/runtime/lifecycle/workflow_monitor.py
@@ -2478,24 +2499,6 @@ entries:
     tests:
       - tests/agent_tools/test_compare_codex_token_footprints.py
 
-  - id: worktree-scope-lint
-    summary: Checks worktree scope and action-log discipline.
-    path: tools/repository/workspace/worktree_scope_lint.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/repository/workspace/worktree_scope_lint.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/worktree_scope_lint.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_worktree_scope_lint.py
-
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
     path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
@@ -2689,14 +2692,14 @@ entries:
   - id: extract-docx
     public: true
     summary: Decomposes an authorized DOCX into a searchable and auditable reference bundle.
-    path: tools/analysis/documents/extraction/extract_docx.py
+    path: tools/runtime/dispatch/agent-canon/src/extract_docx.rs
     family: docs
     role: helper
     status: canonical
     audience: user
     placement: user_entrypoint
-    command: python3 tools/analysis/documents/extraction/extract_docx.py INPUT.docx --output-dir OUTPUT_DIR
-    dispatch: {argv: ["python3", "tools/analysis/documents/extraction/extract_docx.py", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
+    command: tools/bin/agent-canon extract-docx INPUT.docx --output-dir OUTPUT_DIR
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "extract-docx", "INPUT.docx", "--output-dir", "OUTPUT_DIR"]}
     writes: true
     default_wiring:
       ci: false

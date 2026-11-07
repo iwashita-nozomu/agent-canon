@@ -1,0 +1,217 @@
+{
+  "source_commit": "415016cc99607329285be64f60560b6654a79152",
+  "source_path": "tools/analysis/documents/extraction/extract_docx.py",
+  "script_sha256": "69f5f4e8fddcfd07178f387df3ab557e7999c79b33dee5c9655b80f2f4376d40",
+  "cases": [
+    {
+      "name": "stored",
+      "archive_base64": "UEsDBBQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWw8dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+WklQIGNvbnRyYWN0PC93OnQ+PC93OnI+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50PlBLAQIUAxQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAAAAAAAAAAACAAQAAAAB3b3JkL2RvY3VtZW50LnhtbFBLBQYAAAAAAQABAD8AAADNAAAAAAA=",
+      "archive_sha256": "29f656a75b44d735cd35300f8e029a997313ab76418f76a0cfcf8a11338a4914",
+      "source_name": "reference.docx",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "stage_leftovers": [],
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "29f656a75b44d735cd35300f8e029a997313ab76418f76a0cfcf8a11338a4914",
+          "size_bytes": 290
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n",
+      "raw_files": {
+        "word/document.xml": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4="
+      }
+    },
+    {
+      "name": "deflate",
+      "archive_base64": "UEsDBBQAAAAIAAAAISizQldVegAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWxFzjEOwjAMBdCrVD0ArhgYopCdjZktJKGtVNuR4ypwe5p26PK+bOtLttVEDism0u6LCxVT7/2kmg1ACVNCXy6cE223Dwt63UYZobLELBxSKTONuMB1GG6Afqbe2WreHH8tc0Ma6l6PZxeYVHxQC23TlN28e7Tg/Mj9AVBLAQIUAxQAAAAIAAAAISizQldVegAAAJ4AAAARAAAAAAAAAAAAAACAAQAAAAB3b3JkL2RvY3VtZW50LnhtbFBLBQYAAAAAAQABAD8AAACpAAAAAAA=",
+      "archive_sha256": "68da3888f3278ae1abe9b39064e67d8db3237c8b07f28d838c2f3b1e13ce017c",
+      "source_name": "reference.docx",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "stage_leftovers": [],
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "68da3888f3278ae1abe9b39064e67d8db3237c8b07f28d838c2f3b1e13ce017c",
+          "size_bytes": 254
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n",
+      "raw_files": {
+        "word/document.xml": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4="
+      }
+    },
+    {
+      "name": "bzip2",
+      "archive_base64": "UEsDBC4AAAAMAAAAISizQldVlgAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWxCWmg5MUFZJlNZ58S4wQAAEx+AUAHRFwAgQBA/597gIABkNFPKaaHqNRkYBpiDVP0UYg0AZBoA0eGiG4wvxIbQgp9yBC7IDEyCLSVeZoqppo9fCyEm13QKHVDywN1q7dPtzPL9F8xtQUGDh8OyYmIT5OnERU5AqzQzWGWlyvpQsRsaA7sEEklqM2ePxdyRThQkOfEuMEBQSwECLgMuAAAADAAAACEos0JXVZYAAACeAAAAEQAAAAAAAAAAAAAAgAEAAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAEAAQA/AAAAxQAAAAAA",
+      "archive_sha256": "66999fa8227a20654e1942a6a2c222d0af4e0cd8363f2aa19a68eeefaa4b8703",
+      "source_name": "reference.docx",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "stage_leftovers": [],
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "66999fa8227a20654e1942a6a2c222d0af4e0cd8363f2aa19a68eeefaa4b8703",
+          "size_bytes": 282
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n",
+      "raw_files": {
+        "word/document.xml": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4="
+      }
+    },
+    {
+      "name": "lzma",
+      "archive_base64": "UEsDBD8AAgAOAAAAISizQldViAAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWwJBAUAXQAAgAAAHh3DRlZr5VRoKbpxXYXMebtsyGZE06gjMwXSMr1Cs1ntN7J7IdT1k2FfLxZR2GrHN0/n+6Oz1KIZCXKEJpIdkhzTFJw8hw1DXqrhagsPKtUlfZCib2Cyb7BoJJrKjj1PaacfcXCOnh1x5+HC23o+Yn8iHvDy+S6Xkv/8zH7gUEsBAj8DPwACAA4AAAAhKLNCV1WIAAAAngAAABEAAAAAAAAAAAAAAIABAAAAAHdvcmQvZG9jdW1lbnQueG1sUEsFBgAAAAABAAEAPwAAALcAAAAAAA==",
+      "archive_sha256": "c712081f6e2e79ae991d005c659bb7c2f44e720cac9905d84c9a08d33facbbc4",
+      "source_name": "reference.docx",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "stage_leftovers": [],
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "c712081f6e2e79ae991d005c659bb7c2f44e720cac9905d84c9a08d33facbbc4",
+          "size_bytes": 268
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n",
+      "raw_files": {
+        "word/document.xml": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4="
+      }
+    },
+    {
+      "name": "mixed-efs-identical-raw",
+      "archive_base64": "UEsDBBQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWw8dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+WklQIGNvbnRyYWN0PC93OnQ+PC93OnI+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50PlBLAwQUAAAIAAAAACEogTv4NQQAAAAEAAAADQAAAGFzc2V0cy/DqS5iaW51dGY4UEsDBBQAAAAAAAAAIShv1zscBQAAAAUAAAANAAAAYXNzZXRzL8OpLmJpbmNwNDM3UEsBAhQDFAAAAAAAAAAhKLNCV1WeAAAAngAAABEAAAAAAAAAAAAAAIABAAAAAHdvcmQvZG9jdW1lbnQueG1sUEsBAhQDFAAACAAAAAAhKIE7+DUEAAAABAAAAA0AAAAAAAAAAAAAAIABzQAAAGFzc2V0cy/DqS5iaW5QSwECFAMUAAAAAAAAACEob9c7HAUAAAAFAAAADQAAAAAAAAAAAAAAgAH8AAAAYXNzZXRzL8OpLmJpblBLBQYAAAAAAwADALUAAAAsAQAAAAA=",
+      "archive_sha256": "3fd55e6a45c8bd2d50c7810a77ab293cac1e9ee5f641d49c224ea13a4c2d34bd",
+      "source_name": "reference.docx",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "stage_leftovers": [],
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "3fd55e6a45c8bd2d50c7810a77ab293cac1e9ee5f641d49c224ea13a4c2d34bd",
+          "size_bytes": 503
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          },
+          {
+            "directory": false,
+            "name": "assets/\u00e9.bin",
+            "sha256": "941b7ecd47e5a3d6066847def67a662f539afe44c5bdf95d962f9dc785dd96f3",
+            "size_bytes": 4
+          },
+          {
+            "directory": false,
+            "name": "assets/\u251c\u2310.bin",
+            "sha256": "a230ff302a8d0e25a0fc4a07490f01bfef3797f0cc65c11f04c1ac8d555b562b",
+            "size_bytes": 5
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n",
+      "raw_files": {
+        "assets/\u251c\u2310.bin": "Y3A0Mzc=",
+        "assets/\u00e9.bin": "dXRmOA==",
+        "word/document.xml": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4="
+      }
+    },
+    {
+      "name": "exact-duplicate-raw",
+      "archive_base64": "UEsDBBQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWw8dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+WklQIGNvbnRyYWN0PC93OnQ+PC93OnI+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50PlBLAwQUAAAAAAAAACEos0JXVZ4AAACeAAAAEQAAAHdvcmQvZG9jdW1lbnQueG1sPHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PlpJUCBjb250cmFjdDwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD5QSwECFAMUAAAAAAAAACEos0JXVZ4AAACeAAAAEQAAAAAAAAAAAAAAgAEAAAAAd29yZC9kb2N1bWVudC54bWxQSwECFAMUAAAAAAAAACEos0JXVZ4AAACeAAAAEQAAAAAAAAAAAAAAgAHNAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAIAAgB+AAAAmgEAAAAA",
+      "archive_sha256": "18ce71a28fcdfd99368244c8ce9dffdbdb81d97a77e97bb805931de3c9eeb98b",
+      "source_name": "reference.docx",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "extract_docx: duplicate ZIP member identity: 'word/document.xml' and 'word/document.xml' -> 'word/document.xml'\n",
+      "output_exists": false,
+      "stage_leftovers": []
+    }
+  ]
+}

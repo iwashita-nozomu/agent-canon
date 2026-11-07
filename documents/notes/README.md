@@ -64,20 +64,13 @@ upstream design ../README.md document index and notes placement boundary
 
 ## Growth Rule
 
-- 実行中の局所ログは `documents/notes/worktrees/` に残します。
+- 実行中の判断と引継ぎは会話に保持します。
 - closeout 時に、再利用知識は `documents/notes/knowledge/`、topic synthesis は `documents/notes/themes/`、再発防止は `documents/notes/failures/` へ昇格させます。
 - どこへ昇格させるか迷うときは [documents/operations/notes-lifecycle.md](../operations/notes-lifecycle.md) を見ます。
 - `documents/notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
 - stable preference は対象の [AGENTS.md](../../AGENTS.md) または canonical owner へ直接昇格します。
 - 同じ問題に再遭遇したときに使う独立した知識や修正 feedback は private `agent-canon-log` に残します。
   raw chat と時系列観測は runtime logs/evidence/Issue/failures の owner に置きます。
-
-## Action Log Rule
-
-- branch / worktree を例外運用する場合は、意味のある操作を 1 か所の append-only な note に逐次残します。
-- 既定の action log 置き場は `documents/notes/worktrees/worktree_<topic>_YYYY-MM-DD.md` です。
-- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断のような節目は必ず追記します。
-- worktree 内で下書きするときも、最終的に `main` に置くのと同じ相対パスへ書きます。
 
 ## 書き方
 

@@ -251,6 +251,41 @@ External Python execution selected by an explicit v2 identity is a retained
 provider capability; it does not mean the native default delegates to an owned
 Python tool. This port does not complete other migration families.
 
+## Native DOCX Extraction and Caller Closure
+
+`tools/bin/agent-canon extract-docx` owns the public `extract-docx` catalog
+route and selects `tools/runtime/dispatch/agent-canon/src/extract_docx.rs`.
+The Python implementation is retired; the Python CLI test remains as an
+independent input/oracle harness and invokes the native product command.
+The `tool-docs.toml` entry and public DOCX guide name the same native owner.
+
+The migration preserves the schema-v1 bundle, member order and hashes,
+paragraph/table/Office Math Markdown, CLI status split, source snapshot checks,
+absent-or-empty output reservation, and stage/readback/publish/rollback flow.
+Archive names come from raw ZIP name bytes and flags: bit 11 selects UTF-8,
+otherwise CP437 is decoded, and names are truncated at NUL as CPython
+`ZipInfo` does. Unicode 15 NFC and full case folding retain portable member
+identity; Stored, Deflate, BZIP2, and LZMA methods remain available. The safe
+Expat 2.9 port matches the frozen 20-case ElementTree acceptance and event
+corpus, including encoding, namespaces, default attributes, entities, and depth;
+this is not a universal XML-equivalence claim. External entity references fail
+without external I/O. The DOCX owner opens the
+caller-selected input and canonical output parent as capabilities and does not
+apply the separate external-runtime artifact boundary to the user's bundle.
+Heading suffixes reuse the shared Unicode 15 decimal parser while preserving
+Python's `isdigit` selection and `int(character)` failure for nondecimal Digit
+characters. Multiple paragraph-property blocks retain the original search order.
+XML elements live in a flat indexed arena; parsing, lookup, text extraction,
+table traversal, and destruction do not recurse or add a nesting limit.
+
+The previous Python helper-mock readback test is replaced by a native
+transaction-boundary check over real staged bytes; it asserts no publication,
+stage cleanup, and preservation of an admitted empty output. The preserved CLI
+tests keep the late-failure and output transaction oracles. The XML corpus
+continues to freeze the old ElementTree events and Markdown projection. This
+closes the known DOCX caller set; it does not imply that other Python document
+tools are native or migrated.
+
 ## Plan and Audit Interfaces
 
 ```bash

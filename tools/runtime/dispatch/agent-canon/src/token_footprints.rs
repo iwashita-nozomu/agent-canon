@@ -8,7 +8,6 @@
 // upstream implementation python_text.rs preserves Python-compatible whitespace and line splitting
 // upstream implementation path_resolution.rs preserves non-strict resolved paths
 // upstream reference ../../../../../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
-// upstream implementation source_dependency_graph.rs supplies Python-compatible component matching
 // upstream implementation hook_report_projection.rs appends optional run-local monitoring evidence
 // downstream implementation main.rs exposes the token footprint CLI
 // downstream implementation ../../../../../eval/producers/generate_agent_runtime_dashboard.py records the native command
@@ -19,15 +18,14 @@ use crate::python_cli_integer;
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::python_text::{python_splitlines, python_strip};
 use agent_canon::hook_report_projection::append_monitoring_projection;
-use agent_canon::path_resolution::resolve_non_strict;
+use agent_canon::path_resolution::{python_glob_paths, resolve_non_strict};
 use agent_canon::python_json::{parse_json, JsonNumber, JsonValue};
 use rustpython_ast::bigint::BigInt;
 use rustpython_literal::format::Case as FloatFormatCase;
-use std::collections::{BTreeMap, HashSet};
-use std::env;
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const TARGET_RATIO: f64 = 0.5;
@@ -574,8 +572,7 @@ fn session_glob_paths(
 ) -> Result<Vec<PathBuf>, String> {
     let mut unique_paths = BTreeMap::<String, PathBuf>::new();
     for pattern in patterns {
-        let (base, components, directory_only) = split_glob_pattern(pattern)?;
-        let matches = glob_paths(&base, &components, directory_only);
+        let matches = python_glob_paths(pattern)?;
         for path in matches {
             if !fs::metadata(&path).is_ok_and(|metadata| metadata.is_file()) {
                 continue;
@@ -636,125 +633,6 @@ fn read_session_globs(
         return Err("no session files with token_count events matched --session-glob".to_owned());
     }
     Ok(footprints)
-}
-
-fn split_glob_pattern(pattern: &str) -> Result<(PathBuf, Vec<String>, bool), String> {
-    let path = Path::new(pattern);
-    let components = path.components().collect::<Vec<_>>();
-    let prefix = components.iter().find_map(|component| match component {
-        Component::Prefix(prefix) => Some(prefix.as_os_str()),
-        _ => None,
-    });
-    let mut base = if path.is_absolute() {
-        PathBuf::new()
-    } else if let Some(prefix) = prefix {
-        PathBuf::from(prefix)
-    } else {
-        env::current_dir().map_err(|error| format!("current directory: {error}"))?
-    };
-    let mut patterns = Vec::new();
-    for component in components {
-        match component {
-            Component::Prefix(prefix) => {
-                if path.is_absolute() {
-                    base.push(prefix.as_os_str());
-                }
-            }
-            Component::RootDir => base.push(component.as_os_str()),
-            Component::CurDir => {}
-            Component::ParentDir => patterns.push("..".to_owned()),
-            Component::Normal(value) => patterns.push(
-                value
-                    .to_str()
-                    .ok_or_else(|| "glob pattern contains a non-UTF-8 path component".to_owned())?
-                    .to_owned(),
-            ),
-        }
-    }
-    let directory_only =
-        pattern.ends_with(std::path::MAIN_SEPARATOR) || cfg!(windows) && pattern.ends_with('/');
-    Ok((base, patterns, directory_only))
-}
-
-fn glob_paths(base: &Path, components: &[String], directory_only: bool) -> Vec<PathBuf> {
-    let mut matches = Vec::new();
-    let mut pending = vec![(base.to_path_buf(), 0_usize)];
-    let mut visited = HashSet::new();
-
-    while let Some((current, index)) = pending.pop() {
-        if index == components.len() {
-            if !directory_only || fs::metadata(&current).is_ok_and(|metadata| metadata.is_dir()) {
-                matches.push(current);
-            }
-            continue;
-        }
-
-        let pattern = &components[index];
-        if pattern == "**" {
-            let key = resolve_non_strict(&current).unwrap_or_else(|_| current.clone());
-            if !visited.insert((key, index)) {
-                continue;
-            }
-            pending.push((current.clone(), index + 1));
-            let Ok(entries) = fs::read_dir(&current) else {
-                continue;
-            };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name();
-                let Some(name) = name.to_str() else {
-                    continue;
-                };
-                if name.starts_with('.') {
-                    continue;
-                }
-                if index + 1 == components.len() {
-                    pending.push((path.clone(), index + 1));
-                }
-                if fs::metadata(&path).is_ok_and(|metadata| metadata.is_dir()) {
-                    pending.push((path, index));
-                }
-            }
-            continue;
-        }
-
-        let has_glob_magic = |value: &str| {
-            value
-                .chars()
-                .any(|character| matches!(character, '*' | '?' | '['))
-        };
-        if !has_glob_magic(pattern) {
-            let mut path = current;
-            let mut next_index = index;
-            while let Some(component) = components.get(next_index) {
-                if component == "**" || has_glob_magic(component) {
-                    break;
-                }
-                path.push(component);
-                next_index += 1;
-            }
-            pending.push((path, next_index));
-            continue;
-        }
-
-        let Ok(entries) = fs::read_dir(&current) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let Some(name_text) = name.to_str() else {
-                continue;
-            };
-            if name_text.starts_with('.') && !pattern.starts_with('.') {
-                continue;
-            }
-            if crate::source_dependency_graph::fnmatch_case(name_text, pattern) {
-                pending.push((entry.path(), index + 1));
-            }
-        }
-    }
-
-    matches
 }
 
 fn path_posix(path: &Path) -> String {

@@ -1,0 +1,974 @@
+{
+  "source_commit": "6ca0d65968ceec40e183a924e648a6a89ec8d197",
+  "owner": "tools/analysis/documents/extraction/extract_docx.py",
+  "owner_sha256": "69f5f4e8fddcfd07178f387df3ab557e7999c79b33dee5c9655b80f2f4376d40",
+  "python": "3.12.3",
+  "source_name": "reference.docx",
+  "external_entities": "no loader; existing sentinel bytes remain absent",
+  "cases": [
+    {
+      "name": "word-basic",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PkEgJmFtcDsgQjwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A & B"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nA & B\n"
+    },
+    {
+      "name": "alternate-prefix",
+      "input_base64": "PHg6ZG9jdW1lbnQgeG1sbnM6eD0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48eDpib2R5Pjx4OnA+PHg6dD5BbHRlcm5hdGU8L3g6dD48L3g6cD48L3g6Ym9keT48L3g6ZG9jdW1lbnQ+",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "Alternate"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nAlternate\n"
+    },
+    {
+      "name": "utf16-le",
+      "input_base64": "//48AHcAOgBkAG8AYwB1AG0AZQBuAHQAIAB4AG0AbABuAHMAOgB3AD0AIgBoAHQAdABwADoALwAvAHMAYwBoAGUAbQBhAHMALgBvAHAAZQBuAHgAbQBsAGYAbwByAG0AYQB0AHMALgBvAHIAZwAvAHcAbwByAGQAcAByAG8AYwBlAHMAcwBpAG4AZwBtAGwALwAyADAAMAA2AC8AbQBhAGkAbgAiAD4APAB3ADoAYgBvAGQAeQA+ADwAdwA6AHAAPgA8AHcAOgByAD4APAB3ADoAdAA+AEEAIAAmAGEAbQBwADsAIABCADwALwB3ADoAdAA+ADwALwB3ADoAcgA+ADwALwB3ADoAcAA+ADwALwB3ADoAYgBvAGQAeQA+ADwALwB3ADoAZABvAGMAdQBtAGUAbgB0AD4A",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A & B"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nA & B\n"
+    },
+    {
+      "name": "utf16-be",
+      "input_base64": "/v8APAB3ADoAZABvAGMAdQBtAGUAbgB0ACAAeABtAGwAbgBzADoAdwA9ACIAaAB0AHQAcAA6AC8ALwBzAGMAaABlAG0AYQBzAC4AbwBwAGUAbgB4AG0AbABmAG8AcgBtAGEAdABzAC4AbwByAGcALwB3AG8AcgBkAHAAcgBvAGMAZQBzAHMAaQBuAGcAbQBsAC8AMgAwADAANgAvAG0AYQBpAG4AIgA+ADwAdwA6AGIAbwBkAHkAPgA8AHcAOgBwAD4APAB3ADoAcgA+ADwAdwA6AHQAPgBBACAAJgBhAG0AcAA7ACAAQgA8AC8AdwA6AHQAPgA8AC8AdwA6AHIAPgA8AC8AdwA6AHAAPgA8AC8AdwA6AGIAbwBkAHkAPgA8AC8AdwA6AGQAbwBjAHUAbQBlAG4AdAA+",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A & B"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nA & B\n"
+    },
+    {
+      "name": "latin1",
+      "input_base64": "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iSVNPLTg4NTktMSI/Pjx3OmRvY3VtZW50IHhtbG5zOnc9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy93b3JkcHJvY2Vzc2luZ21sLzIwMDYvbWFpbiI+PHc6Ym9keT48dzpwPjx3OnQ+Y2Fm6Twvdzp0PjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "caf\u00e9"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\ncaf\u00e9\n"
+    },
+    {
+      "name": "raw-and-character-cr",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD5BDQpCJiMxMztDPC93OnQ+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50Pg==",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A\nB\rC"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nA\nB\rC\n"
+    },
+    {
+      "name": "word-tail-and-breaks",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cj48dzp0PkE8dzpiLz5pZ25vcmVkIHRhaWw8L3c6dD48dzp0YWIvPjx3OnQ+Qjwvdzp0Pjx3OmJyLz48dzppbnN0clRleHQ+ZmllbGQ8L3c6aW5zdHJUZXh0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}b",
+          "attributes": {}
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}b"
+        },
+        {
+          "kind": "text",
+          "text": "ignored tail"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tab",
+          "attributes": {}
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tab"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "B"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}br",
+          "attributes": {}
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}br"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}instrText",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "field"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}instrText"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nA\tB\nfield\n"
+    },
+    {
+      "name": "word-table",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnRibD48dzp0cj48dzp0Yz48dzpwPjx3OnQ+QXxCPC93OnQ+PC93OnA+PC93OnRjPjx3OnRjPjx3OnA+PHc6dD5DPC93OnQ+PC93OnA+PC93OnRjPjwvdzp0cj48dzp0cj48dzp0Yz48dzpwPjx3OnQ+RDwvdzp0PjwvdzpwPjwvdzp0Yz48L3c6dHI+PC93OnRibD48L3c6Ym9keT48L3c6ZG9jdW1lbnQ+",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tbl",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "A|B"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "C"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "D"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tc"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tr"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tbl"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\n| A\\|B | C |\n| --- | --- |\n| D |  |\n"
+    },
+    {
+      "name": "dtd-default-heading",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhQVRUTElTVCB3OnBTdHlsZSB3OnZhbCBDREFUQSAiSGVhZGluZzIiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6cFByPjx3OnBTdHlsZS8+PC93OnBQcj48dzpyPjx3OnQ+SGVhZGluZzwvdzp0PjwvdzpyPjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pPr",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pStyle",
+          "attributes": {
+            "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val": "Heading2"
+          }
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pStyle"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}pPr"
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "Heading"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\n## Heading\n"
+    },
+    {
+      "name": "internal-entity",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIHZhbHVlICJpbnRlcm5hbCAmYW1wOyB2YWx1ZSI+XT48dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzp0PiZ2YWx1ZTs8L3c6dD48L3c6cD48L3c6Ym9keT48L3c6ZG9jdW1lbnQ+",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "internal & value"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\ninternal & value\n"
+    },
+    {
+      "name": "entity-depth-19",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIGUwICJ4Ij48IUVOVElUWSBlMSAiJmUwOyI+PCFFTlRJVFkgZTIgIiZlMTsiPjwhRU5USVRZIGUzICImZTI7Ij48IUVOVElUWSBlNCAiJmUzOyI+PCFFTlRJVFkgZTUgIiZlNDsiPjwhRU5USVRZIGU2ICImZTU7Ij48IUVOVElUWSBlNyAiJmU2OyI+PCFFTlRJVFkgZTggIiZlNzsiPjwhRU5USVRZIGU5ICImZTg7Ij48IUVOVElUWSBlMTAgIiZlOTsiPjwhRU5USVRZIGUxMSAiJmUxMDsiPjwhRU5USVRZIGUxMiAiJmUxMTsiPjwhRU5USVRZIGUxMyAiJmUxMjsiPjwhRU5USVRZIGUxNCAiJmUxMzsiPjwhRU5USVRZIGUxNSAiJmUxNDsiPjwhRU5USVRZIGUxNiAiJmUxNTsiPjwhRU5USVRZIGUxNyAiJmUxNjsiPjwhRU5USVRZIGUxOCAiJmUxNzsiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mZTE4Ozwvdzp0PjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "x"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nx\n"
+    },
+    {
+      "name": "entity-depth-20",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIGUwICJ4Ij48IUVOVElUWSBlMSAiJmUwOyI+PCFFTlRJVFkgZTIgIiZlMTsiPjwhRU5USVRZIGUzICImZTI7Ij48IUVOVElUWSBlNCAiJmUzOyI+PCFFTlRJVFkgZTUgIiZlNDsiPjwhRU5USVRZIGU2ICImZTU7Ij48IUVOVElUWSBlNyAiJmU2OyI+PCFFTlRJVFkgZTggIiZlNzsiPjwhRU5USVRZIGU5ICImZTg7Ij48IUVOVElUWSBlMTAgIiZlOTsiPjwhRU5USVRZIGUxMSAiJmUxMDsiPjwhRU5USVRZIGUxMiAiJmUxMTsiPjwhRU5USVRZIGUxMyAiJmUxMjsiPjwhRU5USVRZIGUxNCAiJmUxMzsiPjwhRU5USVRZIGUxNSAiJmUxNDsiPjwhRU5USVRZIGUxNiAiJmUxNTsiPjwhRU5USVRZIGUxNyAiJmUxNjsiPjwhRU5USVRZIGUxOCAiJmUxNzsiPjwhRU5USVRZIGUxOSAiJmUxODsiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mZTE5Ozwvdzp0PjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "x"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nx\n"
+    },
+    {
+      "name": "entity-depth-21",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIGUwICJ4Ij48IUVOVElUWSBlMSAiJmUwOyI+PCFFTlRJVFkgZTIgIiZlMTsiPjwhRU5USVRZIGUzICImZTI7Ij48IUVOVElUWSBlNCAiJmUzOyI+PCFFTlRJVFkgZTUgIiZlNDsiPjwhRU5USVRZIGU2ICImZTU7Ij48IUVOVElUWSBlNyAiJmU2OyI+PCFFTlRJVFkgZTggIiZlNzsiPjwhRU5USVRZIGU5ICImZTg7Ij48IUVOVElUWSBlMTAgIiZlOTsiPjwhRU5USVRZIGUxMSAiJmUxMDsiPjwhRU5USVRZIGUxMiAiJmUxMTsiPjwhRU5USVRZIGUxMyAiJmUxMjsiPjwhRU5USVRZIGUxNCAiJmUxMzsiPjwhRU5USVRZIGUxNSAiJmUxNDsiPjwhRU5USVRZIGUxNiAiJmUxNTsiPjwhRU5USVRZIGUxNyAiJmUxNjsiPjwhRU5USVRZIGUxOCAiJmUxNzsiPjwhRU5USVRZIGUxOSAiJmUxODsiPjwhRU5USVRZIGUyMCAiJmUxOTsiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mZTIwOzwvdzp0PjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "x"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nx\n"
+    },
+    {
+      "name": "entity-depth-25",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIGUwICJ4Ij48IUVOVElUWSBlMSAiJmUwOyI+PCFFTlRJVFkgZTIgIiZlMTsiPjwhRU5USVRZIGUzICImZTI7Ij48IUVOVElUWSBlNCAiJmUzOyI+PCFFTlRJVFkgZTUgIiZlNDsiPjwhRU5USVRZIGU2ICImZTU7Ij48IUVOVElUWSBlNyAiJmU2OyI+PCFFTlRJVFkgZTggIiZlNzsiPjwhRU5USVRZIGU5ICImZTg7Ij48IUVOVElUWSBlMTAgIiZlOTsiPjwhRU5USVRZIGUxMSAiJmUxMDsiPjwhRU5USVRZIGUxMiAiJmUxMTsiPjwhRU5USVRZIGUxMyAiJmUxMjsiPjwhRU5USVRZIGUxNCAiJmUxMzsiPjwhRU5USVRZIGUxNSAiJmUxNDsiPjwhRU5USVRZIGUxNiAiJmUxNTsiPjwhRU5USVRZIGUxNyAiJmUxNjsiPjwhRU5USVRZIGUxOCAiJmUxNzsiPjwhRU5USVRZIGUxOSAiJmUxODsiPjwhRU5USVRZIGUyMCAiJmUxOTsiPjwhRU5USVRZIGUyMSAiJmUyMDsiPjwhRU5USVRZIGUyMiAiJmUyMTsiPjwhRU5USVRZIGUyMyAiJmUyMjsiPjwhRU5USVRZIGUyNCAiJmUyMzsiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mZTI0Ozwvdzp0PjwvdzpwPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p",
+          "attributes": {}
+        },
+        {
+          "kind": "start",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t",
+          "attributes": {}
+        },
+        {
+          "kind": "text",
+          "text": "x"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}body"
+        },
+        {
+          "kind": "end",
+          "name": "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document"
+        }
+      ],
+      "markdown_accepted": true,
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nx\n"
+    },
+    {
+      "name": "external-entity-no-loader",
+      "input_base64": "PCFET0NUWVBFIHc6ZG9jdW1lbnQgWzwhRU5USVRZIGV4dGVybmFsIFNZU1RFTSAiZmlsZTovLy92YXIvbGliL2FnZW50LWNhbm9uL3J1bnRpbWUvdGFza3MvZnVsbC1ydXN0LW1pZ3JhdGlvbi0yMDI2MTAzMC1zejhxX3A0ei9kb2N4LXhtbC1vbGQtYXBpLW9yYWNsZS1mdmVkaXlubi9leHRlcm5hbC1zZW50aW5lbC50eHQiPl0+PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mZXh0ZXJuYWw7PC93OnQ+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50Pg==",
+      "xml_accepted": false,
+      "xml_error_kind": "ParseError",
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml is not valid XML"
+    },
+    {
+      "name": "undeclared-entity",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnA+PHc6dD4mdW5kZWNsYXJlZDs8L3c6dD48L3c6cD48L3c6Ym9keT48L3c6ZG9jdW1lbnQ+",
+      "xml_accepted": false,
+      "xml_error_kind": "ParseError",
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml is not valid XML"
+    },
+    {
+      "name": "duplicate-attribute",
+      "input_base64": "PHc6ZG9jdW1lbnQgeG1sbnM6dz0iaHR0cDovL3NjaGVtYXMub3BlbnhtbGZvcm1hdHMub3JnL3dvcmRwcm9jZXNzaW5nbWwvMjAwNi9tYWluIj48dzpib2R5Pjx3OnAgYT0iMSIgYT0iMiIvPjwvdzpib2R5Pjwvdzpkb2N1bWVudD4=",
+      "xml_accepted": false,
+      "xml_error_kind": "ParseError",
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml is not valid XML"
+    },
+    {
+      "name": "malformed",
+      "input_base64": "PHc6ZG9jdW1lbnQ+",
+      "xml_accepted": false,
+      "xml_error_kind": "ParseError",
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml is not valid XML"
+    },
+    {
+      "name": "valid-no-body",
+      "input_base64": "PGRvY3VtZW50Lz4=",
+      "xml_accepted": true,
+      "events": [
+        {
+          "kind": "start",
+          "name": "document",
+          "attributes": {}
+        },
+        {
+          "kind": "end",
+          "name": "document"
+        }
+      ],
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml has no document body"
+    },
+    {
+      "name": "multiple-roots",
+      "input_base64": "PGEvPjxiLz4=",
+      "xml_accepted": false,
+      "xml_error_kind": "ParseError",
+      "markdown_accepted": false,
+      "markdown_error": "word/document.xml is not valid XML"
+    }
+  ]
+}
