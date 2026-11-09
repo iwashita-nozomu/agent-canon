@@ -149,6 +149,8 @@ run_docs() {
 }
 
 run_rust() {
+  # Producer identity checks hash the test executable; reduce debug-only bytes.
+  export CARGO_PROFILE_TEST_DEBUG=0
   local phase="${1:-all}"
   case "${phase}" in
     all|prepare)
