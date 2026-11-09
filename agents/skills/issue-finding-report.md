@@ -30,9 +30,10 @@ reorganization.
 ## Record a finding
 
 Distinguish an AgentCanon invariant failure from consumer, host, credential, or
-unknown-owner behavior. Preserve the observed action, source/runtime snapshot
-when available, expected and actual behavior, and uncertain hypotheses. Do not
-require recurrence or a private receipt before preserving a useful observation.
+unknown-owner behavior. Preserve the observed action, relevant source revision
+when available, causal input conditions, expected and actual behavior, and
+uncertain hypotheses. Do not require recurrence or a private receipt before
+preserving a useful observation.
 
 Investigate only enough to change the owner, mechanism, validation, or Issue
 boundary. Keep unproven causes out of required fixes. For unknown or foreign
@@ -57,6 +58,14 @@ use only the existing
 [private pending-metadata route](../../documents/runtime/private-feedback-knowledge.md);
 never store Issue bodies in AgentCanon source. Do not close an Issue without
 completion evidence.
+
+Use a minimal controlled fixture, public API/CLI, or existing regression check
+to decide whether the affected contract is repaired. Do not require the reporting
+host, absolute paths, private project data, access details, or a rerun in the
+original environment in the Issue or its completion criteria. Keep known
+environment facts only when they explain the cause; do not turn that context
+into mandatory verification. Deployment or verification in a particular live
+environment is a separate scope selected by an explicit user request.
 
 The direct AgentCanon defect route targets iwashita-nozomu/agent-canon only when
 current source and effect evidence support that ownership. Otherwise preserve
