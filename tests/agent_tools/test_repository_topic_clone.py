@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -53,6 +54,14 @@ def git_metadata_path(root: Path, name: str) -> Path:
     """Resolve a Git path from this checkout, preserving absolute results."""
     value = Path(run_git(root, "rev-parse", "--git-path", name))
     return root / value
+
+
+def use_symlinked_git_directory(root: Path) -> None:
+    """Represent the existing Git admin directory with a relative .git symlink."""
+    admin = Path(run_git(root, "rev-parse", "--absolute-git-dir"))
+    git_entry = root / ".git"
+    git_entry.unlink()
+    git_entry.symlink_to(os.path.relpath(admin, root), target_is_directory=True)
 
 
 def patch_linked_checkout_identity(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -577,8 +586,15 @@ def test_prepare_rejects_nested_parent_repo_without_mutating_ancestor(
     assert not run_git(workspace, "status", "--porcelain")
 
 
+@pytest.mark.parametrize(
+    "symlink_git_entry", [False, True], ids=["gitfile", "gitdir-symlink"]
+)
+@pytest.mark.parametrize("worktree_config_enabled", [False, True])
 def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    symlink_git_entry: bool,
+    worktree_config_enabled: bool,
 ) -> None:
     """A clean unmarked native worktree is identified by its path and Git facts."""
     _, remote_url = init_remote(tmp_path)
@@ -618,7 +634,10 @@ def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
         capture_output=True,
         text=True,
     )
-    run_git(clone, "config", "extensions.worktreeConfig", "true")
+    if worktree_config_enabled:
+        run_git(clone, "config", "extensions.worktreeConfig", "true")
+    if symlink_git_entry:
+        use_symlinked_git_directory(clone)
     packet_path = clone / rtc.WRITER_TARGET_PACKET_RELATIVE
     config_path = git_metadata_path(clone, "config.worktree")
     index_path = git_metadata_path(clone, "index")
@@ -658,8 +677,11 @@ def test_prepare_reuses_unmarked_linked_worktree_from_exact_git_identity(
     assert not run_git(clone, "status", "--porcelain")
 
 
+@pytest.mark.parametrize(
+    "symlink_git_entry", [False, True], ids=["gitfile", "gitdir-symlink"]
+)
 def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, symlink_git_entry: bool
 ) -> None:
     """Matching branch and remote do not adopt a worktree registered elsewhere."""
     _, remote_url = init_remote(tmp_path)
@@ -703,6 +725,8 @@ def test_prepare_holds_unmarked_linked_worktree_from_foreign_common_root(
         text=True,
     )
     run_git(clone, "config", "extensions.worktreeConfig", "true")
+    if symlink_git_entry:
+        use_symlinked_git_directory(clone)
     before_status = run_git(clone, "status", "--porcelain")
     assert not before_status
 
@@ -1348,12 +1372,16 @@ def test_prepare_reuses_exact_target_without_rewriting_dirty_content(
 @pytest.mark.parametrize(
     "linked_workspace_root", [False, True], ids=["main-parent", "linked-parent"]
 )
+@pytest.mark.parametrize(
+    "symlink_git_entry", [False, True], ids=["gitfile", "gitdir-symlink"]
+)
 def test_prepare_holds_external_info_exclude_symlink_without_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     packet_present: bool,
     requested_paths: tuple[str, ...],
     linked_workspace_root: bool,
+    symlink_git_entry: bool,
 ) -> None:
     """An exclude symlink outside the parent cannot receive writer metadata."""
     _, remote_url = init_remote(tmp_path)
@@ -1376,6 +1404,8 @@ def test_prepare_holds_external_info_exclude_symlink_without_mutation(
     )
 
     prepared = rtc.request(**request)
+    if symlink_git_entry:
+        use_symlinked_git_directory(prepared.clone)
     packet = prepared.writer_target_packet
     assert packet is not None
     packet_before = packet.read_bytes() if packet_present else None
