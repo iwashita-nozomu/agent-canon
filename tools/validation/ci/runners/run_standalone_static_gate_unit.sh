@@ -149,6 +149,8 @@ run_docs() {
 }
 
 run_rust() {
+  # Producer identity checks hash the test executable; reduce debug-only bytes.
+  export CARGO_PROFILE_TEST_DEBUG=0
   local phase="${1:-all}"
   case "${phase}" in
     all|prepare)
@@ -190,6 +192,7 @@ run_contracts() {
     tests.agent_tools.test_tool_dispatch \
     tests.agent_tools.test_paper_writing_citeproc \
     tests.agent_tools.test_render_dependency_manifest_graph \
+    tests.agent_tools.test_repository_topic_clone \
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_search \
     tests.tools.test_notebook_quality \
