@@ -190,6 +190,7 @@ run_contracts() {
     tests.agent_tools.test_tool_dispatch \
     tests.agent_tools.test_paper_writing_citeproc \
     tests.agent_tools.test_render_dependency_manifest_graph \
+    tests.agent_tools.test_repository_topic_clone \
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_search \
     tests.tools.test_notebook_quality \
