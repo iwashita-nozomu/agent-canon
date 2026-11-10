@@ -528,8 +528,8 @@ require another read.
 - parent は選択済み writer handoff で各 writer の allowed path / directory を管理します
 - write-capable handoff は `writer_target`（絶対 `checkout_root`、固定 `branch`、正規化済み `remote`、`allowed_paths`）を必須とし、branch は handoff 前に `repository-topic-clone.prepare` で用意します
 - 同じ `checkout_root` で write target が衝突する作業は同時に起動せず、reader は同じ checkout を共有できます
-- `repository-topic-clone.prepare` は選択済み mode の prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。PreToolUse はこの packet を正本として読み、環境変数は readback 一致確認に限って使い、modified path が `allowed_paths` の外なら拒否します。packet が無い checkout や packet 自身の変更は拒否し、read-only command はこの writer path gate の対象外です
-- repository write は `worker`、`spark_worker`、`integration_executor` の各 write-capable route に限定します。IssueWorker の `publisher` は外部 GitHub publication 専用で target を持たず、reviewer と artifact-only role は read-only とします
+- `repository-topic-clone.prepare` は prepared checkout の ignored `.agent-canon/writer-target.json` に target と検証済み checkout identity を materialize します。作業範囲は handoff と Git diff で確認します。PreToolUse は role、identity receipt、spawn 記録、writer packet を編集の許可条件にしません。
+- 選択済みの実行 owner が合意済み範囲を編集します。委譲した reviewer と artifact-only role は read-only、IssueWorker の `publisher` は外部 GitHub publication 専用とします。
 - 同一 path、同一 directory ownership、同一 public API surface、shared Git index/HEAD、generated output、formatter output は順序制約つきの writer に割り当てます
 - write-capable subagent instance を並行させる場合は、checkout roots と write targets の衝突を避けます
 - same directory / same file / same canonical surface を同時に変更せず、衝突する作業は必要に応じて順に行います

@@ -3,7 +3,6 @@
 // responsibility Dispatches the bounded active Hook contract through existing pure safety, authority, selection, assembly, and spool owners.
 // upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the previous active CLI and event contract.
 // upstream implementation ./hook_safety.rs owns secret and protected-Git decisions.
-// upstream implementation ./mutation_authority.rs owns writer-target and child-scope admission.
 // upstream implementation ./hook_event_log.rs owns append-only hook event publication.
 // downstream implementation main.rs exposes the native codex-hook CLI route.
 // downstream implementation ../tests/hook_dispatcher_native.rs checks the captured CPython CLI corpus.
@@ -27,9 +26,6 @@ use crate::hook_report_projection::emit_behavior_projection;
 use crate::hook_safety::{
     branch_block_payload, first_block, payload_prompt_json, payload_tool_command_json,
     payload_tool_name_json, secret_block_payload, secret_kind_json, SHELL_TOOL_NAMES,
-};
-use crate::mutation_authority::{
-    evaluate_mutation_authority, mutation_block_payload, MutationAuthorityContext,
 };
 use crate::path_resolution::resolve_non_strict;
 use crate::prompt_classifier::PromptClassifierInputs;
@@ -986,39 +982,6 @@ fn dispatch_event(
         environment,
     )?;
 
-    let null_payload = JsonValue::Null;
-    let mutation_decision = if event == "PreToolUse" {
-        let hook_spool_root = log_context
-            .spool_root()
-            .map_err(|error| format!("hook spool path unavailable: {error}"))?;
-        Some(evaluate_mutation_authority(
-            payload.as_ref().unwrap_or(&null_payload),
-            &MutationAuthorityContext {
-                report_dir: report_dir.as_deref(),
-                active_root: &root_state.active_root,
-                environment,
-                hook_spool_root: Some(&hook_spool_root),
-            },
-        ))
-    } else {
-        None
-    };
-    if let Some(decision) = mutation_decision.as_ref() {
-        if decision.status == "blocked" {
-            let target_blocked = decision.reason.starts_with("writer_target");
-            if output.is_none() || target_blocked {
-                output = Some(official_payload(event, mutation_block_payload(decision))?);
-                status = if target_blocked {
-                    "blocked_writer_target".to_owned()
-                } else {
-                    "blocked_parent_mutation".to_owned()
-                };
-            }
-        }
-        set_field(&mut spool_entry, "mutation_control", decision.as_dict());
-        set_field(&mut spool_entry, "status", text_value(&status));
-    }
-
     let empty_payload = empty_object();
     let payload_data = payload.as_ref().unwrap_or(&empty_payload);
     let workflow_context = report_dir
@@ -1096,6 +1059,7 @@ fn dispatch_event(
     };
 
     let event_value = JsonValue::String(JsonString::from_text(event));
+    let null_payload = JsonValue::Null;
     if let Some(receipt) = build_coordination_receipt(
         payload.as_ref().unwrap_or(&null_payload),
         subagent_selection.as_ref(),

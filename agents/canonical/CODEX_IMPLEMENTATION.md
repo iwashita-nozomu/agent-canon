@@ -62,8 +62,9 @@ contracts and their consumers as necessary.
 Markdown links identify the expected owner and Skill route; they do not create a
 dispatch frontier. When delegation is selected, use the configured native
 collaboration route and preserve actual launch, completion, and failure results.
-A blocked child does not create a parent write fallback. User-guided debugging
-uses the common ROOT exception.
+Repair a selected tool's refusal at its owner, then resume the authorized
+operation. Runtime identity, spawn, and writer-packet records are not editing
+permission gates.
 
 A bounded route's selected execution owner performs its edit and verification
 without a child handoff. When the selected route requires full staging, read
