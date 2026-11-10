@@ -31,7 +31,8 @@ incorporated path. RC-09 owns retirement and necessary caller migration.
    for domain meaning, independent behavior, or a demonstrated shared responsibility.
 - For numerical code, establish the governing equations and required invariants.
    When retiring numerical corrections, use [stabilization removal](computational-optimization.md#remove-unsupported-stabilization).
-   Use [refactor-loop](refactor-loop.md) for structural migration and
-   [change-review](change-review.md) for the resulting contract and missed deletions.
+   It specializes the same implementation sequence; follow it once.
+- Use [refactor-loop](refactor-loop.md) for structural migration and
+  [change-review](change-review.md) for the selected contract/retirement review.
 
 No new inventory, handoff schema, or full-repository scan is required by cleanup.
