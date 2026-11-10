@@ -222,8 +222,6 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "validate_projection_bytes",
         "record_hook_invocation",
         "HookLogContext",
-        "RETIRED_CHILD_TOMBSTONES",
-        "MOVED_SOURCE_ABSENCES",
     ),
     "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
@@ -240,7 +238,6 @@ HOOK_GUARDRAIL_POLICY_MARKERS = {
         "active/inactive",
         "legacy `Stop`",
         "fail-open",
-        "retired child tombstones",
         "bounded",
         "redacted",
     ),

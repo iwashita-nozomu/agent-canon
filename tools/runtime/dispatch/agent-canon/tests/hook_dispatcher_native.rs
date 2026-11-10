@@ -5,7 +5,6 @@
 // responsibility Replays frozen Hook CLI cases and declared migration locators through the native owner.
 // upstream implementation ../src/hook_dispatcher.rs owns event execution and contract readback
 // upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the old CLI outputs
-// upstream reference ../../../../../tests/fixtures/codex_runtime_summary/retirement_digest.json derives the relocated digest with the old Python owner
 // @dependency-end
 
 use agent_canon::hook_dispatcher::{run_with_input, HookCliResult};
@@ -244,45 +243,34 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
         usize_value(field(case, "exit").expect("expected exit")) as i32,
         "exit status for {name}"
     );
-    let mut expected_stdout = case_bytes(case, "stdout_base64");
+    let expected_stdout = case_bytes(case, "stdout_base64");
     if matches!(
         text(field(case, "name").unwrap()).as_str(),
         "contract" | "contract-stop"
     ) {
-        // Only declared owner/command relocations and their manifest digest adapt.
-        // The original captured contract bytes remain frozen.
-        let digest_oracle = parse_json(include_str!(
-            "../../../../../tests/fixtures/codex_runtime_summary/retirement_digest.json"
-        ))
-        .expect("old Python digest derivation");
+        // Keep the frozen current-event oracle; retired migration metadata was removed.
+        let expected = parse_json(&String::from_utf8(expected_stdout).unwrap()).unwrap();
+        let JsonValue::Object(mut fields) = expected else {
+            panic!("contract oracle must be an object");
+        };
+        fields.0.retain(|(key, _)| {
+            !matches!(
+                key.to_text().unwrap().as_str(),
+                "retired_child_tombstones" | "moved_source_absences" | "counts" | "source_digest"
+            )
+        });
+        let expected_contract = canonical_json_ascii_bytes(&JsonValue::Object(fields)).unwrap();
         assert_eq!(
-            text(field(&digest_oracle, "source").unwrap()),
-            "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6"
+            canonical_json_ascii_bytes(
+                &parse_json(&String::from_utf8(result.stdout.clone()).unwrap()).unwrap()
+            )
+            .unwrap(),
+            expected_contract,
+            "current-event contract for {name}"
         );
-        assert_eq!(
-            text(field(&digest_oracle, "old_digest").unwrap()),
-            "7fe7b7ea25b13567ba27aa93235da043460df83132162818b93236fa4c4369b9"
-        );
-        let relocated_digest = text(field(&digest_oracle, "new_digest").unwrap());
-        let mut expected = String::from_utf8(expected_stdout).unwrap();
-        for (old, new) in [
-            ("\"owner\": \"tools/validation/semantic/tools/tool_rejection_preflight.py\"",
-             "\"owner\": \"tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs\""),
-            ("\"command_or_skill\": \"command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation\"",
-             "\"command_or_skill\": \"command-only:tools/bin/agent-canon tool-rejection-preflight\""),
-            ("\"owner\": \"tools/runtime/archive/export_codex_runtime_summary.py\"",
-             "\"owner\": \"tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs\""),
-            ("\"command_or_skill\": \"command-only:python3 tools/runtime/archive/export_codex_runtime_summary.py\"",
-             "\"command_or_skill\": \"command-only:tools/bin/agent-canon export-codex-runtime-summary\""),
-            ("cad81898e43d3891d23ed3c220c6fac6703716536a95a7f7c3c7cc323174c9ad",
-             relocated_digest.as_str()),
-        ] {
-            assert_eq!(expected.matches(old).count(), 1, "declared contract relocation");
-            expected = expected.replace(old, new);
-        }
-        expected_stdout = expected.into_bytes();
+    } else {
+        assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     }
-    assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     if text(field(case, "name").expect("case name")) == "surrogate-command" {
         assert!(
             !result.stderr.is_empty(),
