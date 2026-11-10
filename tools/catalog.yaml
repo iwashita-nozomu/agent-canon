@@ -2652,23 +2652,6 @@ entries:
     tests:
       - tests/tools/test_save_experiment_result_annex.py
 
-  - id: triplet-validator
-    summary: Validates source, document, and test triplets.
-    path: tools/validation/documentation/checks/triplet_validator.py
-    family: validation
-    role: checker
-    status: canonical
-    command: python3 tools/validation/documentation/checks/triplet_validator.py
-    dispatch: {argv: ["python3", "tools/validation/documentation/checks/triplet_validator.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-    tests: []
-    test_exempt_reason: No dedicated unit test exists; invoke the checker directly through its catalog command.
-
 
   - id: notebook-quality
     summary: Validates notebooks as readable runnable demos instead of fine-grained tests.
