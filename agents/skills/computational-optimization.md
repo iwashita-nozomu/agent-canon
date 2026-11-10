@@ -26,11 +26,32 @@ every numerical question.
   residual, constraint, derivative, stopping rule, tolerance, or numerical status.
 - A convergence regression, non-finite result, or numerical performance claim is
   in scope.
+- Implementing a numerical formula or removing unsupported stabilization is in scope.
+
+## Mathematical fidelity
+
+Implement the agreed equations, relevant assumptions, valid inputs, derivatives
+and update/stopping rules. Carry only premises needed for this change; refer to
+the existing mathematical owner for the rest. Trace each correction to that
+formulation before coding. A numerical symptom, a passing test, a library default
+or an existing implementation does not supply approval for a different method.
+
+Epsilon denominators, clipping/floors, diagonal jitter, ridge terms, damping,
+fallback inverses and non-finite replacement can change the problem or its
+failure meaning. Add them only when required by the agreed method; otherwise
+present the proposed mathematical change and obtain agreement first. Fix source-
+or specification-proven errors directly within the agreed contract.
+
+Equivalent evaluation is an implementation choice when it preserves the function,
+domain, derivatives and required update/failure behavior. Explain that equivalence
+and use the selected numerical oracle; do not introduce an unrequested parameter
+or alter the test tolerance to make the result pass. Preserve required input and
+memory-safety boundaries.
 
 ## Core Method
 
 Follow [Before optional changes](#before-optional-changes) when implementing or
-tuning a numerical method.
+tuning a numerical method, under [mathematical fidelity](#mathematical-fidelity).
 
 1. State the requested numerical property in terms of the public contract. Record
    only the relevant parts of the problem: for example objective or residual,
@@ -86,7 +107,8 @@ unapproved tweaks into the baseline; distinguish them from the agreed method.
 Tie an additional candidate to an observed deficiency, its supported cause or
 explicit hypothesis, and the quantity that can test it. Compare changes in an
 interpretable unit while preserving the inputs, oracle, stopping and failure
-semantics; retain the baseline failure rather than masking it as success.
+semantics; retain the baseline failure rather than masking it as success. A
+candidate that changes the agreed mathematics needs agreement before implementation.
 Source- or specification-proven algorithm errors can be repaired directly:
 this rule does not require running a known-invalid implementation, benchmarking
 ordinary correctness repairs, or executing a theory-only request.
@@ -96,6 +118,29 @@ optional tweaks; continue independent authorized baseline implementation or
 explanation. This rule grants no new execution authority and does not require
 rerunning valid existing evidence. Changes to scope, method, or acceptance follow
 [Decision Order](agent-orchestration.md#decision-order).
+
+## Remove unsupported stabilization
+
+Use for a requested cleanup of numerical corrections, with
+[code-cleanup](code-cleanup.md#route) owning deletion and caller closure.
+
+1. Read the relevant formulation and valid inputs, then trace the correction,
+   its producer/consumer and its effect on values, derivatives, updates or status.
+2. Keep mechanisms required by that formulation and justified equivalent
+   evaluation. For the rest, establish the mismatch from source or selected
+   evidence. Missing history alone is not proof that a mechanism is unnecessary.
+3. Decide the complete repair before editing. Remove unsupported corrections and
+   exclusive flags/helpers/fallbacks with their caller changes. Restore the agreed
+   computation or required failure; do not replace the removed tweak with another.
+4. Review the final diff and references for remaining correction paths. Then use
+   existing closed-form/reference/invariant checks on the product API, including
+   valid inputs affected by the old floor or clip. Keep required regularization,
+   line search, preconditioning and safety checks. Update stale expectations to
+   the agreed mathematics, preserving the independent oracle.
+
+A source-proven mismatch can be removed without first running that known-invalid
+implementation. An unresolved method/domain choice returns to the user with the
+checked facts; it does not become an automatic numeric workaround or a new gate.
 
 ## Related Skills
 
