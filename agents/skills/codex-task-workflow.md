@@ -44,7 +44,8 @@ Use [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md) to select an owner for the
 next needed action. Follow actual dependencies, not a fixed stage order. Resolve
 a material design question with [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md)
 when it changes the implementation. Keep obsolete-support retirement with the
-existing owner. A newly selected capability uses its existing CLI/API/script
+existing owner through [Implementation and deletion](#implementation-and-deletion).
+A newly selected capability uses its existing CLI/API/script
 with its native arguments and process-result semantics. Before adding an
 implementation, map the required operations to capabilities already identified
 in the caller's context and construct a concrete call flow using
@@ -55,6 +56,17 @@ only for a concrete gap at its owner. Judge overlap by responsibility and contra
 not by names or paths alone.
 Use [Skill and tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
 for native execution state, completed evidence, and the next owning decision.
+
+## Implementation and deletion
+
+For code repairs, replacements, and refactors, follow the existing
+[implementation sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation):
+decide the retained implementation and obsolete code, migrate callers and delete
+that code with its exclusive support, inspect the final diff and old references,
+then format and validate. Removal is part of the implementation unit; a separate
+cleanup request is unnecessary. The sequence and
+[RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+own the deletion boundary and retained guarantees.
 
 ## Coordination handoff
 
