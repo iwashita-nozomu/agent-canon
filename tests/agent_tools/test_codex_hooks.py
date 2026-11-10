@@ -36,39 +36,6 @@ from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
-RETIRED_ROUTE_TABLE = (
-    "branch_worktree_guard.py",
-    "cause_investigation_guard.py",
-    "codex_runtime_summary_logger.py",
-    "completion_review_guard.py",
-    "direct_rg_context_guard.py",
-    "execution_resource_plan_projection_guard.py",
-    "first_party_library_guard.py",
-    "goal_completion_guard.py",
-    "helper_first_guard.py",
-    "helper_inventory_guard.py",
-    "library_implementation_guard.py",
-    "log_archive_mount_warning.py",
-    "log_surface_inventory_guard.py",
-    "module_boundary_guard.py",
-    "notebook_quality_guard.py",
-    "oop_readability_guard.py",
-    "prompt_secret_guard.py",
-    "reference_capture_guard.py",
-    "role_write_policy_guard.py",
-    "runtime_log_auto_sync.py",
-    "skill_usage_logger.py",
-    "style_checker_guard.py",
-    "task_authority_schema_guard.py",
-)
-RETIRED_ROUTE_FIELDS = {
-    "filename",
-    "artifact",
-    "command_or_skill",
-    "decision_semantics",
-    "owner",
-    "profile_trigger",
-}
 
 
 def codex_hook_command(*arguments: str) -> list[str]:
@@ -563,15 +530,11 @@ class CodexHooksTest(unittest.TestCase):
         )
 
     def test_hook_contract_is_table_driven_static_and_stop_noop(self) -> None:
-        """The static contract covers active events, inactive Stop, and all retired routes."""
+        """The static contract covers active events and inactive Stop."""
         contract = self._contract()
         events = cast("dict[str, dict[str, object]]", contract["events"])
         active_events = cast("list[str]", contract["active_events"])
         inactive_events = cast("list[str]", contract["inactive_events"])
-        retired_rows = cast(
-            "list[dict[str, object]]", contract["retired_child_tombstones"]
-        )
-        moved_rows = cast("list[dict[str, object]]", contract["moved_source_absences"])
         active_handlers = set(cast("list[str]", contract["active_handlers"]))
 
         self.assertEqual(set(active_events), set(ACTIVE_EVENTS))
@@ -585,21 +548,6 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(inactive_events, ["Stop"])
         self.assertEqual(set(events), set((*ACTIVE_EVENTS, "Stop")))
-        retired_routes = {cast(str, row["filename"]): row for row in retired_rows}
-        self.assertEqual(set(retired_routes), set(RETIRED_ROUTE_TABLE))
-        self.assertEqual(len(retired_rows), 23)
-        self.assertEqual(len(moved_rows), 1)
-        self.assertTrue(set(retired_routes).isdisjoint(active_handlers))
-        scanner_route = retired_routes["log_surface_inventory_guard.py"]
-        self.assertEqual(
-            scanner_route["owner"],
-            "tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs",
-        )
-        self.assertEqual(
-            scanner_route["command_or_skill"],
-            "command-only:tools/bin/agent-canon log-surface-inventory",
-        )
-
         for event, expected_active in (
             *((event, True) for event in ACTIVE_EVENTS),
             ("Stop", False),
@@ -609,14 +557,6 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsInstance(events[event]["matchers"], list)
                 self.assertIsInstance(events[event]["failure"], str)
                 self.assertIsInstance(events[event]["telemetry"], str)
-
-        for route_name in RETIRED_ROUTE_TABLE:
-            with self.subTest(route=route_name):
-                route = retired_routes[route_name]
-                self.assertEqual(set(route), RETIRED_ROUTE_FIELDS)
-                self.assertTrue(
-                    all(isinstance(value, str) and value for value in route.values())
-                )
 
         stop = self._run_hook("Stop", "not-json")
         self.assertEqual(stop.stdout, "")

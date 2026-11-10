@@ -24,7 +24,6 @@ use crate::execution_resource_projection::{
 };
 use crate::hook_event_log::{utc_now, HookLogContext};
 use crate::hook_report_projection::emit_behavior_projection;
-use crate::hook_retirement::{source_digest, MOVED_SOURCE_ABSENCES, RETIRED_CHILD_TOMBSTONES};
 use crate::hook_safety::{
     branch_block_payload, first_block, payload_prompt_json, payload_tool_command_json,
     payload_tool_name_json, secret_block_payload, secret_kind_json, SHELL_TOOL_NAMES,
@@ -392,28 +391,6 @@ fn contract_payload(event: Option<&str>) -> JsonValue {
             inactive_events.push(JsonString::from_text(name));
         }
     }
-    let retired = RETIRED_CHILD_TOMBSTONES
-        .iter()
-        .map(|row| row.to_json_value())
-        .collect();
-    let moved = MOVED_SOURCE_ABSENCES
-        .iter()
-        .map(|row| row.to_json_value())
-        .collect();
-    let count_fields = vec![
-        (
-            key("retired_child_tombstones"),
-            integer_value(RETIRED_CHILD_TOMBSTONES.len()),
-        ),
-        (
-            key("moved_source_absences"),
-            integer_value(MOVED_SOURCE_ABSENCES.len()),
-        ),
-        (
-            key("retired_filenames"),
-            integer_value(RETIRED_CHILD_TOMBSTONES.len() + MOVED_SOURCE_ABSENCES.len()),
-        ),
-    ];
     object(vec![
         ("schema", text_value(HOOK_CONTRACT_SCHEMA)),
         ("events", JsonValue::Object(JsonObject(events))),
@@ -423,13 +400,6 @@ fn contract_payload(event: Option<&str>) -> JsonValue {
             "active_handlers",
             string_array_static(&ACTIVE_HOOK_HANDLERS),
         ),
-        (
-            "retired_child_tombstones",
-            JsonValue::Array(JsonArray(retired)),
-        ),
-        ("moved_source_absences", JsonValue::Array(JsonArray(moved))),
-        ("counts", JsonValue::Object(JsonObject(count_fields))),
-        ("source_digest", text_value(&source_digest())),
     ])
 }
 
@@ -528,10 +498,6 @@ fn key(value: &str) -> JsonString {
 
 fn text_value(value: &str) -> JsonValue {
     JsonValue::String(JsonString::from_text(value))
-}
-
-fn integer_value(value: usize) -> JsonValue {
-    JsonValue::Number(JsonNumber::Integer(value.to_string()))
 }
 
 fn empty_object() -> JsonValue {

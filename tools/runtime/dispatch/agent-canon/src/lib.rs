@@ -86,7 +86,6 @@ pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_report_projection;
-pub mod hook_retirement;
 pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod log_repository_identity;
