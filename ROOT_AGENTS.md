@@ -37,6 +37,10 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   needs separate current-user agreement.
 - **Memory safety:** preserve ownership, lifetimes, access bounds, and
   synchronization before performance or implementation convenience.
+- **Numerical fidelity:** implement the agreed equations, assumptions and method.
+  Obtain agreement before adding stabilization that changes the model, valid
+  inputs, update, derivatives or failure semantics. Use equivalent numerical
+  evaluation only when it preserves that contract; retain required safety checks.
 - **Terminology:** use established terms and preserve API/tool identifiers.
   Briefly explain necessary unfamiliar terms at first use for the intended
   reader; replace needless internal jargon with concrete actions. In Japanese,

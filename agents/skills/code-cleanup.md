@@ -29,8 +29,9 @@ incorporated path. RC-09 owns retirement and necessary caller migration.
   adding code. Do not add a compatibility layer as a cleanup step.
 - Remove relay-only packets, wrappers, types, and names. Keep abstractions only
    for domain meaning, independent behavior, or a demonstrated shared responsibility.
-- For numerical code, establish equations and convergence semantics before
-   deletion. Use [refactor-loop](refactor-loop.md) for structural migration and
+- For numerical code, establish the governing equations and required invariants.
+   When retiring numerical corrections, use [stabilization removal](computational-optimization.md#remove-unsupported-stabilization).
+   Use [refactor-loop](refactor-loop.md) for structural migration and
    [change-review](change-review.md) for the resulting contract and missed deletions.
 
 No new inventory, handoff schema, or full-repository scan is required by cleanup.
