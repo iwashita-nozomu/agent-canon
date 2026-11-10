@@ -98,7 +98,7 @@ needed, and tests or help-smoke evidence.
 
 Current AgentCanon versions were kept for core runtime files such as
 `tools/agent/orchestration/agent_team.py`, `bootstrap_agent_run.py`,
-`tools/validation/ci/runners/run_all_checks.sh`, `tools/validation/documentation/checks/triplet_validator.py`, and
+`tools/validation/ci/runners/run_all_checks.sh`, and
 Markdown tooling that already has newer AgentCanon behavior.
 
 ## Additional Local Preference Captured
