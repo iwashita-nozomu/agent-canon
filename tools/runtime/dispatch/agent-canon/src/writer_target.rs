@@ -5,7 +5,6 @@
 // upstream implementation path_resolution.rs owns non-strict physical path resolution
 // upstream implementation path_expansion.rs owns Python-compatible user-home expansion
 // upstream implementation python_json.rs owns Python-compatible JSON strings and canonical bytes
-// downstream implementation mutation_authority.rs mutation decision consumes the validated packet
 // downstream implementation ../tests/writer_target_native.rs compares the frozen CPython oracle
 // @dependency-end
 

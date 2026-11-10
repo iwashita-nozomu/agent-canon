@@ -82,10 +82,10 @@ still visible. Host archive Git/annex publication remains at its existing owner.
 
 The active host Hook route calls native `codex-hook` after the existing resident
 trust admission and target-mount transaction. Its dispatcher composes the native
-safety, mutation-authority, event-assembly, spool, and report owners. Frozen old
+safety, event-assembly, spool, and report owners. Frozen old
 CLI cases check both the library and real command; integration tests retain
-report selection and containment, privacy, append/report failures, parent
-mutation denial, and authenticated child admission. The Python dispatcher is retired after its direct tests and consumers move to
+report selection and containment, privacy, append/report failures, and ordinary
+editing without runtime role or receipt gates. The Python dispatcher is retired after its direct tests and consumers move to
 the native command. Shared Python helpers retain their remaining consumers and
 remain in the migration inventory.
 
