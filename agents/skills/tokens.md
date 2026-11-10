@@ -27,11 +27,18 @@ downstream design ./agent-eval-accumulation.md accumulated eval evidence route
 ## Task workflow
 
 1. Reuse the goal, source and accepted decisions. Fix the requested token metric
-   and required task outcomes before a comparison. Preserve them through
-   resumption; reopening completed investigation adds context without progress.
+   and required task outcomes before a comparison. Carry already located target,
+   consumer/test references and completed lookup results, with source revision and
+   scope, in the existing handoff. Supply the raw source slices needed for the next
+   decision, including affected fields' definitions and consumers; avoid a reading
+   list of whole files or completed history. Additional
+   reads remain available for a missing decision. Preserve these facts on resumption.
 2. Inspect the selected sessions' actual counters and calls. Separate document
    reads, cached/fresh input, output, retries and tool calls; identify a concrete
-   redundant read, oversized result or failed call. Keep missing data unmeasured.
+   redundant read, oversized result or failed call. Obtain counters from existing
+   runtime logs outside the task agent's work; do not add manual measurement to
+   its deliverable. Keep missing data unmeasured and include new preparation work
+   when claiming savings for an entire delegated workflow.
 3. Repair that cause at its existing owner. Use
    [bounded reads](agent-orchestration.md#owner-first-read-trace) and
    [tool cooperation](agent-orchestration.md#skill-and-tool-cooperation) for

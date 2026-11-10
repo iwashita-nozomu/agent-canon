@@ -59,12 +59,13 @@ child; available slots and role inventories do not require filling them.
 
 ## Owner-First Read Trace
 
-Use loaded instructions and the selected target first. Read independent target,
-caller, test-oracle and distribution references together, then decide the repair,
-deletions and validation from those results. Further lookup needs a missing fact
-that could change that decision. For a read-only plan, return that plan once these
-are settled. Branch, publication, runtime and coordination manuals apply when
-those operations are selected; links identify owners rather than a reading list.
+Use loaded instructions and the selected target first. Read only a section that
+answers a concrete missing decision; links and dependency headers identify owners,
+not a reading checklist. Stop when the decision is resolved. For example, a
+read-only code plan needs target contracts and relevant source/tests; branch,
+PR, runtime installation, and coordination manuals apply when those operations
+are actually selected. Use headings and bounded reads rather than entire manuals.
+This leaves context for the source and consumers that determine the repair.
 
 ## Skill and tool cooperation
 
@@ -72,8 +73,7 @@ The Skill owns acceptance; the provider owns its interface, execution state, and
 effects. Compose known APIs/CLIs with their actual target, execution plane,
 arguments, and output. Use [reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
 only for a concrete reuse decision. Read schema/help only for an unresolved call.
-Batch independent calls, preserving ordering and shared effects. Keep a single
-operation's invocation direct; correct a call syntax error before retrying.
+Preserve ordering and shared effects when parallelizing.
 
 Keep a returned handle and follow the provider's completion mechanism. Use actual
 outputs in the next call; obtain only the needed missing slice of truncated
