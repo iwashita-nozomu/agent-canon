@@ -67,6 +67,12 @@ PR, runtime installation, and coordination manuals apply when those operations
 are actually selected. Use headings and bounded reads rather than entire manuals.
 This leaves context for the source and consumers that determine the repair.
 
+Search a known symbol/path in its owner first. For an unknown owner, find matching
+paths with `rg --files` or `rg -l`, then read the relevant source/test ranges
+together. Keep generated or minified fixture contents out of source discovery;
+read an oracle fixture separately when its expected behavior is needed. Broad
+content matches that overflow the result create extra searches and context.
+
 ## Skill and tool cooperation
 
 The Skill owns acceptance; the provider owns its interface, execution state, and
@@ -74,6 +80,12 @@ effects. Compose known APIs/CLIs with their actual target, execution plane,
 arguments, and output. Use [reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
 only for a concrete reuse decision. Read schema/help only for an unresolved call.
 Preserve ordering and shared effects when parallelizing.
+
+Batch independent lookups in one tool call; keep dependent follow-ups sequential.
+Read the needed slice directly, without a temporary document copy. When measuring
+a read, obtain its bytes in that same call. Keep single-tool orchestration to a
+direct invocation. A call syntax error needs a corrected call, not an unchanged
+retry; an empty/failed result is not evidence to repeat a broad search.
 
 Keep a returned handle and follow the provider's completion mechanism. Use actual
 outputs in the next call; obtain only the needed missing slice of truncated
