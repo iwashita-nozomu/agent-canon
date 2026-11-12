@@ -481,6 +481,196 @@ def test_main_selection_uses_push_range_and_handles_unavailable_base(
     )
 
 
+def test_cargo_target_selection_preserves_library_binary_integration_and_docs(
+    tmp_path: Path,
+) -> None:
+    """Cargo metadata, rather than a hand-maintained list, selects every test target."""
+    root = executable_fixture_root(tmp_path)
+    metadata = root / "metadata.json"
+    metadata.write_text(
+        json.dumps(
+            {
+                "packages": [
+                    {
+                        "targets": [
+                            {
+                                "kind": ["lib"],
+                                "name": "agent_canon",
+                                "test": True,
+                                "doctest": True,
+                            },
+                            {
+                                "kind": ["bin"],
+                                "name": "agent-canon",
+                                "test": True,
+                                "doctest": False,
+                            },
+                            {
+                                "kind": ["test"],
+                                "name": "one",
+                                "test": True,
+                                "doctest": False,
+                            },
+                            {
+                                "kind": ["test"],
+                                "name": "two",
+                                "test": True,
+                                "doctest": False,
+                            },
+                            {
+                                "kind": ["custom-build"],
+                                "name": "build-script",
+                                "test": False,
+                                "doctest": False,
+                            },
+                        ]
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    selection = next(
+        item
+        for item in workflow()["jobs"]["select-static-units"]["steps"]
+        if item.get("id") == "rust_targets"
+    )
+    output = root / "output"
+    actual = run_shell(
+        'cargo() { cat "$METADATA"; }\n' + selection["run"],
+        root=root,
+        METADATA=str(metadata),
+        GITHUB_OUTPUT=str(output),
+    )
+    assert actual.returncode == 0, actual.stderr
+    targets = json.loads(output.read_text().strip().split("=", 1)[1])
+    assert targets == [
+        {"kind": "lib", "name": "agent_canon"},
+        {"kind": "bin", "name": "agent-canon"},
+        {"kind": "test", "name": "one"},
+        {"kind": "test", "name": "two"},
+        {"kind": "doc", "name": ""},
+    ]
+
+
+@pytest.mark.parametrize("failure", [False, True])
+def test_rust_targets_get_separate_executions_and_preserve_failure(
+    tmp_path: Path, failure: bool
+) -> None:
+    """One target's failure fails Rust, while later validation units still execute."""
+    root = executable_fixture_root(tmp_path)
+    source = root / "candidate"
+    source.mkdir()
+    bootstrap = source / "bootstrap.sh"
+    bootstrap.write_text(
+        '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$CALLS"\n'
+        'if [[ "$FAIL_TARGET" == yes && "$*" == *"rust test one" ]]; then exit 9; fi\n',
+        encoding="utf-8",
+    )
+    bootstrap.chmod(0o755)
+    calls, summary = root / "calls", root / "summary"
+    actual = run_shell(
+        step("Run selected units in the shared runtime")["run"],
+        root=ROOT,
+        AGENT_CANON_CANDIDATE_SOURCE=str(source),
+        AGENT_CANON_CONTROL_PARENT_ROOT=str(root),
+        GITHUB_WORKSPACE=str(ROOT),
+        RUNNER_TEMP=str(root),
+        SELECTED_UNITS="rust,contracts",
+        DOCS_PATHS="[]",
+        BASE_SHA="fixed",
+        GITHUB_EVENT_NAME="pull_request",
+        GITHUB_STEP_SUMMARY=str(summary),
+        GITHUB_OUTPUT=str(root / "outputs"),
+        CALLS=str(calls),
+        FAIL_TARGET="yes" if failure else "no",
+        RUST_TARGETS=json.dumps(
+            [
+                {"kind": "lib", "name": "agent_canon"},
+                {"kind": "bin", "name": "agent-canon"},
+                {"kind": "test", "name": "one"},
+                {"kind": "test", "name": "two"},
+                {"kind": "doc", "name": ""},
+            ]
+        ),
+    )
+    assert actual.returncode == (1 if failure else 0), actual.stderr
+    arguments = [
+        line.split("run_standalone_static_gate_unit.sh ", 1)[1]
+        for line in calls.read_text().splitlines()
+    ]
+    expected = ["rust prepare", "rust lib", "rust bin agent-canon", "rust test one"]
+    if not failure:
+        expected += ["rust test two", "rust doc"]
+    assert arguments == expected + ["contracts"]
+    assert summary.read_text().splitlines() == [
+        "unit=rust status=fail exit=9" if failure else "unit=rust status=pass",
+        "unit=contracts status=pass",
+    ]
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        [],
+        ["prepare"],
+        ["lib"],
+        ["bin", "agent-canon"],
+        ["test", "catalog_native"],
+        ["doc"],
+    ],
+)
+def test_rust_phases_keep_debug_tests_locked_and_offline(
+    tmp_path: Path, phase: list[str]
+) -> None:
+    """Splitting execution retains Cargo's test selection and runtime isolation."""
+    root = executable_fixture_root(tmp_path)
+    fake_bin = root / "bin"
+    fake_bin.mkdir()
+    cargo = fake_bin / "cargo"
+    cargo.write_text(
+        '#!/usr/bin/env bash\nprintf "%s|runtime=%s\\n" "$*" "${AGENT_CANON_RUNTIME_ROOT:-unset}" >> "$CALLS"\n',
+        encoding="utf-8",
+    )
+    cargo.chmod(0o755)
+    target = root / "target"
+    (target / "debug").mkdir(parents=True)
+    cli = target / "debug/agent-canon"
+    cli.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    cli.chmod(0o755)
+    text = RUNNER.read_text()
+    body = (
+        "run_rust() {"
+        + text.split("run_rust() {", 1)[1].split("\n}\n\nrun_contracts()", 1)[0]
+        + "\n}\n"
+    )
+    calls = root / "calls"
+    actual = run_shell(
+        body + "run_rust " + shlex.join(phase),
+        root=root,
+        PATH=str(fake_bin) + os.pathsep + os.environ["PATH"],
+        CALLS=str(calls),
+        CARGO_TARGET_DIR=str(target),
+        AGENT_CANON_RUNTIME_ROOT="selected-runtime",
+    )
+    assert actual.returncode == 0, actual.stderr
+    commands = calls.read_text().splitlines()
+    assert all("--release" not in command for command in commands)
+    for command in commands:
+        if command.startswith(("build ", "clippy ", "test ")):
+            assert "--locked --offline" in command
+    tests = [command for command in commands if command.startswith("test ")]
+    assert len(tests) == 1
+    if phase == ["prepare"]:
+        assert tests[0].endswith("--no-run|runtime=selected-runtime")
+    else:
+        assert tests[0].endswith("|runtime=unset")
+        if phase:
+            assert ("--" + phase[0]) in tests[0]
+            if len(phase) == 2:
+                assert phase[1] in tests[0]
+
+
 def test_contracts_unit_rejects_retired_baseline_argument() -> None:
     result = subprocess.run(
         ["bash", str(RUNNER), "contracts", "origin/main"],

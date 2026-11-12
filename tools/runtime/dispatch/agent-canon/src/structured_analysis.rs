@@ -21,6 +21,8 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod lexicon;
+
 const DOC_SUFFIXES: &[&str] = &["md", "rst", "txt"];
 const HEADER_SCAN_LINES: usize = 120;
 const HEADER_SCAN_BYTES: usize = 64 * 1024;
@@ -218,6 +220,7 @@ pub fn run(args: &[String]) -> i32 {
         "document-inventory" => run_document_inventory(&args[1..]),
         "graph-contract" => run_graph_contract(&args[1..]),
         "import-document-inventory" => run_import_document_inventory(&args[1..]),
+        "lexicon" => lexicon::run(&args[1..]),
         "help" | "--help" | "-h" => {
             print_usage();
             0
@@ -233,7 +236,7 @@ pub fn run(args: &[String]) -> i32 {
 
 fn print_usage() {
     eprintln!(
-        "usage: agent-canon structured-analysis build --root <repo-root> [--runtime-root path] [--profile name] [--out-dir path] | analyze [--runtime-root path] --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | graph-contract [--db <graph.sqlite>] [--format text|json] | document-inventory --root <repo-root> [--runtime-root path] [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory [--runtime-root path] --db <graph.sqlite> --json <inventory.json>"
+        "usage: agent-canon structured-analysis build --root <repo-root> [--runtime-root path] [--profile name] [--out-dir path] | analyze [--runtime-root path] --db <prose_graph.sqlite> --diagnostics-db <diagnostics.sqlite> [--profile name] | graph-contract [--db <graph.sqlite>] [--format text|json] | document-inventory --root <repo-root> [--runtime-root path] [--json-out path] [--markdown-out path] [--fail-on-findings] | import-document-inventory [--runtime-root path] --db <graph.sqlite> --json <inventory.json> | lexicon < request.json"
     );
 }
 

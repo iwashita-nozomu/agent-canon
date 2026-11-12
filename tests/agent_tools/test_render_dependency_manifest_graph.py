@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -29,12 +30,13 @@ RENDER_GRAPH = (
 
 
 def run_renderer(
-    *args: str, cwd: Path | None = None
+    *args: str, cwd: Path | None = None, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
     """Run the renderer CLI and capture text output."""
     return subprocess.run(
         [sys.executable, str(RENDER_GRAPH), *args],
         cwd=cwd or PROJECT_ROOT,
+        env=env,
         check=False,
         capture_output=True,
         text=True,
@@ -92,6 +94,40 @@ def sha256_file(path: Path) -> str:
 
 class RenderDependencyManifestGraphTest(unittest.TestCase):
     """Validate native graph inputs, labels, relations, and artifact readback."""
+
+    def test_default_reader_uses_the_installed_cli_on_path(self) -> None:
+        """Direct invocation reads the selected Git tree through the installed CLI."""
+        env = os.environ.copy()
+        selected_cli = env.pop("AGENT_CANON_CLI")
+        env.pop("AGENT_CANON_NATIVE_BIN", None)
+        env["PATH"] = str(Path(selected_cli).parent) + os.pathsep + env["PATH"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "a.md").write_text("a\n", encoding="utf-8")
+            (root / "b.md").write_text("b\n", encoding="utf-8")
+            graph = root / "input.tsv"
+            write_graph(graph, [("upstream", "design", "a.md", "b.md")])
+            revision = initialize_git_fixture(root)
+            output = root / "graph.json"
+            result = run_renderer(
+                "--root",
+                str(root),
+                "--graph-tsv",
+                str(graph),
+                "--ir-out",
+                str(output),
+                "--format",
+                "json",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["source"][
+                    "git_tree_revision"
+                ],
+                revision,
+            )
+            self.assertEqual(json.loads(result.stdout)["summary"]["edge_count"], 1)
 
     def test_bundle_preserves_native_graph_and_artifact_descriptors(self) -> None:
         """Bundle mode emits all native artifacts and source summaries."""

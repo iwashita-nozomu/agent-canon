@@ -41,8 +41,6 @@
 // downstream implementation hook_report_projection.rs updates one existing behavior-event section
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
-// downstream implementation writer_target.rs owns typed writer-target and packet validation
-// downstream implementation mutation_authority.rs owns PreToolUse mutation classification and child-scope admission
 // downstream implementation tool_selection.rs owns pure tool-selection evidence
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -86,12 +84,10 @@ pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_report_projection;
-pub mod hook_retirement;
 pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
-pub mod mutation_authority;
 pub mod native_release;
 pub mod owner_guarantee;
 pub mod path_expansion;
@@ -125,7 +121,6 @@ pub mod update_lifecycle_contract;
 pub mod waterfall_gate;
 pub mod work_log;
 pub mod workflow_context;
-pub mod writer_target;
 
 #[cfg(test)]
 mod template_tests;

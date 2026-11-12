@@ -34,7 +34,9 @@ filename を `agent-canon-naming-rules.md` にして repository と親 directory
 - 文書 filename は英語にします。owner 指定のない prose 文書では、英語 lower-kebab-case を既定にします。
 - `README.md`、[AGENTS.md](../../AGENTS.md)、external schema、tool、manifest など owner が固定する名前は例外です。
 - 命名の可読性を、過度な語彙リストや path の列挙で代替しません。既存の naming family、owner の用語、読者が行う検索を根拠にします。
-- 本文は日本語にします。ただし path、identifier、ToolCall、external fixed name は原表記を保ちます。
+- 本文の説明は日本語を基本とし、定着した専門用語や原典の名称は必要に応じて原語を保ちます。
+  読者に馴染みのない用語は初出で意味や役割を短く説明し、不自然な訳語を作りません。
+  path、identifier、ToolCall、外部で固定された名前は原表記を保ちます。
 - 互換 alias や一時的な suffix を追加して不確かな名前を温存せず、既存 family と一緒に rename する必要がある場合は design で境界を固定します。
 
 ## 識別子と生成物

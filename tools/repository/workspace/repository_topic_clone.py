@@ -182,8 +182,6 @@ def _git_common_dir(path: Path) -> Path:
 
 def _is_linked_worktree(path: Path, *, anchor: Path | None = None) -> bool:
     """Use Git's common-dir relationship as the checkout-kind witness."""
-    if not (path / ".git").is_file():
-        return False
     try:
         git_dir = Path(_run_git(path, ["rev-parse", "--git-dir"]).strip())
         common_dir = _git_common_dir(path)
@@ -865,6 +863,12 @@ def _update_existing_prepare_metadata(
                 )
         if not request.allowed_paths:
             effective_request = replace(request, allowed_paths=target.allowed_paths)
+    if not _marker_namespace_present(
+        clone, MARKER_PREFIX, checkout_mode=request.checkout_mode
+    ):
+        if request.checkout_mode == CHECKOUT_MODE_LINKED:
+            _ensure_worktree_config(clone)
+        _set_marker(clone, effective_request, branch=branch)
     candidate_sha = _run_git(clone, ["rev-parse", branch]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     clone_identity = clone.stat()

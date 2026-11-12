@@ -103,7 +103,6 @@ action log や並行した台帳は作りません。
 
 ## Templates
 
-- [documents/notes/worktrees/WORKTREE_LOG_TEMPLATE.md](../notes/worktrees/WORKTREE_LOG_TEMPLATE.md)
 - [documents/notes/branches/BRANCH_NOTE_TEMPLATE.md](../notes/branches/BRANCH_NOTE_TEMPLATE.md)
 - [documents/notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md](../notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md)
 - [documents/notes/themes/THEME_NOTE_TEMPLATE.md](../notes/themes/THEME_NOTE_TEMPLATE.md)

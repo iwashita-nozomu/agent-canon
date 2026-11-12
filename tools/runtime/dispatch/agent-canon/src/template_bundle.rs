@@ -1,16 +1,23 @@
 //! Git-bound template profile export, source-free Codex projection, and native packages.
 // @dependency-start
 // contract implementation
-// responsibility Exports source-commit-bound template profiles and produces/verifies deterministic native CLI packages.
+// responsibility Exports source-commit-bound template profiles/static seeds, reads committed trees, and produces/verifies deterministic native CLI packages.
 // upstream design ../../../../../documents/contracts/template-bundle-manifest.toml profile roots and native package layout
+// upstream design ../../../../../documents/contracts/static-seed-export.md static-seed producer and source-free consumer boundary
+// upstream design ../../../../../documents/contracts/static-seed-allowlist.toml exact static-seed paths
 // upstream implementation entrypoint_composer.rs canonical guidance composition
+// upstream implementation docs.rs shared semantic TOML traversal and producer-prefix policy
 // downstream implementation lib.rs shared native Template library
 // downstream implementation main.rs template-bundle CLI route
+// downstream implementation ../../../../analysis/dependencies/render_dependency_manifest_graph.py consumes the committed-tree CLI
 // downstream implementation native_release.rs source-bound release package verifier
 // downstream implementation template_tests.rs profile, Codex and native package oracles
 // downstream implementation ../tests/native_release_native.rs source-bound native release oracles
 // @dependency-end
 
+use crate::docs::{
+    contains_bytes, STATIC_SEED_FORBIDDEN_PREFIXES as STATIC_SEED_FORBIDDEN_CONTENT_PREFIXES,
+};
 use crate::entrypoint_composer::Composition;
 use flate2::read::GzDecoder;
 use flate2::{Compression, GzBuilder};
@@ -38,6 +45,9 @@ const CODEX_MARKETPLACE: &str = ".agents/plugins/marketplace.json";
 const NATIVE_CLI_PROFILE: &str = "native-cli";
 const NATIVE_CLI_CARGO_MANIFEST: &str = "tools/runtime/dispatch/agent-canon/Cargo.toml";
 const NATIVE_CLI_SCHEMA: &str = "agent-canon.native-cli-package.v1";
+const STATIC_SEED_ALLOWLIST: &str = "documents/contracts/static-seed-allowlist.toml";
+const STATIC_SEED_PROVENANCE: &str = "agent-canon-static-seed.json";
+const STATIC_SEED_REPOSITORY: &str = "iwashita-nozomu/agent-canon";
 const HEX_40: usize = 40;
 const HEX_64: usize = 64;
 
@@ -102,6 +112,20 @@ struct TreeEntry {
     mode: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct CommittedTreeEntry {
+    mode: String,
+    object_type: String,
+    object_id: String,
+    path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StaticSeedPlan {
+    source_commit: String,
+    files: Payload,
+}
+
 struct BundleIdentityWork {
     identity: Value,
     commit: String,
@@ -158,7 +182,7 @@ impl GitSource {
             format!("{reference}^{{commit}}"),
         ])?;
         let commit = String::from_utf8_lossy(&value).trim().to_owned();
-        if !valid_hex(&commit, HEX_40) {
+        if !valid_hex(&commit, HEX_40) && !valid_hex(&commit, HEX_64) {
             return Err(bundle_error("invalid source commit"));
         }
         Ok(commit)
@@ -171,7 +195,7 @@ impl GitSource {
             format!("{commit}^{{tree}}"),
         ])?;
         let tree = String::from_utf8_lossy(&value).trim().to_owned();
-        if !valid_hex(&tree, HEX_40) {
+        if !valid_hex(&tree, HEX_40) && !valid_hex(&tree, HEX_64) {
             return Err(bundle_error("invalid source tree"));
         }
         Ok(tree)
@@ -181,42 +205,51 @@ impl GitSource {
         self.git(&["show".to_owned(), format!("{commit}:{path}")])
     }
 
-    fn entries(&self, commit: &str) -> BundleResult<Vec<TreeEntry>> {
+    fn tree_entries(&self, commit: &str) -> BundleResult<BTreeMap<String, CommittedTreeEntry>> {
         let output = self.git(&[
             "ls-tree".to_owned(),
             "-r".to_owned(),
             "-z".to_owned(),
+            "--full-tree".to_owned(),
             commit.to_owned(),
         ])?;
-        let mut entries = Vec::new();
-        for record in output
-            .split(|byte| *byte == 0)
-            .filter(|record| !record.is_empty())
-        {
-            let tab = record
-                .iter()
-                .position(|byte| *byte == b'\t')
+        let output =
+            std::str::from_utf8(&output).map_err(|_| bundle_error("git tree path is not UTF-8"))?;
+        let mut entries = BTreeMap::new();
+        for record in output.split_terminator('\0') {
+            let (header, path) = record
+                .split_once('\t')
                 .ok_or_else(|| bundle_error("git tree entry is invalid"))?;
-            let metadata = std::str::from_utf8(&record[..tab])
-                .map_err(|_| bundle_error("git tree entry is invalid"))?;
-            let mut fields = metadata.split(' ');
-            let mode = fields
-                .next()
-                .ok_or_else(|| bundle_error("git tree entry is invalid"))?;
-            let kind = fields
-                .next()
-                .ok_or_else(|| bundle_error("git tree entry is invalid"))?;
-            if kind == "blob" {
-                let path = std::str::from_utf8(&record[tab + 1..])
-                    .map_err(|_| bundle_error("git tree path is not UTF-8"))?;
-                entries.push(TreeEntry {
-                    path: path.to_owned(),
-                    mode: mode.to_owned(),
-                });
+            let fields = header.split_ascii_whitespace().collect::<Vec<_>>();
+            let [mode, object_type, object_id] = fields.as_slice() else {
+                return Err(bundle_error("git tree entry is invalid"));
+            };
+            let entry = CommittedTreeEntry {
+                mode: (*mode).to_owned(),
+                object_type: (*object_type).to_owned(),
+                object_id: (*object_id).to_owned(),
+                path: path.to_owned(),
+            };
+            if entries.insert(entry.path.clone(), entry).is_some() {
+                return Err(bundle_error(format!(
+                    "committed tree contains duplicate path: {}",
+                    path
+                )));
             }
         }
-        entries.sort_by(|left, right| left.path.cmp(&right.path));
         Ok(entries)
+    }
+
+    fn entries(&self, commit: &str) -> BundleResult<Vec<TreeEntry>> {
+        Ok(self
+            .tree_entries(commit)?
+            .into_values()
+            .filter(|entry| entry.object_type == "blob")
+            .map(|entry| TreeEntry {
+                path: entry.path,
+                mode: entry.mode,
+            })
+            .collect())
     }
 
     fn resolve_profile(&self, commit: &str) -> BundleResult<(DocumentMut, String)> {
@@ -268,6 +301,458 @@ impl GitSource {
             })
             .collect())
     }
+}
+
+const STATIC_SEED_FORBIDDEN_PATH_PREFIXES: &[&str] = &[
+    ".agent-canon",
+    ".agents",
+    ".codex/hooks",
+    ".devcontainer",
+    ".github",
+    ".vscode",
+    "agents",
+    "evidence",
+    "issues",
+    "knowledge",
+    "notes",
+    "reports",
+    "rust",
+    "tests",
+    "tools",
+    "vendor",
+];
+const STATIC_SEED_FORBIDDEN_EXACT_PATHS: &[&str] = &[
+    ".git",
+    ".gitmodules",
+    "AGENTS.md",
+    "ROOT_AGENTS.md",
+    "sources.json",
+    "sources.toml",
+    "sources.yaml",
+    "sources.yml",
+    "sync-state.json",
+    "update-state.toml",
+    STATIC_SEED_PROVENANCE,
+];
+const STATIC_SEED_FORBIDDEN_SECRET_SUFFIXES: &[&str] = &[".key", ".p12", ".pem"];
+const STATIC_SEED_FORBIDDEN_SECRET_COMPONENTS: &[&str] = &[
+    ".env",
+    "credentials",
+    "credential",
+    "private_key",
+    "secret",
+    "secrets",
+    "token",
+];
+const STATIC_SEED_FORBIDDEN_CONTENT_MARKERS: &[&[u8]] = &[
+    b"agent_canon_repo_ssh_key",
+    b"agent_canon_repo_token",
+    b"agent_canon_source_root",
+    b"agent-canon-latest-check",
+    b"agent-canon-update",
+    b"begin private key",
+    b"check_agent_canon_latest",
+    b"checkout_agent_canon_submodule",
+    b"curl ",
+    b"from agent_tools",
+    b"ghp_",
+    b"git clone",
+    b"git submodule",
+    b"git@",
+    b"github_pat_",
+    b"http://",
+    b"https://",
+    b"import agent_tools",
+    b"ssh://",
+    b"sync-state.json",
+    b"tools/agent-canon",
+    b"update-state.toml",
+    b"vendor/agent-canon",
+    b"wget ",
+];
+const STATIC_SEED_FORBIDDEN_TOML_KEYS: &[&str] = &[
+    "command",
+    "credentials",
+    "credential",
+    "env",
+    "environment",
+    "hooks",
+    "http_url",
+    "mcp_servers",
+    "network_access",
+    "remote",
+    "secret",
+    "secrets",
+    "socket",
+    "token",
+    "update_state",
+    "url",
+];
+
+fn validate_static_seed_relative_path(raw_path: &str) -> BundleResult<String> {
+    if raw_path.is_empty() || raw_path.contains('\0') || raw_path.contains('\\') {
+        return Err(bundle_error(format!(
+            "invalid allowlisted path: {raw_path:?}"
+        )));
+    }
+    if Path::new(raw_path)
+        .components()
+        .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        || raw_path
+            .split('/')
+            .any(|part| part.is_empty() || matches!(part, "." | ".."))
+    {
+        return Err(bundle_error(format!(
+            "allowlisted path is not canonical and relative: {raw_path:?}"
+        )));
+    }
+    Ok(raw_path.to_owned())
+}
+
+fn validate_static_seed_path_surface(path: &str) -> BundleResult<()> {
+    if STATIC_SEED_FORBIDDEN_EXACT_PATHS.contains(&path) {
+        return Err(bundle_error(format!(
+            "allowlisted path is a forbidden surface: {path}"
+        )));
+    }
+    if STATIC_SEED_FORBIDDEN_PATH_PREFIXES
+        .iter()
+        .any(|prefix| Path::new(path).starts_with(prefix))
+    {
+        return Err(bundle_error(format!(
+            "allowlisted path is a forbidden surface: {path}"
+        )));
+    }
+    for component in path.split('/') {
+        let lowered = component.to_lowercase();
+        if STATIC_SEED_FORBIDDEN_SECRET_COMPONENTS.contains(&lowered.as_str())
+            || STATIC_SEED_FORBIDDEN_SECRET_SUFFIXES
+                .iter()
+                .any(|suffix| lowered.ends_with(suffix))
+        {
+            return Err(bundle_error(format!(
+                "allowlisted path may contain secret material: {path}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_static_seed_producer_path(path: &str, value: &str) -> BundleResult<()> {
+    let lowered = value.to_lowercase();
+    if let Some(prefix) = STATIC_SEED_FORBIDDEN_CONTENT_PREFIXES
+        .iter()
+        .find(|prefix| lowered.contains(**prefix))
+    {
+        return Err(bundle_error(format!(
+            "allowlisted TOML contains forbidden producer prefix {prefix:?}: {path}"
+        )));
+    }
+    Ok(())
+}
+
+fn parse_static_seed_toml(path: &str, content: &[u8]) -> BundleResult<DocumentMut> {
+    let text = std::str::from_utf8(content)
+        .map_err(|_| bundle_error(format!("allowlisted file is not valid UTF-8 TOML: {path}")))?;
+    text.parse::<DocumentMut>()
+        .map_err(|_| bundle_error(format!("allowlisted file is not valid UTF-8 TOML: {path}")))
+}
+
+fn validate_static_seed_content(path: &str, content: &[u8]) -> BundleResult<()> {
+    let mut lowered = content.to_vec();
+    lowered.make_ascii_lowercase();
+    if let Some(marker) = STATIC_SEED_FORBIDDEN_CONTENT_MARKERS
+        .iter()
+        .find(|marker| contains_bytes(&lowered, marker))
+    {
+        let label = std::str::from_utf8(marker).unwrap_or("invalid marker");
+        return Err(bundle_error(format!(
+            "allowlisted file contains forbidden marker {label:?}: {path}"
+        )));
+    }
+    let document = parse_static_seed_toml(path, content)?;
+    let mut failure = None;
+    crate::docs::visit_toml_strings(document.as_table(), |value, key| {
+        if failure.is_some() {
+            return;
+        }
+        failure = validate_static_seed_producer_path(path, value).err();
+        if let Some(key) = key.filter(|_| failure.is_none()) {
+            if STATIC_SEED_FORBIDDEN_TOML_KEYS.contains(&value.to_lowercase().as_str()) {
+                failure = Some(bundle_error(format!(
+                    "allowlisted TOML contains forbidden key {key:?}: {path}"
+                )));
+            }
+        }
+    });
+    failure.map_or(Ok(()), Err)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StaticSeedAllowlist {
+    version: Value,
+    source_repository: String,
+    files: Vec<String>,
+}
+
+fn parse_static_seed_allowlist(content: &[u8]) -> BundleResult<Vec<String>> {
+    let text = std::str::from_utf8(content)
+        .map_err(|_| bundle_error(format!("{STATIC_SEED_ALLOWLIST} is not valid UTF-8 TOML")))?;
+    let allowlist: StaticSeedAllowlist = toml_edit::de::from_str(text).map_err(|error| {
+        bundle_error(format!(
+            "{STATIC_SEED_ALLOWLIST} has unsupported keys or invalid fields: {error}"
+        ))
+    })?;
+    if allowlist.version.as_f64() != Some(1.0) && allowlist.version.as_bool() != Some(true) {
+        return Err(bundle_error(format!(
+            "{STATIC_SEED_ALLOWLIST} has unsupported version"
+        )));
+    }
+    if allowlist.source_repository != STATIC_SEED_REPOSITORY {
+        return Err(bundle_error(format!(
+            "{STATIC_SEED_ALLOWLIST} source_repository must be {STATIC_SEED_REPOSITORY:?}"
+        )));
+    }
+    if allowlist.files.is_empty() {
+        return Err(bundle_error(format!(
+            "{STATIC_SEED_ALLOWLIST} files must not be empty"
+        )));
+    }
+    let paths = allowlist
+        .files
+        .iter()
+        .map(|path| validate_static_seed_relative_path(path))
+        .collect::<BundleResult<Vec<_>>>()?;
+    for pair in paths.windows(2) {
+        let problem = if pair[0] > pair[1] {
+            Some("must be lexicographically sorted")
+        } else if pair[0] == pair[1] {
+            Some("contain duplicates")
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            return Err(bundle_error(format!(
+                "{STATIC_SEED_ALLOWLIST} files {problem}"
+            )));
+        }
+    }
+    Ok(paths)
+}
+
+fn validate_static_seed_codex_config(files: &Payload) -> BundleResult<()> {
+    let config_path = ".codex/config.toml";
+    let config_bytes = files
+        .get(config_path)
+        .ok_or_else(|| bundle_error(format!("canonical seed must include {config_path}")))?;
+    let document = parse_static_seed_toml(config_path, config_bytes)?;
+    let agents = document
+        .get("agents")
+        .and_then(Item::as_table_like)
+        .ok_or_else(|| bundle_error(format!("{config_path} agents must be a TOML table")))?;
+    let mut referenced = BTreeSet::new();
+    for (role, raw_role) in agents.iter() {
+        let Some(role_table) = raw_role.as_table_like() else {
+            continue;
+        };
+        let Some(config_file) = role_table.get("config_file").and_then(Item::as_str) else {
+            continue;
+        };
+        let relative = validate_static_seed_relative_path(config_file)?;
+        let resolved = format!(".codex/{relative}");
+        let expected = format!(".codex/agents/{role}.toml");
+        if resolved != expected {
+            return Err(bundle_error(format!(
+                "Codex role {role:?} must resolve to its same-named seed file: {resolved}"
+            )));
+        }
+        if !files.contains_key(resolved.as_str()) {
+            return Err(bundle_error(format!(
+                "Codex role {role:?} references an unexported file: {resolved}"
+            )));
+        }
+        referenced.insert(resolved);
+    }
+    let exported_roles: BTreeSet<String> = files
+        .keys()
+        .filter(|path| path.starts_with(".codex/agents/"))
+        .cloned()
+        .collect();
+    if referenced != exported_roles {
+        let missing: Vec<String> = exported_roles.difference(&referenced).cloned().collect();
+        return Err(bundle_error(format!(
+            "unreferenced Codex role files in seed: {missing:?}"
+        )));
+    }
+    Ok(())
+}
+
+/// Load and validate source-independent static-seed bytes from one committed tree.
+#[cfg(test)]
+pub(crate) fn load_static_seed_plan(
+    source_root: &Path,
+    source_ref: &str,
+) -> BundleResult<StaticSeedPlan> {
+    let source = GitSource::open(source_root)?;
+    load_static_seed_plan_from_source(&source, source_ref)
+}
+
+fn load_static_seed_plan_from_source(
+    source: &GitSource,
+    source_ref: &str,
+) -> BundleResult<StaticSeedPlan> {
+    let source_commit = source.commit(source_ref)?;
+    let tree = source.tree_entries(&source_commit)?;
+    let allowlist_entry = tree.get(STATIC_SEED_ALLOWLIST).ok_or_else(|| {
+        bundle_error(format!(
+            "committed source does not contain {STATIC_SEED_ALLOWLIST}"
+        ))
+    })?;
+    if allowlist_entry.mode != "100644" || allowlist_entry.object_type != "blob" {
+        return Err(bundle_error(format!(
+            "{STATIC_SEED_ALLOWLIST} must be a regular non-executable tracked file"
+        )));
+    }
+    let allowlist_bytes = source.blob(&source_commit, STATIC_SEED_ALLOWLIST)?;
+    let paths = parse_static_seed_allowlist(&allowlist_bytes)?;
+    let mut files = Payload::new();
+    for path in paths {
+        validate_static_seed_path_surface(&path)?;
+        let entry = tree.get(&path).ok_or_else(|| {
+            bundle_error(format!(
+                "allowlisted path is not tracked in source commit: {path}"
+            ))
+        })?;
+        if entry.mode != "100644" || entry.object_type != "blob" {
+            return Err(bundle_error(format!(
+                "allowlisted path must be a regular non-executable tracked file: {path} (mode={}, type={})",
+                entry.mode, entry.object_type
+            )));
+        }
+        let content = source.blob(&source_commit, &path)?;
+        validate_static_seed_content(&path, &content)?;
+        files.insert(path, content);
+    }
+    validate_static_seed_codex_config(&files)?;
+    Ok(StaticSeedPlan {
+        source_commit,
+        files,
+    })
+}
+
+fn set_static_seed_mode(path: &Path, mode: u32) -> BundleResult<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|error| {
+            bundle_error(format!("set output mode {}: {error}", path.display()))
+        })?;
+    }
+    #[cfg(not(unix))]
+    let _ = (path, mode);
+    Ok(())
+}
+
+fn write_static_seed_file(root: &Path, relative: &str, content: &[u8]) -> BundleResult<()> {
+    // The plan owns validated relative paths and the private staging directory
+    // contains only regular files created by this writer.
+    let path = root.join(relative);
+    write_output_file(&path, content, 0o644)?;
+    set_static_seed_mode(&path, 0o644)?;
+    for directory in path
+        .ancestors()
+        .skip(1)
+        .take_while(|dir| dir.starts_with(root))
+    {
+        set_static_seed_mode(directory, 0o755)?;
+    }
+    Ok(())
+}
+
+fn require_missing_static_seed_destination(destination: &Path) -> BundleResult<()> {
+    match fs::symlink_metadata(destination) {
+        Ok(_) => Err(bundle_error(format!(
+            "output already exists: {}",
+            destination.display()
+        ))),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(bundle_error(format!(
+            "inspect output {}: {error}",
+            destination.display()
+        ))),
+    }
+}
+
+/// Publish a validated static-seed plan without reopening its source repository.
+pub(crate) fn write_static_seed(plan: &StaticSeedPlan, output: &Path) -> BundleResult<PathBuf> {
+    let destination = canonicalize_allow_missing(&resolve_output(output)?)
+        .map_err(|error| bundle_error(format!("resolve output: {error}")))?;
+    require_missing_static_seed_destination(&destination)?;
+    let parent = destination
+        .parent()
+        .ok_or_else(|| bundle_error("output directory has no parent"))?;
+    fs::create_dir_all(parent).map_err(|error| {
+        bundle_error(format!(
+            "create output parent {}: {error}",
+            parent.display()
+        ))
+    })?;
+    let staged = tempfile::Builder::new()
+        .prefix(".agent-canon-static-seed-")
+        .tempdir_in(parent)
+        .map_err(|error| bundle_error(format!("create temporary output: {error}")))?;
+    for (path, content) in &plan.files {
+        write_static_seed_file(staged.path(), path, content)?;
+    }
+    let provenance = json!({
+        "schema_version": 1,
+        "source_commit": plan.source_commit,
+        "source_repository": STATIC_SEED_REPOSITORY,
+    });
+    write_static_seed_file(
+        staged.path(),
+        STATIC_SEED_PROVENANCE,
+        &json_bytes(&provenance)?,
+    )?;
+    require_missing_static_seed_destination(&destination)?;
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "redox"))]
+    rustix::fs::renameat_with(
+        rustix::fs::CWD,
+        staged.path(),
+        rustix::fs::CWD,
+        &destination,
+        rustix::fs::RenameFlags::NOREPLACE,
+    )
+    .map_err(|error| bundle_error(format!("publish static seed: {error}")))?;
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "redox")))]
+    fs::rename(staged.path(), &destination)
+        .map_err(|error| bundle_error(format!("publish static seed: {error}")))?;
+    let _ = staged.keep();
+    Ok(destination)
+}
+
+fn export_static_seed(source: &GitSource, source_ref: &str, output: &Path) -> BundleResult<Value> {
+    let plan = load_static_seed_plan_from_source(source, source_ref)?;
+    let destination = write_static_seed(&plan, output)?;
+    Ok(json!({
+        "source_commit": plan.source_commit,
+        "file_count": plan.files.len(),
+        "output": destination.to_string_lossy(),
+    }))
+}
+
+pub(crate) fn committed_tree_value(source_root: &Path, source_ref: &str) -> BundleResult<Value> {
+    let source = GitSource::open(source_root)?;
+    let source_commit = source.commit(source_ref)?;
+    let entries = source
+        .tree_entries(&source_commit)?
+        .into_values()
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "source_commit": source_commit,
+        "entries": entries,
+    }))
 }
 
 fn portable_relative(value: &str) -> BundleResult<Vec<&str>> {
@@ -1443,10 +1928,10 @@ pub(crate) fn export_bundle_at(
     runtime_root: &Path,
 ) -> BundleResult<Value> {
     let source = GitSource::open(source_root)?;
-    let output = ensure_fresh_output(output, &source.root, "output")?;
     if profile == "static-seed" {
-        return Err(bundle_error("static-seed uses export_static_seed.py"));
+        return export_static_seed(&source, source_ref, output);
     }
+    let output = ensure_fresh_output(output, &source.root, "output")?;
     authorize_runtime_output(&source.root, runtime_root, &output, "output")?;
     let work = bundle_identity_for(&source, source_ref, profile)?;
     prepare_runtime_output(runtime_root, &output, "output")?;
@@ -1460,6 +1945,10 @@ pub(crate) fn export_bundle(
     profile: &str,
     output: &Path,
 ) -> BundleResult<Value> {
+    if profile == "static-seed" {
+        let source = GitSource::open(source_root)?;
+        return export_static_seed(&source, source_ref, output);
+    }
     let runtime_root =
         crate::runtime_boundary::resolve_runtime_root(source_root).map_err(bundle_error)?;
     export_bundle_at(source_root, source_ref, profile, output, &runtime_root)
@@ -2482,17 +2971,19 @@ fn print_json(value: &Value) -> BundleResult<()> {
 
 /// Native implementation for the existing `template-bundle` command selector.
 pub fn run(args: &[String]) -> i32 {
+    let mut static_seed = false;
     let result = (|| -> BundleResult<(Value, Option<String>)> {
         let operation = args
             .first()
             .ok_or_else(|| bundle_error("template-bundle operation is required"))?;
         let rest = &args[1..];
-        let options = match operation.as_str() {
+        let mut options = match operation.as_str() {
             "export" => parse_cli_options(
                 rest,
                 &["--source-root", "--source-ref", "--profile", "--output"],
                 &[],
             )?,
+            "committed-tree" => parse_cli_options(rest, &["--source-root", "--source-ref"], &[])?,
             "verify" => parse_cli_options(rest, &["--root", "--format"], &[])?,
             "native-package" => parse_cli_options(
                 rest,
@@ -2513,17 +3004,36 @@ pub fn run(args: &[String]) -> i32 {
             )?,
             "native-version" => parse_cli_options(rest, &["--source-root", "--source-ref"], &[])?,
             "-h" | "--help" | "help" => {
-                println!("Usage: agent-canon template-bundle <export|verify|native-package|native-verify|native-version> [options]");
+                println!("Usage: agent-canon template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]");
                 return Ok((Value::Null, None));
             }
             _ => return Err(bundle_error("template-bundle operation is invalid")),
         };
+        static_seed = operation == "export"
+            && options
+                .get("--profile")
+                .and_then(|values| values.first())
+                .map(String::as_str)
+                == Some("static-seed")
+            && options.contains_key("--output");
+        if static_seed {
+            options
+                .entry("--source-root".to_owned())
+                .or_insert_with(|| vec![".".to_owned()]);
+            options
+                .entry("--source-ref".to_owned())
+                .or_insert_with(|| vec!["HEAD".to_owned()]);
+        }
         let value = match operation.as_str() {
             "export" => export_bundle(
                 Path::new(required(&options, "--source-root")?),
                 required(&options, "--source-ref")?,
                 required(&options, "--profile")?,
                 Path::new(required(&options, "--output")?),
+            )?,
+            "committed-tree" => committed_tree_value(
+                Path::new(required(&options, "--source-root")?),
+                required(&options, "--source-ref")?,
             )?,
             "verify" => {
                 if let Some(format) = options.get("--format").and_then(|values| values.first()) {
@@ -2617,6 +3127,12 @@ pub fn run(args: &[String]) -> i32 {
         Ok((value, None))
     })();
     match result {
+        Ok((value, _)) if static_seed => {
+            println!("AGENT_CANON_STATIC_SEED=exported source_commit={} files={} provenance={STATIC_SEED_PROVENANCE} output={}",
+                value["source_commit"].as_str().unwrap_or_default(), value["file_count"],
+                value["output"].as_str().unwrap_or_default());
+            0
+        }
         Ok((_, Some(tsv))) => {
             print!("{tsv}");
             0
@@ -2629,6 +3145,10 @@ pub fn run(args: &[String]) -> i32 {
                 2
             }
         },
+        Err(error) if static_seed => {
+            eprintln!("AGENT_CANON_STATIC_SEED=fail detail={error}");
+            1
+        }
         Err(error) => {
             print_cli_error(&error.to_string());
             2
