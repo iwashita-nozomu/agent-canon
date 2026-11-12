@@ -1,0 +1,9 @@
+version: 1
+skill_dependencies:
+  fixture-skill:
+    responsibility_group: fixture
+    required_prerequisites: []
+    routing_candidates: []
+    successors: []
+    order_constraints: []
+    parallel_independent: []

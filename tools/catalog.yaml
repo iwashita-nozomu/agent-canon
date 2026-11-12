@@ -1873,12 +1873,12 @@ entries:
 
   - id: check-skill-frontmatter
     summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
-    path: tools/validation/semantic/skills/check_skill_frontmatter.py
+    path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/skills/check_skill_frontmatter.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/skills/check_skill_frontmatter.py"]}
+    command: tools/bin/agent-canon check-skill-frontmatter
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-skill-frontmatter"]}
     writes: false
     default_wiring:
       ci: true
@@ -1888,7 +1888,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/skills.md
     tests:
-      - tests/agent_tools/test_check_skill_frontmatter.py
+      - tools/runtime/dispatch/agent-canon/tests/skill_frontmatter_native.rs
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
