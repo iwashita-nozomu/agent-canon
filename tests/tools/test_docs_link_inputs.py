@@ -90,6 +90,28 @@ def test_native_docs_check_uses_embedded_defaults_for_fresh_readme(
     assert not (root / "tools/validation/documentation/config/lychee.toml").exists()
 
 
+def test_native_docs_check_keeps_quarto_cache_outside_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _prepare_docs_root(tmp_path)
+    (root / "README.md").write_text(
+        "# Fresh project\n\nA short project description.\n", encoding="utf-8"
+    )
+    home = tmp_path / "unused-home"
+    home.mkdir()
+    temporary = tmp_path / "provider-temporary"
+    temporary.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("TMPDIR", str(temporary))
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+
+    result = _run_docs_check(root)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not (home / ".cache" / "quarto").exists()
+    assert not list(temporary.glob("agent-canon-docs-pandoc-cache-*"))
+
+
 def test_native_docs_check_detects_broken_readme_link_without_project_configs(
     tmp_path: Path,
 ) -> None:

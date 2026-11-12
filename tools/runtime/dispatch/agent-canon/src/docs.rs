@@ -2927,8 +2927,11 @@ struct DocumentAst {
 }
 
 fn read_document_ast(root: &Path, path: &Path) -> Result<DocumentAst, String> {
+    let cache = DocsTemporaryDirectory::create("pandoc-cache")
+        .map_err(|error| format!("quarto pandoc: cannot create temporary cache: {error}"))?;
     let output = Command::new("quarto")
         .current_dir(root)
+        .env("XDG_CACHE_HOME", &cache.0)
         .arg("pandoc")
         .arg(path)
         .arg("--to=json")
