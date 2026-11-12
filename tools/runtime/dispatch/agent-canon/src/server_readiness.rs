@@ -541,8 +541,10 @@ fn mount_for_path<'a>(
     let resolved = normalized_path(path);
     mounts
         .iter()
+        .map(|(mountpoint, info)| (normalized_path(mountpoint), (mountpoint, info)))
         .filter(|(mountpoint, _)| resolved.starts_with(mountpoint))
         .max_by_key(|(mountpoint, _)| mountpoint.components().count())
+        .map(|(_, original)| original)
 }
 
 fn normalized_path(path: &Path) -> PathBuf {
