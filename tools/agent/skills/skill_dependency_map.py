@@ -9,7 +9,7 @@
 # upstream implementation ../../runtime/artifacts/runtime_artifacts.py owns external artifact publication and source exclusion
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.md is generated Mermaid
 # downstream implementation ../../../documents/runtime/skill-dependency-graph.json is generated machine graph
-# downstream implementation ../../validation/semantic/skills/check_skill_tool_invocation_graph.py is the public checker entrypoint
+# downstream implementation ../../runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs is the public checker entrypoint
 # downstream implementation ../../../tests/agent_tools/test_skill_dependency_map.py checks graph identity and readback
 # @dependency-end
 """Materialize and validate the deterministic public skill/dependency graph."""
@@ -85,7 +85,7 @@ IMPLEMENTATION_TRACE_PATHS = (
     "documents/runtime/skill-dependency-graph.md",
     "tests/agent_tools/test_route.py",
     "tests/agent_tools/test_skill_dependency_map.py",
-    "tools/validation/semantic/skills/check_skill_tool_invocation_graph.py",
+    "tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
     "tools/agent/orchestration/capability_route.py",
     "tools/agent/orchestration/route.py",
     "tools/agent/skills/skill_dependency_map.py",
@@ -121,7 +121,7 @@ contract reference
 responsibility Publishes the generated public skill/dependency graph as a Mermaid reader surface.
 upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph identity, serialization, and readback
 upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and dependency records and renders the Mermaid projection
-downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates source/artifact equality and actual Mermaid syntax readback
 downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers identity, determinism, and stale-artifact failures
 @dependency-end
 -->"""
