@@ -116,6 +116,7 @@ use std::env;
 const HELP: &str = "AgentCanon's native command line interface.
 
 Usage: agent-canon <command> [arguments]
+  experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
   check-skill-tool-invocation-graph [--root ROOT]
@@ -355,6 +356,9 @@ fn main() {
         std::process::exit(check_solid_evidence::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == agent_canon::experiment_registry::SELECTOR {
+        std::process::exit(agent_canon::experiment_registry::run(&args[2..]));
+    }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }

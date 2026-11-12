@@ -559,7 +559,10 @@ fn native_cli_invocation_is_referenced(text: &str, argv: &[String]) -> bool {
             return false;
         };
         let mut command_starts = Vec::new();
-        if tokens.first().is_some_and(|token| token.value == "if") {
+        if tokens
+            .first()
+            .is_some_and(|token| matches!(token.value.as_str(), "if" | "elif"))
+        {
             command_starts.push(1);
         }
         command_starts.push(0);
@@ -2600,4 +2603,29 @@ pub fn run(args: &[String]) -> i32 {
     let mut output = stdout.lock();
     let mut error = stderr.lock();
     run_with_io(args, &mut output, &mut error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::native_cli_invocation_is_referenced;
+
+    #[test]
+    fn conditional_native_commands_preserve_command_position() {
+        let argv = vec![
+            "tools/bin/agent-canon".to_owned(),
+            "experiment-registry".to_owned(),
+        ];
+        assert!(native_cli_invocation_is_referenced(
+            "elif run_agent_canon experiment-registry 2>&1; then",
+            &argv
+        ));
+        assert!(native_cli_invocation_is_referenced(
+            "if run_agent_canon experiment-registry; then",
+            &argv
+        ));
+        assert!(!native_cli_invocation_is_referenced(
+            "echo run_agent_canon experiment-registry",
+            &argv
+        ));
+    }
 }

@@ -2022,12 +2022,12 @@ entries:
 
   - id: check-experiment-registry
     summary: Validates the shared experiment registry contract.
-    path: tools/validation/ci/checks/check_experiment_registry.py
+    path: tools/runtime/dispatch/agent-canon/src/experiment_registry.rs
     family: ci
     role: checker
     status: canonical
-    command: python3 -m tools.validation.ci.checks.check_experiment_registry
-    dispatch: {argv: ["python3", "-m", "tools.validation.ci.checks.check_experiment_registry"]}
+    command: tools/bin/agent-canon experiment-registry
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "experiment-registry"], execution_plane: tool-container, cwd: source-root, env: allowlisted, stdin: inherited, stdout: captured, stderr: captured}
     writes: false
     default_wiring:
       ci: true
@@ -2036,8 +2036,8 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/experiments/experiment-registry.md
-    tests: []
-    test_exempt_reason: Registry contract is exercised through repo-wide CI smoke checks.
+    tests:
+      - tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs
 
   - id: check-solid-evidence
     summary: Checks SOLID-sensitive Python changes have path-covered OOP readability evidence.
