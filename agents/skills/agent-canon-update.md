@@ -86,13 +86,14 @@ migration edit, and a source-free boundary pass cannot claim product behavior.
 ## Runtime bootstrap
 
 The only lifecycle entrypoint is top-level `bootstrap.sh`. It requires an
-authorized parent control root; the default runtime is the ignored,
-reconstructible `<install-root>/.runtime/`:
+authorized parent control root; the runtime is the ignored,
+reconstructible `<control-parent-root>/.runtime/`:
 
 ```bash
+INSTALL_ROOT=<absolute-installed-agent-canon-root>
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
 ROOT=<authorized-parent-root>
-BOOTSTRAP=./bootstrap.sh
-COMMON=(--control-parent-root "$ROOT")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$ROOT")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" start
@@ -102,8 +103,8 @@ COMMON=(--control-parent-root "$ROOT")
 
 There is no implicit `$HOME`, `$HOME/.cache`, `$HOME/.local`, global
 `CODEX_HOME`, source-tree general artifact directory, or project-local fallback.
-Only bootstrap-owned `.runtime/` is permitted under the install source; other
-runtime roots must not escape through a symlink. One control root uses one
+Runtime state belongs to the explicit control root; runtime roots must not
+escape through a symlink. One control root uses one
 shared image and at most one resident tool container; task directories and
 exact target mounts provide isolation. Never create a project/task-specific
 AgentCanon image, container, virtualenv, Cargo toolchain, or volume.
