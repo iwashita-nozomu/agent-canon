@@ -67,10 +67,7 @@ enum ParsedArgs {
 }
 
 /// Validate one consumer registry and return findings in declaration order.
-fn collect_findings(
-    repo_root: &Path,
-    registry_path: &Path,
-) -> Result<Vec<Finding>, String> {
+fn collect_findings(repo_root: &Path, registry_path: &Path) -> Result<Vec<Finding>, String> {
     if !registry_path.is_file() {
         return Ok(vec![Finding {
             level: "error",
@@ -89,7 +86,9 @@ fn collect_findings(
             level: "error",
             message: format!(
                 "schema_version must be 1, got {}",
-                schema_version.map(python_repr).unwrap_or_else(|| "None".to_owned())
+                schema_version
+                    .map(python_repr)
+                    .unwrap_or_else(|| "None".to_owned())
             ),
         });
     }
@@ -141,7 +140,8 @@ fn collect_findings(
     validate_eval_artifact_lists(&mut findings, "defaults", defaults);
 
     let topics = normalize_topics(table_get(registry_table, "topics"), "topics")?;
-    let branch_topics = normalize_topics(table_get(registry_table, "branch_topics"), "branch_topics")?;
+    let branch_topics =
+        normalize_topics(table_get(registry_table, "branch_topics"), "branch_topics")?;
     let mut seen_names = BTreeSet::new();
     for topic in topics {
         if let Some(name) = string_value(table_get(topic, "name")) {
@@ -220,7 +220,11 @@ pub fn run(args: &[String]) -> i32 {
     println!("repo_root={}", repo_root.display());
     println!("registry_path={}", registry_path.display());
     for finding in &findings {
-        println!("{}: {}", finding.level.to_ascii_uppercase(), finding.message);
+        println!(
+            "{}: {}",
+            finding.level.to_ascii_uppercase(),
+            finding.message
+        );
     }
     if findings.iter().any(|finding| finding.level == "error") {
         return 1;
@@ -232,7 +236,10 @@ pub fn run(args: &[String]) -> i32 {
 fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
     let mut repo_root = None;
     let mut registry = None;
-    let options = [("--repo-root", OptionKind::RepoRoot), ("--registry", OptionKind::Registry)];
+    let options = [
+        ("--repo-root", OptionKind::RepoRoot),
+        ("--registry", OptionKind::Registry),
+    ];
     let mut index = 0;
     while index < args.len() {
         let token = &args[index];
@@ -242,14 +249,12 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         let (name, inline_value) = token
             .split_once('=')
             .map_or((token.as_str(), None), |(name, value)| (name, Some(value)));
-        let option = resolve_long_option_prefix(name, &options).map_err(|error| {
-            match error {
-                LongOptionError::Unrecognized => format!("unrecognized argument: {token}"),
-                LongOptionError::Ambiguous(matches) => format!(
-                    "ambiguous option: {name} could match {}",
-                    matches.join(", ")
-                ),
-            }
+        let option = resolve_long_option_prefix(name, &options).map_err(|error| match error {
+            LongOptionError::Unrecognized => format!("unrecognized argument: {token}"),
+            LongOptionError::Ambiguous(matches) => format!(
+                "ambiguous option: {name} could match {}",
+                matches.join(", ")
+            ),
         })?;
         let value = if let Some(value) = inline_value {
             value.to_owned()
@@ -440,10 +445,7 @@ fn python_repr(value: &RegistryValue) -> String {
                 };
             }
             let rendered = value.to_string();
-            if !rendered.contains('.')
-                && !rendered.contains('e')
-                && !rendered.contains('E')
-            {
+            if !rendered.contains('.') && !rendered.contains('e') && !rendered.contains('E') {
                 format!("{rendered}.0")
             } else {
                 rendered
@@ -453,7 +455,11 @@ fn python_repr(value: &RegistryValue) -> String {
         RegistryValue::Boolean(false) => "False".to_owned(),
         RegistryValue::Array(values) => format!(
             "[{}]",
-            values.iter().map(python_repr).collect::<Vec<_>>().join(", ")
+            values
+                .iter()
+                .map(python_repr)
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
         RegistryValue::Table(values) => format!(
             "{{{}}}",
@@ -510,9 +516,7 @@ fn normalize_topics<'a>(
         .iter()
         .enumerate()
         .map(|(index, value)| {
-            table(value).ok_or_else(|| {
-                format!("{table_name}[{index}] must be a table")
-            })
+            table(value).ok_or_else(|| format!("{table_name}[{index}] must be a table"))
         })
         .collect()
 }
@@ -524,9 +528,7 @@ fn required_field_finding(topic_name: &str, key: &str) -> Finding {
     }
 }
 
-fn required_topic_values(
-    topic: &[(String, RegistryValue)],
-) -> Vec<(&'static str, Option<String>)> {
+fn required_topic_values(topic: &[(String, RegistryValue)]) -> Vec<(&'static str, Option<String>)> {
     [
         "status",
         "topic_dir",
@@ -605,14 +607,14 @@ fn optional_string_list_findings(
     values
         .iter()
         .enumerate()
-        .filter_map(|(index, value)| {
+        .filter(|(_, value)| {
             string_value(Some(value))
                 .filter(|value| !python_strip(value).is_empty())
                 .is_none()
-                .then(|| Finding {
-                    level: "error",
-                    message: format!("{scope_name}: {key}[{index}] must be a non-empty string"),
-                })
+        })
+        .map(|(index, _)| Finding {
+            level: "error",
+            message: format!("{scope_name}: {key}[{index}] must be a non-empty string"),
         })
         .collect()
 }
@@ -633,7 +635,10 @@ fn validate_eval_patterns(
                 ),
             });
         }
-        if path.components().any(|component| component == Component::ParentDir) {
+        if path
+            .components()
+            .any(|component| component == Component::ParentDir)
+        {
             findings.push(Finding {
                 level: "error",
                 message: format!(
@@ -679,7 +684,7 @@ fn validate_topic_layout(
     repo_root: &Path,
     defaults: &[(String, RegistryValue)],
     topic_name: &str,
-    fields: &[(&str, String)],
+    fields: &[(&'static str, String)],
     findings: &mut Vec<Finding>,
 ) {
     let status = required_value(fields, "status");
@@ -715,7 +720,9 @@ fn validate_topic_layout(
     let report_root = repo_root.join(report_root_raw);
     let topic_template_dir = string_value(table_get(defaults, "topic_template_dir"));
     let expected_topic_dir_raw = if topic_name == "_template" {
-        topic_template_dir.unwrap_or("experiments/_template").to_owned()
+        topic_template_dir
+            .unwrap_or("experiments/_template")
+            .to_owned()
     } else {
         format!("experiments/{topic_name}")
     };
@@ -762,7 +769,10 @@ fn validate_topic_layout(
     if !topic_dir.is_dir() {
         findings.push(Finding {
             level: "error",
-            message: format!("{topic_name}: topic_dir is missing: {}", topic_dir.display()),
+            message: format!(
+                "{topic_name}: topic_dir is missing: {}",
+                topic_dir.display()
+            ),
         });
     }
     if !topic_readme.is_file() {
@@ -786,21 +796,25 @@ fn validate_topic_layout(
     if !expected_config.is_file() {
         findings.push(Finding {
             level: "error",
-            message: format!(
-                "{topic_name}: topic config is missing: {expected_config_raw}"
-            ),
+            message: format!("{topic_name}: topic config is missing: {expected_config_raw}"),
         });
     }
     if !result_root.is_dir() {
         findings.push(Finding {
             level: "error",
-            message: format!("{topic_name}: result_root is missing: {}", result_root.display()),
+            message: format!(
+                "{topic_name}: result_root is missing: {}",
+                result_root.display()
+            ),
         });
     }
     if !report_root.is_dir() {
         findings.push(Finding {
             level: "error",
-            message: format!("{topic_name}: report_root is missing: {}", report_root.display()),
+            message: format!(
+                "{topic_name}: report_root is missing: {}",
+                report_root.display()
+            ),
         });
     }
 }
@@ -835,9 +849,15 @@ fn validate_topic_commands(
                 ),
             });
         }
-        let managed_runner_module = managed_runner
-            .filter(|runner| runner.ends_with(".py"))
-            .map(|runner| runner.strip_suffix(".py").unwrap_or(runner).replace('/', "."));
+        let managed_runner_module =
+            managed_runner
+                .filter(|runner| runner.ends_with(".py"))
+                .map(|runner| {
+                    runner
+                        .strip_suffix(".py")
+                        .unwrap_or(runner)
+                        .replace('/', ".")
+                });
         if managed_runner.is_some_and(|runner| command_text.contains(runner))
             || managed_runner_module
                 .as_ref()
@@ -853,7 +873,10 @@ fn validate_topic_commands(
     }
 }
 
-fn registered_command_value(topic: &[(String, RegistryValue)], command_kind: &str) -> Option<String> {
+fn registered_command_value(
+    topic: &[(String, RegistryValue)],
+    command_kind: &str,
+) -> Option<String> {
     let key = format!("{command_kind}_inner_command");
     maybe_string(topic, &key).or_else(|| {
         (command_kind == "default")
@@ -955,7 +978,12 @@ fn validate_topic_references(
             });
         }
     }
-    for key in ["active_worktree", "scope_file", "branch_note", "primary_note"] {
+    for key in [
+        "active_worktree",
+        "scope_file",
+        "branch_note",
+        "primary_note",
+    ] {
         let Some(optional_path) = maybe_string(topic, key) else {
             continue;
         };

@@ -72,6 +72,11 @@ fn build_repo() -> RepoFixture {
     let temp = tempfile::tempdir().expect("temporary registry repo creates");
     let root = temp.path().to_path_buf();
     copy_fixture_tree(&fixture_root(), &root);
+    fs::rename(
+        root.join("registry.toml"),
+        root.join("experiments/registry.toml"),
+    )
+    .expect("registry fixture is placed at its public path");
     initialize_git(&root);
     RepoFixture { _temp: temp, root }
 }
@@ -86,7 +91,10 @@ fn registry_text(repo: &RepoFixture) -> String {
 
 fn replace_registry(repo: &RepoFixture, old: &str, new: &str) {
     let text = registry_text(repo);
-    assert!(text.contains(old), "fixture must contain the replacement source");
+    assert!(
+        text.contains(old),
+        "fixture must contain the replacement source"
+    );
     fs::write(registry_path(repo), text.replace(old, new)).expect("registry variant writes");
 }
 
@@ -95,7 +103,8 @@ fn append_registry(repo: &RepoFixture, text: &str) {
         .append(true)
         .open(registry_path(repo))
         .expect("registry opens for append");
-    file.write_all(text.as_bytes()).expect("registry entry appends");
+    file.write_all(text.as_bytes())
+        .expect("registry entry appends");
 }
 
 fn run_cli_in(cwd: &Path, args: &[&str]) -> Output {
@@ -108,7 +117,10 @@ fn run_cli_in(cwd: &Path, args: &[&str]) -> Output {
 }
 
 fn run_cli(repo: &RepoFixture, args: &[&str]) -> Output {
-    let mut command_args = vec!["--repo-root", repo.root.to_str().expect("repo root is UTF-8")];
+    let mut command_args = vec![
+        "--repo-root",
+        repo.root.to_str().expect("repo root is UTF-8"),
+    ];
     command_args.extend_from_slice(args);
     run_cli_in(&repo.root, &command_args)
 }
@@ -220,8 +232,9 @@ fn malformed_eval_artifact_items_keep_their_indexed_diagnostic() {
     let output = run_cli(&repo, &[]);
 
     assert_eq!(output.status.code(), Some(1));
-    assert!(stdout(&output)
-        .contains("defaults: required_eval_artifacts[1] must be a non-empty string"));
+    assert!(
+        stdout(&output).contains("defaults: required_eval_artifacts[1] must be a non-empty string")
+    );
 }
 
 #[test]

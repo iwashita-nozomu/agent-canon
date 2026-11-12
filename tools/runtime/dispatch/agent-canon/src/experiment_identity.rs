@@ -28,19 +28,19 @@ pub fn validate_segment(value: &str, field: &str) -> Result<(), String> {
         return Err(format!("{field} must not contain whitespace"));
     }
     let normalized = ComposingNormalizer::new_nfkc().normalize(value);
-    if normalized.as_ref() != value {
+    if normalized != value {
         return Err(format!("{field} must not change under normalization"));
     }
     let mut characters = value.chars();
-    let valid_first = characters.next().is_some_and(|character| character.is_ascii_alphanumeric());
+    let valid_first = characters
+        .next()
+        .is_some_and(|character| character.is_ascii_alphanumeric());
     if !valid_first
         || !characters.all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
         })
     {
-        return Err(format!(
-            "{field} must match [A-Za-z0-9][A-Za-z0-9._-]*"
-        ));
+        return Err(format!("{field} must match [A-Za-z0-9][A-Za-z0-9._-]*"));
     }
     Ok(())
 }
