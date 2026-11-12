@@ -39,7 +39,6 @@ checkout の clean / dirty、差分、conflict risk、authority drift、carry-ov
 - [documents/notes/failures/README.md](../../documents/notes/failures/README.md)
 - [documents/notes/worktrees/README.md](../../documents/notes/worktrees/README.md)
 - `tools/runtime/authority/hook_safety.py`
-- `tools/validation/semantic/authority/validate_role_write_scope.py`
 
 ## Expected Outcome
 

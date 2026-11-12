@@ -2,6 +2,7 @@
 # contract test
 # responsibility Tests AgentCanon improvement guide generation.
 # upstream implementation ../../eval/producers/generate_agent_improvement_guide.py generates guide reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/historical_skill_usage.rs supplies native historical skill-usage readback
 # @dependency-end
 
 """Tests for generated AgentCanon improvement guides."""
