@@ -15,6 +15,7 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
+// downstream implementation historical_skill_usage.rs reads archived skill-use history without writes
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
 // downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
@@ -77,6 +78,7 @@ pub mod experiment_registry;
 pub mod extract_docx;
 pub mod generated_completeness;
 pub mod git_read;
+pub mod historical_skill_usage;
 pub mod server_readiness;
 pub mod skill_frontmatter;
 // This shared source module also serves the CLI's AST tools; the reusable LSP

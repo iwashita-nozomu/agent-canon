@@ -45,6 +45,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation historical_skill_usage.rs reads archived skill-usage history
 // downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
@@ -160,6 +161,7 @@ Commands:
   git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  historical-skill-usage-read --path <skill_usage.jsonl>
   eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
@@ -432,6 +434,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "summarize-hlo-jsonl" {
         std::process::exit(result_logs::run_summary(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::historical_skill_usage::SELECTOR {
+        std::process::exit(agent_canon::historical_skill_usage::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "semantic-index" {
