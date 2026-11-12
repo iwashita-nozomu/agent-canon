@@ -37,9 +37,19 @@ command, not a new runtime selector or a value copied into the shared style.
 A crate-wide command is appropriate only within the repository's accepted scope;
 do not expand a bounded edit to a whole-workspace reformat.
 
-Markdown uses AgentCanon's existing `docs format` operation. Invoke it through
-the [shared runtime](../../agents/skills/agent-canon-bootstrap.md#command-shape)
-from the registered target and name the edited Markdown paths.
+### Markdown through the shared runtime
+
+Markdown uses AgentCanon's existing `docs format` operation. Registered source
+targets are read-only. Through the
+[shared runtime](../../agents/skills/agent-canon-bootstrap.md#command-shape),
+copy the edited source into a writable task directory under
+`AGENT_CANON_RUNTIME_ROOT/tasks`, keeping the repository-relative paths and
+local link targets. Run `agent-canon docs format --root <snapshot> <edited paths...>`
+there. The docs command manages temporary provider output under `TMPDIR`, which
+bootstrap sets to its external task directory. Inspect the changes and copy
+only the selected formatted files back through the host editing route.
+This preserves the source mount boundary while formatting the content that
+will be submitted. Remove the task snapshot after its selected use ends.
 
 ## Engineering rationale
 
