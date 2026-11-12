@@ -8,6 +8,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -765,7 +766,7 @@ AGENT_CANON_ALLOW_BUILD=1
 export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT AGENT_CANON_RUNTIME_ROOT
 export AGENT_CANON_STATE_ROOT AGENT_CANON_PRIVATE_LOG_ROOT
 export AGENT_CANON_DOCKER_CMD AGENT_CANON_ALLOW_BUILD
-{f"export AGENT_CANON_LOCAL_BUILD" if force_build is not None else ""}
+{"export AGENT_CANON_LOCAL_BUILD" if force_build is not None else ""}
 _agent_canon_replace_resident_locked() {{
   printf '%s\\n' replaced > {str(replaced)!r}
   _agent_canon_commit_pending_rollback_plan
@@ -2342,6 +2343,8 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     assert not (bad_dashboard_stage / "agent-runtime-dashboard-bad.md").exists()
 
     dashboard_destination = control / "dashboard-route"
+    (control / ".runtime" / "host-state").mkdir(parents=True)
+    (control / ".runtime" / "host-state" / "replacement.lock").touch()
     dashboard_route = subprocess.run(
         [
             "bash",
@@ -3862,10 +3865,10 @@ def test_structured_exec_target_digest_is_shell_validated_before_container_hando
     assert "--target-digest" in text
     assert "AGENT_CANON_STATE_ROOT/mounts.tsv" in text
     assert "AGENT_CANON_TARGET_DIGEST=$digest" in text
-    assert (
-        "install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)"
-        in text
-    )
+    route = text.split("_agent_canon_exec_tool_route_locked() {", 1)[1].split(
+        "\n}\n", 1
+    )[0]
+    assert "_agent_canon_extract_exec_target_digest" in route
     assert '" ${command_args[*]} " == *" --request-json "*' not in text
 
 
@@ -4642,11 +4645,13 @@ def test_container_exec_forwards_only_explicit_stdin(tmp_path: Path) -> None:
     docker.chmod(0o755)
     control = tmp_path / "control"
     control.mkdir()
+    repository = tmp_path / "repository"
+    create_source_checkout(repository)
     runtime = tmp_path / "runtime"
     runtime.mkdir()
     script = f"""
 source {str(ADAPTER)!r}
-AGENT_CANON_REPOSITORY_ROOT={str(ROOT)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
 AGENT_CANON_CONTROL_ROOT={str(control)!r}
 AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
 AGENT_CANON_STATE_ROOT={str(runtime / "container-state")!r}
@@ -4710,6 +4715,369 @@ _agent_canon_replace_resident candidate
         ["first start", "first end", "second start", "second end"],
         ["second start", "second end", "first start", "first end"],
     )
+
+
+def _generation_lock_fixture(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, Path, Path, dict[str, str]]:
+    """Prepare one fake resident and observable flock/Docker boundaries."""
+    image_ref = "agent-canon-tools:live"
+    image_id = "sha256:" + "1" * 64
+    _, _, repository, control, runtime, _state_path, _container, environment = (
+        _gc_fixture(tmp_path, active=(image_ref, image_id))
+    )
+    tracker = tmp_path / "generation-lock-tracker"
+    tracker.mkdir()
+    fake_bin = tmp_path / "generation-lock-bin"
+    fake_bin.mkdir()
+    real_flock = shutil.which("flock")
+    assert real_flock is not None
+    flock_wrapper = fake_bin / "flock"
+    flock_wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        "kind=${1:-}\n"
+        "role=${AGENT_CANON_TEST_LOCK_ROLE:-}\n"
+        'if [[ "$kind" != -s && "$kind" != -x ]]; then\n'
+        '  exec "$AGENT_CANON_TEST_REAL_FLOCK" "$@"\n'
+        "fi\n"
+        'if [[ -n "$role" ]]; then\n'
+        '  : > "$AGENT_CANON_TEST_TRACKER/$role.$kind.attempt"\n'
+        "fi\n"
+        'if "$AGENT_CANON_TEST_REAL_FLOCK" "$@"; then\n'
+        '  if [[ -n "$role" ]]; then\n'
+        '    : > "$AGENT_CANON_TEST_TRACKER/$role.$kind.acquired"\n'
+        "  fi\n"
+        "else\n"
+        "  rc=$?\n"
+        '  exit "$rc"\n'
+        "fi\n",
+        encoding="utf-8",
+    )
+    flock_wrapper.chmod(0o755)
+    docker_wrapper = fake_bin / "docker"
+    docker_wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        f"fake_docker={str(ROOT / 'tests' / 'bootstrap' / 'fake_docker.py')!r}\n"
+        'if [[ "${1:-}" == exec ]]; then\n'
+        "  route=${AGENT_CANON_TEST_ROUTE:?}\n"
+        '  : > "$AGENT_CANON_TEST_TRACKER/$route.docker-exec-entered"\n'
+        '  while [[ ! -e "$AGENT_CANON_TEST_TRACKER/$route.release-exec" ]]; do\n'
+        "    sleep 0.01\n"
+        "  done\n"
+        '  exit "${AGENT_CANON_TEST_EXEC_STATUS:-0}"\n'
+        "fi\n"
+        'exec "$fake_docker" "$@"\n',
+        encoding="utf-8",
+    )
+    docker_wrapper.chmod(0o755)
+    environment = {
+        **environment,
+        "AGENT_CANON_DOCKER": str(docker_wrapper),
+        "AGENT_CANON_LOCK_READ_ONLY": "0",
+        "AGENT_CANON_TEST_TRACKER": str(tracker),
+        "AGENT_CANON_TEST_EXPECTED_IMAGE_REF": image_ref,
+        "AGENT_CANON_TEST_EXPECTED_IMAGE_ID": image_id,
+        "AGENT_CANON_TEST_REAL_FLOCK": real_flock,
+        "PATH": f"{fake_bin}:{environment.get('PATH', '/usr/bin:/bin')}",
+    }
+    prepare_script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_REPOSITORY_ROOT={str(repository)!r}
+AGENT_CANON_CONTROL_ROOT={str(control)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+AGENT_CANON_PRIVATE_LOG_ROOT={str(tmp_path / "agent-canon-log")!r}
+AGENT_CANON_SOURCE_FREE_BUNDLE=0
+export AGENT_CANON_REPOSITORY_ROOT AGENT_CANON_CONTROL_ROOT \\
+  AGENT_CANON_RUNTIME_ROOT AGENT_CANON_PRIVATE_LOG_ROOT \\
+  AGENT_CANON_SOURCE_FREE_BUNDLE
+_agent_canon_prepare_host_runtime
+"""
+    prepared = subprocess.run(
+        ["bash", "-c", prepare_script],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert prepared.returncode == 0, prepared.stderr
+    target = tmp_path / "registered-target"
+    target.mkdir()
+    target_source = target.resolve()
+    target_digest = hashlib.sha256(str(target_source).encode("utf-8")).hexdigest()
+    (runtime / "container-state" / "mounts.tsv").write_text(
+        f"target\t{target_digest}\t{target_source}\t/targets/{target_digest}\tread-only\n",
+        encoding="utf-8",
+    )
+    return repository, control, runtime, tracker, target, environment
+
+
+def _start_generation_route(
+    repository: Path,
+    control: Path,
+    environment: dict[str, str],
+    role: str,
+    route: tuple[str, ...],
+    *,
+    status: int = 0,
+) -> subprocess.Popen[str]:
+    script = f"""
+source {str(ADAPTER)!r}
+_agent_canon_use_active_image() {{
+  : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.selection"
+  _agent_canon_read_active_image
+}}
+_agent_canon_validate_existing_container() {{
+  : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.validation"
+}}
+_agent_canon_ensure_container() {{
+  _agent_canon_validate_existing_container "$(_agent_canon_container_name)"
+  _agent_canon_container_name
+}}
+_agent_canon_private_feedback_sync() {{
+  [[ "$1" == "$(_agent_canon_container_name)" ]] || return 90
+  [[ "$AGENT_CANON_IMAGE_REF" == "$AGENT_CANON_TEST_EXPECTED_IMAGE_REF" &&
+     "$AGENT_CANON_EXPECTED_IMAGE_ID" == "$AGENT_CANON_TEST_EXPECTED_IMAGE_ID" ]] ||
+    return 91
+  : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.feedback"
+}}
+bootstrap_host_entrypoint {str(repository)!r} \\
+  --control-parent-root {str(control)!r} {shlex.join(route)}
+"""
+    return subprocess.Popen(
+        ["bash", "-c", script],
+        env={
+            **environment,
+            "AGENT_CANON_TEST_ROUTE": role,
+            "AGENT_CANON_TEST_LOCK_ROLE": role,
+            "AGENT_CANON_TEST_EXEC_STATUS": str(status),
+        },
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def _start_replacement_lock_holder(
+    runtime: Path,
+    tracker: Path,
+    environment: dict[str, str],
+    role: str,
+) -> subprocess.Popen[str]:
+    script = f"""
+source {str(ADAPTER)!r}
+AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}
+export AGENT_CANON_RUNTIME_ROOT
+_agent_canon_test_replacement() {{
+  : > "$AGENT_CANON_TEST_TRACKER/{role}.replacement-entered"
+  while [[ ! -e "$AGENT_CANON_TEST_TRACKER/{role}.release-replacement" ]]; do
+    sleep 0.01
+  done
+}}
+_agent_canon_with_replacement_lock _agent_canon_test_replacement
+"""
+    return subprocess.Popen(
+        ["bash", "-c", script],
+        env={
+            **environment,
+            "AGENT_CANON_TEST_LOCK_ROLE": role,
+        },
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def _wait_for_generation_marker(
+    marker: Path,
+    processes: tuple[subprocess.Popen[str], ...],
+    *,
+    timeout: float = 30.0,
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if marker.exists():
+            return
+        for process in processes:
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                raise AssertionError(
+                    f"process exited before {marker.name}: {stdout}\n{stderr}"
+                )
+        time.sleep(0.01)
+    raise AssertionError(f"timed out waiting for {marker}")
+
+
+def test_ordinary_exec_readers_share_lock_and_block_replacement(
+    tmp_path: Path,
+) -> None:
+    """Exec and tool readers overlap while replacement waits for both."""
+    repository, control, runtime, tracker, target, environment = (
+        _generation_lock_fixture(tmp_path)
+    )
+    readers: list[subprocess.Popen[str]] = []
+    writer: subprocess.Popen[str] | None = None
+    try:
+        first = _start_generation_route(
+            repository,
+            control,
+            environment,
+            "reader-one",
+            ("exec", "--root", str(target), "--", "/bin/true"),
+        )
+        readers.append(first)
+        _wait_for_generation_marker(
+            tracker / "reader-one.docker-exec-entered", (first,)
+        )
+        assert (tracker / "reader-one.selection").exists()
+        assert (tracker / "reader-one.validation").exists()
+
+        second = _start_generation_route(
+            repository,
+            control,
+            environment,
+            "reader-two",
+            ("tool", "run", "--root", str(target), "rust-version", "--"),
+        )
+        readers.append(second)
+        _wait_for_generation_marker(
+            tracker / "reader-two.docker-exec-entered", (first, second)
+        )
+        assert (tracker / "reader-two.selection").exists()
+        assert (tracker / "reader-two.validation").exists()
+
+        lock_path = runtime / "host-state" / "replacement.lock"
+        exclusive_probe = subprocess.run(
+            [
+                environment["AGENT_CANON_TEST_REAL_FLOCK"],
+                "-n",
+                "-x",
+                str(lock_path),
+                "true",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert exclusive_probe.returncode != 0
+
+        (tracker / "writer.release-replacement").unlink(missing_ok=True)
+        writer = _start_replacement_lock_holder(runtime, tracker, environment, "writer")
+        _wait_for_generation_marker(
+            tracker / "writer.-x.attempt", (first, second, writer)
+        )
+        assert writer.poll() is None
+        assert not (tracker / "writer.-x.acquired").exists()
+        assert not (tracker / "writer.replacement-entered").exists()
+
+        (tracker / "reader-one.release-exec").touch()
+        (tracker / "reader-two.release-exec").touch()
+        _wait_for_generation_marker(tracker / "writer.replacement-entered", (writer,))
+        (tracker / "writer.release-replacement").touch()
+        writer_output, writer_error = writer.communicate(timeout=30)
+        assert writer.returncode == 0, writer_error or writer_output
+
+        first_output, first_error = first.communicate(timeout=120)
+        second_output, second_error = second.communicate(timeout=120)
+        assert first.returncode == 0, first_error or first_output
+        assert second.returncode == 0, second_error or second_output
+        assert (tracker / "reader-one.feedback").exists()
+        assert (tracker / "reader-two.feedback").exists()
+    finally:
+        for role in ("reader-one", "reader-two", "writer"):
+            (tracker / f"{role}.release-exec").touch()
+            (tracker / f"{role}.release-replacement").touch()
+        all_processes = list(readers)
+        if writer is not None:
+            all_processes.append(writer)
+        for process in all_processes:
+            if process.poll() is None:
+                process.terminate()
+            try:
+                process.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate(timeout=10)
+
+
+def test_ordinary_exec_waits_for_writer_and_failure_releases_lock(
+    tmp_path: Path,
+) -> None:
+    """An exclusive replacement blocks selection and resumes after failed exec."""
+    repository, control, runtime, tracker, target, environment = (
+        _generation_lock_fixture(tmp_path)
+    )
+    processes: list[subprocess.Popen[str]] = []
+    try:
+        first_writer = _start_replacement_lock_holder(
+            runtime, tracker, environment, "writer-one"
+        )
+        processes.append(first_writer)
+        _wait_for_generation_marker(
+            tracker / "writer-one.replacement-entered", (first_writer,)
+        )
+
+        reader = _start_generation_route(
+            repository,
+            control,
+            environment,
+            "reader-fails",
+            ("exec", "--root", str(target), "--", "/bin/true"),
+            status=42,
+        )
+        processes.append(reader)
+        _wait_for_generation_marker(
+            tracker / "reader-fails.-s.attempt", (first_writer, reader)
+        )
+        assert not (tracker / "reader-fails.-s.acquired").exists()
+        assert not (tracker / "reader-fails.selection").exists()
+        assert not (tracker / "reader-fails.validation").exists()
+        assert not (tracker / "reader-fails.docker-exec-entered").exists()
+        assert reader.poll() is None
+
+        (tracker / "writer-one.release-replacement").touch()
+        writer_output, writer_error = first_writer.communicate(timeout=30)
+        assert first_writer.returncode == 0, writer_error or writer_output
+        _wait_for_generation_marker(
+            tracker / "reader-fails.docker-exec-entered", (reader,)
+        )
+        assert (tracker / "reader-fails.selection").exists()
+        assert (tracker / "reader-fails.validation").exists()
+
+        (tracker / "writer-two.release-replacement").touch()
+        second_writer = _start_replacement_lock_holder(
+            runtime, tracker, environment, "writer-two"
+        )
+        processes.append(second_writer)
+        _wait_for_generation_marker(
+            tracker / "writer-two.-x.attempt", (reader, second_writer)
+        )
+        assert not (tracker / "writer-two.-x.acquired").exists()
+        assert not (tracker / "writer-two.replacement-entered").exists()
+
+        (tracker / "reader-fails.release-exec").touch()
+        reader_output, reader_error = reader.communicate(timeout=120)
+        assert reader.returncode == 42, reader_error or reader_output
+        assert not (tracker / "reader-fails.feedback").exists()
+
+        _wait_for_generation_marker(
+            tracker / "writer-two.replacement-entered", (second_writer,)
+        )
+        writer_output, writer_error = second_writer.communicate(timeout=30)
+        assert second_writer.returncode == 0, writer_error or writer_output
+    finally:
+        for role in ("reader-fails", "writer-one", "writer-two"):
+            (tracker / f"{role}.release-exec").touch()
+            (tracker / f"{role}.release-replacement").touch()
+        for process in processes:
+            if process.poll() is None:
+                process.terminate()
+            try:
+                process.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate(timeout=10)
 
 
 def test_replacement_candidate_inspect_failure_stops_before_transaction_callbacks(
@@ -6227,11 +6595,19 @@ def test_active_image_state_owns_ordinary_route_selection() -> None:
     assert "_agent_canon_read_active_image" in text
     assert "_agent_canon_record_active_container" in text
     assert text.count("_agent_canon_record_active_container") >= 3
-    ordinary = text.split(
-        "    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)",
+    ordinary = text.split("    exec|tool)", 1)[1].split(
+        "    install|update|start|stop|rollback|uninstall|target|template|task|gc|eval)",
         1,
-    )[1]
-    assert "_agent_canon_use_active_image" in ordinary
+    )[0]
+    route = text.split("_agent_canon_exec_tool_route_locked() {", 1)[1].split(
+        "\n}\n", 1
+    )[0]
+    assert "_agent_canon_with_replacement_lock --shared" in ordinary
+    assert (
+        route.index("_agent_canon_use_active_image")
+        < route.index("_agent_canon_ensure_container")
+        < route.index("_agent_canon_container_exec")
+    )
     assert '_agent_canon_image "$image_ref"' not in ordinary
     assert "AGENT_CANON_EXPECTED_IMAGE_ID=$candidate_image_id" in text
     assert "AGENT_CANON_EXPECTED_IMAGE_ID=$rollback_image_id" in text
@@ -6292,10 +6668,12 @@ def test_archive_and_codex_crossings_are_host_owned() -> None:
     assert "_agent_canon_sync_personal_skill_view" not in text
     assert "skill-projection" not in text
     assert '"$codex_executable" --project-root "$codex_project"' in text
-    assert (
-        'if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then'
-        in text
-    )
+    exec_tool_route = text.split("    exec|tool)", 1)[1].split(
+        "    install|update|start|stop|rollback|uninstall|target|template|task|gc|eval)",
+        1,
+    )[0]
+    assert "if ((exec_tool_rc == 0))" in exec_tool_route
+    assert "_agent_canon_private_feedback_sync_current_locked" in exec_tool_route
     controller = (ROOT / "tools/runtime/container/bootstrap_runtime.py").read_text(
         encoding="utf-8"
     )
