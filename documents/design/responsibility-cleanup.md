@@ -16,7 +16,7 @@ downstream implementation ../../agents/skills/catalog.yaml public skill registry
 downstream implementation ../../agents/skills/skill-dependencies.yaml public skill dependency DAG
 downstream implementation ../../tools/agent/skills/skill_shim_materializer.py generated shim materializer
 downstream implementation ../../tools/agent/skills/skill_dependency_map.py generated graph materializer
-downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py graph readback checker
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph readback checker
 @dependency-end
 -->
 
@@ -189,7 +189,7 @@ validation は変更面の既存 checker（`tools/agent/skills/skill_shim_materi
 sufficient behavior を owner の契約に従って分類します（`tools/agent/skills/skill_shim_materializer.py`）。公開 skill surface では catalog、
 dependency map、materialized shim、host-wiring source/input の `.codex/config.toml`、generated graph（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）、graph readback を同じ
 source snapshot から検証します（[documents/runtime/skill-dependency-graph.md](../runtime/skill-dependency-graph.md)）。失敗は実装原因を分類して同じ owner route を修正し、
-checker の条件を弱めずに再実行します（`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py`）。
+checker の条件を弱めずに再実行します（`tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`）。
 RC-09 の置換・廃止では、正本、不要な旧コードの除去、必要な利用側移行を検証し、廃止済み入口の負例と移行漏れを区別します。
 
 `tools/agent/skills/skill_shim_materializer.py` の生成 target は

@@ -119,6 +119,7 @@ Usage: agent-canon <command> [arguments]
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
+  check-skill-tool-invocation-graph [--root ROOT]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
@@ -279,6 +280,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
+        std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool" {
