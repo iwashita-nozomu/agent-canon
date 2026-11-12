@@ -29,7 +29,7 @@ downstream implementation ../../.github/workflows/agent-canon-native-release.yml
 - Host は Skill、[AGENTS.md](../../AGENTS.md)、workflow shell、Git、GitHub、Docker、Codex 起動を所有する。
 - native binary は first-class Rust command を host 上で実行し、共有 tool container は既存 Python / LSP tool と catalog-declared native CLI を実行する。
 - project build / test / experiment / GPU は project-owned execution environment が所有する。
-- runtime lifecycle state は bootstrap-owned で ignored な `<install-root>/.runtime/` に置く。
+- runtime lifecycle state は bootstrap-owned で ignored な `<control-root>/.runtime/` に置く。
   一般の eval、report、SQLite、log、analysis、archive artifact は source tree 外に置く。
 - public command の互換性、resource lifecycle、eval publication、skill discovery を
   完了条件に含める。
@@ -100,7 +100,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
 既存 control root の明示指定を返します。
 
 ```text
-<install-root>/.runtime/
+<control-root>/.runtime/
   current-generation
   rollback-generation
   lifecycle.lock
@@ -111,7 +111,7 @@ Docker label readback で既存 owner を検出し、`shared_runtime_owned_elsew
   source-sync/source-sync.json  # host-written, resident read-only view
   spool/
 
-<install-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
+<control-root>/.runtime/cache/{cargo,pycache,semantic-index,tool-metadata}/
 ```
 
 Bootstrap lifecycle codeだけが固定された `.runtime/` surfaces を直接管理します。
@@ -125,28 +125,13 @@ repository top-level `bootstrap.sh` は shared-runtime lifecycle と transitiona
 catalog tool route の入口です。Rust first-class command は native executable
 から直接実行し、この bootstrap path を通りません。
 
-```bash
-./bootstrap.sh --control-parent-root <path> install
-./bootstrap.sh --control-parent-root <path> update
-./bootstrap.sh --control-parent-root <path> start
-./bootstrap.sh --control-parent-root <path> status
-./bootstrap.sh --control-parent-root <path> target add --root <project-a> --mode read-only
-./bootstrap.sh --control-parent-root <path> target add --root <project-b> --mode read-only
-./bootstrap.sh --control-parent-root <path> tool run <catalog-id> -- <args...>
-./bootstrap.sh --control-parent-root <path> template export --root <registered-source> --profile <profile> --output <runtime-relative-directory>
-./bootstrap.sh --control-parent-root <path> codex prepare
-./bootstrap.sh --control-parent-root <path> codex --project-root <path>
-./bootstrap.sh --control-parent-root <path> eval collect --root <path> --run-id <id>
-./bootstrap.sh --control-parent-root <path> eval sync --run-id <id>
-./bootstrap.sh --control-parent-root <path> stop
-./bootstrap.sh --control-parent-root <path> rollback
-./bootstrap.sh --control-parent-root <path> gc
-./bootstrap.sh --control-parent-root <path> uninstall
-```
+絶対パスの installed bootstrap、明示した install/control root、登録済み project target
+を使うコマンドは [One command family](../runtime/bootstrap-runtime.md#one-command-family)
+を参照します。操作例はこの正本で管理します。
 
 Bootstrap command を実行する cwd は runtime の選択に使わず、cwd に関する warning は出しません。
 経路は `cwd -> bootstrap.sh -> install root -> control root ->
-<install-root>/.runtime/ -> resident container` です。`install` は検証済み image と
+<control-root>/.runtime/ -> resident container` です。`install` は検証済み image と
 resident を作り、`update` は同じ resident を current checkout へ更新し、`status` は
 `.runtime/` の active image と resident health を読み返します。`sync` は
 `replacement.lock` を一度だけ取得し、`git -C <install-root> fetch origin main` に
