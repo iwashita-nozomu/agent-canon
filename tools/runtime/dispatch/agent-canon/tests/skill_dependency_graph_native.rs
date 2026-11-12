@@ -14,7 +14,8 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const EXPECTED: &str = include_str!("../../../../../tests/fixtures/skill_dependency_graph/expected.json");
+const EXPECTED: &str =
+    include_str!("../../../../../tests/fixtures/skill_dependency_graph/expected.json");
 const CHECK_INPUTS: &[&str] = &[
     "agents/skills/catalog.yaml",
     "agents/skills/skill-dependencies.yaml",
@@ -58,13 +59,34 @@ fn native_checker_matches_the_independent_v2_artifact_oracle() {
     assert_eq!(expected["schema"].as_str(), Some(GRAPH_SCHEMA));
     assert_eq!(expected["version"].as_u64(), Some(2));
     let summary = check_artifacts(&root).expect("validate generated graph artifacts");
-    assert_eq!(summary.skill_count, expected["skill_count"].as_u64().unwrap() as usize);
-    assert_eq!(summary.command_count, expected["command_count"].as_u64().unwrap() as usize);
-    assert_eq!(summary.tool_count, expected["tool_count"].as_u64().unwrap() as usize);
-    assert_eq!(summary.edge_count, expected["edge_count"].as_u64().unwrap() as usize);
-    assert_eq!(summary.graph_digest, expected["graph_digest"].as_str().unwrap());
-    assert_eq!(summary.json_digest, expected["json_digest"].as_str().unwrap());
-    assert_eq!(summary.mermaid_digest, expected["mermaid_digest"].as_str().unwrap());
+    assert_eq!(
+        summary.skill_count,
+        expected["skill_count"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        summary.command_count,
+        expected["command_count"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        summary.tool_count,
+        expected["tool_count"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        summary.edge_count,
+        expected["edge_count"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        summary.graph_digest,
+        expected["graph_digest"].as_str().unwrap()
+    );
+    assert_eq!(
+        summary.json_digest,
+        expected["json_digest"].as_str().unwrap()
+    );
+    assert_eq!(
+        summary.mermaid_digest,
+        expected["mermaid_digest"].as_str().unwrap()
+    );
     let json_bytes = fs::read(root.join(GRAPH_JSON_PATH)).expect("read checked JSON artifact");
     assert_eq!(
         sha256_hex(&json_bytes),

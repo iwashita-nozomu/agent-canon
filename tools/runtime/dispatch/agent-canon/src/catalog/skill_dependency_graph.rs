@@ -40,15 +40,27 @@ struct CheckOutput<'a> {
 #[derive(Serialize)]
 #[serde(untagged)]
 enum CheckResult<'a> {
-    Pass { skill_count: usize, command_count: usize, tool_count: usize,
-        edge_count: usize, graph_digest: &'a str, json_digest: &'a str, mermaid_digest: &'a str },
-    Fail { error: &'a str },
+    Pass {
+        skill_count: usize,
+        command_count: usize,
+        tool_count: usize,
+        edge_count: usize,
+        graph_digest: &'a str,
+        json_digest: &'a str,
+        mermaid_digest: &'a str,
+    },
+    Fail {
+        error: &'a str,
+    },
 }
 
 /// Read-only public checker; the graph writer remains a separate operation.
 pub fn run(args: &[String]) -> i32 {
-    let mut root = Path::new(env!("CARGO_MANIFEST_DIR")).ancestors().nth(4)
-        .expect("crate is nested below source root").to_path_buf();
+    let mut root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .ancestors()
+        .nth(4)
+        .expect("crate is nested below source root")
+        .to_path_buf();
     let mut index = 0;
     while index < args.len() {
         let argument = &args[index];
@@ -56,14 +68,20 @@ pub fn run(args: &[String]) -> i32 {
             println!("usage: agent-canon check-skill-tool-invocation-graph [--root ROOT]");
             return 0;
         }
-        let (option, inline) = argument.split_once('=').map_or((argument.as_str(), None), |(key, value)| (key, Some(value)));
+        let (option, inline) = argument
+            .split_once('=')
+            .map_or((argument.as_str(), None), |(key, value)| (key, Some(value)));
         if !option.starts_with("--") || option == "--" || !"--root".starts_with(option) {
-            eprintln!("unrecognized arguments: {argument}"); return 2;
+            eprintln!("unrecognized arguments: {argument}");
+            return 2;
         }
-        let value = if let Some(value) = inline { value } else {
+        let value = if let Some(value) = inline {
+            value
+        } else {
             index += 1;
             let Some(value) = args.get(index).filter(|value| !value.starts_with('-')) else {
-                eprintln!("argument --root: expected one argument"); return 2;
+                eprintln!("argument --root: expected one argument");
+                return 2;
             };
             value
         };
@@ -72,13 +90,37 @@ pub fn run(args: &[String]) -> i32 {
     }
     match check_artifacts(&root) {
         Ok(summary) => {
-            println!("{}", serde_json::to_string(&CheckOutput { schema: CHECK_SCHEMA, status: "pass", result: CheckResult::Pass {
-                skill_count: summary.skill_count, command_count: summary.command_count, tool_count: summary.tool_count,
-                edge_count: summary.edge_count, graph_digest: &summary.graph_digest, json_digest: &summary.json_digest,
-                mermaid_digest: &summary.mermaid_digest } }).expect("typed checker output serializes"));
+            println!(
+                "{}",
+                serde_json::to_string(&CheckOutput {
+                    schema: CHECK_SCHEMA,
+                    status: "pass",
+                    result: CheckResult::Pass {
+                        skill_count: summary.skill_count,
+                        command_count: summary.command_count,
+                        tool_count: summary.tool_count,
+                        edge_count: summary.edge_count,
+                        graph_digest: &summary.graph_digest,
+                        json_digest: &summary.json_digest,
+                        mermaid_digest: &summary.mermaid_digest
+                    }
+                })
+                .expect("typed checker output serializes")
+            );
             0
         }
-        Err(error) => { println!("{}", serde_json::to_string(&CheckOutput { schema: CHECK_SCHEMA, status: "fail", result: CheckResult::Fail { error: &error } }).expect("typed checker output serializes")); 2 }
+        Err(error) => {
+            println!(
+                "{}",
+                serde_json::to_string(&CheckOutput {
+                    schema: CHECK_SCHEMA,
+                    status: "fail",
+                    result: CheckResult::Fail { error: &error }
+                })
+                .expect("typed checker output serializes")
+            );
+            2
+        }
     }
 }
 
@@ -100,8 +142,8 @@ const IMPLEMENTATION_TRACE_PATHS: &[&str] = &[
     "tools/agent/skills/skill_route_catalog.py",
 ];
 const DESIGN_CLAUSE_IDS: &[&str] = &[
-    "SG-001", "SG-002", "SG-003", "SG-004", "SG-005", "SG-006", "SG-007", "SG-008",
-    "SG-009", "SG-010", "SG-011", "SG-012", "SG-013", "SG-014", "SG-015",
+    "SG-001", "SG-002", "SG-003", "SG-004", "SG-005", "SG-006", "SG-007", "SG-008", "SG-009",
+    "SG-010", "SG-011", "SG-012", "SG-013", "SG-014", "SG-015",
 ];
 const DIC_CLAUSE_IDS: &[&str] = &[
     "DIC-001", "DIC-002", "DIC-003", "DIC-004", "DIC-005", "DIC-006", "DIC-007", "DIC-008",
@@ -111,7 +153,14 @@ const SOURCE_KINDS: &[&str] = &[
     "identity", "edge", "field", "phase", "branch", "module", "evidence", "time",
 ];
 const IDENTITY_KINDS: &[&str] = &[
-    "skill", "phase", "command", "tool", "capability", "edge", "source", "manifest",
+    "skill",
+    "phase",
+    "command",
+    "tool",
+    "capability",
+    "edge",
+    "source",
+    "manifest",
     "readback",
 ];
 const EDGE_TYPES: &[&str] = &[
@@ -177,7 +226,7 @@ impl IdentityStore {
             {
                 return Err(format!("identity_collision:{kind}:{identity_id}"));
             }
-            return Ok(reference(existing)?);
+            return reference(existing);
         }
         if self
             .by_digest
@@ -233,7 +282,7 @@ impl IdentityStore {
         let kind = string_field(record, "kind")?;
         let payload = get(record, "canonical_payload")
             .ok_or_else(|| format!("digest_mismatch:record:{identity_id}"))?;
-        if identity_digest(&canonical_id, &kind, payload)? != digest {
+        if identity_digest(&canonical_id, kind, payload)? != digest {
             return Err(format!("digest_mismatch:record:{identity_id}"));
         }
         Ok(record.clone())
@@ -321,7 +370,9 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
                 .ok_or_else(|| "skill_tool_invocation_graph_skill_identity_mismatch".to_owned())
         })
         .collect::<Result<BTreeMap<_, _>, _>>()?;
-    if skill_ids.iter().any(|skill| !route_by_skill.contains_key(skill))
+    if skill_ids
+        .iter()
+        .any(|skill| !route_by_skill.contains_key(skill))
         || route_by_skill.len() != skill_ids.len()
         || rule_by_skill.len() != skill_ids.len()
     {
@@ -394,7 +445,10 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
                 &mut identities,
                 &mut source_inventory,
                 "branch",
-                &format!("agents/skills/catalog.yaml#capability:{}", capability.capability_id),
+                &format!(
+                    "agents/skills/catalog.yaml#capability:{}",
+                    capability.capability_id
+                ),
                 capability_refs.len(),
                 Some(&capability_ref),
                 json!({"owner": capability.owner, "phase": capability.phase}),
@@ -406,7 +460,10 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
     let source_snapshot = source_snapshot(&root, &route_rules)?;
     for (key, locator) in [
         ("catalog_sha256", "agents/skills/catalog.yaml"),
-        ("dependencies_sha256", "agents/skills/skill-dependencies.yaml"),
+        (
+            "dependencies_sha256",
+            "agents/skills/skill-dependencies.yaml",
+        ),
         ("reader_index_sha256", "agents/canonical/skills.md"),
         ("route_packet_sha256", "agents/skills/catalog.yaml#routing"),
     ] {
@@ -428,9 +485,7 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         let rule = rule_by_skill[skill];
         for prerequisite in &rule.required_prerequisites {
             add_edge(
-                &mut identities,
-                &mut edges,
-                &mut source_inventory,
+                (&mut identities, &mut edges, &mut source_inventory),
                 "prerequisite",
                 &skill_refs[prerequisite],
                 &skill_refs[skill],
@@ -441,9 +496,7 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         }
         for successor in &rule.successors {
             add_edge(
-                &mut identities,
-                &mut edges,
-                &mut source_inventory,
+                (&mut identities, &mut edges, &mut source_inventory),
                 "successor",
                 &skill_refs[skill],
                 &skill_refs[successor],
@@ -454,9 +507,7 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         }
         for constraint in &rule.order_constraints {
             add_edge(
-                &mut identities,
-                &mut edges,
-                &mut source_inventory,
+                (&mut identities, &mut edges, &mut source_inventory),
                 "order",
                 &skill_refs[&constraint.before],
                 &skill_refs[&constraint.after],
@@ -467,9 +518,7 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         }
         for candidate in &rule.routing_candidates {
             add_edge(
-                &mut identities,
-                &mut edges,
-                &mut source_inventory,
+                (&mut identities, &mut edges, &mut source_inventory),
                 "routing",
                 &skill_refs[skill],
                 &skill_refs[candidate],
@@ -481,9 +530,7 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         for other in &rule.parallel_independent {
             if skill < other {
                 add_edge(
-                    &mut identities,
-                    &mut edges,
-                    &mut source_inventory,
+                    (&mut identities, &mut edges, &mut source_inventory),
                     "parallel",
                     &skill_refs[skill],
                     &skill_refs[other],
@@ -550,12 +597,20 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
     });
     let projection_digests = projection_digests(&graph)?;
     graph["projection_digests"] = projection_digests;
-    let identity_refs = identities.records.iter().map(reference).collect::<Result<Vec<_>, _>>()?;
+    let identity_refs = identities
+        .records
+        .iter()
+        .map(reference)
+        .collect::<Result<Vec<_>, _>>()?;
     let edge_refs = graph["edges"]
         .as_array()
         .ok_or_else(|| "graph_edges_not_array".to_owned())?
         .iter()
-        .map(|edge| get(edge, "edge_ref").cloned().ok_or_else(|| "edge_ref_missing".to_owned()))
+        .map(|edge| {
+            get(edge, "edge_ref")
+                .cloned()
+                .ok_or_else(|| "edge_ref_missing".to_owned())
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let source_digest = digest_value(&graph["source_snapshot"])?;
     let manifest_payload = json!({
@@ -604,10 +659,10 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         "route_packet_sha256": source_snapshot["route_packet_sha256"],
     });
     graph["readback_ref"] = readback_ref.clone();
-    graph["graph_digest"] = digest_value(&without_fields(
+    graph["graph_digest"] = Value::String(digest_value(&without_fields(
         &graph,
         &["graph_digest", "json_digest", "mermaid_digest", "readback"],
-    )?)?;
+    )?)?);
     let mermaid = render_graph_mermaid(&graph)?;
     graph["mermaid_digest"] = json!(sha256_hex(mermaid.as_bytes()));
     graph["readback"] = json!({
@@ -619,10 +674,10 @@ pub fn build_graph(root: &Path) -> Result<Value, String> {
         "projection_digests": graph["projection_digests"],
         "counts": graph["source_counts"],
     });
-    graph["json_digest"] = digest_value(&without_fields(
+    graph["json_digest"] = Value::String(digest_value(&without_fields(
         &graph,
         &["json_digest", "readback", "mermaid_digest"],
-    )?)?;
+    )?)?);
     graph["readback"]["json_digest"] = graph["json_digest"].clone();
     validate_projection_refs(&graph, &identities)?;
     Ok(graph)
@@ -680,10 +735,7 @@ fn validate_design_correspondence(root: &Path) -> Result<Value, String> {
 }
 
 fn source_snapshot(root: &Path, rules: &[SkillRoutingRule]) -> Result<Value, String> {
-    let route_packet = rules
-        .iter()
-        .map(route_snapshot_entry)
-        .collect::<Vec<_>>();
+    let route_packet = rules.iter().map(route_snapshot_entry).collect::<Vec<_>>();
     let catalog_sha256 = file_digest(root, "agents/skills/catalog.yaml")?;
     let dependencies_sha256 = file_digest(root, "agents/skills/skill-dependencies.yaml")?;
     let reader_index_sha256 = file_digest(root, "agents/canonical/skills.md")?;
@@ -730,7 +782,9 @@ fn route_snapshot_entry(rule: &SkillRoutingRule) -> Value {
 fn file_digest(root: &Path, relative: &str) -> Result<String, String> {
     let path = root.join(relative);
     if !path.is_file() {
-        return Err(format!("skill_tool_invocation_graph_missing_source:{relative}"));
+        return Err(format!(
+            "skill_tool_invocation_graph_missing_source:{relative}"
+        ));
     }
     let bytes = fs::read(&path).map_err(|error| error.to_string())?;
     Ok(sha256_hex(&bytes))
@@ -780,15 +834,14 @@ fn source_record(
 }
 
 fn add_edge(
-    identities: &mut IdentityStore,
-    edges: &mut Vec<Value>,
-    inventory: &mut Vec<Value>,
+    output: (&mut IdentityStore, &mut Vec<Value>, &mut Vec<Value>),
     edge_type: &str,
     source: &Value,
     target: &Value,
     order: usize,
     attributes: Value,
 ) -> Result<(), String> {
+    let (identities, edges, inventory) = output;
     if !EDGE_TYPES.contains(&edge_type) {
         return Err(format!("unknown_edge_type:{edge_type}"));
     }
@@ -825,7 +878,12 @@ fn add_edge(
     Ok(())
 }
 
-fn projection_entry(reference: &Value, label: &str, order: Option<usize>, kind: Option<&str>) -> Value {
+fn projection_entry(
+    reference: &Value,
+    label: &str,
+    order: Option<usize>,
+    kind: Option<&str>,
+) -> Value {
     let mut result = json!({"ref": reference, "display_label": label});
     if let Some(order) = order {
         result["order"] = json!(order);
@@ -871,7 +929,8 @@ fn projection_digests(graph: &Value) -> Result<Value, String> {
 fn validate_projection_refs(graph: &Value, identities: &IdentityStore) -> Result<(), String> {
     for field in ["skills", "phases", "commands", "tools", "capabilities"] {
         for item in array(graph, field)? {
-            let reference = get(item, "ref").ok_or_else(|| format!("projection_ref_missing:{field}"))?;
+            let reference =
+                get(item, "ref").ok_or_else(|| format!("projection_ref_missing:{field}"))?;
             identities.require(reference)?;
             if item.get("canonical_payload").is_some()
                 || item.get("logical_argv").is_some()
@@ -883,7 +942,8 @@ fn validate_projection_refs(graph: &Value, identities: &IdentityStore) -> Result
     }
     for edge in array(graph, "edges")? {
         for field in ["edge_ref", "source_ref", "target_ref"] {
-            let reference = get(edge, field).ok_or_else(|| format!("projection_ref_missing:edges.{field}"))?;
+            let reference =
+                get(edge, field).ok_or_else(|| format!("projection_ref_missing:edges.{field}"))?;
             identities.require(reference)?;
         }
     }
@@ -969,7 +1029,7 @@ fn normalize_identifier(value: &str) -> String {
 }
 
 fn normalize_nfc(value: &str) -> String {
-    ComposingNormalizer::new_nfc().normalize(value).into_owned()
+    ComposingNormalizer::new_nfc().normalize(value)
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -1056,7 +1116,11 @@ fn projection_nodes(graph: &Value) -> Result<Vec<(String, Value, usize)>, String
 fn safe_mermaid_id(value: &str) -> String {
     let mut result = String::from("n_");
     for character in value.chars() {
-        result.push(if character.is_alphanumeric() { character } else { '_' });
+        result.push(if character.is_alphanumeric() {
+            character
+        } else {
+            '_'
+        });
     }
     result
 }
@@ -1076,7 +1140,9 @@ fn rendered_node_label(item: &Value) -> Result<String, String> {
     if let Some(order) = get(item, "order") {
         Ok(format!(
             "{display} (order={}; ref={digest})",
-            order.as_u64().ok_or_else(|| "projection_order_invalid".to_owned())?
+            order
+                .as_u64()
+                .ok_or_else(|| "projection_order_invalid".to_owned())?
         ))
     } else {
         Ok(format!("{display} (ref={digest})"))
@@ -1102,7 +1168,10 @@ pub fn render_graph_mermaid(graph: &Value) -> Result<String, String> {
         GRAPH_HEADER.to_owned(),
         "# Public Skill Dependency Graph".to_owned(),
         String::new(),
-        format!("<!-- graph_digest={} -->", string_field(graph, "graph_digest")?),
+        format!(
+            "<!-- graph_digest={} -->",
+            string_field(graph, "graph_digest")?
+        ),
         "```mermaid".to_owned(),
         "graph LR".to_owned(),
     ];
@@ -1121,7 +1190,10 @@ pub fn render_graph_mermaid(graph: &Value) -> Result<String, String> {
             .get(skill)
             .and_then(Value::as_str)
             .ok_or_else(|| format!("responsibility_group_missing:{skill}"))?;
-        groups.entry(group.to_owned()).or_default().push(item.clone());
+        groups
+            .entry(group.to_owned())
+            .or_default()
+            .push(item.clone());
     }
     for (group, members) in &groups {
         lines.push(format!(
@@ -1164,7 +1236,9 @@ pub fn render_graph_mermaid(graph: &Value) -> Result<String, String> {
             let reference = get(item, "ref").ok_or_else(|| "projection_ref_missing".to_owned())?;
             let identity_id = string_field(reference, "id")?;
             let digest = string_field(reference, "digest")?;
-            let order = get(item, "order").and_then(Value::as_u64).unwrap_or_default();
+            let order = get(item, "order")
+                .and_then(Value::as_u64)
+                .unwrap_or_default();
             lines.push(format!(
                 "    %% node kind={kind} id={identity_id} digest={digest} order={order}"
             ));
@@ -1308,7 +1382,9 @@ fn readback_mermaid(graph: &Value, text: &str) -> Result<Value, String> {
             order,
         ));
     }
-    if observed_actual_edges != expected_actual_edges || actual_edges.len() != expected_actual_edges.len() {
+    if observed_actual_edges != expected_actual_edges
+        || actual_edges.len() != expected_actual_edges.len()
+    {
         return Err("mermaid_readback_actual_edge_order_or_digest_mismatch".to_owned());
     }
 
@@ -1418,21 +1494,19 @@ fn readback_mermaid(graph: &Value, text: &str) -> Result<Value, String> {
     }))
 }
 
-fn parse_mermaid_metadata(
-    text: &str,
-) -> Result<(
+type MermaidMetadata = (
     String,
     Vec<BTreeMap<String, String>>,
     Vec<BTreeMap<String, String>>,
     Vec<BTreeMap<String, String>>,
-), String> {
+);
+
+fn parse_mermaid_metadata(text: &str) -> Result<MermaidMetadata, String> {
     let headers = text
         .lines()
         .filter(|line| mermaid_header_regex().is_match(line))
         .collect::<Vec<_>>();
-    if headers.len() != 1
-        || !text.contains("```mermaid")
-        || text.matches("```mermaid").count() != 1
+    if headers.len() != 1 || !text.contains("```mermaid") || text.matches("```mermaid").count() != 1
     {
         return Err("mermaid_readback_block_or_header".to_owned());
     }
@@ -1468,7 +1542,9 @@ struct ActualMermaidEdge {
     target: String,
 }
 
-fn parse_mermaid_syntax(text: &str) -> Result<(BTreeMap<String, String>, Vec<ActualMermaidEdge>), String> {
+fn parse_mermaid_syntax(
+    text: &str,
+) -> Result<(BTreeMap<String, String>, Vec<ActualMermaidEdge>), String> {
     let lines = text.lines().collect::<Vec<_>>();
     let start = lines
         .iter()
@@ -1493,7 +1569,11 @@ fn parse_mermaid_syntax(text: &str) -> Result<(BTreeMap<String, String>, Vec<Act
                 .as_str()
                 .to_owned();
             let label = (2..=4)
-                .find_map(|index| captures.get(index).map(|capture| capture.as_str().to_owned()))
+                .find_map(|index| {
+                    captures
+                        .get(index)
+                        .map(|capture| capture.as_str().to_owned())
+                })
                 .ok_or_else(|| "mermaid_node_parse".to_owned())?;
             if actual_nodes.insert(node_id.clone(), label).is_some() {
                 return Err(format!("mermaid_readback_duplicate_node:{node_id}"));
@@ -1606,16 +1686,14 @@ fn mermaid_kv_regex() -> &'static Regex {
 fn mermaid_node_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
     REGEX.get_or_init(|| {
-        Regex::new(r#"^\s+(n_[A-Za-z0-9_]+)(?:\[\["(.*)"\]\]|\["(.*)"\]|\{"(.*)"\})$"#)
-            .unwrap()
+        Regex::new(r#"^\s+(n_[A-Za-z0-9_]+)(?:\[\["(.*)"\]\]|\["(.*)"\]|\{"(.*)"\})$"#).unwrap()
     })
 }
 
 fn mermaid_edge_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
     REGEX.get_or_init(|| {
-        Regex::new(r#"^\s+(n_[A-Za-z0-9_]+)\s+(-\.->|-->)\|"(.*)"\|\s+(n_[A-Za-z0-9_]+)$"#)
-            .unwrap()
+        Regex::new(r#"^\s+(n_[A-Za-z0-9_]+)\s+(-\.->|-->)\|"(.*)"\|\s+(n_[A-Za-z0-9_]+)$"#).unwrap()
     })
 }
 
@@ -1674,7 +1752,10 @@ mod tests {
             "id": "foo",
             "z": {"a": 1, "b": 2},
         });
-        assert_eq!(canonical_bytes(&first).unwrap(), canonical_bytes(&second).unwrap());
+        assert_eq!(
+            canonical_bytes(&first).unwrap(),
+            canonical_bytes(&second).unwrap()
+        );
         assert_eq!(normalize_identifier("Ｆｏｏ"), "foo");
     }
 
@@ -1731,7 +1812,12 @@ mod tests {
         let skills = array(&graph, "skills")
             .unwrap()
             .iter()
-            .filter(|item| get(item, "ref").and_then(|reference| reference.get("id")).and_then(Value::as_str) != Some("skill:dependency-design"))
+            .filter(|item| {
+                get(item, "ref")
+                    .and_then(|reference| reference.get("id"))
+                    .and_then(Value::as_str)
+                    != Some("skill:dependency-design")
+            })
             .cloned()
             .collect::<Vec<_>>();
         let skill_count = skills.len();
