@@ -70,7 +70,7 @@ fn initialize_git(root: &Path) {
 
 fn build_repo() -> RepoFixture {
     let temp = tempfile::tempdir().expect("temporary registry repo creates");
-    let root = temp.path().to_path_buf();
+    let root = fs::canonicalize(temp.path()).expect("fixture root resolves platform aliases");
     copy_fixture_tree(&fixture_root(), &root);
     fs::rename(
         root.join("registry.toml"),
