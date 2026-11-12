@@ -68,7 +68,7 @@ const EXPERIMENT_EXECUTION_SURFACE_PATHS: &[&str] = &[
     "documents/experiments/experiment-registry.md",
     "documents/design/experiment_runner.md",
     "experiments/registry.toml",
-    "tools/validation/ci/checks/check_experiment_registry.py",
+    "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
     "tools/experiments/artifacts/save_experiment_result_annex.py",
     "tools/experiments/registry/registry_lib.py",
     "tools/experiments/execution/run_managed_experiment.py",
@@ -178,7 +178,7 @@ const AGENT_CANON_NEW_TOOL_SOURCE_ROUTE_GATE_TEMPLATES: &[GateTemplate] = &[Gate
 }];
 const EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
     gate: "experiment_execution_surface_guard",
-    command_template: "if [ -e experiments/registry.toml ]; then python3 -m tools.validation.ci.checks.check_experiment_registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
+    command_template: "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
     handoff: "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
 }];
 const LIBRARY_GATE_TEMPLATES: &[GateTemplate] = &[GateTemplate {
