@@ -1,9 +1,11 @@
 // @dependency-start
 // contract implementation
-// responsibility Provides Python-compatible JSON values, parsing, number formatting, and compact ASCII canonicalization.
+// responsibility Provides Python-compatible JSON values, parsing, equality, number formatting, and compact ASCII canonicalization.
 // downstream implementation execution_resource_projection.rs reuses strict parsing for exact projections.
 // downstream implementation update_lifecycle_contract.rs reuses Python JSON values, byte encodings, and integer/bool equality.
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
+// downstream implementation eval_accumulation_check.rs parses hook JSONL with Python-compatible values
+// downstream implementation work_log.rs uses Python-compatible JSON value equality for ledger deduplication
 // downstream implementation codex_runtime_summary.rs preserves Python JSON parsing and canonical append bytes.
 // downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
 // downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
@@ -190,6 +192,89 @@ impl JsonNumber {
             Self::Float(value) => json_float(*value),
         }
     }
+}
+
+fn normalized_integer(value: &str) -> &str {
+    if value == "-0" {
+        "0"
+    } else {
+        value
+    }
+}
+
+fn integer_equals_float(integer: &str, float: f64) -> bool {
+    if !float.is_finite() || float.fract() != 0.0 {
+        return false;
+    }
+    let rendered = format!("{float:.0}");
+    normalized_integer(integer)
+        == if rendered == "-0" {
+            "0"
+        } else {
+            rendered.as_str()
+        }
+}
+
+fn python_number_equal(left: &JsonNumber, right: &JsonNumber) -> bool {
+    match (left, right) {
+        (JsonNumber::Integer(left), JsonNumber::Integer(right)) => {
+            normalized_integer(left) == normalized_integer(right)
+        }
+        (JsonNumber::Float(left), JsonNumber::Float(right)) => left == right,
+        (JsonNumber::Integer(integer), JsonNumber::Float(float))
+        | (JsonNumber::Float(float), JsonNumber::Integer(integer)) => {
+            integer_equals_float(integer, *float)
+        }
+    }
+}
+
+/// Compare JSON values using Python equality, including bool/int equivalence.
+///
+/// The explicit work stack preserves Python's structural equality without recursing on nested
+/// arrays or objects. Number comparisons retain arbitrary precision for integer values.
+pub fn python_json_equal(left: &JsonValue, right: &JsonValue) -> bool {
+    let mut pending = vec![(left, right)];
+    while let Some((left, right)) = pending.pop() {
+        match (left, right) {
+            (JsonValue::Null, JsonValue::Null) => {}
+            (JsonValue::Bool(left), JsonValue::Bool(right)) if left == right => {}
+            (JsonValue::Bool(value), JsonValue::Number(number))
+            | (JsonValue::Number(number), JsonValue::Bool(value)) => {
+                let integer = if *value { "1" } else { "0" };
+                let equal = match number {
+                    JsonNumber::Integer(number) => normalized_integer(number) == integer,
+                    JsonNumber::Float(number) => integer_equals_float(integer, *number),
+                };
+                if !equal {
+                    return false;
+                }
+            }
+            (JsonValue::Number(left), JsonValue::Number(right))
+                if python_number_equal(left, right) => {}
+            (JsonValue::String(left), JsonValue::String(right)) if left == right => {}
+            (JsonValue::Array(left), JsonValue::Array(right)) => {
+                if left.0.len() != right.0.len() {
+                    return false;
+                }
+                pending.extend(left.0.iter().zip(&right.0));
+            }
+            (JsonValue::Object(left), JsonValue::Object(right)) => {
+                if left.0.len() != right.0.len() {
+                    return false;
+                }
+                for (left_key, left_value) in &left.0 {
+                    let Some((_, right_value)) =
+                        right.0.iter().find(|(right_key, _)| right_key == left_key)
+                    else {
+                        return false;
+                    };
+                    pending.push((left_value, right_value));
+                }
+            }
+            _ => return false,
+        }
+    }
+    true
 }
 
 pub fn parse_json(input: &str) -> Result<JsonValue, String> {
@@ -818,37 +903,45 @@ fn is_json_integer(value: &str) -> bool {
 
 /// Serialize with Python's `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)` bytes.
 pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, false, false)
+    canonical_json_ascii_bytes_with_options(value, false, false, false)
 }
 
 /// Serialize with the same canonical form, rejecting non-finite floats as `allow_nan=False` does.
 pub fn canonical_json_ascii_bytes_reject_nonfinite(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, true, false)
+    canonical_json_ascii_bytes_with_options(value, true, false, false)
 }
 
 /// Serialize like `json.dump(value, sort_keys=True, ensure_ascii=True)` with default separators.
 pub fn python_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, false, true)
+    canonical_json_ascii_bytes_with_options(value, false, true, false)
+}
+
+/// Serialize Python's sorted, ASCII JSON with two-space indentation.
+pub fn python_json_pretty_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_options(value, false, true, true)
 }
 
 fn canonical_json_ascii_bytes_with_options(
     value: &JsonValue,
     reject_nonfinite: bool,
     spaced_separators: bool,
+    pretty: bool,
 ) -> Result<Vec<u8>, String> {
     enum Action<'a> {
-        Value(&'a JsonValue),
+        Value(&'a JsonValue, usize),
         String(&'a JsonString),
         Text(&'static [u8]),
+        Indent(usize),
     }
 
     let mut bytes = Vec::new();
-    let mut actions = vec![Action::Value(value)];
+    let mut actions = vec![Action::Value(value, 0)];
     while let Some(action) = actions.pop() {
         match action {
             Action::Text(text) => bytes.extend_from_slice(text),
             Action::String(value) => write_ascii_json_string(value, &mut bytes)?,
-            Action::Value(value) => match value {
+            Action::Indent(depth) => bytes.resize(bytes.len() + depth * 2, b' '),
+            Action::Value(value, depth) => match value {
                 JsonValue::Null => bytes.extend_from_slice(b"null"),
                 JsonValue::Bool(value) => {
                     bytes.extend_from_slice(if *value { b"true" } else { b"false" })
@@ -872,9 +965,16 @@ fn canonical_json_ascii_bytes_with_options(
                 JsonValue::Array(values) => {
                     bytes.push(b'[');
                     actions.push(Action::Text(b"]"));
+                    if pretty && !values.0.is_empty() {
+                        actions.push(Action::Indent(depth));
+                        actions.push(Action::Text(b"\n"));
+                    }
                     for index in (0..values.0.len()).rev() {
-                        actions.push(Action::Value(&values.0[index]));
-                        if index > 0 {
+                        actions.push(Action::Value(&values.0[index], depth + 1));
+                        if pretty {
+                            actions.push(Action::Indent(depth + 1));
+                            actions.push(Action::Text(if index > 0 { b",\n" } else { b"\n" }));
+                        } else if index > 0 {
                             actions.push(Action::Text(if spaced_separators {
                                 b", "
                             } else {
@@ -898,12 +998,19 @@ fn canonical_json_ascii_bytes_with_options(
                     }
                     bytes.push(b'{');
                     actions.push(Action::Text(b"}"));
+                    if pretty && !unique_entries.is_empty() {
+                        actions.push(Action::Indent(depth));
+                        actions.push(Action::Text(b"\n"));
+                    }
                     for index in (0..unique_entries.len()).rev() {
                         let (key, value) = unique_entries[index];
-                        actions.push(Action::Value(value));
+                        actions.push(Action::Value(value, depth + 1));
                         actions.push(Action::Text(if spaced_separators { b": " } else { b":" }));
                         actions.push(Action::String(key));
-                        if index > 0 {
+                        if pretty {
+                            actions.push(Action::Indent(depth + 1));
+                            actions.push(Action::Text(if index > 0 { b",\n" } else { b"\n" }));
+                        } else if index > 0 {
                             actions.push(Action::Text(if spaced_separators {
                                 b", "
                             } else {

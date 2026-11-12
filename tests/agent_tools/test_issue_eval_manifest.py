@@ -5,7 +5,7 @@
 # responsibility Tests issue-derived eval manifest coverage for AgentCanon closeout issues.
 # upstream implementation ../../eval/definitions/issue_eval_manifest.toml registers issue-derived eval rows.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval closeout expectations.
-# downstream implementation ../../eval/checkers/eval_accumulation_check.py validates eval accumulation surfaces.
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval accumulation surfaces.
 # @dependency-end
 
 from __future__ import annotations

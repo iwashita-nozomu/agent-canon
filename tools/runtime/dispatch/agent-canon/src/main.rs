@@ -48,6 +48,7 @@
 // downstream implementation notebook_quality.rs validates notebook quality as readable runnable demos
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
+// downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
 // downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
@@ -161,11 +162,14 @@ Commands:
   git-dependency-diff-summary [options] [pathspecs...]
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
+  eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  check-skill-frontmatter [--root ROOT] [--format text|json]
+  chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
@@ -222,6 +226,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "run-evaluation" {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
+        std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "codex-hook" {
@@ -348,6 +356,12 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-frontmatter" {
+        std::process::exit(agent_canon::skill_frontmatter::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "chatgpt-codex-route" {
+        std::process::exit(agent_canon::chatgpt_codex_routing::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {

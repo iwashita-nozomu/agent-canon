@@ -31,6 +31,8 @@
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
+// downstream implementation eval_archive_paths.rs resolves native read-only eval archive paths
+// downstream implementation eval_accumulation_check.rs validates native eval and hook result accumulation
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation active_design_packet.rs owns native persisted active-design packet normalization
 // downstream implementation waterfall_gate.rs owns the native Waterfall CLI gate
@@ -65,6 +67,7 @@ pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
+pub mod chatgpt_codex_routing;
 pub mod code_template_rendering;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
@@ -76,11 +79,14 @@ pub mod experiment_identity;
 pub mod experiment_registry;
 pub mod extract_docx;
 pub mod generated_completeness;
+pub mod skill_frontmatter;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
 pub mod behavior_event_assembly;
 pub mod environment_dependencies;
+pub mod eval_accumulation_check;
+pub mod eval_archive_paths;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;

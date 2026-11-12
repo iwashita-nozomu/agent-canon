@@ -14,9 +14,9 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention trace contracts
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/responsibility_scope.rs validates responsibility-scope coverage
 # upstream implementation ../../../../eval/producers/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../../../../eval/checkers/eval_accumulation_check.py validates eval result accumulation
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates eval result accumulation
 # upstream implementation ../../../runtime/archive/runtime_log_archive_git.py manages mounted hook/eval log archive branches
-# upstream implementation ../../semantic/skills/check_skill_frontmatter.py validates runtime skill YAML frontmatter
+# upstream implementation ../../../runtime/dispatch/agent-canon/src/skill_frontmatter.rs validates runtime skill YAML frontmatter
 # upstream implementation ../../../../eval/producers/evaluate_workflow_selection.py validates workflow selection routing cases
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
@@ -391,7 +391,7 @@ else
   echo "❌ convention compliance wiring checks 失敗"
   EXIT_CODE=1
 fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/tools/validation/semantic/skills/check_skill_frontmatter.py" 2>&1; then
+if run_agent_canon check-skill-frontmatter --root "${WORKSPACE_ROOT}" 2>&1; then
   echo "✅ runtime skill frontmatter checks 成功"
 else
   echo "❌ runtime skill frontmatter checks 失敗"
@@ -434,8 +434,9 @@ else
   echo "❌ accumulated agent eval producers 失敗"
   EXIT_CODE=1
 fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/eval_accumulation_check.py" \
-  --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
+if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+  run_agent_canon eval-accumulation-check \
+    --root "${WORKSPACE_ROOT}" --runtime-root "${AGENT_CANON_CI_RUNTIME_ROOT}" 2>&1; then
   echo "✅ eval accumulation checks 成功"
 else
   echo "❌ eval accumulation checks 失敗"
