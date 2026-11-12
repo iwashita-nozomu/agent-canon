@@ -461,7 +461,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 "--format",
                 "json",
                 "tools/experiments/execution/run_managed_experiment.py",
-                "tools/validation/ci/checks/check_experiment_registry.py",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             ],
@@ -480,7 +480,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             guarded_paths,
             {
                 "tools/experiments/execution/run_managed_experiment.py",
-                "tools/validation/ci/checks/check_experiment_registry.py",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             },
@@ -491,7 +491,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             if gate["gate"] == "experiment_execution_surface_guard"
         )
         self.assertIn(
-            "tools.validation.ci.checks.check_experiment_registry",
+            "tools/bin/agent-canon experiment-registry",
             guarded_gate["command"],
         )
         self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])

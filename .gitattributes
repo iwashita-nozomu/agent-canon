@@ -22,6 +22,9 @@ agents/skills/skill-dependencies.yaml text eol=lf
 .codex/personal/skills/**/SKILL.md text eol=lf
 tests/fixtures/skill_frontmatter/** text eol=lf
 
+# Registry mutation fixtures contain exact line replacements on every host.
+tests/fixtures/experiment_registry/** text eol=lf
+
 # Graph identities bind these source and artifact bytes on every host.
 agents/canonical/skills.md text eol=lf
 documents/design/skill-tool-invocation-graph.md text eol=lf

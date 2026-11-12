@@ -5,7 +5,9 @@ contract reference
 responsibility Documents Experiment Registry for this repository.
 upstream design README.md durable document index
 upstream design ./gpu-admission-r5-source-packet.md exact registry closure and frozen topic adapter contract
-downstream implementation ../../tools/validation/ci/checks/check_experiment_registry.py validates registry schema
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/experiment_registry.rs validates registry schema
+downstream test ../../tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs exercises the native command and controlled registry fixtures
+downstream implementation ../../tools/bin/agent-canon exposes the native command
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts managed execution surface guardrails
 @dependency-end
 -->
@@ -163,11 +165,11 @@ python3 -m tools.experiments.artifacts.update_latest_result experiments/<topic>/
 ## validation
 
 ```bash
-python3 -m tools.validation.ci.checks.check_experiment_registry
+agent-canon experiment-registry
 make experiment-check
 ```
 
-この checker は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
+この native command は、path の存在、必須 field、command の placeholder、branch / worktree metadata の妥当性を確認します。
 registered command から `{config_path}` が欠ける場合も fail します。
 
 実験実行面の検証は [experiment-lifecycle](../../agents/skills/experiment-lifecycle.md#topic-boundary)
@@ -175,6 +177,7 @@ registered command から `{config_path}` が欠ける場合も fail します�
 `experiment_execution_surface_guard` は
 [Optional Rejection Prediction](../../agents/COMMUNICATION_PROTOCOL.md#optional-rejection-prediction)
 の補助診断であり、patch 前の必須 evidence ではありません。
-registry checker (`check_experiment_registry.py`) と runner の
-`tests/tools/test_run_managed_experiment.py` は、それぞれの契約変更を検証します。
+native registry command の契約は
+`tools/runtime/dispatch/agent-canon/tests/experiment_registry_native.rs` が検証します。
+`tests/tools/test_run_managed_experiment.py` は managed runner の契約を検証します。
 この文書の説明だけの変更に runner test や formal run を要求しません。
