@@ -364,11 +364,6 @@ class HookEvidenceCounter:
                 continue
             self.state.skills[skill] += 1
             self.state.skill_events[f"{skill}@{event}"] += 1
-        monitor_count = self.integer_value(entry.get("workflow_monitor_event_count"))
-        if monitor_count <= 0:
-            self.state.quality["skill_without_workflow_monitor_event"] += 1
-        if not str(entry.get("workflow_monitor_report_dir") or ""):
-            self.state.quality["missing_workflow_monitor_report_dir"] += 1
 
     def trusted_skill_source(self, sources: tuple[str, ...]) -> bool:
         """Return whether source fields are trusted for explicit skill ids."""

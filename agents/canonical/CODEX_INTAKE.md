@@ -84,7 +84,7 @@ AgentCanon の更新・再構築を要求しません。
 
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
-- branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
+- branch / worktree の目的と対象は会話で保持し、Git の実状態を確認します。選択した lifecycle と既存の破壊的 Git 操作の安全境界に従います。
 - AgentCanon source 変更は standalone source checkout を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。親で作業する場合は repository-topic lifecycle の `<anchor>/workspace/<topic>/agent-canon` checkout を再利用します。親の pin や root projection は作成しません。
 - standalone source の writer placement は [Parallel Write Safety](CODEX_SUBAGENTS.md#parallel-write-safety)
   に従い、同じ checkout root の競合する writes を直列化します。独立した責務は実際の
@@ -141,7 +141,7 @@ file や path の欠落を見つけたときは、再作成、削除済み判定
 1. template root または登録された template remote / current template main で同じ path の有無と現在の正本形を確認する
 1. standalone AgentCanon source checkout と親の development checkout で同じ path の有無、rename、移動、外部 runtime への移行理由を確認する
 1. AgentCanon-owned surface なら [documents/runtime/bootstrap-runtime.md](../../documents/runtime/bootstrap-runtime.md)、[documents/runtime/runtime-log-archive.md](../../documents/runtime/runtime-log-archive.md)、および選択した owner Skill に従い、standalone source update、shared runtime update、または意図的削除のどれかに分類する
-1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を run bundle に残す
+1. template と canon のどちらにも無く、task 固有に必要な file だけを新規作成候補にし、既存実装・文書で足りない理由を説明する
 
 欠落を見つけた agent は、handoff や review artifact に `missing_file_triage` として確認した template path、canon path、分類、次 action を記録します。
 欠落 path の判断は、template / canon 確認後の `missing_file_triage` に基づけます。
@@ -167,11 +167,7 @@ LCPの全文規則は [`agent-orchestration.md#Local Capability Priority`](../sk
 reader-facing docs は日本語で書きます。機械可読の key、command、path、
 role id、schema は正本表記を保ちます。
 
-repo-changing run では `team_manifest.yaml` の
-`run.user_facing_language_policy` を handoff packet に含め、subagent と reviewer
-が同じ方針を参照できる状態で渡します。`bootstrap_agent_run.py` と
-`bootstrap_agent_run.py` の `USER_FACING_LANGUAGE=ja` を起動時 evidence として
-扱います。
+handoff では、この言語方針を必要な文脈とともに伝えます。
 
 ## 1. Intake
 

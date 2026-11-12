@@ -25,10 +25,6 @@ markers = ["静的解析、読み取り確認、docs / targeted tests / agent ch
 path = "agents/canonical/CODEX_BOOTSTRAP.md"
 markers = ["Runtime evidence"]
 
-[[contracts.surfaces]]
-path = "agents/canonical/CODEX_IMPLEMENTATION.md"
-markers = ["distinct unresolved claim/risk"]
-
 [[contracts]]
 id = "source_file_definition_order"
 description = "Python source files keep readable definition order visible in conventions, routing, and review surfaces."

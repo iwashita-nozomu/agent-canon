@@ -79,8 +79,6 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Decision（判定）
 
-<!-- Review decision parsing and alias normalization are owned by
-     `tools/agent/orchestration/review_dispatch.py`; this template records its
-     normalized result. A selected owning gate performs a focused rerun after
+<!-- Record the selected reviewer decision and finding dispositions. A selected owning gate performs a focused rerun after
      an accepted behavior, owner-boundary, correctness, validation, or
      publication change. -->

@@ -100,7 +100,6 @@ selected gate の判定後、implementation worker はこれを source packet �
 
 ## Upstream Requirement Packet（upstream 要件 packet）
 
-<!-- designer が design を書く前に読んだ exact document path を列挙します。user_request_contract.md、schedule.md、intent_brief.md、waterfall workflow docs、その他の governing docs を含め、chat-only context に依存しません。 -->
 
 ## Installed Libraries And Existing Implementation Survey（library と既存実装の調査）
 
@@ -108,7 +107,6 @@ selected gate の判定後、implementation worker はこれを source packet �
 
 ## Implementation Source Packet（implementation source packet）
 
-<!-- worker が edit 前に読む全 artifact を列挙します。user_request_contract.md、schedule.md、この design brief、active 時の design_review.md/document_flow_review.md、post-implementation test design が active な場合だけ test_plan.md、repo docs、dependency surface、code path、test、外部 reference を含めます。各 item を required または not used と記録します。 -->
 
 <!-- semantic delta がある場合は run-local semantic_responsibility_contract.toml instance を含めます。reusable template から生成し、implementation 前に読みます。 -->
 

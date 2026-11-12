@@ -92,15 +92,13 @@ def test_all_source_gate_entrypoints_require_distinct_control_and_runtime_roots(
         "regression_status",
         "producer_status",
         "checker_status",
-        "smoke_status",
         "expected_names",
     ),
     [
-        (0, 0, 0, 0, ["regression", "producer", "checker", "smoke"]),
-        (0, 7, 0, 0, ["regression", "producer"]),
-        (0, 0, 9, 0, ["regression", "producer", "checker"]),
-        (0, 0, 0, 11, ["regression", "producer", "checker", "smoke"]),
-        (1, 0, 0, 0, ["regression"]),
+        (0, 0, 0, ["regression", "producer", "checker"]),
+        (0, 7, 0, ["regression", "producer"]),
+        (0, 0, 9, ["regression", "producer", "checker"]),
+        (1, 0, 0, ["regression"]),
     ],
 )
 def test_eval_preserves_failed_producer_logs_until_ci_capture(
@@ -108,7 +106,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     regression_status: int,
     producer_status: int,
     checker_status: int,
-    smoke_status: int,
     expected_names: list[str],
 ) -> None:
     """Failed producer logs survive; successful temporary output is still cleaned."""
@@ -132,11 +129,6 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     )
     paths = (
         ("eval/producers/run_accumulated_agent_evals.py", "producer", producer_status),
-        (
-            "eval/checkers/smoke_test_research_perspective_pack.py",
-            "smoke",
-            smoke_status,
-        ),
     )
     archive_relative = LOG_ARCHIVE_PARENT.as_posix()
     for relative, name, status in paths:
@@ -216,15 +208,11 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         check=False,
     )
     assert result.returncode == (
-        regression_status or producer_status or checker_status or smoke_status
+        regression_status or producer_status or checker_status
     ), result.stdout + result.stderr
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
-    assert all(
-        record[1:] == [None, None, str(runtime)]
-        for record in records
-        if record[0] != "smoke"
-    )
+    assert all(record[1:] == [None, None, str(runtime)] for record in records)
     report_path = (
         runtime
         / LOG_ARCHIVE_PARENT
@@ -239,7 +227,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     if regression_status:
         assert temporary_logs.is_dir()
         assert not list(temporary_logs.iterdir())
-    elif producer_status or checker_status or smoke_status:
+    elif producer_status or checker_status:
         assert temporary_logs.is_dir()
         assert "producer stdout line 161" in (
             temporary_logs / "02-workflow-selection.stdout.txt"

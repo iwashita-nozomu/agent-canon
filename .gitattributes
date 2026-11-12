@@ -38,5 +38,3 @@ tools/validation/ci/config/actionlint.yaml text eol=lf
 # raw evidence; do not run Git's text whitespace diff oracle over these files.
 tests/fixtures/nvidia/*.txt -diff
 tests/fixtures/nvidia/*.xml -diff
-# The Waterfall CLI baseline corpus is byte-hashed by native tests on every host.
-tests/fixtures/waterfall_gate/python_golden.jsonl text eol=lf

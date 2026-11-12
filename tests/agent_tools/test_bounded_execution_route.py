@@ -58,8 +58,8 @@ def test_real_edge_or_resumption_selects_existing_coordination(context, reason):
     result = decide_execution(ROOT, {**context, "coordination": [reason]})
     assert result == {
         "execution_route": "coordination",
-        "next_action": "run_existing_coordinated_closeout",
-        "commands": ["tools/bin/agent-canon task-close --run-id <run-id>"],
+        "next_action": "coordinate_with_native_codex_and_report_results",
+        "commands": [],
         "selected_validation": context["validation"],
         "verification_status": "pending",
     }

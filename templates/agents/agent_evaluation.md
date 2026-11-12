@@ -6,8 +6,6 @@ contract template
 responsibility Documents Agent Evaluation for this repository.
 upstream design ../../documents/runtime/task-contract-observation.md defines contract coverage and archive routing
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs generates concrete evaluations
-downstream implementation ../../tools/runtime/lifecycle/task_contract_observation.py produces current-run contract coverage evidence
-downstream implementation ../../tools/runtime/dispatch/agent-canon/src/task_close.rs enforces pass status before user completion
 @dependency-end
 -->
 
@@ -45,7 +43,6 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/task_clos
 | Observation ID | Contract ID | Source | Phase | Final Outcome | Evidence | Response |
 | -------------- | ----------- | ------ | ----- | ------------- | -------- | -------- |
 
-<!-- `task_contract_observation.py` の checker output と Behavior Events を参照します。blocked/violated の未解決、identity/sequence collision、observed と none の混在、checker を通さない pass token は fail とします。 -->
 
 ## Feedback Actions（feedback 対応）
 

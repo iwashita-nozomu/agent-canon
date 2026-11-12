@@ -41,7 +41,6 @@ from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
     load_team_config,
 )
-from tools.runtime.manifest.manifest_rendering import render_subagent_prompt_packet  # noqa: E402
 
 
 def _route_environment(
@@ -431,65 +430,14 @@ class RouteToolTest(unittest.TestCase):
                 )
 
     def test_math_scope_contract_is_owned_and_routed(self) -> None:
-        """The math owner defines packet fields and orchestration routes to it."""
+        """The math role and orchestration retain the mathematical owner route."""
         orchestration = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
-        optimization = (
-            PROJECT_ROOT / "agents" / "skills" / "computational-optimization.md"
-        ).read_text(encoding="utf-8")
-        bootstrap = (
-            PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "bootstrap_agent_run.py"
-        ).read_text(encoding="utf-8")
-        for field in (
-            "math_object",
-            "problem",
-            "variables",
-            "domains",
-            "units",
-            "objective",
-            "residual",
-            "constraints",
-            "equations",
-            "definitions",
-            "assumptions",
-            "approximations",
-            "derivation",
-            "iteration_map",
-            "update_map",
-            "invariants",
-            "limits",
-            "stopping_scalar",
-            "failure_semantics",
-            "equation_to_code_map",
-            "math_oracle",
-            "counterexample",
-            "mathematical_definition_paths",
-            "mathematical_oracle_paths",
-            "mathematical_documentation_paths",
-            "allowed_write_paths",
-            "forbidden_surfaces",
-            "separate_handoff_targets",
-        ):
-            with self.subTest(field=field):
-                self.assertIn(field, optimization)
-        for surface in (
-            "architecture",
-            "JIT",
-            "backend",
-            "runtime",
-            "routing",
-            "environment",
-        ):
-            with self.subTest(surface=surface):
-                self.assertIn(surface, optimization)
         self.assertIn(
             "[computational-optimization](computational-optimization.md)",
             orchestration,
         )
-        self.assertIn("mathematical intent", orchestration)
-        self.assertIn("math_packet_missing", optimization)
-        self.assertIn("writer_target", bootstrap)
 
         team_config = json.loads(
             (PROJECT_ROOT / "agents" / "agents_config.json").read_text(encoding="utf-8")
@@ -1609,10 +1557,7 @@ class RouteToolTest(unittest.TestCase):
             for family in catalog.workflow_families
             if family["id"] == "comprehensive_development"
         )
-        rendered = "\n".join(
-            # The family packet is the existing task-manifest projection for T11/T12.
-            render_subagent_prompt_packet(family, indent="  ")
-        )
+        rendered = json.dumps(family["subagent_prompt"], ensure_ascii=False)
         self.assertIn("involved Git-root/module count", rendered)
         self.assertIn("dependency-repository consumer", rendered)
         self.assertIn("dependency DAG", rendered)

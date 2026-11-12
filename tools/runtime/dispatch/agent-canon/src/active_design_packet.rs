@@ -3,7 +3,6 @@
 // responsibility Owns native normalization and mapping for the persisted active-design-packet contract.
 // upstream design ../../../../../agents/COMMUNICATION_PROTOCOL.md active design packet schema
 // upstream implementation ../../../../../tools/agent/orchestration/packets.py owns the source packet schema and normalized contract
-// downstream implementation waterfall_gate.rs validates the persisted packet and reference projection
 // @dependency-end
 
 use crate::artifacts::artifact_identity::canonical_json_bytes;

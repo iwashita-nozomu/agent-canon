@@ -21,7 +21,7 @@ artifacts and state below apply only to `coordination`, not `bounded_fast_path`.
 | Assessing required outcome/evidence coverage | [Completion Bar](#completion-bar) |
 | Performing selected validation | [6. Validation](#6-validation) |
 | Closing a bounded route | [Bounded delivery](#bounded-delivery) |
-| Closing a coordination run | [Mechanical Completion Loop](#mechanical-completion-loop) and [Coordination closeout](#coordination-closeout) |
+| Completing coordinated work | [Completion Review](#completion-review) and [Coordinated delivery](#coordinated-delivery) |
 | Reporting or handing off the result | [Completion Readiness](#completion-readiness) |
 
 ## Completion Bar
@@ -66,33 +66,17 @@ and authorized remote readback. Clean up only task-owned resources created by
 the selected operations. Decide commit and push under
 [delivery ownership](ROOT_DELIVERY.md#commit-and-push-decisions).
 
-The selected results are the evidence. This route creates no coordination run
-bundle, `user_request_contract.md`, `schedule.md`, or `closeout_gate.md`, and does
-not invoke `agent-canon task-close`. A concrete new
+The selected results are the evidence. A concrete new
 coordination need returns only that changed decision to the route owner; labels,
 links, and report length do not initiate a route change.
 
-## Mechanical Completion Loop
+## Completion Review
 
-For an explicitly selected coordination closeout, use its existing run bundle and
-`closeout_gate.md`. Read current request clauses, accepted findings, validation gaps, and
-selected commit/push, synchronization, and follow-up outcomes. Inspect the final
-tracked/untracked diff and directly affected dependencies/consumers. Run selected
-static and targeted checks; select broad execution only when the affected contract
-requires it and it can resolve a remaining decision.
-
-An activated owning review gate may request a read-only diff-check. Give it the
-current source, selected handoff, validation, and dependency evidence. The owning
-reviewer adjudicates hypotheses and reopens only an accepted, source-backed
-in-scope repair. Preserve the intent through repair, redesign, or authorized
-escalation. Use [review activation and adjudication](../skills/agent-orchestration.md#review-activation-and-adjudication)
-for those decisions.
-
-For an explicitly selected coordination closeout, `agent-canon task-close` checks the
-requested outcome, actual validation and delivery evidence, and applicable
-closeout records. It does not require a task graph, stage plan, or planned-work
-ledger. Record `not_applicable` only where the selected closeout artifact defines
-an inactive field.
+Compare the agreed outcome with the actual diff, selected validation and activated
+review results. Finish authorized publication and synchronization with their native
+owner, then read back the resulting state. Preserve unknown state and clean up
+task-owned resources when their use ends. No custom closeout gate or run bundle
+is created.
 
 ## 6. Validation
 
@@ -134,7 +118,7 @@ consumer/runtime evidence; neither is inferred from unrelated successful checks.
 ## 7. Closeout
 
 Use [Completion Readiness](#completion-readiness) for the selected route. Read
-[Coordination closeout](#coordination-closeout) only for a coordination run.
+[Coordinated delivery](#coordinated-delivery) when integrating child work.
 
 ## Completion Readiness
 
@@ -159,8 +143,8 @@ user-guided parent ownership. A bounded route has no child return to interpret.
 The user's explicit step boundary defines that step's deliverable; do not expand
 it to the entire project or wait for unrelated work.
 
-Return a completion result only when the selected bounded evidence or coordination
-`agent-canon task-close` result establishes all required outcomes on the final source.
+Return a completion result only when the selected evidence establishes all
+required outcomes on the final source.
 If the user explicitly requests pause/handoff, preserve that boundary. Otherwise,
 an incomplete blocker handoff requires evidence that the next required operations
 cannot proceed under current authority, safety, or available execution routes,
@@ -177,39 +161,13 @@ Before either result, apply
 comparable rationale, results, limitations, and exact PR/head references on the
 Issue. Review-only/no-change work retains its result and source-backed rationale.
 
-## Coordination closeout
+## Coordinated delivery
 
-For the selected coordination run, pass the existing run evidence through the
-[native TaskClose owner](../../tools/runtime/dispatch/agent-canon/src/task_close.rs).
-`agent-canon task-close` remains the sole coordination terminal predicate;
-this owner does not restate its artifact fields or create another checklist.
-Keep source/config/schema/fixtures/documentation/tool entrypoints needed by the
-runnable commit together under [Branch Scope](../../documents/operations/BRANCH_SCOPE.md).
+Integrate selected child work and accepted review findings, then check the final
+diff and actual validation results. Keep source, fixtures, documentation, and
+entrypoints needed by the runnable commit together under
+[Branch Scope](../../documents/operations/BRANCH_SCOPE.md). Read back authorized
+publication and clean up task-owned temporary resources, preserving unknown state.
 
-For selected commit/push operations, record `commit_created` and `push_completed`
-as `yes`; unselected operations use the schema's `not_applicable` with the reason.
-A missing or failed selected operation remains incomplete. Preserve exact remote
-head/tree and post-integration evidence. Creator-owned temporary resources need
-their exact identity and absence readback through the cleanup owner before terminal
-closeout, preserving unrelated/user-owned resources.
-
-`review_findings_integrated=yes` requires intent-preserving disposition of accepted
-findings and authorized withdrawal/replacement/escalation for any discarded slice.
-Keep selected review post-fix evidence and required inactive dispositions in the
-same run record. The terminal owner consumes canonical tree-head, subagent, log,
-and evaluation evidence under their actual activation conditions.
-
-When behavior feedback/evaluation is selected, update the existing
-`workflow_monitoring.md` signals, interventions, decisions, and protocol feedback
-with their real outcomes. `--closeout-token-preset` only records established facts;
-it does not replace formatter/check, dependency, review, or finding evidence.
-An activated evaluation uses `tools/bin/agent-canon run-evaluation` and its behavior manifest;
-only its actual result and resolved feedback establish evaluation completion.
-Reuse [agent-learning](../skills/agent-learning.md#reader-map) for private knowledge
-or behavior-learning decisions. Public failed verification stays in the saved topic
-record. A standalone memo save does not activate behavior evaluation.
-
-Keep any selected run's execution trail current, settle applicable
-log-derived avoidances at their owner, and retain required experiment/performance
-comparisons and scope-limited claims. Publish actual results through the existing
-reporting owner rather than a second closeout checklist or approval gate.
+Selected Eval and archival operations retain their existing owners. Report their
+actual results when requested; they do not require new run bundles or progress files.

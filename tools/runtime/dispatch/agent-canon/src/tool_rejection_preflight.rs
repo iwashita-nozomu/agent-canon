@@ -12,7 +12,6 @@
 // upstream implementation ../../../../../tools/bin/agent-canon owns the stable native CLI
 // downstream implementation main.rs registers the native selector
 // downstream implementation ../../../../../tools/catalog.yaml publishes the native command
-// downstream implementation ../../../../../tools/runtime/manifest/manifest_rendering.py projects the optional diagnostic
 // downstream implementation ../../../../../tests/agent_tools/test_tool_rejection_preflight.py validates predicted gate routing
 // @dependency-end
 

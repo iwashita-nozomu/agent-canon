@@ -33,7 +33,7 @@ agent context の再利用を優先します。並行作業を選ぶ場合は実
 衝突を考慮し、起動結果と完了結果を区別して会話または native handoff で伝えます。
 
 Runtime collaboration capability and coordination receipts are owned by
-[agents/COMMUNICATION_PROTOCOL.md#Runtime Collaboration Capability Handshake](../COMMUNICATION_PROTOCOL.md#runtime-collaboration-capability-handshake).
+[Native Collaboration](../COMMUNICATION_PROTOCOL.md#native-collaboration).
 This document only projects the route: read capability from the direct runtime
 collaboration namespace, use `direct_peer` only after an `available` readback,
 and use an honest `parent_relay` or `durable_artifact` path for
@@ -258,7 +258,7 @@ active writer's scope until its actual completion or an explicit cancellation.
 `explicit_empirical_skill_evaluation`. Use the catalog's `skill_evaluation`
 family and selected role guidance when that route is chosen. Keep the evaluator
 read-only and artifact-only; the evaluation reviewer owns scoring and
-convergence. Any run bundle is separate from the evaluator prompt, which uses
+convergence. The evaluator prompt uses
 the current Scenario Packet, packet-listed files, `do_not_read`, and fixed
 output schema.
 The evaluator's `mini_skill_evaluator_medium` profile (`gpt-6-luna/medium`) is
@@ -304,7 +304,7 @@ skill/reviewer が判断し、parent は結果を既存 handoff route で relay 
 | --- | --- | --- |
 | log archive API、structured dashboard、routing miss、selection gap、actual execution records | `agent-log-analysis` | log-analysis owner が context artifact を生成し、`prompt_config_reviewer` は prompt / config drift、`docs_workflow_steward` は workflow / skill wording、`project_reviewer` は repo-wide operational risk を別 packet で見る。parent は launch/relay/status だけを担当する |
 | repository layout、root shared view、responsibility scope、directory README、import boundary、project `.codex` / `.agents` view と personal `~/.codex` の境界 | `structure-refactor` | `explorer` は responsibility graph と stale surface、`execution_planner` は move / validation order、write-capable agent は disjoint path mapping、document-flow reviewer は reader route を見る |
-| run bundle、spawn authorization、handoff capsule、same-role instance identity | `subagent-bootstrap` | parent は launch と handoff を所有し、selected role の input packet、scope、validation route を保ちます |
+| native agent launch and handoff | `subagent-bootstrap` | parent は launch と handoff を所有し、selected role の input packet、scope、validation route を保ちます |
 
 Skill を連鎖させる場合は、前 skill が作った context artifact、handoff
 packet、または structure contract を次 skill の input にします。境界は
@@ -335,8 +335,7 @@ Goal の存在だけでは、事前 fan-out、schedule、handoff file、進捗�
 - これらは session-level setting で、per-agent TOML には書きません
 - runtime が `/agent` を提供する場合は inventory 確認に使います
 - `/agent` が使えない runtime では `.codex/agents/*.toml` を直接見ます
-- run bundle は coordination、resumption、または selected workflow が durable
-  lifecycle evidence を必要とするときだけ、既存 owner route で用意します
+- 実行・協調・再開には Codex 標準ツールを使い、範囲と結果を Git と会話で引き継ぎます
 - `--task-id` の task-default specialist と default review pack は候補として
   読み込み、owner-critical operation、unresolved branch、または selected
   validation route が有効化したものだけを materialize します
@@ -363,7 +362,7 @@ role / Skills / authority を `$direct-luna-communication` packet に載せま�
 | `change_reviewer` | `diff_triage_reviewer` by default; `python_reviewer`, `cpp_reviewer`, then `reviewer` only with language or broad-review eligibility evidence |
 | `final_reviewer` | `ship_reviewer` checks final diff traceability to the Abstract Design Frame and approved packet; then `reviewer` / `project_reviewer` when final gate escalation is needed |
 | `verifier` | prescribed validation runner |
-| `auditor` | closeout artifact and workflow-monitoring gate |
+| `auditor` | selected completion evidence |
 | `researcher` | `literature_researcher` or `explorer` |
 | `research_reviewer` | `reviewer` |
 | `experimenter` | `experiment_runner` for runs; `worker` only for scoped runtime-output handling |
@@ -598,36 +597,15 @@ runtime は再生成後に restart し、readback で反映を確認します。
 - generation 後は alignment readback を確認し、load 済み session の projection
   freshness は registry materialization と fresh-session restart/readback で回復します
 
-## Smoke Test
+## Role validation
 
-runtime inventory や review pack を変えたら、まず次を実行します。
+Role inventory and selected review-pack changes use the existing alignment checker:
 
-    python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-    python3 eval/checkers/smoke_test_research_perspective_pack.py
+```bash
+python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
+```
 
-この smoke test は次を確認します。
-
-- `agents/task_catalog.yaml` の各 task が有効な specialist / review pack へ展開できる
-- `agents/agents_config.json` の required output が実テンプレートに結び付いている
-- `.codex/config.toml` が `.codex/agents/*.toml` を全 role 登録している
-- `.codex/agents/*.toml` が role ごとの model / reasoning 設定を持っている
-- selected workflow が bundle を必要とする場合だけ temporary run bundle を
-  作り、required output が実際に生成される
-- `agents/agents_config.json` に perspective reviewers と artifact mapping がある
-- `agents/task_catalog.yaml` に `research_perspective_triage` default pack と optional `research_perspective_review` pack がある
-- `.codex/agents/*.toml` に対応 subagent 定義がある
-- perspective review が選択され bundle が必要な場合だけ temporary run bundle を
-  作り、各 perspective review artifact が実際に生成される
-Role and profile selection is owned by the canonical model/profile registry and
-the selected workflow. Sol is the parent; Luna owns ambiguous design, causal
-repair, cross-owner integration, and review; Spark is an implementation option;
-and `skill_evaluator` is selected for explicit empirical evaluation. Model and
-profile policy stays out of `route.py`.
-
-Use native tool results as the evidence of what ran and whether it succeeded;
-preserve actual failures rather than inferring success from a plan or monitor.
-Existing Eval or owner review can assess whether necessary work was missed or
-unnecessary work was done. A different route alone is not a failure.
+This validates role references and model/profile projections independently of task progress files.
 
 ## Capacity And Lifecycle
 

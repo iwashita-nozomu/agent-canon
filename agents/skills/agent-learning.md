@@ -7,7 +7,7 @@ responsibility Routes private knowledge and feedback to the external log owner a
 upstream design ../../documents/runtime/private-feedback-knowledge.md private log command and storage contract
 upstream design ../../documents/operations/notes-lifecycle.md public failed verification and topic reuse
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs native private knowledge and feedback commands
-downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py runtime feedback evidence
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs runtime behavior evidence
 @dependency-end
 -->
 
@@ -49,7 +49,7 @@ Notes Lifecycle directly.
 - [Private log contract](../../documents/runtime/private-feedback-knowledge.md)
 - [Notes Lifecycle](../../documents/operations/notes-lifecycle.md)
 - `tools/runtime/dispatch/agent-canon/src/private_feedback.rs`
-- `tools/runtime/lifecycle/workflow_monitor.py`
+- `tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs`
 - `eval/definitions/agent_behavior_eval.toml`
 
 ## Mandatory Behavior and Learning Contract
@@ -59,8 +59,8 @@ Separate stable user preferences from observations; record source, evidence,
 scope, confidence, and the decision rather than a raw transcript. Stable preferences
 are explicit changes to the relevant AGENTS or canonical owner, not private canon.
 
-Use `workflow_monitor.py` for its existing behavior-event and runtime-feedback
-schemas. Skill invocation, subagent routing/lifecycle, tool gates, prompt evaluation,
+Use existing hook logs and selected evaluation results as behavior evidence.
+Skill invocation, subagent routing/lifecycle, tool gates, prompt evaluation,
 review feedback, and diff-check decisions retain their event owner. Select the
 affected Skill, prompt, workflow, evaluation, or knowledge owner from the evidence.
 The active Skill set is the first calibration candidate for an observed Skill gap;

@@ -43,10 +43,6 @@ REPO_REVIEW = (
     / "dependencies"
     / "run_repo_dependency_review.sh"
 )
-WORKFLOW_MONITOR = (
-    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-)
-AGENT_TEAM = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "agent_team.py"
 DOCKER_VALIDATOR = (
     PROJECT_ROOT
     / "tools"
@@ -1334,7 +1330,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
             target = root / "target.md"
             source = root / "source.md"
             hits = root / "search_hits.txt"
@@ -1422,7 +1417,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
             target = root / "target.md"
             source = root / "source.md"
             report_dir = runtime_root_for(root) / "reports" / "dependency-review"
@@ -2047,8 +2041,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
-            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
             a = root / "a.md"
             b = root / "b.md"
             a.write_text(
@@ -2189,84 +2181,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
             self.assertNotIn(
                 "reports/dependency-review/run/search_hits.txt", result.stdout
-            )
-
-    def test_repo_review_records_monitoring_when_report_dir_is_given(self) -> None:
-        """The review wrapper records monitoring evidence when directed to a run."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            subprocess.run(
-                ["git", "init"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            tool_dir = root / "tools" / "agent_tools"
-            tool_dir.mkdir(parents=True)
-            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
-            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
-            (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
-            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
-            target = root / "target.md"
-            source = root / "source.md"
-            target.write_text(
-                "\n".join(
-                    [
-                        "# Target",
-                        "<!--",
-                        "@dependency-start",
-                        "contract test",
-                        "responsibility Defines target test fixture context.",
-                        "downstream design source.md source reads target",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            source.write_text(
-                "\n".join(
-                    [
-                        "# Source",
-                        "<!--",
-                        "@dependency-start",
-                        "contract test",
-                        "responsibility Defines source test fixture context.",
-                        "upstream design target.md target context",
-                        "@dependency-end",
-                        "-->",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            subprocess.run(
-                ["git", "add", "target.md", "source.md"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            report_dir = runtime_root_for(root) / "reports" / "agents" / "run-3"
-
-            result = run_tool(
-                str(REPO_REVIEW),
-                "--root",
-                str(root),
-                "--report-dir",
-                str(report_dir),
-                root=root,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            text = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
-            self.assertIn("repo_dependency_review=pass", text)
-            self.assertIn(
-                "run_repo_dependency_review.sh recorded dependency review pass",
-                text,
             )
 
     def graph_ensure_fixture(

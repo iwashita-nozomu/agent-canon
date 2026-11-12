@@ -60,15 +60,11 @@ owner's applicable check.
 Use `tools/bin/agent-canon docs check` when that check is selected for the
 document.
 
-## Standard command
+## Start the writing task
 
-```bash
-python3 tools/analysis/documents/doc_start.py \
-  --task "academic writing task" \
-  --kind academic \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
+Follow the section and figure outline above, then use the selected writing Skill
+and native collaboration for an activated review. Keep manuscript and figure
+artifacts at their project owner paths; no task run directory is created.
 
 ## Review outcomes
 

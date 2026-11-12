@@ -81,9 +81,7 @@ expression unparse, and visitor traversal. Old/new fixture comparison remains
 the acceptance oracle for CPython AST behavior.
 
 Private feedback/knowledge storage now belongs to `private_feedback.rs`; its
-packaged Python adapter is retired. `workflow_monitor.py` remains an owned Python
-implementation pending its own port and invokes native capture through stdin.
-That remaining caller is not a feedback implementation fallback. The planner
+packaged Python adapter and custom task monitoring writer are retired. The planner
 retains its adapter-marker observation so a future reintroduced delegation is
 still visible. Host archive Git/annex publication remains at its existing owner.
 

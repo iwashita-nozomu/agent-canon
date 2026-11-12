@@ -23,21 +23,13 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import tomllib
 from collections.abc import Collection
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-try:
-    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary
-except ImportError:
-    from tools.runtime.artifacts.runtime_artifacts import runtime_artifact_boundary  # type: ignore[no-redef]
 
 from typing import cast
 
@@ -46,41 +38,20 @@ import yaml
 
 from tools.agent.orchestration.team_config import (
     ROOT,
-    Role,
-    RunBundleSpec,
-    TaskCatalog,
     TeamConfig,
     default_specialists_for_task,
     load_task_catalog,
     load_team_config,
     resolve_role,
     resolve_workflow_family,
-    select_roles,
     task_ids,
 )
 
-from tools.agent.orchestration.agent_team import create_run_bundle
-
-from tools.runtime.source.agent_canon_source_root import (
-    RepositoryRoots,
-    RootResolution,
-    resolve_agent_canon_source_root,
-)
-
-from tools.repository.workspace.workspace_scope import resolve_repository_roots
-
-from tools.runtime.manifest.manifest_rendering import required_output_templates_missing
 
 from tools.agent.orchestration.subagent_selection import COLLABORATION_OPERATIONS
 
-from tools.agent.orchestration.packets import (
-    resolve_active_design_packet_config,
-    resolve_cross_cutting_document_packet,
-    resolve_role_document_packet,
-)
 from tools.agent.skills.skill_route_catalog import load_skill_route_rules
 
-UTC = timezone.utc
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
@@ -136,51 +107,6 @@ TOOL_RESULT_ROUTE_MARKERS = (
     "repo-wide drift and integration risk -> project_reviewer",
 )
 PERMANENT_TEAM_MAPPING_HEADING = "## Permanent Team To Codex Mapping"
-
-
-@dataclass(frozen=True)
-class AlignmentWorkspace:
-    """Temporary workspace used for runtime bundle smoke checks."""
-
-    workspace_root: Path
-    report_root: Path
-    repository_roots: RepositoryRoots
-
-
-@contextmanager
-def runtime_alignment_parent(source_resolution: RootResolution):
-    """Yield runtime-owned scratch without treating the source as a parent."""
-    source_root = source_resolution.source_root.resolve()
-    boundary = runtime_artifact_boundary(source_root, create=True)
-    yield boundary.ensure_directory("checks/runtime-alignment")
-
-
-def resolve_packet_probe_workspace() -> Path:
-    """Return the workspace root that should be used for packet path existence checks."""
-    candidate = ROOT.parent.parent.resolve()
-    try:
-        if (candidate / "vendor" / "agent-canon").resolve() == ROOT.resolve():
-            return candidate
-    except FileNotFoundError:
-        pass
-    return ROOT.resolve()
-
-
-@contextmanager
-def packet_probe_runtime_root():
-    """Yield an external runtime root for packet-only validation artifacts.
-
-    Alignment is a source-tree check.  Its synthetic report bundle is useful
-    only while validating packet paths and must therefore never default to a
-    ``reports/`` directory below AgentCanon itself.  A caller may provide the
-    normal runtime root; otherwise use one short-lived system temporary root.
-    """
-    configured = os.environ.get("AGENT_CANON_RUNTIME_ROOT", "").strip()
-    if configured:
-        yield Path(configured).expanduser().resolve()
-        return
-    with tempfile.TemporaryDirectory(prefix="agent-canon-runtime-alignment-") as root:
-        yield Path(root).resolve()
 
 
 def ensure(condition: bool, message: str) -> None:
@@ -735,7 +661,6 @@ def validate_codex_agent_settings() -> None:
 def validate_team_config_references() -> None:
     """Check role references inside the team config."""
     config = load_team_config()
-    active_design_packet = resolve_active_design_packet_config(config)
     ensure(
         not (SCOPED_MODEL_POLICY_KEYS & set(config.raw)),
         "agents_config.json must not own model, effort, review model, or tier policy",
@@ -756,11 +681,6 @@ def validate_team_config_references() -> None:
         evaluator.codex_agents == (EVALUATOR_AGENT_ID,),
         f"{EVALUATOR_AGENT_ID} must map only to itself",
     )
-    ensure(
-        evaluator.write_policy.mode == "artifacts_only"
-        and "skill_evaluation" in evaluator.write_policy.allowed_artifacts,
-        f"{EVALUATOR_AGENT_ID} must be artifact-only skill evaluation",
-    )
 
     for role in config.always_on_roles + config.specialist_roles:
         ensure(
@@ -769,54 +689,11 @@ def validate_team_config_references() -> None:
             f"{role.id} codex_agents must not include {EVALUATOR_AGENT_ID}; "
             f"the evaluator candidate is reserved for the {EVALUATOR_AGENT_ID} role",
         )
-        ensure(bool(role.required_outputs), f"{role.id} must declare required_outputs")
-        ensure(
-            bool(role.write_policy.allowed_artifacts),
-            f"{role.id} must declare allowed_artifacts",
-        )
         for codex_agent_id in role.codex_agents:
             ensure(
                 codex_agent_id in codex_agent_ids,
                 f"{role.id} references missing Codex agent: {codex_agent_id}",
             )
-        for output in role.required_outputs:
-            ensure(
-                output.endswith((".md", ".yaml", ".txt")),
-                f"{role.id} output has unsupported suffix: {output}",
-            )
-        for artifact_key in role.write_policy.allowed_artifacts:
-            ensure(
-                artifact_key in config.artifacts,
-                f"{role.id} allowed_artifact key missing from artifacts: {artifact_key}",
-            )
-            mapped = config.artifacts[artifact_key]
-            conditional_keys = {
-                key
-                for keys in role.write_policy.conditional_artifacts.values()
-                for key in keys
-            }
-            ensure(
-                mapped in role.required_outputs or artifact_key in conditional_keys,
-                f"{role.id} artifact mapping mismatch: {artifact_key} -> {mapped}",
-            )
-        for condition, artifact_keys in role.write_policy.conditional_artifacts.items():
-            ensure(
-                bool(condition.strip()),
-                f"{role.id} conditional artifact condition must be non-empty",
-            )
-            for artifact_key in artifact_keys:
-                ensure(
-                    artifact_key in role.write_policy.allowed_artifacts,
-                    f"{role.id} conditional artifact is not allowed: {artifact_key}",
-                )
-                ensure(
-                    artifact_key in config.artifacts,
-                    f"{role.id} conditional artifact key missing from artifacts: {artifact_key}",
-                )
-                ensure(
-                    config.artifacts[artifact_key].endswith((".md", ".yaml", ".txt")),
-                    f"{role.id} conditional artifact has unsupported suffix: {artifact_key}",
-                )
 
     implementer = resolve_role(config, "implementer")
     ensure(
@@ -828,20 +705,6 @@ def validate_team_config_references() -> None:
         change_reviewer.codex_agents[:4]
         == ("diff_triage_reviewer", "python_reviewer", "cpp_reviewer", "reviewer"),
         "change_reviewer codex_agents must start with diff_triage_reviewer,python_reviewer,cpp_reviewer,reviewer",
-    )
-
-    missing_templates = required_output_templates_missing(
-        config,
-        config.always_on_roles + config.specialist_roles,
-        allowed_missing=(
-            config.artifacts["team_manifest"],
-            config.artifacts["verification"],
-        ),
-        source_root=ROOT,
-    )
-    ensure(
-        not missing_templates,
-        f"missing required output templates: {', '.join(sorted(missing_templates))}",
     )
 
     for handoff in config.handoffs:
@@ -881,49 +744,6 @@ def validate_team_config_references() -> None:
             rule_role in role_ids,
             f"activation rule references unknown role: {rule_role}",
         )
-
-    packet_probe_workspace = resolve_packet_probe_workspace()
-    with packet_probe_runtime_root() as packet_probe_runtime:
-        packet_probe_report_dir = (
-            packet_probe_runtime / "reports" / "agents" / "_packet_probe"
-        )
-        for entry in resolve_cross_cutting_document_packet(
-            packet_probe_workspace,
-            ROOT,
-        ):
-            ensure(
-                entry.path.exists(),
-                f"cross-cutting document packet path missing: {entry.path}",
-            )
-        for role in config.always_on_roles + config.specialist_roles:
-            packet = resolve_role_document_packet(
-                config=config,
-                role=role,
-                report_dir=packet_probe_report_dir,
-                workspace_root=packet_probe_workspace,
-                active_design_packet=active_design_packet,
-                agentcanon_source_root=ROOT,
-            )
-            for entry in packet.read_before_work:
-                ensure(
-                    "#" not in str(entry.path),
-                    f"{role.id} document packet path must not encode sections: {entry.path}",
-                )
-                if "/reports/agents/_packet_probe/" in str(entry.path):
-                    continue
-                ensure(
-                    entry.path.exists(),
-                    f"{role.id} document packet path missing: {entry.path}",
-                )
-                for section in entry.sections:
-                    ensure(
-                        bool(section.heading),
-                        f"{role.id} document packet section missing heading: {entry.path}",
-                    )
-                    ensure(
-                        bool(section.anchor),
-                        f"{role.id} document packet section missing anchor: {entry.path}",
-                    )
 
 
 def validate_task_catalog_references() -> None:
@@ -1392,11 +1212,7 @@ def validate_subagent_protocol_docs() -> None:
                 "agents/task_catalog.yaml",
                 "agents/agents_config.json",
                 ".codex/agents/*.toml",
-                "bootstrap_agent_run.py",
-                "workflow_monitor.py",
                 "python3 tools/agent/orchestration/route.py --prompt",
-                "Markdown links",
-                "actual results",
             ):
                 ensure(marker in text, f"{path} missing owner-map marker: {marker}")
         else:
@@ -1460,571 +1276,6 @@ def validate_permanent_team_mapping(config: TeamConfig, markdown_text: str) -> N
     )
 
 
-def alignment_workspace(
-    tmp_root: Path,
-    source_resolution: RootResolution,
-) -> AlignmentWorkspace:
-    """Return the temporary workspace layout for bundle smoke checks."""
-    workspace_root = tmp_root / "workspace"
-    report_root = tmp_root / "reports"
-    repository_roots = resolve_repository_roots(
-        workspace_root,
-        report_root,
-        source_root=source_resolution.source_root,
-        canon_root=source_resolution.canon_root,
-    )
-    return AlignmentWorkspace(
-        workspace_root=workspace_root,
-        report_root=report_root,
-        repository_roots=repository_roots,
-    )
-
-
-def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
-    """Create the directories and scope file required by bundle smoke checks."""
-    workspace.workspace_root.mkdir(parents=True, exist_ok=True)
-    workspace.report_root.mkdir(parents=True, exist_ok=True)
-    (workspace.workspace_root / "python").mkdir()
-    (workspace.workspace_root / "documents").mkdir()
-    (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
-    (workspace.workspace_root / ".codex").mkdir()
-    (workspace.workspace_root / ".codex" / "config.toml").write_bytes(
-        (
-            workspace.repository_roots.agentcanon_source_root / ".codex" / "config.toml"
-        ).read_bytes()
-    )
-    (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
-        "\n".join(
-            [
-                "# Worktree Scope",
-                "",
-                "## Editable Directories",
-                "- `python`",
-                "- `documents`",
-                "",
-                "## Runtime Output Directories",
-                "- `reports/runtime`",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-
-def current_utc_iso() -> str:
-    """Return a second-granularity UTC timestamp."""
-    return (
-        datetime.now(UTC)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace(
-            "+00:00",
-            "Z",
-        )
-    )
-
-
-def task_by_id(catalog: TaskCatalog, task_id: str) -> dict[str, object]:
-    """Return one task-catalog row by id."""
-    return next(task for task in catalog.tasks if task["id"] == task_id)
-
-
-def roles_for_task(
-    config: TeamConfig, catalog: TaskCatalog, task_id: str
-) -> tuple[Role, ...]:
-    """Return roles materialized by the normal route, not catalog candidates."""
-    task = task_by_id(catalog, task_id)
-    enabled_specialists: list[str] = []
-    if str(task["family"]) == "skill_evaluation":
-        enabled_specialists = list(
-            default_specialists_for_task(
-                config=config,
-                catalog=catalog,
-                task_id=task_id,
-                include_default_review_packs=False,
-            )
-        )
-    return select_roles(
-        config=config,
-        enabled_specialists=enabled_specialists,
-        full_team=False,
-        catalog=catalog,
-        workflow_family_id=str(task["family"]),
-    )
-
-
-def missing_required_outputs(report_dir: Path, roles: tuple[Role, ...]) -> list[str]:
-    """Return required role outputs not created in one report directory."""
-    return [
-        output
-        for role in roles
-        for output in role.required_outputs
-        if not (report_dir / output).is_file()
-    ]
-
-
-def ensure_required_outputs(
-    report_dir: Path, roles: tuple[Role, ...], label: str
-) -> None:
-    """Ensure all role-required outputs exist in one report directory."""
-    missing_outputs = missing_required_outputs(report_dir, roles)
-    ensure(
-        not missing_outputs,
-        f"{label} bundle did not generate required outputs: "
-        + ", ".join(sorted(set(missing_outputs))),
-    )
-
-
-def ensure_task_manifest(config: TeamConfig, report_dir: Path, task_id: str) -> None:
-    """Ensure an explicitly generated bundle preserves role and handoff contracts."""
-    manifest_text = (report_dir / config.artifacts["team_manifest"]).read_text(
-        encoding="utf-8",
-    )
-    raw_manifest: object = yaml.safe_load(manifest_text)
-    manifest = require_mapping(
-        raw_manifest, f"task {task_id} manifest must be a mapping"
-    )
-    run = require_mapping(
-        manifest.get("run"), f"task {task_id} manifest missing run mapping"
-    )
-    manifest_roles = manifest.get("roles")
-    implementation_policy = require_mapping(
-        run.get("contract_complete_implementation_policy"),
-        f"task {task_id} manifest missing contract-complete implementation policy",
-    )
-    if "implementation_handoff_required" in implementation_policy:
-        ensure(
-            implementation_policy.get("parent_orchestration_only") == "yes",
-            f"task {task_id} manifest must require parent orchestration only",
-        )
-        ensure(
-            implementation_policy.get("write_capable_child_required") == "yes",
-            f"task {task_id} manifest must require a write-capable child",
-        )
-        ensure(
-            implementation_policy.get("parent_blocked_route")
-            == "typed_blocked_retry_or_user_report",
-            f"task {task_id} manifest must expose typed child-launch blocker route",
-        )
-        for retired_field in (
-            "parent_direct_write_exception_required",
-            "parent_direct_write_exception",
-        ):
-            ensure(
-                retired_field not in implementation_policy,
-                f"task {task_id} manifest retains retired field: {retired_field}",
-            )
-    capability = require_mapping(
-        run.get("coordination_capability_handshake"),
-        f"task {task_id} manifest missing run.coordination_capability_handshake",
-    )
-    ensure(
-        capability.get("source") == "direct_runtime_collaboration_namespace",
-        f"task {task_id} coordination capability source must be direct runtime namespace",
-    )
-    ensure(
-        capability.get("status") in {"available", "unavailable", "unverified"},
-        f"task {task_id} coordination capability status is invalid",
-    )
-    ensure(
-        capability.get("effective_operations") == [],
-        f"task {task_id} generated manifest must not invent effective operations",
-    )
-    ensure(
-        capability.get("evidence_ref") == "",
-        f"task {task_id} generated manifest must not invent capability evidence",
-    )
-    ensure(
-        capability.get("matcher_is_not_capability_evidence") is True,
-        f"task {task_id} manifest must separate matchers from capability readback",
-    )
-    ensure(
-        capability.get("forbidden_capability_source") == "functions.exec.ALL_TOOLS",
-        f"task {task_id} manifest must reject exec tool inventories as capability evidence",
-    )
-    transport_policy = require_mapping(
-        capability.get("transport_by_status"),
-        f"task {task_id} coordination capability transport policy is missing",
-    )
-    ensure(
-        transport_policy.get("available") == "direct_peer"
-        and transport_policy.get("unavailable") == "parent_relay_or_durable_artifact"
-        and transport_policy.get("unverified") == "parent_relay_or_durable_artifact",
-        f"task {task_id} coordination transport policy is inconsistent",
-    )
-    receipt_policy = require_mapping(
-        run.get("coordination_receipt_policy"),
-        f"task {task_id} manifest missing run.coordination_receipt_policy",
-    )
-    ensure(
-        receipt_policy.get("operation_observation") == list(COLLABORATION_OPERATIONS),
-        f"task {task_id} coordination receipt operation observation is incomplete",
-    )
-    ensure(
-        receipt_policy.get("direct_peer_requires")
-        == "available_status_and_operation_evidence",
-        f"task {task_id} direct peer receipt gate is missing",
-    )
-    ensure(
-        receipt_policy.get("parent_relay_is_not_direct_peer") is True,
-        f"task {task_id} parent relay must remain distinct from direct peer",
-    )
-    write_scope_policy = require_mapping(
-        run.get("write_scope_policy"),
-        f"task {task_id} manifest missing run.write_scope_policy",
-    )
-    ensure(
-        write_scope_policy.get("overlapping_write_scopes")
-        == "reject_same_checkout_root_before_spawn",
-        f"task {task_id} manifest must reject overlapping writes to one checkout",
-    )
-    ensure(
-        "subagent_prompt_packet:" in manifest_text,
-        f"task {task_id} manifest missing subagent_prompt_packet",
-    )
-    repo_tool_routing_policy = require_mapping(
-        run.get("repo_tool_routing_policy"),
-        f"task {task_id} manifest missing run.repo_tool_routing_policy",
-    )
-    sequence = require_list(
-        repo_tool_routing_policy.get("sequence"),
-        f"task {task_id} manifest missing native tool sequence",
-    )
-    ensure(
-        all(isinstance(stage, str) for stage in sequence),
-        f"task {task_id} native tool sequence must contain strings",
-    )
-    ensure(
-        "sequential_tool_routes" not in repo_tool_routing_policy,
-        f"task {task_id} tool route must not retain command packets",
-    )
-    ensure(
-        "subagent_lifecycle_policy:" in manifest_text,
-        f"task {task_id} manifest missing subagent_lifecycle_policy",
-    )
-    prompt_packet = require_mapping(
-        run.get("subagent_prompt_packet"),
-        f"task {task_id} manifest missing run.subagent_prompt_packet object",
-    )
-    ensure(
-        "native_argv" in prompt_packet,
-        f"task {task_id} subagent_prompt_packet missing native_argv",
-    )
-    ensure(
-        "tool_command_packet_command" not in prompt_packet
-        and "tool_commands" not in prompt_packet,
-        f"task {task_id} subagent_prompt_packet must not keep prose command aliases",
-    )
-    ensure(
-        "fresh_subagents_required: conditional" in manifest_text
-        and "reuse_for_new_task: allowed_when_owner_context_compatible"
-        in manifest_text,
-        f"task {task_id} manifest missing conditional subagent lifecycle policy",
-    )
-    lifecycle_policy = require_mapping(
-        run.get("subagent_lifecycle_policy"),
-        f"task {task_id} manifest missing run.subagent_lifecycle_policy object",
-    )
-    ensure(
-        lifecycle_policy.get("same_task_delta_reuse")
-        == "allowed_when_owner_context_compatible",
-        f"task {task_id} manifest missing compatible same-task reuse policy",
-    )
-    ensure(
-        lifecycle_policy.get("scope_change_reuse")
-        == "evaluate_owner_context_compatibility",
-        f"task {task_id} manifest missing scope-change compatibility policy",
-    )
-    if task_id != "T15" or manifest_roles:
-        ensure(
-            "prompt_contract:" in manifest_text,
-            f"task {task_id} manifest missing role prompt_contract",
-        )
-    if task_id == "T14":
-        ensure_skill_evaluator_manifest_contract(config, manifest)
-    if task_id != "T15" or manifest_roles:
-        ensure_manifest_abstract_design_prompt_contracts(manifest, task_id)
-
-
-def ensure_skill_evaluator_manifest_contract(
-    config: TeamConfig,
-    manifest: dict[str, object],
-) -> None:
-    """Ensure T14 keeps parent closeout state outside evaluator context."""
-    run = require_mapping(manifest.get("run"), "T14 manifest missing run mapping")
-    context_policy = require_mapping(
-        run.get("handoff_context_policy"),
-        "T14 manifest missing handoff_context_policy",
-    )
-    evaluator_fields = require_string_list(
-        context_policy.get("evaluator_prompt_must_include"),
-        "T14 evaluator_prompt_must_include must be a list",
-    )
-    ensure(
-        evaluator_fields
-        == [
-            "current_scenario_packet",
-            "packet_listed_evaluation_files",
-            "do_not_read",
-            "expected_output_schema",
-        ],
-        "T14 evaluator prompt must contain only the frozen scenario packet contract",
-    )
-    roles = require_list(manifest.get("roles"), "T14 manifest missing roles list")
-    evaluator_roles: list[dict[str, object]] = []
-    for raw_role in roles:
-        role = require_mapping(raw_role, "T14 role must be a mapping")
-        if role.get("id") == EVALUATOR_AGENT_ID:
-            evaluator_roles.append(role)
-    ensure(
-        len(evaluator_roles) == 1, "T14 manifest must contain one skill_evaluator role"
-    )
-    prompt_contract = require_mapping(
-        evaluator_roles[0].get("prompt_contract"),
-        "T14 evaluator missing prompt_contract",
-    )
-    ensure(
-        prompt_contract.get("common_prompt_must_include_ref") == "not_applicable",
-        "T14 evaluator must not reference the common prompt packet",
-    )
-    ensure(
-        prompt_contract.get("evaluator_prompt_must_include_ref")
-        == "run.handoff_context_policy.evaluator_prompt_must_include",
-        "T14 evaluator must reference the evaluator-only prompt packet",
-    )
-    artifacts = set(
-        require_string_list(manifest.get("artifacts"), "T14 artifacts must be a list")
-    )
-    required_artifacts = {
-        config.artifacts[key]
-        for key in (
-            "user_request_contract",
-            "schedule",
-            "work_log",
-            "team_manifest",
-            "verification",
-            "closeout_gate",
-            "agent_evaluation",
-            "workflow_monitoring",
-        )
-    }
-    ensure(
-        required_artifacts.issubset(artifacts),
-        "T14 manifest missing standard parent-owned closeout artifacts",
-    )
-
-
-def ensure_manifest_abstract_design_prompt_contracts(
-    manifest: dict[str, object],
-    task_id: str,
-) -> None:
-    """Ensure generated role prompts preserve ADF trace contracts."""
-    roles = require_list(
-        manifest.get("roles"), f"task {task_id} manifest missing roles list"
-    )
-
-    def prompt_fields(role_id: str) -> set[str] | None:
-        common_fields: set[str] = set()
-        run = manifest.get("run")
-        if isinstance(run, dict):
-            run = require_mapping(
-                cast(object, run), f"task {task_id} run must be a mapping"
-            )
-            context_policy = run.get("handoff_context_policy")
-            if isinstance(context_policy, dict):
-                context_policy = require_mapping(
-                    cast(object, context_policy),
-                    f"task {task_id} handoff_context_policy must be a mapping",
-                )
-                raw_common_fields = context_policy.get("common_prompt_must_include")
-                if isinstance(raw_common_fields, list):
-                    common_fields = set(
-                        require_string_list(
-                            cast(object, raw_common_fields),
-                            f"task {task_id} common_prompt_must_include must be a list",
-                        )
-                    )
-        for role in roles:
-            if not isinstance(role, dict):
-                continue
-            role = require_mapping(
-                cast(object, role), f"task {task_id} role must be a mapping"
-            )
-            if role.get("id") != role_id:
-                continue
-            prompt_contract = require_mapping(
-                role.get("prompt_contract"),
-                f"task {task_id} role {role_id} missing prompt_contract",
-            )
-            raw_fields = prompt_contract.get("role_prompt_must_include")
-            raw_fields = require_string_list(
-                raw_fields,
-                f"task {task_id} role {role_id} missing role_prompt_must_include",
-            )
-            return common_fields | set(raw_fields)
-        return None
-
-    expected_role_fields = {
-        "designer": {
-            "abstract_design_frame",
-            "responsibility_model",
-            "concept_or_layer_model",
-        },
-        "design_reviewer": {
-            "abstract_design_frame_review",
-            "adf_before_file_scope",
-            "adf_to_implementation_trace",
-        },
-        "implementer": {
-            "abstract_design_frame",
-            "implementation_source_packet",
-            "design_to_implementation_trace",
-        },
-        "change_reviewer": {
-            "abstract_design_frame_trace",
-            "implementation_source_packet_entry",
-            "revise_if_slice_only_justified_by_nearest_file_helper_or_current_finding",
-        },
-        "final_reviewer": {
-            "abstract_design_frame_trace",
-            "spec_to_product_trace",
-            "review_finding_incorporation_trace",
-        },
-    }
-    for role_id, required_fields in expected_role_fields.items():
-        fields = prompt_fields(role_id)
-        if fields is None:
-            continue
-        ensure(
-            required_fields.issubset(fields),
-            f"task {task_id} role {role_id} missing abstract design prompt fields",
-        )
-
-
-def validate_task_bundle_output(
-    config: TeamConfig,
-    catalog: TaskCatalog,
-    workspace: AlignmentWorkspace,
-    task_id: str,
-    created_at_iso: str,
-) -> None:
-    """Create and validate one catalog task bundle."""
-    task = task_by_id(catalog, task_id)
-    roles = roles_for_task(config, catalog, task_id)
-    report_dir = workspace.report_root / task_id
-    repository_roots = workspace.repository_roots
-    create_run_bundle(
-        RunBundleSpec(
-            config=config,
-            report_dir=report_dir,
-            run_id=task_id,
-            task=f"alignment smoke for {task_id}",
-            owner="codex",
-            created_at_iso=created_at_iso,
-            roles=roles,
-            workspace_root=workspace.workspace_root,
-            agentcanon_source_root=repository_roots.agentcanon_source_root,
-            report_root=repository_roots.report_root,
-            repository_roots=repository_roots,
-            workflow_family_id=str(task["family"]),
-            task_catalog=catalog,
-        )
-    )
-    ensure_required_outputs(report_dir, roles, f"task {task_id}")
-    standard_closeout_artifacts = {
-        config.artifacts[key]
-        for key in (
-            "user_request_contract",
-            "schedule",
-            "work_log",
-            "team_manifest",
-            "verification",
-            "closeout_gate",
-            "agent_evaluation",
-            "workflow_monitoring",
-        )
-    }
-    missing_closeout_artifacts = sorted(
-        artifact
-        for artifact in standard_closeout_artifacts
-        if not (report_dir / artifact).is_file()
-    )
-    ensure(
-        not missing_closeout_artifacts,
-        f"task {task_id} bundle missing standard closeout artifacts: "
-        + ", ".join(missing_closeout_artifacts),
-    )
-    ensure_task_manifest(config, report_dir, task_id)
-
-
-def validate_full_team_bundle_output(
-    config: TeamConfig,
-    catalog: TaskCatalog,
-    workspace: AlignmentWorkspace,
-    created_at_iso: str,
-) -> None:
-    """Create and validate a full specialist-team bundle."""
-    full_team_roles = select_roles(
-        config,
-        [],
-        full_team=True,
-        catalog=catalog,
-        workflow_family_id="comprehensive_development",
-    )
-    full_team_dir = workspace.report_root / "full-team"
-    repository_roots = workspace.repository_roots
-    create_run_bundle(
-        RunBundleSpec(
-            config=config,
-            report_dir=full_team_dir,
-            run_id="full-team",
-            task="alignment smoke full team",
-            owner="codex",
-            created_at_iso=created_at_iso,
-            roles=full_team_roles,
-            workspace_root=workspace.workspace_root,
-            agentcanon_source_root=repository_roots.agentcanon_source_root,
-            report_root=repository_roots.report_root,
-            repository_roots=repository_roots,
-            workflow_family_id="comprehensive_development",
-            task_catalog=catalog,
-        )
-    )
-    ensure_required_outputs(full_team_dir, full_team_roles, "full-team")
-
-
-def validate_bundle_outputs() -> None:
-    """Create temporary bundles for every catalog task and full-team run."""
-    source_resolution = resolve_agent_canon_source_root(ROOT)
-    source_root = source_resolution.source_root
-    config = load_team_config(source_root / "agents" / "agents_config.json")
-    catalog = load_task_catalog(config, root=source_root)
-    created_at_iso = current_utc_iso()
-
-    with runtime_alignment_parent(source_resolution) as temp_parent:
-        with tempfile.TemporaryDirectory(
-            prefix="agent-runtime-alignment-", dir=str(temp_parent)
-        ) as tmp_dir:
-            workspace = alignment_workspace(Path(tmp_dir), source_resolution)
-            initialize_alignment_workspace(workspace)
-
-            for task_id in task_ids(catalog):
-                validate_task_bundle_output(
-                    config=config,
-                    catalog=catalog,
-                    workspace=workspace,
-                    task_id=task_id,
-                    created_at_iso=created_at_iso,
-                )
-
-            validate_full_team_bundle_output(
-                config=config,
-                catalog=catalog,
-                workspace=workspace,
-                created_at_iso=created_at_iso,
-            )
-
-
 def main() -> int:
     """Run all runtime-alignment checks."""
     validate_project_config()
@@ -2034,7 +1285,6 @@ def main() -> int:
     validate_task_catalog_references()
     validate_public_skill_shims()
     validate_subagent_protocol_docs()
-    validate_bundle_outputs()
     print("AGENT_RUNTIME_ALIGNMENT=pass")
     return 0
 

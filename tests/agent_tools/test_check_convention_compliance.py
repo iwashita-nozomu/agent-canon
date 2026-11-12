@@ -183,9 +183,6 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "external public API/behavior/schema unchanged scoped_change "
         "dependency/consumer/migration/docs closure\n"
     ),
-    "tools/agent/orchestration/agent_team.py": (
-        "$literature-survey $research-workflow research_driven_change selected.append\n"
-    ),
     ".codex/agents/python_reviewer.toml": (
         "check-solid-evidence OOP readability report SOLID principle signal "
         "Single responsibility Open/closed Liskov substitution Interface segregation "
@@ -212,15 +209,15 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| role topology and same-role instance schema | `agents/task_catalog.yaml` |\n"
         "| default specialists and review packs | "
         "`agents/task_catalog.yaml`; `agents/agents_config.json` |\n"
-        "| optional run bundle and actual route evidence | "
-        "`bootstrap_agent_run.py`; `workflow_monitor.py` |\n"
+        "| native coordination and actual route evidence | "
+        "`agents/COMMUNICATION_PROTOCOL.md` |\n"
         "| skill selection | `agents/skills/catalog.yaml`; "
         "`python3 tools/agent/orchestration/route.py --prompt` |\n"
         "| implementation guidance and closeout | "
         "`agents/skills/codex-task-workflow.md` |\n"
         "| active design packet schema | `agents/COMMUNICATION_PROTOCOL.md`; "
         "`agents/agents_config.json#artifacts.active_design_packet` |\n"
-        "| closeout authority | `tools/runtime/dispatch/agent-canon/src/task_close.rs`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |\n\n"
+        "| closeout authority | `agents/canonical/CODEX_COMPLETION.md`; `tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs` |\n\n"
         "## Workflow Family Reader Paths\n\n"
         "| Family | Owner Row |\n"
         "| ------ | --------- |\n"
@@ -303,7 +300,6 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "branch_block_payload operation command_sha256 DESTRUCTIVE_GIT_GUARD=block "
         "BRANCH_WORKTREE_CREATION_GUARD=block\n"
     ),
-    "tools/runtime/dispatch/agent-canon/src/task_close.rs": "task close owner\n",
     "ROOT_AGENTS.md": (
         "Current user request controls scope; preserve unknown state and user data.\n"
         "## Runtime Owner Map\n\n"
@@ -324,7 +320,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
         "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
-        "| report and closeout structure | `tools/runtime/dispatch/agent-canon/src/task_close.rs` | closeout gate |\n"
+        "| report and closeout structure | `agents/canonical/CODEX_COMPLETION.md` | Completion Review |\n"
     ),
     "AGENTS.md": (
         "Multiple chats or sessions unknown dirty Proven exact task ownership "
@@ -884,7 +880,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_route", result.stdout)
             self.assertIn("missing-marker:issue_sync.py", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:

@@ -6,8 +6,6 @@ responsibility Owns bounded packet exchange and truthful handback for direct Lun
 upstream design ./agent-orchestration.md selects the logical role, Skill set, execution profile, and authority.
 upstream design ./subagent-bootstrap.md owns launch readiness and lifecycle handoff.
 upstream design ../canonical/CODEX_SUBAGENTS.md owns capacity and logical-role lifecycle policy.
-downstream implementation ../../tools/agent/orchestration/direct_luna_dispatch.py validates handoff packets.
-downstream implementation ../../tests/tools/test_direct_luna_dispatch.py validates packet invariants.
 downstream implementation ../../tests/tools/test_direct_luna_topology.py validates profile-level topology.
 @dependency-end
 -->
@@ -16,9 +14,9 @@ downstream implementation ../../tests/tools/test_direct_luna_topology.py validat
 
 Exchange one bounded packet between the parent and a directly selected Luna subagent without sharing implicit raw history or creating a physical custom-agent alias per logical role.
 
-This Skill owns packet construction and handback semantics. The packet's model and reasoning-effort fields record the requested profile; they do not prove the child's effective runtime. This Skill does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
+This Skill owns packet construction and handback semantics. The handoff records the requested model and effort; they do not prove the child's effective runtime. This Skill does not choose the logical role, replace specialist Skills, grant authority, or provide a fallback model.
 
-The packet builder checks bounded paths and direct-Luna authority. It does not prove effective runtime identity or the quality or completeness of a reuse investigation from a record's format, and it does not introduce admission requirements for other runtime routes.
+Permissions follow the native runtime and the agreed handoff scope.
 
 ## Inputs
 
@@ -36,19 +34,13 @@ extraction, or suspected missing predecessor makes it relevant. Keep the selecte
 capability and remaining gap in the existing context rather than building a
 second inventory.
 
-Build `direct_luna_handoff_packet_v1` with
-`tools/agent/orchestration/direct_luna_dispatch.py`. For `workspace-write`, the
-packet must carry explicit bounded `allowed_paths`; reject invalid authority,
-escaping paths, and overlap with `do_not_read`. Context cannot enlarge those
-permissions. If launch is needed, send the serialized packet to the selected
-direct `gpt-6-luna` profile with `fork_turns="none"`. Treat the packet's model
-and effort as requested values only. If child-correlated runtime metadata is not
-available in the current context, report “effective runtime unverified”; do not
-infer effective values from the request. If the invocation is observably
-rejected or unavailable, report that observed failure. Never substitute
-another model or a legacy role alias.
+Use the selected native collaboration ToolCall. Put the objective, relevant source
+context, authority and bounded paths, expected output, and validation route in
+the message. Reuse the current conversation; do not create a custom packet file
+or run directory. The requested model and effort are not runtime readback. When
+child-correlated metadata is unavailable, report effective runtime unverified.
 
-Use the packet's expected output, findings, observed limitations, and validation
+Use the handoff.s expected output, findings, observed limitations, and validation
 observations as the handback. State whether effective runtime is unverified
 when no child-correlated readback exists. Continue with a compatible active
 child by sending only the changed objective, findings, or scope within its
@@ -64,8 +56,8 @@ Use existing source/design references and send only the relevant delta.
 
 An unavailable fixed worker is a blocker, not a reason to spawn a read-only Luna
 reviewer and then a new Luna writer, even with explicit identical model selection.
-Preserve the candidate and packet, report the blocked scope, and continue unaffected
-authorized work without parent implementation or model substitution.
+Preserve the candidate and handoff context, report the blocked scope, and continue unaffected
+authorized work without silently substituting models or claiming parent results as child evidence.
 
 Start a fresh child only for an already selected responsibility that cannot reuse
 an existing compatible child: initial work, an actually ended/lost child, or required

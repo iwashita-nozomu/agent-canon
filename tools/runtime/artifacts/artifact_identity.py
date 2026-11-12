@@ -4,8 +4,6 @@
 # responsibility Materializes and verifies canonical artifact byte identities.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns artifact identity schemas and import rules.
 # upstream implementation ../values.py refines decoded canonical JSON mappings.
-# downstream implementation ../../agent/orchestration/review_dispatch.py imports review target and decision identities.
-# downstream implementation ../../repository/github/publication_integrator.py imports approval and publication identities.
 # downstream implementation ../../repository/github/github_publish.py verifies publication packet identities before network mutation.
 # downstream implementation ./report_artifact_checks.py recomputes artifact identity equality.
 # downstream implementation ../../../tests/agent_tools/test_artifact_identity.py validates exact byte and source readback.
