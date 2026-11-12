@@ -15,7 +15,6 @@
 // upstream implementation environment_dependencies.rs owns complete environment dependency plans and executable receipts
 // downstream implementation owner_guarantee.rs owns native owner-guarantee and invalidation packet APIs
 // downstream implementation agent_tool_calls.rs owns native G6 close-agent lifecycle composition
-// downstream implementation task_close.rs consumes the task-close terminal predicates
 // upstream implementation docs.rs owns Markdown checks, formatting, and link repair
 // downstream implementation entrypoint_owner_map.rs owns the entrypoint grammar used by shared docs
 // upstream implementation source_mutation.rs owns exact-path source mutation capabilities
@@ -35,12 +34,10 @@
 // downstream implementation eval_accumulation_check.rs validates native eval and hook result accumulation
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation active_design_packet.rs owns native persisted active-design packet normalization
-// downstream implementation waterfall_gate.rs owns the native Waterfall CLI gate
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
-// downstream implementation work_log.rs owns the canonical run-local work log and semantic ledger
-// downstream implementation hook_report_projection.rs updates one existing behavior-event section
+// downstream implementation work_log.rs reads historical work-log snapshots for explicit Eval
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation tool_selection.rs owns pure tool-selection evidence
@@ -56,7 +53,6 @@
 // downstream implementation ../tests/owner_guarantee_native.rs validates Python packet and projection oracles
 // downstream implementation ../tests/artifacts_native.rs validates the shared artifact API
 // downstream implementation ../tests/catalog_native.rs validates the shared catalog API
-// downstream implementation ../tests/waterfall_gate_native.rs validates the historical Waterfall CLI corpus
 // downstream implementation template_tests.rs validates native Template APIs
 // downstream implementation ../tests/lean_proof_env_native.rs validates native Lean proof environment planning
 // downstream implementation ../tests/theorem_graph_board_native.rs validates theorem-board API and CLI behavior
@@ -94,7 +90,6 @@ pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;
 pub mod hook_event_log;
-pub mod hook_report_projection;
 pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod log_repository_identity;
@@ -121,7 +116,6 @@ pub mod skill_lane_detector;
 pub mod source_mutation;
 pub mod stablehlo_value_closure;
 pub mod subagent_selection;
-pub mod task_close;
 pub mod template_bundle;
 pub mod theorem_graph_board;
 pub mod theorem_graph_circularity_check;
@@ -129,7 +123,6 @@ pub mod tool_dispatch;
 pub mod tool_proof_coverage;
 pub mod tool_selection;
 pub mod update_lifecycle_contract;
-pub mod waterfall_gate;
 pub mod work_log;
 pub mod workflow_context;
 

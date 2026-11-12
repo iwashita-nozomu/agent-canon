@@ -47,20 +47,11 @@ class CheckToolCatalogTest(unittest.TestCase):
         rows = {
             entry["id"]: entry
             for entry in catalog["entries"]
-            if entry["id"]
-            in {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"}
+            if entry["id"] in {"quarto", "vl-convert"}
         }
         self.assertEqual(
             set(rows),
-            {"workflow-monitor", "waterfall-gate-check", "quarto", "vl-convert"},
-        )
-        self.assertEqual(
-            rows["workflow-monitor"]["path"],
-            "tools/runtime/lifecycle/workflow_monitor.py",
-        )
-        self.assertEqual(
-            rows["waterfall-gate-check"]["path"],
-            "tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs",
+            {"quarto", "vl-convert"},
         )
         self.assertEqual(
             rows["quarto"]["path"],
@@ -77,8 +68,6 @@ class CheckToolCatalogTest(unittest.TestCase):
             native_capability["path"],
             "tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs",
         )
-        self.assertTrue(rows["workflow-monitor"]["writes"])
-        self.assertFalse(rows["waterfall-gate-check"]["writes"])
         result = self.run_checker(PROJECT_ROOT, "--format", "json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

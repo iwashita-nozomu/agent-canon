@@ -13,8 +13,6 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
-// downstream implementation task_close.rs owns the native coordinated closeout route
-// downstream implementation waterfall_gate.rs owns the native selected-stage gate command
 // downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
@@ -29,7 +27,6 @@
 // downstream implementation jit_ir_to_lean.rs routes JIT-canonical JSON to Lean evidence generation
 // downstream implementation stablehlo_value_closure.rs exposes scoped SSA dependency closure APIs
 // downstream implementation theorem_graph_circularity_check.rs validates theorem graph proof frontiers
-// downstream implementation work_log.rs owns canonical workflow ledger and plain work-log command
 // downstream implementation migration_audit.rs validates migration boundaries
 // downstream implementation classify_path_risk.rs owns native path-risk and static-gate selection
 // downstream implementation semantic_responsibility.rs validates contract schemas, identities, and references
@@ -110,7 +107,7 @@ use agent_canon::{
     catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
     generated_completeness, native_release, report_artifact_checks, run_evaluation,
     stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
-    tool_dispatch, tool_proof_coverage, waterfall_gate, work_log,
+    tool_dispatch, tool_proof_coverage,
 };
 use std::env;
 
@@ -134,9 +131,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
-  task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
   codex-hook [EVENT|--group EVENT] [--contract|--list]
-  waterfall-gate-check (--run-id ID|--report-dir PATH) --gate <gate> [--report-root PATH]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
@@ -148,7 +143,6 @@ Commands:
   log-surface-inventory [--root <repo-root>] [--format text|json] [--output <path>] [--check --baseline <path>]
   stablehlo-value-closure --ir <path> --function NAME --value SSA [--region-id ID] [--max-nodes N] [--format text|json]
   theorem-graph-circularity-check --graph <path> [--out <path>] [--format text|json|markdown] [--fail-on-finding]
-  work-log [--report-dir PATH|--run-id ID] --message TEXT [options]
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
   compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
@@ -241,14 +235,6 @@ fn main() {
         std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
     }
 
-    if args.len() >= 2 && args[1] == "task-close" {
-        std::process::exit(agent_canon::task_close::run_cli(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == "waterfall-gate-check" {
-        std::process::exit(waterfall_gate::run(&args[2..]));
-    }
-
     if args.len() >= 2 && args[1] == generated_completeness::SELECTOR {
         std::process::exit(generated_completeness::run(&args[2..]));
     }
@@ -275,10 +261,6 @@ fn main() {
 
     if args.len() >= 2 && args[1] == theorem_graph_circularity_check::SELECTOR {
         std::process::exit(theorem_graph_circularity_check::run(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == work_log::SELECTOR {
-        std::process::exit(work_log::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool-catalog" {

@@ -110,6 +110,32 @@ fn expected_with_native_tool_locator(value: &JsonValue) -> JsonValue {
             }
         }
     }
+    // Preserve the frozen oracle while removing the explicitly retired monitor.
+    tools.0.retain(
+        |tool| !matches!(tool, JsonValue::String(name) if name.equals_text("workflow_monitor.py")),
+    );
+    let should_log = [
+        "skills",
+        "selected_workflows",
+        "candidate_skills",
+        "candidate_workflows",
+        "candidate_tools",
+        "feedback_labels",
+    ]
+    .iter()
+    .any(|field| {
+        fields.0.iter().any(|(key, value)| {
+            key.equals_text(field)
+                && matches!(value, JsonValue::Array(items) if !items.0.is_empty())
+        })
+    });
+    if let Some((_, value)) = fields
+        .0
+        .iter_mut()
+        .find(|(key, _)| key.equals_text("should_log"))
+    {
+        *value = JsonValue::Bool(should_log);
+    }
     expected
 }
 

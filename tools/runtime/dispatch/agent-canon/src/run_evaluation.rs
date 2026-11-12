@@ -6,7 +6,6 @@
 // upstream design ../../../../../templates/agents/workflow_monitoring.md defines monitoring evidence
 // upstream implementation eval_manifest_paths.rs resolves canonical and legacy Eval manifests
 // upstream implementation report_artifact_checks.rs owns pure report artifact checks
-// downstream implementation task_close.rs consumes shared report status fields at terminal closeout
 // upstream implementation runtime_boundary.rs owns the external output capability
 // downstream implementation ../../../../../tools/catalog.yaml registers the native CLI route
 // downstream test ../tests/run_evaluation_native.rs verifies native scoring and CLI behavior

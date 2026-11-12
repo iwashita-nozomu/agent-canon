@@ -754,10 +754,6 @@ const TOOL_KEYWORDS: &[SimpleKeywordRule] = &[
         "tool-rejection-preflight",
         &["tool rejection", "preflight", "はじかれる"],
     ),
-    (
-        "workflow_monitor.py",
-        &["workflow_monitor", "runtime-feedback", "runtime feedback"],
-    ),
 ];
 
 /// Caller-frozen inputs. The classifier never reads repo_root or routing_rules.

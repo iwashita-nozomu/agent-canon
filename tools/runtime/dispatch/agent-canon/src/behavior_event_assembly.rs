@@ -1,7 +1,7 @@
 // @dependency-start
 // contract implementation
 // responsibility Assembles one pure, deduplicatable behavior event from typed hook observations.
-// upstream implementation ../../../../../tools/runtime/archive/behavior_event_assembly.py owns the current API contract.
+// upstream reference ../../../../../tests/fixtures/behavior_event_assembly/python_golden.json records the retained assembly contract.
 // upstream implementation ./prompt_capture.rs owns bounded prompt evidence and redaction.
 // upstream implementation ./prompt_classifier.rs owns prompt classification.
 // upstream implementation ./tool_selection.rs owns tool observations.

@@ -4,7 +4,6 @@
 # contract test
 # responsibility Exercises owner-local guarantee receipts, existing-edge invalidation, and integration non-rerun projection.
 # upstream implementation ../../tools/agent/orchestration/packets.py owns packet normalization and reuse tuple.
-# upstream implementation ../../tools/repository/github/publication_integrator.py owns integration receipt projection.
 # upstream implementation ../../tools/repository/github/issue_sync.py owns Issue clause projection.
 # @dependency-end
 
@@ -22,9 +21,7 @@ from tools.agent.orchestration.packets import (  # noqa: E402
     OWNER_INVALIDATION_PACKET_SCHEMA,
     normalize_owner_invalidation_packet,
     owner_receipt_is_invalidated,
-    owner_receipt_key,
 )
-from tools.repository.github.publication_integrator import owner_receipt_projection  # noqa: E402
 
 
 def receipt(
@@ -52,52 +49,16 @@ def receipt(
         "primary_observation_ref": f"receipt:{owner}:{property_ref}:{plane}",
         "observation_outcome": outcome,
         "correspondence_state": state,
-        "invalidation_inputs": ["candidate_digest", "mechanism_ref", "effect_closure", "tool_input_locator"],
+        "invalidation_inputs": [
+            "candidate_digest",
+            "mechanism_ref",
+            "effect_closure",
+            "tool_input_locator",
+        ],
         "downstream_edges": list(edges or []),
         "source_snapshot": "git:2486f179",
         "authority_ref": "user:ordinary-docker-build",
     }
-
-
-def test_grounded_receipt_and_speculative_hardening_are_distinct() -> None:
-    grounded = receipt()
-    speculative = receipt(
-        owner="reviewer-hypothesis",
-        property_ref="fsync-crash-recovery",
-        state="advisory",
-        outcome="inconclusive",
-    )
-    assert owner_receipt_projection([grounded, speculative])["publication_state"] == "ready"
-    assert owner_receipt_projection([speculative])["publication_state"] == "ready"
-    assert owner_receipt_projection([speculative])["owner_receipt_refs"] == []
-
-
-def test_repeated_agent_claims_and_identical_receipts_are_one_lookup() -> None:
-    first = receipt()
-    duplicate = dict(first)
-    duplicate["primary_observation_ref"] = "copied-agent-claim"
-    projection = owner_receipt_projection([first, duplicate])
-    assert projection["owner_receipt_refs"] == [first["primary_observation_ref"]]
-    assert owner_receipt_key(first) == owner_receipt_key(duplicate)
-
-
-def test_distinct_hosted_property_is_kept_once_and_missing_is_bounded() -> None:
-    local = receipt()
-    hosted = receipt(
-        owner="hosted-publication-owner",
-        property_ref="clean-host-publication",
-        plane="remote-publication",
-        input_ref="command:hosted-ci",
-    )
-    projection = owner_receipt_projection(
-        [local, hosted],
-        required_owner_refs=["bootstrap-runtime-owner", "hosted-publication-owner"],
-    )
-    assert projection["publication_state"] == "ready"
-    assert len(projection["owner_receipt_refs"]) == 2
-    missing = owner_receipt_projection([local], required_owner_refs=["hosted-publication-owner"])
-    assert missing["publication_state"] == "blocked"
-    assert missing["missing_or_incompatible"] == ["missing_owner:hosted-publication-owner"]
 
 
 def test_invalidation_reaches_only_declared_dependency_edge() -> None:
@@ -146,15 +107,9 @@ def test_issue_excessive_done_is_advisory_while_grounded_problem_remains() -> No
         url=issue.url,
         body="## Problem\nObserved reachable failure.\n\n## Done\nAdd fsync everywhere.",
     )
-    states = {item["clause_kind"]: item["state"] for item in project_issue_clauses(unsupported)}
+    states = {
+        item["clause_kind"]: item["state"]
+        for item in project_issue_clauses(unsupported)
+    }
     assert states["problem"] == "unproven"
     assert states["done"] == "advisory"
-
-
-def test_integration_reports_mismatch_without_command_execution() -> None:
-    projection = owner_receipt_projection(
-        [receipt()],
-        candidate_digest="candidate:other",
-    )
-    assert projection["publication_state"] == "blocked"
-    assert any(str(value).startswith("incompatible:") for value in projection["missing_or_incompatible"])

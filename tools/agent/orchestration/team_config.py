@@ -3,11 +3,7 @@
 # responsibility AgentTeam team config owner module.
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ../../runtime/values.py refines decoded configuration containers
-# downstream implementation ./implementation_dispatch.py consumes public config normalizers
 # downstream implementation ./packets.py consumes public config normalizers
-# downstream implementation ../../runtime/manifest/manifest_rendering.py consumes public config normalizers
-# downstream implementation ./agent_team.py facade consumes config APIs.
-# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes config APIs.
 # @dependency-end
 """Own AgentTeam configuration, catalog, and role policy definitions."""
 

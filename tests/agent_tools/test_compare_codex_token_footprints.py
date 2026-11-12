@@ -96,7 +96,15 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
     def test_complete_cli_and_report_bytes_match_frozen_python_outputs(self) -> None:
         """Only the declared report-owner locator and clock input may differ."""
         fixture = PROJECT_ROOT / "tests/fixtures/token_footprints/python_golden.json"
-        cases = json.loads(fixture.read_text(encoding="utf-8"))["cases"]
+        frozen_cases = json.loads(fixture.read_text(encoding="utf-8"))["cases"]
+        retired_option_cases = [
+            case for case in frozen_cases if "--report-dir" in case["args"]
+        ]
+        self.assertTrue(
+            retired_option_cases,
+            "keep historical report-dir cases in the frozen oracle and exclude them here",
+        )
+        cases = [case for case in frozen_cases if "--report-dir" not in case["args"]]
         old_owner = "../../eval/checkers/compare_codex_token_footprints.py"
         native_owner = (
             "../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs"
@@ -140,13 +148,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                     self.assertEqual(
                         normalize(report, root), normalize(case["report"], root)
                     )
-                if "monitor_raw" in case:
-                    monitor = (
-                        root / "reports/agents/run-1/workflow_monitoring.md"
-                    ).read_text(encoding="utf-8")
-                    self.assertEqual(
-                        normalize(monitor, root), normalize(case["monitor_raw"], root)
-                    )
 
     def test_candidate_token_footprint_below_half_passes(self) -> None:
         """A candidate at or below half the baseline should pass mechanically."""
@@ -154,7 +155,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             root = Path(tmp_dir)
             baseline = root / "baseline.jsonl"
             candidate = root / "candidate.jsonl"
-            report_dir = root / "reports" / "agents" / "run-1"
             report = root / "comparison.md"
             write_session(baseline, total_tokens=200)
             write_session(candidate, total_tokens=80)
@@ -169,8 +169,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                     str(candidate),
                     "--report-out",
                     str(report),
-                    "--report-dir",
-                    str(report_dir),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -183,13 +181,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             self.assertIn("TOKEN_FOOTPRINT_RATIO=0.400", result.stdout)
             report_text = report.read_text(encoding="utf-8")
             self.assertIn("comparison_status: pass", report_text)
-            monitor_text = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn("token_footprint_comparison=pass", monitor_text)
-            self.assertIn(
-                "token footprint measured from Codex session logs", monitor_text
-            )
 
     def test_candidate_token_footprint_above_half_fails(self) -> None:
         """A candidate above the target ratio should fail mechanically."""
@@ -227,7 +218,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             sessions.mkdir()
             write_two_event_session(sessions / "a.jsonl", total_tokens=100)
             write_session(sessions / "b.jsonl", total_tokens=200)
-            report_dir = root / "reports" / "agents" / "run-1"
             report = root / "token-summary.md"
 
             result = subprocess.run(
@@ -240,8 +230,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                     "2",
                     "--report-out",
                     str(report),
-                    "--report-dir",
-                    str(report_dir),
                 ],
                 cwd=PROJECT_ROOT,
                 check=False,
@@ -258,11 +246,6 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             )
             report_text = report.read_text(encoding="utf-8")
             self.assertIn("token_usage_summary_status: present", report_text)
-            monitor_text = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
-            self.assertIn("token_usage_summary=present", monitor_text)
-            self.assertIn("latest_moving_average_total=150.000", monitor_text)
 
     def test_session_glob_summary_can_filter_recent_files(self) -> None:
         """Recent summary mode should use file mtime for long-running sessions."""

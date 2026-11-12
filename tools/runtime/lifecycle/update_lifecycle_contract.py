@@ -10,9 +10,7 @@
 # upstream implementation ../../repository/github/github_publish.py provides the authoritative G3 owner API consumed through SourceProjectionGateOwnerApis.
 # downstream implementation ../../agent/orchestration/tool_calls.py materializes lifecycle-bound subagent and close ToolCall packets.
 # downstream implementation ../../repository/github/github_publish.py consumes immutable pull-request lifecycle and gate evidence.
-# downstream implementation ../../repository/github/publication_integrator.py consumes candidate CAS and publication receipts.
 # downstream implementation ../../repository/workspace/repository_topic_clone.py consumes source branch receipts.
-# downstream implementation ../../../tests/agent_tools/test_publication_integrator.py validates lifecycle mechanics.
 # downstream implementation ../../../tests/agent_tools/test_bootstrap_and_close.py validates terminal cleanup guards.
 # @dependency-end
 """Canonical mechanics for resumable AgentCanon update transactions.

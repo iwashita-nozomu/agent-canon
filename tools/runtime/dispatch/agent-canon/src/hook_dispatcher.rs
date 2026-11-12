@@ -10,7 +10,7 @@
 // @dependency-end
 //! Native active Codex hook CLI and event dispatcher.
 
-use crate::agent_canon_source_root::{resolve_agent_canon_source_root, LAYOUT_STANDALONE};
+use crate::agent_canon_source_root::resolve_agent_canon_source_root;
 use crate::authority::{
     AttestationRequest, AttestedParent, NonEmptyTrimmedString, Nonce128, ParentRootAttestor,
 };
@@ -22,7 +22,6 @@ use crate::execution_resource_projection::{
     ProjectionError,
 };
 use crate::hook_event_log::{utc_now, HookLogContext};
-use crate::hook_report_projection::emit_behavior_projection;
 use crate::hook_safety::{
     branch_block_payload, first_block, payload_prompt_json, payload_tool_command_json,
     payload_tool_name_json, secret_block_payload, secret_kind_json, SHELL_TOOL_NAMES,
@@ -36,15 +35,14 @@ use crate::python_json::{
 use crate::python_text::python_strip;
 use crate::subagent_selection::{build_coordination_receipt, select_subagents};
 use crate::tool_selection::select_tools;
-use crate::workflow_context::load_workflow_context;
+use crate::workflow_context::WorkflowContext;
 use icu_casemap::CaseMapper;
 use serde_json::Value as SerdeValue;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::env;
-use std::fs;
 use std::io::{Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 pub const OFFICIAL_HOOK_SCHEMA: &str = "agent-canon.posttooluse-stop.v1";
 pub const HOOK_CONTRACT_SCHEMA: &str = "agent-canon.hook-contract.v1";
@@ -52,9 +50,6 @@ pub const POST_TOOL_USE_INPUT_SCHEMA: &str = "agent-canon-post-tool-use-input/v1
 pub const MAX_HOOK_PAYLOAD_BYTES: usize = 256 * 1024;
 
 const DISPATCHER_SOURCE_ROOT_ENV: &str = "AGENT_CANON_HOOK_SOURCE_ROOT";
-const WORKFLOW_MONITOR_REPORT_DIR_ENV: &str = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR";
-const ACTIVE_RUN_POINTER: &str = "reports/agents/.active_run";
-const REPORT_ROOT_RELATIVE: &str = "reports/agents";
 const PARENT_ROOT_ENV: &str = "AGENT_CANON_PARENT_ROOT";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,26 +58,6 @@ pub struct HookEventContract {
     pub matchers: &'static [&'static str],
     pub failure: &'static str,
     pub telemetry: &'static str,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum HookRootStatus {
-    Resolved,
-    Override,
-    Failed,
-}
-
-#[derive(Clone, Debug)]
-struct HookRootState {
-    active_root: PathBuf,
-    standalone: bool,
-    status: HookRootStatus,
-}
-
-impl HookRootState {
-    fn report_projection_enabled(&self) -> bool {
-        self.status != HookRootStatus::Failed
-    }
 }
 
 pub const HOOK_EVENT_CONTRACTS: [(&str, HookEventContract); 4] = [
@@ -100,7 +75,7 @@ pub const HOOK_EVENT_CONTRACTS: [(&str, HookEventContract); 4] = [
         HookEventContract {
             active: true,
             matchers: &["Bash|apply_patch|python|python3"],
-            failure: "unauthorized_destructive_git=block; raw_git_merge_or_rebase=block; writer_target_packet_missing=block; writer_target_mismatch=block; malformed_payload=fail_open; spool_failure=fail_open",
+            failure: "unauthorized_destructive_git=block; malformed_payload=fail_open; spool_failure=fail_open",
             telemetry: "one bounded fingerprint-only local spool event",
         },
     ),
@@ -443,7 +418,6 @@ fn process_environment() -> BTreeMap<String, String> {
         "AGENT_CANON_HOOK_SOURCE_ROOT",
         "AGENT_CANON_TARGET_ROOT",
         "AGENT_CANON_TARGET_CONTAINER_ROOT",
-        "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
         "AGENT_CANON_PARENT_ROOT",
         "AGENT_CANON_RUNTIME_ROOT",
         "AGENT_CANON_HOOK_RESULTS_DIR",
@@ -694,15 +668,11 @@ fn serde_safety_payload(value: SerdeValue) -> Result<JsonValue, String> {
 fn hook_root(
     current_directory: Option<&Path>,
     environment: &BTreeMap<String, String>,
-) -> Result<HookRootState, String> {
+) -> Result<PathBuf, String> {
     let override_root = env_value(environment, DISPATCHER_SOURCE_ROOT_ENV);
     if !override_root.is_empty() {
         let path = resolve_override_path(&override_root, current_directory)?;
-        return Ok(HookRootState {
-            active_root: path,
-            standalone: true,
-            status: HookRootStatus::Override,
-        });
+        return Ok(path);
     }
     let target_root = {
         let target = env_value(environment, "AGENT_CANON_TARGET_ROOT");
@@ -714,27 +684,15 @@ fn hook_root(
     };
     if !target_root.is_empty() {
         let path = resolve_override_path(&target_root, current_directory)?;
-        return Ok(HookRootState {
-            active_root: path,
-            standalone: true,
-            status: HookRootStatus::Override,
-        });
+        return Ok(path);
     }
 
     if let Some(current_directory) = current_directory {
         if let Ok(resolution) = resolve_agent_canon_source_root(current_directory, environment) {
-            return Ok(HookRootState {
-                active_root: resolution.current_repository_root,
-                standalone: resolution.layout == LAYOUT_STANDALONE,
-                status: HookRootStatus::Resolved,
-            });
+            return Ok(resolution.current_repository_root);
         }
     }
-    Ok(HookRootState {
-        active_root: source_root_fallback(),
-        standalone: false,
-        status: HookRootStatus::Failed,
-    })
+    Ok(source_root_fallback())
 }
 
 fn source_root_fallback() -> PathBuf {
@@ -757,100 +715,6 @@ fn resolve_override_path(value: &str, current_directory: Option<&Path>) -> Resul
     resolve_non_strict(&path)
 }
 
-fn active_report_target(pointer: &Path, active_root: &Path, report_root: &Path) -> Option<PathBuf> {
-    if !pointer.is_file() {
-        return None;
-    }
-    let value = python_strip(&fs::read_to_string(pointer).ok()?).to_owned();
-    if value.is_empty() {
-        return None;
-    }
-    let declared = PathBuf::from(value);
-    if declared
-        .components()
-        .any(|part| part == Component::ParentDir)
-    {
-        return None;
-    }
-    let target = if declared.is_absolute() {
-        declared
-    } else if declared.starts_with(Path::new(REPORT_ROOT_RELATIVE)) {
-        active_root.join(declared)
-    } else {
-        report_root.join(declared)
-    };
-    let active_root = resolve_non_strict(active_root).ok()?;
-    let report_root = resolve_non_strict(report_root).ok()?;
-    if !path_is_within(&report_root, &active_root) || report_root == active_root {
-        return None;
-    }
-    let target = resolve_non_strict(&target).ok()?;
-    if !path_is_within(&target, &report_root) || target == report_root || !target.is_dir() {
-        return None;
-    }
-    Some(target)
-}
-
-fn resolve_report_target(
-    state: &HookRootState,
-    environment: &BTreeMap<String, String>,
-) -> Option<PathBuf> {
-    if !state.report_projection_enabled() {
-        return None;
-    }
-    let override_path = env_value(environment, WORKFLOW_MONITOR_REPORT_DIR_ENV);
-    if !override_path.is_empty() {
-        let path = PathBuf::from(override_path);
-        let target = if path.is_absolute() {
-            path
-        } else {
-            state.active_root.join(path)
-        };
-        let resolved = resolve_non_strict(&target).ok()?;
-        return resolved
-            .is_dir()
-            .then(|| parent_bound_report(&resolved, "hook-report-projection", environment))
-            .flatten();
-    }
-    let report_root = state.active_root.join(REPORT_ROOT_RELATIVE);
-    let active_target = active_report_target(
-        &state.active_root.join(ACTIVE_RUN_POINTER),
-        &state.active_root,
-        &report_root,
-    );
-    if let Some(target) = active_target {
-        return parent_bound_report(&target, "hook-report-projection", environment);
-    }
-    if state.standalone {
-        let target = active_report_target(
-            &state.active_root.join(".active_run"),
-            &state.active_root,
-            &report_root,
-        );
-        return target.and_then(|target| {
-            parent_bound_report(&target, "hook-report-projection", environment)
-        });
-    }
-    None
-}
-
-fn parent_bound_report(
-    path: &Path,
-    purpose: &str,
-    environment: &BTreeMap<String, String>,
-) -> Option<PathBuf> {
-    let parent = env_value(environment, PARENT_ROOT_ENV);
-    if parent.is_empty() {
-        return None;
-    }
-    let attestation = attest_parent_root(Path::new(&parent), purpose)?;
-    let purpose = NonEmptyTrimmedString::new(purpose).ok()?;
-    attestation
-        .resolve_parent_owned_path(path, purpose)
-        .ok()
-        .map(|receipt| receipt.physical_path().to_path_buf())
-}
-
 fn attest_parent_root(parent_root: &Path, purpose: &str) -> Option<AttestedParent> {
     let request = AttestationRequest {
         cwd: parent_root.to_path_buf(),
@@ -867,10 +731,6 @@ fn attest_parent_root(parent_root: &Path, purpose: &str) -> Option<AttestedParen
         nonce: Nonce128::generate().ok()?,
     };
     ParentRootAttestor::new().attest(&request).ok()
-}
-
-fn path_is_within(path: &Path, root: &Path) -> bool {
-    path == root || path.starts_with(root)
 }
 
 fn env_value(environment: &BTreeMap<String, String>, key: &str) -> String {
@@ -898,7 +758,7 @@ fn dispatch_event(
         "malformed_payload".to_owned()
     };
     let mut telemetry = BTreeMap::new();
-    let root_state = hook_root(current_directory, environment)?;
+    let active_root = hook_root(current_directory, environment)?;
 
     if let Some(payload) = payload.as_ref() {
         if event == "UserPromptSubmit" {
@@ -972,22 +832,19 @@ fn dispatch_event(
         }
     }
 
-    let report_dir = resolve_report_target(&root_state, environment);
+    let report_dir: Option<PathBuf> = None;
     let (mut spool_entry, log_context, timestamp, payload_fingerprint) = spool_event(
         event,
         raw_payload,
         &status,
-        &root_state.active_root,
+        &active_root,
         &telemetry,
         environment,
     )?;
 
     let empty_payload = empty_object();
     let payload_data = payload.as_ref().unwrap_or(&empty_payload);
-    let workflow_context = report_dir
-        .as_ref()
-        .map(|report_dir| load_workflow_context(&report_dir.join("skill_usage_context.json")))
-        .unwrap_or_default();
+    let workflow_context = WorkflowContext::default();
     let classifier_prompt = object_string(payload_data, "prompt")
         .cloned()
         .unwrap_or_default();
@@ -1005,7 +862,7 @@ fn dispatch_event(
         Ok((tools, subagents)) => {
             let rules = PromptClassifierInputs {
                 prompt: &classifier_prompt,
-                repo_root: &root_state.active_root,
+                repo_root: &active_root,
                 catalog: &empty_classifier_mapping,
                 routing_rules: &empty_classifier_mapping,
                 structural_lane_evidence: &no_lane_evidence,
@@ -1053,7 +910,7 @@ fn dispatch_event(
         workflow_context: &workflow_context,
         payload_fingerprint: JsonString::from_text(&payload_fingerprint),
         timestamp: JsonString::from_text(&timestamp),
-        root: root_state.active_root.clone(),
+        root: active_root.clone(),
         hook_log_namespace: JsonString::default(),
         report_dir: report_dir.clone(),
     };
@@ -1101,27 +958,7 @@ fn dispatch_event(
     } else {
         attest_parent_root(Path::new(&parent_root), "hook-event-spool")
     };
-    let append_result = log_context.append(JsonValue::Object(spool_entry), event_parent.as_ref());
-    if behavior.is_some() && append_result.status == "spooled" && report_dir.is_some() {
-        let runtime_root = env_value(environment, crate::runtime_boundary::RUNTIME_ROOT_ENV);
-        let runtime_root = (!runtime_root.is_empty()).then(|| PathBuf::from(runtime_root));
-        if let (Some(behavior), Some(report_dir)) = (behavior.as_ref(), report_dir.as_ref()) {
-            // workspace_scope's existing artifact source is the tools tree.
-            // Packaged binaries use the resident's declared source location.
-            let compiled_source = source_root_fallback();
-            let source_root = if compiled_source.join("tools").is_dir() {
-                compiled_source
-            } else {
-                PathBuf::from(env_value(environment, "AGENT_CANON_SOURCE_ROOT"))
-            };
-            let _ = emit_behavior_projection(
-                report_dir,
-                &source_root.join("tools"),
-                runtime_root.as_deref(),
-                behavior.as_json_value(),
-            );
-        }
-    }
+    let _ = log_context.append(JsonValue::Object(spool_entry), event_parent.as_ref());
 
     match output {
         Some(output) => Ok(json_stdout(&output)),
