@@ -37,11 +37,9 @@ downstream implementation ../../tests/tools/test_fix_mermaid.py tests native Mer
    a writable source snapshot in the runtime task directory, then inspect and
    copy back only the selected files.
    This entrypoint applies the configured formatter and checks together on the
-   selected files. Read help only when an option remains unresolved. If a
-   provider requires writable cache or temporary output, place a task-specific directory under
-   `AGENT_CANON_RUNTIME_ROOT` and pass it through that invocation's supported
-   environment variable. The registered target or private home may be
-   read-only, so generated state belongs outside them under the
+   selected files. Read help only when an option remains unresolved. The docs
+   command owns temporary provider output; bootstrap supplies its task-local
+   `TMPDIR`. Generated state follows the
    [shared runtime boundary](agent-canon-bootstrap.md#command-shape).
 3. Inspect the formatter's changes and diagnostics, then repair relevant
    formatting, link, heading, math, or Mermaid findings. The formatter

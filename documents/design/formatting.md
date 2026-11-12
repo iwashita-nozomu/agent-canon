@@ -45,8 +45,9 @@ targets are read-only. Through the
 copy the edited source into a writable task directory under
 `AGENT_CANON_RUNTIME_ROOT/tasks`, keeping the repository-relative paths and
 local link targets. Run `agent-canon docs format --root <snapshot> <edited paths...>`
-there, with provider caches in the same external task area. Inspect the changes
-and copy only the selected formatted files back through the host editing route.
+there. The docs command manages temporary provider output under `TMPDIR`, which
+bootstrap sets to its external task directory. Inspect the changes and copy
+only the selected formatted files back through the host editing route.
 This preserves the source mount boundary while formatting the content that
 will be submitted. Remove the task snapshot after its selected use ends.
 
