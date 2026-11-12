@@ -128,7 +128,10 @@ STATIC_OBLIGATION_TABLE: tuple[StaticObligation, ...] = (
     StaticObligation(
         schema_id=SCHEMA_IDS["consumer_static_obligation"],
         obligation_id="stop_handback",
-        fragment="return branch/head/check evidence or the role result and stop",
+        fragment=(
+            "return the role result and any new commit/check facts produced by "
+            "the assigned work, then stop"
+        ),
     ),
 )
 _STATIC_OBLIGATIONS_BY_ID = {
@@ -146,20 +149,26 @@ REQUIRED_STATIC_OBLIGATION_SETS: Mapping[str, frozenset[str]] = {
 
 CHECKOUT_IDENTITY_PROMPT = (
     "Carry one checkout_identity block with cwd, git_root, branch (or detached), head, "
-    "and normalized remote owner/repository at bounded workflow transitions; do not "
-    "repeat it for ordinary commands."
+    "and normalized remote owner/repository at bounded workflow transitions. In a "
+    "handback, refer to the existing readback without repeating its fields; refresh "
+    "it only when checkout state changes."
 )
 
 WRITER_TARGET_ROLE_IDS = frozenset(
     {"worker", "spark_worker", "implementer", "integration_executor"}
 )
 WRITER_TARGET_PROMPT = (
-    "Write-capable handoffs must carry writer_target with an absolute checkout_root, "
-    "fixed branch, normalized remote owner/repository, and allowed_paths. The checkout "
-    "is prepared by repository-topic-clone before handoff; start with cwd equal to "
-    "checkout_root and branch equal to the target branch. Do not use git switch, git "
-    "checkout, branch rename, or git worktree operations; a target mismatch is a hard "
-    "stop before mutation."
+    "Source-edit handoffs must carry writer_target with an absolute checkout_root, "
+    "fixed branch, normalized remote owner/repository, and allowed_paths. If the explicitly "
+    "assigned action is canonical repository-topic-clone.prepare, run that operation with "
+    "the supplied repository URL/name, workspace root, topic, branch, mode, and current "
+    "allowed paths to materialize the target; a preexisting target is not required for "
+    "preparation. This authorizes only preparation. Do not edit source until the returned "
+    "target is read back. Once prepared, use its checkout_root and branch for source edits; "
+    "do not echo the target/path list in the result. Return the role result and only new "
+    "commit/check facts produced by the assigned work. Do not use git switch, git checkout, "
+    "branch rename, or git worktree operations; an identity mismatch is a hard stop before "
+    "source mutation."
 )
 CANONICAL_SPAWN_PROMPT = (
     "Spawn only through the canonical AgentTeam dispatch and ToolCall route; "
