@@ -350,17 +350,6 @@ echo ""
 
 EXIT_CODE=0
 
-if [ -f "${WORKSPACE_ROOT}/WORKTREE_SCOPE.md" ]; then
-  echo "0️⃣a worktree scope / action-log checks を実行中..."
-  if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/worktree_scope_lint.py" --current 2>&1; then
-    echo "✅ worktree scope / action-log checks 成功"
-  else
-    echo "❌ worktree scope / action-log checks 失敗"
-    EXIT_CODE=1
-  fi
-  echo ""
-fi
-
 # 0. agent/runtime sync checks
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0

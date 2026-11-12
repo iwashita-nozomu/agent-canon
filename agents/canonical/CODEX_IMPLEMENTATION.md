@@ -62,8 +62,9 @@ contracts and their consumers as necessary.
 Markdown links identify the expected owner and Skill route; they do not create a
 dispatch frontier. When delegation is selected, use the configured native
 collaboration route and preserve actual launch, completion, and failure results.
-A blocked child does not create a parent write fallback. User-guided debugging
-uses the common ROOT exception.
+Repair a selected tool's refusal at its owner, then resume the authorized
+operation. Runtime identity, spawn, and writer-packet records are not editing
+permission gates.
 
 A bounded route's selected execution owner performs its edit and verification
 without a child handoff. When the selected route requires full staging, read
@@ -167,15 +168,24 @@ use history for rationale, not correctness.
 
 For the planned repair or migration, follow this order:
 
-1. Decide what changes and how before editing: the required behavior, owning
-   mechanism, affected callers, and obsolete code to remove.
+1. Decide what changes and how before editing: the required behavior, retained
+   implementation, affected callers, and obsolete paths/symbols to delete.
    Group the work into complete units by responsibility and dependency.
-2. Implement the planned units in dependency order, including their API, caller,
-   and configuration changes.
-3. Review the completed migration for omitted deletions, obsolete implementations,
-   remaining references, and exclusive support. Complete its retirement and
-   consumer changes before validation.
+2. Implement each unit in dependency order: connect callers to the retained
+   API, then delete superseded code and its exclusive helpers, configuration,
+   build targets, dependencies, and fixtures under
+   [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement).
+   Move tests for retained guarantees to that API and preserve shared support.
+3. Inspect the actual diff and search old paths, symbols, imports, dispatch,
+   and build references within the affected responsibility. Use existing
+   reference tools when text search cannot establish reachability. Remove
+   missed code and migrate remaining callers before validation; explain retained
+   old code by a current requirement in the existing task/PR context.
 4. Format the final state and run its selected tests and checks together.
+
+The final-state review catches code left behind when a new path works; tests of
+the new path alone do not establish deletion. If the change makes no code
+obsolete, retain the required implementation without forcing unrelated deletion.
 
 Use existing failure evidence to settle the repair decision before the next
 implementation pass. Intermediate helpers, edits, and commits do not require

@@ -6,6 +6,7 @@
 // downstream implementation result_logs/mod.rs retains result-log output formatting over the shared values.
 // downstream implementation eval_accumulation_check.rs parses hook JSONL with Python-compatible values
 // downstream implementation work_log.rs uses Python-compatible JSON value equality for ledger deduplication
+// downstream implementation codex_runtime_summary.rs preserves Python JSON parsing and canonical append bytes.
 // downstream implementation ../tests/python_json_native.rs validates frozen CPython 3.12.3 byte and digest oracles.
 // downstream implementation ../tests/update_lifecycle_dsv_native.rs exercises DSV text/byte parsing and Unicode error semantics.
 // downstream implementation ../tests/update_lifecycle_queue_native.rs exercises immutable replay equality semantics.

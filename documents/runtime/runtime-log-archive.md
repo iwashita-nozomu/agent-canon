@@ -6,6 +6,7 @@ upstream design bootstrap-runtime.md shared runtime boundary
 upstream implementation ../../tools/runtime/archive/runtime_log_paths.py external path resolver
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py canonical archive publisher
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs eval completeness gate
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
 downstream design runtime-log-archive-migration.md archive migration route
 @dependency-end
 -->
@@ -42,6 +43,9 @@ for the command family and lifecycle. Use
 `runtime_log_paths.py` for path resolution and
 `runtime_log_archive_git.py` for archive state, clone, commit, push, and
 readback. Use `tools/bin/agent-canon eval-accumulation-check` to validate the external archive.
+Use `tools/bin/agent-canon export-codex-runtime-summary` to append a bounded,
+prompt-free Codex runtime summary and cross-chat index through the native
+external-runtime boundary.
 
 Given:
 

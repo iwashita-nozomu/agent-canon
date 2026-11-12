@@ -6,7 +6,7 @@ upstream design ../../README.md AgentCanon source tree and consumer distribution
 upstream design ./README.md parent-repository contract index
 upstream design ./static-seed-allowlist.toml sole exact-path allowlist for default consumers
 downstream design ./template-bootstrap.md default source-free bootstrap contract
-downstream implementation ../../tools/runtime/source/export_static_seed.py committed-tree exporter
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/template_bundle.rs committed-tree static-seed exporter and tree reader
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/docs.rs `docs check-bootstrap` source-free consumer structure checker
 downstream design ../tools/export_static_seed.md maintainer commands and failure semantics
 downstream implementation ../../tests/agent_tools/test_export_static_seed.py producer determinism and exclusion tests
@@ -33,7 +33,7 @@ producer export と default bootstrap の境界は次の通りです。
 
 静的 seed の file set は
 [`static-seed-allowlist.toml`](static-seed-allowlist.toml) の exact path 列だけです。生成入口は
-[`export_static_seed.py`](../../tools/runtime/source/export_static_seed.py) だけです。allowlist の path は
+[`agent-canon template-bundle export`](../tools/agent-canon.md) だけです。allowlist の path は
 source と出力で同一とし、glob、directory copy、fallback、暗黙追加を使用しません。
 
 allowlist は現在、次の consumer-owned regular file だけを含みます。
@@ -48,7 +48,7 @@ instruction file、AgentCanon checkout、source symlink は seed に混ぜませ
 
 ## Consumer-static role projection
 
-35 個の role file は、単一の `agents/model_profiles.toml` を読む materializer の
+37 個の role file は、単一の `agents/model_profiles.toml` を読む materializer の
 in-memory `consumer-static` mode から生成します。live mode の
 `developer_instructions` と executable role fields は変更せず、static mode だけが
 producer path を source-neutral な clause と閉じた obligation fragment に置き換えます。
@@ -74,13 +74,14 @@ consumer runtimeの追加手順ではありません。
 maintainer は source commit を明示して export します。
 
 ```bash
-python3 tools/runtime/source/export_static_seed.py \
+tools/bin/agent-canon template-bundle export \
   --source-root . \
   --source-ref <agent-canon-commit> \
+  --profile static-seed \
   --output <fresh-output-directory>
 ```
 
-entrypoint は network access を行わず、次の順で一つの immutable plan を作ります。
+native entrypoint は network access を行わず、次の順で一つの immutable plan を作ります。
 
 1. `source-ref` を local Git object database 内の commit に解決する。
 1. 同じ commit の tree から canonical allowlist を読む。

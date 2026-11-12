@@ -136,14 +136,15 @@ already maintained there.
 When numerical results disagree, first investigate defects in the algorithm
 and its implementation against the governing equations and specification,
 including assumptions, units, indexing, update order, and boundary conditions.
-Correct identified algorithmic defects before considering numerical adjustments.
-Do not hide unexplained discrepancies with correction factors, offsets,
-clipping, arbitrary epsilons, or relaxed test tolerances. Numerical remedies
-are justified only after algorithmic correctness has been checked and the
-remaining discrepancy is attributable to rounding, conditioning, or
-approximation, with an error analysis and validation against an independent
-reference or invariant. Keep the investigation and validation with the
-applicable repository's algorithm and numerical owners.
+Correct identified algorithmic defects against the agreed mathematics. For
+rounding, conditioning or approximation, establish the remaining cause and use
+contract-preserving evaluation with an independent reference or invariant.
+An observed failure or error analysis does not authorize a different objective,
+input domain, update or failure rule; obtain agreement before that method change.
+Use [mathematical fidelity](../skills/computational-optimization.md#mathematical-fidelity)
+for implementation and [stabilization removal](../skills/computational-optimization.md#remove-unsupported-stabilization)
+when retiring an unsupported correction. Keep the investigation with the
+applicable algorithm owner.
 
 ## Numerical result retention
 

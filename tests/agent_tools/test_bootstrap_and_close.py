@@ -83,9 +83,6 @@ def codex_hook_command(event: str) -> list[str]:
     return [selected_cli, "codex-hook", event]
 
 
-WORKTREE_START_SCRIPT = (
-    PROJECT_ROOT / "tools" / "repository" / "workspace" / "worktree_start.py"
-)
 TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
 # Keep test artifacts outside both the parent checkout and AgentCanon source;
 # the exact process-owned root is removed when the test process exits.
@@ -2113,32 +2110,6 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "5. Implementation",
                     {section["heading"] for section in workflow_entry["sections"]},
                 )
-
-    def test_worktree_start_rejects_branch_kickoff(self) -> None:
-        """worktree_start.py is cleanup-only and must not create branch worktrees."""
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["git", "init"], cwd=workspace_root, check=True, capture_output=True
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(WORKTREE_START_SCRIPT),
-                    "feature/demo",
-                ],
-                cwd=workspace_root,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("cleanup diagnostic only", result.stderr)
-            self.assertFalse((workspace_root / ".worktrees").exists())
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""

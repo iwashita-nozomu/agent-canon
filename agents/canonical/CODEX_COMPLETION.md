@@ -32,6 +32,9 @@ the agreed target and required input domain rather than calling an incomplete
 slice complete. Each material result has its actual operation and evidence.
 Necessary path/link presence, forbidden legacy-path absence, and sufficient
 behavior are different claims; select the evidence the changed contract requires.
+For changed code, use the [implementation and deletion review](CODEX_IMPLEMENTATION.md#5-implementation)
+to confirm actual removal and caller migration from the final diff and references.
+A deletion plan or passing replacement tests alone does not close that work.
 After a repair detour, distinguish cause-side changes/checks from the requested
 target's resulting behavior and acceptance evidence. If its interrupted operation
 is still unfinished, use the retained
