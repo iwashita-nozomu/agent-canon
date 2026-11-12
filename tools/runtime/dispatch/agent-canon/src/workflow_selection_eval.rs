@@ -360,6 +360,49 @@ fn format_string_spec(value: &str, spec: &str, group_id: &str) -> Result<String,
     })
 }
 
+fn subject_field_value(field_name: &str, subject: &str, group_id: &str) -> Result<String, String> {
+    let invalid = || format!("case group {group_id} has invalid prompt template");
+    if field_name == "subject" {
+        return Ok(subject.to_owned());
+    }
+    let Some(mut selectors) = field_name.strip_prefix("subject") else {
+        if field_name.is_empty()
+            || field_name
+                .chars()
+                .all(|character| character.is_ascii_digit())
+        {
+            return Err(invalid());
+        }
+        return Err(format!(
+            "case group {group_id} template uses unsupported field {field_name:?}"
+        ));
+    };
+    if !selectors.starts_with('[') {
+        return Err(format!(
+            "case group {group_id} template uses unsupported field {field_name:?}"
+        ));
+    }
+
+    let mut value = subject.to_owned();
+    while !selectors.is_empty() {
+        let Some(after_open) = selectors.strip_prefix('[') else {
+            return Err(invalid());
+        };
+        let Some(close_index) = after_open.find(']') else {
+            return Err(invalid());
+        };
+        let index_text = &after_open[..close_index];
+        if index_text.is_empty() || !index_text.chars().all(|c| c.is_ascii_digit()) {
+            return Err(invalid());
+        }
+        let index = index_text.parse::<usize>().map_err(|_| invalid())?;
+        let character = value.chars().nth(index).ok_or_else(invalid)?;
+        value = character.to_string();
+        selectors = &after_open[close_index + 1..];
+    }
+    Ok(value)
+}
+
 fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<String, String> {
     let characters = template.chars().collect::<Vec<_>>();
     let mut prompt = String::new();
@@ -384,19 +427,8 @@ fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<
                 }
                 let field = characters[start..index].iter().collect::<String>();
                 let field_name = field.split(['!', ':']).next().unwrap_or_default();
-                if field_name != "subject" {
-                    if field_name.is_empty()
-                        || field_name
-                            .chars()
-                            .all(|character| character.is_ascii_digit())
-                    {
-                        return Err(format!("case group {group_id} has invalid prompt template"));
-                    }
-                    return Err(format!(
-                        "case group {group_id} template uses unsupported field {field_name:?}"
-                    ));
-                }
-                let suffix = &field["subject".len()..];
+                let subject_value = subject_field_value(field_name, subject, group_id)?;
+                let suffix = &field[field_name.len()..];
                 let (conversion, spec) = if let Some(after_marker) = suffix.strip_prefix('!') {
                     let conversion = after_marker.chars().next().ok_or_else(|| {
                         format!("case group {group_id} has invalid prompt template")
@@ -417,9 +449,9 @@ fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<
                     return Err(format!("case group {group_id} has invalid prompt template"));
                 };
                 let converted = match conversion {
-                    's' => subject.to_owned(),
-                    'r' => python_repr_string(subject),
-                    'a' => python_ascii_repr_string(subject),
+                    's' => subject_value,
+                    'r' => python_repr_string(&subject_value),
+                    'a' => python_ascii_repr_string(&subject_value),
                     _ => {
                         return Err(format!("case group {group_id} has invalid prompt template"));
                     }
@@ -1243,7 +1275,7 @@ pub fn run(args: &[String]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{load_manifest, WorkflowSelectionManifest};
+    use super::{format_group_prompt, load_manifest, WorkflowSelectionManifest};
     use std::collections::HashSet;
     use std::path::PathBuf;
 
@@ -1350,5 +1382,21 @@ mod tests {
                 .iter()
                 .any(|skill| skill == "test-design")
         }));
+    }
+
+    #[test]
+    fn generated_prompt_templates_index_subject_by_unicode_scalar() {
+        assert_eq!(
+            format_group_prompt("{subject[0]}", "abc", "indexed-subject"),
+            Ok("a".to_owned())
+        );
+        assert_eq!(
+            format_group_prompt("{subject[1]}", "a猫b", "indexed-subject"),
+            Ok("猫".to_owned())
+        );
+        assert_eq!(
+            format_group_prompt("{subject[3]}", "abc", "indexed-subject"),
+            Err("case group indexed-subject has invalid prompt template".to_owned())
+        );
     }
 }
