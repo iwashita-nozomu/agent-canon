@@ -3310,6 +3310,13 @@ _agent_canon_replace_resident_locked() {
 _agent_canon_with_replacement_lock() {
   local callback=$1
   shift
+  local lock_mode=exclusive
+  if [[ "$callback" == --shared ]]; then
+    # Ordinary resident readers share the writer's generation boundary.
+    lock_mode=shared
+    callback=$1
+    shift
+  fi
   local lock_path="$AGENT_CANON_RUNTIME_ROOT/host-state/replacement.lock"
   local lock_fd rc unlock_rc
   if [[ -L "$lock_path" ]]; then
@@ -3344,7 +3351,13 @@ _agent_canon_with_replacement_lock() {
     _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be opened"
     return 2
   fi
-  if ! flock -x "$lock_fd"; then
+  if [[ "$lock_mode" == shared ]]; then
+    if ! flock -s "$lock_fd"; then
+      exec {lock_fd}>&-
+      _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be acquired"
+      return 2
+    fi
+  elif ! flock -x "$lock_fd"; then
     exec {lock_fd}>&-
     _agent_canon_json_error replacement_lock_unavailable "resident replacement lock could not be acquired"
     return 2
@@ -3840,6 +3853,13 @@ _agent_canon_private_feedback_identity() {
   else
     printf '%s\n' "$normalized"
   fi
+}
+
+_agent_canon_private_feedback_sync_current_locked() {
+  # The shared route ran in a subshell; reselect under this exclusive phase.
+  local container=$1
+  _agent_canon_use_active_image "$container"
+  _agent_canon_private_feedback_sync "$container"
 }
 
 _agent_canon_private_feedback_raw_pending() {
@@ -5097,6 +5117,85 @@ _agent_canon_rollback_locked() {
   printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"ok","operation":"rollback","code":"previous_generation_restored"}\n'
 }
 
+_agent_canon_exec_tool_route_locked() {
+  local operation=$1
+  shift
+  local -a command_args=("$@")
+  _agent_canon_use_active_image "$(_agent_canon_container_name)"
+  local container
+  container=$(_agent_canon_ensure_container)
+  if [[ "$operation" == exec ]] && _agent_canon_exec_is_structured_request; then
+    _agent_canon_extract_exec_target_digest
+    _agent_canon_validate_private_log_mount "$container"
+  elif [[ "$operation" == tool || "$operation" == exec ]]; then
+    _agent_canon_rewrite_target_args "${command_args[@]}"
+  fi
+  if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
+        "${command_args[2]:-}" == guide ]]; then
+    [[ ${#command_args[@]} -eq 5 &&
+       "${command_args[3]:-}" == --destination ]] ||
+      _agent_canon_json_error argument_invalid \
+        "tool export accepts only guide --destination <host-dir>"
+    local guide_destination guide_relative
+    guide_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "improvement guide destination could not be canonicalized"
+    guide_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
+      "$guide_destination") ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "improvement guide destination could not be authorized"
+    [[ "$guide_relative" != . && "$guide_relative" != .. &&
+       "$guide_relative" != ../* ]] ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "improvement guide destination must be a strict control-root descendant"
+    _agent_canon_validate_new_path "$guide_destination" "improvement guide destination"
+    _agent_canon_volume_copy export guide "$guide_destination"
+    return $?
+  fi
+  if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
+        "${command_args[2]:-}" == dashboard ]]; then
+    [[ ${#command_args[@]} -eq 7 &&
+       "${command_args[3]:-}" == --destination &&
+       "${command_args[5]:-}" == --run-id ]] ||
+      _agent_canon_json_error argument_invalid \
+        "tool export dashboard accepts --destination <host-dir> --run-id <id>"
+    local dashboard_destination dashboard_run_id dashboard_relative
+    dashboard_run_id=${command_args[6]}
+    dashboard_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "runtime dashboard destination could not be canonicalized"
+    dashboard_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
+      "$dashboard_destination") ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "runtime dashboard destination could not be authorized"
+    [[ "$dashboard_relative" != . && "$dashboard_relative" != .. &&
+       "$dashboard_relative" != ../* ]] ||
+      _agent_canon_json_error volume_copy_destination_invalid \
+        "runtime dashboard destination must be a strict control-root descendant"
+    _agent_canon_validate_new_path "$dashboard_destination" "runtime dashboard destination"
+    _agent_canon_volume_copy export dashboard "$dashboard_destination" "$dashboard_run_id"
+    return $?
+  fi
+  if [[ "$operation" == tool && "${command_args[1]:-}" == export ]]; then
+    _agent_canon_json_error argument_invalid \
+      "tool export accepts only guide or dashboard exports"
+  fi
+  local output_file error_file rc
+  output_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stdout.XXXXXX")
+  error_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stderr.XXXXXX")
+  rc=0
+  _agent_canon_container_exec "$container" \
+    python3 /opt/agent-canon/source/tools/runtime/container/bootstrap_runtime.py \
+    --repository-root /opt/agent-canon/source \
+    --control-parent-root /var/lib/agent-canon \
+    --runtime-root /var/lib/agent-canon/runtime \
+    "${command_args[@]}" >"$output_file" 2>"$error_file" || rc=$?
+  cat "$output_file"
+  cat "$error_file" >&2
+  rm -f -- "$output_file" "$error_file"
+  return "$rc"
+}
+
 bootstrap_host_entrypoint() {
   local repository_root=$1
   shift
@@ -5453,7 +5552,27 @@ bootstrap_host_entrypoint() {
         return $?
       fi
       ;;&
-    install|update|start|stop|rollback|uninstall|target|tool|template|task|gc|eval|exec)
+    exec|tool)
+      local exec_tool_rc=0
+      set +e
+      _agent_canon_with_replacement_lock --shared \
+        _agent_canon_exec_tool_route_locked "$operation" "${command_args[@]}"
+      exec_tool_rc=$?
+      set -e
+      if ((exec_tool_rc == 0)) &&
+         [[ "$operation" != tool || "${command_args[1]:-}" != export ||
+            ( "${command_args[2]:-}" != guide &&
+              "${command_args[2]:-}" != dashboard ) ]]; then
+        set +e
+        _agent_canon_with_replacement_lock \
+          _agent_canon_private_feedback_sync_current_locked \
+          "$(_agent_canon_container_name)"
+        exec_tool_rc=$?
+        set -e
+      fi
+      return "$exec_tool_rc"
+      ;;
+    install|update|start|stop|rollback|uninstall|target|template|task|gc|eval)
       if [[ "$operation" != install && "$operation" != update ]]; then
         _agent_canon_use_active_image "$(_agent_canon_container_name)"
       fi
@@ -5463,61 +5582,8 @@ bootstrap_host_entrypoint() {
       else
         container=$(_agent_canon_ensure_container)
       fi
-      if [[ "$operation" == exec ]] && _agent_canon_exec_is_structured_request; then
-        _agent_canon_extract_exec_target_digest
-        _agent_canon_validate_private_log_mount "$container"
-      elif [[ "$operation" == tool || "$operation" == template || "$operation" == eval || "$operation" == exec ]]; then
+      if [[ "$operation" == template || "$operation" == eval ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
-      fi
-      if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
-            "${command_args[2]:-}" == guide ]]; then
-        [[ ${#command_args[@]} -eq 5 &&
-           "${command_args[3]:-}" == --destination ]] ||
-          _agent_canon_json_error argument_invalid \
-            "tool export accepts only guide --destination <host-dir>"
-        local guide_destination guide_relative
-        guide_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "improvement guide destination could not be canonicalized"
-        guide_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
-          "$guide_destination") ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "improvement guide destination could not be authorized"
-        [[ "$guide_relative" != . && "$guide_relative" != .. &&
-           "$guide_relative" != ../* ]] ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "improvement guide destination must be a strict control-root descendant"
-        _agent_canon_validate_new_path "$guide_destination" "improvement guide destination"
-        _agent_canon_volume_copy export guide "$guide_destination"
-        return $?
-      fi
-      if [[ "$operation" == tool && "${command_args[1]:-}" == export &&
-            "${command_args[2]:-}" == dashboard ]]; then
-        [[ ${#command_args[@]} -eq 7 &&
-           "${command_args[3]:-}" == --destination &&
-           "${command_args[5]:-}" == --run-id ]] ||
-          _agent_canon_json_error argument_invalid \
-            "tool export dashboard accepts --destination <host-dir> --run-id <id>"
-        local dashboard_destination dashboard_run_id dashboard_relative
-        dashboard_run_id=${command_args[6]}
-        dashboard_destination=$(realpath -m -- "${command_args[4]}" 2>/dev/null) ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "runtime dashboard destination could not be canonicalized"
-        dashboard_relative=$(realpath -m --relative-to="$AGENT_CANON_CONTROL_ROOT" \
-          "$dashboard_destination") ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "runtime dashboard destination could not be authorized"
-        [[ "$dashboard_relative" != . && "$dashboard_relative" != .. &&
-           "$dashboard_relative" != ../* ]] ||
-          _agent_canon_json_error volume_copy_destination_invalid \
-            "runtime dashboard destination must be a strict control-root descendant"
-        _agent_canon_validate_new_path "$dashboard_destination" "runtime dashboard destination"
-        _agent_canon_volume_copy export dashboard "$dashboard_destination" "$dashboard_run_id"
-        return $?
-      fi
-      if [[ "$operation" == tool && "${command_args[1]:-}" == export ]]; then
-        _agent_canon_json_error argument_invalid \
-          "tool export accepts only guide or dashboard exports"
       fi
       local output_file error_file rc
       output_file=$(mktemp "$AGENT_CANON_RUNTIME_ROOT/.bootstrap.stdout.XXXXXX")
@@ -5550,10 +5616,6 @@ bootstrap_host_entrypoint() {
         if ((rc == 0 && eval_collect_export_rc != 0)); then
           rc=$eval_collect_export_rc
         fi
-      fi
-      if ((rc == 0)) && [[ "$operation" == exec || "$operation" == tool ]]; then
-        _agent_canon_with_replacement_lock _agent_canon_private_feedback_sync \
-          "$container" || rc=$?
       fi
       return "$rc"
       ;;
