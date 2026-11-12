@@ -13,15 +13,18 @@ downstream design ./CODEX_WORKFLOW.md consumes task and closeout routes
 
 ## Host entrypoint
 
-`bootstrap.sh` is the only supported Host entrypoint. Do not call Python/Rust
-tools through a copied tree, a `tools/agent-canon` alias, a vendor checkout, or
-the global Host environment.
+Standalone native commands use the release-installed `agent-canon` on PATH.
+Shared-runtime catalog tools use the installed `bootstrap.sh` with explicit
+install, control and target roots. AgentCanon source commands, builds and tests
+use that runtime's current-source binary. Host release archives are updated
+separately from the source and Skill sync.
 
 ```bash
-BOOTSTRAP=/path/to/agent-canon/bootstrap.sh
-CONTROL=<authorized-parent-root>
+INSTALL_ROOT=/absolute/path/to/agent-canon
+BOOTSTRAP="$INSTALL_ROOT/bootstrap.sh"
+CONTROL=<authorized-control-root>
 TARGET=<selected-source-or-project-root>
-COMMON=(--control-parent-root "$CONTROL")
+COMMON=(--repository-root "$INSTALL_ROOT" --control-parent-root "$CONTROL")
 
 "$BOOTSTRAP" "${COMMON[@]}" install
 "$BOOTSTRAP" "${COMMON[@]}" start

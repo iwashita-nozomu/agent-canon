@@ -54,6 +54,9 @@ const ORGANIZE_DESIGN_PROGRAM: &str = "organize_designs.py";
 const ORGANIZE_DESIGN_USAGE: &str = "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
 const ORGANIZE_DESIGN_TASK_DIRECTORY: &str = "tasks/design-organization";
 const ORGANIZE_DESIGN_REPORT_FILENAME: &str = "design_organize_report.txt";
+const EMBEDDED_MARKDOWNLINT_CONFIG: &str = include_str!("../../../../../.markdownlint-cli2.jsonc");
+const EMBEDDED_LYCHEE_CONFIG: &str =
+    include_str!("../../../../../tools/validation/documentation/config/lychee.toml");
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -2747,15 +2750,72 @@ fn render_findings(findings: &[Finding], root: &Path) -> bool {
     findings.is_empty()
 }
 
+enum DocsProviderConfig {
+    Project(PathBuf),
+    Embedded(tempfile::NamedTempFile),
+}
+
+impl DocsProviderConfig {
+    fn path(&self) -> &Path {
+        match self {
+            Self::Project(path) => path,
+            Self::Embedded(file) => file.path(),
+        }
+    }
+}
+
+fn docs_provider_config(
+    root: &Path,
+    relative_path: &Path,
+    suffix: &str,
+    embedded_config: &str,
+    provider: &str,
+) -> Result<DocsProviderConfig, String> {
+    let project_path = root.join(relative_path);
+    match fs::symlink_metadata(&project_path) {
+        Ok(_) => Ok(DocsProviderConfig::Project(project_path)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let mut temporary = tempfile::Builder::new()
+                .suffix(suffix)
+                .tempfile()
+                .map_err(|error| format!("cannot stage embedded {provider} config: {error}"))?;
+            temporary
+                .write_all(embedded_config.as_bytes())
+                .map_err(|error| format!("cannot write embedded {provider} config: {error}"))?;
+            temporary
+                .flush()
+                .map_err(|error| format!("cannot flush embedded {provider} config: {error}"))?;
+            Ok(DocsProviderConfig::Embedded(temporary))
+        }
+        Err(error) => Err(format!(
+            "cannot inspect {provider} config {}: {error}",
+            project_path.display()
+        )),
+    }
+}
+
 fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+    let config = match docs_provider_config(
+        root,
+        Path::new(".markdownlint-cli2.jsonc"),
+        ".markdownlint-cli2.jsonc",
+        EMBEDDED_MARKDOWNLINT_CONFIG,
+        "markdownlint-cli2",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("markdownlint-cli2: {error}");
+            return false;
+        }
+    };
     let mut command = Command::new("markdownlint-cli2");
     command
         .current_dir(root)
         .arg("--config")
-        .arg(root.join(".markdownlint-cli2.jsonc"))
+        .arg(config.path())
         .arg("--no-globs");
     for path in files {
         command.arg(format!(":{}", path.display()));
@@ -2767,6 +2827,19 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+    let config = match docs_provider_config(
+        root,
+        Path::new("tools/validation/documentation/config/lychee.toml"),
+        ".toml",
+        EMBEDDED_LYCHEE_CONFIG,
+        "lychee",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("lychee: {error}");
+            return false;
+        }
+    };
     let mut inputs = Vec::with_capacity(files.len());
     for path in files {
         let Some(relative) = pathdiff::diff_paths(path, root) else {
@@ -2783,7 +2856,7 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     command
         .current_dir(root)
         .arg("--config")
-        .arg(root.join("tools/validation/documentation/config/lychee.toml"))
+        .arg(config.path())
         .args(inputs);
     run_native_command("lychee", &mut command)
 }

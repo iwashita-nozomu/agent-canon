@@ -151,3 +151,69 @@ def test_wrapper_has_no_host_build_or_source_cache_fallback() -> None:
     assert "mkdir" not in source
     assert "AGENT_CANON_TOOLS_HOME" not in source
     assert "PYTHONDONTWRITEBYTECODE=1" in source
+
+
+def test_wrapper_finds_the_normally_installed_cli_on_path(tmp_path: Path) -> None:
+    source, control, runtime, native, captured = _fixture(tmp_path)
+    installed_bin = tmp_path / "installed bin"
+    installed_bin.mkdir()
+    (installed_bin / "agent-canon").symlink_to(native)
+    environment = _environment(control, runtime, native)
+    environment.pop("AGENT_CANON_NATIVE_BIN")
+    environment["PATH"] = str(installed_bin) + os.pathsep + environment["PATH"]
+    result = subprocess.run(
+        [str(source / "tools/bin/agent-canon"), "--version", "two words"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    call = json.loads(captured.read_text(encoding="utf-8"))
+    assert call["argv"] == ["--version", "two words"]
+    assert call["environment"]["AGENT_CANON_SOURCE_ROOT"] == str(source.resolve())
+
+
+def test_wrapper_keeps_explicit_selection_when_path_also_has_a_cli(
+    tmp_path: Path,
+) -> None:
+    source, control, runtime, native, captured = _fixture(tmp_path)
+    installed_bin = tmp_path / "bin"
+    installed_bin.mkdir()
+    (installed_bin / "agent-canon").symlink_to(native)
+    environment = _environment(control, runtime, tmp_path / "missing-native")
+    environment["PATH"] = str(installed_bin) + os.pathsep + environment["PATH"]
+    for arguments, expected_status in (
+        (["--version"], 127),
+        (["tool", "run", "quarto", "--", "--version"], 2),
+    ):
+        result = subprocess.run(
+            [str(source / "tools/bin/agent-canon"), *arguments],
+            cwd=source,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == expected_status
+        assert not captured.exists()
+
+
+def test_wrapper_path_self_reference_returns_without_recursion(tmp_path: Path) -> None:
+    source, control, runtime, native, captured = _fixture(tmp_path)
+    environment = _environment(control, runtime, native)
+    environment.pop("AGENT_CANON_NATIVE_BIN")
+    environment["PATH"] = str(source / "tools/bin") + os.pathsep + environment["PATH"]
+    result = subprocess.run(
+        [str(source / "tools/bin/agent-canon"), "--version"],
+        cwd=source,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5,
+    )
+    assert result.returncode == 2
+    assert "resolves to its source wrapper" in result.stderr
+    assert not captured.exists()
