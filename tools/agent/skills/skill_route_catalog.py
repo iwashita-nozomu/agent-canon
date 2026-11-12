@@ -5,7 +5,7 @@
 # upstream design ../../../agents/skills/oop-type-design.md approved OOP/type-design owner and module contract
 # upstream implementation ../../../agents/skills/catalog.yaml complete public skill-route catalog and capability metadata
 # upstream implementation ../../../agents/skills/skill-dependencies.yaml canonical public-skill dependency dictionary
-# downstream implementation ../orchestration/capability_route.py immutable capability decision consumer
+# downstream implementation ../../runtime/dispatch/agent-canon/src/catalog/skill_routes.rs native capability decision consumer
 # downstream implementation ../orchestration/route.py public route composition and compatibility facade
 # downstream implementation ../../validation/semantic/runtime/check_agent_runtime_alignment.py registration/path parity consumer
 # downstream implementation ../../../tests/agent_tools/test_route.py catalog-owned route tests

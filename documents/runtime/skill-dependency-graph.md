@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the public skill/dependency graph; do not edit by hand. -->
 # Public Skill Dependency Graph
 
-<!-- graph_digest=64867c4a09c7eca524787a94c37f951782b61863b0f6bc1557b1439d80e84985 -->
+<!-- graph_digest=876b95aecec3f9184d495491267ce09d973fc50bd28ecfab427316afe8a52e8b -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -1268,4 +1268,4 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Graph digest: `64867c4a09c7eca524787a94c37f951782b61863b0f6bc1557b1439d80e84985`.
+Graph digest: `876b95aecec3f9184d495491267ce09d973fc50bd28ecfab427316afe8a52e8b`.
