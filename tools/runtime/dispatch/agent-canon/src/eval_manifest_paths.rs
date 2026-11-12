@@ -4,6 +4,7 @@
 // upstream design ../../../../../eval/README.md owns evidence-directory placement
 // upstream design ../../../../../eval/definitions/README.md owns canonical manifest sources
 // downstream implementation run_evaluation.rs resolves behavior evaluation manifests
+// downstream implementation eval_accumulation_check.rs resolves its family registry
 // @dependency-end
 
 use std::panic::Location;

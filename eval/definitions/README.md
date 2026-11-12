@@ -5,7 +5,7 @@ responsibility Documents active AgentCanon eval definitions and accumulation.
 upstream design ../../agents/canonical/skills.md skill canon registry
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evaluation.rs runs behavior evals
 downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
-downstream implementation ../checkers/eval_accumulation_check.py validates accumulated result evidence
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated result evidence
 downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
 downstream implementation ../producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
 @dependency-end
@@ -53,7 +53,7 @@ order:
 1. Declare accumulated eval result families in `eval_result_families.toml`.
 1. Treat that registry as the abstract contract between eval producers, archive
    paths, filename / run-id checks, and consumers such as
-   `eval_accumulation_check.py` and dashboards.
+   the native `eval-accumulation-check` command and dashboards.
 1. Keep the checker branch-free for future eval domains.
 1. Add a registry family for structural analysis, writing-flow analysis,
    routing analysis, role behavior, deterministic responsibility, or other non-code
@@ -105,7 +105,7 @@ required behavior-event fields.
 | Run comparison | execution path comparison and token footprint comparison when the task makes those comparisons relevant. |
 
 New behavior-event rows use the namespaced `agent-canon.behavior-event.v1`
-schema. `eval_accumulation_check.py` validates the bounded fields structurally:
+schema. The native `eval-accumulation-check` command validates the bounded fields structurally:
 `workflow_attribution_kind` is `owner`, `context`, or `missing` with matching
 owner/context lists, and `prompt_capture_status` is `present` or `missing` with
 coherent redacted excerpt, fingerprint, character-count, and truncation fields.

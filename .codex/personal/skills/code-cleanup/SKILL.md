@@ -2,7 +2,7 @@
 name: code-cleanup
 description: "Use when public or module code cleanup must be bounded by responsibility and reachability, then passed through dependency-analysis, refactor-loop, and change-review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"d644aaae57508c6c3f74b2612a6c228e0f58fe1c0609500ba381b7fd2c566452"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"6fc6c71a11c3af3aabf776c5b37b48afeddf93b4e897f468c4f52e9dd8ad4499"} -->
 
 <!--
 @dependency-start
