@@ -96,7 +96,7 @@ fn resolve_override(value: &str) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 
-fn has_catalog(root: &Path) -> bool {
+pub(crate) fn has_catalog(root: &Path) -> bool {
     root.join("agents/skills/catalog.yaml").is_file()
 }
 

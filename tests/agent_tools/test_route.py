@@ -5,7 +5,7 @@
 # responsibility Tests short task routing helper behavior and explicit capability owner partitions.
 # upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
 # upstream implementation ../../tools/agent/skills/skill_route_catalog.py owns catalog/rule/index behavior
-# upstream implementation ../../tools/agent/orchestration/capability_route.py owns capability preflight/decision behavior
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns native capability preflight/decision behavior
 # upstream design ../../documents/design/tool-skill-routing-refactor.md defines naming policy
 # upstream design ../../.codex/personal/skills/code-visualization/SKILL.md owns the runtime direct-route text
 # upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer routing
@@ -30,10 +30,11 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROUTE = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "route.py"
 AGENT_CANON_CLI = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
+CAPABILITY_ROUTE_GOLDEN = (
+    PROJECT_ROOT / "tests" / "fixtures" / "capability_route" / "python_golden.json"
+)
 sys.path.insert(0, str(PROJECT_ROOT))
 from tools.runtime.source import agent_canon_source_root  # noqa: E402
-import tools.agent.orchestration.capability_route as capability_module  # noqa: E402
-import tools.agent.orchestration.route as route_module  # noqa: E402
 import tools.agent.skills.skill_route_catalog as catalog_module  # noqa: E402
 from tools.agent.orchestration.team_config import (  # noqa: E402
     default_specialists_for_task,
@@ -1996,6 +1997,34 @@ class CapabilityRouteTest(unittest.TestCase):
         )
         return path
 
+    def test_native_capability_route_matches_frozen_python_cli_outputs(self) -> None:
+        """The Rust route matches the frozen old CLI on exact inputs and streams."""
+        golden = json.loads(CAPABILITY_ROUTE_GOLDEN.read_text(encoding="utf-8"))
+        self.assertEqual(golden["source"], "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6")
+        self.assertEqual(
+            golden["route_sha256"],
+            "4a5354289bb29a0a2d21da08b03c6b9f59ec52b274845086f91407c133931d86",
+        )
+        self.assertEqual(
+            golden["capability_sha256"],
+            "4d92beaa59e7ea03503a2cc1498b84d267dd5eb49e80e41228fbb3e69d112f6b",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for input_file in golden["input_files"]:
+                path = root / input_file["path"]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(input_file["text"], encoding="utf-8")
+            for case in golden["cases"]:
+                with self.subTest(case=case["name"]):
+                    arguments = tuple(
+                        value.replace("<ROOT>", str(root)) for value in case["argv"]
+                    )
+                    result = self.run_route(*arguments)
+                    self.assertEqual(result.returncode, case["exit"])
+                    self.assertEqual(result.stdout, case["stdout"])
+                    self.assertEqual(result.stderr, case["stderr"])
+
     def capability_entry(
         self,
         skill: str = "oop-type-design",
@@ -2351,14 +2380,6 @@ class CapabilityRouteTest(unittest.TestCase):
             )
         self.assert_failure_code(result, "capability-root-catalog-invalid")
 
-    def test_capability_route_direct_unknown_id_is_fail_closed(self) -> None:
-        """The direct helper has the same unknown-ID contract as the CLI."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        with self.assertRaises(capability_module.CapabilityRouteError) as raised:
-            capability_module.capability_skill_routes(("unknown_capability",), index)
-        self.assertEqual(raised.exception.code, "unknown-capability:unknown_capability")
-
     def test_capability_route_failure_preserves_exact_error_fields(self) -> None:
         """Failure decisions keep the stable schema and empty match fields."""
         result = self.run_route(
@@ -2415,17 +2436,26 @@ class CapabilityRouteTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             index.rules_by_skill["other"] = index.rules_by_skill["oop-type-design"]  # type: ignore[index]
 
-    def test_capability_route_json_serializes_immutable_mapping(self) -> None:
-        """The JSON adapter converts immutable mappings without asdict()."""
-        rules = catalog_module.load_skill_route_rules(PROJECT_ROOT)
-        index = catalog_module.build_capability_index(rules)
-        preflight = capability_module.CapabilityPreflight(
-            ("oop_type_design",), "repo-changing", "json", "", None
+    def test_native_capability_json_preserves_related_skill_order(self) -> None:
+        """The native envelope preserves related candidates and deferred order."""
+        result = self.run_route(
+            "--capability",
+            "oop_type_design",
+            "--mode",
+            "repo-changing",
+            "--format",
+            "json",
         )
-        decision = capability_module.decide_capabilities(
-            ("oop_type_design",), "repo-changing", index, preflight
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            payload["skills"],
+            ["agent-orchestration", "codex-task-workflow", "oop-type-design"],
         )
-        payload = route_module.capability_decision_to_json_data(decision)
+        self.assertEqual(
+            payload["active_skills"], ["agent-orchestration", "oop-type-design"]
+        )
+        self.assertEqual(payload["deferred_skills"], ["codex-task-workflow"])
         self.assertEqual(
             payload["related_skills"]["oop-type-design"],
             [
