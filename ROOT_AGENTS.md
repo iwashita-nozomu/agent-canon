@@ -37,6 +37,9 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   needs separate current-user agreement.
 - **Memory safety:** preserve ownership, lifetimes, access bounds, and
   synchronization before performance or implementation convenience.
+- **Tool implementation:** write agent-authored tools and task automation in
+  shell scripts or Rust. Do not create or add Python tool implementations,
+  including temporary scripts, inline execution payloads, and generated tool code.
 - **Numerical fidelity:** implement the agreed equations, assumptions and method.
   Obtain agreement before adding stabilization that changes the model, valid
   inputs, update, derivatives or failure semantics. Use equivalent numerical
