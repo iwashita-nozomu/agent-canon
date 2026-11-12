@@ -382,7 +382,7 @@ fn report_container_runtime(
                     && context
                         .docker_version
                         .as_ref()
-                        .map_or(true, |result| !result.succeeded)
+                        .is_none_or(|result| !result.succeeded)
                 {
                     "error"
                 } else {
@@ -646,7 +646,7 @@ fn path_is_read_write(path: &Path) -> bool {
 mod tests {
     use super::{mount_for_path, parse_args, parse_mounts_text, MountInfo, ParsedArgs};
     use std::collections::BTreeMap;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn mount_for_path_selects_the_longest_component_prefix() {
@@ -705,11 +705,11 @@ mod tests {
 
         assert!(matches!(
             parse_args(&prefix),
-            Ok(ParsedArgs::Options(Some(path))) if path == PathBuf::from("server.toml")
+            Ok(ParsedArgs::Options(Some(path))) if path == Path::new("server.toml")
         ));
         assert!(matches!(
             parse_args(&equals),
-            Ok(ParsedArgs::Options(Some(path))) if path == PathBuf::from("server.toml")
+            Ok(ParsedArgs::Options(Some(path))) if path == Path::new("server.toml")
         ));
     }
 }
