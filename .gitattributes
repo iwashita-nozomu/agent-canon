@@ -9,6 +9,10 @@
 # Match rustfmt's LF policy on every host without changing global Git settings.
 tools/runtime/dispatch/agent-canon/**/*.rs text eol=lf
 
+# The native docs CLI embeds these provider defaults for source-free targets.
+.markdownlint-cli2.jsonc text eol=lf
+tools/validation/documentation/config/lychee.toml text eol=lf
+
 # The dependency-plan golden binds to these tracked manifest bytes on every host.
 bootstrap/container/image/dependencies.toml text eol=lf
 
