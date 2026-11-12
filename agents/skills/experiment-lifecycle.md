@@ -49,7 +49,7 @@ closeout are separate conditional tasks.
 
 When topic setup is part of the request, use the caller's existing creator or
 scaffold. For an AgentCanon experiment topic, its native creator is
-`python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>`; select
+`tools/bin/agent-canon create-experiment-topic <topic>`; select
 supported options only when the topic's actual needs call for them.
 
 ## Topic boundary

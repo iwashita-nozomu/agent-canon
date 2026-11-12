@@ -21,6 +21,10 @@ use std::process::{Command, Output};
 use toml_edit::{DocumentMut, Item, TableLike, Value as TomlValue};
 
 pub const SELECTOR: &str = "experiment-registry";
+pub mod context;
+pub mod create_experiment_topic;
+pub(crate) mod store;
+pub(crate) const CONTEXT_SELECTOR: &str = "sync-experiment-registry-context";
 const MANAGED_RUN_ARTIFACTS: &[&str] = &[
     "run_manifest.json",
     "eval_manifest.json",
@@ -42,7 +46,7 @@ struct Finding {
 }
 
 #[derive(Clone, Debug)]
-enum RegistryValue {
+pub(crate) enum RegistryValue {
     String(String),
     Integer(i64),
     Float(f64),
@@ -330,7 +334,7 @@ fn extract_git_root(output: Output) -> Option<PathBuf> {
     (!root.is_empty()).then(|| PathBuf::from(root))
 }
 
-fn parse_registry(text: &str) -> Result<RegistryValue, String> {
+pub(crate) fn parse_registry(text: &str) -> Result<RegistryValue, String> {
     let document = text
         .parse::<DocumentMut>()
         .map_err(|error| error.to_string())?;
