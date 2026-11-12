@@ -80,7 +80,8 @@ class CheckToolCatalogTest(unittest.TestCase):
         role_eval = next(
             entry
             for entry in catalog["entries"]
-            if entry["path"] == "eval/producers/evaluate_codex_agent_roles.py"
+            if entry["path"]
+            == "tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs"
         )
         wrapper = (
             PROJECT_ROOT / "eval" / "producers" / "run_accumulated_agent_evals.py"

@@ -69,6 +69,7 @@ pub mod authority;
 pub mod catalog;
 pub mod chatgpt_codex_routing;
 pub mod code_template_rendering;
+pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
 pub mod docs;
@@ -79,6 +80,7 @@ pub mod experiment_identity;
 pub mod experiment_registry;
 pub mod extract_docx;
 pub mod generated_completeness;
+pub mod git_read;
 pub mod server_readiness;
 pub mod skill_frontmatter;
 // This shared source module also serves the CLI's AST tools; the reusable LSP

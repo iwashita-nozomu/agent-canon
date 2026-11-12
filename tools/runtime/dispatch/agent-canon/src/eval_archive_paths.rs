@@ -103,6 +103,17 @@ pub fn mounted_log_archive_root(
     )
 }
 
+/// Resolve the existing active report family for a native Eval producer.
+pub(crate) fn eval_results_dir(
+    canon_root: &Path,
+    family: &str,
+    runtime_root: Option<&Path>,
+) -> Result<PathBuf, String> {
+    Ok(log_archive_root(canon_root, runtime_root)?
+        .join("eval-results")
+        .join(archive_safe_slug(family)))
+}
+
 /// Return the active and legacy-import eval directories for one family.
 pub fn eval_result_search_dirs(
     canon_root: &Path,

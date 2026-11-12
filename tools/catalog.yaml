@@ -2002,13 +2002,13 @@ entries:
 
   - id: evaluate-codex-agent-roles
     summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
-    path: eval/producers/evaluate_codex_agent_roles.py
+    path: tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_codex_agent_roles.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_codex_agent_roles.py"]}
-    writes: false
+    command: tools/bin/agent-canon evaluate-codex-agent-roles
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "evaluate-codex-agent-roles"], execution_plane: tool-container, cwd: source-root, env: allowlisted, stdin: inherited, stdout: captured, stderr: captured}
+    writes: true
     default_wiring:
       ci: true
       pr_check: true

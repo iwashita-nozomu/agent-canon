@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex agent role eval automation.
-# upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py helper
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs native producer
 # upstream design ../../eval/definitions/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
@@ -24,7 +24,7 @@ else:
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
+SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.agent.orchestration.team_config import (
@@ -419,7 +419,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
 def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the role eval helper."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [str(SCRIPT), "evaluate-codex-agent-roles", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
