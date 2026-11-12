@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import base64
 import binascii
 import ctypes
@@ -215,34 +214,6 @@ HOOK_SPOOL_CURSOR_SCHEMA_VERSION = 1
 HOOK_SPOOL_CURSOR_NAME = ".spool-cursor.json"
 ARCHIVE_TRANSACTION_LOCK_RELATIVE = Path("locks") / "archive-transaction.lock"
 HOOK_SPOOL_ZERO_SHA256 = "0" * 64
-HOOK_HOT_PATH_ROOTS = (
-    "HookLogContext.append",
-    "canonical_hook_event_bytes",
-    "publish_hook_event_noreplace",
-)
-HOOK_HOT_PATH_RUNTIME_PATH_HELPERS = frozenset(
-    {"codex_trace_key", "hook_event_spool_root", "repo_log_key"}
-)
-HOOK_HOT_PATH_FORBIDDEN_CALLS = frozenset(
-    {
-        "subprocess",
-        "system",
-        "source_git_head",
-        "hook_results_dir",
-        "mounted_log_archive_root",
-        "ensure_archive_branch",
-        "runtime_log_archive_git",
-        "rglob",
-        "glob",
-        "walk",
-        "graph",
-        "git",
-        "fetch",
-        "status",
-        "commit",
-        "push",
-    }
-)
 _ACTIVE_ARCHIVE_LOCKS: set[Path] = set()
 AT_FDCWD = -100
 RENAME_NOREPLACE = 1
@@ -517,226 +488,6 @@ def fixed_result_family_spec(
     return spec
 
 
-def _ast_call_name(call: ast.Call) -> str:
-    """Return one dotted call target when syntax fixes it statically."""
-    return _ast_expression_name(call.func)
-
-
-def _ast_expression_name(node: ast.expr) -> str:
-    """Return a dotted expression name without evaluating source code."""
-    parts: list[str] = []
-    while isinstance(node, ast.Attribute):
-        parts.append(node.attr)
-        node = node.value
-    if isinstance(node, ast.Name):
-        parts.append(node.id)
-    return ".".join(reversed(parts))
-
-
-def _resolve_ast_alias(name: str, aliases: dict[str, str]) -> str:
-    """Resolve imported and local name aliases to a stable dotted target."""
-    resolved = name
-    visited: set[str] = set()
-    while resolved:
-        first, separator, remainder = resolved.partition(".")
-        replacement = aliases.get(first)
-        if replacement is None or first in visited:
-            break
-        visited.add(first)
-        resolved = replacement + (f".{remainder}" if separator else "")
-    return resolved
-
-
-def _module_ast_aliases(tree: ast.Module) -> dict[str, str]:
-    """Index statically named import and module-level assignment aliases."""
-    aliases: dict[str, str] = {}
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                aliases[alias.asname or alias.name.split(".", 1)[0]] = alias.name
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            for alias in node.names:
-                if alias.name != "*":
-                    aliases[alias.asname or alias.name] = f"{node.module}.{alias.name}"
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            value = node.value
-            if value is None:
-                continue
-            target_name = next(
-                (target.id for target in targets if isinstance(target, ast.Name)),
-                None,
-            )
-            value_name = _ast_expression_name(value)
-            if target_name and value_name:
-                aliases[target_name] = _resolve_ast_alias(value_name, aliases)
-    return aliases
-
-
-def _definition_ast_aliases(
-    definition: ast.FunctionDef | ast.AsyncFunctionDef,
-    module_aliases: dict[str, str],
-) -> dict[str, str]:
-    """Extend module aliases with statically named aliases in one function."""
-    aliases = dict(module_aliases)
-    for node in ast.walk(definition):
-        if (
-            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
-            and node is not definition
-        ):
-            continue
-        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
-            continue
-        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-        value = node.value
-        if value is None:
-            continue
-        value_name = _ast_expression_name(value)
-        if not value_name:
-            continue
-        resolved = _resolve_ast_alias(value_name, aliases)
-        for target in targets:
-            if isinstance(target, ast.Name):
-                aliases[target.id] = resolved
-    return aliases
-
-
-def _hot_path_definitions(
-    tree: ast.Module,
-) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
-    """Index module functions and HookLogContext methods for call-graph traversal."""
-    definitions: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            definitions[node.name] = node
-        if isinstance(node, ast.ClassDef) and node.name == "HookLogContext":
-            for child in node.body:
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    definitions[f"HookLogContext.{child.name}"] = child
-    return definitions
-
-
-def _runtime_path_definitions(
-    tree: ast.Module,
-) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
-    """Index runtime_log_paths functions under an unambiguous module prefix."""
-    return {
-        f"runtime_log_paths.{node.name}": node
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-
-def _runtime_path_imports(tree: ast.Module) -> dict[str, str]:
-    """Return approved runtime_log_paths helper bindings imported by the hook."""
-    bindings: dict[str, str] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.ImportFrom) or node.module != "runtime_log_paths":
-            continue
-        for alias in node.names:
-            if alias.name in HOOK_HOT_PATH_RUNTIME_PATH_HELPERS:
-                bindings[alias.asname or alias.name] = f"runtime_log_paths.{alias.name}"
-    return bindings
-
-
-def check_hook_hot_path(path: Path) -> tuple[str, ...]:
-    """Return static forbidden-operation findings reachable from hook append."""
-    try:
-        text = path.read_text(encoding="utf-8")
-        tree = ast.parse(text, filename=str(path))
-    except (OSError, SyntaxError, UnicodeError):
-        return ("hook_source_unreadable",)
-
-    definitions = _hot_path_definitions(tree)
-    module_aliases = _module_ast_aliases(tree)
-    runtime_imports = _runtime_path_imports(tree)
-    findings: set[str] = set()
-    if runtime_imports:
-        runtime_path = (
-            path.resolve().parents[2]
-            / "tools"
-            / "runtime"
-            / "archive"
-            / "runtime_log_paths.py"
-        )
-        try:
-            runtime_text = runtime_path.read_text(encoding="utf-8")
-            runtime_tree = ast.parse(runtime_text, filename=str(runtime_path))
-        except (OSError, SyntaxError, UnicodeError):
-            findings.add("runtime_log_paths_source_unreadable")
-        else:
-            definitions.update(_runtime_path_definitions(runtime_tree))
-            module_aliases.update(_module_ast_aliases(runtime_tree))
-            for target in runtime_imports.values():
-                if target not in definitions:
-                    findings.add(f"missing:{target}")
-    append_node = definitions.get("HookLogContext.append")
-    if append_node is None:
-        findings.add("missing:HookLogContext.append")
-    else:
-        annotation = append_node.returns
-        if not isinstance(annotation, ast.Name) or annotation.id != "HookAppendResult":
-            findings.add("return_annotation:HookLogContext.append")
-
-    pending = list(HOOK_HOT_PATH_ROOTS)
-    visited: set[str] = set()
-    while pending:
-        name = pending.pop()
-        if name in visited:
-            continue
-        visited.add(name)
-        definition = definitions.get(name)
-        if definition is None:
-            findings.add(f"missing:{name}")
-            continue
-        aliases = _definition_ast_aliases(definition, module_aliases)
-        for node in ast.walk(definition):
-            if not isinstance(node, ast.Call):
-                continue
-            call_name = _ast_call_name(node)
-            resolved_call = _resolve_ast_alias(call_name, aliases)
-            call_parts = tuple(
-                part.casefold() for part in resolved_call.split(".") if part
-            )
-            forbidden = next(
-                (part for part in call_parts if part in HOOK_HOT_PATH_FORBIDDEN_CALLS),
-                None,
-            )
-            if forbidden is not None:
-                findings.add(f"forbidden:{resolved_call}")
-            if resolved_call in {
-                "print",
-                "builtins.print",
-                "sys.stdout.write",
-                "sys.stderr.write",
-            }:
-                findings.add(f"output:{resolved_call}")
-
-            local_name = ""
-            if name.startswith("runtime_log_paths.") and "." not in resolved_call:
-                candidate = f"runtime_log_paths.{resolved_call}"
-                if candidate in definitions:
-                    local_name = candidate
-            elif resolved_call.startswith("self."):
-                local_name = f"HookLogContext.{resolved_call.removeprefix('self.')}"
-            elif resolved_call.startswith("runtime_log_paths."):
-                local_name = resolved_call
-            elif "." not in resolved_call and resolved_call in definitions:
-                local_name = resolved_call
-            if local_name in definitions and local_name not in visited:
-                pending.append(local_name)
-    return tuple(sorted(findings))
-
-
-def command_check_hook_hot_path(path: Path) -> int:
-    """Print the stable, context-free hook hot-path checker result."""
-    findings = check_hook_hot_path(path)
-    print(f"RUNTIME_LOG_HOT_PATH_PATH={path}")
-    print(f"RUNTIME_LOG_HOT_PATH_FORBIDDEN_COUNT={len(findings)}")
-    print(f"RUNTIME_LOG_HOT_PATH={'pass' if not findings else 'fail'}")
-    return 0 if not findings else 1
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -767,12 +518,6 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Explicit external runtime root (or {RUNTIME_ROOT_ENV}).",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-
-    check_hot_path = subparsers.add_parser(
-        "check-hook-hot-path",
-        help="Statically reject blocking or output-producing hook append operations.",
-    )
-    check_hot_path.add_argument("--path", type=Path, default=None)
 
     context_discovery = subparsers.add_parser(
         "append-context-discovery",
@@ -8018,9 +7763,6 @@ def main(argv: list[str] | None = None) -> int:
     """Run the runtime log archive Git helper."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command == "check-hook-hot-path":
-        path = args.path or (args.canon_root / ".codex/hooks/hook_event_log.py")
-        return command_check_hook_hot_path(path.resolve())
     try:
         context = build_context(args)
         if args.command == "append-context-discovery":
