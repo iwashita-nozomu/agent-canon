@@ -1072,8 +1072,8 @@ entries:
     family: agent_tools
     role: sync
     status: canonical
-    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>
-    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|check-hook-hot-path|sync>"]}
+    command: python3 tools/runtime/archive/runtime_log_archive_git.py <append-context-discovery|materialize-runtime-event|sync>
+    dispatch: {argv: ["python3", "tools/runtime/archive/runtime_log_archive_git.py", "<append-context-discovery|materialize-runtime-event|sync>"]}
     writes: true
     default_wiring:
       ci: false
