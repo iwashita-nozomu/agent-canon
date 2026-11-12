@@ -53,6 +53,12 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-server-readiness
+      selector: server-readiness
+      path: tools/runtime/dispatch/agent-canon/src/server_readiness.rs
+    - id: rust-chatgpt-codex-route
+      selector: chatgpt-codex-route
+      path: tools/runtime/dispatch/agent-canon/src/chatgpt_codex_routing.rs
     - id: rust-version
       selector: --version
       path: tools/runtime/dispatch/agent-canon/src/main.rs
@@ -868,12 +874,12 @@ entries:
 
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
-    path: eval/checkers/eval_accumulation_check.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/eval_accumulation_check.py
-    dispatch: {argv: ["python3", "eval/checkers/eval_accumulation_check.py"]}
+    command: tools/bin/agent-canon eval-accumulation-check
+    dispatch: {argv: ["tools/bin/agent-canon", "eval-accumulation-check"]}
     writes: false
     default_wiring:
       ci: true
@@ -954,12 +960,12 @@ entries:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
 
   - id: template-bundle
-    summary: Exports one canonical template profile to a fresh external directory.
+    summary: Exports canonical template profiles and static seeds, and reads committed tree entries.
     path: tools/runtime/dispatch/agent-canon/src/template_bundle.rs
     family: agent_tools
     role: helper
     status: canonical
-    command: tools/bin/agent-canon template-bundle <export|verify|native-package|native-verify|native-version> [options]
+    command: tools/bin/agent-canon template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
     writes: true
     dispatch:
       runtime: native
@@ -981,10 +987,16 @@ entries:
     docs:
       - templates/README.md
       - documents/contracts/template-bundle-manifest.toml
+      - documents/contracts/static-seed-export.md
+      - documents/contracts/static-seed-allowlist.toml
+      - documents/tools/export_static_seed.md
+      - documents/tools/agent-canon.md
     tests:
       - tools/runtime/dispatch/agent-canon/src/template_tests.rs
       - tools/runtime/dispatch/agent-canon/tests/native_release_native.rs
       - tests/agent_tools/test_native_cli_distribution.py
+      - tests/agent_tools/test_export_static_seed.py
+      - tests/agent_tools/test_render_dependency_manifest_graph.py
 
   - id: create-experiment-topic
     public: true
@@ -1847,25 +1859,6 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
-  - id: agent-canon-update-todos
-    summary: Routes parent readback tasks after a standalone AgentCanon source merge.
-    path: tools/agent/orchestration/agent_canon_update_todos.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent/orchestration/agent_canon_update_todos.py
-    dispatch: {argv: ["python3", "tools/agent/orchestration/agent_canon_update_todos.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - documents/agent-canon/agent-canon-parent-repo-latest-checklist.md
-    tests:
-      - tests/agent_tools/test_agent_canon_update_todos.py
-
   - id: check-agent-runtime-alignment
     summary: Verifies runtime entrypoints and agent config mirrors stay aligned.
     path: tools/validation/semantic/runtime/check_agent_runtime_alignment.py
@@ -1887,12 +1880,12 @@ entries:
 
   - id: check-skill-frontmatter
     summary: Validates runtime skill SKILL.md YAML frontmatter for Codex loading.
-    path: tools/validation/semantic/skills/check_skill_frontmatter.py
+    path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/validation/semantic/skills/check_skill_frontmatter.py
-    dispatch: {argv: ["python3", "tools/validation/semantic/skills/check_skill_frontmatter.py"]}
+    command: tools/bin/agent-canon check-skill-frontmatter
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "check-skill-frontmatter"]}
     writes: false
     default_wiring:
       ci: true
@@ -1902,7 +1895,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/skills.md
     tests:
-      - tests/agent_tools/test_check_skill_frontmatter.py
+      - tools/runtime/dispatch/agent-canon/tests/skill_frontmatter_native.rs
 
   - id: skill-document-reader
     summary: Reads compact Skills and task-relevant canonical sections in bounded UTF-8 chunks.
@@ -2497,24 +2490,6 @@ entries:
     tests:
       - tests/agent_tools/test_compare_codex_token_footprints.py
 
-  - id: worktree-scope-lint
-    summary: Checks worktree scope and action-log discipline.
-    path: tools/repository/workspace/worktree_scope_lint.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 tools/repository/workspace/worktree_scope_lint.py
-    dispatch: {argv: ["python3", "tools/repository/workspace/worktree_scope_lint.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_worktree_scope_lint.py
-
   - id: jsonl-to-md
     summary: Converts JSONL result logs into Markdown tables.
     path: tools/runtime/dispatch/agent-canon/src/result_logs/mod.rs
@@ -2667,23 +2642,6 @@ entries:
       - agents/skills/experiment-lifecycle.md
     tests:
       - tests/tools/test_save_experiment_result_annex.py
-
-  - id: triplet-validator
-    summary: Validates source, document, and test triplets.
-    path: tools/validation/documentation/checks/triplet_validator.py
-    family: validation
-    role: checker
-    status: canonical
-    command: python3 tools/validation/documentation/checks/triplet_validator.py
-    dispatch: {argv: ["python3", "tools/validation/documentation/checks/triplet_validator.py"]}
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-    tests: []
-    test_exempt_reason: No dedicated unit test exists; invoke the checker directly through its catalog command.
 
 
   - id: notebook-quality

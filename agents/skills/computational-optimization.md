@@ -26,41 +26,59 @@ every numerical question.
   residual, constraint, derivative, stopping rule, tolerance, or numerical status.
 - A convergence regression, non-finite result, or numerical performance claim is
   in scope.
+- Implementing a numerical formula or removing unsupported stabilization is in scope.
+
+## Mathematical fidelity
+
+Implement the agreed equations, relevant assumptions, valid inputs, derivatives
+and update/stopping rules. Carry only premises needed for this change; refer to
+the existing mathematical owner for the rest. Trace each correction to that
+formulation before coding. A numerical symptom, a passing test, a library default
+or an existing implementation does not supply approval for a different method.
+
+Epsilon denominators, clipping/floors, diagonal jitter, ridge terms, damping,
+fallback inverses and non-finite replacement can change the problem or its
+failure meaning. Add them only when required by the agreed method; otherwise
+present the proposed mathematical change and obtain agreement first. Fix source-
+or specification-proven errors directly within the agreed contract.
+
+Equivalent evaluation is an implementation choice when it preserves the function,
+domain, derivatives and required update/failure behavior. Explain that equivalence
+and use the selected numerical oracle; do not introduce an unrequested parameter
+or alter the test tolerance to make the result pass. Preserve required input and
+memory-safety boundaries.
 
 ## Core Method
 
-Follow [Before optional changes](#before-optional-changes) when implementing or
-tuning a numerical method.
+Specialize the [common implementation sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation)
+below, under [mathematical fidelity](#mathematical-fidelity). Optional mechanisms
+also use [Before optional changes](#before-optional-changes); performance claims
+use [their comparison](#performance-claims). Read those branches when selected.
 
-1. State the requested numerical property in terms of the public contract. Record
-   only the relevant parts of the problem: for example objective or residual,
-   variables and parameters, constraints, derivatives, iteration state, stopping
-   policy, and failure semantics. Keep correctness questions separate from speed
-   claims.
-2. Reuse the caller's existing solver, numerical library, oracle, and data
-   producer before adding a mechanism. If implementation work reveals a concrete
-   gap, use an existing extension point where possible instead of duplicating a
-   wrapper, runner, dispatcher, or schema.
-3. Trace the property through the current implementation. For an iterative
-   method, identify the relevant update, accepted step, stopping quantity, and
-   terminal status. Diagnose a failure from the first contract-violating state
-   or iteration and its preceding finite values; a final NaN, residual, or test
-   assertion alone does not establish the cause.
-4. Validate the property with evidence appropriate to the caller's contract and
-   prescribed execution path. Do not relax tolerances, alter expected values,
-   skip cases, or treat `not_converged`, `max_iter`, non-finite state, or a
-   constraint violation as success. Retain and report the observed failure
-   status. Require GPU evidence only when the request, contract, or runtime
-   profile requires GPU behavior; numerical subject matter alone does not.
-5. For performance claims, compare the same mathematical problem, initial
-   state, stopping policy, workload, and relevant dtype/backend context. Separate
-   numerical trajectory and algorithmic work from execution cost such as compile,
-   per-iteration, transfer, or synchronization time. Total time alone cannot
-   attribute a regression. When diagnosing iterative-solver performance, use the
-   existing [`numeric-performance`](../../tools/runtime/dispatch/agent-canon/src/numeric_performance.rs)
-   command (`tools/bin/agent-canon numeric-performance --input <post-run-observations.json> --format json`) and follow its current input and output contract; do not recreate its
-   schema or infer a systems-level cause from prose alone. This comparison is not
-   required for ordinary numerical correctness work.
+1. **Establish the mathematics and cause.** Read the agreed formulation, relevant
+   assumptions/valid inputs, required property and failure meaning. Trace the
+   target and consumed inputs to the first mismatch. For iterations, include the
+   update, accepted step, stopping quantity and terminal status; a final NaN or
+   failed assertion alone does not identify the cause. Keep observations and
+   established causes distinct from unconfirmed hypotheses.
+2. **Decide the complete repair and verification before editing.** Reuse the
+   existing numerical provider, data producer and independent oracle. Select the
+   owning mechanism, necessary caller changes and code/support to retire. Settle
+   a method/domain/acceptance change through [Decision Order](agent-orchestration.md#decision-order)
+   before dependent edits; a repair derived from the agreed mathematics proceeds.
+3. **Implement and remove by responsibility unit.** Complete the API and caller
+   changes, delete superseded corrections and exclusive helpers/flags/fallbacks,
+   and move tests of retained guarantees to the retained API. Keep required method
+   components, valid inputs and safety boundaries. Complete the planned units
+   before their final validation; edits and commits are not separate test gates.
+4. **Review the final state, then validate.** Compare the resulting computation
+   and references with the formulation; repair remaining old paths or missing
+   callers first. Format and run the selected product-API checks with independent
+   closed-form, reference or invariant evidence, including valid inputs affected
+   by a removed correction. Preserve the oracle and tolerances. Report actual
+   status/backend/limits: `not_converged`, `max_iter`, non-finite state and constraint
+   violations remain failures. GPU evidence follows the requested contract/runtime
+   profile, not numerical subject matter alone.
 
 The convergence of an iterative method is a property of its implemented update
 and stopping rule under stated assumptions. Do not add proof-only state, runtime
@@ -69,33 +87,48 @@ public numerical contract unless the task authorizes a contract change.
 
 ## Before optional changes
 
-Begin with the agreed existing implementation or the smallest complete version
-of the requested method, using the project's established defaults and runner.
-Include mechanisms required by the user's method, approved contract, or a
-supported mathematical derivation of that requirement. Do not remove a required
-line search, preconditioner, or other method component to invent a simpler baseline.
+Use this branch at the repair-decision step only when adding an optional numerical
+or performance mechanism. Reuse actual baseline results/failures from the agreed
+method, established defaults and authorized runner. Keep its required line search,
+preconditioner and other components. Compilation, smoke exits, predictions and
+environment failures do not establish a numerical deficiency.
 
-Before adding an optional numerical or performance mechanism, obtain or reuse
-actual baseline numerical results or failures under the selected authorized
-route. Compilation, a smoke exit, an unrun prediction, or a method's popularity
-is not that evidence. Build, launcher, or environment errors do not establish a
-numerical deficiency. Do not add speculative epsilon, clipping, damping, scaling,
-cache, or parallel variants just in case. Do not silently absorb your own
-unapproved tweaks into the baseline; distinguish them from the agreed method.
+Tie the candidate to the observed deficiency, cause or explicit hypothesis, and
+the quantity that can test it. Preserve inputs, oracle, stopping and failure
+meaning; obtain agreement for changes to the agreed mathematics. Speculative
+epsilon, clipping, damping, scaling, cache and parallel variants stay out of the
+baseline. If execution is held/unavailable, report the gap and defer that optional
+change while continuing independent authorized work. Reuse valid existing runs.
 
-Tie an additional candidate to an observed deficiency, its supported cause or
-explicit hypothesis, and the quantity that can test it. Compare changes in an
-interpretable unit while preserving the inputs, oracle, stopping and failure
-semantics; retain the baseline failure rather than masking it as success.
-Source- or specification-proven algorithm errors can be repaired directly:
-this rule does not require running a known-invalid implementation, benchmarking
-ordinary correctness repairs, or executing a theory-only request.
+Source/specification-proven repairs and removal of a known-invalid correction can
+proceed directly. They need no run of the known-invalid code, performance benchmark
+or execution of a theory-only request.
 
-If execution is held or unavailable, state what remains unobserved and defer
-optional tweaks; continue independent authorized baseline implementation or
-explanation. This rule grants no new execution authority and does not require
-rerunning valid existing evidence. Changes to scope, method, or acceptance follow
-[Decision Order](agent-orchestration.md#decision-order).
+## Remove unsupported stabilization
+
+Use the [Core Method](#core-method) once, selecting numerical corrections as the
+retirement unit. At the decision step, compare their effect on values, derivatives,
+updates and status with the agreed formulation. Retain required regularization,
+line search, preconditioning, equivalent evaluation and safety checks. Establish
+an unsupported correction's mismatch from source or selected evidence; missing
+history alone does not prove it unnecessary.
+
+Restore the agreed computation or required failure and retire exclusive support
+with its consumers. Update stale expectations to that mathematics while retaining
+the independent oracle. Use valid inputs affected by the old floor/clip in final
+verification. Follow the same retirement review and validation steps rather than
+starting another cleanup round.
+
+## Performance claims
+
+Only for performance work, compare the same mathematical problem, initial state,
+stopping policy, workload and dtype/backend. Separate numerical trajectory and
+algorithmic work from compile, iteration, transfer and synchronization costs;
+total time alone does not identify a cause. Iterative-solver performance diagnosis
+uses the existing [`numeric-performance`](../../tools/runtime/dispatch/agent-canon/src/numeric_performance.rs)
+command (`tools/bin/agent-canon numeric-performance --input <post-run-observations.json> --format json`)
+and its native schema. Ordinary numerical correctness and cleanup need no
+performance comparison.
 
 ## Related Skills
 
@@ -118,8 +151,3 @@ rerunning valid existing evidence. Changes to scope, method, or acceptance follo
   claims to `benchmark_reviewer`, and language-specific implementation diffs to
   `$python-review` or `$cpp-review` as applicable. Non-numerical C++ performance
   stays on the C++ review route.
-
-Report the contract details relevant to the task, observed state and likely cause
-separately from unconfirmed hypotheses, and the validation evidence with its
-actual backend and limits. Include performance decomposition only when the claim
-is about performance.

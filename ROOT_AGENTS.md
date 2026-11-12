@@ -37,6 +37,17 @@ context/evidence. The contracts below apply without an installed Skill/runtime.
   needs separate current-user agreement.
 - **Memory safety:** preserve ownership, lifetimes, access bounds, and
   synchronization before performance or implementation convenience.
+- **Tool implementation:** write agent-authored tools and task automation in
+  shell scripts or Rust. Do not create or add Python tool implementations,
+  including temporary scripts, inline execution payloads, and generated tool code.
+- **Numerical fidelity:** implement the agreed equations, assumptions and method.
+  Obtain agreement before adding stabilization that changes the model, valid
+  inputs, update, derivatives or failure semantics. Use equivalent numerical
+  evaluation only when it preserves that contract; retain required safety checks.
+- **Terminology:** use established terms and preserve API/tool identifiers.
+  Briefly explain necessary unfamiliar terms at first use for the intended
+  reader; replace needless internal jargon with concrete actions. In Japanese,
+  use conventional terminology or the original term rather than inventing a translation.
 - **Reuse:** extend the existing capability owner first. A separate implementation
   needs a concrete requirement, responsibility, or contract gap extension cannot fill.
 - **Investigation:** start local repair at target code, diff, and contract, without

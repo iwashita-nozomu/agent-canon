@@ -31,6 +31,8 @@
 // upstream implementation path_resolution.rs owns non-strict physical path resolution shared by source and validation tools
 // downstream implementation lean_proof_env.rs owns native Lean proof environment planning and execution
 // downstream implementation eval_manifest_paths.rs resolves canonical/legacy Eval manifests
+// downstream implementation eval_archive_paths.rs resolves native read-only eval archive paths
+// downstream implementation eval_accumulation_check.rs validates native eval and hook result accumulation
 // downstream implementation report_artifact_checks.rs owns pure report artifact checks
 // downstream implementation active_design_packet.rs owns native persisted active-design packet normalization
 // downstream implementation waterfall_gate.rs owns the native Waterfall CLI gate
@@ -41,8 +43,6 @@
 // downstream implementation hook_report_projection.rs updates one existing behavior-event section
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
-// downstream implementation writer_target.rs owns typed writer-target and packet validation
-// downstream implementation mutation_authority.rs owns PreToolUse mutation classification and child-scope admission
 // downstream implementation tool_selection.rs owns pure tool-selection evidence
 // downstream implementation catalog/mod.rs owns catalog, route, path, and source-span behavior
 // downstream implementation tool_proof_coverage.rs owns catalog-backed proof coverage reports
@@ -67,6 +67,7 @@ pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
+pub mod chatgpt_codex_routing;
 pub mod code_template_rendering;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;
@@ -76,22 +77,24 @@ pub(crate) mod entrypoint_owner_map;
 pub mod execution_resource_projection;
 pub mod extract_docx;
 pub mod generated_completeness;
+pub mod server_readiness;
+pub mod skill_frontmatter;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
 pub mod behavior_event_assembly;
 pub mod environment_dependencies;
+pub mod eval_accumulation_check;
+pub mod eval_archive_paths;
 pub mod eval_manifest_paths;
 pub mod git_dependency_diff_summary;
 pub mod hook_dispatcher;
 pub mod hook_event_log;
 pub mod hook_report_projection;
-pub mod hook_retirement;
 pub mod hook_safety;
 pub mod lean_proof_env;
 pub mod log_repository_identity;
 pub mod lsp_code_analysis;
-pub mod mutation_authority;
 pub mod native_release;
 pub mod owner_guarantee;
 pub mod path_expansion;
@@ -125,7 +128,6 @@ pub mod update_lifecycle_contract;
 pub mod waterfall_gate;
 pub mod work_log;
 pub mod workflow_context;
-pub mod writer_target;
 
 #[cfg(test)]
 mod template_tests;

@@ -22,7 +22,7 @@ upstream design ../README.md notes lifecycle index
 - 1 branch 1 file を基本にします
 - タイトルは branch 名そのものではなく topic-first で付けます
 - branch 名、役割、現在の状態、読むべき note、主要な知見を最初に書きます
-- active な branch は、対応する worktree action log と carry-over 先をここから辿れるようにします
+- 関連する知見や結果の carry-over 先をここから辿れるようにします
 
 ## Retention Labels
 
@@ -36,7 +36,7 @@ upstream design ../README.md notes lifecycle index
 ## Workflow
 
 1. branch を切ったら、必要に応じて同時にこのディレクトリへ branch summary を作ります。
-1. `WORKTREE_SCOPE.md` で指定した action log と carry-over target を、この summary から辿れるようにします。
+1. 保存する知見や結果の carry-over target を、この summary から辿れるようにします。
 1. branch を閉じる前に、関連 note と final JSON のリンクを更新します。
 
 ## Template

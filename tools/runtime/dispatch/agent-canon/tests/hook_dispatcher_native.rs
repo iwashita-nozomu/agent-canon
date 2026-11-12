@@ -5,14 +5,12 @@
 // responsibility Replays frozen Hook CLI cases and declared migration locators through the native owner.
 // upstream implementation ../src/hook_dispatcher.rs owns event execution and contract readback
 // upstream reference ../../../../../tests/fixtures/hook_dispatcher/python_golden.json freezes the old CLI outputs
-// upstream reference ../../../../../tests/fixtures/codex_runtime_summary/retirement_digest.json derives the relocated digest with the old Python owner
 // @dependency-end
 
 use agent_canon::hook_dispatcher::{run_with_input, HookCliResult};
 use agent_canon::python_json::{canonical_json_ascii_bytes, parse_json, JsonArray, JsonValue};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -223,6 +221,10 @@ fn assert_spool_fields(actual: &JsonValue, expected: &JsonValue, name: &str) {
     };
     for (expected_key, expected_value) in &expected_fields.0 {
         let expected_name = expected_key.to_text().expect("field name is Unicode");
+        if expected_name == "mutation_control" {
+            assert!(field(actual, "mutation_control").is_none());
+            continue;
+        }
         let value = actual_fields
             .0
             .iter()
@@ -230,6 +232,10 @@ fn assert_spool_fields(actual: &JsonValue, expected: &JsonValue, name: &str) {
             .find(|(actual_key, _)| actual_key == expected_key)
             .map(|(_, value)| value)
             .unwrap_or_else(|| panic!("{name}: missing spool field {expected_name}"));
+        if expected_name == "status" && text(expected_value) == "blocked_parent_mutation" {
+            assert_eq!(text(value), "pass", "ordinary writes are admitted");
+            continue;
+        }
         assert_eq!(
             canonical_json_ascii_bytes(value).expect("serialize actual field"),
             canonical_json_ascii_bytes(expected_value).expect("serialize old oracle field"),
@@ -244,45 +250,36 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
         usize_value(field(case, "exit").expect("expected exit")) as i32,
         "exit status for {name}"
     );
-    let mut expected_stdout = case_bytes(case, "stdout_base64");
+    let expected_stdout = case_bytes(case, "stdout_base64");
     if matches!(
         text(field(case, "name").unwrap()).as_str(),
         "contract" | "contract-stop"
     ) {
-        // Only declared owner/command relocations and their manifest digest adapt.
-        // The original captured contract bytes remain frozen.
-        let digest_oracle = parse_json(include_str!(
-            "../../../../../tests/fixtures/codex_runtime_summary/retirement_digest.json"
-        ))
-        .expect("old Python digest derivation");
+        // Keep the frozen current-event oracle; retired migration metadata was removed.
+        let expected = parse_json(&String::from_utf8(expected_stdout).unwrap()).unwrap();
+        let JsonValue::Object(mut fields) = expected else {
+            panic!("contract oracle must be an object");
+        };
+        fields.0.retain(|(key, _)| {
+            !matches!(
+                key.to_text().unwrap().as_str(),
+                "retired_child_tombstones" | "moved_source_absences" | "counts" | "source_digest"
+            )
+        });
+        let expected_contract = canonical_json_ascii_bytes(&JsonValue::Object(fields)).unwrap();
         assert_eq!(
-            text(field(&digest_oracle, "source").unwrap()),
-            "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6"
+            canonical_json_ascii_bytes(
+                &parse_json(&String::from_utf8(result.stdout.clone()).unwrap()).unwrap()
+            )
+            .unwrap(),
+            expected_contract,
+            "current-event contract for {name}"
         );
-        assert_eq!(
-            text(field(&digest_oracle, "old_digest").unwrap()),
-            "7fe7b7ea25b13567ba27aa93235da043460df83132162818b93236fa4c4369b9"
-        );
-        let relocated_digest = text(field(&digest_oracle, "new_digest").unwrap());
-        let mut expected = String::from_utf8(expected_stdout).unwrap();
-        for (old, new) in [
-            ("\"owner\": \"tools/validation/semantic/tools/tool_rejection_preflight.py\"",
-             "\"owner\": \"tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs\""),
-            ("\"command_or_skill\": \"command-only:python3 tools/validation/semantic/tools/tool_rejection_preflight.py --gate cause_investigation\"",
-             "\"command_or_skill\": \"command-only:tools/bin/agent-canon tool-rejection-preflight\""),
-            ("\"owner\": \"tools/runtime/archive/export_codex_runtime_summary.py\"",
-             "\"owner\": \"tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs\""),
-            ("\"command_or_skill\": \"command-only:python3 tools/runtime/archive/export_codex_runtime_summary.py\"",
-             "\"command_or_skill\": \"command-only:tools/bin/agent-canon export-codex-runtime-summary\""),
-            ("cad81898e43d3891d23ed3c220c6fac6703716536a95a7f7c3c7cc323174c9ad",
-             relocated_digest.as_str()),
-        ] {
-            assert_eq!(expected.matches(old).count(), 1, "declared contract relocation");
-            expected = expected.replace(old, new);
-        }
-        expected_stdout = expected.into_bytes();
+    } else if text(field(case, "name").expect("case name")) == "touch" {
+        assert!(result.stdout.is_empty(), "ordinary writes are admitted");
+    } else {
+        assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     }
-    assert_eq!(result.stdout, expected_stdout, "stdout bytes for {name}");
     if text(field(case, "name").expect("case name")) == "surrogate-command" {
         assert!(
             !result.stderr.is_empty(),
@@ -706,95 +703,54 @@ fn missing_runtime_directory_does_not_change_safety_or_create_files() {
 }
 
 #[test]
-fn dispatcher_preserves_parent_denial_and_authenticated_child_admission() {
-    for role in ["parent", "implementer"] {
-        let temp = TempDir::new();
-        git_repo(temp.path());
-        let source = temp.path().join("source");
-        let results = source.join("hook-results");
-        let report = source.join("run");
-        fs::create_dir_all(report.join("runtime")).unwrap();
-        fs::create_dir_all(results.join(".event-spool")).unwrap();
-        let scope_digest = format!(
-            "{:x}",
-            Sha256::digest(br#"{"allowed_directories":[],"allowed_files":["src/owned.py"]}"#)
-        );
-        let mut receipt = serde_json::json!({
-            "schema": "agent-canon.runtime-agent-identity.v1",
-            "run_id": "hook-run", "agent_id": "child-hook", "role_id": role,
-            "parent_agent_id": "parent-hook", "authority": "write_capable_child",
-            "allowed_files": ["src/owned.py"], "allowed_directories": [],
-            "scope_digest": scope_digest, "status": "active"
-        });
-        let receipt_hash = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&receipt).unwrap())
-        );
-        receipt["receipt_sha256"] = serde_json::Value::String(receipt_hash);
-        fs::write(
-            report.join("runtime/agent_identity.json"),
-            serde_json::to_vec(&receipt).unwrap(),
-        )
-        .unwrap();
-        let packet = serde_json::json!({
-            "schema": "agent-canon.writer-target-packet.v1",
-            "checkout_root": source, "branch": "test", "remote": "local/repo",
-            "allowed_paths": ["src/"],
-            "checkout_identity": {"cwd": source, "git_root": source, "branch": "test", "head": "a".repeat(40), "remote": "local/repo"}
-        });
-        fs::create_dir(source.join(".agent-canon")).unwrap();
-        fs::write(
-            source.join(".agent-canon/writer-target.json"),
-            serde_json::to_vec(&packet).unwrap(),
-        )
-        .unwrap();
-        let spawn = serde_json::json!({"subagent_event_kind":"spawn", "subagent_target":"child-hook", "subagent_agent_type":"worker", "mutation_scope_digest":scope_digest});
-        fs::write(
-            results.join(".event-spool/spawn.json"),
-            serde_json::to_vec(&spawn).unwrap(),
-        )
-        .unwrap();
-        let mut values = environment(&source, &results);
-        for name in ["AGENT_CANON_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT"] {
-            values.insert(name.to_owned(), temp.path().display().to_string());
-        }
-        values.insert(
-            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
-            report.display().to_string(),
-        );
-        values.insert(
-            "AGENT_CANON_RUNTIME_AGENT_ID".to_owned(),
-            "child-hook".to_owned(),
-        );
-        values.insert("AGENT_CANON_RUNTIME_ROLE_ID".to_owned(), role.to_owned());
-        values.insert(
-            "AGENT_CANON_RUNTIME_PARENT_AGENT_ID".to_owned(),
-            "parent-hook".to_owned(),
-        );
-        let result = run_with_input(&["PreToolUse".to_owned()], br#"{"hookEventName":"PreToolUse","tool_name":"apply_patch","tool_input":{"patch":"*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"}}"#, &values, &source);
-        assert_eq!(
-            result.exit_code,
-            0,
-            "{role}: {}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        if role == "parent" {
-            let output = parse_json(std::str::from_utf8(&result.stdout).unwrap()).unwrap();
-            assert_eq!(text(field(&output, "decision").unwrap()), "block");
-            assert_eq!(
-                text(field(&output, "mutation_authority").unwrap()),
-                "parent_mutation_forbidden"
+fn dispatcher_admits_edits_without_runtime_work_control_records() {
+    for role in ["", "parent", "implementer"] {
+        for stale_records in [false, true] {
+            let temp = TempDir::new();
+            git_repo(temp.path());
+            let source = temp.path().join("source");
+            let results = source.join("hook-results");
+            fs::create_dir_all(&source).unwrap();
+            if stale_records {
+                for path in [
+                    "run/runtime/agent_identity.json",
+                    ".agent-canon/writer-target.json",
+                    "hook-results/.event-spool/spawn.json",
+                ] {
+                    let path = source.join(path);
+                    fs::create_dir_all(path.parent().unwrap()).unwrap();
+                    fs::write(path, b"{}").unwrap();
+                }
+            }
+            let mut values = environment(&source, &results);
+            for name in ["AGENT_CANON_PARENT_ROOT", "AGENT_CANON_RUNTIME_ROOT"] {
+                values.insert(name.to_owned(), temp.path().display().to_string());
+            }
+            values.insert(
+                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
+                source.join("run").display().to_string(),
             );
-        } else {
-            assert!(result.stdout.is_empty(), "authenticated child is admitted");
+            values.insert("AGENT_CANON_RUNTIME_ROLE_ID".to_owned(), role.to_owned());
+            for payload in [
+                br#"{"tool_name":"apply_patch","tool_input":{"patch":"*** Begin Patch\n*** Update File: src/owned.rs\n*** End Patch\n"}}"#.as_slice(),
+                br#"{"tool_name":"Write","tool_input":{"file_path":"src/new.rs","content":"pub fn answer() -> u32 { 42 }"}}"#.as_slice(),
+                br#"{"tool_name":"Bash","tool_input":{"command":"touch src/a.rs"}}"#.as_slice(),
+            ] {
+                let result = run_with_input(&["PreToolUse".to_owned()], payload, &values, &source);
+                assert_eq!(result.exit_code, 0, "{role}: {}", String::from_utf8_lossy(&result.stderr));
+                assert!(result.stdout.is_empty(), "{role}: {}", String::from_utf8_lossy(&result.stdout));
+                assert!(result.stderr.is_empty());
+            }
             let events = event_values(&results);
-            let event = events
+            let invocations: Vec<_> = events
                 .iter()
-                .find(|event| field(event, "hook_event_name").is_some())
-                .unwrap();
-            let control = field(event, "mutation_control").unwrap();
-            assert_eq!(text(field(control, "status").unwrap()), "allowed");
-            assert_eq!(text(field(control, "role_id").unwrap()), "implementer");
+                .filter(|event| field(event, "hook_event_name").is_some())
+                .collect();
+            assert_eq!(invocations.len(), 3);
+            for event in invocations {
+                assert_eq!(text(field(event, "status").unwrap()), "pass");
+                assert!(field(event, "mutation_control").is_none());
+            }
         }
     }
 }

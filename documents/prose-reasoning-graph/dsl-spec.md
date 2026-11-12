@@ -318,6 +318,22 @@ Corpus hints are calibration metadata, not evidence. A downstream literature
 search, evaluator, or reviewer may use them to choose examples and norms, but
 must still cite or inspect actual sources before making scholarly claims.
 
+Word extraction uses the Rust `structured-analysis lexicon` operation. It
+uses Unicode Normalization Form C (NFC) so canonically equivalent spellings
+compare alike, applies Unicode case folding, and uses ICU4X 1.3.2 dictionary word
+boundaries. Only segments containing Unicode letters are eligible: ASCII
+segments need at least three characters and non-ASCII segments at least two;
+the shared stop-word list removes common English and Japanese function words.
+Punctuation, emoji, and number-only segments are not concept words. The IR,
+concept extraction, responsibility coverage, and lexical overlap use the same
+terms. Source text and its offsets retain their original spelling.
+
+Top terms are ranked by frequency in document text, with ties resolved by first
+appearance. The prompt affects domain hints but does not add document terms.
+English domain cues use identifier boundaries; Japanese cues also recognize
+software-related phrases. Their `lexical_keyword_matching` basis describes a
+heuristic hint, not a measured probability or a loaded scholarly corpus.
+
 ### Edge
 
 An edge represents a typed relation between two prose-profile nodes. The shared

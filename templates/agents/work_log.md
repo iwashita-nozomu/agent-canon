@@ -17,7 +17,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Purpose（目的）
 
-<!-- 意味のある execution step を chronological な run-local log として保持します。worktree action log が active でなくても必須です。 -->
+<!-- 作業ログの出力が依頼された場合に、判断に必要な記録をまとめます。 -->
 
 - owner / responsibility unit:
 - design-to-implementation trace:
@@ -27,4 +27,4 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Entries（記録）
 
-<!-- 意味のある step ごとに time、kind、request clause ID、ref、next action を 1 行追加します。 -->
+<!-- 依頼された範囲の操作・結果・未解決事項を記載します。 -->

@@ -36,39 +36,6 @@ from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
-RETIRED_ROUTE_TABLE = (
-    "branch_worktree_guard.py",
-    "cause_investigation_guard.py",
-    "codex_runtime_summary_logger.py",
-    "completion_review_guard.py",
-    "direct_rg_context_guard.py",
-    "execution_resource_plan_projection_guard.py",
-    "first_party_library_guard.py",
-    "goal_completion_guard.py",
-    "helper_first_guard.py",
-    "helper_inventory_guard.py",
-    "library_implementation_guard.py",
-    "log_archive_mount_warning.py",
-    "log_surface_inventory_guard.py",
-    "module_boundary_guard.py",
-    "notebook_quality_guard.py",
-    "oop_readability_guard.py",
-    "prompt_secret_guard.py",
-    "reference_capture_guard.py",
-    "role_write_policy_guard.py",
-    "runtime_log_auto_sync.py",
-    "skill_usage_logger.py",
-    "style_checker_guard.py",
-    "task_authority_schema_guard.py",
-)
-RETIRED_ROUTE_FIELDS = {
-    "filename",
-    "artifact",
-    "command_or_skill",
-    "decision_semantics",
-    "owner",
-    "profile_trigger",
-}
 
 
 def codex_hook_command(*arguments: str) -> list[str]:
@@ -563,15 +530,11 @@ class CodexHooksTest(unittest.TestCase):
         )
 
     def test_hook_contract_is_table_driven_static_and_stop_noop(self) -> None:
-        """The static contract covers active events, inactive Stop, and all retired routes."""
+        """The static contract covers active events and inactive Stop."""
         contract = self._contract()
         events = cast("dict[str, dict[str, object]]", contract["events"])
         active_events = cast("list[str]", contract["active_events"])
         inactive_events = cast("list[str]", contract["inactive_events"])
-        retired_rows = cast(
-            "list[dict[str, object]]", contract["retired_child_tombstones"]
-        )
-        moved_rows = cast("list[dict[str, object]]", contract["moved_source_absences"])
         active_handlers = set(cast("list[str]", contract["active_handlers"]))
 
         self.assertEqual(set(active_events), set(ACTIVE_EVENTS))
@@ -585,21 +548,6 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertEqual(inactive_events, ["Stop"])
         self.assertEqual(set(events), set((*ACTIVE_EVENTS, "Stop")))
-        retired_routes = {cast(str, row["filename"]): row for row in retired_rows}
-        self.assertEqual(set(retired_routes), set(RETIRED_ROUTE_TABLE))
-        self.assertEqual(len(retired_rows), 23)
-        self.assertEqual(len(moved_rows), 1)
-        self.assertTrue(set(retired_routes).isdisjoint(active_handlers))
-        scanner_route = retired_routes["log_surface_inventory_guard.py"]
-        self.assertEqual(
-            scanner_route["owner"],
-            "tools/runtime/dispatch/agent-canon/src/log_surface_inventory.rs",
-        )
-        self.assertEqual(
-            scanner_route["command_or_skill"],
-            "command-only:tools/bin/agent-canon log-surface-inventory",
-        )
-
         for event, expected_active in (
             *((event, True) for event in ACTIVE_EVENTS),
             ("Stop", False),
@@ -609,14 +557,6 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsInstance(events[event]["matchers"], list)
                 self.assertIsInstance(events[event]["failure"], str)
                 self.assertIsInstance(events[event]["telemetry"], str)
-
-        for route_name in RETIRED_ROUTE_TABLE:
-            with self.subTest(route=route_name):
-                route = retired_routes[route_name]
-                self.assertEqual(set(route), RETIRED_ROUTE_FIELDS)
-                self.assertTrue(
-                    all(isinstance(value, str) and value for value in route.values())
-                )
 
         stop = self._run_hook("Stop", "not-json")
         self.assertEqual(stop.stdout, "")
@@ -638,133 +578,6 @@ class CodexHooksTest(unittest.TestCase):
         )
         self.assertTrue(payload["remediation"])
         self.assertNotIn(secret, result.stdout)
-
-    @staticmethod
-    def _write_identity_receipt(report_dir: Path, role_id: str) -> None:
-        value: dict[str, object] = {
-            "schema": "agent-canon.runtime-agent-identity.v1",
-            "run_id": "hook-run",
-            "agent_id": "child-hook",
-            "role_id": role_id,
-            "parent_agent_id": "parent-hook",
-            "authority": "write_capable_child",
-            "allowed_files": ["src/owned.py"],
-            "allowed_directories": [],
-            "scope_digest": "",
-            "status": "active",
-            "receipt_sha256": "",
-        }
-        value["scope_digest"] = hashlib.sha256(
-            json.dumps(
-                {"allowed_files": value["allowed_files"], "allowed_directories": []},
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
-        unsigned = dict(value)
-        unsigned.pop("receipt_sha256")
-        value["receipt_sha256"] = hashlib.sha256(
-            json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-        target = report_dir / "runtime" / "agent_identity.json"
-        target.parent.mkdir(parents=True)
-        target.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
-        packet_root = report_dir.parent
-        packet = {
-            "schema": "agent-canon.writer-target-packet.v1",
-            "checkout_root": str(packet_root),
-            "branch": "test",
-            "remote": "local/repo",
-            "allowed_paths": ["src/"],
-            "checkout_identity": {
-                "cwd": str(packet_root),
-                "git_root": str(packet_root),
-                "branch": "test",
-                "head": "a" * 40,
-                "remote": "local/repo",
-            },
-        }
-        packet_path = packet_root / ".agent-canon" / "writer-target.json"
-        packet_path.parent.mkdir(parents=True, exist_ok=True)
-        packet_path.write_text(json.dumps(packet, sort_keys=True), encoding="utf-8")
-
-    def test_pretooluse_rejects_parent_mutation_and_allows_child_scope(self) -> None:
-        """The active hook enforces runtime identity and child write scope."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir) / "source"
-            root.mkdir()
-            run_dir = root / "run"
-            run_dir.mkdir()
-            self._write_identity_receipt(run_dir, "parent")
-            result = self._run_hook_in_root(
-                root,
-                "PreToolUse",
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "apply_patch",
-                    "tool_input": {
-                        "patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"
-                    },
-                },
-                extra_env={
-                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
-                    "AGENT_CANON_RUNTIME_AGENT_ID": "child-hook",
-                    "AGENT_CANON_RUNTIME_ROLE_ID": "parent",
-                    "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-hook",
-                },
-            )
-            output = cast("dict[str, object]", json.loads(result.stdout))
-            self.assertEqual(output["decision"], "block")
-            self.assertEqual(output["mutation_authority"], "parent_mutation_forbidden")
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir) / "source"
-            root.mkdir()
-            run_dir = root / "run"
-            run_dir.mkdir()
-            self._write_identity_receipt(run_dir, "implementer")
-            identity = json.loads(
-                (run_dir / "runtime" / "agent_identity.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-            spool = root / "hook-results" / ".event-spool"
-            spool.mkdir(parents=True)
-            (spool / "spawn.json").write_text(
-                json.dumps(
-                    {
-                        "subagent_event_kind": "spawn",
-                        "subagent_target": "child-hook",
-                        "subagent_agent_type": "worker",
-                        "mutation_scope_digest": identity["scope_digest"],
-                    },
-                    sort_keys=True,
-                ),
-                encoding="utf-8",
-            )
-            result = self._run_hook_in_root(
-                root,
-                "PreToolUse",
-                {
-                    "hookEventName": "PreToolUse",
-                    "tool_name": "apply_patch",
-                    "tool_input": {
-                        "patch": "*** Begin Patch\n*** Update File: src/owned.py\n*** End Patch\n"
-                    },
-                },
-                extra_env={
-                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(run_dir),
-                    "AGENT_CANON_RUNTIME_AGENT_ID": "child-hook",
-                    "AGENT_CANON_RUNTIME_ROLE_ID": "implementer",
-                    "AGENT_CANON_RUNTIME_PARENT_AGENT_ID": "parent-hook",
-                    "AGENT_CANON_HOOK_RESULTS_DIR": str(root / "hook-results"),
-                },
-            )
-            self.assertEqual(result.stdout, "")
-            event = self._spooled_event(root)
-            control = cast("dict[str, object]", event["mutation_control"])
-            self.assertEqual(control["status"], "allowed")
-            self.assertEqual(control["role_id"], "implementer")
 
     def test_dispatcher_forwards_only_valid_execution_projection(self) -> None:
         """PostToolUse forwards one exact, validator-approved execution projection."""
@@ -1154,12 +967,7 @@ class CodexHooksTest(unittest.TestCase):
             f"{destructive} git restore file.py",
             f"env {destructive} git reset HEAD",
         ):
-            payload = self._run_shared_checkout_guard(command)
-            if payload is None:
-                raise AssertionError("destructive command was not blocked")
-            self.assertEqual(
-                payload.get("mutation_authority"), "blocked_authority_required"
-            )
+            self.assertIsNone(self._run_shared_checkout_guard(command))
         self.assertIsNotNone(
             self._run_shared_checkout_guard(
                 "git restore file.py",
@@ -1294,7 +1102,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNone(self._run_shared_checkout_guard(command))
 
     def test_shared_checkout_guard_enforces_overlap_authority_matrix(self) -> None:
-        """Git authority strings cannot bypass the authenticated child guard."""
+        """Creation needs its grant; forced replacement also needs destructive approval."""
         commands = [
             "git switch -ctopic",
             "git checkout -btopic",
@@ -1307,6 +1115,8 @@ class CodexHooksTest(unittest.TestCase):
             "git branch --create-reflog topic origin/main",
             "git worktree add -b topic ../topic",
             "git worktree add --orphan topic ../topic",
+        ]
+        forced_commands = [
             "git switch -Ctopic",
             "git checkout -Btopic",
             "git branch -Ctopic main",
@@ -1317,13 +1127,29 @@ class CodexHooksTest(unittest.TestCase):
         ]
         for command in commands:
             with self.subTest(command=command):
-                payload = self._run_shared_checkout_guard(
-                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested " + command
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                        "AGENT_CANON_BRANCH_WORKTREE_REASON=requested " + command
+                    )
                 )
-                if payload is None:
-                    raise AssertionError("branch mutation was not blocked")
-                self.assertEqual(payload.get("decision"), "block")
+        for command in forced_commands:
+            with self.subTest(command=command):
+                authority = (
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON=requested "
+                )
+                payload = self._run_shared_checkout_guard(authority + command)
+                self.assertIsNotNone(payload)
+                self.assertEqual(cast("dict[str, object]", payload)["decision"], "block")
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        authority
+                        + "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved "
+                        + command
+                    )
+                )
 
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(
         self,

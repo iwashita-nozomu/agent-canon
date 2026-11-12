@@ -1,0 +1,9 @@
+version: 1
+skill_families:
+  - id: fixture-skill
+    purpose: Fixture purpose
+    canonical_doc: agents/skills/fixture-skill.md
+    shim: .codex/personal/skills/fixture-skill/SKILL.md
+    discovery:
+      name: fixture-skill
+      description: Fixture discovery description
