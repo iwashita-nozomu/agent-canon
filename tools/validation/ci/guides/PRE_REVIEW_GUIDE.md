@@ -13,11 +13,9 @@ upstream implementation ../../code/config/ruff-docstrings.toml owns the native D
 ## Reader Map
 
 - Purpose: explain the `tools/validation/ci/runners/pre_review.sh` verifier entrypoint.
-- Use When: maintaining GitHub agent-coordination verifier jobs or running the
-  same Python quality gate with optional role write-scope evidence.
+- Use When: running the shared Python quality gate with an optional report.
 - Section path: Entry Contract shows the owner boundary; Commands gives local
-  usage; Report Evidence explains `AGENT_REPORT_DIR` and role write-scope
-  output.
+  usage; Report Evidence explains `AGENT_REPORT_DIR`.
 - Boundary: Python quality check behavior is owned by
   `tools/validation/ci/checks/run_python_quality_checks.sh`; this guide does not duplicate its
   command list.
@@ -26,11 +24,10 @@ upstream implementation ../../code/config/ruff-docstrings.toml owns the native D
 
 `tools/validation/ci/runners/pre_review.sh` is a thin verifier wrapper. It calls
 `tools/validation/ci/checks/run_python_quality_checks.sh` and, when requested by the workflow,
-records `verification.txt` plus role write-scope evidence.
+records `verification.txt` in the external runtime.
 
-It is not a separate PR-quality policy surface. Update
-`tools/validation/ci/checks/run_python_quality_checks.sh` when the shared Python gate changes.
-Update this guide only when verifier report or role-scope behavior changes.
+Update `tools/validation/ci/checks/run_python_quality_checks.sh` when the shared
+Python gate changes. Update this guide when verifier report behavior changes.
 
 ## Commands
 
@@ -46,8 +43,7 @@ Run the same gate with ruff skipped:
 bash tools/validation/ci/runners/pre_review.sh --quick
 ```
 
-Run the shared Python gate directly when report/write-scope evidence is not
-needed:
+Run the shared Python gate directly when a report is unnecessary:
 
 ```bash
 bash tools/validation/ci/checks/run_python_quality_checks.sh
@@ -78,19 +74,16 @@ the shared PR correctness gate is unaffected.
 
 ## Report Evidence
 
-`agent-coordination.yml` sets these variables for verifier jobs:
+Select an external report directory when a report is needed:
 
 ```bash
-export AGENT_REPORT_DIR="<run-bundle-report-dir>"
-export AGENT_ROLE="verifier"
-export AGENT_ENFORCE_WRITE_SCOPE="1"
+export AGENT_REPORT_DIR="<external-runtime-root>/reports/review"
 bash tools/validation/ci/runners/pre_review.sh
 ```
 
 When `AGENT_REPORT_DIR` is set, `pre_review.sh` writes
 `verification.txt` with start/end timestamps, the workspace root,
-`python_quality=pass|fail`, and `write_scope=pass|fail` when role enforcement
-is active.
+`python_quality=pass|fail`, and final status.
 
 ## Validation
 
