@@ -65,6 +65,7 @@ pub mod agent_tool_calls;
 pub mod artifacts;
 pub mod authority;
 pub mod catalog;
+pub mod chatgpt_codex_routing;
 pub mod code_template_rendering;
 pub mod codex_runtime_summary;
 pub mod compare_agent_run_paths;

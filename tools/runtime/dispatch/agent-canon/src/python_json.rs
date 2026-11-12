@@ -818,37 +818,45 @@ fn is_json_integer(value: &str) -> bool {
 
 /// Serialize with Python's `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)` bytes.
 pub fn canonical_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, false, false)
+    canonical_json_ascii_bytes_with_options(value, false, false, false)
 }
 
 /// Serialize with the same canonical form, rejecting non-finite floats as `allow_nan=False` does.
 pub fn canonical_json_ascii_bytes_reject_nonfinite(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, true, false)
+    canonical_json_ascii_bytes_with_options(value, true, false, false)
 }
 
 /// Serialize like `json.dump(value, sort_keys=True, ensure_ascii=True)` with default separators.
 pub fn python_json_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
-    canonical_json_ascii_bytes_with_options(value, false, true)
+    canonical_json_ascii_bytes_with_options(value, false, true, false)
+}
+
+/// Serialize Python's sorted, ASCII JSON with two-space indentation.
+pub fn python_json_pretty_ascii_bytes(value: &JsonValue) -> Result<Vec<u8>, String> {
+    canonical_json_ascii_bytes_with_options(value, false, true, true)
 }
 
 fn canonical_json_ascii_bytes_with_options(
     value: &JsonValue,
     reject_nonfinite: bool,
     spaced_separators: bool,
+    pretty: bool,
 ) -> Result<Vec<u8>, String> {
     enum Action<'a> {
-        Value(&'a JsonValue),
+        Value(&'a JsonValue, usize),
         String(&'a JsonString),
         Text(&'static [u8]),
+        Indent(usize),
     }
 
     let mut bytes = Vec::new();
-    let mut actions = vec![Action::Value(value)];
+    let mut actions = vec![Action::Value(value, 0)];
     while let Some(action) = actions.pop() {
         match action {
             Action::Text(text) => bytes.extend_from_slice(text),
             Action::String(value) => write_ascii_json_string(value, &mut bytes)?,
-            Action::Value(value) => match value {
+            Action::Indent(depth) => bytes.resize(bytes.len() + depth * 2, b' '),
+            Action::Value(value, depth) => match value {
                 JsonValue::Null => bytes.extend_from_slice(b"null"),
                 JsonValue::Bool(value) => {
                     bytes.extend_from_slice(if *value { b"true" } else { b"false" })
@@ -872,9 +880,16 @@ fn canonical_json_ascii_bytes_with_options(
                 JsonValue::Array(values) => {
                     bytes.push(b'[');
                     actions.push(Action::Text(b"]"));
+                    if pretty && !values.0.is_empty() {
+                        actions.push(Action::Indent(depth));
+                        actions.push(Action::Text(b"\n"));
+                    }
                     for index in (0..values.0.len()).rev() {
-                        actions.push(Action::Value(&values.0[index]));
-                        if index > 0 {
+                        actions.push(Action::Value(&values.0[index], depth + 1));
+                        if pretty {
+                            actions.push(Action::Indent(depth + 1));
+                            actions.push(Action::Text(if index > 0 { b",\n" } else { b"\n" }));
+                        } else if index > 0 {
                             actions.push(Action::Text(if spaced_separators {
                                 b", "
                             } else {
@@ -898,12 +913,19 @@ fn canonical_json_ascii_bytes_with_options(
                     }
                     bytes.push(b'{');
                     actions.push(Action::Text(b"}"));
+                    if pretty && !unique_entries.is_empty() {
+                        actions.push(Action::Indent(depth));
+                        actions.push(Action::Text(b"\n"));
+                    }
                     for index in (0..unique_entries.len()).rev() {
                         let (key, value) = unique_entries[index];
-                        actions.push(Action::Value(value));
+                        actions.push(Action::Value(value, depth + 1));
                         actions.push(Action::Text(if spaced_separators { b": " } else { b":" }));
                         actions.push(Action::String(key));
-                        if index > 0 {
+                        if pretty {
+                            actions.push(Action::Indent(depth + 1));
+                            actions.push(Action::Text(if index > 0 { b",\n" } else { b"\n" }));
+                        } else if index > 0 {
                             actions.push(Action::Text(if spaced_separators {
                                 b", "
                             } else {
