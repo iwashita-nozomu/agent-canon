@@ -4,7 +4,7 @@
 # responsibility Produces route golden, fresh packet, and deterministic shim measurement artifacts.
 # upstream design ../../documents/design/skill-runtime-shim-materialization.md approved shim evaluation contract
 # upstream implementation ../../tools/agent/orchestration/route.py owns route behavior and JSON schema
-# upstream implementation ./evaluate_workflow_selection.py owns the frozen 525-case manifest loader
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs owns the frozen 525-case manifest loader
 # upstream implementation ../../tools/agent/skills/skill_shim_materializer.py owns generated shim records and content
 # upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external runtime receipt publication
 # downstream implementation ../../tests/agent_tools/test_skill_shim_evaluation.py focused producer tests
@@ -24,6 +24,7 @@ import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Protocol, cast
 
 try:
@@ -31,7 +32,6 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.11+ is the supported runtime.
     import tomli as tomllib  # type: ignore[no-redef]
 
-from eval.producers.evaluate_workflow_selection import load_manifest
 from tools.agent.skills.skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
     BuildContext,
     build_context,
@@ -267,7 +267,24 @@ def route_golden(
     runtime_root: Path | str | None = None,
 ) -> Mapping[str, object]:
     """Run the real route CLI for every frozen manifest case."""
-    manifest_data = cast(WorkflowSelectionManifest, load_manifest(manifest))
+    completed = subprocess.run(
+        [
+            str(Path(__file__).resolve().parents[2] / "tools" / "bin" / "agent-canon"),
+            "workflow-selection-manifest",
+            "--manifest",
+            str(manifest),
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode:
+        raise ProducerError(completed.stderr.decode("utf-8").strip())
+    manifest_payload = json.loads(completed.stdout)
+    manifest_payload["cases"] = tuple(
+        SimpleNamespace(**case) for case in manifest_payload["cases"]
+    )
+    manifest_data = cast(WorkflowSelectionManifest, SimpleNamespace(**manifest_payload))
     if (
         manifest_data.expected_case_count != 525
         or manifest_data.expected_generated_case_count != 525

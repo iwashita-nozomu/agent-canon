@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-workflow-selection-manifest
+      selector: workflow-selection-manifest
+      path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
     - id: rust-check-skill-tool-invocation-graph
       selector: check-skill-tool-invocation-graph
       path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
@@ -1154,12 +1157,12 @@ entries:
 
   - id: workflow-selection-eval
     summary: Validates deterministic prompt-to-workflow routing cases.
-    path: eval/producers/evaluate_workflow_selection.py
+    path: tools/runtime/dispatch/agent-canon/src/workflow_selection_eval.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/producers/evaluate_workflow_selection.py
-    dispatch: {argv: ["python3", "eval/producers/evaluate_workflow_selection.py"]}
+    command: tools/bin/agent-canon evaluate-workflow-selection
+    dispatch: {runtime: rust, argv: [tools/bin/agent-canon, evaluate-workflow-selection]}
     writes: true
     default_wiring:
       ci: true

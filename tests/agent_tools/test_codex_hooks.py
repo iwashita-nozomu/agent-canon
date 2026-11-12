@@ -20,18 +20,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import NotRequired, TypedDict, cast
+from typing import cast
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 
 import hook_event_log  # noqa: E402
-
-from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
-    PromptClassifierInputs,
-    prompt_intake_signals,
-)
 
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
@@ -44,18 +39,6 @@ def codex_hook_command(*arguments: str) -> list[str]:
     if not selected_cli:
         raise RuntimeError("AGENT_CANON_CLI must select the native Hook CLI")
     return [selected_cli, "codex-hook", *arguments]
-
-
-class PromptClassifierCase(TypedDict):
-    """Type the optional expectations in the prompt-routing fixture table."""
-
-    name: str
-    prompt: str
-    required_candidates: NotRequired[set[str]]
-    selected: NotRequired[set[str]]
-    required_workflows: NotRequired[set[str]]
-    forbidden_candidates: NotRequired[set[str]]
-    reason_fragment: NotRequired[str]
 
 
 class CodexHooksTest(unittest.TestCase):
@@ -630,79 +613,6 @@ class CodexHooksTest(unittest.TestCase):
             "reqwest::",
         ):
             self.assertNotIn(operation, source)
-
-    def test_prompt_intake_signals_keeps_evaluator_classification_pure(self) -> None:
-        """Prompt routing remains observable without JSONL or runtime-hook side effects."""
-        cases: tuple[PromptClassifierCase, ...] = (
-            {
-                "name": "validation-repair",
-                "prompt": "failed validation; do not delete tests or weaken oracle before repairing the failing contract",
-            },
-            {
-                "name": "declared-skill",
-                "prompt": "Use $codex-task-workflow for a validation failure; do not delete tests or weaken the oracle.",
-                "selected": {"codex-task-workflow"},
-                "forbidden_candidates": {"codex-task-workflow"},
-            },
-            {
-                "name": "oracle-mismatch",
-                "prompt": "The test oracle has a spec mismatch; fix test design.",
-            },
-            {
-                "name": "user-guided-debugging",
-                "prompt": "Use user-guided refactor cadence: show one concrete issue, patch only that target, and do not run validation unless I ask.",
-                "forbidden_candidates": {"user-guided-debugging"},
-            },
-            {
-                "name": "ordinary-docs",
-                "prompt": "Please update the docs; no validation unless asked.",
-                "forbidden_candidates": {"user-guided-debugging"},
-            },
-            {
-                "name": "parent-repo-skill-lane",
-                "prompt": "親レポに固有スキルを置けるようにする設計修正",
-                "forbidden_candidates": {"task-routing", "structure-refactor"},
-            },
-            {
-                "name": "advisory-routing",
-                "prompt": "Which route contract applies for this repository task?",
-                "forbidden_candidates": {"codex-task-workflow"},
-            },
-        )
-        for case in cases:
-            with self.subTest(case=case["name"]):
-                signals = prompt_intake_signals(
-                    PromptClassifierInputs(
-                        prompt=case["prompt"],
-                        repo_root=PROJECT_ROOT,
-                        catalog={},
-                        routing_rules={},
-                    )
-                )
-                candidates = set(signals.candidate_skills)
-                selected = set(signals.skills)
-                required_candidates = case.get("required_candidates")
-                if required_candidates is not None:
-                    self.assertTrue(required_candidates <= candidates)
-                selected_expectations = case.get("selected")
-                if selected_expectations is not None:
-                    self.assertTrue(selected_expectations <= selected)
-                required_workflows = case.get("required_workflows")
-                if required_workflows is not None:
-                    self.assertTrue(
-                        required_workflows <= set(signals.candidate_workflows)
-                    )
-                forbidden_candidates = case.get("forbidden_candidates")
-                if forbidden_candidates is not None:
-                    self.assertTrue(forbidden_candidates.isdisjoint(candidates))
-                reason_fragment = case.get("reason_fragment")
-                if reason_fragment is not None:
-                    self.assertTrue(
-                        any(
-                            reason_fragment in reason
-                            for reason in signals.candidate_skill_reasons
-                        )
-                    )
 
     def test_shared_checkout_guard_blocks_destructive_git_parser_table(self) -> None:
         """Protected Git stays visible through prefixes, wrappers, options, and grouping."""

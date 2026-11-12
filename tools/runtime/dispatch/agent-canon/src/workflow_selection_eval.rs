@@ -8,7 +8,7 @@
 // upstream implementation eval_archive_paths.rs owns accumulated Eval destinations
 // upstream implementation runtime_boundary.rs owns external report publication
 // downstream implementation main.rs exposes the evaluate-workflow-selection selector
-// downstream test ../../tests/agent_tools/test_evaluate_workflow_selection.py preserves CLI oracles
+// downstream test ../../../../../tests/agent_tools/test_evaluate_workflow_selection.py preserves CLI oracles
 // @dependency-end
 
 use crate::eval_archive_paths::eval_results_dir;

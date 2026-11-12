@@ -1,7 +1,6 @@
 // @dependency-start
 // contract implementation
 // responsibility Classifies immutable prompt evidence into workflow, skill, tool, and feedback signals.
-// upstream implementation ../../../../../tools/agent/orchestration/prompt_classifier.py owns the current pure API contract.
 // upstream implementation ./skill_lane_detector.rs owns structural and validation-repair lane evidence.
 // upstream implementation ./python_json.rs owns Python-compatible JSON strings and values.
 // upstream implementation ./python_text.rs owns Python-compatible Unicode whitespace.

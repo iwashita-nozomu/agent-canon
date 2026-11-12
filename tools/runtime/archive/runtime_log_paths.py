@@ -6,8 +6,7 @@
 # downstream implementation ../../../.codex/hooks/hook_event_log.py writes hook JSONL through this resolver
 # downstream implementation ../../../eval/producers/generate_agent_improvement_guide.py reads mounted hook log archives
 # downstream implementation ./runtime_log_archive_git.py archives run-bundle agent reports
-# downstream implementation ../../../eval/producers/evaluate_workflow_selection.py writes accumulated eval reports through this resolver
-# downstream implementation ../dispatch/agent-canon/src/codex_agent_role_eval/mod.rs writes accumulated eval reports through this resolver
+# upstream reference ../dispatch/agent-canon/src/eval_archive_paths.rs owns the native archive-path counterpart used by Eval producers
 # downstream implementation ./runtime_log_archive_git.py copies agent reports into this archive
 # @dependency-end
 """Resolve AgentCanon runtime log and eval archive paths."""

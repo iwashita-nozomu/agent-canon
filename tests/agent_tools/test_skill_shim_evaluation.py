@@ -138,6 +138,19 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
 
     def fake_run(args, **kwargs):
         command = list(args)
+        if "workflow-selection-manifest" in command:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                json.dumps(
+                    {
+                        "expected_case_count": manifest.expected_case_count,
+                        "expected_generated_case_count": manifest.expected_generated_case_count,
+                        "cases": [vars(case) for case in manifest.cases],
+                    }
+                ).encode(),
+                b"",
+            )
         if "--prompt-file" in command:
             prompt_path = Path(command[command.index("--prompt-file") + 1])
             assert prompt_path.is_relative_to(runtime_root)
@@ -151,8 +164,6 @@ def test_route_golden_uses_external_runtime_receipt(tmp_path: Path) -> None:
 
     with mock.patch.dict(
         os.environ, {"AGENT_CANON_RUNTIME_ROOT": str(runtime_root)}, clear=False
-    ), mock.patch.object(
-        skill_shim_evaluation, "load_manifest", return_value=manifest
     ), mock.patch.object(skill_shim_evaluation.subprocess, "run", side_effect=fake_run):
         payload = route_golden(
             parent_root,
