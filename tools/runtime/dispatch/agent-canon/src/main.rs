@@ -118,6 +118,7 @@ Usage: agent-canon <command> [arguments]
   experiment-registry [--repo-root ROOT] [--registry PATH]
 
 Commands:
+  evaluate-codex-agent-roles [--root ROOT] [--runtime-root PATH] [--accumulate] [--format text|json]
   check-skill-tool-invocation-graph [--root ROOT]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
@@ -351,6 +352,9 @@ fn main() {
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::codex_agent_role_eval::SELECTOR {
+        std::process::exit(agent_canon::codex_agent_role_eval::run(&args[2..]));
     }
     if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
         std::process::exit(agent_canon::server_readiness::run(&args[2..]));
