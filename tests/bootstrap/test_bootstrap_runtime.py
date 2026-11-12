@@ -2046,9 +2046,13 @@ def test_eval_snapshot_failure_releases_admission(
 
 
 def test_eval_collect_runs_existing_producers_and_prepares_sync_request(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native_cli_input: Path
 ) -> None:
     """The resident executes both real producers and releases their task lease."""
+    monkeypatch.setattr(
+        bootstrap_runtime_module, "NATIVE_CLI_DESTINATION", str(native_cli_input)
+    )
+    monkeypatch.delenv("AGENT_CANON_NATIVE_BIN", raising=False)
     container_runtime_root = tmp_path / "container-runtime"
     exchange = container_runtime_root / "exchange"
     monkeypatch.setattr(

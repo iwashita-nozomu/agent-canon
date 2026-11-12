@@ -43,9 +43,13 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             source = Path(temp_dir) / "source"
             source.mkdir()
             with self.assertRaises(SourceLocalArtifact):
-                RuntimeArtifactBoundary.for_source(source, source / ".agent-canon", create=True)
+                RuntimeArtifactBoundary.for_source(
+                    source, source / ".agent-canon", create=True
+                )
             with self.assertRaises(SourceLocalArtifact):
-                RuntimeArtifactBoundary.for_source(source, source / ".runtime", create=True)
+                RuntimeArtifactBoundary.for_source(
+                    source, source / ".runtime", create=True
+                )
             with self.assertRaises(SourceLocalArtifact):
                 RuntimeArtifactBoundary.for_source(source, source, create=True)
 
@@ -58,8 +62,13 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             boundary = runtime_spool_boundary(source, runtime, create=True)
 
             self.assertEqual(boundary.root, runtime)
-            self.assertEqual(boundary.resolve("spool/events"), runtime / "spool" / "events")
-            self.assertEqual(boundary.resolve("locks/archive.lock"), runtime / "locks" / "archive.lock")
+            self.assertEqual(
+                boundary.resolve("spool/events"), runtime / "spool" / "events"
+            )
+            self.assertEqual(
+                boundary.resolve("locks/archive.lock"),
+                runtime / "locks" / "archive.lock",
+            )
             with self.assertRaises(RuntimePathEscape):
                 boundary.resolve("archive/report.json")
             with self.assertRaises(RuntimePathEscape):
@@ -67,7 +76,9 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             with self.assertRaises(SourceLocalArtifact):
                 runtime_spool_boundary(source, source / "other-runtime", create=True)
             with self.assertRaises(SourceLocalArtifact):
-                runtime_spool_boundary(source, source / "nested" / ".runtime", create=True)
+                runtime_spool_boundary(
+                    source, source / "nested" / ".runtime", create=True
+                )
 
     def test_source_runtime_spool_boundary_rejects_symlink_root(self) -> None:
         """A source runtime alias cannot redirect the spool capability."""
@@ -82,7 +93,9 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             with self.assertRaises(RuntimeSymlinkEscape):
                 runtime_spool_boundary(source, source / ".runtime", create=True)
 
-    def test_external_runtime_spool_boundary_rejects_archive_and_report_paths(self) -> None:
+    def test_external_runtime_spool_boundary_rejects_archive_and_report_paths(
+        self,
+    ) -> None:
         """The restricted spool capability stays restricted for external roots."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -93,9 +106,18 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             outside.mkdir()
             boundary = runtime_spool_boundary(source, runtime, create=True)
 
-            self.assertEqual(boundary.resolve("spool/events"), runtime / "spool" / "events")
-            self.assertEqual(boundary.resolve("locks/archive.lock"), runtime / "locks" / "archive.lock")
-            for path in ("archive/report.json", "reports/agents/run/report.md", "tasks/request.json"):
+            self.assertEqual(
+                boundary.resolve("spool/events"), runtime / "spool" / "events"
+            )
+            self.assertEqual(
+                boundary.resolve("locks/archive.lock"),
+                runtime / "locks" / "archive.lock",
+            )
+            for path in (
+                "archive/report.json",
+                "reports/agents/run/report.md",
+                "tasks/request.json",
+            ):
                 with self.assertRaises(RuntimePathEscape):
                     boundary.resolve(path)
             (runtime / "spool" / "escape").parent.mkdir(parents=True)
@@ -172,6 +194,7 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
                 base_env={
                     "PATH": "/usr/bin",
                     "LANG": "C.UTF-8",
+                    "AGENT_CANON_NATIVE_BIN": "/runtime/bin/agent-canon",
                     "OPENAI_API_KEY": "secret",
                     "HTTPS_PROXY": "https://user:password@example.invalid",
                     "GITHUB_TOKEN": "secret",
@@ -179,6 +202,9 @@ class RuntimeArtifactBoundaryTest(unittest.TestCase):
             )
             self.assertEqual(environment["PATH"], "/usr/bin")
             self.assertEqual(environment["LANG"], "C.UTF-8")
+            self.assertEqual(
+                environment["AGENT_CANON_NATIVE_BIN"], "/runtime/bin/agent-canon"
+            )
             self.assertNotIn("OPENAI_API_KEY", environment)
             self.assertNotIn("HTTPS_PROXY", environment)
             self.assertNotIn("GITHUB_TOKEN", environment)

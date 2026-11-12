@@ -123,7 +123,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         f"    assert os.environ['AGENT_CANON_RUNTIME_ROOT'] == {str(runtime)!r}\n"
         "    with Path(os.environ['CALLS']).open('a') as stream:\n"
         "        stream.write(json.dumps(['regression', None, None, "
-        "os.environ['AGENT_CANON_RUNTIME_ROOT']]) + '\\n')\n"
+        "os.environ['AGENT_CANON_RUNTIME_ROOT'], "
+        "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
         f"    assert {regression_status} == 0, 'requested prerequisite failure'\n",
         encoding="utf-8",
     )
@@ -154,7 +155,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             f"    stream.write(json.dumps([{name!r}, "
             "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
             "os.environ.get('AGENT_CANON_LOG_ROOT'), "
-            "os.environ.get('AGENT_CANON_RUNTIME_ROOT')]) + '\\n')\n"
+            "os.environ.get('AGENT_CANON_RUNTIME_ROOT'), "
+            "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
             + producer_logs
             + f"raise SystemExit({status})\n",
             encoding="utf-8",
@@ -171,7 +173,8 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
         "    stream.write(json.dumps(['checker', "
         "os.environ.get('AGENT_CANON_HOOK_ARCHIVE_DIR'), "
         "os.environ.get('AGENT_CANON_LOG_ROOT'), "
-        "os.environ.get('AGENT_CANON_RUNTIME_ROOT')]) + '\\n')\n"
+        "os.environ.get('AGENT_CANON_RUNTIME_ROOT'), "
+        "os.environ.get('AGENT_CANON_NATIVE_BIN')]) + '\\n')\n"
         f"report = Path(os.environ['AGENT_CANON_RUNTIME_ROOT']) / {archive_relative!r} / "
         "'eval-results/workflow-selection/agent-canon-pr-gate-pass.md'\n"
         "if not report.is_file():\n"
@@ -198,6 +201,7 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
             "AGENT_CANON_STATIC_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_RUNTIME_ROOT": str(runtime),
             "AGENT_CANON_CLI": str(native_cli),
+            "AGENT_CANON_NATIVE_BIN": "",
             "AGENT_CANON_HOOK_ARCHIVE_DIR": "/var/lib/agent-canon/private-log",
             "AGENT_CANON_LOG_ROOT": "/var/lib/agent-canon/private-log",
             "CALLS": str(calls),
@@ -212,7 +216,10 @@ def test_eval_preserves_failed_producer_logs_until_ci_capture(
     ), result.stdout + result.stderr
     records = [json.loads(line) for line in calls.read_text().splitlines()]
     assert [record[0] for record in records] == expected_names
-    assert all(record[1:] == [None, None, str(runtime)] for record in records)
+    assert all(record[1:4] == [None, None, str(runtime)] for record in records)
+    assert [record[4] for record in records] == [
+        str(native_cli) if record[0] == "producer" else "" for record in records
+    ]
     report_path = (
         runtime
         / LOG_ARCHIVE_PARENT

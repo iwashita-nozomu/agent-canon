@@ -52,6 +52,7 @@ SAFE_CHILD_ENV_NAMES = frozenset(
         "PYTHONUNBUFFERED",
         "SYSTEMROOT",
         "PATHEXT",
+        "AGENT_CANON_NATIVE_BIN",
     }
 )
 RUNTIME_PATH_ENV_NAMES = frozenset(
@@ -143,12 +144,22 @@ def root_capability_environment(
             TARGET_ROOT_DEV_ENV: target_dev,
             TARGET_ROOT_INO_ENV: target_ino,
             PARENT_ROOT_CAPABILITY_ENV: json.dumps(
-                {"kind": "parent-root", "root": str(parent), "dev": parent_dev, "ino": parent_ino},
+                {
+                    "kind": "parent-root",
+                    "root": str(parent),
+                    "dev": parent_dev,
+                    "ino": parent_ino,
+                },
                 sort_keys=True,
                 separators=(",", ":"),
             ),
             TARGET_ROOT_CAPABILITY_ENV: json.dumps(
-                {"kind": "target-root", "root": str(target), "dev": target_dev, "ino": target_ino},
+                {
+                    "kind": "target-root",
+                    "root": str(target),
+                    "dev": target_dev,
+                    "ino": target_ino,
+                },
                 sort_keys=True,
                 separators=(",", ":"),
             ),
@@ -188,9 +199,13 @@ def _reject_symlink_components(path: Path, stop: Path) -> None:
         current /= part
         try:
             if current.is_symlink():
-                raise RuntimeSymlinkEscape(f"symlink component is not allowed: {current}")
+                raise RuntimeSymlinkEscape(
+                    f"symlink component is not allowed: {current}"
+                )
         except OSError as exc:
-            raise RuntimeArtifactError(f"cannot inspect runtime path: {current}") from exc
+            raise RuntimeArtifactError(
+                f"cannot inspect runtime path: {current}"
+            ) from exc
 
 
 def _contains(parent: Path, child: Path) -> bool:
@@ -352,7 +367,9 @@ class RuntimeArtifactBoundary:
         candidate = Path(path)
         if candidate.is_absolute():
             if not allow_absolute:
-                raise RuntimePathEscape(f"absolute runtime path is not allowed: {candidate}")
+                raise RuntimePathEscape(
+                    f"absolute runtime path is not allowed: {candidate}"
+                )
             joined = candidate
         else:
             # Use POSIX parsing for deterministic rejection on all hosts.
@@ -368,21 +385,27 @@ class RuntimeArtifactBoundary:
             raise RuntimePathEscape(f"path escapes runtime root: {joined}") from exc
         if relative == Path("."):
             raise RuntimePathEscape("runtime root itself is not an artifact")
-        if self.spool_only and relative.parts[0] not in SOURCE_RUNTIME_ALLOWED_TOP_LEVELS:
+        if (
+            self.spool_only
+            and relative.parts[0] not in SOURCE_RUNTIME_ALLOWED_TOP_LEVELS
+        ):
             raise RuntimePathEscape(
-                "runtime spool path is outside bootstrap spool/control paths: "
-                f"{joined}"
+                f"runtime spool path is outside bootstrap spool/control paths: {joined}"
             )
         _reject_symlink_components(joined, self.root)
         try:
             resolved = joined.resolve(strict=False)
         except OSError as exc:
-            raise RuntimeArtifactError(f"cannot resolve runtime path: {joined}") from exc
+            raise RuntimeArtifactError(
+                f"cannot resolve runtime path: {joined}"
+            ) from exc
         if not _contains(self.root, resolved):
             raise RuntimeSymlinkEscape(f"runtime path escapes root: {joined}")
         if _contains(self.source_root, resolved):
             if not self.source_runtime_spool:
-                raise SourceLocalArtifact(f"runtime artifact resolves into source: {resolved}")
+                raise SourceLocalArtifact(
+                    f"runtime artifact resolves into source: {resolved}"
+                )
             try:
                 runtime_relative = resolved.relative_to(self.root)
             except ValueError as exc:  # pragma: no cover - root is validated above.
@@ -407,7 +430,9 @@ class RuntimeArtifactBoundary:
         try:
             target.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            raise RuntimeArtifactError(f"cannot create runtime directory: {target}") from exc
+            raise RuntimeArtifactError(
+                f"cannot create runtime directory: {target}"
+            ) from exc
         return target
 
     def _prepare_parent(self, path: Path | str) -> Path:
@@ -441,13 +466,17 @@ class RuntimeArtifactBoundary:
                 os.fsync(stream.fileno())
             os.replace(temporary, target)
             temporary = None
-            directory_fd = os.open(target.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            directory_fd = os.open(
+                target.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            )
             try:
                 os.fsync(directory_fd)
             finally:
                 os.close(directory_fd)
         except OSError as exc:
-            raise RuntimeArtifactError(f"atomic runtime write failed: {target}") from exc
+            raise RuntimeArtifactError(
+                f"atomic runtime write failed: {target}"
+            ) from exc
         finally:
             if temporary is not None:
                 try:
@@ -456,7 +485,9 @@ class RuntimeArtifactBoundary:
                     pass
         return target
 
-    def atomic_write_text(self, path: Path | str, text: str, *, mode: int = 0o600) -> Path:
+    def atomic_write_text(
+        self, path: Path | str, text: str, *, mode: int = 0o600
+    ) -> Path:
         return self.atomic_write_bytes(path, text.encode("utf-8"), mode=mode)
 
     def atomic_write_json(
@@ -495,7 +526,9 @@ class RuntimeArtifactBoundary:
         try:
             return hashlib.sha256(target.read_bytes()).hexdigest()
         except OSError as exc:
-            raise RuntimeArtifactError(f"cannot read runtime artifact: {target}") from exc
+            raise RuntimeArtifactError(
+                f"cannot read runtime artifact: {target}"
+            ) from exc
 
 
 def runtime_artifact_boundary(
