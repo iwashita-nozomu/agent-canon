@@ -1,7 +1,6 @@
 // @dependency-start
 // contract implementation
 // responsibility Captures bounded, redacted prompt evidence without side effects.
-// upstream implementation ../../../../../tools/agent/orchestration/prompt_capture.py owns the current pure API contract.
 // upstream implementation ./hook_safety.rs owns shared Python Unicode 15 word boundaries for secret patterns.
 // upstream implementation ./python_json.rs owns Python-compatible strings and JSON values.
 // downstream implementation ../tests/prompt_capture_native.rs checks frozen CPython 3.12.3 results.
