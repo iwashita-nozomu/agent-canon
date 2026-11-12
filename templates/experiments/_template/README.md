@@ -8,7 +8,7 @@ upstream design ../../../documents/operations/annex.md pointer/payload boundary 
 upstream implementation ../../../tools/experiments/artifacts/save_experiment_result_annex.py explicit raw retention owner.
 downstream implementation ./provenance.toml records machine-readable plan and provenance.
 downstream implementation ./run.py provides the runnable topic scaffold and atomic summary publication.
-downstream implementation ../../../tools/experiments/lifecycle/create_experiment_topic.py materializes this topic pair.
+downstream implementation ../../../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs materializes this topic pair.
 @dependency-end
 -->
 

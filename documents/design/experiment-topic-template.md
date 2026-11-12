@@ -5,7 +5,7 @@ responsibility Defines the single-source experiment topic template, materializat
 upstream design ../experiments/experiment-registry.md owns topic identity and registered execution
 upstream design ../experiments/result-log-retention-and-visualization.md owns result retention classes
 upstream design ./experiment_runner.md owns runner and experiment-side execution responsibilities
-downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py materializes one topic and registry entry
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs materializes one topic and registry entry
 downstream implementation ../../tools/catalog.yaml exposes the one public creator through typed target-write dispatch
 downstream implementation ../../templates/experiments/_template/run.py owns run aggregation and summary publication
 downstream implementation ../../templates/experiments/_template/cases.py owns case models and execution
@@ -24,7 +24,7 @@ downstream implementation ../../tests/tools/test_experiment_template_contracts.p
 
 ## 目的
 
-本設計は、`create_experiment_topic.py` が選択されたcopy sourceからexperiment topicとregistry entryを
+本設計は、`create-experiment-topic` が選択されたcopy sourceからexperiment topicとregistry entryを
 materializeする契約を定める。Python profileは既存managed lifecycleへ接続するrunnable scaffoldを生成し、
 C++ profileはnative starter packageをdraft状態で生成する。topic固有のalgorithm、metric、visualization内容は
 汎用Python scaffoldへ実装しない。
@@ -162,7 +162,7 @@ operational stop condition など実行に必要な宣言だけを対象にす�
 canonical commandは次である。
 
 ```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+tools/bin/agent-canon create-experiment-topic <topic>
 ```
 
 tool-container経由ではcatalog entry `create-experiment-topic`を使い、登録済みparent targetへ
@@ -173,7 +173,7 @@ C++ packageは同じcreatorの選択引数で生成する。CMake profileはcons
 path shapeや既定値から推測しない。
 
 ```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic> \
+tools/bin/agent-canon create-experiment-topic <topic> \
   --template-profile cpp --cmake-profile <root-aggregate|consumer-local>
 ```
 
@@ -202,7 +202,7 @@ project root CMakeLists.txtを変更しない。consumer ownerによるinclude�
 .codex/personal/skills/experiment-lifecycle/SKILL.md
   -> agents/skills/experiment-lifecycle.md#Topic Preparation
   -> bootstrap.sh tool run create-experiment-topic -- <topic> [profile selection]
-  -> tools/experiments/lifecycle/create_experiment_topic.py
+  -> tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs
   -> templates/experiments/_template/ or _cpp_template/
   -> experiments/registry.toml
 ```

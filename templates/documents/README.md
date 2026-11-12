@@ -6,7 +6,7 @@ upstream design ../../documents/rule/README.md document filename, placement, and
 downstream implementation ./github/README.md GitHub template source and checked-in standalone target map
 downstream implementation ../experiments/_template/README.md runnable experiment topic planning contract
 downstream implementation ../experiments/_template/provenance.toml machine-readable provenance contract
-downstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py places experiment templates in new topics
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs places experiment templates in new topics
 @dependency-end
 -->
 
