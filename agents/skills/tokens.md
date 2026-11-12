@@ -75,7 +75,7 @@ do not create an unrelated baseline or a new metric/threshold.
   `$agent-orchestration` and `$subagent-bootstrap`.
 - For an actual session comparison, reuse or select
   `tools/bin/agent-canon compare-codex-token-footprints`. Use
-  `eval/producers/evaluate_codex_agent_roles.py` only when role attribution is
+  `tools/bin/agent-canon evaluate-codex-agent-roles` only when role attribution is
   unresolved. For an accumulated trend question, use existing dashboard
   summaries and `eval/producers/generate_agent_runtime_dashboard.py` as its
   owner; run collection or repair through `$agent-eval-accumulation` only when

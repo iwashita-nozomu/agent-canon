@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use regex::Regex;
+use rustpython_ast::{self as ast, Visitor};
+use rustpython_parser::Parse;
 use serde::Serialize;
 use serde_json::{json, Map as JsonMap, Value as JsonValue};
 use toml_edit::{DocumentMut, Item, TableLike};
@@ -518,8 +520,13 @@ fn check_default_wiring(root: &Path, entries: &[&Yaml]) -> Vec<Finding> {
             .and_then(|value| value.to_str())
             == Some("rs")
         {
-            native_cli_dispatch(entry)
-                .is_some_and(|argv| native_cli_invocation_is_referenced(&command_text, &argv))
+            native_cli_dispatch(entry).is_some_and(|argv| {
+                native_cli_invocation_is_referenced(&command_text, &argv)
+                    || fs::read_to_string(
+                        root.join("eval/producers/run_accumulated_agent_evals.py"),
+                    )
+                    .is_ok_and(|source| python_eval_producer_is_referenced(&source, &argv))
+            })
         } else {
             default_text.contains(&path) || default_text.contains(basename)
         };
@@ -538,6 +545,82 @@ fn native_cli_dispatch(entry: &Yaml) -> Option<Vec<String>> {
     let dispatch = mapping_value(entry, "dispatch")?;
     let argv = string_list(mapping_value(dispatch, "argv"));
     (argv.len() >= 2 && argv[0].as_str() == "tools/bin/agent-canon").then_some(argv)
+}
+
+fn python_eval_producer_is_referenced(source: &str, argv: &[String]) -> bool {
+    struct ProducerCalls<'a> {
+        argv: &'a [String],
+        found: bool,
+    }
+    fn literal(value: &ast::Expr) -> Option<&str> {
+        match value {
+            ast::Expr::Constant(value) => match &value.value {
+                ast::Constant::Str(value) => Some(value),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    fn path_parts(value: &ast::Expr, parts: &mut Vec<String>) -> bool {
+        match value {
+            ast::Expr::Name(value) => value.id.as_str() == "canon",
+            ast::Expr::BinOp(value) if value.op == ast::Operator::Div => {
+                if !path_parts(&value.left, parts) {
+                    return false;
+                }
+                if let Some(part) = literal(&value.right) {
+                    parts.push(part.into());
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+    impl Visitor for ProducerCalls<'_> {
+        fn visit_expr_call(&mut self, node: ast::ExprCall) {
+            if matches!(node.func.as_ref(), ast::Expr::Name(name) if name.id.as_str() == "EvalProducer")
+            {
+                if let Some(ast::Expr::Tuple(arguments)) = node.args.get(1) {
+                    if let Some(ast::Expr::Call(executable)) = arguments.elts.first() {
+                        let mut parts = Vec::new();
+                        let path_matches = matches!(executable.func.as_ref(), ast::Expr::Name(name) if name.id.as_str() == "str")
+                            && executable
+                                .args
+                                .first()
+                                .is_some_and(|path| path_parts(path, &mut parts))
+                            && self
+                                .argv
+                                .first()
+                                .is_some_and(|command| command == &parts.join("/"));
+                        if path_matches
+                            && self
+                                .argv
+                                .iter()
+                                .skip(1)
+                                .enumerate()
+                                .all(|(index, expected)| {
+                                    arguments.elts.get(index + 1).and_then(literal)
+                                        == Some(expected.as_str())
+                                })
+                        {
+                            self.found = true;
+                        }
+                    }
+                }
+            }
+            self.generic_visit_expr_call(node);
+        }
+    }
+    let Ok(suite) = ast::Suite::parse(source, "eval-producers") else {
+        return false;
+    };
+    let mut calls = ProducerCalls { argv, found: false };
+    for statement in suite {
+        calls.visit_stmt(statement);
+    }
+    calls.found
 }
 
 // Only a command-position wrapper/direct invocation proves native default wiring.
@@ -2607,7 +2690,21 @@ pub fn run(args: &[String]) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::native_cli_invocation_is_referenced;
+    use super::{native_cli_invocation_is_referenced, python_eval_producer_is_referenced};
+
+    #[test]
+    fn python_eval_wiring_uses_executable_tuple_not_incidental_literals() {
+        let argv = vec![
+            "tools/bin/agent-canon".into(),
+            "evaluate-codex-agent-roles".into(),
+        ];
+        assert!(python_eval_producer_is_referenced("EvalProducer('role', (str(canon / 'tools' / 'bin' / 'agent-canon'), 'evaluate-codex-agent-roles', '--root', root))", &argv));
+        assert!(!python_eval_producer_is_referenced(
+            "x = 'tools/bin/agent-canon evaluate-codex-agent-roles'",
+            &argv
+        ));
+        assert!(!python_eval_producer_is_referenced("EvalProducer('role', (str(canon / 'tools' / 'bin' / 'other'), 'evaluate-codex-agent-roles'))", &argv));
+    }
 
     #[test]
     fn conditional_native_commands_preserve_command_position() {

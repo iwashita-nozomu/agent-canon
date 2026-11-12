@@ -7,7 +7,7 @@ downstream implementation ../../tools/runtime/dispatch/agent-canon/src/run_evalu
 downstream implementation ../producers/generate_agent_improvement_guide.py summarizes observations without creating task obligations
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated result evidence
 downstream implementation ../producers/evaluate_workflow_selection.py runs workflow selection evals
-downstream implementation ../producers/evaluate_codex_agent_roles.py runs Codex subagent role evals
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs runs Codex subagent role evals
 @dependency-end
 -->
 
@@ -36,7 +36,7 @@ without storing run outputs here.
 | --- | --- |
 | `agent_behavior_eval.toml` | observable run-bundle behavior evidence. |
 | `workflow_selection_eval.toml` | prompt-intake routing from user wording to workflow labels. |
-| `evaluate_codex_agent_roles.py` | `.codex/agents/*.toml` role behavior, prohibitions, model / reasoning bucket, routing defaults, runtime metrics, and output-use evidence. |
+| `agent-canon evaluate-codex-agent-roles` | `.codex/agents/*.toml` role behavior, prohibitions, model / reasoning bucket, routing defaults, runtime metrics, and output-use evidence. |
 
 Reader-facing report artifacts follow `report-writing` and
 `result-artifact-writeout`; when selected, `report_reviewer` owns the report
