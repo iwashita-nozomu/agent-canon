@@ -376,12 +376,9 @@ the owner's contract or prove that those checks ran.
 
 ## Review Decision Boundary
 
-Review decision normalization is owned solely by
-[`canonicalize_review_decision`](../tools/agent/orchestration/review_dispatch.py).
-The dispatcher owns the canonical review-decision vocabulary and its aliases;
-workflow and reader surfaces consume the normalized result instead of defining
-another token set. Generic handback and lifecycle statuses remain separate
-facts and are not review decisions.
+The selected reviewer reports its decision and findings through native handoff.
+Resolve accepted findings against the current contract and diff. Lifecycle status
+and a successful tool call do not establish a review decision.
 
 ## Review Packet
 

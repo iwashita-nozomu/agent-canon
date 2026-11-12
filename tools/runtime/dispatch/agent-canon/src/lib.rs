@@ -37,7 +37,7 @@
 // downstream implementation run_evaluation.rs evaluates one selected run bundle
 // downstream implementation generated_completeness.rs owns the G2 receipt API and CLI operation
 // downstream implementation update_lifecycle_contract.rs validates immutable lifecycle records and gate verdicts
-// downstream implementation work_log.rs owns the canonical run-local work log and semantic ledger
+// downstream implementation work_log.rs reads historical work-log snapshots for explicit Eval
 // downstream implementation python_sequence_matcher.rs owns CPython-compatible sequence similarity
 // downstream implementation python_json.rs owns shared Python-compatible JSON values and canonical bytes
 // downstream implementation tool_selection.rs owns pure tool-selection evidence

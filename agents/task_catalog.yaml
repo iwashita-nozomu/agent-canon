@@ -6,7 +6,6 @@
 # downstream design canonical/CODEX_SUBAGENTS.md Codex subagent inventory consumes task routing
 # downstream implementation ../.codex/config.toml Codex runtime config consumes task routing
 # downstream implementation ../tools/agent/orchestration/route.py consumes exclusive execution routes
-# downstream implementation ../tools/runtime/lifecycle/bootstrap_agent_run.py creates optional run-bundle metadata
 # @dependency-end
 version: 2
 

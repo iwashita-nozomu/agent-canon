@@ -76,8 +76,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、レビュ
 
 ## Decision ownership and selected reruns
 
-Review decision parsing and alias normalization are owned by
-[`canonicalize_review_decision`](../../tools/agent/orchestration/review_dispatch.py).
+The selected reviewer reports its decision and the disposition of findings.
 Review decisions distinguish the normalized status from finding disposition.
 Only the selected owning gate reruns after an accepted behavior, owner-boundary,
 correctness, validation, or publication change. Explain any decision that changes

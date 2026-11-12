@@ -2,7 +2,7 @@
 name: adaptive-improvement-loop
 description: "Use when experiments, research, tuning, and iterative code improvement must be managed as one backlog-driven agile outer loop."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"5b6a53fb97219299e6ad4156b7f5f03d8bbbc296821ca2f855db3a55acc02038"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"e82f0a261c240b4a6da761f5d380a99c823979a983729c7bd6562593764333d3"} -->
 
 <!--
 @dependency-start
