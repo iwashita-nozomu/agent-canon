@@ -11,8 +11,8 @@ downstream design ../../ROOT_AGENTS.md live-integration entrypoint consumer
 downstream design ../skills/agent-orchestration.md Codex-side workflow and owner routing consumer
 downstream design github-connected-work.md current-session transport under the execution owner
 downstream implementation ../../.codex/personal/skills/_chatgpt-codex-routing/SKILL.md private runtime discovery adapter
-downstream implementation ../../tools/agent/orchestration/chatgpt_codex_routing.py deterministic decision owner
-downstream implementation ../../tests/agent_tools/test_chatgpt_codex_routing.py finite-relation and monotonicity validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/chatgpt_codex_routing.rs deterministic decision owner
+downstream implementation ../../tools/runtime/dispatch/agent-canon/tests/chatgpt_codex_routing_native.rs finite-relation and monotonicity validation
 @dependency-end
 -->
 
@@ -170,7 +170,7 @@ Chat-only conflict prepends `explicit_chat_only_conflict` to the true execution 
 2. `E, M, R, X, V, D` と `explicit_chat_only` を boolean として抽出します。
 3. Codex fact が一つでも true の場合、具体的な `codex_scope` と
    `validation_oracle` を固定します。
-4. `python3 tools/agent/orchestration/chatgpt_codex_routing.py --input <packet.json>` で
+4. `tools/bin/agent-canon chatgpt-codex-route --input <packet.json>` で
    deterministic packet を生成します。実行環境のない接続セッションでは、上記と同じ
    有限 relation と packet fields で事実を整理し、command 未実行を記録します。
    判定だけのために bootstrap や別 runtime を新設しません。
@@ -196,7 +196,7 @@ Focused invariant set:
 Canonical command:
 
 ```bash
-python3 -m unittest -v tests/agent_tools/test_chatgpt_codex_routing.py
+cargo test --manifest-path tools/runtime/dispatch/agent-canon/Cargo.toml --test chatgpt_codex_routing_native
 ```
 
 ## Non-Goals
