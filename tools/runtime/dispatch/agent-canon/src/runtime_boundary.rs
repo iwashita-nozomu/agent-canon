@@ -1281,6 +1281,13 @@ fn resolve_runtime_path(
     }
     let joined = root.join(&relative);
     reject_symlink_components(&joined, root)?;
+    if !source_runtime_spool && joined.starts_with(source_root) {
+        return Err(format!(
+            "runtime artifact {} is inside source root {}",
+            joined.display(),
+            source_root.display()
+        ));
+    }
     if source_runtime_spool && !joined.starts_with(source_root) {
         return Err(format!(
             "source runtime path escaped source root: {}",
@@ -1705,6 +1712,28 @@ mod tests {
         fs::create_dir_all(&runtime).unwrap();
         fs::create_dir_all(&outside).unwrap();
         assert!(validate_external_target(&root, &runtime, &root.join("cache"), "db").is_err());
+        let canonical_runtime = fs::canonicalize(&runtime).unwrap();
+        let nested_source = canonical_runtime.join("source");
+        fs::create_dir_all(&nested_source).unwrap();
+        let boundary =
+            RuntimeArtifactBoundary::for_source(&nested_source, Some(&canonical_runtime), false)
+                .unwrap();
+        for path in [
+            nested_source.join("forbidden.txt"),
+            PathBuf::from("source/forbidden.txt"),
+        ] {
+            assert!(boundary
+                .atomic_write_bytes(&path, b"forbidden", 0o600)
+                .is_err());
+        }
+        assert!(!nested_source.join("forbidden.txt").exists());
+        boundary
+            .atomic_write_bytes(Path::new("artifacts/allowed.txt"), b"allowed", 0o600)
+            .unwrap();
+        assert_eq!(
+            fs::read(canonical_runtime.join("artifacts/allowed.txt")).unwrap(),
+            b"allowed"
+        );
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(&outside, runtime.join("escape")).unwrap();
