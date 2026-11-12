@@ -4,14 +4,14 @@ contract reference
 responsibility Publishes the generated public skill/dependency graph as a Mermaid reader surface.
 upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph identity, serialization, and readback
 upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and dependency records and renders the Mermaid projection
-downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates source/artifact equality and actual Mermaid syntax readback
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates source/artifact equality and actual Mermaid syntax readback
 downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py covers identity, determinism, and stale-artifact failures
 @dependency-end
 -->
 <!-- Generated from the public skill/dependency graph; do not edit by hand. -->
 # Public Skill Dependency Graph
 
-<!-- graph_digest=2b51d976f3f71a26ae54fca226ae3d7dd589239fb4da811e97de5b9c6ef453e1 -->
+<!-- graph_digest=0d5e010baabda2f2ea9d254b60844287b7f652d2432c8ca8a18b06edf5387afb -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -1268,4 +1268,4 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Graph digest: `2b51d976f3f71a26ae54fca226ae3d7dd589239fb4da811e97de5b9c6ef453e1`.
+Graph digest: `0d5e010baabda2f2ea9d254b60844287b7f652d2432c8ca8a18b06edf5387afb`.

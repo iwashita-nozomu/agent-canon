@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-check-skill-tool-invocation-graph
+      selector: check-skill-tool-invocation-graph
+      path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
     - id: rust-server-readiness
       selector: server-readiness
       path: tools/runtime/dispatch/agent-canon/src/server_readiness.rs
