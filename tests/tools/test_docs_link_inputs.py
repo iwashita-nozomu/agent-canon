@@ -32,7 +32,9 @@ def _prepare_docs_root(tmp_path: Path) -> Path:
 
 def _prepare_source_docs_root(tmp_path: Path) -> Path:
     root = _prepare_docs_root(tmp_path)
-    shutil.copyfile(ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc")
+    shutil.copyfile(
+        ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc"
+    )
     target_config = root / "tools/validation/documentation/config/lychee.toml"
     target_config.parent.mkdir(parents=True)
     shutil.copyfile(CONFIG, target_config)

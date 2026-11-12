@@ -2886,10 +2886,7 @@ fn run_lychee_group(root: &Path, files: &[PathBuf], template_profile: Option<&st
     }
 
     let mut command = Command::new("lychee");
-    command
-        .current_dir(root)
-        .arg("--config")
-        .arg(config.path());
+    command.current_dir(root).arg("--config").arg(config.path());
     if let Some(template_profile) = template_profile {
         let base_path = root.join("experiments").join(template_profile);
         let mut base_url = base_path.into_os_string();
