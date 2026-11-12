@@ -4,7 +4,7 @@ contract design
 responsibility Defines the implementation-ready AgentCanon Wave 3 hook simplification target after the completed caller audit and reviewer-finding correction.
 upstream design ../../.codex/README.md owns the project-scoped hook design and reader route.
 upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns the active lifecycle dispatch contract.
-upstream implementation ../../.codex/hooks/hook_event_log.py owns no-replace per-event spool transport for canonical hook telemetry.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_event_log.rs owns no-replace per-event spool transport for canonical hook telemetry.
 upstream implementation ../../tools/runtime/archive/log_surface_inventory.py emits telemetry field inventory on demand.
 upstream design ../../tools/catalog.yaml owns canonical tool registration.
 upstream design ../../responsibility-scope.toml owns top-level responsibility coverage.
@@ -36,7 +36,7 @@ downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates 
 | --- | --- | --- |
 | `.codex/hooks/hook_dispatcher.py` | finalized `UserPromptSubmit`/`PreToolUse`/`PostToolUse` path | one `record_hook_invocation` call; one `HookLogContext.append` for every active invocation; optional projection when append status is `spooled` and behavior record exists |
 | `tools/runtime/archive/behavior_event_assembly.py` | direct import from dispatcher | returns `BehaviorEventRecord | None`; no I/O |
-| `.codex/hooks/hook_event_log.py` | direct import from dispatcher | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
+| `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs` | native dispatcher module | no-replace per-event spool append (`<spool>/<namespace>/<hook_name>/<hook_run_id>.json`) with `spooled|duplicate|failed` result |
 | `tools/runtime/lifecycle/workflow_monitor.py` | direct import from dispatcher | emit projection only when append status is `spooled` AND behavior record exists |
 
 ### Active root and report projection placement
@@ -56,7 +56,7 @@ active handler は `record_hook_invocation` を一回、`HookLogContext.append` 
 
 Invalid interpretations:
 
-- no transport relocation（hook transport は `.codex/hooks/hook_event_log.py` に留める）
+- no Python transport shim（canonical event serialization and spool append belong to the native `hook_event_log.rs` owner）
 - no compatibility wrapper / shim / fallback re-export
 
 ## Reviewer-corrected caller and readback audit
@@ -249,7 +249,7 @@ from behavior_event_assembly import HookInvocationParts, record_hook_invocation
 from workflow_monitor import emit_behavior_projection
 ```
 
-The canonical identities for the precomputed values are `tools.agent.orchestration.tool_selection`, `tools.agent.orchestration.subagent_selection`, and `tools.agent.orchestration.workflow_context`. Behavior assembly belongs to `tools.runtime.archive.behavior_event_assembly`; `.codex/hooks/hook_event_log.py` remains the local transport hook. Use direct imports without `importlib`, dynamic path loading, or CLI subprocesses, and call the single assembly owner once per active invocation. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. Delete the old `.codex/hooks/hook_safety.py` after the canonical owner and pure-owner tests pass; do not retain it as a wrapper.
+The canonical identities for the precomputed values are `tools.agent.orchestration.tool_selection`, `tools.agent.orchestration.subagent_selection`, and `tools.agent.orchestration.workflow_context`. Behavior assembly belongs to `tools.runtime.archive.behavior_event_assembly`; native event serialization and spool publication belong to `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs`. Use direct imports without `importlib`, dynamic path loading, or CLI subprocesses for the Python assembly owners, and call the single assembly owner once per active invocation. The dispatcher must not inspect cwd or Git, spawn a process, or access a network. Delete the old `.codex/hooks/hook_safety.py` after the canonical owner and pure-owner tests pass; do not retain it as a wrapper.
 
 Raw-to-spool mapping: for every active invocation, the handler result defines one base spool record; behavior-only fields are an optional enrichment layer merged into that base before append.
 
@@ -276,7 +276,7 @@ The following is copied from the current implementation and is the parity oracle
 | safety block | `decision`, `reason`, `next_action`, `remediation`; Git adds `operation`, `command_sha256` | decision fixed `block`; reason/next_action strings; remediation list of strings; Git operation string and command hash 64 lowercase hex; prompt/command material absent | official wrapper adds `schema`, `hookSpecificOutput.{hookEventName,additionalContext}`; block status is `blocked_secret` or `blocked_destructive_git` | new `hook_safety`, same payload bytes/fields |
 | projection output | `schema`, `hookSpecificOutput.{hookEventName,additionalContext}` | strings; context is the already validated canonical projection stdout | official schema `agent-canon.posttooluse-stop.v1`; context max is bounded by 65536-byte projection | new projection owner, same wrapper |
 | spool base | `hook_run_id`, `timestamp`, `payload_fingerprint`, `status`, `hook_event_name` | all non-empty strings; payload hash 64 lowercase hex; timestamp UTC ISO string | no explicit spool event byte limit in current code; only bounded hashes/status/short telemetry are written | preserve no new input/raw text |
-| spool context | `source_repo_key`, `hook_log_namespace` | non-empty strings added by `HookLogContext`; optional `codex_trace_key`, `codex_thread_id` are non-empty strings when environment provides them | namespace slug max 80; no-replace per-event path; mode 0600 temp file | `hook_event_log.py` remains sole transport owner |
+| spool context | `source_repo_key`, `hook_log_namespace` | non-empty strings added by `HookLogContext`; optional `codex_trace_key`, `codex_thread_id` are non-empty strings when environment provides them | namespace slug max 80; no-replace per-event path; mode 0600 temp file | native `hook_event_log.rs` remains sole transport owner |
 | spool identity | `hook_run_id` | `hook-<compact timestamp>-<10 hex digest>-<10 hex nonce>`; path basename-safe; `fingerprint_json` helper returns 12 lowercase hex, while namespace disambiguation uses 8 lowercase hex | append-only no-replace; duplicate identical bytes is `duplicate`; conflict/I/O is failure | dispatcher catches all append failures and stays fail-open |
 | append result | `status`, `hook_run_id`, `spool_path`, `event_sha256`, `error_code` | status is `spooled|duplicate|failed`; path is `Path`; event hash is 64 lowercase hex on success; error code is empty or `event_identity_missing|event_schema_invalid|spool_unavailable|spool_io_failure|spool_conflict` | returned by `HookLogContext.append`; not copied into dispatcher safety status | transport owner preserves result domain |
 | telemetry | `safety_decision`, `operation` | optional non-empty strings; only block events emit them | UserPrompt block emits `safety_decision=block`; PreTool block additionally emits `operation`; no prompt, command, secret, stdout, stderr | field names and omission rules unchanged |
@@ -302,7 +302,7 @@ The old hook module is not replaced by one broad helper. Its complete responsibi
 | behavior record assembly | `tools/runtime/archive/behavior_event_assembly.py` | `record_hook_invocation(parts) -> BehaviorEventRecord | None` | one record candidate per eligible invocation; returns `BehaviorEventRecord` only, no append/monitor/IO | dispatcher is the sole caller |
 | historical skill-usage readback | `tools/runtime/archive/historical_skill_usage_reader.py` | `read_skill_usage_history(path) -> HistoricalReadback` | none; opens `skill_usage.jsonl` read-only, never imports/executes the old logger, never appends or rewrites it | improvement guide, historical dashboard migration, fixture tests |
 
-The ownership boundary is intentional: `tools/runtime/lifecycle/workflow_monitor.py` owns monitor projection, while `.codex/hooks/hook_event_log.py` owns canonical per-event spool transport serialization/append. `tools/runtime/lifecycle/workflow_monitor.py` and `.codex/hooks/hook_event_log.py` are not wrappers for the retired logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
+The ownership boundary is intentional: `tools/runtime/lifecycle/workflow_monitor.py` owns monitor projection, while `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs` owns canonical per-event spool transport serialization/append. `workflow_monitor.py` and the native logger are direct owners, not wrappers for the retired Python logger. `generate_agent_runtime_dashboard.py` and `generate_agent_improvement_guide.py` are read-only consumers; they do not become emitters. The target artifact is `behavior_events.jsonl`; `skill_usage.jsonl` remains a historical input only.
 
 ### Pure classifier owner
 
@@ -340,7 +340,7 @@ SkillLaneEvidence {
 }
 ```
 
-The detector returns no record for an unmatched lane; it never writes logs. `tools/runtime/archive/behavior_event_assembly.py` is the sole pure assembler (`record_hook_invocation(parts) -> BehaviorEventRecord | None`) and does not perform transport I/O. Canonical durable behavior events are serialized by `.codex/hooks/hook_event_log.py` into per-event no-replace spool files with result `spooled|duplicate|failed`; `tools/runtime/lifecycle/workflow_monitor.py` is the monitor owner and the existing `--behavior-event` route accepts one assembled canonical object to emit a monitor projection line; it does not participate in spool file writes. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
+The detector returns no record for an unmatched lane; it never writes logs. `tools/runtime/archive/behavior_event_assembly.py` is the sole pure assembler (`record_hook_invocation(parts) -> BehaviorEventRecord | None`) and does not perform transport I/O. Canonical durable behavior events are serialized by `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs` into per-event no-replace spool files with result `spooled|duplicate|failed`; `tools/runtime/lifecycle/workflow_monitor.py` is the monitor owner and the existing `--behavior-event` route accepts one assembled canonical object to emit a monitor projection line; it does not participate in spool file writes. The event envelope is the fixed `agent-canon.behavior-event.v1` schema:
 
 ```text
 {
@@ -395,7 +395,7 @@ The fields above preserve the current logger's types and empty-value nullability
 
 The exact behavior-event field set is the union of the envelope fields and the parity fields in the table below; no implementation may silently drop a current logger field because a dashboard row does not display it.
 
-The classifier returns the existing behavior dimensions consumed by assembly: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. `.codex/hooks/hook_event_log.py` performs per-event no-replace spool append; `tools/runtime/archive/runtime_log_archive_git.py` emits checkpoint `behavior_events` lines after explicit checkpointing from per-event spools, and `tools/runtime/lifecycle/workflow_monitor.py` emits monitor projection only after a spooled append result. `hook_event_log` never writes shared `behavior_events.jsonl`; it only spools per-event bytes. `runtime_log_archive_git` writes checkpoint JSONL only after invocation and outside the hot-path. `workflow_monitor.py` emits monitor projection only and never writes `skill_usage.jsonl`.
+The classifier returns the existing behavior dimensions consumed by assembly: selected/candidate skills and workflows, `candidate_skill_reasons`, feedback labels/action/targets, prompt capture, tool selection, subagent selection, workflow attribution/context, and structural lane evidence. This keeps one execution route and one event identity for dashboard aggregation. Native `hook_event_log.rs` performs per-event no-replace spool append; `tools/runtime/archive/runtime_log_archive_git.py` emits checkpoint `behavior_events` lines after explicit checkpointing from per-event spools, and `tools/runtime/lifecycle/workflow_monitor.py` emits monitor projection only after a spooled append result. `hook_event_log` never writes shared `behavior_events.jsonl`; it only spools per-event bytes. `runtime_log_archive_git` writes checkpoint JSONL only after invocation and outside the hot-path. `workflow_monitor.py` emits monitor projection only and never writes `skill_usage.jsonl`.
 
 The remaining current logger fields are carried without semantic loss as follows; these are part of the behavior-event schema even when a dashboard view does not display them:
 
@@ -517,7 +517,7 @@ This is the exact future implementation write set `W`; this design wave does not
 
 **runtime artifact write set:**
 
-`behavior_events` checkpoint lines (`<hook-name>-<agent-canon-commit>.jsonl`) are written only by `tools/runtime/archive/runtime_log_archive_git.py`; per-invocation transport spooling is performed only by `.codex/hooks/hook_event_log.py` into no-replace `<spool>/<namespace>/<hook_name>/<hook_run_id>.json` with `spooled|duplicate|failed` result. The dispatcher performs exactly one base append per active invocation and merges behavior fields into that same entry when a behavior record exists; no second append is allowed. `workflow_monitoring.md` and its projection lines are written only by `tools/runtime/lifecycle/workflow_monitor.py` after a successful spooled append of a behavior record. `.codex/hooks/hook_dispatcher.py` and `tools/runtime/archive/behavior_event_assembly.py` write no files. `skill_usage.jsonl` has no active writer. A runtime append or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
+`behavior_events` checkpoint lines (`<hook-name>-<agent-canon-commit>.jsonl`) are written only by `tools/runtime/archive/runtime_log_archive_git.py`; per-invocation transport spooling is performed only by `tools/runtime/dispatch/agent-canon/src/hook_event_log.rs` into no-replace `<spool>/<namespace>/<hook_name>/<hook_run_id>.json` with `spooled|duplicate|failed` result. The dispatcher performs exactly one base append per active invocation and merges behavior fields into that same entry when a behavior record exists; no second append is allowed. `workflow_monitoring.md` and its projection lines are written only by `tools/runtime/lifecycle/workflow_monitor.py` after a successful spooled append of a behavior record. The dispatcher and `tools/runtime/archive/behavior_event_assembly.py` write no files. `skill_usage.jsonl` has no active writer. A runtime append or monitor failure is telemetry-only and leaves the finalized handler output unchanged.
 
 **deleted files, only after caller migration:**
 

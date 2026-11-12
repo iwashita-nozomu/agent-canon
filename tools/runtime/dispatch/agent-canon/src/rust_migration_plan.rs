@@ -773,7 +773,7 @@ mod tests {
             "tools/runtime/lifecycle/task_close.py",
             "eval/producers/evaluate_agent_run.py",
             ".codex/hooks/hook_dispatcher.py",
-            ".codex/hooks/hook_event_log.py",
+            ".codex/hooks/custom_fixture.py",
         ] {
             write(
                 &root,

@@ -9,7 +9,7 @@
 # upstream implementation ../../agent/orchestration/tool_selection.py owns tool evidence.
 # upstream implementation ../../agent/orchestration/subagent_selection.py owns subagent evidence.
 # upstream implementation ../../agent/orchestration/workflow_context.py owns context load/store.
-# upstream implementation ../../../.codex/hooks/hook_event_log.py owns append-only transport primitives.
+# downstream implementation ../dispatch/agent-canon/src/hook_dispatcher.rs invokes this assembler and publishes native hook events.
 # downstream implementation ../lifecycle/workflow_monitor.py emits the post-append projection.
 # downstream implementation ../../../eval/producers/generate_agent_runtime_dashboard.py reads canonical events.
 # downstream implementation ../../../tests/agent_tools/test_behavior_event_assembly.py validates cardinality and fail-open behavior.
