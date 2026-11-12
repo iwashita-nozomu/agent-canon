@@ -69,7 +69,7 @@ const EXPERIMENT_EXECUTION_SURFACE_PATHS: &[&str] = &[
     "experiments/registry.toml",
     "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
     "tools/experiments/artifacts/save_experiment_result_annex.py",
-    "tools/experiments/registry/registry_lib.py",
+    "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
     "tools/experiments/execution/run_managed_experiment.py",
 ];
 const LIBRARY_SURFACE_PREFIXES: &[&str] = &[

@@ -462,6 +462,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
                 "json",
                 "tools/experiments/execution/run_managed_experiment.py",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             ],
@@ -481,6 +482,7 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             {
                 "tools/experiments/execution/run_managed_experiment.py",
                 "tools/runtime/dispatch/agent-canon/src/experiment_registry.rs",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "documents/experiments/experiment-registry.md",
                 "experiments/registry.toml",
             },

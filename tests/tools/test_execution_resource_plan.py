@@ -17,7 +17,6 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from dataclasses import replace
@@ -1112,7 +1111,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             for relative_path in (
                 "tools/experiments/execution/execution_resource_plan.py",
                 "tools/experiments/execution/run_managed_experiment.py",
-                "tools/experiments/registry/registry_lib.py",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "tools/analysis/proof/jit_canonical_ir.py",
                 "experiments/registry.toml",
                 "experiments/topic/cases.py",
@@ -1135,7 +1134,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             for relative_path in (
                 "tools/experiments/execution/execution_resource_plan.py",
                 "tools/experiments/execution/run_managed_experiment.py",
-                "tools/experiments/registry/registry_lib.py",
+                "tools/runtime/dispatch/agent-canon/src/experiment_registry/store.rs",
                 "tools/analysis/proof/jit_canonical_ir.py",
                 "experiments/topic/run.py",
             ):

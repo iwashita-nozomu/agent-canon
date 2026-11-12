@@ -134,7 +134,7 @@ registry entry を一つの route で配置します。`templates/experiments/_t
 利用者向けの作成手順にしません。
 
 ```bash
-python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+tools/bin/agent-canon create-experiment-topic <topic>
 ```
 
 実行、publication、LATEST 更新には variant を必ず明示します。
