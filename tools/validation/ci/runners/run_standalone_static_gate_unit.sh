@@ -197,6 +197,7 @@ run_contracts() {
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_search \
     tests.tools.test_notebook_quality \
+    tests.tools.test_docs_link_inputs \
     tests.agent_tools.test_check_solid_evidence \
     tests.agent_tools.test_check_semantic_responsibility_contract \
     tests.agent_tools.test_check_run_log_contract \

@@ -6,6 +6,8 @@
 # upstream implementation ../../tools/validation/documentation/config/lychee.toml configured source selection
 # @dependency-end
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -13,6 +15,25 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "tools/validation/documentation/config/lychee.toml"
+
+
+def _native_cli() -> str:
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return selected_cli
+
+
+def _prepare_docs_root(tmp_path: Path) -> Path:
+    root = tmp_path / "consumer repository with spaces"
+    root.mkdir()
+    shutil.copyfile(
+        ROOT / ".markdownlint-cli2.jsonc", root / ".markdownlint-cli2.jsonc"
+    )
+    target_config = root / "tools/validation/documentation/config/lychee.toml"
+    target_config.parent.mkdir(parents=True)
+    shutil.copyfile(CONFIG, target_config)
+    return root
 
 
 @pytest.mark.parametrize(
@@ -37,3 +58,79 @@ def test_native_link_filter_selects_directory_components(tmp_path, relative, che
     assert (actual.returncode != 0) is checked, actual.stdout + actual.stderr
     if checked:
         assert "missing.md" in actual.stdout + actual.stderr
+
+
+@pytest.mark.parametrize("profile", ["_template", "_cpp_template"])
+def test_native_docs_check_uses_consumer_relative_template_context(
+    tmp_path: Path, profile: str
+) -> None:
+    root = _prepare_docs_root(tmp_path)
+    (root / "documents").mkdir()
+    (root / "documents" / "projectdoc.md").write_text(
+        "# Project documentation\n", encoding="utf-8"
+    )
+    (root / "documents" / "ordinary-target.md").write_text(
+        "# Ordinary target\n", encoding="utf-8"
+    )
+    (root / "documents" / "ordinary.md").write_text(
+        "# Ordinary document\n\n[Target](ordinary-target.md)\n", encoding="utf-8"
+    )
+    template_dir = root / "templates" / "experiments" / profile
+    template_dir.mkdir(parents=True)
+    (template_dir / "run.py").write_text("pass\n", encoding="utf-8")
+    (template_dir / "README.md").write_text(
+        "# Template\n\n"
+        "[Project documentation](../../documents/projectdoc.md)\n\n"
+        "[Same package](./run.py)\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            _native_cli(),
+            "docs",
+            "check",
+            "--root",
+            str(root),
+            f"templates/experiments/{profile}/README.md",
+            "documents/ordinary.md",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_native_docs_check_still_fails_for_missing_template_link(
+    tmp_path: Path,
+) -> None:
+    root = _prepare_docs_root(tmp_path)
+    template_dir = root / "templates" / "experiments" / "_template"
+    template_dir.mkdir(parents=True)
+    (template_dir / "run.py").write_text("pass\n", encoding="utf-8")
+    (template_dir / "README.md").write_text(
+        "# Template\n\n[Missing](../../documents/missing-projectdoc.md)\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            _native_cli(),
+            "docs",
+            "check",
+            "--root",
+            str(root),
+            "templates/experiments/_template/README.md",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    output = result.stdout + result.stderr
+    assert result.returncode != 0, output
+    assert "missing-projectdoc.md" in output
