@@ -2,7 +2,7 @@
 name: agent-eval-accumulation
 description: "Use when AgentCanon eval collection or repair is selected to establish required evidence; runs registered producers, validates family accumulation, and archives reports. Read-only observation of missing, stale, or failing evidence alone does not activate this repair loop."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"7f950bf17fe8ec615261b8c7c399fd8220bc78c9f097375cae8fd679e2ee4f6b"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":3,"record_digest":"37f0cebd101b348e064cb8a48bd26f62a61429fd6011bd4a48fd80844114bbaf"} -->
 
 <!--
 @dependency-start

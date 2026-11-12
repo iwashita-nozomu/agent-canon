@@ -42,14 +42,31 @@ fn array<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         .unwrap_or(&[])
 }
 
-fn specialists(config: &Value, catalog: &Value, task_id: &str) -> Vec<String> {
+fn specialists(config: &Value, catalog: &Value, task_id: &str) -> Result<Vec<String>, String> {
     let Some(task) = array(catalog, "tasks")
         .iter()
         .find(|task| task.get("id").and_then(Value::as_str) == Some(task_id))
     else {
-        return Vec::new();
+        return Err(format!("unknown task id: {task_id}"));
     };
+    let family_id = task.get("family").and_then(Value::as_str).unwrap_or("");
+    let family = array(catalog, "workflow_families")
+        .iter()
+        .find(|family| family.get("id").and_then(Value::as_str) == Some(family_id))
+        .ok_or_else(|| format!("unknown workflow family: {family_id}"))?;
+    let family_roles = family
+        .get("roles")
+        .filter(|roles| roles.is_object())
+        .ok_or_else(|| format!("workflow family roles must be a mapping for {family_id}"))?;
+    let family_specialists = strings(family_roles.get("specialists"));
     let mut result = strings(task.get("specialists"));
+    for id in &result {
+        if !family_specialists.contains(id) {
+            return Err(format!(
+                "task {task_id} specialist {id} is not declared in family {family_id}"
+            ));
+        }
+    }
     for pack in array(catalog, "review_packs") {
         if strings(pack.get("default_for_tasks")).contains(&task_id.to_owned()) {
             result.extend(strings(pack.get("specialists")));
@@ -61,8 +78,13 @@ fn specialists(config: &Value, catalog: &Value, task_id: &str) -> Vec<String> {
         .filter_map(|role| role.get("id").and_then(Value::as_str))
         .collect::<BTreeSet<_>>();
     let mut seen = BTreeSet::new();
-    result.retain(|id| known.contains(id.as_str()) && seen.insert(id.clone()));
-    result
+    for id in &result {
+        if !known.contains(id.as_str()) {
+            return Err(format!("unknown role: {id}"));
+        }
+    }
+    result.retain(|id| seen.insert(id.clone()));
+    Ok(result)
 }
 
 fn python_tuple(values: &[String]) -> String {
@@ -296,7 +318,7 @@ pub(super) fn evaluate(root: &Path) -> Result<Vec<Finding>, String> {
         {
             findings.push(Finding::new("routing", id, "must-use-owner-bounded-change"));
         }
-        let active = specialists(&config, &catalog, id);
+        let active = specialists(&config, &catalog, id)?;
         let forbidden = ["document_flow_reviewer", "schedule_reviewer", "scheduler"]
             .iter()
             .filter(|name| active.iter().any(|id| id == **name))
@@ -310,7 +332,7 @@ pub(super) fn evaluate(root: &Path) -> Result<Vec<Finding>, String> {
             ));
         }
     }
-    let t12 = specialists(&config, &catalog, "T12");
+    let t12 = specialists(&config, &catalog, "T12")?;
     if t12
         != [
             "scheduler",

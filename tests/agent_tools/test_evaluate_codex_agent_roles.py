@@ -677,6 +677,32 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_routing_rejects_unknown_task_and_default_pack_roles(self) -> None:
+        """Unknown roles remain invalid instead of being removed from the evaluation."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    task = next(task for task in catalog["tasks"] if task["id"] == "T1")
+                    task["specialists"].append("ghost_role")
+                    expected = "not declared in family"
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append("ghost_role")
+                    expected = "unknown role: ghost_role"
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(expected, result.stderr)
+
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
