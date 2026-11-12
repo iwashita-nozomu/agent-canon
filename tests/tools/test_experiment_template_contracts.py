@@ -3,7 +3,7 @@
 # responsibility Tests experiment completion, terminal case invariants, and nested manifest readback.
 # upstream implementation ../../templates/experiments/_template/run.py owns schemas and artifact publication.
 # upstream implementation ../../templates/experiments/_template/cases.py owns case invariants.
-# upstream implementation ../../tools/experiments/lifecycle/create_experiment_topic.py owns topic materialization.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs owns native topic materialization.
 # @dependency-end
 
 """experiment template の completion、state、manifest contract を検証します."""
@@ -25,7 +25,6 @@ TEMPLATE_ROOT = (
     Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 )
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CREATE_TOPIC = PROJECT_ROOT / "tools" / "experiments" / "lifecycle" / "create_experiment_topic.py"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
 from run import (  # noqa: E402
@@ -41,6 +40,13 @@ from run import (  # noqa: E402
 def _timestamp() -> str:
     """検証用の RFC3339 timestamp を返します."""
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _native_cli() -> str:
+    selected_cli = os.environ.get("AGENT_CANON_CLI")
+    if not selected_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
+    return selected_cli
 
 
 def test_created_topic_readme_keeps_research_acceptance_topic_owned(
@@ -66,8 +72,8 @@ def test_created_topic_readme_keeps_research_acceptance_topic_owned(
 
     result = subprocess.run(
         [
-            sys.executable,
-            str(CREATE_TOPIC),
+            _native_cli(),
+            "create-experiment-topic",
             "--repo-root",
             str(parent_root),
             "--status",
@@ -389,9 +395,7 @@ def test_minimal_plan_runs_without_research_verdict_or_review(tmp_path: Path) ->
     config_snapshot_path = run_dir / "summary" / "config_snapshot.json"
     config_snapshot = json.loads(config_snapshot_path.read_text(encoding="utf-8"))
     artifact_manifest = json.loads(
-        (run_dir / "summary" / "artifact-manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (run_dir / "summary" / "artifact-manifest.json").read_text(encoding="utf-8")
     )
     config_snapshot_artifact = next(
         artifact
@@ -406,15 +410,17 @@ def test_minimal_plan_runs_without_research_verdict_or_review(tmp_path: Path) ->
     assert config_snapshot["path"] == "config.yaml"
     assert config_snapshot["state"] == "present"
     assert config_snapshot["content"] == config_text
-    assert config_snapshot["sha256"] == hashlib.sha256(
-        config_text.encode("utf-8")
-    ).hexdigest()
+    assert (
+        config_snapshot["sha256"]
+        == hashlib.sha256(config_text.encode("utf-8")).hexdigest()
+    )
     assert config_snapshot["completion"] == summary["completion_provenance"]
     assert "summary/config_snapshot.json" in summary["preserved_artifacts"]
     config_snapshot_bytes = config_snapshot_path.read_bytes()
-    assert config_snapshot_artifact["sha256"] == hashlib.sha256(
-        config_snapshot_bytes
-    ).hexdigest()
+    assert (
+        config_snapshot_artifact["sha256"]
+        == hashlib.sha256(config_snapshot_bytes).hexdigest()
+    )
     assert config_snapshot_artifact["size_bytes"] == len(config_snapshot_bytes)
 
 

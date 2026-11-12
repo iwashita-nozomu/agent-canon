@@ -56,11 +56,7 @@ from tools.experiments.execution.run_managed_experiment import (
 )
 
 SYNC_CONTEXT_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "registry"
-    / "sync_experiment_registry_context.py"
+    Path(__file__).resolve().parents[2] / "tools" / "bin" / "agent-canon"
 )
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -386,10 +382,6 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
         (
             "tools/experiments/artifacts/update_latest_result.py",
             "tools.experiments.artifacts.update_latest_result",
-        ),
-        (
-            "tools/experiments/lifecycle/create_experiment_topic.py",
-            "tools.experiments.lifecycle.create_experiment_topic",
         ),
     ),
 )
@@ -1360,19 +1352,23 @@ def test_public_gpu_discovery_fails_typed_when_structured_probe_is_missing(
 def test_create_experiment_topic_scaffolds_directory_and_registry(
     tmp_path: Path,
 ) -> None:
-    """The scaffold script should copy the template and append a registry entry."""
+    """The native selector should copy the template and append a registry entry."""
     repo_root = build_repo(tmp_path)
+    native_cli = os.environ.get("AGENT_CANON_CLI")
+    if not native_cli:
+        raise RuntimeError("AGENT_CANON_CLI must select the current native executable")
 
     result = subprocess.run(
         [
-            sys.executable,
-            "tools/experiments/lifecycle/create_experiment_topic.py",
+            native_cli,
+            "create-experiment-topic",
             "--repo-root",
             str(repo_root),
             "--active-branch",
             "work/new-topic-20260406",
             "new_topic",
         ],
+        cwd=Path(__file__).resolve().parents[2],
         check=False,
         capture_output=True,
         text=True,
@@ -1409,8 +1405,8 @@ def test_sync_experiment_registry_context_updates_branch_scope_and_worktree(
 
     result = subprocess.run(
         [
-            sys.executable,
             str(SYNC_CONTEXT_SCRIPT),
+            "sync-experiment-registry-context",
             "--repo-root",
             str(repo_root),
             "--workspace-root",

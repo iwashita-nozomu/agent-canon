@@ -201,9 +201,9 @@ summary = "Deterministic source-to-consumer root AGENTS.md composition documenta
 [[tool]]
 id = "create-experiment-topic"
 classification = "public"
-tool = "tools/experiments/lifecycle/create_experiment_topic.py"
+tool = "tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs"
 doc = "documents/tools/create_experiment_topic.md"
-language = "python"
+language = "rust"
 summary = "Creates a selected Python or C++ experiment topic and registers it in an explicit parent target."
 
 [[tool]]
