@@ -6,7 +6,7 @@ upstream design runtime-log-archive.md runtime log archive ownership and branch 
 upstream design ../conventions/coding-conventions-logging.md JSONL logging convention
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py imports and pushes legacy hook JSONL and eval reports
 downstream design ../../eval/definitions/README.md points readers away from in-tree result paths
-downstream implementation ../../eval/checkers/eval_accumulation_check.py validates mounted archive JSONL and eval reports
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates mounted archive JSONL and eval reports
 @dependency-end
 -->
 

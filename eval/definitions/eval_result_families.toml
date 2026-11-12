@@ -3,7 +3,7 @@
 # responsibility Declares accumulated eval result families and artifact contracts.
 # upstream design README.md eval directory and accumulation contract
 # upstream design ../../documents/runtime/runtime-log-archive.md runtime archive contract
-# downstream implementation ../../eval/checkers/eval_accumulation_check.py validates these families
+# downstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates these families
 # downstream implementation ../../eval/producers/generate_agent_runtime_dashboard.py summarizes these families
 # @dependency-end
 

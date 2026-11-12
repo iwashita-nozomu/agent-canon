@@ -8,7 +8,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../eval/definitions/README.md accumulated eval family contract
 upstream design ../../documents/runtime/runtime-log-archive.md external log archive boundary
 upstream implementation ../../eval/producers/run_accumulated_agent_evals.py runs registered eval producers
-upstream implementation ../../eval/checkers/eval_accumulation_check.py validates accumulated eval families
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs validates accumulated eval families
 downstream implementation ../../.codex/personal/skills/agent-eval-accumulation/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
 -->
