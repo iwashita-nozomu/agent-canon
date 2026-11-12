@@ -19,7 +19,7 @@ paper-specific section contract と citation/evidence trace が必要な場合�
 ## Required working notes
 
 必要な section だけを選び、paper の判断に役立つ working note だけを既存の
-run bundle または linked note に残します。material claim の根拠を追う
+会話または project の既存 note に残します。material claim の根拠を追う
 citation/evidence map と、数式を読むために必要な notation は明確にします。
 paragraph map や細かな section contract は、実際の重複、欠落、順序の問題を
 解く場合に限って作ります。標準 section の役割は次です。
@@ -49,15 +49,11 @@ docs-completeness review は要求された複数 section や関連文書の網�
 大きな構造修正を済ませてから line edit を行い、`tools/bin/agent-canon docs
 check` は選択された文書 check として使います。
 
-## Standard command
+## Start the writing task
 
-```bash
-python3 tools/analysis/documents/doc_start.py \
-  --task "paper writing task" \
-  --kind paper \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
+Follow the section and figure outline above, then use the selected writing Skill
+and native collaboration for an activated review. Keep manuscript and figure
+artifacts at their project owner paths; no task run directory is created.
 
 ## Citation rendering
 

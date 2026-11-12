@@ -21,7 +21,6 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## User Request Coverage Review（user request coverage レビュー）
 
-<!-- user_request_contract.md が must-do、must-not-do、completion-evidence の全 clause を silent drop なく収録するか確認します。 -->
 
 ## Source Bucket Review（source bucket レビュー）
 

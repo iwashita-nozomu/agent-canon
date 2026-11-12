@@ -19,6 +19,9 @@ import re
 import subprocess
 from pathlib import Path
 
+# Read-only legacy archive location; task execution no longer creates this pointer.
+ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
+
 try:
     from tools.runtime.artifacts.runtime_artifacts import (
         RUNTIME_ROOT_ENV,

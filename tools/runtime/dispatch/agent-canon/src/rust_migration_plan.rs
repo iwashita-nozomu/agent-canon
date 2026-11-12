@@ -319,9 +319,6 @@ fn family_for(path: &str) -> &'static str {
     if path.ends_with("/file_surface_inventory.py") {
         return "independent-inventory";
     }
-    if path == "tools/runtime/manifest/manifest_rendering.py" {
-        return "agent-workflow";
-    }
     if path.starts_with("tools/runtime/manifest/")
         || path.ends_with("/skill_projection_registry.py")
         || path.ends_with("/skill_route_catalog.py")
@@ -888,31 +885,6 @@ mod tests {
         assert_eq!(plan.candidates[0].path, path);
         assert_eq!(plan.candidates[0].family, "independent-inventory");
         assert_eq!(plan.candidates[0].class, "port-now");
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn manifest_rendering_waits_for_workflow_prerequisites() {
-        let root = fixture();
-        let path = "tools/runtime/manifest/manifest_rendering.py";
-        write(&root, path, "VALUE = 1\n");
-        write(
-            &root,
-            "tools/runtime/lifecycle/task_close.py",
-            "VALUE = 1\n",
-        );
-
-        let plan = build_plan(&root, 12).unwrap();
-        let rendering = plan
-            .candidates
-            .iter()
-            .find(|item| item.path == path)
-            .unwrap();
-        assert_eq!(rendering.family, "agent-workflow");
-        assert_eq!(rendering.class, "dependency-first");
-        assert!(rendering
-            .remaining_prerequisites
-            .contains(&"archive-lifecycle"));
         fs::remove_dir_all(root).unwrap();
     }
 

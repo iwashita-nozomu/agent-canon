@@ -62,8 +62,8 @@ behavior/eval/path/token evidence とその command/schema は各 owner に委�
   configured native runtime が所有し、この skill は workflow capacity budget を導出しません。
   この skill は選択済み role を利用し、role list や重複判定を再定義しません。
 - behavior event / calibration は `$agent-learning`、登録済み eval と duplicate audit は
-  `$agent-eval-accumulation`、token / path comparison は `$tokens`、runtime feedback の構造化は
-  `workflow_monitor.py` に委譲します。この skill は返された evidence の iteration 解釈と
+  `$agent-eval-accumulation`、token / path comparison は `$tokens` に委譲します。
+  この skill は返された evidence の iteration 解釈と
   next action だけを所有します。
 
 ## Iteration Closeout

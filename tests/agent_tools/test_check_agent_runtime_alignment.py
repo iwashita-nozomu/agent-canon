@@ -46,15 +46,11 @@ from tools.agent.orchestration.team_config import (
     TaskCatalog,
     load_team_config,
     resolve_role,
+    select_roles,
 )  # noqa: E402
 from tools.repository.workspace.workspace_scope import (
     resolve_report_bundle_artifact_path,
 )  # noqa: E402
-from tools.runtime.manifest.manifest_rendering import (  # noqa: E402
-    COMMON_PROMPT_MUST_INCLUDE,
-    render_subagent_prompt_packet,
-    role_prompt_must_include,
-)
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -150,21 +146,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Runtime alignment compares the committed 35-role static snapshot."""
         runtime_alignment.validate_generated_role_views()
 
-    def test_alignment_script_uses_only_explicit_external_runtime(self) -> None:
-        """Standalone checks keep derived reports in the selected runtime."""
-        environment = os.environ.copy()
-        environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=PROJECT_ROOT,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("explicit runtime root required", result.stderr)
-
     def test_permanent_team_mapping_requires_every_configured_role(self) -> None:
         """The CODEX_SUBAGENTS mapping should not omit configured team roles."""
         config = load_team_config()
@@ -202,14 +183,14 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         config = load_team_config()
         catalog = runtime_alignment.load_task_catalog(config)
 
-        comprehensive_roles = runtime_alignment.select_roles(
+        comprehensive_roles = select_roles(
             config,
             [],
             full_team=True,
             catalog=catalog,
             workflow_family_id="comprehensive_development",
         )
-        evaluation_roles = runtime_alignment.select_roles(
+        evaluation_roles = select_roles(
             config,
             [],
             full_team=True,
@@ -247,33 +228,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ):
                 runtime_alignment.validate_team_config_references()
 
-    def test_team_config_rejects_unknown_active_design_packet_field(self) -> None:
-        """Runtime alignment consumes the shared closed packet schema."""
-        config = load_team_config()
-        packet = cast(
-            dict[str, object],
-            config.artifact_registry["active_design_packet"],
-        )
-        mutated_config = replace(
-            config,
-            artifact_registry={
-                **config.artifact_registry,
-                "active_design_packet": {
-                    **packet,
-                    "unexpected_contract": True,
-                },
-            },
-        )
-
-        with patch.object(
-            runtime_alignment, "load_team_config", return_value=mutated_config
-        ):
-            with self.assertRaisesRegex(
-                RuntimeError,
-                r"^artifacts\.active_design_packet:field_unknown:unexpected_contract$",
-            ):
-                runtime_alignment.validate_team_config_references()
-
     def test_skill_evaluator_context_is_packet_only(self) -> None:
         """The evaluator receives only its scenario packet and listed files."""
         config = load_team_config()
@@ -306,7 +260,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         specialists = runtime_alignment.default_specialists_for_task(
             config, catalog, "T14"
         )
-        roles = runtime_alignment.select_roles(
+        roles = select_roles(
             config,
             list(specialists),
             full_team=False,
@@ -339,46 +293,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         with patch.object(runtime_alignment, "load_task_catalog", return_value=catalog):
             with self.assertRaisesRegex(RuntimeError, "implementation role family"):
                 runtime_alignment.validate_task_catalog_references()
-
-    def test_splitter_writer_reuse_survey_context_projects_for_both_change_routes(
-        self,
-    ) -> None:
-        """Both applicable workflow prompts carry the same optional reuse context."""
-        catalog = loaded_task_catalog_raw()
-        families = cast(list[dict[str, object]], catalog["workflow_families"])
-        by_id = {str(family["id"]): family for family in families}
-        instruction_markers = (
-            "current/historical asset paths",
-            "consolidate overlapping responsibility/asset slices",
-            "Missing context is non-blocking",
-        )
-        rendered: dict[str, str] = {}
-        for family_id in ("owner_bounded_change", "scoped_change"):
-            rendered[family_id] = "\n".join(
-                render_subagent_prompt_packet(by_id[family_id], indent="  ")
-            )
-            for marker in instruction_markers:
-                self.assertIn(marker, rendered[family_id])
-            self.assertIn("reuse_survey", rendered[family_id])
-        self.assertGreater(
-            rendered["owner_bounded_change"].count(
-                "consolidate overlapping responsibility/asset slices"
-            ),
-            0,
-        )
-        self.assertGreater(
-            rendered["scoped_change"].count(
-                "consolidate overlapping responsibility/asset slices"
-            ),
-            0,
-        )
-        self.assertIn("reuse_survey", COMMON_PROMPT_MUST_INCLUDE)
-        config = load_team_config()
-        for role_id in ("designer", "implementer"):
-            self.assertIn(
-                "reuse_survey",
-                role_prompt_must_include(resolve_role(config, role_id)),
-            )
 
     def test_alignment_rejects_worker_model_policy_drift(self) -> None:
         """Alignment enforces the exact worker model and effort."""

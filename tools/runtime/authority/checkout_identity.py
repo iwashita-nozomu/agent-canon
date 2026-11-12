@@ -3,8 +3,6 @@
 # contract tool
 # responsibility Reads the current checkout identity at bounded workflow boundaries.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md checkout identity readback
-# downstream implementation ../manifest/manifest_rendering.py projects the identity contract into handoffs
-# downstream implementation ../../agent/orchestration/implementation_dispatch.py carries the observed identity to workers
 # downstream implementation ../../../tests/agent_tools/test_checkout_identity.py verifies branch, detached, and cwd transitions
 # @dependency-end
 """Read one repository-qualified checkout identity without changing Git state.
@@ -131,7 +129,9 @@ read_checkout_identity = resolve_checkout_identity
 def main(argv: list[str] | None = None) -> int:
     """Print the identity as JSON or a line-oriented block."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--cwd", default=".", help="Directory whose checkout is inspected.")
+    parser.add_argument(
+        "--cwd", default=".", help="Directory whose checkout is inspected."
+    )
     parser.add_argument("--format", choices=("json", "lines"), default="lines")
     args = parser.parse_args(argv)
     identity = resolve_checkout_identity(args.cwd)

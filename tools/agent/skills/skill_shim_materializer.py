@@ -6,7 +6,6 @@
 # upstream design ../../../agents/skills/catalog.yaml owns public skill identity and discovery metadata
 # upstream implementation ../../runtime/values.py refines decoded metadata mappings
 # upstream implementation ./skill_route_catalog.py owns typed route and dependency projections
-# upstream implementation ./skill_dependency_map.py owns graph/tool identity projections
 # downstream implementation ../../../tests/agent_tools/test_skill_shim_materializer.py validates migration, readback, and fixed point
 # @dependency-end
 """Author Git-distributed skill adapters; never run during install or launch."""
@@ -32,7 +31,6 @@ if __package__ in (None, ""):
 import yaml
 
 from tools.runtime.values import is_string_object_mapping
-from tools.agent.skills.skill_dependency_map import build_graph
 from tools.agent.skills.skill_route_catalog import (
     SkillDependencyRule,
     SkillRoutingRule,
@@ -134,7 +132,6 @@ class BuildContext:
     catalog_entries: Mapping[str, Mapping[str, object]]
     routes: Mapping[str, SkillRoutingRule]
     dependencies: Mapping[str, SkillDependencyRule]
-    graph: Mapping[str, object]
     source_snapshot_digest: str
 
 
@@ -240,14 +237,11 @@ def _dependency_payload(rule: SkillDependencyRule) -> dict[str, object]:
     }
 
 
-def _source_snapshot_digest(
-    root: Path, graph: Mapping[str, object], skill_ids: Sequence[str]
-) -> str:
+def _source_snapshot_digest(root: Path, skill_ids: Sequence[str]) -> str:
     """Hash only immutable sources so runtime target replacement cannot perturb fixed point."""
     files = {
         "catalog": file_digest(root / CATALOG_PATH),
         "dependencies": file_digest(root / DEPENDENCY_PATH),
-        "graph": cast(str, graph["graph_digest"]),
     }
     files["canonical_docs"] = domain_digest(
         "agent-canon.skill-runtime-shim.canonical-docs.v1",
@@ -267,7 +261,6 @@ def build_context(root: Path, *, output_root: Path | None = None) -> BuildContex
     try:
         routes = {rule.skill: rule for rule in load_skill_route_rules(root)}
         dependencies = dict(load_skill_dependency_map(root, skill_ids))
-        graph = cast(Mapping[str, object], build_graph(root))
     except (OSError, ValueError, yaml.YAMLError) as exc:
         raise MaterializerError("owner_source_invalid", str(exc)) from exc
     if set(routes) != set(skill_ids) or set(dependencies) != set(skill_ids):
@@ -279,8 +272,7 @@ def build_context(root: Path, *, output_root: Path | None = None) -> BuildContex
         entries,
         routes,
         dependencies,
-        graph,
-        _source_snapshot_digest(root, graph, skill_ids),
+        _source_snapshot_digest(root, skill_ids),
     )
 
 

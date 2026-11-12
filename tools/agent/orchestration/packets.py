@@ -4,9 +4,6 @@
 # upstream design ../../../documents/design/agent-team-module-boundaries.md RC-01..RC-08 approved module boundary.
 # upstream implementation ./team_config.py owns shared configuration normalizers.
 # upstream implementation ../../runtime/values.py refines decoded packet containers.
-# downstream implementation ./agent_team.py facade consumes packet APIs.
-# downstream implementation ../../runtime/lifecycle/bootstrap_agent_run.py consumes packet APIs.
-# downstream implementation ../../validation/semantic/lifecycle/waterfall_gate_check.py consumes packet APIs.
 # @dependency-end
 """Own AgentTeam packet identity, normalization, and document references."""
 
@@ -54,25 +51,14 @@ from tools.repository.workspace.workspace_scope import (
     resolve_workspace_document_path,
 )
 
-STANDARD_RUN_ARTIFACT_KEYS = (
-    "user_request_contract",
-    "schedule",
-    "work_log",
-    "team_manifest",
-    "verification",
-    "closeout_gate",
-    "agent_evaluation",
-    "workflow_monitoring",
-)
-
 ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
     "manager": {
-        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "artifact_keys": ["intent_brief"],
         "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": "Requirements and planning start from explicit documented clauses and stage plan.",
     },
     "designer": {
-        "artifact_keys": ["intent_brief", "user_request_contract", "schedule"],
+        "artifact_keys": ["intent_brief"],
         "workspace_paths": [
             "agents/skills/codex-task-workflow.md",
             "agents/canonical/CODEX_BOOTSTRAP.md",
@@ -84,18 +70,12 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ),
     },
     "design_reviewer": {
-        "artifact_keys": ["user_request_contract", "schedule", "design_brief"],
+        "artifact_keys": ["design_brief"],
         "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": "Design review checks the same upstream packet and the resulting design brief.",
     },
     "test_designer": {
-        "artifact_keys": [
-            "user_request_contract",
-            "schedule",
-            "design_brief",
-            "design_review",
-            "work_log",
-        ],
+        "artifact_keys": ["design_brief", "design_review"],
         "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": (
             "Conditional test design starts from the implemented mechanism, approved design, "
@@ -103,13 +83,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ),
     },
     "implementer": {
-        "artifact_keys": [
-            "user_request_contract",
-            "schedule",
-            "design_brief",
-            "design_review",
-            "document_flow_review",
-        ],
+        "artifact_keys": ["design_brief", "design_review", "document_flow_review"],
         "workspace_paths": [
             "agents/skills/codex-task-workflow.md",
             "agents/canonical/CODEX_BOOTSTRAP.md",
@@ -119,13 +93,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         "notes": "Implementation must read and cite the approved design packet before editing.",
     },
     "change_reviewer": {
-        "artifact_keys": [
-            "user_request_contract",
-            "schedule",
-            "design_brief",
-            "design_review",
-            "change_review",
-        ],
+        "artifact_keys": ["design_brief", "design_review", "change_review"],
         "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": (
             "Checkpoint review is the selected owning gate; test_plan is read only when "
@@ -133,7 +101,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ),
     },
     "mathematical_correctness_reviewer": {
-        "artifact_keys": ["user_request_contract", "schedule", "change_review"],
+        "artifact_keys": ["change_review"],
         "workspace_paths": [
             "agents/skills/computational-optimization.md",
             "agents/skills/agent-orchestration.md",
@@ -144,13 +112,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ),
     },
     "final_reviewer": {
-        "artifact_keys": [
-            "user_request_contract",
-            "schedule",
-            "design_brief",
-            "design_review",
-            "final_review",
-        ],
+        "artifact_keys": ["design_brief", "design_review", "final_review"],
         "workspace_paths": ["documents/conventions/REVIEW_PROCESS.md"],
         "notes": (
             "Final review is a selected escalation gate; test_plan is read only when "
@@ -158,7 +120,7 @@ ROLE_DOCUMENT_PACKET_SPECS: dict[str, dict[str, object]] = {
         ),
     },
     "scheduler": {
-        "artifact_keys": ["user_request_contract", "schedule"],
+        "artifact_keys": [],
         "workspace_paths": ["agents/skills/codex-task-workflow.md"],
         "notes": "Scheduling reads explicit requirement and plan surfaces.",
     },
@@ -1604,33 +1566,6 @@ def selected_artifact_name(
     return active_design_packet_artifact_map(config, packet).get(
         artifact_name,
         artifact_name,
-    )
-
-
-def iter_artifacts(
-    config: TeamConfig,
-    roles: tuple[Role, ...],
-    active_design_packet: ActiveDesignPacketConfig | None = None,
-) -> tuple[str, ...]:
-    """Return core plus explicitly selected artifact filenames.
-
-    Core run metadata is always materialized so a bundle remains usable.  Role
-    outputs (including design and review documents) are opt-in: an inactive
-    reviewer does not leave an empty template or an implicit optional-template
-    state machine in the bundle.
-    """
-    packet = active_design_packet or resolve_active_design_packet_config(config)
-    return tuple(
-        dict.fromkeys(
-            (
-                *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
-                *(
-                    output
-                    for role in roles
-                    for output in selected_role_outputs(config, role, packet)
-                ),
-            )
-        )
     )
 
 

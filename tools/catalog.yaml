@@ -1103,49 +1103,6 @@ entries:
     tests:
       - tests/agent_tools/test_export_codex_runtime_summary.py
 
-  - id: workflow-monitor
-    summary: Appends observed workflow behavior and actual native-result evidence to an agent run bundle.
-    path: tools/runtime/lifecycle/workflow_monitor.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/runtime/lifecycle/workflow_monitor.py --report-dir <report-dir>
-    dispatch: {argv: ["python3", "tools/runtime/lifecycle/workflow_monitor.py", "--report-dir", "<report-dir>"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_workflow_monitor.py
-
-  - id: waterfall-gate-check
-    summary: Checks the next approved waterfall gate against the prepared run bundle.
-    path: tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: tools/bin/agent-canon waterfall-gate-check --report-dir <report-dir> --gate <gate>
-    dispatch:
-      runtime: rust
-      argv: ["tools/bin/agent-canon", "waterfall-gate-check", "--report-dir", "<report-dir>", "--gate", "<gate>"]
-      execution_plane: tool-container
-      cwd: source-root
-      env: allowlisted
-      stdin: inherited
-      stdout: captured
-      stderr: captured
-    writes: false
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_waterfall_gate_check.py
 
   - id: agent-canon-graph
     summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
@@ -1785,7 +1742,6 @@ entries:
     tests:
       - tools/runtime/dispatch/agent-canon/tests/generated_completeness_native.rs
       - tests/agent_tools/test_github_publish.py
-      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: check-agent-canon-pr
     summary: Runs the standalone AgentCanon PR readiness checklist.
@@ -1986,23 +1942,6 @@ entries:
     tests:
       - tests/agent_tools/test_reference_materializer.py
 
-  - id: smoke-test-research-perspective-pack
-    summary: Smoke-tests the research perspective role packet.
-    path: eval/checkers/smoke_test_research_perspective_pack.py
-    family: agent_tools
-    role: checker
-    status: canonical
-    command: python3 eval/checkers/smoke_test_research_perspective_pack.py
-    dispatch: {argv: ["python3", "eval/checkers/smoke_test_research_perspective_pack.py"]}
-    writes: false
-    default_wiring:
-      ci: true
-      pr_check: true
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-    tests:
-      - tests/agent_tools/test_smoke_test_research_perspective_pack.py
 
   - id: evaluate-codex-agent-roles
     summary: Evaluates and optionally accumulates Codex subagent role behavior, routing, model settings, and runtime metrics.
@@ -2317,44 +2256,6 @@ entries:
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 
-  - id: bootstrap-agent-run
-    summary: Bootstraps a staged agent run bundle from a task request.
-    path: tools/runtime/lifecycle/bootstrap_agent_run.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/runtime/lifecycle/bootstrap_agent_run.py
-    dispatch: {argv: ["python3", "tools/runtime/lifecycle/bootstrap_agent_run.py"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_BOOTSTRAP.md
-    tests:
-      - tests/agent_tools/test_bootstrap_and_close.py
-
-  - id: task-close
-    summary: Checks closeout evidence before task completion.
-    path: tools/runtime/dispatch/agent-canon/src/task_close.rs
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: tools/bin/agent-canon task-close
-    dispatch: {argv: ["tools/bin/agent-canon", "task-close"]}
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_COMPLETION.md
-    tests:
-      - tests/agent_tools/test_bootstrap_and_close.py
-      - tools/runtime/dispatch/agent-canon/tests/task_close_native.rs
 
   - id: evaluate-agent-run
     public: true

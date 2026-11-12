@@ -6,7 +6,6 @@ responsibility Documents oop-readability-check for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream implementation ../../tools/validation/code/oop/python/readability.py OOP readability CLI
 upstream implementation ../../tools/validation/code/oop/shared/readability_core.py defines mechanical finding categories
-upstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py optional timing recorder
 downstream design ../../.codex/personal/skills/oop-readability-check/SKILL.md Codex discovery shim
 @dependency-end
 -->
@@ -179,14 +178,7 @@ Use this output shape:
 
 ## Timing Token
 
-When a run bundle is active, append a workflow monitoring behavior event:
-
-```text
-tool_call=oop-readability-check duration_ms=<n> status=<pass|fail> scope=<paths> output_path=<path-or-none>
-```
-
-If there is no run bundle, include elapsed time in the user-facing summary only
-when it is useful.
+Include elapsed time in the user-facing summary when it is useful.
 
 ## Boundary
 

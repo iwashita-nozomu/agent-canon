@@ -150,43 +150,11 @@ stages every tool run must complete.
    - `shared_skill_or_workflow_gap`: skill / workflow / task catalog prompt を直す
    - `tool_gap`: tool rule、false positive、structured output を直す
    - `review_required`: 機械判定だけでは採否を決めない
-1. Track a warning through its existing owner when it is actionable or blocks a
-   requested guarantee. A non-blocking warning that does not affect the decision
-   can remain in raw output without creating a new closeout obligation. When a
-   run bundle owns warning tracking, use its existing `Tool Warnings` route and
-   [template](../../templates/agents/workflow_monitoring.md).
-
-```bash
-python3 tools/runtime/lifecycle/workflow_monitor.py \
-  --report-dir reports/agents/<run-id> \
-  --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"
-```
-
-   An actionable warning that is being tracked is updated after repair with its
-   existing evidence. A blocking warning remains open until its owner resolves
-   it. Non-actionable warnings do not need a disposition. Report an explicit
-   no-warning status only when the active run-bundle contract requests one.
-
-```bash
-python3 tools/runtime/lifecycle/workflow_monitor.py \
-  --report-dir reports/agents/<run-id> \
-  --tool-warning-status none
-```
-
-Use this no-warning command only when the active run-bundle owner requires that
-readback.
+1. Track an actionable warning with its existing owner and report its repair evidence. Non-blocking warnings may remain in raw output.
 1. `handoff_prompt_gap` または `shared_skill_or_workflow_gap` は、次の
    write-capable subagent を起動する前に prompt を修正します。closeout へ先送り
    しません。
-1. Record prompt feedback in the run bundle only when evidence establishes a
-   reusable handoff, skill/workflow, tool, test, or design gap. No feedback
-   record is needed for an ordinary resolved finding.
-
-```bash
-python3 tools/runtime/lifecycle/workflow_monitor.py \
-  --report-dir reports/agents/<run-id> \
-  --runtime-feedback "source=<tool|hook|reviewer|subagent|user> target=<skill-or-workflow-or-handoff> action=prompt_repair reason=<short-reason>"
-```
+1. Repair reusable prompt gaps at their owning Skill or workflow when the evidence supports that change.
 
 ## Refactor Integration
 

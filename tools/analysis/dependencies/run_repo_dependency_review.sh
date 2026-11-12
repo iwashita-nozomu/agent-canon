@@ -187,7 +187,6 @@ if [[ -n "${AGENT_CANON_GRAPH_CLI:-}" ]]; then
 else
   GRAPH_CLI="$(command -v agent-canon || true)"
 fi
-WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/../../runtime/lifecycle/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
   GRAPH_CLI="$(realpath -e "$GRAPH_CLI")" || {
@@ -368,10 +367,3 @@ elif [[ -n "$REPORT_DIR" ]]; then
 fi
 
 echo "REPO_DEPENDENCY_REVIEW=pass"
-
-if [[ -n "$REPORT_DIR" ]]; then
-  python3 "$WORKFLOW_MONITOR" \
-    --report-dir "$REPORT_DIR" \
-    --signal "repo_dependency_review=pass paths=${#checkable_paths[@]} check_bidirectional=${CHECK_BIDIRECTIONAL} fail_missing=${FAIL_MISSING}" \
-    --intervention "run_repo_dependency_review.sh recorded dependency review pass"
-fi

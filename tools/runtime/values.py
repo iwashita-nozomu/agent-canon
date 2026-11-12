@@ -4,15 +4,9 @@
 # downstream implementation ./container/devcontainer_dependencies.py narrows dependency manifest and receipt values
 # downstream implementation ../agent/orchestration/model_profile_registry.py narrows registry values
 # downstream implementation ../agent/orchestration/team_config.py narrows config values
-# downstream implementation ../agent/orchestration/implementation_dispatch.py narrows packet values
 # downstream implementation ../agent/orchestration/packets.py narrows packet values
-# downstream implementation ../agent/orchestration/review_dispatch.py narrows ledger and manifest values
-# downstream implementation ./manifest/manifest_rendering.py narrows rendering values
-# downstream implementation ./archive/work_log.py narrows ledger event values
 # downstream implementation ./artifacts/artifact_identity.py narrows canonical JSON maps
-# downstream implementation ./artifacts/external_artifact_binding.py narrows provider readback values
 # downstream implementation ../agent/skills/skill_shim_materializer.py narrows YAML frontmatter values
-# downstream implementation ./lifecycle/bootstrap_agent_run.py narrows command payload values
 # @dependency-end
 """Refine only the container shape of decoded values; domain schemas stay local."""
 

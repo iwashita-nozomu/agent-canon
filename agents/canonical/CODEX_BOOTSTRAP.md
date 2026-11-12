@@ -9,7 +9,7 @@ upstream design ../../documents/design/entrypoint-owner-map.md document responsi
 @dependency-end
 -->
 
-Read the selected section for a selected route requiring a run bundle, goal state, or token adaptation.
+Read the selected section for session goal state or token adaptation.
 Return to [Codex Workflow](CODEX_WORKFLOW.md) for phase selection; do not
 load inactive phases or restart completed intake merely by following a link.
 
@@ -18,11 +18,10 @@ load inactive phases or restart completed intake merely by following a link.
 Codex の goal は session runtime state として使い、repository に mirror file を作りません。
 
 - stable な goal 機能は Codex runtime の既定を使い、shared config に feature flag を重ねません。
-- user が goal-driven intent を示したが exact objective を渡していない場合は、parent が target-state-complete Objective を組み立てます。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective と implementation handoff の固定後に開始します。
-- coordination、resumption、または選択された workflow が durable lifecycle evidence を要求する場合だけ run bundle を materialize し、work unit と iteration state は `schedule.md`、実行結果と next action は `work_log.md`、acceptance は validation evidence に記録します。
-- run bundle を選択しない task は semantic handoff または tool result で owner、replaceable unit、mechanism、validation route、unresolved branch を満たします。session goal の存在は write authorization、implementation readiness、closeout の追加 gate にしません。
-- user が goal-driven task を指定した場合、session goal と実装計画は同じ objective と acceptance criteria を参照します。durable evidence が必要な場合は、その work breakdown を run bundle の `schedule.md` へ直接記録します。
-- iteration の継続は `schedule.md` の open work、`work_log.md` の next action、未完了の validation evidence から判断します。session goal はその判断を表示できますが、repository state の正本にはしません。
+- 利用者が goal 機能を明示的に求めた場合は、合意した目的と完了条件を設定します。
+- 実行・協調・再開には Codex 標準の機能を使い、作業範囲と次の action は Git の差分と現在の会話で引き継ぎます。独自の run bundle、schedule、task contract、進捗ファイルは生成しません。
+- handoff または tool result に、対象・修正単位・期待する結果・検証経路・未解決事項を載せます。role 設定、実験・証明の成果物、hook ログ、Eval 結果は各 owner の既存経路で扱います。
+- session goal の存在は write authorization、implementation readiness、closeout の追加 gate にしません。goal 機能は利用者が明示的に求めた場合に使い、実装計画と同じ objective・acceptance を参照します。
 
 ## Token Observation And Adaptive Materialization
 
@@ -49,9 +48,8 @@ active gates are those selected by runtime profile and risk class.
 
 ## 4. Run Context
 
-coordination、resumption、または選択された workflow が durable lifecycle evidence
-を必要とするときだけ run bundle を使います。通常の作業は選択済み owner への
-semantic handoff と、実際の native tool / child results で進めます。関連 owner への
+coordination と再開には Codex 標準の機能を使い、選択済み owner への
+handoff と、実際の native tool / child results で進めます。関連 owner への
 Markdown 相対リンクは条件付き案内であり、リンク先すべてを読む義務ではありません。
 selected Skill と適用される prerequisite は本文を EOF まで読みます。
 
@@ -65,8 +63,7 @@ default model / reasoning authority は `agents/model_profiles.toml` の registr
 `.codex/agents/*.toml` は runtime readback view です。選択済み role の model と
 validation はその owner route に従います。
 
-Adaptive Improvement Loop では、outer run の `experiment_change_loop.md` に `Extension Backlog` を持ち、各 extension で別の waterfall run-id を作ります。
-次の extension へ進む前に、直前 extension で選択された `waterfall-gate-check`、review、`task-close`、および commit / push の判断・結果を完了させます。未選択の review artifact や full rerun は作りません。
+Adaptive Improvement Loop では、合意した目的と変更単位を会話で保持し、各単位の実装・不要コードの確認・必要な検証を完了して進めます。
 
 Review, validation, and closeout follow the selected workflow's owner guidance.
 

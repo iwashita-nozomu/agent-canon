@@ -154,7 +154,6 @@ dependency manifest を明示的な analysis 注釈として使う場合、file 
 contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
-upstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow metadata
 downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies emitted output
 @dependency-end
 ```
@@ -267,7 +266,6 @@ Markdown:
 contract design
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
 responsibility Provides a Python helper entrypoint for agent run bootstrap.
-downstream implementation ../../tools/runtime/lifecycle/bootstrap_agent_run.py consumes workflow contract
 @dependency-end
 -->
 ```
@@ -278,7 +276,6 @@ Python / shell / TOML:
 # @dependency-start
 # contract tool
 # responsibility Implements one repository tool or runtime helper.
-# upstream implementation ../../tools/agent/orchestration/agent_team.py imports helper contract
 # downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies CLI behavior
 # @dependency-end
 ```

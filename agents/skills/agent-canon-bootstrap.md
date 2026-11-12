@@ -146,7 +146,7 @@ when the owner permits it, and retain the one-container/image limit and
 task-created resource IDs for cleanup.
 
 Eval collection is its own selected branch: run registered producers, collect
-the run bundle, sync through the archive adapter, and verify remote repository
+the producer results, sync through the archive adapter, and verify remote repository
 and commit readback. Producer definitions and manifests come from the
 image-owned AgentCanon snapshot; the registered project remains a read-only
 observation target. Use `$agent-eval-accumulation` for producer/checker detail.

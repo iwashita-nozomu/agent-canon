@@ -47,7 +47,7 @@ Unrelated stale findings do not automatically become acceptance blockers for a b
 ## Overloaded documents
 
 When a file couples independently needed responsibilities and causes unrelated
-reading, apply [Document Split Decision](../../documents/conventions/common/05_docs.md#document-split-decision).
+reading, apply [Document Split Decision](../../documents/conventions/common/05_docs.md#文書構造の判断).
 Locate the exact mixed sections and incoming reader routes, then move details to
 their existing owner and remove the old copy. Update affected callers with a
 condition and direct section link; do not replace one large read with mandatory

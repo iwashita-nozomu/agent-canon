@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Normalizes tool-selection evidence without writing telemetry.
 # upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns tool-selection parity.
-# downstream implementation ../../runtime/archive/behavior_event_assembly.py consumes ToolSelection.
+# downstream implementation ../../runtime/dispatch/agent-canon/src/behavior_event_assembly.rs consumes ToolSelection.
 # downstream implementation ../../../tests/agent_tools/test_tool_selection.py validates domains and ordering.
 # @dependency-end
 """Pure tool-selection owner."""
@@ -49,7 +49,9 @@ def select_tools(payload: object) -> ToolSelection:
     """Return stable tool evidence using only the supplied payload."""
     if not isinstance(payload, dict):
         return ToolSelection()
-    tool_name = payload.get("tool_name") if isinstance(payload.get("tool_name"), str) else ""
+    tool_name = (
+        payload.get("tool_name") if isinstance(payload.get("tool_name"), str) else ""
+    )
     tool_input = _tool_input(payload)
     command = ""
     for key in ("command", "cmd"):
@@ -64,10 +66,18 @@ def select_tools(payload: object) -> ToolSelection:
     selected = payload.get("selected_tools")
     if not isinstance(selected, (list, tuple)):
         selected = ()
-    selected_tools = tuple(str(item) for item in selected if isinstance(item, str) and item)
+    selected_tools = tuple(
+        str(item) for item in selected if isinstance(item, str) and item
+    )
     if tool_name and not selected_tools:
         selected_tools = (tool_name,)
-    encoded = json.dumps(tool_input, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("utf-8")
+    encoded = json.dumps(
+        tool_input,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
     fingerprint = hashlib.sha256(encoded).hexdigest()[:12] if tool_input else ""
     keys = tuple(sorted(str(key) for key in tool_input))
     return ToolSelection(

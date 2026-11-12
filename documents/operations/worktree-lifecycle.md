@@ -32,8 +32,8 @@ read-only inventory で分類します。経過日数、最終更新日時、sta
   `python3 tools/repository/git/orphan_lifecycle.py inventory ...` の digest と candidate identity を残します。
   対象 branch の local/remote 状態も確認し、未公開の内容を保持します。
 - `orphan_safe_to_remove` 以外、または cleanup blocker が一つでもある candidate は削除しません。
-- current checkout で続けられる作業は current checkout の後続 wave に直列化します。
-- carry-over 先、runtime output directory、削除または保持する legacy note を先に決めます。
+- 作業を続けられる既存 checkout がある場合は、現在の branch と Git state を確認して継続先を選びます。
+- Git 上で持ち越す変更、既存 owner の runtime output、削除または保持する legacy note の境界を確認します。
 - 削除対象が agent / process / container mount / runtime の入力として使われている間は保持します。
   利用停止と mount 解除の完了、必要な内容の外部保全を既存 owner で確認してから削除します。
 
@@ -43,16 +43,13 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 
 - `WORKTREE_SCOPE.md` の `Branch` と `Worktree path` が current checkout と違う場合、その scope は作業 authority ではありません。
 - 既存の action log は必要な部分を読み、current handoff へ carry-over 判断を引き継ぎます。
-- 選択済み run bundle の継続ログは current checkout の
-  `python3 tools/runtime/archive/work_log.py --kind <kind> --request-clause-id R1 --message "<what changed>" --next "<next>"`
-  を使います。
 - experiment topic を持つ古い worktree を見つけた場合は、`experiments/registry.toml` の stale `active_worktree` / `scope_file` を cleanup 対象として扱います。
-- branch が複数 session 続いた場合でも、作業再開は current checkout の branch / wave で行い、`documents/notes/branches/` は summary evidence としてだけ使います。
+- branch が複数 session 続いた場合でも、作業再開は current checkout の branch と current conversation で行い、`documents/notes/branches/` は summary evidence としてだけ使います。
 - 観測した drift / cleanup risk と照合する必要がある場合だけ、関係する
   [guardrails](../notes/guardrails/README.md) / [failures](../notes/failures/README.md) を参照します。
 - `git status --short --branch`、対象の `git diff -- <paths>`、`git worktree list --porcelain` で checkout の実際の状態を確認します。
 - 古い scope / action log は必要な内容を直接読み、引継ぎ後に選択した対象を削除します。Git の状態と current handoff に判断材料が揃うため、旧台帳の項目補完・検査・追記は終了します。
-- dirty state、conflict risk、scope drift の兆候があれば、編集前に current task record に残します。
+- dirty state、conflict risk、scope drift の兆候があれば、既存 Git state を保存し、owner の境界を確認してから編集します。
 - `main` へ戻す場合は、integration owner が準備済み checkout 上で統合します。integration
   用 checkout が必要なら `repository-topic-clone` の selected mode を使い、手動の integration
   worktree は切りません。
@@ -67,17 +64,14 @@ stale な worktree や古い scope を見つけた場合は、作業場所とし
 - 別 branch / 別 path の scope file を流用しません。
 - branch の役割と carry-over 先を残したい場合は [BRANCH_SCOPE.md](BRANCH_SCOPE.md) と `documents/notes/branches/` を使います。
 - 既存 action log は `documents/notes/worktrees/` に legacy evidence として残します。
-- 今回の scope 更新、編集、検証、実験開始 / 停止、carry-over 判断は、対応する request clause と
-  ともに既存 current task record へ一度記録します。選択済み run bundle がある場合は
-  その `work_log.md` を使い、legacy action log への二重記録はしません。
-- scope が途中で変わったら、追加編集の前に current task record と handoff packet を更新します。
-- editable path は current checkout の dependency-expanded write scope と handoff packet で管理します。
-- runtime output は current checkout の run bundle または task 固有 output directory へ限定します。
+- Task scope は current conversation と explicit checkout assignment で確認します。scope が変わった場合は、追加編集の前に current owner と authority を再確認します。
+- experiment、Eval、hook log などの runtime output は既存 owner の path に残します。
 - 持ち帰る知見がある場合は [notes lifecycle](notes-lifecycle.md) に従って保存します。
   構成変更の統合と検証は [branch integration](BRANCH_SCOPE.md#5-conflict-解決と-merge--rebase) に従います。
 - file 構成変更を含む branch を閉じる前には、current checkout 上で `tools/bin/agent-canon check-merge-structure --source <branch> --target <base> --compare-commit <integration-commit>` を通します。
-- cleanup 前には digest-bound `authorize-cleanup` receipt、cleanup 後には exact command、result、
-  ref/path readback、保存先 main/successor、関連 Issue/PR comment locator を同じ trace に残します。
+- cleanup 前の digest-bound `authorize-cleanup` receipt と cleanup 後の exact ref/path readback は
+  [orphan-lifecycle owner](orphan-lifecycle.md) に従います。GitHub Issue を使う場合は既存の
+  repository-qualified Issue を durable authority とします。
 - local branch に linked worktree がある場合、worktree を独立 resource として先に処理し、再 inventory するまで branch を削除しません。
 
 ## 閉じる前の確認

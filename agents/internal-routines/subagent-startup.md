@@ -8,10 +8,8 @@ upstream design README.md internal routine registry
 upstream design ../COMMUNICATION_PROTOCOL.md owns Fresh Subagent Context Capsule fields
 upstream design ../skills/user-guided-debugging.md owns guided cadence activation and execution ownership
 downstream design ../skills/subagent-bootstrap.md consumes the canonical private subagent startup route
-downstream implementation ../../tools/agent/orchestration/agent_team.py emits run.subagent_prompt_packet.subagent_startup_route
 downstream implementation ../../tools/agent/orchestration/route.py strips private startup labels from prompt skill activation
 downstream implementation ../../tests/agent_tools/test_route.py checks historical startup labels are not public aliases
-downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py checks generated run manifest fields
 @dependency-end
 -->
 
@@ -73,7 +71,7 @@ in the existing capsule's selected canon context:
 [Execution Ownership](../skills/user-guided-debugging.md#execution-ownership), and
 [Boundary](../skills/user-guided-debugging.md#boundary). The child reads them
 before its first delegated action, reusing unchanged reads. This applies with
-or without a durable run bundle; handoff fields remain protocol-owned.
+using native collaboration; handoff fields remain protocol-owned.
 
 Apply the Skill's activation condition to the latest user instruction. When
 guided cadence is active, return the assignment and existing evidence to the

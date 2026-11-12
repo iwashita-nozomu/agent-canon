@@ -4,7 +4,7 @@
 # responsibility Classifies prompt routing signals from immutable injected evidence.
 # upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns the pure classifier contract.
 # downstream implementation ../../../eval/producers/evaluate_workflow_selection.py supplies frozen catalog/routing inputs.
-# downstream implementation ../../runtime/archive/behavior_event_assembly.py consumes PromptIntakeSignals.
+# downstream implementation ../../runtime/dispatch/agent-canon/src/behavior_event_assembly.rs consumes PromptIntakeSignals.
 # downstream implementation ../../../tests/agent_tools/test_prompt_classifier.py validates purity and field parity.
 # @dependency-end
 """Pure prompt-intake classifier.
@@ -584,7 +584,6 @@ TOOL_KEYWORDS: dict[str, tuple[str, ...]] = {
         "behavior_events",
     ),
     "tool-rejection-preflight": ("tool rejection", "preflight", "はじかれる"),
-    "workflow_monitor.py": ("workflow_monitor", "runtime-feedback", "runtime feedback"),
 }
 SHELL_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 SUBAGENT_TOOL_ACTIONS: dict[str, str] = {

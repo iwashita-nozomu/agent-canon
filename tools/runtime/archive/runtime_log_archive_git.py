@@ -56,6 +56,7 @@ from tools.runtime.artifacts.report_artifact_checks import (  # noqa: E402
     parse_review_identity,
 )
 from tools.runtime.archive.runtime_log_paths import (  # noqa: E402
+    ACTIVE_RUN_POINTER,
     HOOK_SPOOL_INDEX_NAME,
     LOG_ARCHIVE_REMOTE,
     agent_canon_git_commit_key,
@@ -77,7 +78,6 @@ from tools.repository.workspace.parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectError,
     attest_parent_root,
 )
-from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
 DEFAULT_COMMIT_NAME = "AgentCanon Log Archive"
 DEFAULT_COMMIT_EMAIL = "agent-canon-log@example.invalid"
