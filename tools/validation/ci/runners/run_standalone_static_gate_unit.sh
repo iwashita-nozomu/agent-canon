@@ -317,6 +317,7 @@ run_workflow_container() {
     tests/tools/test_agent_improvement_guide_workflow.py
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
+  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
     tests/tools/test_compile_cache.py \
