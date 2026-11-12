@@ -18,7 +18,6 @@ readback を扱います。親レポ固有の設計や実験結果はここへ�
 - [agent-canon-update-route.md](agent-canon-update-route.md): standalone source PR と明示 runtime の更新経路。
 - [agent-canon-parent-repo-latest-checklist.md](agent-canon-parent-repo-latest-checklist.md): 親レポ反映後の確認。
 - [agent-canon-github-remote.md](agent-canon-github-remote.md): canonical remote と公開境界。
-- `agent-canon-update-tasks.toml`: 機械可読な更新 TODO。
 - [template-agent-canon-audit-resolution.md](template-agent-canon-audit-resolution.md): 監査指摘の解決記録。
 - [agent-canon-licensing-policy.md](agent-canon-licensing-policy.md): AgentCanon と親レポのライセンス境界。
 
