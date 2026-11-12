@@ -1136,13 +1136,14 @@ class CodexHooksTest(unittest.TestCase):
                 )
                 payload = self._run_shared_checkout_guard(authority + command)
                 self.assertIsNotNone(payload)
-                self.assertEqual(cast("dict[str, object]", payload)["decision"], "block")
+                self.assertEqual(
+                    cast("dict[str, object]", payload)["decision"], "block"
+                )
                 self.assertIsNone(
                     self._run_shared_checkout_guard(
                         authority
                         + "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved "
-                        + command
+                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved " + command
                     )
                 )
 
