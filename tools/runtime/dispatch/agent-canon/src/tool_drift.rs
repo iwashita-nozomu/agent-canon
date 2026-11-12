@@ -279,7 +279,7 @@ const CONTRACTS: &[ToolContract] = &[
             direct_link(".codex/README.md"),
             direct_link("tools/catalog.yaml"),
             direct_link("tools/validation/semantic/convention/convention_compliance_contracts.toml"),
-            direct_link("tools/validation/semantic/skills/check_skill_frontmatter.py"),
+            direct_link("tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs"),
             direct_link("tools/validation/ci/runners/run_all_checks.sh"),
             direct_link("tools/runtime/dispatch/agent-canon/src/tool_drift.rs"),
             direct_link("tests/agent_tools/test_check_convention_compliance.py"),

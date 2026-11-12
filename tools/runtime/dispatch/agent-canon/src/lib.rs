@@ -78,6 +78,7 @@ pub mod execution_resource_projection;
 pub mod extract_docx;
 pub mod generated_completeness;
 pub mod server_readiness;
+pub mod skill_frontmatter;
 // This shared source module also serves the CLI's AST tools; the reusable LSP
 // API uses only the newline and source-offset helpers from this owner.
 pub mod agent_canon_source_root;
