@@ -239,9 +239,11 @@ fn arguments(args: &[String]) -> Result<Option<Options>, String> {
                 8 => match value.as_str() {
                     "text" => options.json = false,
                     "json" => options.json = true,
-                    _ => return Err(format!(
+                    _ => {
+                        return Err(format!(
                         "argument --format: invalid choice: '{value}' (choose from 'text', 'json')"
-                    )),
+                    ))
+                    }
                 },
                 _ => unreachable!(),
             }
