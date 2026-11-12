@@ -1739,6 +1739,22 @@ def main(argv: list[str]) -> int:
                     'schema = "agent-canon.mount-registry.v2"\n',
                     encoding="utf-8",
                 )
+            if operation == "update" and runtime_mount is not None:
+                volume_root = Path(runtime_mount["Source"])
+                exchange_root = volume_root / "exchange"
+                exchange_root.mkdir(parents=True, exist_ok=True)
+                registry = (volume_root / "mount-registry.toml").read_text(
+                    encoding="utf-8"
+                )
+                for name in ("mounts.toml", "mounts.tsv"):
+                    (exchange_root / name).unlink(missing_ok=True)
+                (exchange_root / "mounts.toml").write_text(
+                    registry or 'schema = "agent-canon.mount-registry.v2"\n',
+                    encoding="utf-8",
+                )
+                (exchange_root / "mounts.tsv").write_bytes(
+                    (volume_root / "host-mounts.tsv").read_bytes()
+                )
             if operation:
                 print(
                     json.dumps(
