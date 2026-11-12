@@ -105,7 +105,7 @@ executable の launch、run identity、config snapshot、raw/summary result、re
 package と既存 materializer の境界を別途所有し、この文書は新しい template client を
 追加しません。
 
-`create_experiment_topic.py --template-profile cpp` は consumer owner が明示した profileだけを
+`create-experiment-topic --template-profile cpp` は consumer owner が明示した profileだけを
 materializeします。`consumer-local` はtopic-local `CMakeLists.txt`を、`root-aggregate` は既存
 root manifestからincludeするtarget registration requestを生成します。profileの選択、root manifestの
 編集、configure/build commandはproject ownerの責務です。

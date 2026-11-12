@@ -169,6 +169,8 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  sync-experiment-registry-context --topic TOPIC [options]
+  create-experiment-topic <topic> [options]
   server-readiness [--layout <layout.toml>]
   check-skill-frontmatter [--root ROOT] [--format text|json]
   chatgpt-codex-route --input <packet.json|->
@@ -369,6 +371,14 @@ fn main() {
                 std::process::exit(2);
             }
         }
+    }
+    if args.len() >= 2 && args[1] == "sync-experiment-registry-context" {
+        std::process::exit(agent_canon::experiment_registry::context::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "create-experiment-topic" {
+        std::process::exit(
+            agent_canon::experiment_registry::create_experiment_topic::run(&args[2..]),
+        );
     }
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
