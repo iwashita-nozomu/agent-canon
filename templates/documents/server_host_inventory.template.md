@@ -42,7 +42,7 @@ responsibility Documents Server Host Inventory Template for this repository.
 - Docker socket path:
 - Docker socket access status:
 - `codex` CLI version:
-- `python3` version:
+- Python provider and version (only when selected by the host layout):
 
 ## Storage Layout
 
@@ -74,7 +74,7 @@ responsibility Documents Server Host Inventory Template for this repository.
 - `df -h`:
 - `mount`:
 - `docker version`:
-- `python3 tools/validation/ci/checks/check_server_readiness.py`:
+- `tools/bin/agent-canon server-readiness --layout <layout.toml>`:
 
 ## Gaps
 
