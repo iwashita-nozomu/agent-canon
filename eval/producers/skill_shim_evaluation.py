@@ -27,6 +27,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Protocol, cast
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python 3.11+ is the supported runtime.

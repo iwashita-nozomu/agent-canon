@@ -38,9 +38,7 @@ class ExperimentWrapperRemovalTest(unittest.TestCase):
         for skill in REMOVED:
             self.assertNotIn(skill, skill_ids)
             self.assertNotIn(skill, dependencies)
-            self.assertFalse(
-                (PROJECT_ROOT / "agents/skills" / f"{skill}.md").exists()
-            )
+            self.assertFalse((PROJECT_ROOT / "agents/skills" / f"{skill}.md").exists())
             self.assertFalse(
                 (PROJECT_ROOT / ".codex/personal/skills" / skill / "SKILL.md").exists()
             )

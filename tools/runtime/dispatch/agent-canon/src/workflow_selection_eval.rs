@@ -13,14 +13,13 @@
 
 use crate::eval_archive_paths::eval_results_dir;
 use crate::eval_manifest_paths::{eval_manifest_path, resolve_eval_manifest};
-use crate::prompt_classifier::{
-    prompt_intake_signals, PromptClassifierInputs, SkillLaneEvidence,
-};
+use crate::prompt_classifier::{prompt_intake_signals, PromptClassifierInputs};
 use crate::python_cli_integer::is_argparse_negative_number;
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::python_json::{JsonObject, JsonString, JsonValue};
 use crate::python_text::python_strip;
 use crate::runtime_boundary::RuntimeArtifactBoundary;
+use crate::skill_lane_detector::SkillLaneEvidence;
 use crate::skill_lane_detector::{
     structural_skill_lane_concept_matches, validation_failure_repair_concept_matches,
 };
@@ -96,7 +95,10 @@ struct WorkflowSelectionBundle {
 
 impl WorkflowSelectionBundle {
     fn failed_count(&self) -> usize {
-        self.results.iter().filter(|result| !result.passed()).count()
+        self.results
+            .iter()
+            .filter(|result| !result.passed())
+            .count()
     }
 }
 
@@ -146,10 +148,7 @@ fn table_entries<'a>(
         return Ok(Vec::new());
     };
     if let Some(tables) = item.as_array_of_tables() {
-        return Ok(tables
-            .iter()
-            .map(|table| table as &dyn TableLike)
-            .collect());
+        return Ok(tables.iter().map(|table| table as &dyn TableLike).collect());
     }
     let Some(array) = item.as_array() else {
         return Err(format!("{field} must be a list of tables"));
@@ -302,7 +301,10 @@ fn format_string_spec(value: &str, spec: &str, group_id: &str) -> Result<String,
         return Err(invalid());
     }
     let width_start = index;
-    while characters.get(index).is_some_and(|character| character.is_ascii_digit()) {
+    while characters
+        .get(index)
+        .is_some_and(|character| character.is_ascii_digit())
+    {
         index += 1;
     }
     let width = if width_start == index {
@@ -318,7 +320,10 @@ fn format_string_spec(value: &str, spec: &str, group_id: &str) -> Result<String,
     if characters.get(index) == Some(&'.') {
         index += 1;
         let precision_start = index;
-        while characters.get(index).is_some_and(|character| character.is_ascii_digit()) {
+        while characters
+            .get(index)
+            .is_some_and(|character| character.is_ascii_digit())
+        {
             index += 1;
         }
         if precision_start == index {
@@ -381,11 +386,11 @@ fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<
                 let field_name = field.split(['!', ':']).next().unwrap_or_default();
                 if field_name != "subject" {
                     if field_name.is_empty()
-                        || field_name.chars().all(|character| character.is_ascii_digit())
+                        || field_name
+                            .chars()
+                            .all(|character| character.is_ascii_digit())
                     {
-                        return Err(format!(
-                            "case group {group_id} has invalid prompt template"
-                        ));
+                        return Err(format!("case group {group_id} has invalid prompt template"));
                     }
                     return Err(format!(
                         "case group {group_id} template uses unsupported field {field_name:?}"
@@ -402,27 +407,21 @@ fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<
                     } else if rest.is_empty() {
                         (conversion, "")
                     } else {
-                        return Err(format!(
-                            "case group {group_id} has invalid prompt template"
-                        ));
+                        return Err(format!("case group {group_id} has invalid prompt template"));
                     }
                 } else if let Some(spec) = suffix.strip_prefix(':') {
                     ('s', spec)
                 } else if suffix.is_empty() {
                     ('s', "")
                 } else {
-                    return Err(format!(
-                        "case group {group_id} has invalid prompt template"
-                    ));
+                    return Err(format!("case group {group_id} has invalid prompt template"));
                 };
                 let converted = match conversion {
                     's' => subject.to_owned(),
                     'r' => python_repr_string(subject),
                     'a' => python_ascii_repr_string(subject),
                     _ => {
-                        return Err(format!(
-                            "case group {group_id} has invalid prompt template"
-                        ));
+                        return Err(format!("case group {group_id} has invalid prompt template"));
                     }
                 };
                 prompt.push_str(&format_string_spec(&converted, spec, group_id)?);
@@ -445,7 +444,7 @@ fn format_group_prompt(template: &str, subject: &str, group_id: &str) -> Result<
     if prompt.is_empty() {
         return Err(format!("case group {group_id} generated an empty prompt"));
     }
-    Ok(prompt)
+    Ok(prompt.to_owned())
 }
 
 fn load_explicit_cases(
@@ -454,14 +453,14 @@ fn load_explicit_cases(
 ) -> Result<Vec<WorkflowSelectionCase>, String> {
     let mut cases = Vec::new();
     for (index, entry) in table_entries(raw_cases, "cases")?.into_iter().enumerate() {
-        let case_id = python_strip(&python_string_or(entry.get("id"), ""));
+        let case_id = python_strip(&python_string_or(entry.get("id"), "")).to_owned();
         if case_id.is_empty() {
             return Err(format!("case {} must define id", index + 1));
         }
         if !seen_ids.insert(case_id.clone()) {
             return Err(format!("duplicate case id: {case_id}"));
         }
-        let prompt = python_strip(&python_string_or(entry.get("prompt"), ""));
+        let prompt = python_strip(&python_string_or(entry.get("prompt"), "")).to_owned();
         if prompt.is_empty() {
             return Err(format!("case {case_id} must define prompt"));
         }
@@ -471,7 +470,6 @@ fn load_explicit_cases(
             return Err(format!("case {case_id} must define expected_workflows"));
         }
         cases.push(WorkflowSelectionCase {
-            case_id,
             group_id: python_string_or(entry.get("group_id"), "explicit"),
             description: python_string_or(entry.get("description"), ""),
             prompt,
@@ -482,6 +480,7 @@ fn load_explicit_cases(
                 .map_err(|_| format!("{case_id}.expected_skills must be a list of strings"))?,
             expected_tools: string_list(entry, "expected_tools")
                 .map_err(|_| format!("{case_id}.expected_tools must be a list of strings"))?,
+            case_id,
         });
     }
     Ok(cases)
@@ -493,8 +492,11 @@ fn load_case_groups(
 ) -> Result<(Vec<WorkflowSelectionCase>, usize), String> {
     let mut cases = Vec::new();
     let mut generated_count = 0;
-    for (index, entry) in table_entries(raw_groups, "case_groups")?.into_iter().enumerate() {
-        let group_id = python_strip(&python_string_or(entry.get("id"), ""));
+    for (index, entry) in table_entries(raw_groups, "case_groups")?
+        .into_iter()
+        .enumerate()
+    {
+        let group_id = python_strip(&python_string_or(entry.get("id"), "")).to_owned();
         if group_id.is_empty() {
             return Err(format!("case group {} must define id", index + 1));
         }
@@ -503,7 +505,9 @@ fn load_case_groups(
         let subjects = string_list(entry, "subjects")
             .map_err(|_| format!("{group_id}.subjects must be a list of strings"))?;
         if templates.is_empty() {
-            return Err(format!("case group {group_id} must define prompt_templates"));
+            return Err(format!(
+                "case group {group_id} must define prompt_templates"
+            ));
         }
         if subjects.is_empty() {
             return Err(format!("case group {group_id} must define subjects"));
@@ -579,11 +583,12 @@ fn load_manifest(path: &Path) -> Result<WorkflowSelectionManifest, String> {
         load_case_groups(root.get("case_groups"), &mut seen_ids)?;
     cases.extend(generated_cases);
     if cases.is_empty() {
-        return Err("manifest must define at least one [[cases]] or [[case_groups]] entry".to_owned());
+        return Err(
+            "manifest must define at least one [[cases]] or [[case_groups]] entry".to_owned(),
+        );
     }
     let expected_case_count = optional_count(root, "expected_case_count")?;
-    let expected_generated_case_count =
-        optional_count(root, "expected_generated_case_count")?;
+    let expected_generated_case_count = optional_count(root, "expected_generated_case_count")?;
     let mut count_failures = Vec::new();
     if let Some(expected) = expected_case_count {
         if expected != cases.len() as i64 {
@@ -688,9 +693,7 @@ fn evaluate_case(root: &Path, case: &WorkflowSelectionCase) -> WorkflowSelection
     );
     let selected_skills = json_strings(signals.skills);
     let candidate_skills = json_strings(signals.candidate_skills);
-    let observed_skills = deduplicate(
-        selected_skills.iter().chain(&candidate_skills).cloned(),
-    );
+    let observed_skills = deduplicate(selected_skills.iter().chain(&candidate_skills).cloned());
     let observed_tools = json_strings(signals.candidate_tools);
     WorkflowSelectionResult {
         case: case.clone(),
@@ -1037,11 +1040,7 @@ fn resolve_results_dir(
         }
         return boundary.resolve(&path);
     }
-    eval_results_dir(
-        &bundle.root,
-        DEFAULT_RESULTS_FAMILY,
-        Some(boundary.root()),
-    )
+    eval_results_dir(&bundle.root, DEFAULT_RESULTS_FAMILY, Some(boundary.root()))
 }
 
 fn build_report_paths(
@@ -1051,12 +1050,9 @@ fn build_report_paths(
     if options.report_out.is_none() && !options.accumulate {
         return Ok(Vec::new());
     }
-    let boundary = RuntimeArtifactBoundary::for_source(
-        &bundle.root,
-        options.runtime_root.as_deref(),
-        false,
-    )
-    .map_err(RunFailure::Runtime)?;
+    let boundary =
+        RuntimeArtifactBoundary::for_source(&bundle.root, options.runtime_root.as_deref(), false)
+            .map_err(RunFailure::Runtime)?;
     let mut paths = Vec::new();
     if let Some(path) = options.report_out.as_deref() {
         paths.push(write_report(&boundary, path, bundle)?);
@@ -1111,12 +1107,11 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
             Some((option, value)) => (option, Some(value.to_owned())),
             None => (token.as_str(), None),
         };
-        let option = resolve_long_option_prefix(option_text, CLI_OPTIONS).map_err(|error| {
-            match error {
+        let option =
+            resolve_long_option_prefix(option_text, CLI_OPTIONS).map_err(|error| match error {
                 LongOptionError::Unrecognized => format!("unrecognized argument: {token}"),
                 LongOptionError::Ambiguous(_) => format!("ambiguous option: {option_text}"),
-            }
-        })?;
+            })?;
         if matches!(option, CliOption::Help) {
             if inline_value.is_some() {
                 return Err(format!("ignored explicit argument for --help: {token}"));
@@ -1125,7 +1120,9 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
         }
         if matches!(option, CliOption::Accumulate) {
             if inline_value.is_some() {
-                return Err(format!("ignored explicit argument for --accumulate: {token}"));
+                return Err(format!(
+                    "ignored explicit argument for --accumulate: {token}"
+                ));
             }
             accumulate = true;
             index += 1;
@@ -1227,7 +1224,11 @@ pub fn run(args: &[String]) -> i32 {
     match execute(&options) {
         Ok((bundle, report_paths)) => {
             emit_bundle(&bundle, &report_paths);
-            if bundle.status == "pass" { 0 } else { 1 }
+            if bundle.status == "pass" {
+                0
+            } else {
+                1
+            }
         }
         Err(RunFailure::Evaluation(error)) => {
             eprintln!("{error}");
@@ -1335,19 +1336,14 @@ mod tests {
                         .any(|skill| skill.as_str() == *required)
                 })
         }));
-        assert!(large_cases
-            .iter()
-            .all(|case| {
-                case.expected_skills.len() == 1
-                    && case.expected_skills[0] == "refactor-loop"
-            }));
-        assert!(validation_cases
-            .iter()
-            .all(|case| {
-                case.expected_skills
-                    .iter()
-                    .any(|skill| skill == "codex-task-workflow")
-            }));
+        assert!(large_cases.iter().all(|case| {
+            case.expected_skills.len() == 1 && case.expected_skills[0] == "refactor-loop"
+        }));
+        assert!(validation_cases.iter().all(|case| {
+            case.expected_skills
+                .iter()
+                .any(|skill| skill == "codex-task-workflow")
+        }));
         assert!(validation_cases.iter().all(|case| {
             !case
                 .expected_skills

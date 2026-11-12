@@ -385,7 +385,10 @@ fn prompt_classifier_preserves_direct_python_classifier_cases() {
     for (name, prompt, expected_selected, forbidden_candidates) in cases {
         let signals = classify_without_context(prompt);
         for expected in *expected_selected {
-            assert!(has_text(&signals.skills, expected), "selected {expected} in {name}");
+            assert!(
+                has_text(&signals.skills, expected),
+                "selected {expected} in {name}"
+            );
         }
         for forbidden in *forbidden_candidates {
             assert!(
@@ -399,20 +402,14 @@ fn prompt_classifier_preserves_direct_python_classifier_cases() {
 #[test]
 fn prompt_classifier_preserves_focused_python_routing_oracles() {
     let declared = classify_without_context("use $task-routing");
-    assert_eq!(
-        declared.skills,
-        vec![JsonString::from_text("task-routing")]
-    );
+    assert_eq!(declared.skills, vec![JsonString::from_text("task-routing")]);
 
     for prompt in [
         "Use the parent/same-repository branch with linked-worktree for the AgentCanon update.",
         "Use the dependency repository's independent-clone for the AgentCanon update.",
     ] {
         let signals = classify_without_context(prompt);
-        assert!(has_text(
-            &signals.candidate_workflows,
-            "agent-canon-update"
-        ));
+        assert!(has_text(&signals.candidate_workflows, "agent-canon-update"));
         assert!(has_text(
             &signals.candidate_workflows,
             "agent-canon-update-route"
@@ -422,10 +419,7 @@ fn prompt_classifier_preserves_focused_python_routing_oracles() {
     let refactor = classify_without_context(
         "複数の関係ファイルに及ぶ routing evaluator refactor を既存 oracle と一致させて",
     );
-    assert!(has_text(
-        &refactor.candidate_workflows,
-        "large-delivery"
-    ));
+    assert!(has_text(&refactor.candidate_workflows, "large-delivery"));
     assert!(has_text(&refactor.candidate_skills, "refactor-loop"));
 }
 
