@@ -18,7 +18,9 @@ struct RuntimeRoot(TempDir);
 
 impl RuntimeRoot {
     fn new() -> Self {
-        Self(tempfile::tempdir().expect("external runtime fixture creates"))
+        let root = fs::canonicalize(std::env::temp_dir())
+            .expect("runtime fixture parent resolves platform aliases");
+        Self(tempfile::tempdir_in(root).expect("external runtime fixture creates"))
     }
 
     fn path(&self) -> &Path {
