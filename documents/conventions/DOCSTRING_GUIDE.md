@@ -250,9 +250,7 @@ ABI/header/native ownership の詳細は [documents/conventions/coding-conventio
 ## Skill routing boundary
 
 skill routing は、既存の changed-path routing と設計 owner の capability 選択を分離します。
-`agent_team.language_review_candidates` が language implementation path と convention /
-template documentation path を読み、選択された touched surface に対応する reviewer を
-返します。catalog capability は pre-implementation の OOP/type design owner を選ぶ場合に
+変更された implementation・convention・template の責務に応じて、既存の reviewer を選択します。catalog capability は pre-implementation の OOP/type design owner を選ぶ場合に
 だけ使います。新しい Docstring capability、keyword branch、または reviewer branch は追加
 しません。
 
@@ -260,10 +258,10 @@ template documentation path を読み、選択された touched surface に対�
 | --- | --- |
 | `agents/skills/catalog.yaml` | OOP/type design owner の capability identity and selection |
 | `agents/skills/skill-dependencies.yaml` | prerequisite, successor, and dependency order |
-| `tools/agent/orchestration/agent_team.py` | changed paths から language reviewer candidates を選択 |
+| `agents/canonical/CODEX_SUBAGENTS.md` | touched surface に応じた reviewer guidance |
 | `tools/agent/orchestration/route.py` | OOP/type design capability と既存 route packet を materialize |
 
-`agent_team.language_review_candidates` は Python implementation path（`python/`、`tests/`、
+Python implementation path（`python/`、`tests/`、
 `.py` / `.pyi`）、native C/C++ implementation path（native suffix または `src/`、`include/`、
 `lib/`、`cmake/` marker）、および document/config・convention/template path を判定します。
 それぞれ `python_reviewer`、`cpp_reviewer`、`docs_workflow_steward` を候補にし、convention /
@@ -335,10 +333,9 @@ Completion は欄の充足率ではなく、次の forward/reverse correspondenc
 3. **Consistency**: Docstring が design clause にない保証、effect、failure、ownership を
    発明していない。未確定の内容は DIC evidence から設計 owner へ戻る。
 4. **Readback**: template source、adapter projection、実装 Docstring、review decision を
-   同じ DIC trace で再読し、forward/reverse の欠落を closeout 前に解消する。dependency /
+   同じ DIC trace で再読し、forward/reverse の欠落を review accept 前に解消する。dependency /
    skill projection source が変わった場合は、canonical CI と selected edge/readback evidence
-   を使用する。一般の Docstring projectionには local runtime-event certificate や graph
-   freshness gate を追加しない。
+   を使用する。
 
 ### Design-to-implementation trace
 
@@ -350,8 +347,8 @@ Completion は欄の充足率ではなく、次の forward/reverse correspondenc
 | DSC-04 | Python syntax/public surface | [documents/conventions/coding-conventions-python.md](coding-conventions-python.md) | `templates/experiments/_template/run.py`, `cases.py` | DIC path/section/clause/evidence readback for Python regions |
 | DSC-05 | C++ syntax/native boundary and build-design join | [documents/conventions/coding-conventions-cpp.md](coding-conventions-cpp.md) + [documents/design/cpp-build-layout.md](../design/cpp-build-layout.md) | selected-profile native header/source target identity | DIC path/section/clause/evidence readback with build-design anchor |
 | DSC-06 | existing prose migration | this guide plus language convention owners | existing Python/C++ prose converted into projection consumers | duplicate semantic owner removed and DIC trace retained |
-| DSC-07 | reviewer routing | `agent_team.language_review_candidates` plus OOP capability owner | existing changed-path candidates and OOP route packet | language implementation/docs candidates; no keyword/new branch |
-| DSC-08 | positive completion | this section | implementation Docstring and review artifact | each current path has forward/reverse DIC trace; no per-function record |
+| DSC-07 | reviewer routing | selected language reviewer plus OOP capability owner | existing changed-path candidates and OOP route packet | language implementation/docs candidates; no keyword/new branch |
+| DSC-08 | positive completion | this section | implementation Docstring and review decision | each current path has forward/reverse DIC trace; no per-function record |
 | DSC-09 | dependency/skill projection readback | `Dependency/skill projection readback route` | canonical CI and selected source/edge readback | canonical CI/readback evidence when those projections change |
 
 ### Current projection set
@@ -382,14 +379,13 @@ scope, and `cpp-build-layout.md` continues to own any future native target ident
 ## Dependency/skill projection readback route
 
 General Docstring changes close through the DIC trace and targeted docs, dependency-header, runtime
-alignment, and routing checks. This evidence set contains no local runtime-event certificate or
-fresh-graph status gate. Local `.active_run` state remains task-local runtime state, while canonical
-readback evidence establishes dependency and skill projection state.
+alignment, and routing checks. Canonical readback evidence establishes dependency and skill
+projection state.
 
 When a dependency or skill projection source changes, read back the selected owner and edges through
-the canonical CI/static gate and its fresh-checkout evidence, together with the targeted dependency
+the canonical CI/static gate, together with the targeted dependency
 header, runtime-alignment, and route checks. The canonical GitHub static-gate result is the accepted
-positive evidence for this projection branch; local task state remains outside that evidence path.
+positive evidence for this projection branch.
 
 ## Mechanical checks
 

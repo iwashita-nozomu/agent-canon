@@ -97,18 +97,12 @@ tools/bin/agent-canon graph build --root . --profile default --format json
 tools/bin/agent-canon graph status --root . --profile default --format json
 ```
 
-## Optional Run Bundle
+## Native Task Coordination
 
-When a workflow benefits from durable run artifacts, create an optional bundle
-using the existing entrypoint. Do not use it to decide whether ordinary work
-may begin.
-
-```bash
-python3 tools/runtime/lifecycle/bootstrap_agent_run.py \
-  --task "scoped repo change" \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
+Use Codex collaboration tools with the agreed checkout, scope, source context,
+expected result and validation route in messages. Keep progress in Git and the
+current conversation. Role configuration, experiment/proof artifacts, hook logs
+and Eval evidence retain their own owners.
 
 Explicit skill examples:
 
@@ -132,4 +126,4 @@ $paper-writing
 - 選択された reviewer の feedback は、その reviewer の担当と実際の evidence に基づいて扱います。
 - tracked repo change がある task では、required review、validation、commit、`origin` への push を経ずに完了扱いにしません。
 - tracked repo change で push が自然な完了条件なら、push の許可を取りに戻らず実行します。止めるのは user が明示的に止めた場合か external block がある場合だけです。
-- user-facing completion は、割り当てられた仕事の実結果と必要な validation evidence に基づいて報告します。記録された failure は隠さず、選択されていない check は成功扱いしません。native `agent-canon task-close` は既存 run が選択した場合の evidence 集約に使いますが、通常の task 開始や実行を認可する graph gate ではありません。
+- user-facing completion は、割り当てられた仕事の実結果と必要な validation evidence に基づいて報告します。記録された failure は隠さず、選択されていない check は成功扱いしません。

@@ -5,7 +5,7 @@
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent role inventory contract
 # upstream design ../../eval/definitions/README.md eval directory contract
 # upstream implementation ../../tools/agent/orchestration/team_config.py loads team and task routing metadata
-# upstream implementation ../../tools/agent/orchestration/implementation_dispatch.py owns role type selection
+# upstream implementation ../../agents/canonical/CODEX_SUBAGENTS.md owns role type selection
 # upstream implementation ../../tools/agent/orchestration/model_profile_registry.py owns canonical model/profile expectations
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py resolves accumulated eval archive paths
 # upstream implementation ../../tools/runtime/artifacts/runtime_artifacts.py owns external role-eval artifact writes

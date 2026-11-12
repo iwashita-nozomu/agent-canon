@@ -21,7 +21,6 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Atomic User Request Clauses（atomic request clause）
 
-<!-- user request を user_request_contract.md で追跡する clause ID に分割します。 -->
 
 ## Must-Not-Do Drift（禁止する drift）
 

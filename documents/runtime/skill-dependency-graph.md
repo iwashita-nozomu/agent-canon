@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the public skill/dependency graph; do not edit by hand. -->
 # Public Skill Dependency Graph
 
-<!-- graph_digest=0d5e010baabda2f2ea9d254b60844287b7f652d2432c8ca8a18b06edf5387afb -->
+<!-- graph_digest=876b95aecec3f9184d495491267ce09d973fc50bd28ecfab427316afe8a52e8b -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -335,7 +335,7 @@ graph LR
   %% source kind=time id=source:time:00068:0541cf4f78b7bf82 digest=b5174be1931d52d15c215e9faf34dec112bcf1cb20d7333fe0365a5dcb187e1e locator=agents/skills/skill-dependencies.yaml#invocation:integration ordinal=68
   %% source kind=identity id=source:identity:00069:15940f3e91b76905 digest=9b48bd15ec4641a716f6cd7c4521b2d96f6ddd0572e832f26e5e3cff6046ff3c locator=agents/skills/catalog.yaml#skill:repository-reading ordinal=69
   %% source kind=time id=source:time:00069:4dec3cb10a13c8a4 digest=27ea7495e19fb0725b13bdc34894473f2b64873936e0dc582727c73900fade04 locator=agents/skills/skill-dependencies.yaml#invocation:repository-reading ordinal=69
-  %% source kind=evidence id=source:evidence:00143:9e8a6ba4bc82628a digest=4daac7a148713a318aaa0ea8bc848cd0ca4047aff832c0c6569880d19f69c29f locator=agents/skills/catalog.yaml ordinal=143
+  %% source kind=evidence id=source:evidence:00143:b96912cc208bd4ab digest=16e4ceea96aebcdb0538baa825eea6d0704e81877eb2247312700ae956a3afe7 locator=agents/skills/catalog.yaml ordinal=143
   %% source kind=evidence id=source:evidence:00144:c1c7152410f36e25 digest=26fdc5d62b6a16c21498c9da24516184275dd12894adb506d838e84ea2dc703e locator=agents/skills/skill-dependencies.yaml ordinal=144
   %% source kind=evidence id=source:evidence:00145:314cea484b8f0b28 digest=97f33c60cecca7ed7dcf973a69d92d986d4c8c2dde43f283bbe9677a7d0c398a locator=agents/canonical/skills.md ordinal=145
   %% source kind=evidence id=source:evidence:00146:340b0ceb92be33e7 digest=891be9f83899d08bec499aa7da8a34752b53e000564249e82c2d2ae3063ecc68 locator=agents/skills/catalog.yaml#routing ordinal=146
@@ -1268,4 +1268,4 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Graph digest: `0d5e010baabda2f2ea9d254b60844287b7f652d2432c8ca8a18b06edf5387afb`.
+Graph digest: `876b95aecec3f9184d495491267ce09d973fc50bd28ecfab427316afe8a52e8b`.

@@ -12,7 +12,6 @@ downstream implementation ./experiments/_template/run.py runnable experiment sca
 downstream implementation ./experiments/_cpp_template C++-first experiment package source
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/template_bundle.rs produces the exact default-consumer seed
 downstream implementation ../tools/agent/templates/code_template_rendering.py renders AgentCanon-internal code templates
-downstream implementation ../tools/agent/orchestration/agent_team.py renders AgentCanon-internal agent templates
 downstream implementation ../tools/experiments/lifecycle/create_experiment_topic.py copies AgentCanon-internal experiment templates
 @dependency-end
 -->

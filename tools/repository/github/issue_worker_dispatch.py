@@ -6,7 +6,6 @@
 # upstream implementation ../../runtime/authority/checkout_identity.py supplies repository identity
 # upstream implementation ../../agent/orchestration/model_profile_registry.py materializes publisher prompts
 # upstream implementation ../../agent/orchestration/tool_calls.py materializes the IssueWorker ToolCall
-# downstream implementation ../../agent/orchestration/agent_team.py exposes the orchestration facade
 # downstream implementation ../../../tests/agent_tools/test_issue_worker_dispatch.py verifies route materialization
 # @dependency-end
 """Orchestrate explicit IssueWorker candidates without giving GitHub to runtime."""
@@ -193,14 +192,17 @@ def dispatch_issue_worker(
     identity = resolve_checkout_identity(workspace)
     handoff = qualify_issue_worker_finding(
         candidate,
-        authenticated_repository=identity.remote if identity.remote != "unknown" else "",
+        authenticated_repository=identity.remote
+        if identity.remote != "unknown"
+        else "",
     )
     if handoff.status == "no-action":
         return IssueWorkerDispatch("no-action", handoff, identity)
     if (
         not identity.remote
         or identity.remote == "unknown"
-        or normalize_repository(handoff.repository) != normalize_repository(identity.remote)
+        or normalize_repository(handoff.repository)
+        != normalize_repository(identity.remote)
         or not handoff.can_route
     ):
         return IssueWorkerDispatch("deferred", handoff, identity)
@@ -233,7 +235,11 @@ def dispatch_issue_worker(
     else:
         target_root = str(Path(target_root).expanduser().resolve())
     publication_mode = "publish" if not missing_route else "investigate_only"
-    publication_reason = "" if not missing_route else "receipt_route_unavailable:" + ",".join(missing_route)
+    publication_reason = (
+        ""
+        if not missing_route
+        else "receipt_route_unavailable:" + ",".join(missing_route)
+    )
     command_agentcanon_source_root = str(canonical_source_root)
     command_runtime_root = str(runtime_value)
     command_control_parent = str(control_parent_value)

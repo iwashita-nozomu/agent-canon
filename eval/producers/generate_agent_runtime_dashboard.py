@@ -1451,7 +1451,6 @@ class RuntimeDashboardVisuals:
 
     def markdown_docs_row(self) -> str:
         """Return the Markdown/docs signal action-map row."""
-        breakdown = self.summary.markdown_docs_breakdown
         evidence_count = markdown_hook_signal_count(self.summary)
         return action_map_row(
             "Markdown/docs hook signals",
@@ -3357,7 +3356,7 @@ def workflow_attribution_next_action(
             action="repair workflow attribution logging",
             reason=f"{breakdown.entries_without_workflow} hook entries lack workflow attribution",
             evidence=WORKFLOW_ATTRIBUTION_EVIDENCE_TARGET,
-            owner_surface="tools/runtime/archive/behavior_event_assembly.py and workflow_monitoring.md",
+            owner_surface="tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs and workflow_monitoring.md",
             command=DASHBOARD_TOOL_ROUTE,
             done_condition="AGENT_RUNTIME_DASHBOARD_HOOK_WORKFLOW_MISSING=0 or entries are explicitly exempt",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),
@@ -3395,7 +3394,6 @@ def markdown_docs_next_action(
     summary: RuntimeDashboardSummary,
 ) -> tuple[DashboardNextAction, ...]:
     """Return the next action for Markdown/docs checker signals."""
-    breakdown = summary.markdown_docs_breakdown
     if markdown_hook_signal_count(summary) > 0:
         return ()
     return (
@@ -3430,7 +3428,7 @@ def prompt_tool_next_action(
             action="repair prompt and tool selection evidence",
             reason="prompt excerpts or tool selection entries are missing",
             evidence=PROMPT_TOOL_EVIDENCE_TARGET,
-            owner_surface="tools/runtime/archive/behavior_event_assembly.py",
+            owner_surface="tools/runtime/dispatch/agent-canon/src/behavior_event_assembly.rs",
             command=DASHBOARD_TOOL_ROUTE,
             done_condition="prompt_entries>0, tool_selection_entries>0, prompt_missing_excerpt_entries=0",
             issue=issue_label_by_slug(summary, "eval-accumulation-gaps"),

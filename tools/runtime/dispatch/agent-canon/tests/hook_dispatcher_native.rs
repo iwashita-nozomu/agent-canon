@@ -256,7 +256,12 @@ fn assert_case_result(result: HookCliResult, case: &JsonValue, name: &str) {
         "contract" | "contract-stop"
     ) {
         // Keep the frozen current-event oracle; retired migration metadata was removed.
-        let expected = parse_json(&String::from_utf8(expected_stdout).unwrap()).unwrap();
+        let expected_text = String::from_utf8(expected_stdout)
+            .unwrap()
+            .replace("raw_git_merge_or_rebase=block; ", "")
+            .replace("writer_target_packet_missing=block; ", "")
+            .replace("writer_target_mismatch=block; ", "");
+        let expected = parse_json(&expected_text).unwrap();
         let JsonValue::Object(mut fields) = expected else {
             panic!("contract oracle must be an object");
         };
@@ -392,130 +397,6 @@ fn native_hook_cli_matches_frozen_cpython_cases() {
 }
 
 #[test]
-fn report_selection_preserves_precedence_and_pointer_containment() {
-    for kind in [
-        "explicit",
-        "pointer",
-        "local-pointer",
-        "container-target",
-        "missing",
-        "parent-escape",
-        "absolute-escape",
-        "target-symlink",
-        "report-root-symlink",
-    ] {
-        let temp = TempDir::new();
-        git_repo(temp.path());
-        let source = temp.path().join("source");
-        let results = temp.path().join("results");
-        let report_root = source.join("reports/agents");
-        let target = report_root.join("selected-run");
-        let outside = temp.path().join("outside");
-        fs::create_dir_all(&target).expect("create existing run target");
-        fs::create_dir_all(&results).expect("create event results directory");
-        fs::create_dir_all(&outside).expect("create outside directory");
-        let mut values = environment(&source, &results);
-        values.insert(
-            "AGENT_CANON_PARENT_ROOT".to_owned(),
-            temp.path().display().to_string(),
-        );
-        values.insert(
-            "AGENT_CANON_RUNTIME_ROOT".to_owned(),
-            temp.path().display().to_string(),
-        );
-        let mut selected = None;
-        match kind {
-            "explicit" => {
-                fs::write(report_root.join(".active_run"), "selected-run\n").unwrap();
-                values.insert(
-                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR".to_owned(),
-                    outside.display().to_string(),
-                );
-                selected = Some(outside.clone());
-            }
-            "pointer" | "container-target" => {
-                fs::write(report_root.join(".active_run"), "selected-run\n").unwrap();
-                selected = Some(target.clone());
-                if kind == "container-target" {
-                    values.remove("AGENT_CANON_HOOK_SOURCE_ROOT");
-                    values.insert(
-                        "AGENT_CANON_TARGET_CONTAINER_ROOT".to_owned(),
-                        source.display().to_string(),
-                    );
-                }
-            }
-            "local-pointer" => {
-                fs::write(source.join(".active_run"), "reports/agents/selected-run\n").unwrap();
-                selected = Some(target.clone());
-            }
-            "missing" => fs::write(report_root.join(".active_run"), "missing-run\n").unwrap(),
-            "parent-escape" => fs::write(report_root.join(".active_run"), "../escape\n").unwrap(),
-            "absolute-escape" => fs::write(
-                report_root.join(".active_run"),
-                outside.display().to_string(),
-            )
-            .unwrap(),
-            "target-symlink" => {
-                std::os::unix::fs::symlink(&outside, report_root.join("escape")).unwrap();
-                fs::write(report_root.join(".active_run"), "escape\n").unwrap();
-            }
-            "report-root-symlink" => {
-                fs::remove_dir(&target).unwrap();
-                fs::remove_dir(&report_root).unwrap();
-                std::os::unix::fs::symlink(&outside, &report_root).unwrap();
-                fs::create_dir(outside.join("selected-run")).unwrap();
-                fs::write(outside.join(".active_run"), "selected-run\n").unwrap();
-            }
-            _ => unreachable!(),
-        }
-        let result = run_with_input(
-            &["UserPromptSubmit".to_owned()],
-            br#"{"prompt":"use $task-routing"}"#,
-            &values,
-            &source,
-        );
-        assert_eq!(
-            result.exit_code,
-            0,
-            "{kind}: {}",
-            String::from_utf8_lossy(&result.stderr)
-        );
-        assert!(result.stdout.is_empty(), "{kind}: no prompt output");
-        let events = event_values(&results);
-        assert_eq!(events.len(), 1, "{kind}: one event");
-        assert_eq!(
-            text(field(&events[0], "root").unwrap()),
-            source.display().to_string(),
-            "{kind}: event uses selected repository root"
-        );
-        let expected = selected
-            .as_ref()
-            .map(|path| path.display().to_string())
-            .unwrap_or_default();
-        assert_eq!(
-            text(field(&events[0], "workflow_monitor_report_dir").unwrap()),
-            expected,
-            "{kind}: report selection"
-        );
-        if let Some(selected) = selected {
-            assert!(
-                selected.join("workflow_monitoring.md").is_file(),
-                "{kind}: selected report is written"
-            );
-        } else {
-            assert!(
-                !target.join("workflow_monitoring.md").exists(),
-                "{kind}: target report absent"
-            );
-            assert!(
-                !outside.join("workflow_monitoring.md").exists(),
-                "{kind}: outside report absent"
-            );
-        }
-    }
-}
-
-#[test]
 fn report_and_spool_keep_private_arguments_out_and_fail_open() {
     for marker in [
         "private-command-value".to_owned(),
@@ -578,15 +459,14 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
             assert!(field(event, "tool_response").is_none());
             let bytes = canonical_json_ascii_bytes(event).unwrap();
             let event_text = String::from_utf8(bytes).unwrap();
-            let report_text = if failure == "none" {
-                fs::read_to_string(&monitor).expect("successful append writes report")
-            } else {
+            if failure == "none" {
                 assert!(
-                    monitor.is_dir(),
-                    "failed report preserves existing directory"
+                    !monitor.exists(),
+                    "hooks do not create retired progress reports"
                 );
-                String::new()
-            };
+            } else {
+                assert!(monitor.is_dir(), "existing report path is untouched");
+            }
             for private in [
                 marker.as_str(),
                 "private-stdout",
@@ -597,40 +477,6 @@ fn report_and_spool_keep_private_arguments_out_and_fail_open() {
                     !event_text.contains(private),
                     "{failure}: private event value"
                 );
-                assert!(
-                    !report_text.contains(private),
-                    "{failure}: private report value"
-                );
-            }
-            if failure == "none" {
-                assert_eq!(report_text.matches("behavior_event_json=").count(), 1);
-                let line = report_text
-                    .lines()
-                    .find_map(|line| {
-                        line.split_once("behavior_event_json=")
-                            .map(|(_, json)| json)
-                    })
-                    .expect("one behavior projection");
-                let projected = parse_json(line).unwrap();
-                let JsonValue::Object(fields) = &projected else {
-                    panic!("projected event is an object");
-                };
-                assert_eq!(text(field(&projected, "hook_log_namespace").unwrap()), "");
-                assert_eq!(text(field(event, "hook_log_namespace").unwrap()), "fixture");
-                for (name, expected) in &fields.0 {
-                    let name = name.to_text().unwrap();
-                    if name == "hook_log_namespace" {
-                        continue;
-                    }
-                    assert_eq!(
-                        canonical_json_ascii_bytes(
-                            field(event, &name).expect("projection field belongs to spooled event")
-                        )
-                        .unwrap(),
-                        canonical_json_ascii_bytes(expected).unwrap(),
-                        "monitor and spool agree on {name}"
-                    );
-                }
             }
         }
     }

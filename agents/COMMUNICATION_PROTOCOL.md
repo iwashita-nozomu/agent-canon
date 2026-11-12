@@ -10,7 +10,6 @@ downstream design skills/codex-task-workflow.md consumes pre-edit investigation 
 downstream design skills/subagent-bootstrap.md consumes fresh subagent context capsules
 downstream design TASK_WORKFLOWS.md routes active design packet ownership
 downstream design skills/codex-task-workflow.md consumes the active design packet contract
-downstream implementation ../tools/agent/orchestration/agent_team.py normalizes and materializes active design packets
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/waterfall_gate.rs validates persisted active design packets
 downstream implementation ../tools/runtime/dispatch/agent-canon/src/tool_rejection_preflight.rs predicts edit-time tool rejection gates
 @dependency-end
@@ -84,71 +83,20 @@ consumer が commit して読みます。source checkout、runtime projection、
 submodule、singular `AGENT.md` を通信経路に追加せず、nested directory の [AGENTS.md](../AGENTS.md) は
 この root composition の対象外です。
 
-## Runtime Collaboration Capability Handshake
+## Native Collaboration
 
-This section is the sole owner of the runtime collaboration capability and
-coordination receipt contract. Generated manifests and hook events reference
-this contract; they do not redefine its schema or infer platform capability.
-
-The capability source is the direct runtime collaboration namespace exposed to
-the current agent. `functions.exec` and its `ALL_TOOLS` inventory are never
-capability evidence. A handshake has the following closed fields:
-
-- `schema`: `agent-canon.communication-capability-handshake.v1`
-- `status`: exactly `available`, `unavailable`, or `unverified`
-- `effective_operations`: operations explicitly returned by the direct runtime
-  readback, not merely names recognized by a matcher
-- `evidence_ref`: a durable artifact or runtime readback reference; it is
-  required for `available` and must not be fabricated when the runtime cannot
-  expose it
-- `source`: exactly `direct_runtime_collaboration_namespace`
-
-The effective transport is derived from the handshake:
-
-| status | allowed coordination mode | meaning |
-| --- | --- | --- |
-| `available` | `direct_peer` | the named operation was read back from the direct namespace |
-| `unavailable` | `parent_relay` or `durable_artifact` | the parent or an artifact carries the message; no peer claim |
-| `unverified` | `parent_relay` or `durable_artifact` | capability was not observed and remains unknown |
-
-An operation matcher is observation only. Seeing `send_message`,
-`followup_task`, `list_agents`, or `interrupt_agent` in an event does not change
-`unavailable` or `unverified` into `available`.
-
-### Coordination Receipt
-
-Every coordination attempt emits one coordination receipt through the existing
-`HookLogContext.append` base-event route. It is stored under the
-`coordination_receipt` member of that transport event; it is not added to the
-fixed `agent-canon.behavior-event.v1` snapshot field set. Its closed fields are:
-
-- `schema`: `agent-canon.coordination-receipt.v1`
-- `operation`: the observed operation
-- `capability_status`: the handshake status used for the decision
-- `effective_operations`: operations actually read back from the direct runtime
-  namespace; the hook route uses an empty list when no readback is available
-- `evidence_ref`: the handshake evidence or an explicit artifact reference
-- `transport`: `direct_peer`, `parent_relay`, or `durable_artifact`
-- `direct_peer`: a boolean consistency readback for the transport
-- `status`: `succeeded`, `failed`, or `invalid_tool_result`, derived from the
-  real tool response
-
-`transport=direct_peer` is valid only with `capability_status=available` and
-an evidence reference that names the operation. The hook dispatcher cannot
-observe the parent handoff capability, so its receipt is always
-`capability_status=unverified`, `effective_operations=[]`,
-`transport=durable_artifact`, and `direct_peer=false`. A parent relay is always
-recorded as `parent_relay`; it must never be rewritten as direct peer
-communication. If the runtime cannot return the direct namespace, use
-`durable_artifact` and preserve the honest `unverified` or `unavailable` status.
+Use the collaboration tools exposed by the current runtime. Send the selected
+operation first with the current target, scope and context. An actual result
+establishes launch or completion; an inventory or role name does not. Repair an
+observed failure at its owner and continue independent authorized work. Do not
+create a capability manifest, run directory or identity receipt.
 
 ## 主要な通信面
 
-1. `reports/agents/<run-id>/` の role artifact
-1. `decision_log.md`
-1. `team_manifest.yaml`
-
-run 固有のやり取りは report bundle に残し、repo-wide の正本には持ち込みません。
+Use native ToolCalls and messages for task coordination. Git owns the checkout
+and diff. Project-owned experiment, proof, manuscript and figure artifacts keep
+their existing paths and formats. Hook logs and Eval results keep their evidence
+owners. Task manifests and progress files are not produced.
 
 ## Context Visibility Contract
 
@@ -279,100 +227,21 @@ path, for example
 
 ## Handoff Packet
 
-### Parent Orchestration-Only Contract
+### Native Execution Authority
 
-For repository-changing work, the selected task route determines who owns
-investigation, implementation, validation, review, integration, and publication.
-The parent coordinates and returns external readback; it may also perform work
-when selected as that work's owner. It does not replace a distinct unit already
-assigned to a child.
-
-A child is used when the selected task route needs delegation; repository edits
-do not require a child by default. When a child is used, distinguish its actual
-launch result from its completion result and preserve failures honestly.
-Decision-owning reviewers or ship reviewers judge findings; verifiers,
-integration executors, publishers, and evaluation reviewers retain their
-selected responsibilities.
-
-Read-only conversational answers remain outside this repository-changing
-route and do not create a write handoff.
-
-Implementation handoffs keep the selected owner's scope, mechanism, validation,
-and unresolved decisions clear. Use actual native tool results and errors as
-evidence; a launch or plan alone does not establish completion. The parent
-coordinates handoff and readback, while the selected owner remains responsible
-for its source changes and findings.
-
-- `from`
-- `to`
-- `stage`
-- `request_clause_ids`
-- `summary`
-- `requested_action`
-- `pre_edit_repository_investigation`
-- `fresh_subagent_context_capsule`
-- `pre_handoff_gate_status`
-- `artifacts`
-- `repo_changes`
-- `design_issue_blocker`
-- `open_questions`
-- `status`
-
-`pre_handoff_gate_status` is conditional: include it only when the selected
-route has an active pre-handoff gate. Design-backed implementation handoffs
-require the current `design_brief.md` path or revision and the selected
-owner/design gate.
-`design_review.md` `Design Artifact Under Review`, normalized decision evidence
-from the [review dispatcher](../tools/agent/orchestration/review_dispatch.py),
-`tools/bin/agent-canon waterfall-gate-check --report-dir <report-dir> --gate design`
-evidence, and selected
-`document_flow_review.md` status are required only when those gates are active.
-Missing candidate review artifacts do not block an otherwise semantically
-sufficient handoff; an active gate with missing, stale, or non-approval evidence
-returns the task to its owning route.
+The user agreement and selected native route define authority. The parent may
+perform authorized bounded edits and may delegate independent work. Send each
+child its actual checkout and allowed scope; preserve reviewer read-only roles.
+No agent identity, spawn receipt or writer packet is an editing permission gate.
+Preserve filesystem containment, unknown state and actual Git identity.
 
 ## Active Design Packet Schema
 
-This document owns the artifact-level schema named
-`waterfall.design_packet.v1`. The record is closed and contains the five
-runtime selection fields plus one clause registry and four typed graph entries:
-
-- `schema`
-- `design_artifact`
-- `design_review_artifact`
-- `document_flow_review_artifact`
-- `document_flow_required`
-- `clause_registry`
-- `abstract_design_frame`
-- `implementation_source_packet`
-- `design_side_effect_map`
-- `design_to_implementation_trace`
-
-`schema` must equal `waterfall.design_packet.v1`. The three artifact fields are
-non-empty relative paths that remain inside one run bundle and do not traverse
-symlinks. `document_flow_required` is a boolean. Missing, unknown, mistyped, or
-outside-bundle fields fail closed with the input boundary's typed field prefix.
-
-Each graph entry is closed to `entry_id`, `responsibility_id`, `clause_refs`,
-`owner_refs`, `source_refs`, `dependency_refs`, `output_refs`, and
-`reviewer_refs`; entry dependencies are validated as a fixed acyclic order.
-`agents/agents_config.json#artifacts.active_design_packet` owns the standard
-record. `agent_team.py` owns the executable schema constants, normalization,
-precedence, graph materialization, and source-byte identity used by task-start
-and bootstrap. An explicit
-`--active-design-packet` record overrides a workflow-family record, which
-overrides the standard registry record. The selected record is persisted at
-`team_manifest.yaml#run.active_design_packet`; after publication, that manifest
-record is the only gate input. Producers, shared normalizers, materializers,
-runtime checkers, and the waterfall gate must consume this same closed field
-set and schema name.
-
-The `implementation_source_packet` and `design_to_implementation_trace` entries
-must include the logical `artifact:semantic_responsibility_contract.toml`
-source reference when the task has semantic deltas. The reference points into
-the current run bundle; the contract checker validates the instance identity
-and references without turning the active packet into a second responsibility
-schema.
+Keep selected design documents and review evidence at their project owner paths.
+A handoff carries the needed clauses, assumptions, interfaces, side effects and
+verification references. Mathematical intent, experimental inputs and proof
+artifacts retain their domain contracts. No team manifest, task packet file or
+custom gate is required to make those references authoritative.
 
 ## Pre-Edit Repository Investigation
 
@@ -507,12 +376,9 @@ the owner's contract or prove that those checks ran.
 
 ## Review Decision Boundary
 
-Review decision normalization is owned solely by
-[`canonicalize_review_decision`](../tools/agent/orchestration/review_dispatch.py).
-The dispatcher owns the canonical review-decision vocabulary and its aliases;
-workflow and reader surfaces consume the normalized result instead of defining
-another token set. Generic handback and lifecycle statuses remain separate
-facts and are not review decisions.
+The selected reviewer reports its decision and findings through native handoff.
+Resolve accepted findings against the current contract and diff. Lifecycle status
+and a successful tool call do not establish a review decision.
 
 ## Review Packet
 

@@ -22,7 +22,7 @@ upstream design README.md notes lifecycle index
 - 会話だけを根拠に実装、設計変更、文書改訂へ進める
 - 承認済み design packet があるのに、文書を読まず会話文脈、記憶、推測で実装する
 - `Implementation Source Packet` や `Design-To-Implementation Trace` がないまま worker が編集を始める
-- design artifact path、design section、test plan item、request clause ID を引用できない実装 slice を進める
+- design artifact path、design section、または test plan item を根拠で結べない実装 slice を進める
 - design packet と repo docs / code の矛盾を worker がその場で解釈して実装する
 - `documents/`、`documents/notes/`、`references/` の context sweep をせずに着手する
 - dependency surface、導入済みライブラリ、既存実装候補を見ずに、新規 helper や新規 module を足す
@@ -31,18 +31,14 @@ upstream design README.md notes lifecycle index
 - compatibility-preservation drift として、旧入口、旧名、旧 wrapper、旧 config route を残して caller migration を先送りする
 - duplicate implementation として、同じ責務、同じ normalized body、同じ tool behavior、同じ DSL / contract を別 path に再実装する
 - canonical owner を確認せず、互換 helper、mirror、wrapper、alternate route を足す
-- contract-complete implementation として request clause、acceptance contract、Implementation Source Packet、validation route を結ばず、implementation shortcut を `design_issue_blocker` に戻さない
+- approved design と current request の矛盾を local fallback、wrapper、helper、分岐、互換 route、test 緩和で吸収し、design owner への escalation を省く
 - `git status --short --branch`、`git remote -v`、alternate route の `git config --get-regexp '^remote\\..*\\.url$'` / `.git/config` を確認せず、PR 文脈や template 名から push 先 repository を推定する
-- 過去ログ由来の user trait を、今回 request、repo/code precedent、domain/external constraint、unknown/open question と分けずに task requirement へ混ぜる
+- 過去ログ由来の user trait や task requirement を、今回の user request や現在の repository facts と混同する
 - notes、guardrails、documents、prior logs、local code / tests で解決できる曖昧さを調べずにユーザーへ戻す
 - unknown や open question を silent assumption に変換して要件を埋める
-- active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残す
 - 欠落 file / path を見つけたときに、parent root、qualified AgentCanon source clone、明示 runtime root を確認せず、すぐ再作成、削除済み判定、repo-local 例外扱いにする
 - Spark を要件定義、詳細設計、重要レビュー、最終判断に使う
 - chunk、slice、checkpoint、subpass の完了を user request 全体の完了として報告する
-- remaining planned work units や active clause が残っているのに closeout を unlock する
-- 最初の update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言しない
-- repo-changing task で run bundle と explicit stage activation を省略する
 - `plan_reviewer`、`detailed_design_reviewer`、`document_flow_reviewer` を同じ instance で兼務する
 - 学術文章で `notation_definition_reviewer` や `logic_gap_reviewer` を立てずに author 自己判断だけで閉じる
 - review feedback を反映せずに次段へ handoff する
@@ -63,12 +59,10 @@ upstream design README.md notes lifecycle index
 - protocol にない ad hoc output path、手作業 rename、partial-run resume protocol を増やす
 - user request が generic path の usable smoke を求めているのに、specialized path の tuning だけで完了扱いにする
 - scope で禁止された runner 変更、function fusion、別経路追加を、性能改善のために横滑りで入れる
-- user request clause にない実装 slice を「ついで」として入れる
+- current user request にない実装 slice を「ついで」として入れる
 - 詳細設計または明白な局所 precedent にない variable、function、class、file、CLI flag、config key、public API identifier を worker が自由裁量で作る
-- `task_authority.yaml` `allowed_paths`、`team_manifest.yaml` write scope、review gate を固定せずに編集範囲を広げる
 - stale または別 branch / 別 path の `WORKTREE_SCOPE.md` を現在の worktree に流用する
-- parent-assigned `allowed_paths`、`team_manifest.yaml` write scope、approved `Implementation Source Packet` 外を編集する
-- scope 更新、編集開始、テスト実行、実験開始 / 停止、carry-over 判断を run-local `work_log.md` に残さず進める
+- current task の明示された scope や approved design owner の範囲外へ編集を広げる
 - raw 結果だけ残して、読み方や判断を note / report に落とさない
 - JAX の任意 callable を current native runtime が直接理解できるものとして扱う
 - generic callable path、specialized coeff path、export-based generic path を 1 つの実装 slice で混同する

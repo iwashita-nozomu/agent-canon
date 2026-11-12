@@ -98,15 +98,13 @@ receipt、workflow をこの note から直接追加しません。current requi
 
 ## Repo Use
 
-- Before coding: run the required startup checks, fill `user_request_contract.md`, read the material canonical engineering clauses, and search local docs/code for reuse candidates.
+- Before coding: inspect the agreed task, relevant source and existing reuse candidates.
 - During coding: keep implementation tied to clause IDs and avoid mixing unrelated refactors, protocol changes, runtime flags, or performance experiments into the same change unless the contract requires it.
 - During review: require review artifacts to state spec-to-product gaps and unapplied findings; the implementation is not complete while such gaps remain.
-- During closeout: `closeout_gate.md` must have `completion_coverage_consumer: yes`, `coverage_check.ok: true`, and an empty `completion_boundary.topology_errors`; `task_close.py` should be the mechanical final gate.
+- During closeout: compare the final diff and selected validation with the agreed outcome, then read back authorized delivery.
 
 ## Practical Commands Or Paths
 
-- `python3 tools/runtime/lifecycle/bootstrap_agent_run.py --task "<task>" --task-id T1 --owner codex --workspace-root "$PWD"`
-- `python3 tools/runtime/lifecycle/task_close.py --report-dir <reports/agents/run-id>`
 - [documents/conventions/software-engineering-principles.md](../../conventions/software-engineering-principles.md)
 - `documents/notes/knowledge/`
 - `reports/agents/<run-id>/user_request_contract.md`

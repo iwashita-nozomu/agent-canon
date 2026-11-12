@@ -69,38 +69,20 @@ permission gates.
 A bounded route's selected execution owner performs its edit and verification
 without a child handoff. When the selected route requires full staging, read
 [Coordination design packet](#coordination-design-packet) before that handoff.
-Only an activated design-correspondence route reads
-[DIC](../internal-routines/design-implementation-correspondence.md) and carries
-its clause/fingerprint/closure evidence. Neither a document link nor the presence
-of a design file activates DIC, full staging, or a separate reviewer.
+When a selected design needs comparison with the diff, use
+[design-to-diff review](../internal-routines/design-implementation-correspondence.md).
 
 ## Coordination design packet
 
-Use this section only for design artifacts explicitly supplied or requested by
-the user. Ordinary migration does not create coordination records, clause maps,
-or fingerprint files. For that selected artifact route, its
-`team_manifest.yaml#run.active_design_packet` is the persisted artifact authority,
-with schema `waterfall.design_packet.v1`. Preserve the selected design artifact,
-technical review, document-flow review paths, and `document_flow_required` flag.
-Selection precedence is explicit `--active-design-packet`, workflow-specific
-record, then the standard `agents_config` artifact registry. Consumers read the
-persisted selection rather than deriving new paths.
+Read the selected design for the requested behavior, assumptions, interfaces,
+side effects, and verification. Carry the necessary references in the native
+handoff. Mathematical obligations, proof and experiment artifacts keep their
+domain owners. Use existing project paths; no task manifest, fingerprint file,
+or custom runtime gate is required.
 
-Before the implementation handoff, read the selected Abstract Design Frame,
-Implementation Source Packet, Design Side-Effect Map, and Design-To-Implementation
-Trace. The packet references the populated run-local
-`artifact:semantic_responsibility_contract.toml`, which allocates semantic deltas,
-implementation actions, obligations, primary verification owners, supporting
-properties/roles, and hard-edge closure. Keep one instance shared with review.
-Missing/unknown/invalid fields, schemas, or outside-bundle paths return a typed
-blocker to the packet owner.
-
-Activate a separate detailed-design or document-flow review only for a
-distinct unresolved claim/risk the current owning gate cannot decide. Activated reviews must reference the same
-manifest-declared design and provide their normalized decisions; required
-`document_flow_required` approval remains necessary. Gate transitions use the
-existing waterfall gate owner and current review evidence. Changed design
-invalidates the affected review, not every unrelated gate.
+Activate a separate detailed-design or document-flow review only for a distinct
+unresolved judgment. Preserve accepted findings and recheck the affected evidence
+when the design changes.
 
 ## Edit Execution Surface
 

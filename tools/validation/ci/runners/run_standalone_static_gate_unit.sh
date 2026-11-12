@@ -301,7 +301,6 @@ PY
   fi
   if [[ "${primary_status}" -eq 0 ]]; then
     PYTHONPATH="${ROOT}${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 "${ROOT}/eval/checkers/smoke_test_research_perspective_pack.py"
     primary_status=$?
   fi
   set -e

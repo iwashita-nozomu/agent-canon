@@ -22,12 +22,10 @@ import argparse
 import ast
 import importlib.util
 import json
-import os
 import re
 import subprocess
 import sys
 import tempfile
-import time
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -108,9 +106,6 @@ DEFAULT_MAX_BASE_CLASSES = 2
 DEFAULT_MAX_MODULE_HELPERS = 8
 GIT_BASELINE_TIMEOUT_SECONDS = 20
 UNKNOWN_SEVERITY_FINDING_RANK = 9
-MILLISECONDS_PER_SECOND = 1000
-WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
-WORKFLOW_MONITOR_TIMEOUT_SECONDS = 5
 TOP_FILES_SUMMARY_LIMIT = 20
 CPP_CONSTRUCTOR_PREFIX_LOOKBACK_CHARS = 16
 CPP_ABI_MARKER_LOOKBACK_LINES = 4
@@ -4062,7 +4057,6 @@ def write_review_prompt(path: Path, report_path: str) -> None:
 
 def main(argv: Sequence[str] | None = None, *, default_language: str = "all") -> int:
     """Run the analyzer."""
-    started_at = time.perf_counter()
     parser = build_parser(default_language=default_language)
     args = parser.parse_args(argv)
     root = Path(args.root).resolve()
@@ -4071,47 +4065,7 @@ def main(argv: Sequence[str] | None = None, *, default_language: str = "all") ->
     if args.review_prompt_out:
         write_review_prompt(Path(args.review_prompt_out), "")
     status = str(run.summary["status"])
-    append_workflow_monitor_timing(root, args, status, started_at)
     return 0 if status in {STATUS_PASS, STATUS_REVIEW} else 1
-
-
-def append_workflow_monitor_timing(
-    root: Path,
-    args: argparse.Namespace,
-    status: str,
-    started_at: float,
-) -> None:
-    """Append OOP checker timing to workflow monitoring when a run bundle is active."""
-    report_dir = os.environ.get(WORKFLOW_MONITOR_REPORT_DIR_ENV, "").strip()
-    monitor = root / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-    if not report_dir or not monitor.is_file():
-        return
-    duration_ms = int((time.perf_counter() - started_at) * MILLISECONDS_PER_SECOND)
-    scope = ",".join(str(path) for path in args.paths) if args.paths else "."
-    output_path = str(args.review_prompt_out) if args.review_prompt_out else "stdout"
-    event = (
-        "tool_call=oop-readability-check "
-        f"command={Path(sys.argv[0]).as_posix()} "
-        f"duration_ms={duration_ms} "
-        f"status={status} "
-        f"scope={scope} "
-        f"output_path={output_path}"
-    )
-    subprocess.run(
-        [
-            sys.executable,
-            str(monitor),
-            "--report-dir",
-            report_dir,
-            "--behavior-event",
-            event,
-        ],
-        cwd=root,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=WORKFLOW_MONITOR_TIMEOUT_SECONDS,
-    )
 
 
 def build_thresholds(args: argparse.Namespace) -> Thresholds:

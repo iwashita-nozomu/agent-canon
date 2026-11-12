@@ -3,6 +3,7 @@
 contract reference
 responsibility Documents route tool usage.
 upstream implementation ../../tools/agent/orchestration/route.py selects short tool and skill routes
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs owns explicit capability selection
 upstream design ../../agents/skills/code-visualization.md owns visualization selection and native renderer delegation
 upstream design ../design/tool-skill-routing-refactor.md defines short naming policy
 upstream design ../../agents/skills/structure-refactor.md defines repo-refactor and personal runtime routing boundary
@@ -16,6 +17,9 @@ downstream implementation ../../tests/agent_tools/test_route.py validates route 
 would otherwise become many long one-off tools. It maps long proposal names
 such as `profile_surface_resolver.py` or `$runtime-capability-routing` to one
 small command surface:
+
+Explicit `--capability` selection delegates preflight and decision-making to
+the native `agent-canon capability-route` command.
 
 ```bash
 python3 tools/agent/orchestration/route.py --area checks --changed README.md
@@ -76,9 +80,7 @@ existing coordinated route. Missing facts are unresolved, not implicit consent
 to either execution route. Risk and changed-file counts do not select this path.
 
 For a bounded task, output identifies the selected route and next action, with
-no shell closeout command or inactive gate records. Coordinated output instead
-includes the existing `tools/bin/agent-canon task-close --run-id <run-id>` command and its
-catalog-defined next action. Both routes project `execution_route`, `next_action`,
+no shell closeout command or inactive gate records. Coordinated output identifies native collaboration as its next action. Both routes project `execution_route`, `next_action`,
 `commands`, `selected_validation`, and `verification_status` from the current
 route policy and established context. The current catalog's route policy is
 sufficient; the router neither requires nor returns a separate

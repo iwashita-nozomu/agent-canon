@@ -1,41 +1,34 @@
 // @dependency-start
 // contract test
-// responsibility Verifies native work-log ledger, idempotency, snapshot, and boundary behavior.
-// upstream implementation ../src/work_log.rs owns run-local logs and semantic events.
-// upstream implementation ../src/python_json.rs owns Python-compatible event parsing and canonical bytes.
+// responsibility Preserves read-only work-log ledger snapshot, validation, ordering, and digest behavior.
+// upstream implementation ../src/work_log.rs owns read-only ledger snapshots and canonical digest values
+// upstream implementation ../src/python_json.rs owns Python-compatible event parsing and canonical bytes
 // @dependency-end
 
-use agent_canon::python_json::{JsonArray, JsonNumber, JsonObject, JsonString, JsonValue};
-use agent_canon::work_log::{
-    append_ledger_event, append_work_entry, ledger_snapshot_digest, read_ledger_snapshot,
+use agent_canon::python_json::{
+    canonical_json_ascii_bytes, JsonArray, JsonNumber, JsonObject, JsonString, JsonValue,
 };
+use agent_canon::work_log::{ledger_snapshot_digest, read_ledger_snapshot};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use tempfile::TempDir;
 
-static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
-
-struct RuntimeRoot(PathBuf);
+struct RuntimeRoot(TempDir);
 
 impl RuntimeRoot {
     fn new() -> Self {
-        let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "agent-canon-native-work-log-{}-{sequence}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&path).expect("external runtime fixture is created");
-        Self(fs::canonicalize(path).expect("runtime fixture has a physical path"))
+        let root = fs::canonicalize(std::env::temp_dir())
+            .expect("runtime fixture parent resolves platform aliases");
+        Self(tempfile::tempdir_in(root).expect("external runtime fixture creates"))
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path()
     }
 
     fn report_dir(&self, run_id: &str) -> PathBuf {
-        self.0.join("reports/agents").join(run_id)
-    }
-}
-
-impl Drop for RuntimeRoot {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        self.path().join("reports/agents").join(run_id)
     }
 }
 
@@ -73,17 +66,8 @@ fn event(
     sequence: &str,
     outcome: &str,
     score: JsonNumber,
-    reverse_keys: bool,
 ) -> JsonValue {
-    let gate = object([
-        ("score", JsonValue::Number(score)),
-        ("measured", string("observed")),
-    ]);
-    let source_binding = object([
-        ("run_id", string(run_id)),
-        ("context_id", string("context-1")),
-    ]);
-    let fields = vec![
+    object([
         ("run_id", string(run_id)),
         ("context_id", string("context-1")),
         ("event_id", string(event_id)),
@@ -98,14 +82,33 @@ fn event(
         ("outcome", string(outcome)),
         ("evidence_refs", array([string("evidence:one")])),
         ("artifact_refs", array([string("artifact:one")])),
-        ("source_binding", source_binding),
-        ("gate_evidence", gate),
-    ];
-    if reverse_keys {
-        object(fields.into_iter().rev())
-    } else {
-        object(fields)
+        (
+            "source_binding",
+            object([
+                ("run_id", string(run_id)),
+                ("context_id", string("context-1")),
+            ]),
+        ),
+        (
+            "gate_evidence",
+            object([
+                ("score", JsonValue::Number(score)),
+                ("measured", string("observed")),
+            ]),
+        ),
+    ])
+}
+
+fn write_ledger(report_dir: &Path, events: &[JsonValue]) {
+    fs::create_dir_all(report_dir).expect("report fixture directory creates");
+    let mut text = "# Work Log\n\n## Entries\n\n".to_owned();
+    for event in events {
+        let encoded = canonical_json_ascii_bytes(event).expect("event serializes canonically");
+        text.push_str("- ledger_event=");
+        text.push_str(std::str::from_utf8(&encoded).expect("canonical JSON is ASCII"));
+        text.push('\n');
     }
+    fs::write(report_dir.join("work_log.md"), text).expect("archived ledger fixture writes");
 }
 
 fn field_text<'a>(event: &'a JsonValue, key: &str) -> &'a JsonString {
@@ -124,61 +127,37 @@ fn field_text<'a>(event: &'a JsonValue, key: &str) -> &'a JsonString {
     value
 }
 
+fn expected_snapshot_digest(events: &[JsonValue]) -> String {
+    let encoded = events
+        .iter()
+        .map(|event| canonical_json_ascii_bytes(event).expect("event serializes canonically"))
+        .collect::<Vec<_>>();
+    let mut bytes = b"[".to_vec();
+    for (index, event) in encoded.iter().enumerate() {
+        if index > 0 {
+            bytes.push(b',');
+        }
+        bytes.extend_from_slice(event);
+    }
+    bytes.push(b']');
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 #[test]
-fn append_is_idempotent_conflict_safe_and_snapshot_ordered() {
+fn snapshot_reads_sorted_events_and_reproduces_the_canonical_digest() {
     let runtime = RuntimeRoot::new();
     let report_dir = runtime.report_dir("run-1");
-    let first = event(
-        "run-1",
-        "event-2",
-        "2",
-        "completed",
-        JsonNumber::Float(1.0),
-        false,
-    );
-    let first_path =
-        append_ledger_event(&report_dir, &first, Some(&runtime.0)).expect("first event appends");
-    let before_duplicate = fs::read(&first_path).expect("ledger bytes read");
+    let first = event("run-1", "event-2", "2", "completed", JsonNumber::Float(1.0));
+    let second = event("run-1", "event-10", "10", "checked", JsonNumber::Float(2.5));
+    let mut events = [first, second];
+    write_ledger(&report_dir, &events);
 
-    let equivalent = event(
-        "run-1",
-        "event-2",
-        "2",
-        "completed",
-        JsonNumber::Integer("1".into()),
-        true,
-    );
-    let duplicate_path = append_ledger_event(&report_dir, &equivalent, Some(&runtime.0))
-        .expect("Python-equal event is idempotent despite key order and int/float equality");
-    assert_eq!(duplicate_path, first_path);
-    assert_eq!(
-        fs::read(&first_path).expect("ledger bytes read"),
-        before_duplicate
-    );
+    let snapshot = read_ledger_snapshot(&report_dir, " snapshot-1 ", Some(runtime.path()))
+        .expect("read-only snapshot succeeds");
 
-    let conflicting = event(
-        "run-1",
-        "event-2",
-        "2",
-        "different outcome",
-        JsonNumber::Float(1.0),
-        false,
-    );
-    let error = append_ledger_event(&report_dir, &conflicting, Some(&runtime.0))
-        .expect_err("identity reuse with changed content conflicts");
-    assert!(error.contains("ledger event conflict"));
-
-    let second = event(
-        "run-1",
-        "event-10",
-        "10",
-        "checked",
-        JsonNumber::Float(2.5),
-        false,
-    );
-    append_ledger_event(&report_dir, &second, Some(&runtime.0)).expect("second event appends");
-    let snapshot = read_ledger_snapshot(&report_dir, " snapshot-1 ", Some(&runtime.0))
-        .expect("snapshot reads");
     assert_eq!(snapshot.snapshot_identity, "snapshot-1");
     assert_eq!(snapshot.events.len(), 2);
     assert_eq!(
@@ -202,161 +181,99 @@ fn append_is_idempotent_conflict_safe_and_snapshot_ordered() {
             .expect("event identities are Unicode text"),
         vec!["event-10".to_owned(), "event-2".to_owned()]
     );
-    assert_eq!(snapshot.snapshot_digest.len(), 64);
+    events.swap(0, 1);
+    let expected = expected_snapshot_digest(&events);
+    assert_eq!(snapshot.snapshot_digest, expected);
     assert_eq!(
-        ledger_snapshot_digest(&snapshot).expect("snapshot digest repeats deterministically"),
-        snapshot.snapshot_digest
+        ledger_snapshot_digest(&snapshot).expect("snapshot digest is reproducible"),
+        expected
     );
 }
 
 #[test]
-fn grouped_events_and_source_binding_keep_validation_rules() {
+fn snapshot_rejects_duplicate_identity_with_conflicting_event_content() {
     let runtime = RuntimeRoot::new();
     let report_dir = runtime.report_dir("run-2");
-    let group = object([
-        ("run_id", string("run-2")),
-        ("context_id", string("context-2")),
-        ("event_id", string("group-event")),
-        ("semantic_kind", string("change")),
-        ("owner", string("agent")),
-        ("state_owner", string("workflow")),
-        ("api_owner", string("work-log")),
-        ("dependency_owner", string("runtime")),
-        ("responsibility_unit", string("ledger")),
-        ("intent_id", string("intent-2")),
-        ("outcome", string("mapped")),
-        ("evidence_refs", array([string("evidence:two")])),
-        ("artifact_refs", array([string("artifact:two")])),
-        ("mapping_mode", string("group")),
-        ("group_identity", string("group-2")),
-        ("member_clause_ids", array([string("R2"), string("R3")])),
-        (
-            "source_binding",
-            object([
-                ("run_id", string("run-2")),
-                ("context_id", string("context-2")),
-            ]),
-        ),
-    ]);
-    append_ledger_event(&report_dir, &group, Some(&runtime.0))
-        .expect("valid group event and matching source binding append");
-
-    let mut forbidden = event(
+    let first = event("run-2", "event-1", "1", "completed", JsonNumber::Float(1.0));
+    let conflicting = event(
         "run-2",
-        "bad-group",
-        "3",
-        "invalid",
-        JsonNumber::Integer("1".into()),
-        false,
+        "event-1",
+        "2",
+        "different outcome",
+        JsonNumber::Float(1.0),
     );
-    set_field(&mut forbidden, "mapping_mode", string("group"));
-    set_field(
-        &mut forbidden,
-        "member_clause_ids",
-        array([string("R1"), string("R2")]),
-    );
-    set_field(&mut forbidden, "group_identity", string("g"));
-    set_field(&mut forbidden, "semantic_kind", string("decision"));
-    let error = append_ledger_event(&report_dir, &forbidden, Some(&runtime.0))
-        .expect_err("decision events cannot be grouped");
-    assert!(error.contains("decision ledger events cannot be grouped"));
+    write_ledger(&report_dir, &[first, conflicting]);
 
-    let mut duplicate_members = event(
-        "run-2",
-        "duplicate-members",
-        "3",
-        "invalid",
-        JsonNumber::Integer("1".into()),
-        false,
-    );
-    set_field(&mut duplicate_members, "mapping_mode", string("group"));
-    set_field(&mut duplicate_members, "group_identity", string("g"));
-    set_field(
-        &mut duplicate_members,
-        "member_clause_ids",
-        array([string("R1"), string("R1")]),
-    );
-    let error = append_ledger_event(&report_dir, &duplicate_members, Some(&runtime.0))
-        .expect_err("group members must be unique");
-    assert!(error.contains("member_clause_ids must be unique"));
+    let error = read_ledger_snapshot(&report_dir, "snapshot", Some(runtime.path()))
+        .err()
+        .expect("a repeated event identity is rejected");
 
-    let mut mismatched = event(
-        "run-2",
-        "bad-binding",
-        "4",
-        "invalid",
-        JsonNumber::Integer("1".into()),
-        false,
-    );
-    if let JsonValue::Object(fields) = &mut mismatched {
-        if let Some((_, JsonValue::Object(binding))) = fields
-            .0
-            .iter_mut()
-            .find(|(key, _)| key.equals_text("source_binding"))
-        {
-            if let Some((_, value)) = binding
-                .0
-                .iter_mut()
-                .find(|(key, _)| key.equals_text("context_id"))
-            {
-                *value = string("other-context");
-            }
-        }
-    }
-    let error = append_ledger_event(&report_dir, &mismatched, Some(&runtime.0))
-        .expect_err("source binding context must match the event");
-    assert!(error.contains("source_binding.context_id does not match context_id"));
-
-    let mismatched_run = event(
-        "another-run",
-        "wrong-run",
-        "5",
-        "invalid",
-        JsonNumber::Integer("1".into()),
-        false,
-    );
-    let error = append_ledger_event(&report_dir, &mismatched_run, Some(&runtime.0))
-        .expect_err("event run id must match its report directory");
-    assert!(error.contains("run_id does not match report directory"));
+    assert!(error.contains("duplicate ledger event identity"));
 }
 
 #[test]
-fn append_skips_malformed_old_lines_while_snapshot_fails_closed() {
+fn snapshot_validates_group_and_source_binding_semantics() {
     let runtime = RuntimeRoot::new();
     let report_dir = runtime.report_dir("run-3");
-    fs::create_dir_all(&report_dir).expect("run directory is prepared");
-    let work_log = report_dir.join("work_log.md");
-    fs::write(
-        &work_log,
-        "# Work Log\n\n## Entries\n\n- ledger_event={malformed\n",
-    )
-    .expect("malformed legacy line fixture is created");
-
-    let valid = event(
+    let mut forbidden_group = event(
         "run-3",
         "event-1",
         "1",
-        "appended",
-        JsonNumber::Float(1.25),
-        false,
+        "invalid",
+        JsonNumber::Integer("1".into()),
     );
-    append_ledger_event(&report_dir, &valid, Some(&runtime.0))
-        .expect("append ignores malformed previous event lines");
-    let text = fs::read_to_string(&work_log).expect("work log text is readable");
-    assert!(text.contains("- ledger_event={malformed"));
-    assert!(text.contains("\"event_id\":\"event-1\""));
-    let error = match read_ledger_snapshot(&report_dir, "snapshot", Some(&runtime.0)) {
-        Ok(_) => panic!("snapshot reading rejects malformed event lines"),
-        Err(error) => error,
-    };
-    assert!(error.contains("malformed ledger event"));
+    set_field(&mut forbidden_group, "mapping_mode", string("group"));
+    set_field(&mut forbidden_group, "group_identity", string("group-1"));
+    set_field(
+        &mut forbidden_group,
+        "member_clause_ids",
+        array([string("R1"), string("R2")]),
+    );
+    set_field(&mut forbidden_group, "semantic_kind", string("decision"));
+    write_ledger(&report_dir, &[forbidden_group]);
+
+    let error = read_ledger_snapshot(&report_dir, "snapshot", Some(runtime.path()))
+        .err()
+        .expect("decision events cannot be grouped");
+    assert!(error.contains("decision ledger events cannot be grouped"));
+
+    let mut mismatched_binding = event(
+        "run-3",
+        "event-2",
+        "2",
+        "invalid",
+        JsonNumber::Integer("1".into()),
+    );
+    set_field(
+        &mut mismatched_binding,
+        "source_binding",
+        object([
+            ("run_id", string("run-3")),
+            ("context_id", string("other-context")),
+        ]),
+    );
+    write_ledger(&report_dir, &[mismatched_binding]);
+
+    let error = read_ledger_snapshot(&report_dir, "snapshot", Some(runtime.path()))
+        .err()
+        .expect("source binding context must match the event");
+    assert!(error.contains("source_binding.context_id does not match context_id"));
 }
 
 #[test]
-fn work_log_api_rejects_agent_canon_source_paths() {
-    let source_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/work-log-source-write");
-    let error = append_work_entry(&source_path, "must not write", None)
-        .expect_err("work logs cannot write below AgentCanon source");
-    assert!(error.contains("inside source root") || error.contains("path escapes runtime root"));
-    assert!(!source_path.exists());
+fn snapshot_rejects_malformed_archived_event_text() {
+    let runtime = RuntimeRoot::new();
+    let report_dir = runtime.report_dir("run-4");
+    fs::create_dir_all(&report_dir).expect("report fixture directory creates");
+    fs::write(
+        report_dir.join("work_log.md"),
+        "# Work Log\n\n## Entries\n\n- ledger_event={malformed\n",
+    )
+    .expect("malformed archived record writes");
+
+    let error = read_ledger_snapshot(&report_dir, "snapshot", Some(runtime.path()))
+        .err()
+        .expect("malformed event text is rejected");
+
+    assert!(error.contains("malformed ledger event"));
 }

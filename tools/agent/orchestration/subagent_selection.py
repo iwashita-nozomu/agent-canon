@@ -5,8 +5,7 @@
 # upstream design ../../../documents/design/agentcanon-hook-simplification-wave3.md owns subagent-selection parity.
 # upstream design ../../../agents/COMMUNICATION_PROTOCOL.md owns capability and receipt semantics.
 # upstream implementation ./workflow_context.py supplies inherited workflow context.
-# downstream implementation ../../runtime/archive/behavior_event_assembly.py consumes SubagentSelection.
-# downstream implementation ../../runtime/lifecycle/workflow_monitor.py projects the assembled event.
+# downstream implementation ../../runtime/dispatch/agent-canon/src/behavior_event_assembly.rs consumes SubagentSelection.
 # @dependency-end
 """Pure subagent selection and attribution owner."""
 
@@ -54,7 +53,14 @@ def _normalise_operation(tool_name: str, action: str) -> str:
     if action in _ACTIONS:
         return action
     lowered = tool_name.casefold()
-    for operation in (*COLLABORATION_OPERATIONS, "spawn", "send_input", "wait", "close", "resume"):
+    for operation in (
+        *COLLABORATION_OPERATIONS,
+        "spawn",
+        "send_input",
+        "wait",
+        "close",
+        "resume",
+    ):
         if lowered in {
             operation,
             f"tools.{operation}",
@@ -85,7 +91,8 @@ def build_coordination_receipt(
         return None
     exact_post_tool_payload = (
         isinstance(payload, dict)
-        and set(payload) == {"hookEventName", "tool_name", "tool_input", "tool_response"}
+        and set(payload)
+        == {"hookEventName", "tool_name", "tool_input", "tool_response"}
         and payload.get("hookEventName") == "PostToolUse"
         and isinstance(payload.get("tool_name"), str)
         and isinstance(payload.get("tool_input"), dict)
@@ -125,14 +132,20 @@ def _string(payload: dict[str, object], *keys: str) -> str:
     return ""
 
 
-def select_subagents(payload: object, workflow_context: object = None) -> SubagentSelection:
+def select_subagents(
+    payload: object, workflow_context: object = None
+) -> SubagentSelection:
     if not isinstance(payload, dict):
         return SubagentSelection()
     tool_name = _string(payload, "tool_name", "subagent_tool_name")
     action = _string(payload, "subagent_event_kind", "action", "event")
     action = _normalise_operation(tool_name, action)
     raw_targets = payload.get("subagent_targets", payload.get("targets", ()))
-    targets = tuple(item for item in raw_targets if isinstance(item, str) and item) if isinstance(raw_targets, (list, tuple)) else ()
+    targets = (
+        tuple(item for item in raw_targets if isinstance(item, str) and item)
+        if isinstance(raw_targets, (list, tuple))
+        else ()
+    )
     target = _string(payload, "subagent_target", "target")
     prompt = _string(payload, "subagent_prompt", "prompt")
     return SubagentSelection(
@@ -143,9 +156,15 @@ def select_subagents(payload: object, workflow_context: object = None) -> Subage
         target=target,
         targets=targets,
         model=_string(payload, "subagent_model", "model"),
-        reasoning_effort=_string(payload, "subagent_reasoning_effort", "reasoning_effort"),
-        fork_context=bool(payload.get("subagent_fork_context", payload.get("fork_context", False))),
-        prompt_fingerprint=hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16] if prompt else "",
+        reasoning_effort=_string(
+            payload, "subagent_reasoning_effort", "reasoning_effort"
+        ),
+        fork_context=bool(
+            payload.get("subagent_fork_context", payload.get("fork_context", False))
+        ),
+        prompt_fingerprint=hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+        if prompt
+        else "",
         prompt_char_count=len(prompt),
         item_count=len(targets),
     )
