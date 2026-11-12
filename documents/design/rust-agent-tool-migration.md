@@ -17,11 +17,20 @@ downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 
 ## Scope and Intent
 
+The [agent tool-authoring rule](../../ROOT_AGENTS.md#always-on-boundary) requires
+shell scripts or Rust for new tools and task automation, including temporary
+and inline code. Existing Python tools and external Python providers may still
+be invoked through their selected execution contract during migration.
+
 Migrate every AgentCanon-owned Python tool implementation to Rust, including
 workflow orchestration, runtime lifecycle, Eval producers and checkers, and
 active hooks. This replaces the earlier policy that kept frequently changing
 workflow tools in Python. Stability and usage may inform implementation work;
 they do not exempt an owned tool from migration.
+
+Delete tools without a required use, together with their exclusive support and
+callers. Implement retained tool behavior in Rust. Shell entrypoints invoke the
+existing Rust executable and preserve its arguments, streams, and exit status.
 
 Preserve the tool's external CLI/API, schema, exit behavior, filesystem effects,
 mount and credential boundaries, and consumer functionality. Prioritize memory
@@ -82,10 +91,10 @@ still visible. Host archive Git/annex publication remains at its existing owner.
 
 The active host Hook route calls native `codex-hook` after the existing resident
 trust admission and target-mount transaction. Its dispatcher composes the native
-safety, mutation-authority, event-assembly, spool, and report owners. Frozen old
+safety, event-assembly, spool, and report owners. Frozen old
 CLI cases check both the library and real command; integration tests retain
-report selection and containment, privacy, append/report failures, parent
-mutation denial, and authenticated child admission. The Python dispatcher is retired after its direct tests and consumers move to
+report selection and containment, privacy, append/report failures, and ordinary
+editing without runtime role or receipt gates. The Python dispatcher is retired after its direct tests and consumers move to
 the native command. Shared Python helpers retain their remaining consumers and
 remain in the migration inventory.
 
@@ -250,6 +259,41 @@ context, and export corpus remains an independent compatibility oracle.
 External Python execution selected by an explicit v2 identity is a retained
 provider capability; it does not mean the native default delegates to an owned
 Python tool. This port does not complete other migration families.
+
+## Native DOCX Extraction and Caller Closure
+
+`tools/bin/agent-canon extract-docx` owns the public `extract-docx` catalog
+route and selects `tools/runtime/dispatch/agent-canon/src/extract_docx.rs`.
+The Python implementation is retired; the Python CLI test remains as an
+independent input/oracle harness and invokes the native product command.
+The `tool-docs.toml` entry and public DOCX guide name the same native owner.
+
+The migration preserves the schema-v1 bundle, member order and hashes,
+paragraph/table/Office Math Markdown, CLI status split, source snapshot checks,
+absent-or-empty output reservation, and stage/readback/publish/rollback flow.
+Archive names come from raw ZIP name bytes and flags: bit 11 selects UTF-8,
+otherwise CP437 is decoded, and names are truncated at NUL as CPython
+`ZipInfo` does. Unicode 15 NFC and full case folding retain portable member
+identity; Stored, Deflate, BZIP2, and LZMA methods remain available. The safe
+Expat 2.9 port matches the frozen 20-case ElementTree acceptance and event
+corpus, including encoding, namespaces, default attributes, entities, and depth;
+this is not a universal XML-equivalence claim. External entity references fail
+without external I/O. The DOCX owner opens the
+caller-selected input and canonical output parent as capabilities and does not
+apply the separate external-runtime artifact boundary to the user's bundle.
+Heading suffixes reuse the shared Unicode 15 decimal parser while preserving
+Python's `isdigit` selection and `int(character)` failure for nondecimal Digit
+characters. Multiple paragraph-property blocks retain the original search order.
+XML elements live in a flat indexed arena; parsing, lookup, text extraction,
+table traversal, and destruction do not recurse or add a nesting limit.
+
+The previous Python helper-mock readback test is replaced by a native
+transaction-boundary check over real staged bytes; it asserts no publication,
+stage cleanup, and preservation of an admitted empty output. The preserved CLI
+tests keep the late-failure and output transaction oracles. The XML corpus
+continues to freeze the old ElementTree events and Markdown projection. This
+closes the known DOCX caller set; it does not imply that other Python document
+tools are native or migrated.
 
 ## Plan and Audit Interfaces
 

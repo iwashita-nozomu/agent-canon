@@ -1,0 +1,98 @@
+{
+  "source_commit": "415016cc99607329285be64f60560b6654a79152",
+  "cases": [
+    {
+      "name": "zip64",
+      "archive_base64": "UEsDBBQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAd29yZC9kb2N1bWVudC54bWw8dzpkb2N1bWVudCB4bWxuczp3PSJodHRwOi8vc2NoZW1hcy5vcGVueG1sZm9ybWF0cy5vcmcvd29yZHByb2Nlc3NpbmdtbC8yMDA2L21haW4iPjx3OmJvZHk+PHc6cD48dzpyPjx3OnQ+WklQIGNvbnRyYWN0PC93OnQ+PC93OnI+PC93OnA+PC93OmJvZHk+PC93OmRvY3VtZW50PlBLAQIUAxQAAAAAAAAAISizQldVngAAAJ4AAAARAAAAAAAAAAAAAACAAQAAAAB3b3JkL2RvY3VtZW50LnhtbFBLBgYsAAAAAAAAAC0ALQAAAAAAAAAAAAEAAAAAAAAAAQAAAAAAAAA/AAAAAAAAAM0AAAAAAAAAUEsGBwAAAAAMAQAAAAAAAAEAAABQSwUGAAAAAP///////////////wAA",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "1f120c377b34ec90307db296f527202131a10a093505ecaf941efdaf7c8b26e7",
+          "size_bytes": 366
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n"
+    },
+    {
+      "name": "sfx",
+      "archive_base64": "TVoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFNGWCByZWZlcmVuY2UgcHJlbHVkZQpQSwMEFAAAAAAAAAAhKLNCV1WeAAAAngAAABEAAAB3b3JkL2RvY3VtZW50LnhtbDx3OmRvY3VtZW50IHhtbG5zOnc9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy93b3JkcHJvY2Vzc2luZ21sLzIwMDYvbWFpbiI+PHc6Ym9keT48dzpwPjx3OnI+PHc6dD5aSVAgY29udHJhY3Q8L3c6dD48L3c6cj48L3c6cD48L3c6Ym9keT48L3c6ZG9jdW1lbnQ+UEsBAhQDFAAAAAAAAAAhKLNCV1WeAAAAngAAABEAAAAAAAAAAAAAAIABAAAAAHdvcmQvZG9jdW1lbnQueG1sUEsFBgAAAAABAAEAPwAAAM0AAAAAAA==",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "299f3754578ac6b62a605687b22c73702904c2e20f301b0274f09926f2d194f6",
+          "size_bytes": 376
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n"
+    },
+    {
+      "name": "sfx-zip64",
+      "archive_base64": "TVoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFNGWCByZWZlcmVuY2UgcHJlbHVkZQpQSwMEFAAAAAAAAAAhKLNCV1WeAAAAngAAABEAAAB3b3JkL2RvY3VtZW50LnhtbDx3OmRvY3VtZW50IHhtbG5zOnc9Imh0dHA6Ly9zY2hlbWFzLm9wZW54bWxmb3JtYXRzLm9yZy93b3JkcHJvY2Vzc2luZ21sLzIwMDYvbWFpbiI+PHc6Ym9keT48dzpwPjx3OnI+PHc6dD5aSVAgY29udHJhY3Q8L3c6dD48L3c6cj48L3c6cD48L3c6Ym9keT48L3c6ZG9jdW1lbnQ+UEsBAhQDFAAAAAAAAAAhKLNCV1WeAAAAngAAABEAAAAAAAAAAAAAAIABAAAAAHdvcmQvZG9jdW1lbnQueG1sUEsGBiwAAAAAAAAALQAtAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAD8AAAAAAAAAzQAAAAAAAABQSwYHAAAAAAwBAAAAAAAAAQAAAFBLBQYAAAAA////////////////AAA=",
+      "exit": 0,
+      "stdout": "extracted reference.docx -> {output}\n",
+      "stderr": "",
+      "output_exists": true,
+      "manifest": {
+        "outputs": {
+          "document_xml": "raw/word/document.xml",
+          "extracted_markdown": "extracted.md",
+          "raw_members": "raw/",
+          "source_copy": "source/reference.docx"
+        },
+        "schema_version": 1,
+        "source": {
+          "name": "reference.docx",
+          "sha256": "6f553074a50ada0ce6bfecb10688cac9e9de0306bd0f372ebfb44c52456ee58a",
+          "size_bytes": 452
+        },
+        "zip_members": [
+          {
+            "directory": false,
+            "name": "word/document.xml",
+            "sha256": "6a90731d3f88b69a1951a9016ee963f424395a76730bd4369bea91e6897a3e01",
+            "size_bytes": 158
+          }
+        ]
+      },
+      "markdown": "# DOCX extracted text\n\nSource: `reference.docx`\n\nThis is a searchable extraction. The source DOCX and raw XML/media in this bundle remain authoritative for layout and editable equations.\n\n## Body\n\nZIP contract\n"
+    }
+  ]
+}

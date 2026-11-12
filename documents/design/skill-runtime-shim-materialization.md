@@ -12,8 +12,9 @@ upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md fresh
 downstream implementation ../../tools/agent/orchestration/route.py deterministic catalog-backed route consumer
 downstream implementation ../../tools/agent/skills/skill_dependency_map.py graph materializer and semantic golden producer
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py host-discovery and catalog/shim parity checker
-downstream implementation ../../tools/validation/semantic/skills/check_skill_frontmatter.py frontmatter readback checker
-downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py graph projection readback checker
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_materialization.rs native v3 readback renderer and byte comparison
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs native frontmatter compatibility command
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs graph projection readback checker
 @dependency-end
 -->
 
@@ -211,6 +212,17 @@ schema/version/digest と owner sources から再構成した record digest を�
   更新する前に catalog-derived な全 target を materialize/readback して target tree を収束させます。その
   収束済み tree から fixture producer を二回実行し、first/second とも
   `content_delta_count=0`、`content_delta_paths=[]` を固定します。
+
+`agent-canon check-skill-frontmatter` は read-only native readback route です。
+既存の Rust catalog/route/dependency owners から v3 record と expected shim bytes を再構成し、
+tracked target と比較します。対象を書き換えず、v3 template の sole writer は引き続き
+`tools/agent/skills/skill_shim_materializer.py` です。Rust checker と writer は同じ byte
+contract を使い、checker はその差分 path を返します。
+
+Checker の責務は catalog schema admission、typed route/dependency validation、v3 record と
+rendered bytes の readback です。Python writer が source snapshot digest を作るために呼ぶ
+skill/tool graph の design-correspondence checks は、この checker の drift 判定に使われないため
+重ねて実行しません。graph と design の admission は既存 graph owner が担当します。
 
 実装時の fixture は
 `tests/fixtures/skill-runtime-shim/fixed-point/expected.json`、acceptance test は
@@ -451,7 +463,7 @@ catalog-derived row readback は各 row で次を検査します。
 
 現 snapshot の skill/command/tool/edge 件数と graph/JSON/Mermaid digest は、この設計へ
 埋め込みません。`documents/runtime/skill-dependency-graph.json` の catalog-derived
-projection と `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` の readback が
+projection と `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` の readback が
 current value の owner です。
 
 shim の body は graph source ではないため、shim materialization だけでは graph の
@@ -470,7 +482,7 @@ projection equality とします。raw digest の変化は別の `source_digest_
   run ID、timestamp は projection から除外する。
 - graph JSON/Mermaid は `skill_dependency_map.py graph --root . --runtime-root
   <external-runtime-root>` で外部 runtime artifact として再生成し、
-  check_skill_tool_invocation_graph.py の source/materialized/readback equality を
+  skill_dependency_graph.rs の source/materialized/readback equality を
   通す。tracked reader pair を更新する保守操作だけは、固定2ファイルの
   source-mutation capability と外部 before/after evidence を明示する。generated graph を
   手編集しない。
@@ -837,9 +849,9 @@ Wave 4 design の validation evidence は次です。
 
 ~~~bash
 python3 tools/validation/semantic/runtime/check_agent_runtime_alignment.py
-python3 tools/validation/semantic/skills/check_skill_frontmatter.py --root .
+tools/bin/agent-canon check-skill-frontmatter --root .
 python3 tools/agent/skills/skill_dependency_map.py check --root .
-python3 tools/validation/semantic/skills/check_skill_tool_invocation_graph.py --root .
+python3 tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs --root .
 python3 eval/producers/evaluate_workflow_selection.py \
   --root . --manifest eval/definitions/workflow_selection_eval.toml \
   --report-out <run-dir>/workflow-selection.md
@@ -875,8 +887,8 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
 | fact | public shim と canonical skill doc は catalog の skill id 集合で照合される | current find inventory、check_agent_runtime_alignment.py、graph checker | observed |
-| fact | graph projection の skill/command/tool/edge counts は source snapshot から生成される（`documents/runtime/skill-dependency-graph.json`） | `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` --root . | observed |
-| fact | shim frontmatter は catalog-derived な全件で readback され、body size は不均一になり得る | check_skill_frontmatter.py、catalog-sized inventory | observed |
+| fact | graph projection の skill/command/tool/edge counts は source snapshot から生成される（`documents/runtime/skill-dependency-graph.json`） | `agent-canon check-skill-tool-invocation-graph --root .` | observed |
+| fact | shim frontmatter は catalog-derived な全件で readback され、body size は不均一になり得る | `agent-canon check-skill-frontmatter`、catalog-sized inventory | observed |
 | assumption | discovery metadata を catalog に追加しても graph semantic payload は変わらない | graph builder の skill payload は id/doc/shim/command/capability/phase だけを投影 | explicit; implementation readback required |
 | assumption | Codex の `.agents/skills` 自動探索（bootstrap の固定 directory link 経由）は frontmatter を読み、fresh gpt-5.4-mini evaluator は adapter の canonical relative link を辿れる | official discovery contract、fresh packet artifact と observation reportで検証 | pending implementation eval |
 | limitation | fresh clone には dependency graph DB と semantic-index cache がなく、依存 review/semantic relations は今回実行不可 | run_repo_dependency_review.sh、semantic-index output | recorded, non-blocking for design |
@@ -888,11 +900,11 @@ python3 eval/producers/skill_shim_evaluation.py tokens \
 | SHIM-001 one schema and fixed field order | shim materializer | tools/agent/skills/skill_shim_materializer.py / SkillRuntimeShimRecord | schema/version/field order and canonical JSON digest |
 | SHIM-002 catalog-owned discovery metadata | catalog reader | agents/skills/catalog.yaml / skill_families[].discovery | catalog-sized frontmatter pairs equal generated records |
 | SHIM-003 canonical prose stays out of runtime adapter | human skill canon | agents/skills/<skill>.md and generated template | adapter contains link/digest only; duplicate-policy scan=0 |
-| SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_route_catalog.py`、`tools/agent/orchestration/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | catalog-derived route/dependency digests and semantic edge golden |
+| SHIM-004 owner/dependency/route identity | route/dependency readers | `agents/skills/catalog.yaml`、`tools/agent/skills/skill_route_catalog.py`、`tools/agent/orchestration/route.py`、`documents/runtime/skill-dependency-graph.json`、`tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | catalog-derived route/dependency digests and semantic edge golden |
 | SHIM-005b native owner preservation | graph/native-route owner | native CLI/API/script owner and [skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) | native route and process guarantees remain owner-owned; no private command schema in shim |
 | SHIM-006 host discovery preservation | runtime alignment | `.codex/personal/skills/*/SKILL.md`, check_agent_runtime_alignment.py | catalog-sized shim paths、frontmatter pass、project config skill registry absent |
 | SHIM-008 all-catalog migration/readback | migration route | `tools/agent/skills/skill_shim_materializer.py` migrate/readback and tests | catalog-sized row receipt, unresolved=0 |
-| SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, check_skill_tool_invocation_graph.py, frozen route cases | typed identity/edge/order/route equality |
+| SHIM-009 graph/route golden | graph and route checkers | skill_dependency_map.py, skill_dependency_graph.rs, frozen route cases | typed identity/edge/order/route equality |
 | SHIM-010 token reduction | prompt eval owner | existing prompt/workflow CLIs plus planned skill_shim_evaluation.py tokens | observed host usage, UTF-8 bytes/Unicode scalars, envelope/cache observation, percentile/paired rows; metric status uses aggregate >=70% |
 | SHIM-011 fresh mini usability | evaluator route | planned skill_shim_evaluation.py packets; checklist full/changed packet classes | three scenario variants in two packet classes, no prior context, fixed report grammar |
 | SHIM-012 no keyword/duplicate policy | route and checker tests | route tests plus shim materializer negative tests | keyword-only route and canonical-prose-in-adapter both fail |

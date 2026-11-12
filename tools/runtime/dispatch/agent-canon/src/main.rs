@@ -49,11 +49,14 @@
 // downstream implementation tool_rejection_preflight.rs predicts optional rejection gates for planned paths
 // downstream implementation result_logs/mod.rs converts and summarizes JSONL result records
 // downstream implementation historical_skill_usage.rs reads archived skill-usage history
+// downstream implementation eval_accumulation_check.rs validates accumulated hook and eval results
 // downstream implementation token_footprints.rs routes token comparison and summary evidence
+// downstream implementation codex_runtime_summary.rs routes bounded Codex runtime summary export
 // downstream implementation lib.rs exposes the selected native Lean proof environment API
 // downstream implementation lsp_code_analysis.rs serves the native LSP CLI and provider API
 // downstream implementation tool_dispatch.rs routes typed catalog commands through the native CLI
 // upstream implementation lib.rs exposes native SCIP index and Git dependency summary APIs
+// downstream implementation extract_docx.rs routes the native DOCX extraction command
 // @dependency-end
 
 mod agent_search;
@@ -104,10 +107,10 @@ mod tool_rejection_preflight;
 #[cfg(not(test))]
 use agent_canon::runtime_boundary;
 use agent_canon::{
-    catalog, compare_agent_run_paths, entrypoint_composer, generated_completeness, native_release,
-    report_artifact_checks, run_evaluation, stablehlo_value_closure, template_bundle,
-    theorem_graph_board, theorem_graph_circularity_check, tool_dispatch, tool_proof_coverage,
-    waterfall_gate, work_log,
+    catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
+    generated_completeness, native_release, report_artifact_checks, run_evaluation,
+    stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
+    tool_dispatch, tool_proof_coverage, waterfall_gate, work_log,
 };
 use std::env;
 
@@ -116,6 +119,7 @@ const HELP: &str = "AgentCanon's native command line interface.
 Usage: agent-canon <command> [arguments]
 
 Commands:
+  check-skill-tool-invocation-graph [--root ROOT]
   knowledge|k <search|read|add|status|sync|capture>
   feedback|f <add|status|sync|capture>
   graph <build|status|query|context> [options]
@@ -146,6 +150,7 @@ Commands:
   numeric-performance [--input <path|->] [--format json]
   compare-agent-run-paths --baseline-run <path> --candidate-run <path> [--report-out <path>]
   compare-codex-token-footprints [--baseline-session <path> --candidate-session <path>] | [--session-glob <pattern>...]
+  export-codex-runtime-summary [options]
   tool-catalog [--root <repo-root>] [--format text|json|markdown]
   tool <run|inventory|rust-cli> [options]
   tool-drift [--root <repo-root>] [--contract NAME]... [--format text|json]
@@ -159,14 +164,19 @@ Commands:
   jsonl-to-md <input> <output>
   summarize-hlo-jsonl [--top N] [--only-case CASE] <jsonl>
   historical-skill-usage-read --path <skill_usage.jsonl>
+  eval-accumulation-check [--root ROOT] [--runtime-root ROOT] [--family-registry PATH] [--format text|json] [--compact-out PATH]
   oop-python-rule-inventory|oop-cpp-rule-inventory [--root <repo-root>] [--format text|json|markdown]
   lean-proof-env <init|smoke|agent-smoke|counterexample-smoke|all-smoke|check-file> [options]
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  server-readiness [--layout <layout.toml>]
+  check-skill-frontmatter [--root ROOT] [--format text|json]
+  chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
+  extract-docx <input.docx> --output-dir <directory>
   semantic-index <operation>
   structured-analysis <operation>
   python-structure-hash --root <repo-root> [paths...]
@@ -177,7 +187,7 @@ Commands:
   helper-function-inventory [paths...] [--root <repo-root>] [--format text|json|markdown]
   python-module-groups-check --root <repo-root> [--contract path]
   compose-consumer-entrypoint --base <path> --specific <path> --output <path> [--source-root <path>]
-  template-bundle <export|verify|native-package|native-verify|native-version> [options]
+  template-bundle <export|committed-tree|verify|native-package|native-verify|native-version> [options]
   native-release <prepare|select-artifacts|publish|compare-reproducible> [options]
 
 Options:
@@ -221,6 +231,10 @@ fn main() {
         std::process::exit(run_evaluation::run_cli(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == agent_canon::eval_accumulation_check::SELECTOR {
+        std::process::exit(agent_canon::eval_accumulation_check::run_cli(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == "codex-hook" {
         std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
     }
@@ -249,6 +263,10 @@ fn main() {
         std::process::exit(token_footprints::run(&args[2..]));
     }
 
+    if args.len() >= 2 && args[1] == "export-codex-runtime-summary" {
+        std::process::exit(codex_runtime_summary::run(&args[2..]));
+    }
+
     if args.len() >= 2 && args[1] == stablehlo_value_closure::SELECTOR {
         std::process::exit(stablehlo_value_closure::run(&args[2..]));
     }
@@ -263,6 +281,9 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "tool-catalog" {
         std::process::exit(catalog::tool_catalog::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-tool-invocation-graph" {
+        std::process::exit(catalog::skill_dependency_graph::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "tool" {
@@ -339,6 +360,15 @@ fn main() {
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
     }
+    if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
+        std::process::exit(agent_canon::server_readiness::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-frontmatter" {
+        std::process::exit(agent_canon::skill_frontmatter::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "chatgpt-codex-route" {
+        std::process::exit(agent_canon::chatgpt_codex_routing::run_cli(&args[2..]));
+    }
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {
         std::process::exit(rust_migration_plan::run(&args[2..]));
@@ -362,6 +392,10 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "file-surface-inventory" {
         std::process::exit(file_surface_inventory::run(&args[2..]));
+    }
+
+    if args.len() >= 2 && args[1] == "extract-docx" {
+        std::process::exit(extract_docx::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "docs" {

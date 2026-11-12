@@ -1,0 +1,63 @@
+{
+  "source": "cdf54b674130cd9b058e6848b8fd815b6ea8bfa6",
+  "script_sha256": "9d32bb15e3143c679ad3bea08297d4992dece34ff75bf9d5c914fb748f46fe8e",
+  "columns": 80,
+  "cases": [
+    {
+      "name": "help",
+      "argv": [
+        "--help"
+      ],
+      "exit": 0,
+      "stdout": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\n\nExport bounded Codex runtime summaries into the AgentCanon log archive.\n\noptions:\n  -h, --help            show this help message and exit\n  --source-root SOURCE_ROOT\n  --canon-root CANON_ROOT\n  --thread-id THREAD_ID\n  --all-threads\n  --history-jsonl HISTORY_JSONL\n  --sqlite-log SQLITE_LOG\n  --session-glob SESSION_GLOB\n  --recent-days RECENT_DAYS\n  --all-time\n  --output OUTPUT\n  --dry-run\n  --print-json\n",
+      "stderr": ""
+    },
+    {
+      "name": "missing-recent",
+      "argv": [
+        "--recent-days"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\nexport_codex_runtime_summary.py: error: argument --recent-days: expected one argument\n"
+    },
+    {
+      "name": "invalid-recent",
+      "argv": [
+        "--recent-days",
+        "nope"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\nexport_codex_runtime_summary.py: error: argument --recent-days: invalid int value: 'nope'\n"
+    },
+    {
+      "name": "quoted-recent",
+      "argv": [
+        "--recent-days",
+        "'quote'"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\nexport_codex_runtime_summary.py: error: argument --recent-days: invalid int value: \"'quote'\"\n"
+    },
+    {
+      "name": "ambiguous-all",
+      "argv": [
+        "--all"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\nexport_codex_runtime_summary.py: error: ambiguous option: --all could match --all-threads, --all-time\n"
+    },
+    {
+      "name": "unknown",
+      "argv": [
+        "--unknown"
+      ],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "usage: export_codex_runtime_summary.py [-h] [--source-root SOURCE_ROOT]\n                                       [--canon-root CANON_ROOT]\n                                       [--thread-id THREAD_ID] [--all-threads]\n                                       [--history-jsonl HISTORY_JSONL]\n                                       [--sqlite-log SQLITE_LOG]\n                                       [--session-glob SESSION_GLOB]\n                                       [--recent-days RECENT_DAYS]\n                                       [--all-time] [--output OUTPUT]\n                                       [--dry-run] [--print-json]\nexport_codex_runtime_summary.py: error: unrecognized arguments: --unknown\n"
+    }
+  ]
+}

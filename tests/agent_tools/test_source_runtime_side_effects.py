@@ -9,7 +9,10 @@ import unittest
 from pathlib import Path
 
 from tools.analysis.proof.formal_proof import build_verification_commands
-from tools.runtime.artifacts.runtime_artifacts import RuntimeArtifactError, RuntimeRootRequired
+from tools.runtime.artifacts.runtime_artifacts import (
+    RuntimeArtifactError,
+    RuntimeRootRequired,
+)
 from tools.audit.logging.audit_logger import AuditLogger
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -74,7 +77,6 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
         """Shell wrappers fail before writing when the runtime root is absent."""
         scripts = (
             PROJECT_ROOT / "tools" / "validation" / "tests" / "run_pytest_with_logs.sh",
-            PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_worktree_scopes.sh",
         )
         for script in scripts:
             env = os.environ.copy()
@@ -100,8 +102,19 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
             pytest_result = subprocess.run(
                 [
                     "bash",
-                    str(PROJECT_ROOT / "tools" / "validation" / "tests" / "run_pytest_with_logs.sh"),
-                    str(PROJECT_ROOT / "tests" / "agent_tools" / "test_source_runtime_side_effects.py"),
+                    str(
+                        PROJECT_ROOT
+                        / "tools"
+                        / "validation"
+                        / "tests"
+                        / "run_pytest_with_logs.sh"
+                    ),
+                    str(
+                        PROJECT_ROOT
+                        / "tests"
+                        / "agent_tools"
+                        / "test_source_runtime_side_effects.py"
+                    ),
                     "--collect-only",
                     "-q",
                 ],
@@ -113,16 +126,6 @@ class SourceRuntimeBoundaryTest(unittest.TestCase):
             self.assertEqual(pytest_result.returncode, 0, pytest_result.stderr)
             self.assertIn(str(Path(runtime_dir)), pytest_result.stdout)
             self.assertFalse((PROJECT_ROOT / "tests" / "logs").exists())
-
-            scope_result = subprocess.run(
-                ["bash", str(PROJECT_ROOT / "tools" / "validation" / "documentation" / "checks" / "check_worktree_scopes.sh")],
-                cwd=PROJECT_ROOT.parent,
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(scope_result.returncode, 0, scope_result.stderr)
-            self.assertIn(str(Path(runtime_dir)), scope_result.stdout)
 
 
 if __name__ == "__main__":

@@ -44,7 +44,7 @@ path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
-path: tools/validation/semantic/skills/check_skill_frontmatter.py
+path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
 path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
@@ -271,7 +271,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "tools/validation/ci/runners/run_all_checks.sh": (
         "run_python_quality_checks.sh "
         "check_convention_compliance.py "
-        "check_skill_frontmatter.py "
+        "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
         "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"
@@ -288,13 +288,13 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
         "tests/bootstrap/test_bootstrap_runtime.py bootstrap_runtime.py\n"
     ),
     ".codex/README.md": (
-        "active events active/inactive legacy `Stop` fail-open retired child tombstones bounded redacted\n"
+        "active events active/inactive legacy `Stop` fail-open bounded redacted\n"
     ),
     "tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs": (
         "HOOK_EVENT_CONTRACTS HookEventContract ACTIVE_HOOK_HANDLERS "
         "UserPromptSubmit PreToolUse PostToolUse Stop hook_safety "
         "validate_projection_bytes record_hook_invocation HookLogContext "
-        "RETIRED_CHILD_TOMBSTONES MOVED_SOURCE_ABSENCES\n"
+        "\n"
     ),
     "tools/runtime/authority/hook_safety.py": (
         "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY "

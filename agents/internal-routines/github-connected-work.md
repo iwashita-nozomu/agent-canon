@@ -90,12 +90,16 @@ remote head / tree / diff を読み、作成した commit と scope が一致す
 
 ## 4. Validate what can actually be observed
 
+Issue の再現条件・完了判定は [issue-finding-report](../skills/issue-finding-report.md#publish-and-close)
+に従います。管理可能な再現ケースで契約を検証できる場合、報告元の実環境での再実行を
+残作業や close blocker に追加しません。
+
 変更契約の既存検証を選び、exact source / head、command または action、結果と証明した
 範囲を残します。完全 checkout の canonical validation、部分 source の構造・差分確認、
 remote readback、hosted checks を区別します。CI の緑だけで対象外・skipped の検証を
 実施済みにせず、run / job / step と対象 SHA を確認します。
 
-実行環境がない検証は未実施とし、必要な property、理由、実際の試行と結果、次の owner
+明示的に選択された検証を実行できない場合は未実施とし、必要な property、理由、実際の試行と結果、次の owner
 と正確な検証経路を Issue に残します。検証のためだけの Docker/GPU 設定変更、新 checker、
 無関係な全 suite は追加しません。変更自体の不良や失敗した検証を環境制約へ付け替えず、
 必要な修正は同じ範囲で続けます。安全に公開可能な差分まで止める理由にはしませんが、

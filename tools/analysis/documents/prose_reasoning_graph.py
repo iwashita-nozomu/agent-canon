@@ -179,50 +179,7 @@ EXPERIMENT_VOCABULARY_CUES = (
     "metric",
     "baseline",
 )
-SOFTWARE_ENGINEERING_CORPUS_CUES = (
-    "code",
-    "software",
-    "engineering",
-    "implementation",
-    "developer",
-    "repository",
-    "dependency",
-    "command",
-    "python",
-    "rust",
-    "cli",
-)
-ACADEMIC_CORPUS_CUES = ("academic", "paper", "research", "論文", "学術", "研究")
 EXPERIMENT_ACTIVITY_CUES = ("experiment", "protocol", "実験")
-STOPWORDS = {
-    "the",
-    "and",
-    "for",
-    "that",
-    "this",
-    "with",
-    "from",
-    "into",
-    "are",
-    "is",
-    "can",
-    "not",
-    "but",
-    "you",
-    "our",
-    "their",
-    "have",
-    "has",
-    "must",
-    "should",
-    "する",
-    "です",
-    "ます",
-    "こと",
-    "これ",
-    "それ",
-    "ため",
-}
 SQLITE_BUSY_TIMEOUT_SECONDS = 30
 WSL_MOUNT_MIN_PATH_PARTS = 3
 DEFAULT_DB_NAME = "prose_graph.sqlite"
@@ -230,7 +187,6 @@ DEFAULT_CACHE_HASH_LENGTH = 12
 VERIFICATION_RECURSION_MAX_DEPTH = 3
 FORM_NODE_LABEL_WORD_LIMIT = 8
 CONCEPT_CANDIDATE_LIMIT = 12
-CONCEPT_MIN_TERM_LENGTH = 3
 CONCEPT_NODE_CONFIDENCE = 0.6
 CONCEPT_EDGE_CONFIDENCE = 0.4
 PHASE_INFERENCE_CONFIDENCE = 0.55
@@ -1603,17 +1559,10 @@ def semantic_prose_ir_payload(
 ) -> dict[str, object]:
     """Return deterministic prose intermediate representation and its evidence path."""
     texts = [path.read_text(encoding="utf-8") for path in input_paths]
-    tokens = Counter(
-        token.casefold()
-        for text in texts
-        for token in re.findall(r"[0-9A-Za-z_\u0080-\uFFFF]+", text)
-        if len(token) >= CONCEPT_MIN_TERM_LENGTH and token.casefold() not in STOPWORDS
-    )
-    top_terms = tuple(
-        token for token, _count in tokens.most_common(CONCEPT_CANDIDATE_LIMIT)
-    )
+    lexical = native_lexicon(texts, prompt_text)
+    top_terms = lexical["top_terms"]
     experiment_status = experiment_plan_analysis_status(texts)
-    corpus_hints = semantic_corpus_hints(texts, prompt_text)
+    corpus_hints = lexical["corpus_hints"]
     ir_path = db_path.parent / "semantic_prose_ir.json"
     payload: dict[str, object] = {
         "schema": "semantic-prose-ir/v1",
@@ -1622,6 +1571,7 @@ def semantic_prose_ir_payload(
         "documents": tuple(str(path.resolve()) for path in input_paths),
         "prompt_present": bool(prompt_text.strip()),
         "terms": top_terms,
+        "segmentation": lexical["segmentation"],
         "analysis_intents": (
             {"intent": "experiment_plan", "status": experiment_status},
         ),
@@ -1655,49 +1605,54 @@ def experiment_plan_analysis_status(texts: Sequence[str]) -> str:
     return "absent"
 
 
-def semantic_corpus_hints(
-    texts: Sequence[str], prompt_text: str
-) -> tuple[dict[str, object], ...]:
-    """Return deterministic corpus hints for software engineering and academic writing."""
-    combined = "\n".join((*texts, prompt_text))
-    hints: list[dict[str, object]] = []
-    if has_any(combined, SOFTWARE_ENGINEERING_CORPUS_CUES):
-        hints.append(
-            {
-                "corpus_id": "software_engineering",
-                "label": "Software engineering prose and implementation artifacts",
-                "score": 1,
-                "selected": True,
-                "basis": {
-                    "source": "semantic_keyword_matching",
-                    "signals": tuple(
-                        _for_corpus_matches(combined, SOFTWARE_ENGINEERING_CORPUS_CUES)
-                    ),
-                },
-            }
-        )
-    if has_any(combined, ACADEMIC_CORPUS_CUES):
-        hints.append(
-            {
-                "corpus_id": "academic_writing",
-                "label": "Academic writing and research communication",
-                "score": 1,
-                "selected": True,
-                "basis": {
-                    "source": "semantic_keyword_matching",
-                    "signals": tuple(
-                        _for_corpus_matches(combined, ACADEMIC_CORPUS_CUES)
-                    ),
-                },
-            }
-        )
-    return tuple(hints)
+class LexiconResponse(TypedDict):
+    """Native lexical result consumed by the existing graph adapter."""
+
+    schema: str
+    segmentation: str
+    terms: list[list[str]]
+    top_terms: list[str]
+    corpus_hints: list[dict[str, object]]
 
 
-def _for_corpus_matches(text: str, cues: tuple[str, ...]) -> list[str]:
-    """Return matched cues in deterministic order."""
-    lowered = text.lower()
-    return [cue for cue in cues if has_any(lowered, (cue,))]
+def native_lexicon(texts: Sequence[str], prompt: str = "") -> LexiconResponse:
+    """Read one batch from the shared Rust lexical owner."""
+    result = subprocess.run(
+        [str(CANONICAL_GRAPH_EXECUTABLE), "structured-analysis", "lexicon"],
+        input=json.dumps({"texts": list(texts), "prompt": prompt}, ensure_ascii=False),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    if result.returncode:
+        raise ValueError(f"native prose lexicon failed: {result.stderr.strip()}")
+    payload = json.loads(result.stdout)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != "agent-canon.prose-lexicon.v1"
+    ):
+        raise ValueError("native prose lexicon returned an invalid schema")
+    return cast(LexiconResponse, payload)
+
+
+def analysis_lexicon(connection: sqlite3.Connection) -> Mapping[str, tuple[str, ...]]:
+    """Bind graph source texts to one native batch, without per-comparison processes."""
+    texts = {"": None}
+    for node in fetch_nodes(connection):
+        texts[node.text] = None
+        texts[str(node.payload.get("section_path", ""))] = None
+        if node.layer == "source" and node.kind == "document":
+            for record in dependency_records_from_source_payload(
+                node.payload, node.node_id
+            ):
+                texts[record.body] = None
+                texts[record.text] = None
+    inputs = tuple(texts)
+    result = native_lexicon(inputs)
+    return {
+        text: tuple(terms) for text, terms in zip(inputs, result["terms"], strict=True)
+    }
 
 
 def corpus_hints_from_semantic_ir(
@@ -2019,18 +1974,19 @@ def analyze_graph(connection: sqlite3.Connection, profile: str) -> None:
     paragraphs = fetch_nodes(connection, layer="form", kind="paragraph")
     sentences = fetch_nodes(connection, layer="form", kind="sentence")
     sections = fetch_nodes(connection, layer="form", kind="section")
+    lexicon = analysis_lexicon(connection)
     add_projection_layer(connection, document_id, profile)
-    add_concept_layer(connection, document_id, paragraphs)
+    add_concept_layer(connection, document_id, paragraphs, lexicon)
     add_phase_layer(connection, document_id, paragraphs, profile)
-    add_discourse_layer(connection, paragraphs)
+    add_discourse_layer(connection, paragraphs, lexicon)
     claims = add_argument_layer(connection, document_id, sentences)
-    evidence = add_evidence_layer(connection, document_id, sentences, claims)
+    evidence = add_evidence_layer(connection, document_id, sentences, claims, lexicon)
     add_experiment_layer(connection, document_id, sentences, profile)
     add_presentation_feature_layer(connection, document_id, paragraphs, sentences)
     add_explanation_layer(connection, document_id, profile)
     add_section_edges(connection, sections, paragraphs)
-    add_diagnostics(connection, paragraphs, claims, evidence, profile)
-    add_edit_operations(connection, paragraphs)
+    add_diagnostics(connection, paragraphs, claims, evidence, profile, lexicon)
+    add_edit_operations(connection, paragraphs, lexicon)
 
 
 def fetch_document_id(connection: sqlite3.Connection) -> str:
@@ -2105,16 +2061,19 @@ def add_projection_layer(
 
 
 def add_concept_layer(
-    connection: sqlite3.Connection, document_id: str, paragraphs: Sequence[Node]
+    connection: sqlite3.Connection,
+    document_id: str,
+    paragraphs: Sequence[Node],
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Extract concept nodes from repeated terms."""
     term_counts: Counter[str] = Counter()
     for paragraph in paragraphs:
-        term_counts.update(tokens(paragraph.text))
+        term_counts.update(lexicon[paragraph.text])
     candidates = [
         term
         for term, count in term_counts.most_common(CONCEPT_CANDIDATE_LIMIT)
-        if count > 1 and term not in STOPWORDS and len(term) > CONCEPT_MIN_TERM_LENGTH
+        if count > 1
     ]
     for index, term in enumerate(candidates, start=1):
         insert_node(
@@ -2142,7 +2101,7 @@ def add_concept_layer(
             payload={"basis": "term_cooccurrence"},
         )
     for paragraph in paragraphs:
-        paragraph_terms = Counter(tokens(paragraph.text))
+        paragraph_terms = Counter(lexicon[paragraph.text])
         mentioned_terms = [
             term for term in candidates if paragraph_terms.get(term, 0) > 0
         ]
@@ -2188,16 +2147,6 @@ def add_concept_layer(
 def concept_id_for(candidates: Sequence[str], term: str) -> str:
     """Return concept id for a term."""
     return f"concept:{candidates.index(term) + 1}"
-
-
-def tokens(text: str) -> tuple[str, ...]:
-    """Tokenize prose into lowercase terms."""
-    return tuple(
-        token.lower()
-        for token in re.findall(
-            r"[A-Za-z][A-Za-z0-9_-]{2,}|[一-龥ぁ-んァ-ン]{2,}", text
-        )
-    )
 
 
 def add_phase_layer(
@@ -2256,12 +2205,14 @@ def infer_phase(text: str, index: int, profile: str) -> str:
 
 
 def add_discourse_layer(
-    connection: sqlite3.Connection, paragraphs: Sequence[Node]
+    connection: sqlite3.Connection,
+    paragraphs: Sequence[Node],
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Add discourse edges between adjacent paragraphs."""
     for index, (left, right) in enumerate(zip(paragraphs, paragraphs[1:]), start=1):
         relation = infer_discourse_relation(right.text)
-        overlap = lexical_overlap(left.text, right.text)
+        overlap = lexical_overlap(left.text, right.text, lexicon)
         insert_edge(
             connection,
             f"discourse:{index}",
@@ -2279,7 +2230,7 @@ def add_discourse_layer(
             ),
             payload={
                 "shared_terms": sorted(
-                    set(tokens(left.text)) & set(tokens(right.text))
+                    set(lexicon[left.text]) & set(lexicon[right.text])
                 )[:DISCOURSE_SHARED_TERM_LIMIT],
                 "lexical_overlap": overlap,
                 "surface_signal": first_discourse_signal(right.text),
@@ -2341,10 +2292,12 @@ def first_discourse_signal(text: str) -> str:
     return ""
 
 
-def lexical_overlap(left: str, right: str) -> float:
+def lexical_overlap(
+    left: str, right: str, lexicon: Mapping[str, tuple[str, ...]]
+) -> float:
     """Return token overlap ratio."""
-    left_terms = set(tokens(left)) - STOPWORDS
-    right_terms = set(tokens(right)) - STOPWORDS
+    left_terms = set(lexicon[left])
+    right_terms = set(lexicon[right])
     if not left_terms or not right_terms:
         return 0.0
     return len(left_terms & right_terms) / max(len(left_terms | right_terms), 1)
@@ -2403,6 +2356,7 @@ def add_evidence_layer(
     document_id: str,
     sentences: Sequence[Node],
     claims: Sequence[Node],
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> tuple[Node, ...]:
     """Extract evidence nodes and support nearby claims."""
     evidence_nodes: list[Node] = []
@@ -2441,9 +2395,11 @@ def add_evidence_layer(
                     sentence.source_end,
                 )
             )
-    evidence_nodes.extend(add_graph_dependency_evidence_nodes(connection, document_id))
+    evidence_nodes.extend(
+        add_graph_dependency_evidence_nodes(connection, document_id, lexicon)
+    )
     for claim in claims:
-        evidence = best_supporting_evidence(claim, evidence_nodes)
+        evidence = best_supporting_evidence(claim, evidence_nodes, lexicon)
         if evidence is not None:
             basis = evidence_support_basis(claim, evidence)
             insert_edge(
@@ -2482,7 +2438,9 @@ def add_evidence_layer(
 
 
 def add_graph_dependency_evidence_nodes(
-    connection: sqlite3.Connection, document_id: str
+    connection: sqlite3.Connection,
+    document_id: str,
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> tuple[Node, ...]:
     """Materialize canonical-graph dependency records as prose evidence."""
     row = connection.execute(
@@ -2508,7 +2466,7 @@ def add_graph_dependency_evidence_nodes(
         payload = {
             "source": "canonical_graph",
             "manifest_role": record.role,
-            "responsibility_terms": sorted(set(tokens(record.body)) - STOPWORDS),
+            "responsibility_terms": sorted(set(lexicon[record.body])),
             "strength": "responsibility_contract",
         }
         insert_node(
@@ -2623,7 +2581,9 @@ def member_anchor_ids(*nodes: Node) -> list[str]:
 
 
 def best_supporting_evidence(
-    claim: Node, evidence_nodes: Sequence[Node]
+    claim: Node,
+    evidence_nodes: Sequence[Node],
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> Node | None:
     """Choose evidence that has local relation to a claim."""
     claim_sentence_id = str(claim.payload.get("sentence_id", ""))
@@ -2632,36 +2592,30 @@ def best_supporting_evidence(
             return evidence
     for evidence in evidence_nodes:
         if evidence.kind in {"document_responsibility", "graph_dependency"}:
-            if graph_dependency_covers_claim(claim, evidence):
+            if graph_dependency_covers_claim(claim, evidence, lexicon):
                 return evidence
             continue
-        if lexical_overlap(claim.text, evidence.text) >= EVIDENCE_SUPPORT_MIN_OVERLAP:
+        if (
+            lexical_overlap(claim.text, evidence.text, lexicon)
+            >= EVIDENCE_SUPPORT_MIN_OVERLAP
+        ):
             return evidence
     return None
 
 
-def graph_dependency_covers_claim(claim: Node, evidence: Node) -> bool:
+def graph_dependency_covers_claim(
+    claim: Node, evidence: Node, lexicon: Mapping[str, tuple[str, ...]]
+) -> bool:
     """Return true when graph dependency terms cover claim concepts."""
-    claim_terms = responsibility_terms(claim.text)
-    evidence_terms = responsibility_terms(evidence.text)
+    claim_terms = set(lexicon[claim.text])
+    evidence_terms = set(lexicon[evidence.text])
     if not claim_terms or not evidence_terms:
         return False
     shared_terms = claim_terms & evidence_terms
     if shared_terms:
         return True
-    claim_anchor_terms = responsibility_terms(
-        str(claim.payload.get("section_path", ""))
-    )
+    claim_anchor_terms = set(lexicon[str(claim.payload.get("section_path", ""))])
     return bool(claim_anchor_terms & evidence_terms)
-
-
-def responsibility_terms(text: str) -> set[str]:
-    """Return concept terms used for responsibility coverage."""
-    return {
-        term
-        for term in tokens(text)
-        if term not in STOPWORDS and len(term) > CONCEPT_MIN_TERM_LENGTH
-    }
 
 
 def evidence_support_basis(claim: Node, evidence: Node) -> str:
@@ -2926,6 +2880,7 @@ def add_diagnostics(
     claims: Sequence[Node],
     evidence_nodes: Sequence[Node],
     profile: str,
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Add rule-based diagnostics."""
     support_edges = connection.execute(
@@ -2983,7 +2938,7 @@ def add_diagnostics(
         if section_path(left) != section_path(right):
             continue
         if (
-            lexical_overlap(left.text, right.text) < TOPIC_JUMP_MAX_OVERLAP
+            lexical_overlap(left.text, right.text, lexicon) < TOPIC_JUMP_MAX_OVERLAP
             and not first_discourse_signal(right.text)
             and not is_structured_presentation_block(left.text)
             and not is_structured_presentation_block(right.text)
@@ -3280,7 +3235,9 @@ def required_layers_for_profile(
 
 
 def add_edit_operations(
-    connection: sqlite3.Connection, paragraphs: Sequence[Node]
+    connection: sqlite3.Connection,
+    paragraphs: Sequence[Node],
+    lexicon: Mapping[str, tuple[str, ...]],
 ) -> None:
     """Add split/merge/bridge/reorder operation candidates."""
     prose_paragraphs = [
@@ -3306,7 +3263,7 @@ def add_edit_operations(
             )
             break
     for left, right in zip(prose_paragraphs, prose_paragraphs[1:]):
-        overlap = lexical_overlap(left.text, right.text)
+        overlap = lexical_overlap(left.text, right.text, lexicon)
         if overlap > MERGE_PARAGRAPH_MIN_OVERLAP:
             insert_operation(
                 connection,

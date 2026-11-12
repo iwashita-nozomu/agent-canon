@@ -13,63 +13,56 @@ downstream design ../../.codex/personal/skills/codex-task-workflow/SKILL.md runt
 @dependency-end
 -->
 
+
 ## Purpose
 
-Carry the requested repository change through its selected owners, validation,
-and authorized delivery. Phase procedures remain in their canonical owners.
+Carry a selected repository change through implementation, verification, and
+authorized delivery.
 
 ## Use When
 
-Use after routing selects repository-changing execution. Advice, explanation,
-and read-only inspection keep their existing scope.
+Use after routing selects a repository change. Read-only advice keeps its scope.
 
 ## Execution route
 
-Reuse the applicable route from the [task catalog](../task_catalog.yaml), the
-current target, and settled context. Begin with the requested outcome, authority,
-input/output contract, and governing owner. For a failure repair, identify the
-cause from the target and relevant evidence, then use the root [local repair
-rule](../../ROOT_AGENTS.md#always-on-boundary). Do not restart discovery or add
-phases that do not affect this task.
-For execution-time clarification or a contract blocking the agreed outcome,
-follow [Decision Order](agent-orchestration.md#decision-order)
-to review the whole Goal, resolve retrievable facts, and ask before changing
-the agreed scope, expected result, or major approach. Carry out contract-derived
-repairs within existing authority. Continue independent authorized work while
-a dependent change awaits the user's decision.
+Reuse the known route, target, agreement, and owner. Consult a catalog only for
+an unresolved choice. Read a linked section only when it answers a missing
+question; ordinary execution needs neither the whole phase map nor every manual.
+[Decision Order](agent-orchestration.md#decision-order) owns unresolved scope or
+contract choices. Resolve retrievable facts and continue independent work.
 
 ## Stages
 
-Use [CODEX_WORKFLOW](../canonical/CODEX_WORKFLOW.md) to select an owner for the
-next needed action. Follow actual dependencies, not a fixed stage order. Resolve
-a material design question with [CODEX_IMPLEMENTATION](../canonical/CODEX_IMPLEMENTATION.md)
-when it changes the implementation. Keep obsolete-support retirement with the
-existing owner. A newly selected capability uses its existing CLI/API/script
-with its native arguments and process-result semantics. Before adding an
-implementation, map the required operations to capabilities already identified
-in the caller's context and construct a concrete call flow using
-[reuse feasibility support](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support).
-Check the producer-to-consumer contracts and resulting guarantee, and compose
-the existing operations with necessary caller wiring. Add or extend a capability
-only for a concrete gap at its owner. Judge overlap by responsibility and contract,
-not by names or paths alone.
-Use [Skill and tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
-for native execution state, completed evidence, and the next owning decision.
+Start from the target code, diff, and current contract. Decide the complete
+repair unit before editing. Connect existing APIs/CLIs before adding capability;
+extend the existing owner for a demonstrated gap. Use
+[reuse feasibility](../../documents/conventions/software-engineering-principles.md#reuse-feasibility-support)
+for an unresolved reuse decision, [design admission](../canonical/CODEX_IMPLEMENTATION.md#design-integrity-gate)
+for an unsettled mechanism, and [tool cooperation](agent-orchestration.md#skill-and-tool-cooperation)
+for an unresolved tool/result boundary.
+
+## Implementation and deletion
+
+Implement complete units in dependency order: move callers to the retained API,
+delete superseded code and exclusive support, inspect the final diff and old
+references, then format and run the selected validation together. Preserve tests
+of retained guarantees and shared support. Removal belongs to this work unit.
+Use the [implementation sequence](../canonical/CODEX_IMPLEMENTATION.md#5-implementation)
+or [RC-09](../../documents/design/responsibility-cleanup.md#duplicate-implementation-retirement)
+only for an unresolved deletion boundary; passing replacement tests alone does
+not establish deletion.
 
 ## Coordination handoff
 
-Delegate or create durable coordination only when the selected route needs it.
-Then follow [subagent-bootstrap](subagent-bootstrap.md),
-[CODEX_SUBAGENTS](../canonical/CODEX_SUBAGENTS.md), and
-[COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) for the applicable role,
-checkout, authority, and handoff. Parent and child retain their assigned scopes.
+When delegation is selected, use [subagent-bootstrap](subagent-bootstrap.md) for
+that handoff, scope, and continuation. A task that the current agent owns needs
+no coordination document or bundle.
 
 ## Validation and delivery
 
-Run the validation selected by the changed guarantee and its owner. Report what
-the result establishes; keep failed, skipped, and unrun checks distinct. Use
-[CODEX_COMPLETION](../canonical/CODEX_COMPLETION.md) for closeout when needed.
-Integration or publication follows its selected owner and authorization, with
-remote readback after an external write. When the task changes an operational
-procedure, update the affected Skill's Use When/flow in the same work unit;
-ordinary prose edits do not trigger a repository-wide Skill scan.
+Validate the changed guarantee; distinguish pass, failure, skip, and unrun work.
+Correct the owning failure and resume the requested operation. Reuse unchanged
+results. [Completion readiness](../canonical/CODEX_COMPLETION.md#completion-readiness)
+resolves an unfinished outcome; integration/publication follows the authorized
+owner and remote readback. Update the affected Skill when an operational
+procedure changes. Ordinary prose edits need no repository-wide Skill scan.

@@ -159,6 +159,14 @@ language = "rust"
 summary = "Git diff, optional SCIP impact, and dependency-header expansion summary documentation."
 
 [[tool]]
+id = "export-codex-runtime-summary"
+classification = "public"
+tool = "tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs"
+doc = "documents/tools/codex_runtime_summary.md"
+language = "rust"
+summary = "Bounded and prompt-free Codex runtime summary export documentation."
+
+[[tool]]
 id = "scip-index"
 classification = "public"
 tool = "tools/runtime/dispatch/agent-canon/src/scip_index.rs"
@@ -297,10 +305,10 @@ summary = "Canonical native LSP 3.17 code-analysis API, protocol, and report sch
 [[tool]]
 id = "extract-docx"
 classification = "public"
-tool = "tools/analysis/documents/extraction/extract_docx.py"
+tool = "tools/runtime/dispatch/agent-canon/src/extract_docx.rs"
 doc = "documents/tools/extract_docx.md"
-language = "python"
-summary = "Standard-library DOCX decomposition into searchable and auditable reference bundles."
+language = "rust"
+summary = "Native DOCX decomposition into searchable and auditable reference bundles."
 
 [[tool]]
 id = "evaluate-agent-run"

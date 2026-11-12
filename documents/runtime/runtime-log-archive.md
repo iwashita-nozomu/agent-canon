@@ -5,7 +5,8 @@ responsibility Defines external AgentCanon hook, eval, runtime-summary, and repo
 upstream design bootstrap-runtime.md shared runtime boundary
 upstream implementation ../../tools/runtime/archive/runtime_log_paths.py external path resolver
 upstream implementation ../../tools/runtime/archive/runtime_log_archive_git.py canonical archive publisher
-upstream implementation ../../eval/checkers/eval_accumulation_check.py eval completeness gate
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs eval completeness gate
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_runtime_summary.rs exports bounded Codex runtime summaries
 downstream design runtime-log-archive-migration.md archive migration route
 @dependency-end
 -->
@@ -41,7 +42,10 @@ Start with [Standalone Bootstrap And Shared Tool Runtime](bootstrap-runtime.md)
 for the command family and lifecycle. Use
 `runtime_log_paths.py` for path resolution and
 `runtime_log_archive_git.py` for archive state, clone, commit, push, and
-readback. Use `eval_accumulation_check.py` to validate the external archive.
+readback. Use `tools/bin/agent-canon eval-accumulation-check` to validate the external archive.
+Use `tools/bin/agent-canon export-codex-runtime-summary` to append a bounded,
+prompt-free Codex runtime summary and cross-chat index through the native
+external-runtime boundary.
 
 Given:
 

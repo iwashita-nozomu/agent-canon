@@ -122,8 +122,9 @@ packet、台帳、固定 schema を作る必要はありません。
 
 - repository-qualified Issue、対象製品コードの commit SHA、再現ソースの commit
   SHA とファイル固定リンクを区別する。既存 test が再現なら、その case を指す。
-- 再現に影響する環境・依存 version、入力または取得手順、cwd と実行コマンド、
-  期待結果と実結果を残す。別 SHA の再現ソースを使う場合は適用方法も明示する。
+- 再現に必要な入力・環境特性・依存 version、実行コマンド、期待結果と実結果を残す。
+  元の実ホストや絶対 path は必須にせず、同じ性質を検証できる管理可能な fixture を使う。
+  別 SHA の再現ソースを使う場合は適用方法も明示する。
 - 修正後に検証した exact SHA と同じ oracle の結果、継続的に保証する既存 test /
   checker / integration evidence、未検証範囲と理由を残す。
 
