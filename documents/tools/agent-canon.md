@@ -66,6 +66,14 @@ directory; it never rewrites diagram source. When no path is supplied, the
 command checks the repository documentation targets used by the shared docs
 gate.
 
+The native CLI includes default Markdown and link settings. A project's
+`.markdownlint-cli2.jsonc` and `tools/validation/documentation/config/lychee.toml`
+take precedence when present. Absent settings use temporary copies of the
+bundled defaults; the command creates no configuration inside the project.
+Invalid project settings are reported by the provider and remain unchanged.
+The external providers themselves must be installed or supplied by the shared
+runtime.
+
 If the command contract is unclear, run `tools/bin/agent-canon docs -h` first.
 
 `docs check-bootstrap` validates bootstrap-facing documentation and can validate
