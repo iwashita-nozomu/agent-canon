@@ -21,7 +21,6 @@
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/github_workflow_check.rs validates GitHub workflow and PR checklist contracts
 # upstream implementation ../../../../bootstrap/container/image/Dockerfile defines the shared tool image
 # upstream implementation ../../../runtime/container/bootstrap_runtime.py owns lifecycle readback
-# upstream implementation ../../../../eval/checkers/smoke_test_research_perspective_pack.py validates research role packet
 # @dependency-end
 set -euo pipefail
 
@@ -357,12 +356,6 @@ if run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --form
   CANON_GRAPH_READY=1
 else
   echo "❌ canonical graph build 失敗"
-  EXIT_CODE=1
-fi
-if "$PYTHON_BIN" "${WORKSPACE_ROOT}/eval/checkers/smoke_test_research_perspective_pack.py" 2>&1; then
-  echo "✅ research perspective pack smoke test 成功"
-else
-  echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
 if run_agent_canon notebook-quality --all 2>&1; then

@@ -10,9 +10,7 @@
 # upstream design ../../../agents/skills/change-review.md owns findings-first candidate review decisions.
 # upstream design ../../../agents/skills/pr-processing.md owns PR-head review handling.
 # upstream implementation ./team_config.py resolves task, role, and resume routing.
-# upstream implementation ./implementation_dispatch.py resolves agent type and dispatch routing.
 # upstream implementation ../../runtime/values.py refines decoded ledger and manifest containers.
-# upstream implementation ../../runtime/lifecycle/workflow_monitor.py produces write-result triggers and records review waves.
 # upstream implementation ../../repository/github/github_publish.py produces verified PR-head update triggers.
 # upstream implementation ../../runtime/artifacts/artifact_identity.py materializes review artifact byte identities.
 # upstream implementation ../../runtime/artifacts/external_artifact_binding.py maps provider readback to local events.
@@ -47,7 +45,7 @@ from tools.runtime.artifacts.external_artifact_binding import (
 from tools.runtime.artifacts.report_artifact_checks import (
     markdown_without_adjudicated_rejected_hypotheses,
 )
-from tools.runtime.authority.task_authority import ACTIVE_RUN_POINTER
+from tools.runtime.archive.runtime_log_paths import ACTIVE_RUN_POINTER
 from tools.runtime.values import (
     is_object_list,
     is_string_object_dict,

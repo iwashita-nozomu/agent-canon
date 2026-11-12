@@ -4,7 +4,6 @@ contract agent-runtime
 responsibility Defines the private feedback/knowledge command boundary and its external agent-canon-log storage route.
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/private_feedback.rs owns native private storage and sync semantics
 downstream implementation ../../tools/runtime/dispatch/agent-canon/src/runtime_boundary.rs owns handle-relative files and spool locks
-downstream implementation ../../tools/runtime/lifecycle/workflow_monitor.py structured feedback capture
 @dependency-end
 -->
 

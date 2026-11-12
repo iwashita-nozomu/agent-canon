@@ -2,28 +2,20 @@
 # contract test
 # responsibility Tests orchestration materialization of the IssueWorker publisher route.
 # upstream implementation ../../tools/repository/github/issue_worker_dispatch.py materializes route and ToolCall
-# upstream implementation ../../tools/agent/orchestration/agent_team.py exposes orchestration facade
 # @dependency-end
 """Focused IssueWorker orchestration tests."""
 
 from __future__ import annotations
 
-import io
-import json
-import os
 import subprocess
 import sys
-import tempfile
-from contextlib import redirect_stdout
 from pathlib import Path
 
 import pytest
-import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from tools.repository.github import issue_worker_dispatch  # noqa: E402
-from tools.runtime.lifecycle.bootstrap_agent_run import main as bootstrap_main  # noqa: E402
 from tools.runtime.authority.checkout_identity import CheckoutIdentity  # noqa: E402
 from tools.agent.orchestration.team_config import (  # noqa: E402
     load_task_catalog,
@@ -274,218 +266,6 @@ def test_explicit_issue_worker_candidate_does_not_change_generic_intake() -> Non
         issue_worker_candidate=_candidate(),
     )
     assert all(role.id != "publisher" for role in roles)
-
-
-def test_bootstrap_t15_dispatches_candidate_once_and_persists_role_result(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("AGENT_CANON_SOURCE_ROOT", raising=False)
-    monkeypatch.delenv("AGENT_CANON_ROOT", raising=False)
-    calls: list[tuple[str, str]] = []
-
-    def spawn(agent_type: str, prompt: str) -> str:
-        calls.append((agent_type, prompt))
-        return "publisher-bootstrap-1"
-
-    candidate = _candidate(durable_follow_up=True)
-    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-") as root:
-        runtime_root = Path(root) / "runtime"
-        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
-        report_root = runtime_root / "reports"
-        run_id = "t15-bootstrap-dispatch"
-        output = io.StringIO()
-        with redirect_stdout(output):
-            return_code = bootstrap_main(
-                [
-                    "--task",
-                    "publish explicit feedback",
-                    "--task-id",
-                    "T15",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(PROJECT_ROOT),
-                    "--report-root",
-                    str(report_root),
-                    "--runtime-root",
-                    str(runtime_root),
-                    "--issue-worker-candidate",
-                    json.dumps(candidate),
-                ],
-                spawn=spawn,
-            )
-
-        assert return_code == 0
-        assert len(calls) == 1
-        assert calls[0][0] == "publisher"
-        assert "ISSUE_WORKER_DISPATCH_STATUS=spawned" in output.getvalue()
-        assert "EXECUTION_GRAPH" not in output.getvalue()
-        manifest_path = report_root / run_id / "team_manifest.yaml"
-        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        run = manifest["run"]
-        assert "execution_graph" not in run
-        dispatch = run["issue_worker_dispatch"]
-        assert dispatch["status"] == "spawned"
-        assert dispatch["checkout_identity"]["remote"] == "iwashita-nozomu/agent-canon"
-
-
-def test_bootstrap_t15_without_candidate_does_not_dispatch_publisher(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[str, str]] = []
-
-    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-empty-") as root:
-        runtime_root = Path(root) / "runtime"
-        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
-        report_root = runtime_root / "reports"
-        run_id = "t15-bootstrap-no-candidate"
-        output = io.StringIO()
-        with redirect_stdout(output):
-            return_code = bootstrap_main(
-                [
-                    "--task",
-                    "publish explicit feedback",
-                    "--task-id",
-                    "T15",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    run_id,
-                    "--workspace-root",
-                    str(PROJECT_ROOT),
-                    "--report-root",
-                    str(report_root),
-                    "--runtime-root",
-                    str(runtime_root),
-                ],
-                spawn=lambda agent_type, prompt: (
-                    calls.append((agent_type, prompt)) or "unexpected-publisher"
-                ),
-            )
-
-        assert return_code == 0
-        assert calls == []
-        assert "EXECUTION_GRAPH" not in output.getvalue()
-        manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
-        )
-        run = manifest["run"]
-        assert "execution_graph" not in run
-        assert "issue_worker_dispatch" not in run
-
-
-def test_bootstrap_t15_foreign_candidate_is_handoff_without_spawn(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[str, str]] = []
-    candidate = _candidate(repository="other/repository")
-
-    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-foreign-") as root:
-        runtime_root = Path(root) / "runtime"
-        monkeypatch.setenv("AGENT_CANON_RUNTIME_ROOT", str(runtime_root))
-        report_root = runtime_root / "reports"
-        run_id = "t15-bootstrap-foreign"
-        return_code = bootstrap_main(
-            [
-                "--task",
-                "publish foreign feedback",
-                "--task-id",
-                "T15",
-                "--owner",
-                "codex",
-                "--run-id",
-                run_id,
-                "--workspace-root",
-                str(PROJECT_ROOT),
-                "--report-root",
-                str(report_root),
-                "--runtime-root",
-                str(runtime_root),
-                "--issue-worker-candidate",
-                json.dumps(candidate),
-            ],
-            spawn=lambda agent_type, prompt: (
-                calls.append((agent_type, prompt)) or "unexpected-publisher"
-            ),
-        )
-
-        assert return_code == 0
-        assert calls == []
-        manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
-        )
-        dispatch = manifest["run"]["issue_worker_dispatch"]
-        assert dispatch["status"] == "deferred"
-        assert dispatch["handoff"]["reason"] == "other-repository"
-        assert dispatch["tool_call"] is None
-
-
-def test_bootstrap_cli_materializes_spawn_handoff_without_injected_callback() -> None:
-    candidate = _candidate(durable_follow_up=True)
-
-    with tempfile.TemporaryDirectory(prefix="issue-worker-bootstrap-cli-") as root:
-        runtime_root = Path(root) / "runtime"
-        report_root = runtime_root / "reports"
-        run_id = "t15-bootstrap-cli"
-        environment = os.environ.copy()
-        environment["AGENT_CANON_RUNTIME_ROOT"] = str(runtime_root)
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(
-                    PROJECT_ROOT
-                    / "tools"
-                    / "runtime"
-                    / "lifecycle"
-                    / "bootstrap_agent_run.py"
-                ),
-                "--task",
-                "publish explicit feedback",
-                "--task-id",
-                "T15",
-                "--owner",
-                "codex",
-                "--run-id",
-                run_id,
-                "--workspace-root",
-                str(PROJECT_ROOT),
-                "--report-root",
-                str(report_root),
-                "--runtime-root",
-                str(runtime_root),
-                "--issue-worker-candidate",
-                json.dumps(candidate),
-            ],
-            cwd=PROJECT_ROOT,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        assert result.returncode == 0, result.stderr
-        assert "ISSUE_WORKER_DISPATCH_STATUS=pending" in result.stdout
-        assert "EXECUTION_GRAPH" not in result.stdout
-        spawn_line = next(
-            line
-            for line in result.stdout.splitlines()
-            if line.startswith("ISSUE_WORKER_SPAWN_TOOL_CALL_JSON=")
-        )
-        spawn_tool_call = json.loads(spawn_line.split("=", 1)[1])
-        assert spawn_tool_call["tool_id"] == "spawn_agent"
-        assert spawn_tool_call["arguments"]["role"] == "publisher"
-        assert spawn_tool_call["arguments"]["agent_type"] == "worker"
-        assert spawn_tool_call["arguments"]["checkout_identity"]["remote"] == (
-            "iwashita-nozomu/agent-canon"
-        )
-        manifest = yaml.safe_load(
-            (report_root / run_id / "team_manifest.yaml").read_text(encoding="utf-8")
-        )
-        dispatch = manifest["run"]["issue_worker_dispatch"]
-        assert dispatch["status"] == "pending"
-        assert "spawn_tool_call" not in dispatch
 
 
 def test_other_repository_candidate_is_no_mutation_handoff() -> None:

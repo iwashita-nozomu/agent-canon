@@ -4,7 +4,7 @@
 @dependency-start
 contract skill
 responsibility Launches selected child handoffs and durable coordination without duplicating role policy.
-upstream design ../task_catalog.yaml typed child and run-bundle selection
+upstream design ../task_catalog.yaml workflow and role guidance
 upstream design ../canonical/CODEX_SUBAGENTS.md role, authority, and lifecycle policy
 upstream design ./agent-orchestration.md current-agent default and delegation selection
 upstream design ../COMMUNICATION_PROTOCOL.md handoff and context boundary
@@ -17,7 +17,7 @@ downstream design ../../.codex/personal/skills/subagent-bootstrap/SKILL.md runti
 
 ## Purpose
 
-Prepare and launch a selected specialist handoff or durable coordination run.
+Prepare and launch a selected specialist through native Codex collaboration.
 Workflow and role selection remain with their existing owners.
 
 ## Use When
@@ -44,9 +44,8 @@ rows alone do not establish completion. Existing Eval or owner review can assess
 whether the route missed necessary work; a different route alone is not failure.
 
 [COMMUNICATION_PROTOCOL](../COMMUNICATION_PROTOCOL.md) owns handoff and context
-fields. For a write-capable child, use its prepared writer target and allowed
-paths; [repository-topic-clone](repository-topic-clone.md) owns checkout
-preparation. Do not duplicate their packet or checkout rules here. Read
+fields. For a write-capable child, pass its agreed Git checkout and allowed paths in the message; [repository-topic-clone](repository-topic-clone.md) owns checkout
+preparation. Do not create a run bundle or scope ledger. Read
 [direct-luna-communication](direct-luna-communication.md) only when Luna is the
 selected profile, and [subagent-startup](../internal-routines/subagent-startup.md)
 only when that private route is selected.

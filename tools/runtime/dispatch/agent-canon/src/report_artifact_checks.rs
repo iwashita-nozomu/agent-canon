@@ -1,8 +1,8 @@
 // @dependency-start
 // contract implementation
 // responsibility Owns native report checks, status parsing, token fields, run-bundle placement, and generated report rejection.
-// upstream design ../../../../../documents/design/request-intent-and-update-relation.md run-bundle evidence contract
-// upstream implementation ../../../../../tools/runtime/artifacts/report_artifact_checks.py retains task-close placement checks
+// upstream design ../../../../../documents/design/request-intent-and-update-relation.md selected report evidence contract
+// upstream implementation ../../../../../tools/runtime/artifacts/report_artifact_checks.py retains selected report placement checks
 // upstream design ../../../../../agents/canonical/ARTIFACT_PLACEMENT.md generated artifact placement policy
 // upstream design ../../../../../templates/agents/closeout_gate.md closeout evidence template
 // upstream design ../../../../../tools/README.md native tool index
@@ -14,7 +14,6 @@
 // downstream test ../tests/generated_artifact_guard_native.rs checks the frozen Python CLI oracle
 // downstream test ../../../../../tests/agent_tools/test_tool_drift.py checks caller closure
 // downstream implementation run_evaluation.rs scores selected run artifacts
-// downstream implementation task_close.rs consumes report status and placement checks at task close
 // downstream test ../tests/run_evaluation_native.rs establishes selected-file check behavior
 // @dependency-end
 

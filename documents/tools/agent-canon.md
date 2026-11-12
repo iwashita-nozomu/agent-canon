@@ -13,8 +13,7 @@ downstream design ../../agents/skills/md-style-check.md routes Markdown style wo
 # agent-canon CLI
 
 `agent-canon` is the canonical Rust entrypoint for deterministic AgentCanon
-tooling. This page covers the command families that share the wrapper, including
-the read-only TaskClose terminal consumer.
+tooling. This page covers the command families that share the wrapper.
 `agent-canon docs` owns Markdown documentation formatting and adjacent checks.
 `agent-canon test-design` owns resilient test-design diagnostics.
 The host lifecycle invokes `codex-config` after native compilation to project
@@ -52,8 +51,6 @@ tools/bin/agent-canon docs check-bootstrap [--root <path>] [--static-seed-consum
 tools/bin/agent-canon template-bundle export --source-root <root> --source-ref <commit-ish> --profile static-seed --output <directory>
 tools/bin/agent-canon template-bundle committed-tree --source-root <root> --source-ref <commit-ish>
 tools/bin/agent-canon test-design check <test-paths...>
-tools/bin/agent-canon waterfall-gate-check (--run-id <run-id> | --report-dir <path>) --gate <gate> [--report-root <path>]
-tools/bin/agent-canon task-close (--run-id <run-id> | --report-dir <path>) [--report-root <path>] [--runtime-root <path>]
 agent-canon codex-config --source-config <read-only-source-config>
 python3 tools/agent/orchestration/route.py --prompt "<request>" --mode routing-only --format json
 ```

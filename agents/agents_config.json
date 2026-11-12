@@ -5,11 +5,11 @@
     "report_root": "reports/agents",
     "branch_prefix": "agent",
     "worktree_scope_required": false,
-    "default_runtime_policy": "design_first_parent_managed_write_scope_team",
+    "default_runtime_policy": "native_codex_git_conversation",
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
-    "canonical_runtime": "tools/agent/orchestration/agent_team.py",
-    "summary": "The manager owns intake coordination, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability, but subagent execution is modeled as repeatable role instances identified by role_id+instance_id+agent_type. Repo-changing tasks use an explicit staged flow by workflow family: owner-bounded changes use boundary-evidenced triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> conditional post-implementation test design -> implementation review. Research and scientific-software tasks use evidence-gated perspective review instead of enabling every reviewer by default. One physical agent candidate is selected for each active decision; specialists remain inactive until the parent cites a distinct decision, input artifact, and expected output, with decision_id, review_focus, and disjoint packets required for multiple perspectives. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles only when their named evidence exists. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated; the same role may have multiple instances when each instance has a distinct input packet, expected output, and review or write scope. Every reviewed execution role uses one initial owning review per candidate epoch, stable blocking finding IDs, and focused recheck of only repaired blockers plus invalidated evidence. Advisory or duplicate findings never reopen implementation, repeated state/action fingerprints stop as non_convergent_cycle, and zero blockers with selected validation pass is terminal. Every run maintains a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution; detailed design review remains the strongest pre-implementation gate only when owner-boundary evidence is incomplete. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently, including same-role instances, only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves. Independent streams use the repository-topic lifecycle's prepared linked-worktree for a parent/same-repository branch or independent-clone for a dependency repository; review roles remain artifact-only."
+    "canonical_runtime": "Codex native collaboration",
+    "summary": "Select roles for the agreed task. Codex provides agent execution and collaboration; Git and the current conversation carry scope, handoff and results. Preserve role models, selected reviews, experiment/proof artifacts, hook logs and Eval."
   },
   "always_on_roles": [
     {
@@ -36,23 +36,15 @@
       ],
       "required_outputs": [
         "intent_brief.md",
-        "user_request_contract.md",
-        "schedule.md",
-        "work_log.md",
-        "team_manifest.yaml",
         "decision_log.md"
       ],
       "write_policy": {
         "mode": "artifacts_only",
         "allowed_artifacts": [
           "intent_brief",
-          "user_request_contract",
-          "schedule",
-          "work_log",
-          "decision_log",
-          "team_manifest"
+          "decision_log"
         ],
-        "notes": "The manager records intake, source-bucketed user request clauses, context sweep, library sweep, routing declarations, the canonical task TODO schedule, the run-local work log, and decisions only in the run artifact bundle."
+        "notes": "The manager carries agreed scope, handoff and results in the current conversation and Git. Selected reader-facing reports use their existing owners."
       }
     },
     {
@@ -191,20 +183,18 @@
         "approved_naming_followthrough"
       ],
       "required_outputs": [
-        "decision_log.md",
-        "work_log.md"
+        "decision_log.md"
       ],
       "write_policy": {
         "mode": "parent_assigned_scope_plus_artifacts",
         "allowed_artifacts": [
-          "decision_log",
-          "work_log"
+          "decision_log"
         ],
         "allowed_directories": [
           "."
         ],
         "requires_worktree_scope": false,
-        "notes": "The implementer may modify repository files only inside the parent-assigned allowed paths, team_manifest.yaml write scope, and approved Implementation Source Packet for its implementation slice. Multiple write-capable roles require disjoint scopes in the current checkout; colliding writers must be serialized into later waves. Independent streams use the repository-topic lifecycle's prepared linked-worktree for a parent/same-repository branch or independent-clone for a dependency repository. WORKTREE_SCOPE.md is legacy cleanup/drift evidence, not scope authority. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern, and keep the run-local work log current as implementation progresses."
+        "notes": "The implementer may modify repository files only inside the agreed task scope carried by the parent handoff and current Git diff. Multiple write-capable roles require disjoint scopes in the current checkout; colliding writers must be serialized into later waves. Independent streams use the repository-topic lifecycle's prepared linked-worktree for a parent/same-repository branch or independent-clone for a dependency repository. WORKTREE_SCOPE.md is legacy cleanup/drift evidence, not scope authority. It must extend existing code, mirror existing style, follow approved naming before introducing any new pattern."
       }
     },
     {
@@ -283,17 +273,13 @@
         "retrospective"
       ],
       "required_outputs": [
-        "closeout_gate.md",
         "agent_evaluation.md",
-        "workflow_monitoring.md",
         "retrospective.md"
       ],
       "write_policy": {
         "mode": "artifacts_only",
         "allowed_artifacts": [
-          "closeout_gate",
           "agent_evaluation",
-          "workflow_monitoring",
           "retrospective"
         ],
         "notes": "Audit closeout records the requested outcome, actual validation and delivery results, workflow monitoring, agent evaluation, and retrospective evidence. The auditor confirms unresolved request clauses and blocking findings are accounted for, selected validation results are accurate, focused rechecks are complete when selected, required diff-check evidence is present when selected, and workflow-monitoring plus evaluation feedback are resolved."
@@ -460,14 +446,10 @@
         "subagent_stage_plan",
         "validation_sequence_plan"
       ],
-      "required_outputs": [
-        "schedule.md"
-      ],
+      "required_outputs": [],
       "write_policy": {
         "mode": "artifacts_only",
-        "allowed_artifacts": [
-          "schedule"
-        ],
+        "allowed_artifacts": [],
         "notes": "Execution planning stays in the report bundle and must assign explicit stage owners, review separation, and subagent activation before detailed design begins."
       }
     },
@@ -1309,7 +1291,6 @@
       "share_only": [
         "intent_brief.md",
         "decision_log.md",
-        "team_manifest.yaml",
         "management_review.md"
       ],
       "do_not_share": [
@@ -1794,10 +1775,7 @@
   ],
   "artifacts": {
     "intent_brief": "intent_brief.md",
-    "user_request_contract": "user_request_contract.md",
     "decision_log": "decision_log.md",
-    "work_log": "work_log.md",
-    "team_manifest": "team_manifest.yaml",
     "management_review": "management_review.md",
     "design_brief": "design_brief.md",
     "design_review": "design_review.md",
@@ -1931,17 +1909,14 @@
     "change_review": "change_review.md",
     "final_review": "final_review.md",
     "verification": "verification.txt",
-    "closeout_gate": "closeout_gate.md",
     "agent_evaluation": "agent_evaluation.md",
     "skill_evaluation": "agent_evaluation.md",
-    "workflow_monitoring": "workflow_monitoring.md",
     "retrospective": "retrospective.md",
     "research_notes": "research_notes.md",
     "research_review": "research_review.md",
     "experiment_log": "experiment_log.md",
     "experiment_change_loop": "experiment_change_loop.md",
     "experiment_review": "experiment_review.md",
-    "schedule": "schedule.md",
     "schedule_review": "schedule_review.md",
     "citation_evidence_review": "citation_evidence_review.md",
     "notation_definition_review": "notation_definition_review.md",

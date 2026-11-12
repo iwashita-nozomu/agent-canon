@@ -1,6 +1,6 @@
 // @dependency-start
 // contract implementation
-// responsibility Compares Codex session token footprints and records run-bundle evidence.
+// responsibility Compares Codex session token footprints and optionally writes an explicit Markdown report.
 // upstream design ../../../../../agents/skills/tokens.md defines the token comparison protocol
 // upstream implementation python_cli_integer.rs parses options and exactly divides Python integers
 // upstream implementation python_cli_options.rs resolves Python argparse option prefixes
@@ -8,7 +8,6 @@
 // upstream implementation python_text.rs preserves Python-compatible whitespace and line splitting
 // upstream implementation path_resolution.rs preserves non-strict resolved paths
 // upstream reference ../../../../../tests/fixtures/python_integer_division/python_golden.json freezes CPython threshold ratio inputs
-// upstream implementation hook_report_projection.rs appends optional run-local monitoring evidence
 // downstream implementation main.rs exposes the token footprint CLI
 // downstream implementation ../../../../../eval/producers/generate_agent_runtime_dashboard.py records the native command
 // downstream implementation ../../../../../tests/agent_tools/test_compare_codex_token_footprints.py preserves the CLI scenarios
@@ -17,7 +16,6 @@
 use crate::python_cli_integer;
 use crate::python_cli_options::{resolve_long_option_prefix, LongOptionError};
 use crate::python_text::{python_splitlines, python_strip};
-use agent_canon::hook_report_projection::append_monitoring_projection;
 use agent_canon::path_resolution::{python_glob_paths, resolve_non_strict};
 use agent_canon::python_json::{parse_json, JsonNumber, JsonValue};
 use rustpython_ast::bigint::BigInt;
@@ -32,7 +30,7 @@ const TARGET_RATIO: f64 = 0.5;
 const DEFAULT_MOVING_AVERAGE_WINDOW: i64 = 5;
 const SECONDS_PER_DAY: i64 = 24 * 60 * 60;
 const REPORT_OWNER: &str = "../../tools/runtime/dispatch/agent-canon/src/token_footprints.rs";
-const HELP: &str = "usage: compare_codex_token_footprints.py [-h] [--baseline-session BASELINE_SESSION]\n                                               [--candidate-session CANDIDATE_SESSION]\n                                               [--session-glob SESSION_GLOB]\n                                               [--moving-average-window MOVING_AVERAGE_WINDOW]\n                                               [--recent-days RECENT_DAYS]\n                                               [--report-out REPORT_OUT]\n                                               [--report-dir REPORT_DIR]\n\nCompare or summarize Codex session token footprints.\n\noptions:\n  -h, --help            show this help message and exit\n  --baseline-session BASELINE_SESSION\n                        Baseline Codex session JSONL file.\n  --candidate-session CANDIDATE_SESSION\n                        Candidate Codex session JSONL file.\n  --session-glob SESSION_GLOB\n                        Session JSONL glob for summary mode. May be repeated.\n                        When set, the tool emits token usage moving-average\n                        evidence.\n  --moving-average-window MOVING_AVERAGE_WINDOW\n                        Session window size for token summary moving averages.\n  --recent-days RECENT_DAYS\n                        Only include session files modified within this many\n                        days in summary mode. Uses file mtime so long-running\n                        sessions stay visible.\n  --report-out REPORT_OUT\n                        Optional Markdown report path for the comparison or\n                        summary.\n  --report-dir REPORT_DIR\n                        Optional run bundle directory to append monitoring\n                        evidence.\n";
+const HELP: &str = "usage: compare_codex_token_footprints.py [-h] [--baseline-session BASELINE_SESSION]\n                                               [--candidate-session CANDIDATE_SESSION]\n                                               [--session-glob SESSION_GLOB]\n                                               [--moving-average-window MOVING_AVERAGE_WINDOW]\n                                               [--recent-days RECENT_DAYS]\n                                               [--report-out REPORT_OUT]\n\nCompare or summarize Codex session token footprints.\n\noptions:\n  -h, --help            show this help message and exit\n  --baseline-session BASELINE_SESSION\n                        Baseline Codex session JSONL file.\n  --candidate-session CANDIDATE_SESSION\n                        Candidate Codex session JSONL file.\n  --session-glob SESSION_GLOB\n                        Session JSONL glob for summary mode. May be repeated.\n                        When set, the tool emits token usage moving-average\n                        evidence.\n  --moving-average-window MOVING_AVERAGE_WINDOW\n                        Session window size for token summary moving averages.\n  --recent-days RECENT_DAYS\n                        Only include session files modified within this many\n                        days in summary mode. Uses file mtime so long-running\n                        sessions stay visible.\n  --report-out REPORT_OUT\n                        Optional Markdown report path for the comparison or\n                        summary.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TokenFootprint {
@@ -54,7 +52,6 @@ enum OptionName {
     MovingAverageWindow,
     RecentDays,
     ReportOut,
-    ReportDir,
 }
 
 struct CliOptions {
@@ -64,7 +61,6 @@ struct CliOptions {
     moving_average_window: BigInt,
     recent_days: Option<BigInt>,
     report_out: Option<String>,
-    report_dir: Option<String>,
 }
 
 impl Default for CliOptions {
@@ -76,7 +72,6 @@ impl Default for CliOptions {
             moving_average_window: BigInt::from(DEFAULT_MOVING_AVERAGE_WINDOW),
             recent_days: None,
             report_out: None,
-            report_dir: None,
         }
     }
 }
@@ -155,17 +150,6 @@ pub fn run(args: &[String]) -> i32 {
         };
         (value, comparison_status(value))
     };
-    if let Some(report_dir) = options.report_dir.as_deref() {
-        let report_dir = match resolve_non_strict(Path::new(report_dir)) {
-            Ok(path) => path,
-            Err(error) => return command_error(error),
-        };
-        if let Err(error) =
-            append_comparison_report_dir(&report_dir, &baseline, &candidate, value, status)
-        {
-            return command_error(error);
-        }
-    }
     print!(
         "{}",
         comparison_status_text(&baseline, &candidate, value, status)
@@ -199,20 +183,6 @@ fn run_summary(options: CliOptions) -> i32 {
             return command_error(error);
         }
     }
-    if let Some(report_dir) = options.report_dir.as_deref() {
-        let report_dir = match resolve_non_strict(Path::new(report_dir)) {
-            Ok(path) => path,
-            Err(error) => return command_error(error),
-        };
-        if let Err(error) = append_summary_report_dir(
-            &report_dir,
-            &footprints,
-            &options.moving_average_window,
-            options.recent_days.as_ref(),
-        ) {
-            return command_error(error);
-        }
-    }
     let status = match summary_status_text(
         &footprints,
         &options.moving_average_window,
@@ -234,7 +204,6 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
         ("--moving-average-window", OptionName::MovingAverageWindow),
         ("--recent-days", OptionName::RecentDays),
         ("--report-out", OptionName::ReportOut),
-        ("--report-dir", OptionName::ReportDir),
     ];
 
     let mut options = CliOptions::default();
@@ -297,7 +266,6 @@ fn parse_arguments(args: &[String]) -> Result<Option<CliOptions>, String> {
                 options.recent_days = Some(parse_integer_option(option, &value)?);
             }
             OptionName::ReportOut => options.report_out = Some(value),
-            OptionName::ReportDir => options.report_dir = Some(value),
         }
         index += 1;
     }
@@ -812,80 +780,6 @@ fn summary_status_text(
         "TOKEN_USAGE_SUMMARY=pass\nTOKEN_USAGE_SESSION_COUNT={}\nTOKEN_USAGE_TOKEN_EVENT_COUNT={event_total}\nTOKEN_USAGE_TOTAL_TOKENS={total}\nTOKEN_USAGE_RECENT_DAYS={recent_days_text}\nTOKEN_USAGE_AVERAGE_TOKENS_PER_EVENT={average_per_event}\nTOKEN_USAGE_MOVING_AVERAGE_WINDOW={effective_window}\nTOKEN_USAGE_LATEST_MOVING_AVERAGE_TOTAL={latest_average}\nNEXT_ACTION=record_token_usage_summary\n",
         footprints.len()
     ))
-}
-
-fn append_comparison_report_dir(
-    report_dir: &Path,
-    baseline: &TokenFootprint,
-    candidate: &TokenFootprint,
-    value: f64,
-    status: &str,
-) -> Result<(), String> {
-    let behavior_events = [format!(
-        "token_efficiency_protocol=active token_footprint_comparison={status} baseline_total={} candidate_total={} token_ratio={} target_ratio={}",
-        baseline.total_tokens,
-        candidate.total_tokens,
-        fixed(value),
-        fixed(TARGET_RATIO)
-    )];
-    let baseline_name = baseline
-        .session_file
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy();
-    let candidate_name = candidate
-        .session_file
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy();
-    let interventions = [format!(
-        "token footprint measured from Codex session logs baseline={baseline_name} candidate={candidate_name}"
-    )];
-    append_monitoring(report_dir, &behavior_events, &interventions)
-}
-
-fn append_summary_report_dir(
-    report_dir: &Path,
-    footprints: &[TokenFootprint],
-    window: &BigInt,
-    recent_days: Option<&BigInt>,
-) -> Result<(), String> {
-    let event_total = token_event_total(footprints);
-    let total = token_total(footprints);
-    let recent_days_text = recent_days.map_or_else(|| "all".to_owned(), ToString::to_string);
-    let effective_window = effective_window(window);
-    let latest_average = latest_moving_average(footprints, window)?;
-    let average_per_event = tokens_per_event(footprints)?;
-    let behavior_events = [format!(
-        "token_usage_summary=present session_count={} token_event_count={event_total} total_tokens={total} recent_days={recent_days_text} moving_average_window={effective_window} latest_moving_average_total={} average_tokens_per_event={}",
-        footprints.len(),
-        fixed(latest_average),
-        fixed(average_per_event)
-    )];
-    let interventions = ["token usage moving average measured from Codex session logs".to_owned()];
-    append_monitoring(report_dir, &behavior_events, &interventions)
-}
-
-fn append_monitoring(
-    report_dir: &Path,
-    behavior_events: &[String],
-    interventions: &[String],
-) -> Result<(), String> {
-    let source_root = source_root()?;
-    append_monitoring_projection(
-        report_dir,
-        &source_root,
-        None,
-        behavior_events,
-        interventions,
-    )
-    .map(|_| ())
-}
-
-fn source_root() -> Result<PathBuf, String> {
-    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    fs::canonicalize(crate_root.join("../../../../"))
-        .map_err(|error| format!("AgentCanon source root unavailable: {error}"))
 }
 
 fn write_report(path: &Path, report: &str) -> Result<(), String> {

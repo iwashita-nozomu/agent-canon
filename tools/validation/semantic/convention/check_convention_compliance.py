@@ -262,12 +262,10 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "task bootstrap and CLI entrypoints",
                     "agents/canonical/CLI_ENTRYPOINTS.md",
-                    "bootstrap_agent_run.py",
                 ),
                 (
                     "actual subagent lifecycle and same-role identity",
                     "agents/canonical/CODEX_SUBAGENTS.md",
-                    "workflow_monitor.py",
                 ),
                 (
                     "role behavior and stage conditions",
@@ -281,8 +279,8 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "report and closeout structure",
-                    "tools/runtime/dispatch/agent-canon/src/task_close.rs",
-                    "closeout gate",
+                    "agents/canonical/CODEX_COMPLETION.md",
+                    "Completion Review",
                 ),
                 (
                     "entrypoint responsibility grammar",
@@ -367,11 +365,6 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "agents/agents_config.json",
                 ),
                 (
-                    "optional run bundle and actual route evidence",
-                    "bootstrap_agent_run.py",
-                    "workflow_monitor.py",
-                ),
-                (
                     "skill selection",
                     "agents/skills/catalog.yaml",
                     "python3 tools/agent/orchestration/route.py --prompt",
@@ -381,14 +374,9 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                     "agents/skills/codex-task-workflow.md",
                 ),
                 (
-                    "active design packet schema",
-                    "agents/COMMUNICATION_PROTOCOL.md",
-                    "agents/agents_config.json#artifacts.active_design_packet",
-                ),
-                (
                     "closeout authority",
-                    "task_close.rs",
-                    "report_artifact_checks.py",
+                    "agents/canonical/CODEX_COMPLETION.md",
+                    "report_artifact_checks.rs",
                 ),
             ),
         ),

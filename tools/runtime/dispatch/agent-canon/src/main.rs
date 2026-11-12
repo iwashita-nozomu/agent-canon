@@ -13,8 +13,6 @@
 // downstream implementation dependency_headers.rs checks selected dependency manifests and typed edge syntax
 // downstream implementation check_merge_structure.rs validates local structural integration readback
 // downstream implementation run_evaluation.rs scores and reports one agent run bundle
-// downstream implementation task_close.rs owns the native coordinated closeout route
-// downstream implementation waterfall_gate.rs owns the native selected-stage gate command
 // downstream implementation generated_completeness.rs routes the G2 receipt producer
 // downstream implementation graph.rs routes one-build dependency and runtime-evidence graph commands
 // downstream implementation graph_client.rs exposes the in-process typed graph client API and native consumer CLI
@@ -109,7 +107,7 @@ use agent_canon::{
     catalog, codex_runtime_summary, compare_agent_run_paths, entrypoint_composer, extract_docx,
     generated_completeness, native_release, report_artifact_checks, run_evaluation,
     stablehlo_value_closure, template_bundle, theorem_graph_board, theorem_graph_circularity_check,
-    tool_dispatch, tool_proof_coverage, waterfall_gate, work_log,
+    tool_dispatch, tool_proof_coverage, work_log,
 };
 use std::env;
 
@@ -130,9 +128,7 @@ Commands:
   codex-config --source-config <path>
   test-design <check> [paths...]
   run-evaluation (--run-id ID|--report-dir PATH) [options]
-  task-close (--run-id ID|--report-dir PATH) [--report-root PATH] [--runtime-root PATH]
   codex-hook [EVENT|--group EVENT] [--contract|--list]
-  waterfall-gate-check (--run-id ID|--report-dir PATH) --gate <gate> [--report-root PATH]
   materialize-agent-canon-pr-g2 --g1-bundle <path> --source-root <root> --control-parent-root <root> --runtime-root <root> [--output <path>]
   notebook-quality [paths...] [--root <repo-root>] [--changed|--all] [--format text|json]
   generated-artifact-guard [--root <repo-root>]
@@ -231,14 +227,6 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "codex-hook" {
         std::process::exit(agent_canon::hook_dispatcher::run(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == "task-close" {
-        std::process::exit(agent_canon::task_close::run_cli(&args[2..]));
-    }
-
-    if args.len() >= 2 && args[1] == "waterfall-gate-check" {
-        std::process::exit(waterfall_gate::run(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == generated_completeness::SELECTOR {

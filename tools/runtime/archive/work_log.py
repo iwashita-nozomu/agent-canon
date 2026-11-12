@@ -5,8 +5,6 @@
 # upstream design ../../../agents/canonical/CODEX_WORKFLOW.md runtime preflight logging rules
 # upstream design ../../../agents/canonical/ARTIFACT_PLACEMENT.md run bundle artifact placement contract
 # upstream implementation ../values.py refines decoded ledger containers
-# downstream implementation ../lifecycle/workflow_monitor.py projects semantic events into monitoring output
-# downstream implementation ../lifecycle/workflow_monitor.py projects semantic monitoring events here
 # downstream implementation ../artifacts/report_artifact_checks.py materializes the checked completion read model from this ledger
 # downstream implementation ../../../tests/agent_tools/test_work_log.py verifies work log behavior
 # @dependency-end

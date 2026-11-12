@@ -42,9 +42,7 @@ run ごとの一時 artifact と、repo に長く残す文書を分けて扱い�
   bounded route は既存 task/Issue evidence を使い、配置のために bundle を作りません。
 - cross-run agent report: `.agent-canon/log-archive/agent-reports/<stable-source-repository-id>/<run-id>/<snapshot-id>/`。
   branch と stable-source identity は `agent-canon-log` の repository policy が所有します。
-- temporary runtime output: current handoff、`team_manifest.yaml`、または
-  `task_authority.yaml` の許可された path。`WORKTREE_SCOPE.md` は legacy cleanup evidence
-  であり、新しい write authority ではありません。
+- temporary runtime output: the authorized task-specific runtime directory. Preserve unknown or user-owned files.
 
 ## Task 中の拡張文書
 
@@ -64,8 +62,7 @@ available placements, not instructions to materialize every template.
 `semantic_responsibility_contract.toml` is the populated run-local instance referenced
 by the active design packet. Policy and empty template stay with `documents/design/`
 and `templates/documents/`; a populated instance is not copied back into canon.
-Roles and artifact write policy remain in `agents/agents_config.json` and the selected
-run's authority. Add run-specific sections to existing artifacts rather than new
+Role settings remain in `agents/agents_config.json`; the agreed task scope controls edits. Add run-specific sections to existing artifacts rather than new
 parallel reports.
 
 Archive a selected durable agent report through the existing
@@ -75,10 +72,8 @@ immutable snapshot, append-only index, push and remote readback. Broad `sync` is
 explicitly selected cumulative runtime families, not a replacement report publisher.
 Read actual placement/identity from that owner's status output rather than guessing.
 
-When coordinated closeout is selected, native `agent-canon task-close` checks artifact placement.
 Tracked durable reports are allowed by canon; untracked/ignored reports belong only
-to the current run directory. Old run bundles follow archive/closeout rather than
-being copied into a new run.
+to the current run directory. Historical bundles remain readable by their archive owner.
 
 Mechanically regenerable report roots remain governed by
 `agent-canon generated-artifact-guard`:

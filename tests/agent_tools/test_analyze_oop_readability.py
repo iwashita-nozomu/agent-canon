@@ -23,8 +23,12 @@ from pathlib import Path
 from types import MappingProxyType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PYTHON_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
-CPP_ANALYZER = PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "cpp" / "readability.py"
+PYTHON_ANALYZER = (
+    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "python" / "readability.py"
+)
+CPP_ANALYZER = (
+    PROJECT_ROOT / "tools" / "validation" / "code" / "oop" / "cpp" / "readability.py"
+)
 EMPTY_ENV: Mapping[str, str] = MappingProxyType({})
 
 
@@ -47,7 +51,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             env={**os.environ, **env},
         )
 
-    def run_cpp_analyzer(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_cpp_analyzer(
+        self, root: Path, *args: str
+    ) -> subprocess.CompletedProcess[str]:
         """Run the C++ analyzer against a temporary root."""
         return subprocess.run(
             [sys.executable, str(CPP_ANALYZER), "--root", str(root), *args],
@@ -324,7 +330,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("module_helper_name:calculate_helper", result.stdout)
             self.assertIn("OOP_READABILITY=fail", result.stdout)
 
-    def test_private_and_nested_functions_are_not_public_boundary_findings(self) -> None:
+    def test_private_and_nested_functions_are_not_public_boundary_findings(
+        self,
+    ) -> None:
         """Private helpers and closures do not create public API boundary findings."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -764,7 +772,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                     [
                         "#define NATIVE_AD_VJP(name)",
                         "template <typename T>",
-                        "NATIVE_AD_VJP(\"primitive\")",
+                        'NATIVE_AD_VJP("primitive")',
                         "inline void primitive_vjp(",
                         "    const T* input,",
                         "    const T* weights,",
@@ -795,7 +803,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             source.write_text(
                 "\n".join(
                     [
-                        "extern \"C\" void __nad_ep_impl_example(",
+                        'extern "C" void __nad_ep_impl_example(',
                         "    const float* input,",
                         "    const float* weights,",
                         "    const float* bias,",
@@ -927,7 +935,7 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                         "  int b;",
                         "  int c;",
                         "};",
-                        ")cpp\";",
+                        ')cpp";',
                         "struct RealInput {",
                         "  int a;",
                         "  int b;",
@@ -1154,7 +1162,9 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
             self.assertIn("redundant_class_boundary:Projection", result.stdout)
             self.assertNotIn("redundant_class_boundary:Port", result.stdout)
 
-    def test_python_usage_root_extends_redundant_class_construction_sources(self) -> None:
+    def test_python_usage_root_extends_redundant_class_construction_sources(
+        self,
+    ) -> None:
         """Explicit usage roots should inform selected-file redundant class analysis."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1573,11 +1583,15 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(source),
             )
 
-            self.assertEqual(json_result.returncode, 0, json_result.stdout + json_result.stderr)
+            self.assertEqual(
+                json_result.returncode, 0, json_result.stdout + json_result.stderr
+            )
             json_payload = json.loads(json_result.stdout)
             solid_counts = json_payload["summary"]["solid_counts"]
             self.assertEqual(set(solid_counts), expected_principles)
-            self.assertTrue(all(isinstance(count, int) for count in solid_counts.values()))
+            self.assertTrue(
+                all(isinstance(count, int) for count in solid_counts.values())
+            )
             self.assertEqual(solid_counts["liskov substitution"], 0)
 
             markdown_result = self.run_analyzer(
@@ -1589,7 +1603,11 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 str(source),
             )
 
-            self.assertEqual(markdown_result.returncode, 0, markdown_result.stdout + markdown_result.stderr)
+            self.assertEqual(
+                markdown_result.returncode,
+                0,
+                markdown_result.stdout + markdown_result.stderr,
+            )
             self.assertIn("- `liskov substitution`: 0", markdown_result.stdout)
 
     def test_exclude_skips_vendored_or_report_surfaces(self) -> None:
@@ -1740,73 +1758,6 @@ class AnalyzeOopReadabilityTest(unittest.TestCase):
                 "SOLID Principle Signals",
                 prompt.read_text(encoding="utf-8"),
             )
-
-    def test_run_bundle_timing_event_is_recorded_when_monitor_is_available(self) -> None:
-        """Analyzer should append timing tokens when run-bundle monitoring is active."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            report_dir = root / "reports" / "agents" / "run-1"
-            monitor = root / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-            monitor.parent.mkdir(parents=True)
-            monitor.write_text(
-                "\n".join(
-                    [
-                        "import argparse",
-                        "from pathlib import Path",
-                        "parser = argparse.ArgumentParser()",
-                        "parser.add_argument('--report-dir', required=True)",
-                        "parser.add_argument('--behavior-event', required=True)",
-                        "args = parser.parse_args()",
-                        "path = Path(args.report_dir) / 'workflow_monitoring.md'",
-                        "path.parent.mkdir(parents=True, exist_ok=True)",
-                        "with path.open('a', encoding='utf-8') as stream:",
-                        "    stream.write(args.behavior_event + '\\n')",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            source = root / "model.py"
-            source.write_text(
-                "\n".join(
-                    [
-                        "from dataclasses import dataclass",
-                        "",
-                        "@dataclass(frozen=True)",
-                        "class Result:",
-                        "    value: int",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(PYTHON_ANALYZER),
-                    "--root",
-                    str(root),
-                    "model.py",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-                env={
-                    **os.environ,
-                    "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report_dir),
-                },
-            )
-            monitoring = (report_dir / "workflow_monitoring.md").read_text(
-                encoding="utf-8"
-            )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("tool_call=oop-readability-check", monitoring)
-        self.assertIn("duration_ms=", monitoring)
-        self.assertIn("status=pass", monitoring)
-        self.assertIn("scope=model.py", monitoring)
-        self.assertIn("output_path=stdout", monitoring)
 
 
 if __name__ == "__main__":

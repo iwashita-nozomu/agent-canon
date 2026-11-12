@@ -4,7 +4,6 @@
 # responsibility Provides report artifact checks agent workflow automation.
 # upstream design ../../../README.md shared automation index
 # upstream design ../../../documents/design/request-intent-and-update-relation.md run-bundle temporary-state and retention readback projection
-# upstream implementation ../manifest/manifest_rendering.py renders optional run-bundle artifacts
 # @dependency-end
 
 """Shared checks for run-bundle artifact completeness."""
@@ -20,9 +19,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import TypeGuard
 
 try:
     from tools.repository.workspace.parent_root_side_effects import (
@@ -41,7 +38,6 @@ except ImportError:
         attest_parent_root,
     )
 
-from tools.runtime.archive.work_log import MIN_GROUP_MEMBER_COUNT
 from tools.runtime.artifacts.artifact_identity import (
     canonical_body_sha256,
     canonical_json_bytes,

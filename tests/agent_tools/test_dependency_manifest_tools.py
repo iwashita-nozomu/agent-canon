@@ -43,10 +43,6 @@ REPO_REVIEW = (
     / "dependencies"
     / "run_repo_dependency_review.sh"
 )
-WORKFLOW_MONITOR = (
-    PROJECT_ROOT / "tools" / "runtime" / "lifecycle" / "workflow_monitor.py"
-)
-AGENT_TEAM = PROJECT_ROOT / "tools" / "agent" / "orchestration" / "agent_team.py"
 DOCKER_VALIDATOR = (
     PROJECT_ROOT
     / "tools"
@@ -1334,7 +1330,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
             target = root / "target.md"
             source = root / "source.md"
             hits = root / "search_hits.txt"
@@ -1422,7 +1417,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
             target = root / "target.md"
             source = root / "source.md"
             report_dir = runtime_root_for(root) / "reports" / "dependency-review"
@@ -2047,8 +2041,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
-            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
             a = root / "a.md"
             b = root / "b.md"
             a.write_text(
@@ -2207,8 +2199,6 @@ class DependencyManifestToolTest(unittest.TestCase):
             (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
             (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
             (tool_dir / "check_dependency_graph.sh").symlink_to(GRAPH)
-            (tool_dir / "workflow_monitor.py").symlink_to(WORKFLOW_MONITOR)
-            (tool_dir / "agent_team.py").symlink_to(AGENT_TEAM)
             target = root / "target.md"
             source = root / "source.md"
             target.write_text(

@@ -45,9 +45,7 @@ When the changed surface includes a Docstring or template projection, read
 records the responsibility region, selected semantic relation, and projection
 anchor; it does not copy the guide’s clause text or force `Args`, `Returns`,
 `Raises`, or other fixed sections. The catalog capability `oop_type_design` selects this
-language-neutral OOP/type design owner only. After that owner selection, existing
-`agent_team.language_review_candidates` selects `python_reviewer` or `cpp_reviewer` for
-language implementation paths and `docs_workflow_steward` for convention/template docs.
+language-neutral OOP/type design owner only. After that owner selection, use `python_reviewer` or `cpp_reviewer` for language implementation paths and `docs_workflow_steward` for convention/template docs.
 No new routing branch is introduced.
 
 ## Purpose
