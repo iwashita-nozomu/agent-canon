@@ -104,7 +104,7 @@ upstream design ../experiments/gpu-admission-r5-source-packet.md exact managed G
 .PHONY: experiment-check experiment-smoke experiment-formal
 
 experiment-check:
-  python3 -m tools.validation.ci.checks.check_experiment_registry
+  agent-canon experiment-registry
 
 experiment-smoke:
   python3 -m tools.experiments.execution.run_managed_experiment \

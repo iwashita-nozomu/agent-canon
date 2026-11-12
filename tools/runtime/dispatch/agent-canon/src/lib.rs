@@ -72,6 +72,8 @@ pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;
 pub mod execution_resource_projection;
+pub mod experiment_identity;
+pub mod experiment_registry;
 pub mod extract_docx;
 pub mod generated_completeness;
 // This shared source module also serves the CLI's AST tools; the reusable LSP

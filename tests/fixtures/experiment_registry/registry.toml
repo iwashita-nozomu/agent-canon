@@ -1,0 +1,20 @@
+schema_version = 1
+
+[defaults]
+managed_runner = "tools/experiments/execution/run_managed_experiment.py"
+report_root = "experiments/demo_topic/report"
+integration_branch = "main"
+topic_template_dir = "vendor/agent-canon/templates/experiments/_template"
+required_eval_artifacts = ["summary/summary.json", "summary/cases.jsonl"]
+
+[[topics]]
+name = "demo_topic"
+status = "active"
+topic_dir = "experiments/demo_topic"
+topic_readme = "experiments/demo_topic/README.md"
+canonical_entrypoint = "experiments/demo_topic/run.py"
+result_root = "experiments/demo_topic/result"
+report_root = "experiments/demo_topic/report"
+default_variant = "formal"
+default_inner_command = "python3 experiments/demo_topic/run.py --run-dir {run_dir} --config {config_path} --mode default"
+formal_inner_command = "python3 experiments/demo_topic/run.py --run-dir {run_dir} --config {config_path} --mode formal"

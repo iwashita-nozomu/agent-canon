@@ -480,7 +480,7 @@ if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then
 elif [ ! -e experiments/registry.toml ]; then
   echo "EXPERIMENT_REGISTRY=skip"
   echo "experiment registry absent in this checkout; skipping registry validation"
-elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_experiment_registry.py" 2>&1; then
+elif run_agent_canon experiment-registry 2>&1; then
   echo "✅ experiment registry checks 成功"
 else
   echo "❌ experiment registry checks 失敗"

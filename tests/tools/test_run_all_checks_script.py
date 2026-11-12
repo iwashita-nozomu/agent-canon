@@ -102,7 +102,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
         self.assertLess(
             text.index('if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then'),
-            text.index("check_experiment_registry.py"),
+            text.index("run_agent_canon experiment-registry"),
         )
 
     def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
