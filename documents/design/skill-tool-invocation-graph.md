@@ -10,6 +10,7 @@ upstream design ../../agents/internal-routines/design-implementation-corresponde
 downstream implementation ../../tools/agent/skills/skill_route_catalog.py catalog resolver
 downstream implementation ../../tools/agent/orchestration/route.py capability and phase route materialization
 downstream implementation ../../tools/agent/skills/skill_dependency_map.py dependency graph validation
+downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs native read-only graph and Mermaid readback
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py runtime alignment readback
 downstream implementation ../../tools/validation/semantic/convention/check_convention_compliance.py canonical route convention gate
 @dependency-end
@@ -27,17 +28,19 @@ downstream implementation ../../tools/validation/semantic/convention/check_conve
 | --- | --- | --- | --- |
 | skill identity / capability metadata | `agents/skills/catalog.yaml` | `skill_dependency_map.py`, `route.py` | catalog fields supply current skill and capability records |
 | dependency / order / routing / parallel relation | `agents/skills/skill-dependencies.yaml` | `skill_dependency_map.py`, `route.py` | graph relations come from the declared map |
-| graph identity and projections | source snapshot and `_IdentityStore` | `skill_dependency_map.py` | projections contain Ref values and display fields |
-| equality / stale readback | `check_skill_tool_invocation_graph.py` | checker output | source, generated JSON, and Mermaid are compared |
+| graph identity and projections | source snapshot and `_IdentityStore` | `skill_dependency_map.py`, `catalog/skill_dependency_graph.rs` | projections contain Ref values and display fields |
+| equality / stale readback | `catalog/skill_dependency_graph.rs` | native checker output | source, generated JSON, and actual Mermaid syntax are compared |
 | design/implementation correspondence | [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | `design_correspondence` in the graph | clause and target paths remain traceable |
 
 The graph materializes records from the current catalog and dependency map. Counts describe the graph produced for that snapshot; they are not a separate coverage authority.
+
+The native read-only checker hashes `agents/canonical/skills.md` as a source-snapshot input but does not require specific link substrings. The existing Python writer retains its current writer-side validation while it remains the graph artifact writer; this checker change does not migrate or proxy that writer.
 
 ## Data / State Model
 
 ### Source snapshot
 
-schema は `agent_canon.skill_tool_invocation_graph.v2` とする。graph inputs are the catalog, dependency map, and reader-index links.
+schema は `agent_canon.skill_tool_invocation_graph.v2` とする。graph inputs are the catalog, dependency map, and the reader-index source bytes hashed by `source_snapshot`.
 
 ```text
 SkillDependencyGraph {
@@ -50,7 +53,7 @@ SkillDependencyGraph {
 ```
 
 
-[agents/canonical/skills.md](../../agents/canonical/skills.md) is a reader/index link check, not a skill identity source. Skill identities come from `agents/skills/catalog.yaml`.
+[agents/canonical/skills.md](../../agents/canonical/skills.md) contributes a source digest, not skill identities or a link-substring admission gate for the read-only graph checker. Skill identities come from `agents/skills/catalog.yaml`.
 
 ### Artifact side-effect boundary
 
@@ -112,14 +115,14 @@ Mermaid metadataはgraph digestを保持し、JSON digestやfull JSON payloadは
 
 ## Invariants
 
-- `SG-002` `catalog.yaml` はskill identityとcapability metadataのsource、`skill-dependencies.yaml` はdependency/order/routing/parallel relationのsource、[agents/canonical/skills.md](../../agents/canonical/skills.md) はreader/index link parity targetとする。
+- `SG-002` `catalog.yaml` はskill identityとcapability metadataのsource、`skill-dependencies.yaml` はdependency/order/routing/parallel relationのsource、[agents/canonical/skills.md](../../agents/canonical/skills.md) はsource snapshot digestの入力とする。
 - `SG-003` 各 payload は一つの `IdentityRecord {id,digest,kind,canonical_payload}` に一度だけ保存し、全 consumer は `Ref {id,digest}` を参照する。projection envelope は Ref + compact display fields、edge projection は edge/source/target Ref + compact label に限る。
 - `SG-004` durable artifact は logical repository-relative locator のみ、absolute runtime path は execution 時だけとする。
 - `SG-005` canonical serialization は field order、NFC/identifier normalization、UTF-8、domain-separated digest、array ordering を上記規則に従う。
 - `SG-006` identity collisions and digest mismatches fail instead of being silently merged.
 - `SG-007` capability owner and phase metadata come from the catalog route; the graph does not select a renderer or materialize ToolCalls.
 - `SG-008` dependency, order, routing, and parallel edges come from their source owner, not hand-authored Mermaid.
-- `SG-009` source and generated projections share the graph identity; `skills.md` is checked for required reader links and is not a skill-count source.
+- `SG-009` source and generated projections share the graph identity; `skills.md` bytes are bound into the source snapshot and never define the skill count. The native read-only checker does not add a separate fixed-link substring gate.
 - `SG-010` Mermaid node and edge statements are parsed and compared with the graph projection.
 - `SG-011` the checker compares source-derived graph data with generated JSON and Mermaid and reports stale or malformed artifacts.
 - `SG-012` #461 で固定された log command order は immutable edge/order として `ensure → status → stage → snapshot → commit → compare/rebase → push → readback → check-clean` を保持する。外部 preflight と内部 transaction の境界を graph が混ぜない。
@@ -139,7 +142,6 @@ Source reads, normalization, digesting, JSON/Mermaid projection, and readback ar
 | relation, identity, or generated projection is stale | `stale_artifact` / `failed` | source and generated artifact digests |
 | same ID has different payload or identity digest is invalid | `identity_collision` / `digest_mismatch` / `failed` | identity IDs and digests |
 | embedded payload/base64 or absolute durable locator | `payload_embedded` / `absolute_locator` / `failed` | violating artifact locator |
-| required reader link missing | `reader_link_parity` / `failed` | missing logical link |
 | Mermaid nodes, edges, or source metadata differ from graph | `projection_mismatch` / `failed` | expected and observed readback values |
 | projection contains canonical payload instead of a Ref | `payload_duplicate` / `failed` | offending projection field |
 
@@ -149,6 +151,8 @@ Routing selection remains owned by `agents/skills/catalog.yaml`, `agents/skills/
 
 
 checkerは`agent_canon.skill_tool_invocation_check.v1`のJSONを出力する。pass時は`skill_count`, `command_count`, `tool_count`, `edge_count`, `graph_digest`, `json_digest`, `mermaid_digest`を含む。fail時は`error`を含み、exit statusは2となる。
+
+The read-only native route is `tools/bin/agent-canon check-skill-tool-invocation-graph --root .`. It reconstructs the v2 graph from native catalog/route/dependency owners, validates the machine artifact and actual Mermaid syntax, and never writes artifacts. It hashes the reader-index bytes for source identity without imposing a link-substring gate. The Python materializer remains the graph writer and keeps its writer-side checks.
 
 
 ## Current Catalog Inventory (readback evidence)
@@ -166,7 +170,7 @@ checkerは`agent_canon.skill_tool_invocation_check.v1`のJSONを出力する。p
 ```mermaid
 flowchart LR
   D["skill-dependencies.yaml\nrelation owner"] --> U
-  P["skills.md\nreader/index links"] --> K["equality checker"]
+  P["skills.md\nsource digest"] --> K["native equality checker"]
   U --> G["graph payload digest\nidentity refs"]
   G --> J["canonical JSON\nordered fields digests refs"]
   J --> K
@@ -179,24 +183,24 @@ flowchart LR
 
 | clause | current/planned implementation owner | exact file / symbol | reverse mapping rule |
 | --- | --- | --- | --- |
-| `SG-004..SG-006` | current serialization/identity owner | `tools/agent/skills/skill_dependency_map.py:_canonical_bytes`, `_canonicalize`, `_identity_preimage`, `_IdentityStore` | field order, normalization, digest, duplicate, or collision changes require these clauses |
-| `SG-009..SG-011` | current projection/readback owner | `tools/agent/skills/skill_dependency_map.py:render_graph_mermaid`, `:_parse_mermaid_syntax`, `:readback_mermaid`; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | any JSON/Mermaid/source/skills.md equality, stale, count, or generated-node change maps to these clauses |
+| `SG-004..SG-006` | Python writer and native readback owner | `tools/agent/skills/skill_dependency_map.py:_canonical_bytes`, `_canonicalize`, `_identity_preimage`, `_IdentityStore`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | field order, normalization, digest, duplicate, or collision changes require these clauses |
+| `SG-009..SG-011` | current projection/readback owner | `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/agent/skills/skill_dependency_map.py:render_graph_mermaid` remains the writer | any JSON/Mermaid/source digest, stale, count, or generated-node change maps to these clauses |
 | `SG-012` | current log lifecycle owner | `tools/runtime/archive/runtime_log_archive_git.py`, [documents/design/runtime-log-repository-lifecycle.md](runtime-log-repository-lifecycle.md) | command order or preflight/transaction boundary changes map to SG-012 and the corresponding RL clause |
-| `SG-013..SG-014` | current handoff and review owners | `tools/agent/skills/skill_dependency_map.py:build_graph`, `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py`, [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | manifest/readback/design-fingerprint changes map to the clause before implementation |
-| `SG-015` | current digest/readback owner | `tools/agent/skills/skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`, `:_parse_mermaid_syntax`, `:readback_mermaid`; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | digest preimage, DAG level, JSON self-digest/readback/Mermaid-digest exclusion, Mermaid ref-only metadata, or circular-readback changes map to SG-015 |
+| `SG-013..SG-014` | current handoff and review owners | `tools/agent/skills/skill_dependency_map.py:build_graph`, `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`, [agents/internal-routines/design-implementation-correspondence.md](../../agents/internal-routines/design-implementation-correspondence.md) | manifest/readback/design-fingerprint changes map to the clause before implementation |
+| `SG-015` | Python writer and native digest/readback owner | `tools/agent/skills/skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | digest preimage, DAG level, JSON self-digest/readback/Mermaid-digest exclusion, Mermaid ref-only metadata, or circular-readback changes map to SG-015 |
 
 ### Implementation record and forward/reverse mapping
 
 この実装は AgentCanon final main `eeb451bd4b829e5417b810804a9d67dfb4ba570d` を設計入力として、設計文書の trace を変更する前の SHA-256 `a28cf776915d006aaffe868185816601c8feb11c7c4375b00b6caf18805c1506` に対応付けて記録します。生成 schema は `agent_canon.skill_tool_invocation_graph.v2` です。実装時点の design SHA-256 は generated graph の `design_correspondence.design_sha256` に保存し、DIC-001..DIC-009 のtarget pathsとclause fingerprintをこの表で追跡します。
 
-The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py`; `tools/agent/orchestration/capability_route.py`; `tools/agent/orchestration/route.py`; `tools/agent/skills/skill_dependency_map.py`; and `tools/agent/skills/skill_route_catalog.py`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
+The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `DIC-005`, `DIC-006`, `DIC-007`, `DIC-008`, and `DIC-009`, plus these changed paths in both forward and reverse mappings: `agents/skills/catalog.yaml`; `documents/design/skill-tool-invocation-graph.md`; `documents/runtime/skill-dependency-graph.json`; `documents/runtime/skill-dependency-graph.md`; `tests/agent_tools/test_route.py`; `tests/agent_tools/test_skill_dependency_map.py`; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs`; `tools/agent/orchestration/capability_route.py`; `tools/agent/orchestration/route.py`; `tools/agent/skills/skill_dependency_map.py`; and `tools/agent/skills/skill_route_catalog.py`. Missing clause, DIC, or path references are reported as `design_correspondence_missing`.
 
 | forward clause | implementation target (logical locator / symbol) | focused evidence / validation route | reverse trigger |
 | --- | --- | --- | --- |
 | `SG-004..SG-006` | `tools/agent/skills/skill_dependency_map.py:_IdentityStore`, `_canonical_bytes`, `_canonicalize`, `_identity_preimage` | `test_identity_payloads_are_unique_and_all_projections_are_refs`; typed collision/reference, insertion-order, and Unicode-alias tests | any payload duplication, Ref, Unicode/field-order, or digest-preimage change |
 | `SG-007..SG-008` | `tools/agent/orchestration/route.py:decide_skills`; `tools/agent/orchestration/capability_route.py:decide_capabilities`; `skill_dependency_map.py:_add_edge` | capability route, phase/order relations, and dependency edge checks | any route, phase, or edge change |
 | `SG-009..SG-011` | `skill_dependency_map.py:render_graph_mermaid`, `:_parse_mermaid_syntax`, `:readback_mermaid`, `check_artifacts` | actual one-block Mermaid syntax readback; JSON/Mermaid equality and stale/omission failure | any node/edge/order/readback or generated-artifact change |
-| `SG-013..SG-014` | [documents/design/skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) trace; `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` | `CHECK_SCHEMA=agent_canon.skill_tool_invocation_check.v1`; DIC trace and generated readback | any manifest/readback/design fingerprint or correspondence target change |
+| `SG-013..SG-014` | [documents/design/skill-tool-invocation-graph.md](skill-tool-invocation-graph.md) trace; `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` | `CHECK_SCHEMA=agent_canon.skill_tool_invocation_check.v1`; DIC trace and generated readback | any manifest/readback/design fingerprint or correspondence target change |
 | `SG-015` | `skill_dependency_map.py:_identity_preimage`, `:_json_digest_from_graph`, `:_parse_mermaid_syntax`, `:readback_mermaid` | graph/json/Mermaid digest equality, JSON preimage excludes self/readback/Mermaid digest, no absolute locator/base64 marker | any preimage, DAG layer, self-digest, Mermaid syntax, or readback change |
 
 
@@ -205,7 +209,7 @@ The correspondence checker covers `DIC-001`, `DIC-002`, `DIC-003`, `DIC-004`, `D
 | kind | statement | evidence / owner | status |
 | --- | --- | --- | --- |
 | current state | `catalog.yaml` supplies skill identities and `skill-dependencies.yaml` supplies graph relations | `agents/skills/catalog.yaml`, `agents/skills/skill-dependencies.yaml` | checked |
-| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は `tools/validation/semantic/skills/check_skill_tool_invocation_graph.py` が readback する | `SG-009..SG-011`, `SG-015` | checked |
+| target state | source/JSON/Mermaid equality と generated actual nodes/edges/order は `tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs` が readback する | `SG-009..SG-011`, `SG-015` | checked |
 | assumption | `normalization` / `正規化` は本文の canonical serialization に定義した Unicode NFC/NFKC、casefold、UTF-8 の手順を指す | `SG-005`, `SG-006` | explicit |
 
 ## Clause IDs
