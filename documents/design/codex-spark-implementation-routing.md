@@ -16,7 +16,7 @@ upstream design ../../agents/skills/subagent-bootstrap.md writer selection and l
 upstream design ../../agents/skills/task-routing.md public route/tool ownership rules
 upstream design ../../agents/skills/oop-type-design.md approved OOP type and capability-route ownership
 upstream implementation ../../tools/agent/skills/skill_route_catalog.py canonical explicit skill capability catalog/index owner
-upstream implementation ../../tools/agent/orchestration/capability_route.py canonical explicit skill capability preflight/decision owner
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs canonical explicit skill capability preflight/decision owner
 downstream implementation ../../tools/agent/orchestration/agent_team.py packet projection, queueing, lineage, and generated views
 downstream implementation ../../tools/agent/orchestration/route.py existing public skill route composition/rendering; implementation-model imports forbidden
 downstream implementation ../../tools/validation/semantic/runtime/check_agent_runtime_alignment.py static runtime/profile/view checker
@@ -28,6 +28,11 @@ downstream design ./README.md design index entry
 # Codex Spark implementation routing and model-specific prompt materialization
 
 Status: design schemas and workflow contracts with historical receipt records.
+
+The current explicit-capability preflight and decision owner is
+`tools/runtime/dispatch/agent-canon/src/catalog/skill_routes.rs`.
+`route.py` invokes its `capability-route` command through `tools/bin/agent-canon`.
+The predecessor paths and hashes below describe the recorded historical source.
 The recorded base is AgentCanon main `404678e1e9c242737e2f610e98743328931edd8f`
 (tree `2d04030ea757d275936a6c1f441a05a67190402d`), with freeze reference
 `user-contract://2026-07-18/decision-sufficiency-freeze-v1`. The external packet
