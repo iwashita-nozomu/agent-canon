@@ -17,11 +17,20 @@ downstream implementation ../../tools/bin/agent-canon stable native entrypoint
 
 ## Scope and Intent
 
+The [agent tool-authoring rule](../../ROOT_AGENTS.md#always-on-boundary) requires
+shell scripts or Rust for new tools and task automation, including temporary
+and inline code. Existing Python tools and external Python providers may still
+be invoked through their selected execution contract during migration.
+
 Migrate every AgentCanon-owned Python tool implementation to Rust, including
 workflow orchestration, runtime lifecycle, Eval producers and checkers, and
 active hooks. This replaces the earlier policy that kept frequently changing
 workflow tools in Python. Stability and usage may inform implementation work;
 they do not exempt an owned tool from migration.
+
+Delete tools without a required use, together with their exclusive support and
+callers. Implement retained tool behavior in Rust. Shell entrypoints invoke the
+existing Rust executable and preserve its arguments, streams, and exit status.
 
 Preserve the tool's external CLI/API, schema, exit behavior, filesystem effects,
 mount and credential boundaries, and consumer functionality. Prioritize memory
