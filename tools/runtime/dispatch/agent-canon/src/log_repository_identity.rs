@@ -4,6 +4,7 @@
 // contract implementation
 // responsibility Resolves source-repository identity for local hook events without starting Git.
 // downstream implementation hook_event_log.rs derives the hook spool path
+// downstream implementation eval_archive_paths.rs derives repository-scoped hook archive paths
 // downstream implementation ../tests/hook_event_log_native.rs checks frozen Python identity outputs
 // @dependency-end
 
