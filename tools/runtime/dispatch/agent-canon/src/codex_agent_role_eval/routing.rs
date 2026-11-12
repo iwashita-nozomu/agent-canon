@@ -34,6 +34,24 @@ fn strings(value: Option<&Value>) -> Vec<String> {
         .collect()
 }
 
+fn required_strings(value: Option<&Value>, field: &str) -> Result<Vec<String>, String> {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
+        return Ok(Vec::new());
+    };
+    let values = value
+        .as_array()
+        .ok_or_else(|| format!("{field} must be a list"))?;
+    values
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{field} entries must be strings"))
+        })
+        .collect()
+}
+
 fn array<'a>(value: &'a Value, key: &str) -> &'a [Value] {
     value
         .get(key)
@@ -58,8 +76,14 @@ fn specialists(config: &Value, catalog: &Value, task_id: &str) -> Result<Vec<Str
         .get("roles")
         .filter(|roles| roles.is_object())
         .ok_or_else(|| format!("workflow family roles must be a mapping for {family_id}"))?;
-    let family_specialists = strings(family_roles.get("specialists"));
-    let mut result = strings(task.get("specialists"));
+    let family_specialists = required_strings(
+        family_roles.get("specialists"),
+        &format!("workflow_families[{family_id}].roles.specialists"),
+    )?;
+    let mut result = required_strings(
+        task.get("specialists"),
+        &format!("tasks[{task_id}].specialists"),
+    )?;
     for id in &result {
         if !family_specialists.contains(id) {
             return Err(format!(
@@ -68,8 +92,17 @@ fn specialists(config: &Value, catalog: &Value, task_id: &str) -> Result<Vec<Str
         }
     }
     for pack in array(catalog, "review_packs") {
-        if strings(pack.get("default_for_tasks")).contains(&task_id.to_owned()) {
-            result.extend(strings(pack.get("specialists")));
+        let id = pack.get("id").and_then(Value::as_str).unwrap_or("");
+        if required_strings(
+            pack.get("default_for_tasks"),
+            &format!("review_packs[{id}].default_for_tasks"),
+        )?
+        .contains(&task_id.to_owned())
+        {
+            result.extend(required_strings(
+                pack.get("specialists"),
+                &format!("review_packs[{id}].specialists"),
+            )?);
         }
     }
     let known = array(config, "always_on_roles")

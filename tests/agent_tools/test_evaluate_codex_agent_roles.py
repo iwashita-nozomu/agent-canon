@@ -703,6 +703,31 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertIn(expected, result.stderr)
 
+    def test_routing_rejects_non_string_specialist_entries(self) -> None:
+        """Malformed role list items are rejected before role lookup."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    next(task for task in catalog["tasks"] if task["id"] == "T1")[
+                        "specialists"
+                    ].append(7)
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append(7)
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("entries must be strings", result.stderr)
+
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
