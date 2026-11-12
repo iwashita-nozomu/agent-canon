@@ -163,6 +163,9 @@ Commands:
   check-semantic-responsibility-contract [paths...] [--root ROOT] [--template TEMPLATE] [--instance INSTANCE] [--artifact-root ARTIFACT_ROOT] [--format text|json]
   check-solid-evidence [paths...] [--root ROOT] [--changed] [--base-ref BASE_REF] [--evidence EVIDENCE] [--exclude EXCLUDE] [--verbose] [--format text|json]
   rust-migration-audit --root <repo-root>
+  server-readiness [--layout <layout.toml>]
+  check-skill-frontmatter [--root ROOT] [--format text|json]
+  chatgpt-codex-route --input <packet.json|->
   rust-migration-plan --root <repo-root> [--limit N] [--format text|json]
   surface-manifest [--root PATH] [--prefix PREFIX] [--manifest PATH] <normalized-snapshot|check-doc|projection-forbidden-roots>
   file-surface-inventory --root <repo-root> [--root-only|--agentcanon-only] [--json-out <path>] [--markdown-out <path>] [--max-markdown-entries N]
@@ -338,6 +341,15 @@ fn main() {
 
     if args.len() >= 2 && args[1] == "rust-migration-audit" {
         std::process::exit(migration_audit::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == agent_canon::server_readiness::SELECTOR {
+        std::process::exit(agent_canon::server_readiness::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "check-skill-frontmatter" {
+        std::process::exit(agent_canon::skill_frontmatter::run(&args[2..]));
+    }
+    if args.len() >= 2 && args[1] == "chatgpt-codex-route" {
+        std::process::exit(agent_canon::chatgpt_codex_routing::run_cli(&args[2..]));
     }
 
     if args.len() >= 2 && args[1] == "rust-migration-plan" {

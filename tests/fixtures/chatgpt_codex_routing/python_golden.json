@@ -1,0 +1,76 @@
+{
+  "source_commit": "d9cbf0b4134598e0d4a77e3f1dc5b7bf855f3c42",
+  "source_sha256": "02b124f1fe08b94bb8af2e9544c111fe302cb4c7782bcaad947a39386a09a294",
+  "cases": [
+    {
+      "name": "conversation",
+      "input": "{\"requested_deliverable\":\"answer\",\"chatgpt_scope\":\"explain\"}",
+      "stdout": "{\n  \"blocked_dependency\": \"none\",\n  \"chatgpt_scope\": \"explain\",\n  \"codex_scope\": \"none\",\n  \"handoff\": \"none\",\n  \"reason_codes\": [\n    \"conversation_closure\"\n  ],\n  \"requested_deliverable\": \"answer\",\n  \"route\": \"chatgpt\",\n  \"status\": \"pass\",\n  \"validation_oracle\": \"none\"\n}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "name": "execution",
+      "input": "{\"requested_deliverable\":\"edit\",\"chatgpt_scope\":\"plan\",\"facts\":{\"workspace_or_repository_mutation\":true},\"codex_scope\":\"edit and test\",\"validation_oracle\":\"checks pass\"}",
+      "stdout": "{\n  \"blocked_dependency\": \"none\",\n  \"chatgpt_scope\": \"plan\",\n  \"codex_scope\": \"edit and test\",\n  \"handoff\": \"agent-orchestration\",\n  \"reason_codes\": [\n    \"workspace_or_repository_mutation\"\n  ],\n  \"requested_deliverable\": \"edit\",\n  \"route\": \"codex\",\n  \"status\": \"pass\",\n  \"validation_oracle\": \"checks pass\"\n}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "name": "conflict",
+      "input": "{\"requested_deliverable\":\"edit\",\"chatgpt_scope\":\"plan\",\"facts\":{\"workspace_or_repository_mutation\":true,\"explicit_chat_only\":true},\"codex_scope\":\"edit and test\",\"validation_oracle\":\"checks pass\"}",
+      "stdout": "{\n  \"blocked_dependency\": \"workspace execution is required by the requested deliverable but explicitly prohibited\",\n  \"chatgpt_scope\": \"plan\",\n  \"codex_scope\": \"edit and test\",\n  \"handoff\": \"none\",\n  \"reason_codes\": [\n    \"explicit_chat_only_conflict\",\n    \"workspace_or_repository_mutation\"\n  ],\n  \"requested_deliverable\": \"edit\",\n  \"route\": \"chatgpt\",\n  \"status\": \"pass\",\n  \"validation_oracle\": \"checks pass\"\n}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "name": "unicode",
+      "input": "{\"requested_deliverable\":\" 雪\\ud800\\ud83d\\ude00 \",\"chatgpt_scope\":\"\\u3000説明\\u3000\"}",
+      "stdout": "{\n  \"blocked_dependency\": \"none\",\n  \"chatgpt_scope\": \"\\u8aac\\u660e\",\n  \"codex_scope\": \"none\",\n  \"handoff\": \"none\",\n  \"reason_codes\": [\n    \"conversation_closure\"\n  ],\n  \"requested_deliverable\": \"\\u96ea\\ud800\\ud83d\\ude00\",\n  \"route\": \"chatgpt\",\n  \"status\": \"pass\",\n  \"validation_oracle\": \"none\"\n}\n",
+      "stderr": "",
+      "exit": 0
+    },
+    {
+      "name": "unknown_input",
+      "input": "{\"requested_deliverable\":\"answer\",\"chatgpt_scope\":\"explain\",\"score\":1}",
+      "stdout": "",
+      "stderr": "{\"code\": \"unknown_field\", \"field\": \"score\", \"status\": \"fail\"}\n",
+      "exit": 2
+    },
+    {
+      "name": "invalid_boolean",
+      "input": "{\"requested_deliverable\":\"answer\",\"chatgpt_scope\":\"explain\",\"facts\":{\"workspace_or_repository_mutation\":1}}",
+      "stdout": "",
+      "stderr": "{\"code\": \"invalid_boolean\", \"field\": \"facts.workspace_or_repository_mutation\", \"status\": \"fail\"}\n",
+      "exit": 2
+    },
+    {
+      "name": "missing_scope",
+      "input": "{\"requested_deliverable\":\"edit\",\"chatgpt_scope\":\"plan\",\"facts\":{\"explicit_codex_execution\":true}}",
+      "stdout": "",
+      "stderr": "{\"code\": \"missing_execution_scope\", \"field\": \"codex_scope\", \"status\": \"fail\"}\n",
+      "exit": 2
+    },
+    {
+      "name": "unknown_fact",
+      "input": "{\"requested_deliverable\":\"answer\",\"chatgpt_scope\":\"explain\",\"facts\":{\"score\":true}}",
+      "stdout": "",
+      "stderr": "{\"code\": \"unknown_field\", \"field\": \"facts.score\", \"status\": \"fail\"}\n",
+      "exit": 2
+    },
+    {
+      "name": "invalid_json",
+      "input": "{",
+      "stdout": "",
+      "stderr": "{\"code\": \"invalid_json\", \"field\": \"-\", \"status\": \"fail\"}\n",
+      "exit": 2
+    },
+    {
+      "name": "invalid_mapping",
+      "input": "[]",
+      "stdout": "",
+      "stderr": "{\"code\": \"invalid_mapping\", \"field\": \"input\", \"status\": \"fail\"}\n",
+      "exit": 2
+    }
+  ]
+}

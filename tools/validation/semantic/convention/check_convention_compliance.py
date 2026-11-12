@@ -10,7 +10,7 @@
 # upstream design ../../../catalog.yaml structured tool catalog
 # upstream implementation ../../../runtime/dispatch/agent-canon/src/tool_drift.rs validates tool/convention drift
 # upstream implementation ./convention_compliance_contracts.toml declares marker contracts
-# upstream implementation ../skills/check_skill_frontmatter.py validates runtime skill frontmatter
+# upstream implementation ../skills/check-skill-frontmatter validates runtime skill frontmatter
 # downstream implementation ../../ci/runners/run_all_checks.sh runs convention compliance gate
 # downstream implementation ../../../../tests/agent_tools/test_check_convention_compliance.py tests verifier  # noqa: E501
 # @dependency-end
@@ -121,7 +121,7 @@ TOOL_GATES = {
         (TOOL_CATALOG_PATH,),
     ),
     "skill_frontmatter": (
-        "tools/validation/semantic/skills/check_skill_frontmatter.py",
+        "tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs",
         (TOOL_CATALOG_PATH,),
     ),
     "convention_compliance": (

@@ -1,0 +1,4 @@
+/dev/root / ext4 rw,relatime 0 0
+//files/workspace /srv/workspace cifs rw,relatime 0 0
+/dev/sdb1 /srv/local-state ext4 rw,relatime 0 0
+tmpfs /var/run tmpfs rw,nosuid,nodev 0 0

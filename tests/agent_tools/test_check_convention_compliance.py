@@ -44,7 +44,7 @@ path: tools/runtime/dispatch/agent-canon/src/notebook_quality.rs
 path: tools/validation/code/oop/python/readability.py
 path: tools/validation/code/oop/cpp/readability.py
 path: tools/runtime/dispatch/agent-canon/src/run_evaluation.rs
-path: tools/validation/semantic/skills/check_skill_frontmatter.py
+path: tools/runtime/dispatch/agent-canon/src/skill_frontmatter.rs
 path: tools/validation/semantic/convention/check_convention_compliance.py
 path: tools/runtime/dispatch/agent-canon/src/catalog/tool_catalog.rs
 path: tools/runtime/dispatch/agent-canon/src/tool_drift.rs
@@ -268,7 +268,7 @@ path: tools/runtime/dispatch/agent-canon/src/github_workflow_check.rs
     "tools/validation/ci/runners/run_all_checks.sh": (
         "run_python_quality_checks.sh "
         "check_convention_compliance.py "
-        "check_skill_frontmatter.py "
+        "check-skill-frontmatter "
         "tool_catalog.rs tool_drift.rs notebook-quality "
         "github_workflow_check.rs bootstrap_runtime.py run_agent_canon docs check "
         "run_agent_canon responsibility-scope\n"

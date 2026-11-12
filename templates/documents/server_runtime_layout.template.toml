@@ -13,7 +13,8 @@ label = "Main Server"
 host_kind = "wsl2"
 container_builder = "docker"
 codex_cli_required = true
-python_bin = "python3"
+# Set only when a selected host workflow requires Python.
+# python_bin = "python3"
 
 [paths]
 workspace_root = "/mnt/l/workspace"
