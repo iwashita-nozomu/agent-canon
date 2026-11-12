@@ -20,20 +20,22 @@ used by AgentCanon. A parent repository does not vendor this directory, copy it
 into its own `tools/`, or create a symlink view. Parent automation and project
 tests stay parent-owned.
 
-`tools/bin/agent-canon` resolves the repository root from its `BASH_SOURCE`
-script location before dispatching to `bootstrap.sh`. It is therefore
-cwd-independent: invoking the wrapper from any working directory uses the same
-source checkout and bootstrap runtime. Runtime and output roots remain the
-explicit control/runtime arguments supplied to the command.
+`tools/bin/agent-canon` resolves its source root from `BASH_SOURCE` and executes
+the selected native CLI. It accepts an explicit `AGENT_CANON_NATIVE_BIN`, an
+existing crate-local build, or the installed CLI on PATH. This selection is
+independent of the caller's working directory. Shared-runtime catalog commands
+use `bootstrap.sh` with the explicit install, control and project roots below.
 
 ## Execution planes
 
 Use the top-level [`bootstrap.sh`](../bootstrap.sh) for the shared AgentCanon
 runtime. It requires an authorized control root. The default runtime is the
-bootstrap-owned ignored `.runtime/` under the install checkout:
+bootstrap-owned ignored `.runtime/` under the explicit control root:
 
 ```bash
-./bootstrap.sh --control-parent-root <authorized-parent-root> <operation>
+/absolute/path/to/agent-canon/bootstrap.sh \
+  --repository-root /absolute/path/to/agent-canon \
+  --control-parent-root <authorized-control-root> <operation>
 ```
 
 | Plane | Owner | Examples | Side-effect rule |
@@ -81,7 +83,9 @@ Python tools are not made into flat global executables. A public catalog entry
 is callable through the namespaced route using its typed descriptor:
 
 ```bash
-./bootstrap.sh --control-parent-root <root> \
+/absolute/path/to/agent-canon/bootstrap.sh \
+  --repository-root /absolute/path/to/agent-canon \
+  --control-parent-root <authorized-control-root> \
   tool run --root <project-root> <catalog-id> -- <args...>
 ```
 

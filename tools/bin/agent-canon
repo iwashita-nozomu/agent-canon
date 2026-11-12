@@ -53,6 +53,10 @@ else
     "$canon_root/tools/runtime/dispatch/agent-canon/target/release/agent-canon"
     "$canon_root/tools/runtime/dispatch/agent-canon/target/debug/agent-canon"
   )
+  installed_native="$(type -P agent-canon 2>/dev/null || true)"
+  if [ -n "$installed_native" ]; then
+    native_candidates+=("$installed_native")
+  fi
 fi
 
 for native_bin in "${native_candidates[@]}"; do
@@ -82,5 +86,5 @@ if [ "$tool_run" -eq 1 ]; then
   exit 2
 fi
 
-echo "agent-canon native executable is unavailable; build the CLI or set AGENT_CANON_NATIVE_BIN" >&2
+echo "agent-canon native executable is unavailable; install agent-canon on PATH or set AGENT_CANON_NATIVE_BIN" >&2
 exit 127

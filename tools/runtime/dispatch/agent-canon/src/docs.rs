@@ -54,6 +54,9 @@ const ORGANIZE_DESIGN_PROGRAM: &str = "organize_designs.py";
 const ORGANIZE_DESIGN_USAGE: &str = "usage: organize_designs.py [-h] [--design-root DESIGN_ROOT] [--apply]\n                           [--mutation-capability-json MUTATION_CAPABILITY_JSON]\n                           [--runtime-root RUNTIME_ROOT] [--output OUTPUT]";
 const ORGANIZE_DESIGN_TASK_DIRECTORY: &str = "tasks/design-organization";
 const ORGANIZE_DESIGN_REPORT_FILENAME: &str = "design_organize_report.txt";
+const EMBEDDED_MARKDOWNLINT_CONFIG: &str = include_str!("../../../../../.markdownlint-cli2.jsonc");
+const EMBEDDED_LYCHEE_CONFIG: &str =
+    include_str!("../../../../../tools/validation/documentation/config/lychee.toml");
 
 const DEFAULT_DOC_TARGETS: &[&str] = &[
     "README.md",
@@ -2747,15 +2750,72 @@ fn render_findings(findings: &[Finding], root: &Path) -> bool {
     findings.is_empty()
 }
 
+enum DocsProviderConfig {
+    Project(PathBuf),
+    Embedded(tempfile::NamedTempFile),
+}
+
+impl DocsProviderConfig {
+    fn path(&self) -> &Path {
+        match self {
+            Self::Project(path) => path,
+            Self::Embedded(file) => file.path(),
+        }
+    }
+}
+
+fn docs_provider_config(
+    root: &Path,
+    relative_path: &Path,
+    suffix: &str,
+    embedded_config: &str,
+    provider: &str,
+) -> Result<DocsProviderConfig, String> {
+    let project_path = root.join(relative_path);
+    match fs::symlink_metadata(&project_path) {
+        Ok(_) => Ok(DocsProviderConfig::Project(project_path)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            let mut temporary = tempfile::Builder::new()
+                .suffix(suffix)
+                .tempfile()
+                .map_err(|error| format!("cannot stage embedded {provider} config: {error}"))?;
+            temporary
+                .write_all(embedded_config.as_bytes())
+                .map_err(|error| format!("cannot write embedded {provider} config: {error}"))?;
+            temporary
+                .flush()
+                .map_err(|error| format!("cannot flush embedded {provider} config: {error}"))?;
+            Ok(DocsProviderConfig::Embedded(temporary))
+        }
+        Err(error) => Err(format!(
+            "cannot inspect {provider} config {}: {error}",
+            project_path.display()
+        )),
+    }
+}
+
 fn run_markdownlint_cli(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+    let config = match docs_provider_config(
+        root,
+        Path::new(".markdownlint-cli2.jsonc"),
+        ".markdownlint-cli2.jsonc",
+        EMBEDDED_MARKDOWNLINT_CONFIG,
+        "markdownlint-cli2",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("markdownlint-cli2: {error}");
+            return false;
+        }
+    };
     let mut command = Command::new("markdownlint-cli2");
     command
         .current_dir(root)
         .arg("--config")
-        .arg(root.join(".markdownlint-cli2.jsonc"))
+        .arg(config.path())
         .arg("--no-globs");
     for path in files {
         command.arg(format!(":{}", path.display()));
@@ -2767,6 +2827,52 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+
+    let python_template_root = root.join("templates/experiments/_template");
+    let cpp_template_root = root.join("templates/experiments/_cpp_template");
+    let mut ordinary_files = Vec::new();
+    let mut python_template_files = Vec::new();
+    let mut cpp_template_files = Vec::new();
+    for path in files {
+        if path.starts_with(&python_template_root) {
+            python_template_files.push(path.clone());
+        } else if path.starts_with(&cpp_template_root) {
+            cpp_template_files.push(path.clone());
+        } else {
+            ordinary_files.push(path.clone());
+        }
+    }
+
+    let mut succeeded = true;
+    if !ordinary_files.is_empty() {
+        succeeded &= run_lychee_group(root, &ordinary_files, None);
+    }
+    if !python_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &python_template_files, Some("_template"));
+    }
+    if !cpp_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &cpp_template_files, Some("_cpp_template"));
+    }
+    succeeded
+}
+
+fn run_lychee_group(root: &Path, files: &[PathBuf], template_profile: Option<&str>) -> bool {
+    if files.is_empty() {
+        return true;
+    }
+    let config = match docs_provider_config(
+        root,
+        Path::new("tools/validation/documentation/config/lychee.toml"),
+        ".toml",
+        EMBEDDED_LYCHEE_CONFIG,
+        "lychee",
+    ) {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("lychee: {error}");
+            return false;
+        }
+    };
     let mut inputs = Vec::with_capacity(files.len());
     for path in files {
         let Some(relative) = pathdiff::diff_paths(path, root) else {
@@ -2780,11 +2886,23 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     }
 
     let mut command = Command::new("lychee");
-    command
-        .current_dir(root)
-        .arg("--config")
-        .arg(root.join("tools/validation/documentation/config/lychee.toml"))
-        .args(inputs);
+    command.current_dir(root).arg("--config").arg(config.path());
+    if let Some(template_profile) = template_profile {
+        let base_path = root.join("experiments").join(template_profile);
+        let mut base_url = base_path.into_os_string();
+        let separator = std::path::MAIN_SEPARATOR.to_string();
+        base_url.push(separator.as_str());
+        let remap = format!(
+            "^(file:.*)/experiments/{template_profile}(/.*)$ $1/templates/experiments/{template_profile}$2"
+        );
+        command
+            .arg("--no-progress")
+            .arg("--base-url")
+            .arg(base_url)
+            .arg("--remap")
+            .arg(remap);
+    }
+    command.args(inputs);
     run_native_command("lychee", &mut command)
 }
 
