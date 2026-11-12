@@ -864,12 +864,12 @@ entries:
 
   - id: eval-accumulation-check
     summary: Validates append-only AgentCanon hook results and registered eval-family accumulation.
-    path: eval/checkers/eval_accumulation_check.py
+    path: tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 eval/checkers/eval_accumulation_check.py
-    dispatch: {argv: ["python3", "eval/checkers/eval_accumulation_check.py"]}
+    command: tools/bin/agent-canon eval-accumulation-check
+    dispatch: {argv: ["tools/bin/agent-canon", "eval-accumulation-check"]}
     writes: false
     default_wiring:
       ci: true

@@ -128,7 +128,7 @@ the mounted `.agent-canon/log-archive/` archive. The source tree must not
 contain an `agents/evals/results/` result surface. They are validated by:
 
 ```bash
-python3 eval/checkers/eval_accumulation_check.py --root .
+tools/bin/agent-canon eval-accumulation-check --root .
 ```
 
 This gate checks structure, ignored-file status, JSONL readability, and unique

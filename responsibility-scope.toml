@@ -65,7 +65,6 @@ paths = [
   "documents/runtime/runtime-log-archive.md",
   "documents/runtime/runtime-log-archive-migration.md",
   "reports/**",
-  "eval/checkers/eval_accumulation_check.py",
   "tools/runtime/archive/runtime_log_archive_git.py",
   "tools/runtime/archive/runtime_log_paths.py",
   "tests/agent_tools/test_eval_accumulation_check.py",
@@ -82,7 +81,7 @@ paths = [
   "tests/agent_tools/test_skill_eval_report.py",
 ]
 protecting_tools = [
-  "eval/checkers/eval_accumulation_check.py",
+  "tools/runtime/dispatch/agent-canon/src/eval_accumulation_check.rs",
   "tools/runtime/archive/runtime_log_archive_git.py",
 ]
 issues = []
