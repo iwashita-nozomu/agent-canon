@@ -5,7 +5,7 @@
 # responsibility Verifies skill/dependency graph identities and its generated projections.
 # upstream design ../../documents/design/skill-tool-invocation-graph.md owns graph clauses SG-001..SG-015 and artifact readback
 # upstream implementation ../../tools/agent/skills/skill_dependency_map.py materializes skill and capability identities, edges, and Mermaid
-# upstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py validates generated JSON/Mermaid equality and stale artifacts
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs validates generated JSON/Mermaid equality and stale artifacts
 # downstream implementation ../../documents/runtime/skill-dependency-graph.json is the generated machine-readable graph projection
 # downstream implementation ../../documents/runtime/skill-dependency-graph.md is the generated Mermaid reader projection
 # @dependency-end
@@ -387,7 +387,7 @@ class SkillToolInvocationGraphTests(unittest.TestCase):
             markdown,
         )
         self.assertIn(
-            "downstream implementation ../../tools/validation/semantic/skills/check_skill_tool_invocation_graph.py",
+            "downstream implementation ../../tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs",
             markdown,
         )
         self.assertNotIn("base64", markdown.lower())
