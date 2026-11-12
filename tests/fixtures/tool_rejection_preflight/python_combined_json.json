@@ -140,7 +140,7 @@
       "path": "experiments/registry.toml"
     },
     {
-      "command": "if [ -e experiments/registry.toml ]; then python3 -m tools.validation.ci.checks.check_experiment_registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
+      "command": "if [ -e experiments/registry.toml ]; then tools/bin/agent-canon experiment-registry; else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; fi && python3 -m pytest tests/tools/test_run_managed_experiment.py -q",
       "gate": "experiment_execution_surface_guard",
       "handoff": "route planned edits through $experiment-lifecycle and $test-design; preserve the managed runner, registry checker, registry contract, and deterministic raw-only git-annex retention contract with lightweight registry and runner validation evidence",
       "path": "experiments/registry.toml"
