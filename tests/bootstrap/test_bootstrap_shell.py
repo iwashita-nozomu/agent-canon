@@ -2138,9 +2138,16 @@ def test_concurrent_target_add_serializes_resident_replacement(
     }
     assert {row[2] for row in mount_rows} == expected_targets
     assert all(row[0] == "target" and row[4] == "read-only" for row in mount_rows)
+    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
+    volume_name = f"agent-canon-runtime-{control_digest}"
+    imported_host_mounts = (
+        state_path.parent / f".fake-volume-{volume_name}" / "host-mounts.tsv"
+    )
+    assert imported_host_mounts.read_text(encoding="utf-8") == (
+        runtime / "container-state" / "mounts.tsv"
+    ).read_text(encoding="utf-8")
 
     docker_state = json.loads(state_path.read_text(encoding="utf-8"))
-    control_digest = hashlib.sha256(str(control.resolve()).encode("utf-8")).hexdigest()
     container_name = f"agent-canon-tools-{control_digest[:16]}"
     assert set(docker_state["containers"]) == {container_name}
     resident = docker_state["containers"][container_name]
@@ -2196,9 +2203,10 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
-        "script= input= volume=\n"
+        "script= input= volume= copy_name=\n"
         'while [ "$#" -gt 0 ]; do\n'
         '  case "$1" in\n'
+        "    --name) shift; copy_name=$1 ;;\n"
         "    --mount)\n"
         "      shift\n"
         "      spec=$1\n"
@@ -2220,6 +2228,23 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         '[ "$volume" = "$FAKE_VOLUME_NAME" ]\n'
         '[ -n "$script" ]\n'
         'script=$(printf "%s" "$script" | sed -e "s|/var/lib/agent-canon|$FAKE_VOLUME_ROOT|g" -e "s|/agent-canon-copy-input|$input|g")\n'
+        "export FAKE_COPY_NAME=$copy_name\n"
+        'if [ -n "${FAKE_VOLUME_IMPORT_BARRIER:-}" ] &&\n'
+        '   [ "${AGENT_CANON_COPY_DIRECTION:-}" = import ] &&\n'
+        '   [ "${AGENT_CANON_COPY_KIND:-}" = mount-registry ]; then\n'
+        '  script=$(printf "%s" "$script" | sed -e \'s/\\$\\$/1/g\')\n'
+        "  barrier_function='mv() {\n"
+        '    if [ "$1" = "-f" ] && [ "$2" = "--" ] &&\n'
+        '       [ "$4" = "$FAKE_VOLUME_ROOT/mount-registry.toml" ]; then\n'
+        '      : > "$FAKE_VOLUME_IMPORT_BARRIER/arrived-$FAKE_COPY_NAME"\n'
+        '      while [ "$(find "$FAKE_VOLUME_IMPORT_BARRIER" -type f -name "arrived-*" | wc -l)" -lt 2 ]; do\n'
+        "        sleep 0.01\n"
+        "      done\n"
+        "    fi\n"
+        '    command mv "$@"\n'
+        "  }'\n"
+        '  script="$barrier_function\n$script"\n'
+        "fi\n"
         'exec /bin/sh -c "$script"\n',
         encoding="utf-8",
     )
@@ -2234,6 +2259,47 @@ def test_volume_copy_runs_embedded_helper_with_real_posix_shell(tmp_path: Path) 
         f"AGENT_CANON_RUNTIME_ROOT={str(runtime)!r}; "
         "AGENT_CANON_IMAGE_REF=image; "
     )
+    parallel_import_source = tmp_path / "parallel-mounts.toml"
+    parallel_import_source.write_text('schema = "parallel"\n', encoding="utf-8")
+    parallel_import_destination = volume_root / "mount-registry.toml"
+    parallel_import_destination.write_text('schema = "stale"\n', encoding="utf-8")
+    parallel_import_barrier = tmp_path / "parallel-import-barrier"
+    parallel_import_barrier.mkdir()
+    import_command = (
+        common
+        + f"_agent_canon_volume_copy import mount-registry {str(parallel_import_source)!r}"
+    )
+    parallel_environment = {
+        **os.environ,
+        "FAKE_VOLUME_NAME": volume_name,
+        "FAKE_VOLUME_ROOT": str(volume_root),
+        "FAKE_VOLUME_IMPORT_BARRIER": str(parallel_import_barrier),
+    }
+    importers = [
+        subprocess.Popen(
+            ["bash", "-c", import_command],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=parallel_environment,
+        )
+        for _ in range(2)
+    ]
+    import_results = []
+    try:
+        import_results = [process.communicate(timeout=30) for process in importers]
+    finally:
+        for process in importers:
+            if process.poll() is None:
+                process.kill()
+                process.communicate(timeout=10)
+    assert [process.returncode for process in importers] == [0, 0], import_results
+    assert parallel_import_destination.read_text(encoding="utf-8") == (
+        'schema = "parallel"\n'
+    )
+    assert len(list(parallel_import_barrier.glob("arrived-*"))) == 2
+    assert list(volume_root.glob("mount-registry.toml.*")) == []
+
     result = subprocess.run(
         [
             "bash",
@@ -4463,10 +4529,10 @@ exit "$rc"
         ("private-log", ["mount-registry", "host-mounts", "private-log"]),
     ],
 )
-def test_public_exec_stops_when_existing_resident_host_input_import_fails(
+def test_public_start_stops_when_existing_resident_host_input_import_fails(
     tmp_path: Path, failed_kind: str, attempted_kinds: list[str]
 ) -> None:
-    """A failed ordered volume import must stop ensure before controller exec."""
+    """A failed lifecycle import must stop start before controller exec."""
     _state, _owned, repository, control, runtime, state_path, _name, environment = (
         _gc_fixture(tmp_path)
     )
@@ -4474,8 +4540,6 @@ def test_public_exec_stops_when_existing_resident_host_input_import_fails(
         ["git", "-C", str(repository), "remote", "add", "origin", str(repository)],
         check=True,
     )
-    target = tmp_path / "target"
-    target.mkdir()
     state_root = runtime / "container-state"
     (state_root / "mounts.toml").write_text(
         'schema = "agent-canon.mount-registry.v2"\n', encoding="utf-8"
@@ -4540,7 +4604,7 @@ source {str(ADAPTER)!r}
 _agent_canon_validate_existing_container() {{ :; }}
 bootstrap_host_entrypoint {str(repository)!r} \\
   --control-parent-root {str(control)!r} \\
-  exec --root {str(target)!r} -- agent-canon --version
+  start
 """
 
     completed = subprocess.run(
@@ -4832,8 +4896,12 @@ _agent_canon_validate_existing_container() {{
   : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.validation"
 }}
 _agent_canon_ensure_container() {{
+  : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.ensure-${{1:-default}}"
   _agent_canon_validate_existing_container "$(_agent_canon_container_name)"
   _agent_canon_container_name
+}}
+_agent_canon_import_host_inputs() {{
+  : > "$AGENT_CANON_TEST_TRACKER/$AGENT_CANON_TEST_ROUTE.host-input-import"
 }}
 _agent_canon_private_feedback_sync() {{
   [[ "$1" == "$(_agent_canon_container_name)" ]] || return 90
@@ -4932,6 +5000,8 @@ def test_ordinary_exec_readers_share_lock_and_block_replacement(
         )
         assert (tracker / "reader-one.selection").exists()
         assert (tracker / "reader-one.validation").exists()
+        assert (tracker / "reader-one.ensure-0").exists()
+        assert not (tracker / "reader-one.host-input-import").exists()
 
         second = _start_generation_route(
             repository,
@@ -4946,6 +5016,8 @@ def test_ordinary_exec_readers_share_lock_and_block_replacement(
         )
         assert (tracker / "reader-two.selection").exists()
         assert (tracker / "reader-two.validation").exists()
+        assert (tracker / "reader-two.ensure-0").exists()
+        assert not (tracker / "reader-two.host-input-import").exists()
 
         lock_path = runtime / "host-state" / "replacement.lock"
         exclusive_probe = subprocess.run(
@@ -4984,6 +5056,8 @@ def test_ordinary_exec_readers_share_lock_and_block_replacement(
         assert second.returncode == 0, second_error or second_output
         assert (tracker / "reader-one.feedback").exists()
         assert (tracker / "reader-two.feedback").exists()
+        assert not (tracker / "reader-one.host-input-import").exists()
+        assert not (tracker / "reader-two.host-input-import").exists()
     finally:
         for role in ("reader-one", "reader-two", "writer"):
             (tracker / f"{role}.release-exec").touch()
@@ -5044,6 +5118,7 @@ def test_ordinary_exec_waits_for_writer_and_failure_releases_lock(
         )
         assert (tracker / "reader-fails.selection").exists()
         assert (tracker / "reader-fails.validation").exists()
+        assert (tracker / "reader-fails.ensure-0").exists()
 
         (tracker / "writer-two.release-replacement").touch()
         second_writer = _start_replacement_lock_holder(
@@ -5060,6 +5135,7 @@ def test_ordinary_exec_waits_for_writer_and_failure_releases_lock(
         reader_output, reader_error = reader.communicate(timeout=120)
         assert reader.returncode == 42, reader_error or reader_output
         assert not (tracker / "reader-fails.feedback").exists()
+        assert not (tracker / "reader-fails.host-input-import").exists()
 
         _wait_for_generation_marker(
             tracker / "writer-two.replacement-entered", (second_writer,)

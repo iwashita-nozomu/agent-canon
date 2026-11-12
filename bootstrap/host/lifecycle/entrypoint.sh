@@ -1497,7 +1497,8 @@ elif [ "$direction" = import ]; then
   esac
   if [ "$expected" = file ]; then
     [ -f "$input" ] && [ ! -L "$input" ] || exit 65
-    temporary="$destination.$$"
+    temporary=$(mktemp "${destination}.XXXXXX") || exit 83
+    trap "rm -f -- \"\$temporary\"" 0
     cp -- "$input" "$temporary"
     [ -n "$digest" ] && [ "$(file_digest "$temporary")" = "$digest" ] || exit 82
     chmod "$mode" "$temporary"
@@ -1747,6 +1748,7 @@ _agent_canon_publish_controller_projection() {
     fi
   done
   rmdir "$staging" 2>/dev/null || true
+  _agent_canon_import_host_inputs
 }
 
 _agent_canon_prepare_clean_install() {
@@ -2691,6 +2693,7 @@ _agent_canon_git_mounts() {
 }
 
 _agent_canon_ensure_container() {
+  local import_host_inputs=${1:-1}
   local container=$(_agent_canon_container_name)
   AGENT_CANON_STATE_VOLUME_NAME="${AGENT_CANON_STATE_VOLUME_NAME:-agent-canon-runtime-$(_agent_canon_control_digest)}"
   export AGENT_CANON_STATE_VOLUME_NAME
@@ -2735,10 +2738,15 @@ _agent_canon_ensure_container() {
     _agent_canon_validate_existing_container "$container"
     local validate_rc=$?
     ((validate_rc == 0)) || return "$validate_rc"
-    if "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
+    if [[ "$import_host_inputs" == 1 ]] &&
+       "$AGENT_CANON_DOCKER_CMD" volume inspect "$AGENT_CANON_STATE_VOLUME_NAME" >/dev/null 2>&1; then
       _agent_canon_import_host_inputs || return $?
     fi
   else
+    if [[ "$import_host_inputs" != 1 ]]; then
+      _agent_canon_json_error runtime_unavailable "resident is unavailable for tool execution"
+      return 2
+    fi
     local caller_user
     caller_user=$(_agent_canon_caller_user)
     if _agent_canon_init_state_volume; then
@@ -3811,6 +3819,10 @@ _agent_canon_update() {
 }
 
 _agent_canon_ensure_start_resident() {
+  _agent_canon_with_replacement_lock _agent_canon_ensure_start_resident_locked
+}
+
+_agent_canon_ensure_start_resident_locked() {
   local container=$(_agent_canon_container_name)
   if "$AGENT_CANON_DOCKER_CMD" container inspect "$container" >/dev/null 2>&1; then
     _agent_canon_classify_existing_container "$container"
@@ -3822,7 +3834,7 @@ _agent_canon_ensure_start_resident() {
       # Start has no new image candidate. Reuse the active image through the
       # same serialized replacement path so stale mounts/security are rebuilt
       # from the current manifest before the requested start transition.
-      _agent_canon_replace_resident "$AGENT_CANON_IMAGE_REF" start >/dev/null
+      _agent_canon_replace_resident_locked "$AGENT_CANON_IMAGE_REF" start >/dev/null
       printf '%s\n' "$container"
     fi
   else
@@ -4106,6 +4118,7 @@ _agent_canon_private_feedback_sync() {
   done
 
   local volume_cleanup_rc=0 host_snapshot_after
+  _agent_canon_volume_copy import private-log "$log_root" || return $?
   host_snapshot_after=$(_agent_canon_path_digest "$spool" 2>/dev/null || true)
   if [[ "$host_snapshot_after" == "$snapshot_digest" ]]; then
     rm -rf -- "$spool" || volume_cleanup_rc=2
@@ -4202,6 +4215,7 @@ _agent_canon_archive_eval_sync() {
     --remote "${AGENT_CANON_LOG_REMOTE:-git@github.com:iwashita-nozomu/agent-canon-log.git}" \
     archive-eval --spool-root "$spool" --run-id "$run_id" || adapter_rc=$?
   ((adapter_rc == 0)) || return "$adapter_rc"
+  _agent_canon_volume_copy import private-log "$AGENT_CANON_PRIVATE_LOG_ROOT" || return $?
   host_snapshot_after=$(_agent_canon_path_digest "$spool" 2>/dev/null || true)
   if [[ "$host_snapshot_after" != "$snapshot_digest" ]]; then
     printf '{"schema":"agent-canon.bootstrap-receipt.v2","status":"warning","operation":"eval_sync","code":"published_cleanup_retained","execution_plane":"host_archive_adapter","run_id":"%s"}\n' \
@@ -5123,7 +5137,7 @@ _agent_canon_exec_tool_route_locked() {
   local -a command_args=("$@")
   _agent_canon_use_active_image "$(_agent_canon_container_name)"
   local container
-  container=$(_agent_canon_ensure_container)
+  container=$(_agent_canon_ensure_container 0)
   if [[ "$operation" == exec ]] && _agent_canon_exec_is_structured_request; then
     _agent_canon_extract_exec_target_digest
     _agent_canon_validate_private_log_mount "$container"
@@ -5313,13 +5327,6 @@ bootstrap_host_entrypoint() {
     return $?
   fi
   _agent_canon_prepare_host_runtime
-  if [[ "$operation" == update ]]; then
-    # mounts.tsv is the host-owned projection consumed before the resident
-    # controller runs.  Drop only syntactically valid target rows whose
-    # source is already gone, so candidate creation can converge instead of
-    # failing on stale derived state.
-    _agent_canon_prune_stale_target_manifest
-  fi
   local index
   for index in "${!command_args[@]}"; do
     if [[ "${command_args[index]}" == --image-ref && $((index + 1)) -lt ${#command_args[@]} ]]; then
@@ -5504,7 +5511,7 @@ bootstrap_host_entrypoint() {
       fi
       _agent_canon_use_active_image "$(_agent_canon_container_name)"
       local codex_container codex_prepare_rc=0
-      codex_container=$(_agent_canon_ensure_container)
+      codex_container=$(_agent_canon_ensure_container 0)
       _agent_canon_run_controller "$codex_container" codex prepare || codex_prepare_rc=$?
       ((codex_prepare_rc == 0)) || return "$codex_prepare_rc"
       _agent_canon_volume_copy export codex-home "$AGENT_CANON_STATE_ROOT/codex-home"
@@ -5555,8 +5562,10 @@ bootstrap_host_entrypoint() {
     exec|tool)
       local exec_tool_rc=0
       set +e
-      _agent_canon_with_replacement_lock --shared \
-        _agent_canon_exec_tool_route_locked "$operation" "${command_args[@]}"
+      (
+        _agent_canon_with_replacement_lock --shared \
+          _agent_canon_exec_tool_route_locked "$operation" "${command_args[@]}"
+      )
       exec_tool_rc=$?
       set -e
       if ((exec_tool_rc == 0)) &&
@@ -5580,7 +5589,7 @@ bootstrap_host_entrypoint() {
       if [[ "$operation" == start ]]; then
         container=$(_agent_canon_ensure_start_resident)
       else
-        container=$(_agent_canon_ensure_container)
+        container=$(_agent_canon_ensure_container 0)
       fi
       if [[ "$operation" == template || "$operation" == eval ]]; then
         _agent_canon_rewrite_target_args "${command_args[@]}"
