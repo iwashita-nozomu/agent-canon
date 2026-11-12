@@ -4,7 +4,7 @@
 # contract test
 # responsibility Tests argument privacy for projection-independent hook observations.
 # upstream implementation ../../tools/runtime/dispatch/agent-canon/src/hook_dispatcher.rs owns native dispatch and projection.
-# upstream implementation ../../tools/agent/orchestration/tool_selection.py owns command evidence.
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/tool_selection.rs owns command evidence.
 # upstream implementation test_codex_hooks.py owns isolated hook fixtures.
 # @dependency-end
 
@@ -54,6 +54,7 @@ class CodexHookCommandPrivacyTest(unittest.TestCase):
                 for value in (marker, "private-stdout", "private-stderr"):
                     self.assertNotIn(value, json.dumps(event))
                 self.assertNotIn("tool_response", event)
+
 
 if __name__ == "__main__":
     unittest.main()

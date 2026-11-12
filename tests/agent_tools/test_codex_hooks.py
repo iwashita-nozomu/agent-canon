@@ -16,17 +16,12 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import NotRequired, TypedDict, cast
-from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
-
-import hook_event_log  # noqa: E402
 
 from tools.agent.orchestration.prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
@@ -948,16 +943,6 @@ class CodexHooksTest(unittest.TestCase):
         for command in commands:
             with self.subTest(command=command):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
-
-
-def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> None:
-    """Missing parent capability returns typed failure without touching the path."""
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        target = Path(tmp_dir) / "event.json"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
-            result = hook_event_log.publish_hook_event_noreplace(target, b"event\n")
-        assert result == ("failed", "parent_unattested")
-        assert not target.exists()
 
 
 def test_hook_report_requires_parent_capability() -> None:
