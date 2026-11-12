@@ -2767,6 +2767,39 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     if files.is_empty() {
         return true;
     }
+
+    let python_template_root = root.join("templates/experiments/_template");
+    let cpp_template_root = root.join("templates/experiments/_cpp_template");
+    let mut ordinary_files = Vec::new();
+    let mut python_template_files = Vec::new();
+    let mut cpp_template_files = Vec::new();
+    for path in files {
+        if path.starts_with(&python_template_root) {
+            python_template_files.push(path.clone());
+        } else if path.starts_with(&cpp_template_root) {
+            cpp_template_files.push(path.clone());
+        } else {
+            ordinary_files.push(path.clone());
+        }
+    }
+
+    let mut succeeded = true;
+    if !ordinary_files.is_empty() {
+        succeeded &= run_lychee_group(root, &ordinary_files, None);
+    }
+    if !python_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &python_template_files, Some("_template"));
+    }
+    if !cpp_template_files.is_empty() {
+        succeeded &= run_lychee_group(root, &cpp_template_files, Some("_cpp_template"));
+    }
+    succeeded
+}
+
+fn run_lychee_group(root: &Path, files: &[PathBuf], template_profile: Option<&str>) -> bool {
+    if files.is_empty() {
+        return true;
+    }
     let mut inputs = Vec::with_capacity(files.len());
     for path in files {
         let Some(relative) = pathdiff::diff_paths(path, root) else {
@@ -2783,8 +2816,23 @@ fn run_lychee(root: &Path, files: &[PathBuf]) -> bool {
     command
         .current_dir(root)
         .arg("--config")
-        .arg(root.join("tools/validation/documentation/config/lychee.toml"))
-        .args(inputs);
+        .arg(root.join("tools/validation/documentation/config/lychee.toml"));
+    if let Some(template_profile) = template_profile {
+        let base_path = root.join("experiments").join(template_profile);
+        let mut base_url = base_path.into_os_string();
+        let separator = std::path::MAIN_SEPARATOR.to_string();
+        base_url.push(separator.as_str());
+        let remap = format!(
+            "^(file:.*)/experiments/{template_profile}(/.*)$ $1/templates/experiments/{template_profile}$2"
+        );
+        command
+            .arg("--no-progress")
+            .arg("--base-url")
+            .arg(base_url)
+            .arg("--remap")
+            .arg(remap);
+    }
+    command.args(inputs);
     run_native_command("lychee", &mut command)
 }
 

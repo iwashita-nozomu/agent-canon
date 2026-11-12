@@ -1,7 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests Codex agent role eval automation.
-# upstream implementation ../../eval/producers/evaluate_codex_agent_roles.py helper
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs native producer
 # upstream design ../../eval/definitions/README.md role eval contract
 # @dependency-end
 """Tests for Codex agent role eval automation."""
@@ -24,7 +24,7 @@ else:
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_ROOT / "eval" / "producers" / "evaluate_codex_agent_roles.py"
+SCRIPT = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from tools.agent.orchestration.team_config import (
@@ -419,7 +419,7 @@ PRE_CHANGE_LIVE_GOLDEN = {
 def run_eval(*args: str) -> subprocess.CompletedProcess[str]:
     """Run the role eval helper."""
     return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
+        [str(SCRIPT), "evaluate-codex-agent-roles", *args],
         cwd=PROJECT_ROOT,
         check=False,
         capture_output=True,
@@ -676,6 +676,57 @@ class CodexAgentRoleEvalTest(unittest.TestCase):
                 "skill-evaluator-only-in-skill-evaluation",
                 result.stdout,
             )
+
+    def test_routing_rejects_unknown_task_and_default_pack_roles(self) -> None:
+        """Unknown roles remain invalid instead of being removed from the evaluation."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    task = next(task for task in catalog["tasks"] if task["id"] == "T1")
+                    task["specialists"].append("ghost_role")
+                    expected = "not declared in family"
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append("ghost_role")
+                    expected = "unknown role: ghost_role"
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(expected, result.stderr)
+
+    def test_routing_rejects_non_string_specialist_entries(self) -> None:
+        """Malformed role list items are rejected before role lookup."""
+        for source in ("task", "default_pack"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                copy_eval_root(root)
+                path = root / "agents" / "task_catalog.yaml"
+                catalog = yaml.safe_load(path.read_text(encoding="utf-8"))
+                if source == "task":
+                    next(task for task in catalog["tasks"] if task["id"] == "T1")[
+                        "specialists"
+                    ].append(7)
+                else:
+                    pack = next(
+                        pack
+                        for pack in catalog["review_packs"]
+                        if pack["id"] == "research_perspective_triage"
+                    )
+                    pack["default_for_tasks"] = ["T1"]
+                    pack["specialists"].append(7)
+                path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+                result = run_eval("--root", str(root))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("entries must be strings", result.stderr)
 
     def test_runtime_metrics_are_aggregated(self) -> None:
         """Optional JSONL runtime metrics should be summarized by agent."""

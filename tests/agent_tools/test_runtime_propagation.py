@@ -106,13 +106,15 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     environment.pop("AGENT_CANON_RUNTIME_ROOT", None)
     commands = (
         (
-            "evaluate_workflow_selection.py",
+            sys.executable,
+            str(ROOT / "eval/producers/evaluate_workflow_selection.py"),
             "--accumulate",
             "--runtime-root",
             str(runtime),
         ),
         (
-            "evaluate_codex_agent_roles.py",
+            str(ROOT / "tools/bin/agent-canon"),
+            "evaluate-codex-agent-roles",
             "--accumulate",
             "--runtime-root",
             str(runtime),
@@ -120,11 +122,7 @@ def test_eval_producers_leave_source_status_and_bytes_unchanged(tmp_path: Path) 
     )
     for command in commands:
         result = subprocess.run(
-            [
-                sys.executable,
-                str(ROOT / "eval" / "producers" / command[0]),
-                *command[1:],
-            ],
+            list(command),
             cwd=ROOT,
             check=False,
             capture_output=True,

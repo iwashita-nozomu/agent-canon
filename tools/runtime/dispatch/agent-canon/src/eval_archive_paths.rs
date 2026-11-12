@@ -103,6 +103,39 @@ pub fn mounted_log_archive_root(
     )
 }
 
+/// Resolve the existing active report family for a native Eval producer.
+pub(crate) fn eval_results_dir(
+    canon_root: &Path,
+    family: &str,
+    runtime_root: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let canon_root = agent_canon_root(canon_root)?;
+    Ok(log_archive_root(&canon_root, runtime_root)?
+        .join("eval-results")
+        .join(archive_safe_slug(family)))
+}
+
+/// Preserve the archive owner's declared marker-to-checkout mapping.
+pub(crate) fn agent_canon_root(root: &Path) -> Result<PathBuf, String> {
+    let resolved = crate::path_resolution::resolve_non_strict(root)?;
+    for (marker, depth) in [
+        ("tools/runtime/archive/runtime_log_paths.py", 3),
+        ("eval/definitions/README.md", 2),
+        ("documents/runtime-log-archive.md", 1),
+    ] {
+        let marker = resolved.join(marker);
+        if marker.is_file() {
+            let marker = crate::path_resolution::resolve_non_strict(&marker)?;
+            return marker
+                .ancestors()
+                .nth(depth + 1)
+                .map(Path::to_path_buf)
+                .ok_or_else(|| "archive source marker has insufficient parents".to_owned());
+        }
+    }
+    Ok(resolved)
+}
+
 /// Return the active and legacy-import eval directories for one family.
 pub fn eval_result_search_dirs(
     canon_root: &Path,
@@ -163,5 +196,51 @@ fn archive_safe_slug(value: &str) -> String {
         "unknown".to_owned()
     } else {
         slug.to_owned()
+    }
+}
+#[cfg(test)]
+mod source_root_tests {
+    use super::agent_canon_root;
+    use std::fs;
+
+    #[test]
+    fn each_declared_marker_maps_to_the_source_checkout() {
+        for marker in [
+            "tools/runtime/archive/runtime_log_paths.py",
+            "eval/definitions/README.md",
+            "documents/runtime-log-archive.md",
+        ] {
+            let temporary = tempfile::tempdir().unwrap();
+            let source = fs::canonicalize(temporary.path()).unwrap();
+            let path = source.join(marker);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "marker\n").unwrap();
+            assert_eq!(agent_canon_root(&source).unwrap(), source);
+        }
+    }
+
+    #[test]
+    fn consumer_root_is_retained_without_searching_vendor() {
+        let temporary = tempfile::tempdir().unwrap();
+        let source = fs::canonicalize(temporary.path()).unwrap();
+        let nested = source.join("vendor/agent-canon/eval/definitions");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(nested.join("README.md"), "marker\n").unwrap();
+        assert_eq!(agent_canon_root(&source).unwrap(), source);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolved_marker_identity_selects_the_actual_checkout() {
+        let temporary = tempfile::tempdir().unwrap();
+        let base = fs::canonicalize(temporary.path()).unwrap();
+        let source = base.join("source");
+        let alias = base.join("alias");
+        let relative = "eval/definitions/README.md";
+        fs::create_dir_all(source.join("eval/definitions")).unwrap();
+        fs::create_dir_all(alias.join("eval/definitions")).unwrap();
+        fs::write(source.join(relative), "marker\n").unwrap();
+        std::os::unix::fs::symlink(source.join(relative), alias.join(relative)).unwrap();
+        assert_eq!(agent_canon_root(&alias).unwrap(), source);
     }
 }

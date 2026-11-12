@@ -8,7 +8,7 @@
 # upstream design ../../documents/tools/README.md user-facing tool index
 # upstream design ../../tools/catalog.yaml structured tool catalog
 # upstream implementation ../../tools/runtime/archive/runtime_log_paths.py owns accumulated report destinations
-# upstream implementation ./evaluate_codex_agent_roles.py writes Codex agent role eval reports
+# upstream implementation ../../tools/runtime/dispatch/agent-canon/src/codex_agent_role_eval/mod.rs writes Codex agent role eval reports
 # upstream implementation ./evaluate_workflow_selection.py writes workflow selection eval reports
 # downstream implementation ../../tools/validation/ci/runners/run_all_checks.sh runs producers before accumulation validation
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml runs producers before accumulation validation
@@ -136,8 +136,8 @@ def build_producers(
         EvalProducer(
             "codex-agent-role",
             (
-                python_bin,
-                str(canon / "eval" / "producers" / "evaluate_codex_agent_roles.py"),
+                str(canon / "tools" / "bin" / "agent-canon"),
+                "evaluate-codex-agent-roles",
                 "--root",
                 str(root),
                 "--accumulate",

@@ -197,6 +197,7 @@ run_contracts() {
     tests.agent_tools.test_graph_client_source_projection \
     tests.agent_tools.test_search \
     tests.tools.test_notebook_quality \
+    tests.tools.test_docs_link_inputs \
     tests.agent_tools.test_check_solid_evidence \
     tests.agent_tools.test_check_semantic_responsibility_contract \
     tests.agent_tools.test_check_run_log_contract \
@@ -273,6 +274,7 @@ PY
       tests/agent_tools/test_eval_accumulation_check.py
   set +e
   env -u AGENT_CANON_HOOK_ARCHIVE_DIR -u AGENT_CANON_LOG_ROOT \
+    AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     python3 "${RUNTIME_ROOT}/eval/producers/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate \
       --root "${ROOT}" \
@@ -316,6 +318,7 @@ run_workflow_container() {
     tests/tools/test_agent_improvement_guide_workflow.py
   AGENT_CANON_NATIVE_BIN="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
     "${ROOT}/tools/bin/agent-canon" check-github-workflows --root "${ROOT}"
+  AGENT_CANON_CLI="${AGENT_CANON_CLI:-${AGENT_CANON_CACHE_ROOT}/bin/agent-canon}" \
   python3 -m pytest -p no:cacheprovider -q \
     tests/tools/test_bootstrap_container_contract.py \
     tests/tools/test_compile_cache.py \

@@ -67,6 +67,7 @@ KNOWN_SUBDIRS = (
 CONTAINER_RUNTIME_DIR = "container-runtime"
 CONTAINER_RUNTIME_DESTINATION = "/var/lib/agent-canon/runtime"
 RUFF_CACHE_DESTINATION = "/var/lib/agent-canon/cache/ruff"
+NATIVE_CLI_DESTINATION = "/var/lib/agent-canon/cache/bin/agent-canon"
 PRIVATE_LOG_DESTINATION = "/var/lib/agent-canon/private-log"
 REGISTRY_DESTINATION = "/var/lib/agent-canon/mount-registry.toml"
 SOURCE_SYNC_SCHEMA = "agent-canon.source-sync.v1"
@@ -2413,6 +2414,9 @@ class BootstrapRuntime:
                     environment={
                         "AGENT_CANON_TARGET_ROOT": target_path,
                         "AGENT_CANON_TASK_ROOT": target_path,
+                        "AGENT_CANON_NATIVE_BIN": os.environ.get(
+                            "AGENT_CANON_NATIVE_BIN", NATIVE_CLI_DESTINATION
+                        ),
                         **_target_git_environment(Path(target_path)),
                     },
                     timeout=int(self.manifest["container"]["task_timeout_seconds"]),
