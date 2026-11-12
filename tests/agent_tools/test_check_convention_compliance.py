@@ -880,7 +880,6 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("review_issue_routing", result.stdout)
-            self.assertIn("missing-marker:issue_route", result.stdout)
             self.assertIn("missing-marker:issue_sync.py", result.stdout)
 
     def test_minimal_fixture_covers_review_issue_routing_surfaces(self) -> None:

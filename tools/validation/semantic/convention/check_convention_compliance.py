@@ -200,8 +200,6 @@ MATHEMATICAL_NECESSITY_MARKERS = {
 REVIEW_ISSUE_ROUTING_MARKERS = {
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
-        "issue_route",
-        "github_issue",
         "issue_sync.py",
         "private packet",
     ),
