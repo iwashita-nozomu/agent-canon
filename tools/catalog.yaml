@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-sync-experiment-registry-context
+      selector: sync-experiment-registry-context
+      path: tools/runtime/dispatch/agent-canon/src/experiment_registry/context.rs
     - id: rust-check-skill-tool-invocation-graph
       selector: check-skill-tool-invocation-graph
       path: tools/runtime/dispatch/agent-canon/src/catalog/skill_dependency_graph.rs
@@ -1007,17 +1010,17 @@ entries:
   - id: create-experiment-topic
     public: true
     summary: Materializes one selected experiment topic package and its registry entry in an explicit target.
-    path: tools/experiments/lifecycle/create_experiment_topic.py
+    path: tools/runtime/dispatch/agent-canon/src/experiment_registry/create_experiment_topic.rs
     family: experiments
     role: experiment
     status: canonical
     audience: user
     placement: user_entrypoint
-    command: python3 tools/experiments/lifecycle/create_experiment_topic.py <topic>
+    command: tools/bin/agent-canon create-experiment-topic <topic>
     writes: true
     dispatch:
-      runtime: python
-      argv: [python3, tools/experiments/lifecycle/create_experiment_topic.py]
+      runtime: rust
+      argv: [tools/bin/agent-canon, create-experiment-topic]
       execution_plane: tool-container
       cwd: source-root
       env: allowlisted
