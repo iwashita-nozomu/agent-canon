@@ -1,0 +1,17 @@
+[server]
+host_kind = "linux"
+container_builder = "docker"
+codex_cli_required = true
+python_bin = "python3"
+
+[paths]
+workspace_root = "/srv/workspace"
+local_state_root = "/srv/local-state"
+
+[mounts.workspace_root]
+type = "cifs"
+required = true
+
+[mounts.local_state_root]
+type = "ext4"
+required = false

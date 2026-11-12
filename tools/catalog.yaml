@@ -52,6 +52,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-server-readiness
+      selector: server-readiness
+      path: tools/runtime/dispatch/agent-canon/src/server_readiness.rs
     - id: rust-version
       selector: --version
       path: tools/runtime/dispatch/agent-canon/src/main.rs
