@@ -28,4 +28,4 @@ bare repo / `post-receive` の共通モデル、push と remote freshness の確
 
 ## Related
 
-- `tools/repository/publish/push_origin.sh`
+- `agent-canon github-publish`
