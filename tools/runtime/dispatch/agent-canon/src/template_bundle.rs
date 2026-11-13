@@ -9,7 +9,7 @@
 // upstream implementation docs.rs shared semantic TOML traversal and producer-prefix policy
 // downstream implementation lib.rs shared native Template library
 // downstream implementation main.rs template-bundle CLI route
-// downstream implementation ../../../../analysis/dependencies/render_dependency_manifest_graph.py consumes the committed-tree CLI
+// downstream implementation dependency_manifest_graph.rs consumes the committed-tree CLI
 // downstream implementation native_release.rs source-bound release package verifier
 // downstream implementation template_tests.rs profile, Codex and native package oracles
 // downstream implementation ../tests/native_release_native.rs source-bound native release oracles
