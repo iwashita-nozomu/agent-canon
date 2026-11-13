@@ -577,6 +577,63 @@ fn source_capability_rejects_malformed_fields_and_escaping_paths() {
     }
 }
 
+#[test]
+fn source_capability_publishes_staged_directory_without_replacing_target() {
+    let root = TempRoot::new();
+    let staging = root.0.join("reports/.dependency-graph.staging-one");
+    let target = root.0.join("reports/dependency-graph");
+    fs::create_dir_all(&staging).expect("staging directory creates");
+    fs::write(staging.join("manifest.json"), "staged\n").expect("staged file writes");
+    let grant = capability(
+        &root.0,
+        &[
+            "reports/.dependency-graph.staging-one",
+            "reports/dependency-graph",
+        ],
+    );
+    if !cfg!(any(target_os = "linux", target_vendor = "apple")) {
+        let error = grant
+            .publish_directory_noreplace(&staging, &target)
+            .expect_err("unsupported atomic publication is explicit");
+        assert!(error
+            .to_string()
+            .contains("atomic directory publication without replacement is unavailable"));
+        assert!(staging.join("manifest.json").is_file());
+        assert!(!target.exists());
+        return;
+    }
+    grant
+        .publish_directory_noreplace(&staging, &target)
+        .expect("staged directory publishes atomically");
+    assert_eq!(
+        fs::read_to_string(target.join("manifest.json")).unwrap(),
+        "staged\n"
+    );
+
+    let replacement = root.0.join("reports/.dependency-graph.staging-two");
+    fs::create_dir(&replacement).expect("replacement staging directory creates");
+    fs::write(replacement.join("manifest.json"), "replacement\n")
+        .expect("replacement staged file writes");
+    let replacement_grant = capability(
+        &root.0,
+        &[
+            "reports/.dependency-graph.staging-two",
+            "reports/dependency-graph",
+        ],
+    );
+    assert!(replacement_grant
+        .publish_directory_noreplace(&replacement, &target)
+        .is_err());
+    assert_eq!(
+        fs::read_to_string(target.join("manifest.json")).unwrap(),
+        "staged\n"
+    );
+    assert_eq!(
+        fs::read_to_string(replacement.join("manifest.json")).unwrap(),
+        "replacement\n"
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn source_capability_rechecks_symlink_components_before_write_or_remove() {

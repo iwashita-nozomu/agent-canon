@@ -195,6 +195,88 @@ impl SourceMutationCapability {
         self.write_with(path, mode, false, false, writer)
     }
 
+    /// Atomically publish one approved staged directory without replacing a target.
+    pub fn publish_directory_noreplace(&self, staged: &Path, target: &Path) -> Result<()> {
+        let staged = self.assert_allowed(staged)?;
+        let target = self.assert_allowed(target)?;
+        let staged_parent = staged
+            .parent()
+            .ok_or_else(|| SourceMutationError::new("staged directory has no parent"))?;
+        let target_parent = target
+            .parent()
+            .ok_or_else(|| SourceMutationError::new("published directory has no parent"))?;
+        if staged_parent != target_parent {
+            return Err(SourceMutationError::new(
+                "staged and published directories must share a parent",
+            ));
+        }
+        let staged_name = staged
+            .file_name()
+            .ok_or_else(|| SourceMutationError::new("staged directory has no name"))?;
+        let target_name = target
+            .file_name()
+            .ok_or_else(|| SourceMutationError::new("published directory has no name"))?;
+        let relative_parent = staged_parent
+            .strip_prefix(&self.source_root)
+            .map_err(|_| SourceMutationError::new("directory publication parent escapes source"))?;
+        let mut parent = open_root_nofollow(&self.source_root).map_err(|error| {
+            SourceMutationError::new(format!("cannot open mutation source root: {error}"))
+        })?;
+        for component in relative_parent.components() {
+            let Component::Normal(component) = component else {
+                return Err(SourceMutationError::new(
+                    "directory publication parent is not canonical",
+                ));
+            };
+            parent = parent.open_dir_nofollow(component).map_err(|error| {
+                SourceMutationError::new(format!(
+                    "cannot open directory publication parent: {error}"
+                ))
+            })?;
+        }
+        let staged_metadata = parent.symlink_metadata(staged_name).map_err(|error| {
+            SourceMutationError::new(format!("cannot inspect staged directory: {error}"))
+        })?;
+        if !staged_metadata.is_dir() || staged_metadata.file_type().is_symlink() {
+            return Err(SourceMutationError::new(
+                "staged publication source must be a directory",
+            ));
+        }
+        match parent.symlink_metadata(target_name) {
+            Ok(_) => {
+                return Err(SourceMutationError::new(format!(
+                    "directory publication target already exists: {}",
+                    target.display()
+                )))
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(SourceMutationError::new(format!(
+                    "cannot inspect directory publication target: {error}"
+                )))
+            }
+        }
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+        let published = rustix::fs::renameat_with(
+            &parent,
+            staged_name,
+            &parent,
+            target_name,
+            rustix::fs::RenameFlags::NOREPLACE,
+        )
+        .map_err(io::Error::from);
+        #[cfg(not(any(target_os = "linux", target_vendor = "apple")))]
+        let published: io::Result<()> = Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "atomic directory publication without replacement is unavailable on this platform",
+        ));
+        published.map_err(|error| {
+            SourceMutationError::new(format!(
+                "cannot publish directory without replacement: {error}"
+            ))
+        })
+    }
+
     fn write_with(
         &self,
         path: &Path,

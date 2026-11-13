@@ -1168,6 +1168,9 @@ impl CliArgs {
 
 /// Run the native source-dependency review export and target-resolution commands.
 pub fn run(args: &[String]) -> i32 {
+    if args.first().is_some_and(|argument| argument == "cycles") {
+        return run_cycle_report(&args[1..]);
+    }
     if args
         .first()
         .is_some_and(|argument| argument == "resolve-targets")
@@ -1205,6 +1208,227 @@ pub fn run(args: &[String]) -> i32 {
     }
     println!("SOURCE_DEPENDENCY_EXPORT=pass authority=tracked-source");
     0
+}
+
+/// Return deterministic strongly-connected components for non-reference
+/// dependency edges, filtering only after the complete topology is known.
+/// The two-pass traversal follows Sharir (1981):
+/// https://doi.org/10.1016/0898-1221(81)90008-0 .
+fn cycle_components(
+    edges: &[SourceDependencyEdge],
+    selected: Option<&BTreeSet<String>>,
+) -> Vec<Vec<String>> {
+    let mut adjacency = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut reverse = BTreeMap::<String, BTreeSet<String>>::new();
+    for edge in edges {
+        if edge.kind == "reference" {
+            continue;
+        }
+        let (prerequisite, consumer) = if edge.direction == "upstream" {
+            (&edge.target, &edge.source)
+        } else {
+            (&edge.source, &edge.target)
+        };
+        adjacency
+            .entry(prerequisite.clone())
+            .or_default()
+            .insert(consumer.clone());
+        reverse
+            .entry(consumer.clone())
+            .or_default()
+            .insert(prerequisite.clone());
+        adjacency.entry(consumer.clone()).or_default();
+        reverse.entry(prerequisite.clone()).or_default();
+    }
+    let nodes = adjacency.keys().cloned().collect::<Vec<_>>();
+    let mut visited = BTreeSet::new();
+    let mut finished = Vec::new();
+    for node in &nodes {
+        if !visited.insert(node.clone()) {
+            continue;
+        }
+        let mut stack = vec![(node.clone(), 0usize)];
+        while let Some((current, next_index)) = stack.last_mut() {
+            let neighbors = adjacency
+                .get(current)
+                .map(|values| values.iter().collect::<Vec<_>>())
+                .unwrap_or_default();
+            if *next_index < neighbors.len() {
+                let neighbor = neighbors[*next_index].clone();
+                *next_index += 1;
+                if visited.insert(neighbor.clone()) {
+                    stack.push((neighbor, 0));
+                }
+            } else {
+                finished.push(current.clone());
+                stack.pop();
+            }
+        }
+    }
+
+    visited.clear();
+    let mut cycles = Vec::new();
+    for node in finished.into_iter().rev() {
+        if !visited.insert(node.clone()) {
+            continue;
+        }
+        let mut component = BTreeSet::new();
+        let mut pending = vec![node.clone()];
+        while let Some(current) = pending.pop() {
+            component.insert(current.clone());
+            for neighbor in reverse.get(&current).into_iter().flatten() {
+                if visited.insert(neighbor.clone()) {
+                    pending.push(neighbor.clone());
+                }
+            }
+        }
+        let is_self_cycle = adjacency
+            .get(&node)
+            .is_some_and(|neighbors| neighbors.contains(&node));
+        if (component.len() > 1 || is_self_cycle)
+            && selected.is_none_or(|scope| !component.is_disjoint(scope))
+        {
+            cycles.push(component.into_iter().collect::<Vec<_>>());
+        }
+    }
+    cycles.sort();
+    cycles
+}
+
+fn run_cycle_report(args: &[String]) -> i32 {
+    let mut edges_path = None;
+    let mut selected_path = None;
+    let mut scoped = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "-h" | "--help" => {
+                println!("usage: agent-canon source-dependency-graph cycles --edges PATH --selected PATH [--scoped]");
+                return 0;
+            }
+            "--scoped" => {
+                scoped = true;
+                index += 1;
+            }
+            flag @ ("--edges" | "--selected") => {
+                let Some(value) = args.get(index + 1) else {
+                    eprintln!("source-dependency-graph cycles: {flag}: expected one argument");
+                    return 2;
+                };
+                if flag == "--edges" {
+                    edges_path = Some(PathBuf::from(value));
+                } else {
+                    selected_path = Some(PathBuf::from(value));
+                }
+                index += 2;
+            }
+            argument => {
+                eprintln!("source-dependency-graph cycles: unrecognized argument: {argument}");
+                return 2;
+            }
+        }
+    }
+    let Some(edges_path) = edges_path else {
+        eprintln!("source-dependency-graph cycles: --edges is required");
+        return 2;
+    };
+    let selected = if scoped {
+        let Some(path) = selected_path else {
+            eprintln!("source-dependency-graph cycles: --selected is required with --scoped");
+            return 2;
+        };
+        match fs::read_to_string(path) {
+            Ok(value) => Some(value.lines().map(str::to_owned).collect::<BTreeSet<_>>()),
+            Err(error) => {
+                eprintln!("source-dependency-graph cycles: unable to read selected paths: {error}");
+                return 2;
+            }
+        }
+    } else {
+        None
+    };
+    let input = match fs::read_to_string(edges_path) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("source-dependency-graph cycles: unable to read edges: {error}");
+            return 2;
+        }
+    };
+    let edges = input
+        .lines()
+        .filter_map(|line| {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            (fields.len() == 4 && fields.iter().all(|field| !field.is_empty())).then(|| {
+                SourceDependencyEdge {
+                    direction: fields[0].to_owned(),
+                    kind: fields[1].to_owned(),
+                    source: fields[2].to_owned(),
+                    target: fields[3].to_owned(),
+                    reason: String::new(),
+                    line: 0,
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    let cycles = cycle_components(&edges, selected.as_ref());
+    for component in &cycles {
+        println!("dependency cycle includes {}", component.join(", "));
+    }
+    if cycles.is_empty() {
+        0
+    } else {
+        3
+    }
+}
+
+#[cfg(test)]
+mod cycle_tests {
+    use super::*;
+
+    fn edge(direction: &str, kind: &str, source: &str, target: &str) -> SourceDependencyEdge {
+        SourceDependencyEdge {
+            direction: direction.into(),
+            kind: kind.into(),
+            source: source.into(),
+            target: target.into(),
+            reason: String::new(),
+            line: 0,
+        }
+    }
+
+    #[test]
+    fn reports_full_topology_cycles_then_applies_selected_path_scope() {
+        let edges = vec![
+            edge("downstream", "implementation", "a", "b"),
+            edge("downstream", "implementation", "b", "a"),
+            edge("downstream", "design", "c", "d"),
+            edge("downstream", "design", "d", "c"),
+        ];
+        assert_eq!(
+            cycle_components(&edges, None),
+            vec![
+                vec!["a".to_owned(), "b".to_owned()],
+                vec!["c".to_owned(), "d".to_owned()]
+            ]
+        );
+        assert_eq!(
+            cycle_components(&edges, Some(&BTreeSet::from(["d".into()]))),
+            vec![vec!["c".to_owned(), "d".to_owned()]]
+        );
+    }
+
+    #[test]
+    fn reference_edges_do_not_create_ordering_cycles_and_self_cycles_remain_visible() {
+        let edges = vec![
+            edge("downstream", "implementation", "a", "b"),
+            edge("downstream", "reference", "b", "a"),
+            edge("upstream", "design", "self", "self"),
+        ];
+        assert_eq!(
+            cycle_components(&edges, None),
+            vec![vec!["self".to_owned()]]
+        );
+    }
 }
 
 fn run_resolve_targets(args: &[String]) -> i32 {

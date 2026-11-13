@@ -81,6 +81,7 @@ pub mod cpp_source_canonical_ir;
 pub mod cpp_template_to_lean;
 mod dashboard_render;
 mod dashboard_token_usage;
+pub mod dependency_manifest_graph;
 pub mod docs;
 pub mod entrypoint_composer;
 pub(crate) mod entrypoint_owner_map;

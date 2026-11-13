@@ -336,13 +336,13 @@ protects = [
 ]
 expected_route = [
   "run run_repo_dependency_review.sh --report-dir",
-  "render dependency_graph.tsv with render_dependency_manifest_graph.py",
+  "render dependency_graph.tsv with render-dependency-manifest-graph",
 ]
 forbidden_route = [
   "read raw full graph output as the only review artifact",
 ]
 linked_rules = [
-  "tools/analysis/dependencies/render_dependency_manifest_graph.py",
+  "tools/runtime/dispatch/agent-canon/src/dependency_manifest_graph.rs",
   "tools/analysis/dependencies/run_repo_dependency_review.sh",
   "tests/agent_tools/test_render_dependency_manifest_graph.py",
 ]

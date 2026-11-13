@@ -127,8 +127,8 @@ fields are derived by the parent and cannot be supplied as parent decisions by
 the evaluator. The parent also owns iteration convergence and final completion;
 neither is implied by `evaluation_status=pass`. The route requirements are:
 
-- `full` uses exactly `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json`.
-- `changed` uses exactly `python3 tools/analysis/dependencies/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
+- `full` uses exactly `tools/bin/agent-canon render-dependency-manifest-graph --root . --scope full --bundle-dir reports/dependency-graph --format json`.
+- `changed` uses exactly `tools/bin/agent-canon render-dependency-manifest-graph --root . --scope changed --bundle-dir reports/dependency-graph --format json`, and only when changed scope is explicit.
 - `--json` is invalid. The canonical graph owns dependency status and facts.
   The renderer performs one typed query and owns the six projections; no
   supplied-input or parser fallback exists.
