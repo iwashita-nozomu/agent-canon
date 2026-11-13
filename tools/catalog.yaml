@@ -53,6 +53,9 @@ runtime_schema:
   # one-file catalog entry below. Keeping this inventory here prevents the
   # dispatcher from silently dropping a first-class Rust route.
   rust_public_commands:
+    - id: rust-github-status-lifecycle
+      selector: github-status-lifecycle
+      path: tools/runtime/dispatch/agent-canon/src/github_status_lifecycle.rs
     - id: rust-skill-shim-evaluation
       selector: skill-shim-evaluation
       path: tools/runtime/dispatch/agent-canon/src/skill_shim_evaluation.rs
@@ -2517,12 +2520,12 @@ entries:
 
   - id: save-experiment-result-annex
     summary: Saves one experiment result as one deterministic git-annex archive.
-    path: tools/experiments/artifacts/save_experiment_result_annex.py
+    path: tools/runtime/dispatch/agent-canon/src/annex_retention.rs
     family: experiments
     role: experiment
     status: canonical
-    command: python3 -m tools.experiments.artifacts.save_experiment_result_annex
-    dispatch: {argv: ["python3", "-m", "tools.experiments.artifacts.save_experiment_result_annex"]}
+    command: tools/bin/agent-canon save-experiment-result-annex
+    dispatch: {runtime: rust, argv: ["tools/bin/agent-canon", "save-experiment-result-annex"]}
     writes: true
     default_wiring:
       ci: false
