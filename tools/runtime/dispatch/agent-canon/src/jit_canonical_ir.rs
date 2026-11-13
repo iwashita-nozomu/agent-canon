@@ -78,7 +78,7 @@ struct Args {
 
 enum ParseResult {
     Help,
-    Run(Args),
+    Run(Box<Args>),
 }
 
 fn parse_args(argv: &[String]) -> Result<ParseResult, String> {
@@ -159,7 +159,7 @@ fn parse_args(argv: &[String]) -> Result<ParseResult, String> {
     if args.out.is_none() {
         return Err("the following arguments are required: --out".into());
     }
-    Ok(ParseResult::Run(args))
+    Ok(ParseResult::Run(Box::new(args)))
 }
 
 #[derive(Debug)]
