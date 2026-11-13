@@ -101,6 +101,7 @@ pub mod log_repository_identity;
 pub mod lsp_code_analysis;
 pub mod native_release;
 pub mod owner_guarantee;
+pub mod parent_repository_audit;
 pub mod path_expansion;
 pub mod path_resolution;
 pub mod private_feedback;

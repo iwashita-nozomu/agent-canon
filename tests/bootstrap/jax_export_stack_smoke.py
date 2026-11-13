@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Checks jax export stack CI readiness.
-# upstream design ../../../README.md shared automation index
+# upstream design ../../README.md shared automation index
 # @dependency-end
 
 """Smoke-check the local jax.export + IREE stack and jaxlib C++ headers."""
@@ -43,7 +43,9 @@ def _to_host_array(value: object) -> np.ndarray:
     """Normalize one runtime result to a NumPy array."""
     if isinstance(value, tuple):
         if len(value) != 1:
-            raise RuntimeError(f"unexpected tuple result from IREE runtime: {len(value)} values")
+            raise RuntimeError(
+                f"unexpected tuple result from IREE runtime: {len(value)} values"
+            )
         return _to_host_array(value[0])
     if hasattr(value, "to_host"):
         return np.asarray(value.to_host())
@@ -130,9 +132,14 @@ def main() -> int:
     return 0
 
 
+def test_jax_export_stack() -> None:
+    """Exercise the existing fixed-input provider smoke through pytest."""
+    assert main() == 0
+
+
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:  # pragma: no cover - CLI error path
-        print(f"check_jax_export_stack.py: {exc}", file=sys.stderr)
+        print(f"jax_export_stack_smoke.py: {exc}", file=sys.stderr)
         raise

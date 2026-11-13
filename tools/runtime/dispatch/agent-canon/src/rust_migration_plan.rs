@@ -348,7 +348,6 @@ fn family_for(path: &str) -> &'static str {
         || path.starts_with("tools/analysis/hlo/")
         || path.starts_with("tools/analysis/numerical/")
         || path.starts_with("tools/experiments/")
-        || path.ends_with("/check_jax_export_stack.py")
     {
         return "experiment-proof";
     }
@@ -404,7 +403,7 @@ fn python_delegation(path: &str, text: &str) -> Option<&'static str> {
 }
 
 fn contract_work(path: &str, family: &str) -> Option<&'static str> {
-    if path.ends_with("/jit_canonical_ir.py") || path.ends_with("/check_jax_export_stack.py") {
+    if path.ends_with("/jit_canonical_ir.py") {
         Some("preserve dynamic CPython/JAX API through a reviewed native provider connection")
     } else if family == "ast-analysis" {
         Some(
@@ -484,16 +483,15 @@ fn external_providers(root: &Path, external: &mut Vec<ExternalRuntime>) -> Resul
             });
         }
     }
-    for path in [
-        "tools/analysis/proof/jit_canonical_ir.py",
-        "tools/validation/ci/checks/check_jax_export_stack.py",
-    ] {
-        if root.join(path).is_file() {
-            external.push(ExternalRuntime {
-                owner: path.to_string(), source: path.to_string(),
-                contract: "dynamic CPython/JAX runtime; AgentCanon implementation remains in migration scope".to_string(),
-            });
-        }
+    let path = "tools/analysis/proof/jit_canonical_ir.py";
+    if root.join(path).is_file() {
+        external.push(ExternalRuntime {
+            owner: path.to_string(),
+            source: path.to_string(),
+            contract:
+                "dynamic CPython/JAX runtime; AgentCanon implementation remains in migration scope"
+                    .to_string(),
+        });
     }
     Ok(())
 }
