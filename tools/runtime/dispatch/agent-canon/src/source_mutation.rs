@@ -299,6 +299,7 @@ impl SourceMutationCapability {
                 }
                 #[cfg(not(unix))]
                 let _ = mode;
+                #[cfg(unix)]
                 let published_identity = file
                     .metadata()
                     .map_err(|error| SourceMutationError::new(error.to_string()))?;
@@ -321,6 +322,7 @@ impl SourceMutationCapability {
                                 path.display()
                             ))
                         })?;
+                    #[cfg(unix)]
                     if let Err(error) = directory.open(".").and_then(|file| file.sync_all()) {
                         use cap_fs_ext::MetadataExt;
                         if let Ok(actual) = directory.symlink_metadata(&target_name) {
