@@ -83,7 +83,7 @@
     "tests/agent_tools/test_task_start_and_close.py",
     "tests/agent_tools/test_workflow_monitor.py",
     "tools/runtime/dispatch/agent-canon/src/agent_runtime_dashboard.rs",
-    "tools/agent_tools/report_artifact_checks.py",
+    "tools/runtime/dispatch/agent-canon/src/report_artifact_checks.rs",
     "tools/agent_tools/review_backlog_scan.sh",
     "tools/agent_tools/task_close.py",
     "tools/agent_tools/tool_rejection_preflight.py",

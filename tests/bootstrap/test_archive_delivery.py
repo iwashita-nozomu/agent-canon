@@ -21,6 +21,8 @@ def run_adapter(tmp_path: Path, script: str) -> subprocess.CompletedProcess[str]
         ["bash", "-c", f"source {shlex.quote(str(ADAPTER))}\n{script}"],
         env={
             **os.environ,
+            "AGENT_CANON_NATIVE_BIN": "",
+            "AGENT_CANON_CLI": "",
             "AGENT_CANON_STATE_ROOT": str(state),
             "AGENT_CANON_RUNTIME_ROOT": str(tmp_path),
             "AGENT_CANON_REPOSITORY_ROOT": str(tmp_path),
@@ -59,9 +61,16 @@ def test_source_sync_attempts_pending_delivery_independently(
     tmp_path: Path, fetch_status: int
 ) -> None:
     """Unchanged source and failed source fetch both attempt pending delivery."""
-    archive_owner = tmp_path / "tools/runtime/archive/runtime_log_archive_git.py"
-    archive_owner.parent.mkdir(parents=True)
-    archive_owner.write_text("# fixture archive owner entrypoint\n", encoding="utf-8")
+    archive_cli = tmp_path / "tools/bin/agent-canon"
+    archive_cli.parent.mkdir(parents=True)
+    archive_cli.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ ${1:-} == --version ]]; then exit 0; fi\n"
+        "[[ ${1:-} == runtime-log-archive-git ]] || exit 98\n"
+        "printf 'hook-sync\\n' >> \"$TEST_CALLS\"\n",
+        encoding="utf-8",
+    )
+    archive_cli.chmod(0o755)
     result = run_adapter(
         tmp_path,
         r"""
@@ -87,10 +96,6 @@ _agent_canon_archive_eval_sync() {
 }
 _agent_canon_private_feedback_sync() {
   printf 'feedback-sync\n' >> "$TEST_CALLS"
-}
-python3() {
-  [[ "$*" == *"sync --no-agent-reports --include-main-evals"* ]] || return 98
-  printf 'hook-sync\n' >> "$TEST_CALLS"
 }
 fixture_docker() { printf 'sha256:fixture\n'; }
 AGENT_CANON_DOCKER_CMD=fixture_docker

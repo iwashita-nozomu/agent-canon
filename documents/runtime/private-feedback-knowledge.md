@@ -22,7 +22,7 @@ The operational checkout is the private sibling of the AgentCanon install:
 The control root authorizes access but never selects this storage location.
 For the live installation this is `~/agent-canon-log`. The checkout
 is a private (`0700`) normal Git clone on the source-qualified stable branch
-resolved by `runtime_log_archive_git.py repo-key`, with the exact private
+resolved by `runtime-log-archive-git repo-key`, with the exact private
 remote. The log repository's `main` branch is schema/configuration content and
 is not the feedback content branch.
 Runtime data is written under the resident runtime root in the shared state
