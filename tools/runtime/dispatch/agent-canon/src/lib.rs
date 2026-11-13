@@ -65,6 +65,7 @@ pub mod artifacts;
 pub mod authority;
 pub mod catalog;
 pub mod chatgpt_codex_routing;
+pub mod check_proof_trace_alignment;
 pub mod code_template_rendering;
 pub mod codex_agent_role_eval;
 pub mod codex_runtime_summary;

@@ -22,6 +22,11 @@ environment supplies optional packages such as `pypdf`.
 The executable accepts `runtime`, `html-extract` with HTML bytes on stdin,
 `pdf-extract` with PDF bytes on stdin, and
 `trace-json <module-path> <symbol>`. Each operation writes one JSON result.
+The native `check-proof-trace-alignment` command selects the provider's
+`proof-trace-alignment` operation. That operation loads the existing trace
+mapping and uses CPython's standard AST APIs while Rust checks the contracts,
+source tokens, expression patterns, and branch/return counts. It emits the
+existing text or JSON report and exit code.
 Provider exceptions return status `fail` and exit code 1; invalid CLI arguments
 return exit code 2. The HTML operation uses the standard `HTMLParser` with
 callbacks implemented in Rust. The PDF operation calls the installed `pypdf`; trace loading

@@ -1,27 +1,30 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents check_proof_trace_alignment.py operator usage.
-upstream implementation ../../tools/validation/semantic/proof/check_proof_trace_alignment.py checks proof trace anchors.
+responsibility Documents check-proof-trace-alignment operator usage.
+upstream implementation ../../tools/runtime/dispatch/agent-canon/src/check_proof_trace_alignment.rs checks proof trace anchors.
 upstream design ../../agents/skills/formal-proof-workflow.md defines proof trace alignment policy.
 downstream implementation ../../tests/agent_tools/test_check_proof_trace_alignment.py tests CLI behavior.
 @dependency-end
 -->
 
-# check_proof_trace_alignment.py
+# check-proof-trace-alignment
 
-`check_proof_trace_alignment.py` verifies that a package-retained formal-proof
+`check-proof-trace-alignment` verifies that a package-retained formal-proof
 trace still points at the implementation code path claimed by its contracts.
-It does not prove the mathematical theorem. It checks trace hygiene before
-proof work proceeds.
+It checks recorded theorem references and source anchors before formal proof work.
 
 Use it from a repository root:
 
 ```bash
-python3 tools/validation/semantic/proof/check_proof_trace_alignment.py \
+agent-canon check-proof-trace-alignment \
   --root . \
   --trace-module python/<package>/proof_traces/<claim>_proof_trace.py
 ```
+
+The [native runtime provider](../../tools/runtime/python-provider/README.md)
+loads the existing Python trace and uses CPython's AST parser and unparser.
+The checker orchestration and validation logic are implemented in Rust.
 
 The checker reads `FORMAL_PROOF_TRACE` from the trace module and validates:
 
